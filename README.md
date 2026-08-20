@@ -1,4 +1,4 @@
-# Custom LLM Lab
+# Mucaro-AI
 
 Local-first prototype for a custom LLM workflow with file ingestion, source lineage, cited retrieval, mock/Claude model routing, and a Planning-to-Execution Gate.
 
@@ -7,7 +7,7 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 ### macOS/Linux
 
 ```bash
-cd custom-llm-lab
+cd mucaro-ai
 bash scripts/bootstrap_macos.sh
 ```
 
@@ -22,7 +22,7 @@ BOOTSTRAP_OK
 ### Windows PowerShell
 
 ```powershell
-cd custom-llm-lab
+cd mucaro-ai
 .\scripts\bootstrap_windows.ps1
 ```
 
@@ -123,7 +123,7 @@ The CLI exposes the same local ingestion, planning, validation, and cited-answer
 ```bash
 PYTHONPATH=.:backend python -m backend.app.cli ingest data/input
 PYTHONPATH=.:backend python -m backend.app.cli ask "How does source lineage work?" --format text
-PYTHONPATH=.:backend python -m backend.app.cli plan "Add a CLI capability" --input custom-llm-lab
+PYTHONPATH=.:backend python -m backend.app.cli plan "Add a CLI capability" --input mucaro-ai
 PYTHONPATH=.:backend python -m backend.app.cli validate
 ```
 
