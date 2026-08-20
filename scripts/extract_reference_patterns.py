@@ -46,7 +46,7 @@ def main() -> int:
         })
     (arch / "REFERENCE_FINDINGS.md").write_text("\n".join(findings), encoding="utf-8")
     with (arch / "PATTERN_MATRIX.csv").open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(matrix_rows[0].keys()))
+        writer = csv.DictWriter(f, fieldnames=list(matrix_rows[0].keys()), lineterminator="\n")
         writer.writeheader()
         writer.writerows(matrix_rows)
     (arch / "LICENSE_AUDIT.md").write_text(
