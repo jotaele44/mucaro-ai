@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro-ai.local/schemas/run_manifest.schema.json",
+  "title": "RunManifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "task_id", "state", "inputs", "outputs", "errors", "started_at"],
+  "properties": {
+    "run_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "state": {"type": "string", "enum": ["PLANNING", "READY_FOR_APPROVAL", "EXECUTING", "COMPLETE", "BLOCKED", "FAILED"]},
+    "inputs": {"type": "array", "items": {"type": "string"}},
+    "outputs": {"type": "array", "items": {"type": "string"}},
+    "errors": {"type": "array", "items": {"type": "string"}},
+    "started_at": {"type": "string"},
+    "completed_at": {"type": ["string", "null"]}
+  }
+}

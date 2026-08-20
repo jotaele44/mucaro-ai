@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro-ai.local/schemas/retrieval_result.schema.json",
+  "title": "RetrievalResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "query", "retrieved_chunks"],
+  "properties": {
+    "status": {"type": "string", "enum": ["RETRIEVAL_OK", "ERROR_NO_SOURCES", "ERROR_NO_RETRIEVAL_CONTEXT"]},
+    "query": {"type": "string", "minLength": 1},
+    "retrieved_chunks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["chunk_id", "source_id", "text", "score"],
+        "properties": {
+          "chunk_id": {"type": "string"},
+          "source_id": {"type": "string"},
+          "text": {"type": "string"},
+          "score": {"type": "number"}
+        }
+      }
+    }
+  }
+}

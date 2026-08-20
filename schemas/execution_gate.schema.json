@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro-ai.local/schemas/execution_gate.schema.json",
+  "title": "ExecutionGate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "mission", "active_vector", "state", "inputs_required", "inputs_available", "assumptions", "gaps", "risks", "plan_options", "recommended_mode", "readiness_percent", "approval_required", "approved_mode", "execution_trace_id", "created_at"],
+  "properties": {
+    "task_id": {"type": "string", "pattern": "^task_[a-f0-9]+$"},
+    "mission": {"type": "string", "minLength": 1},
+    "active_vector": {"type": "string", "minLength": 1},
+    "state": {"type": "string", "enum": ["PLANNING", "READY_FOR_APPROVAL", "EXECUTING", "COMPLETE", "BLOCKED"]},
+    "inputs_required": {"type": "array", "items": {"type": "string"}},
+    "inputs_available": {"type": "array", "items": {"type": "string"}},
+    "assumptions": {"type": "array", "items": {"type": "string"}},
+    "gaps": {"type": "array", "items": {"type": "string"}},
+    "risks": {"type": "array", "items": {"type": "string"}},
+    "plan_options": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["mode", "reason"], "properties": {"mode": {"type": "string"}, "reason": {"type": "string"}}}},
+    "recommended_mode": {"type": "string", "enum": ["MANUAL_MODE", "TERMINAL_MODE", "LOCAL_IN_CHAT_MODE", "CLAUDE_CODE_MODE", "GITHUB_PR_MODE", "DESIGN_MODE", "AUTOMATION_MODE"]},
+    "readiness_percent": {"type": "integer", "minimum": 0, "maximum": 100},
+    "approval_required": {"type": "boolean"},
+    "approved_mode": {"type": ["string", "null"]},
+    "execution_trace_id": {"type": ["string", "null"]},
+    "created_at": {"type": "string"}
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro-ai.local/schemas/document_chunk.schema.json",
+  "title": "DocumentChunk",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["chunk_id", "source_id", "chunk_index", "text", "char_start", "char_end", "metadata"],
+  "properties": {
+    "chunk_id": {"type": "string", "pattern": "^chunk_[a-f0-9]+$"},
+    "source_id": {"type": "string", "pattern": "^src_[a-f0-9]+$"},
+    "chunk_index": {"type": "integer", "minimum": 0},
+    "text": {"type": "string", "minLength": 1},
+    "char_start": {"type": "integer", "minimum": 0},
+    "char_end": {"type": "integer", "minimum": 1},
+    "metadata": {"type": "object", "additionalProperties": true}
+  }
+}

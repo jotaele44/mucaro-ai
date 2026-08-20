@@ -1,0 +1,10 @@
+repo,pattern,component,adopt_status,reason,risk_level,notes
+anthropics/claude-cookbooks,"Claude API examples, prompting, tool-use patterns",reference_architecture,CLEAN_ROOM_REIMPLEMENT,Use concepts while preserving custom source-lineage schema.,MEDIUM,NOT_CLONED_IN_SANDBOX
+anthropics/anthropic-retrieval-demo,Reference retrieval flow and cited context assembly,reference_architecture,CLEAN_ROOM_REIMPLEMENT,Use concepts while preserving custom source-lineage schema.,MEDIUM,NOT_CLONED_IN_SANDBOX
+anthropics/claude-quickstarts,Starter app/deployment structures,reference_architecture,CLEAN_ROOM_REIMPLEMENT,Use concepts while preserving custom source-lineage schema.,MEDIUM,NOT_CLONED_IN_SANDBOX
+anthropics/anthropic-sdk-python,Claude Python SDK integration patterns,reference_architecture,CLEAN_ROOM_REIMPLEMENT,Use concepts while preserving custom source-lineage schema.,MEDIUM,NOT_CLONED_IN_SANDBOX
+run-llama/llama_index,"RAG ingestion, indexing, retrieval abstractions",reference_architecture,CLEAN_ROOM_REIMPLEMENT,Use concepts while preserving custom source-lineage schema.,MEDIUM,NOT_CLONED_IN_SANDBOX
+chroma-core/chroma,Vector database abstraction,reference_architecture,CLEAN_ROOM_REIMPLEMENT,Use concepts while preserving custom source-lineage schema.,MEDIUM,NOT_CLONED_IN_SANDBOX
+BerriAI/litellm,Model router abstraction,reference_architecture,CLEAN_ROOM_REIMPLEMENT,Use concepts while preserving custom source-lineage schema.,MEDIUM,NOT_CLONED_IN_SANDBOX
+microsoft/graphrag,Graph/entity retrieval phase 2,reference_architecture,CLEAN_ROOM_REIMPLEMENT,Use concepts while preserving custom source-lineage schema.,MEDIUM,NOT_CLONED_IN_SANDBOX
+modelcontextprotocol/servers,External tool connector phase 2,reference_architecture,CLEAN_ROOM_REIMPLEMENT,Use concepts while preserving custom source-lineage schema.,MEDIUM,NOT_CLONED_IN_SANDBOX

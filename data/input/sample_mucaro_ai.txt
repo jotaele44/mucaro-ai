@@ -1,0 +1,7 @@
+Mucaro AI first-run sample.
+
+The Mucaro AI is a local-first prototype for planning-gated LLM workflows. It uses an Execution Gate before serious execution. The gate records the mission, active vector, required inputs, available inputs, assumptions, gaps, risks, plan options, recommended mode, readiness percent, approval state, and run trace.
+
+The v1 retrieval path is intentionally deterministic. Files are parsed, converted into stable chunks, retrieved lexically, answered in mock mode, and exported with source lineage. Every valid answer should include cited chunk IDs and source IDs.
+
+The first safe workflow is: run preflight, ingest sample data, ask a question, inspect cited chunks, validate JSON, then start the backend and frontend.

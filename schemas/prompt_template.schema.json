@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro-ai.local/schemas/prompt_template.schema.json",
+  "title": "PromptTemplate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["prompt_template_id", "name", "system_prompt", "user_prompt_template", "output_contract", "created_at"],
+  "properties": {
+    "prompt_template_id": {"type": "string", "minLength": 1},
+    "name": {"type": "string", "minLength": 1},
+    "system_prompt": {"type": "string", "minLength": 1},
+    "user_prompt_template": {"type": "string", "minLength": 1},
+    "output_contract": {"type": "object", "additionalProperties": true},
+    "created_at": {"type": "string"}
+  }
+}

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mucaro-ai"
+version = "0.1.0"
+description = "Local-first planning-gated LLM lab with source-lineage RAG and CLI workflows."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.128.2",
+    "uvicorn==0.48.0",
+    "pydantic==2.13.4",
+    "python-multipart==0.0.29",
+    "jsonschema==4.26.0",
+    "pypdf==6.4.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.0.2",
+]
+
+[project.scripts]
+mucaro = "backend.app.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["backend*"]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "backend"]
+testpaths = ["backend/tests"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.black]
+line-length = 120

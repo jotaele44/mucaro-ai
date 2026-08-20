@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro-ai.local/schemas/source_manifest.schema.json",
+  "title": "SourceManifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_id", "source_path", "source_sha256", "file_name", "mime_type", "parser", "ingested_at", "lineage_status", "chunk_count", "errors", "warnings"],
+  "properties": {
+    "source_id": {"type": "string", "pattern": "^src_[a-f0-9]+$"},
+    "source_path": {"type": "string", "minLength": 1},
+    "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "file_name": {"type": "string", "minLength": 1},
+    "mime_type": {"type": "string", "minLength": 1},
+    "parser": {"type": "string", "minLength": 1},
+    "ingested_at": {"type": "string"},
+    "lineage_status": {"type": "string", "enum": ["VALID", "PARTIAL", "FAILED"]},
+    "chunk_count": {"type": "integer", "minimum": 0},
+    "errors": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}
