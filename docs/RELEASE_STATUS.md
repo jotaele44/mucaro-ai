@@ -14,6 +14,7 @@ Observed success markers:
 - `npm run build` succeeded
 - `RELEASE_CHECK_OK`
 - `CERTIFY_RELEASE_OK` after dependency install, source-boundary scans, tests, JSON validation, frontend audit, and frontend build
+- `FRESH_CLONE_CERT_OK` after temporary clone install, release check, CLI help, launcher self-test, and desktop smoke test
 
 Local expected marker after first setup:
 

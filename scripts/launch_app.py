@@ -96,6 +96,25 @@ def start_backend(port: int) -> subprocess.Popen:
     return subprocess.Popen(cmd, cwd=ROOT, env=build_env())
 
 
+def stop_backend(proc: subprocess.Popen, port: int) -> bool:
+    if proc.poll() is None:
+        print("STOPPING_DESKTOP_BACKEND")
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=8)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=8)
+    deadline = time.time() + 4
+    while time.time() < deadline:
+        if not port_open(port):
+            print("DESKTOP_BACKEND_PORT_CLOSED")
+            return True
+        time.sleep(0.2)
+    print(f"ERROR_BACKEND_PORT_STILL_OPEN port={port}", file=sys.stderr)
+    return False
+
+
 def self_test() -> int:
     checks = {
         "ROOT_PRESENT": ROOT.exists(),
@@ -117,6 +136,8 @@ def main() -> int:
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--skip-build", action="store_true", help="Do not build frontend/dist if missing.")
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--smoke-test", action="store_true", help="Start, verify, stop, and exit without opening a long-running session.")
+    parser.add_argument("--hold-seconds", type=float, default=0.5, help="Seconds to hold a successful smoke-test backend before stopping.")
     parser.add_argument("--startup-timeout", type=float, default=20.0)
     args = parser.parse_args()
 
@@ -150,6 +171,17 @@ def main() -> int:
         webbrowser.open(url)
 
     print("DESKTOP_LAUNCH_OK press Ctrl+C to stop")
+    if args.smoke_test:
+        time.sleep(max(0.0, args.hold_seconds))
+        print("DESKTOP_SMOKE_READY")
+        if proc is not None:
+            ok = stop_backend(proc, args.port)
+            proc = None
+            if not ok:
+                return 9
+        print("DESKTOP_SMOKE_OK")
+        return 0
+
     try:
         while True:
             if proc is not None and proc.poll() is not None:
@@ -161,13 +193,7 @@ def main() -> int:
         return 0
     finally:
         if proc is not None and proc.poll() is None:
-            print("STOPPING_DESKTOP_BACKEND")
-            proc.send_signal(signal.SIGTERM)
-            try:
-                proc.wait(timeout=8)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait(timeout=8)
+            stop_backend(proc, args.port)
         print("DESKTOP_STOP_OK")
 
 

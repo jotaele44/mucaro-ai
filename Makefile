@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: bootstrap setup preflight test validate ingest ask cli serve release certify backend frontend dev-backend dev-frontend dev refs clean
+.PHONY: bootstrap setup preflight test validate ingest ask cli serve launch-smoke release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
 
 bootstrap:
 	bash scripts/bootstrap_macos.sh
@@ -30,11 +30,17 @@ cli:
 serve:
 	PYTHONPATH=.:backend $(PYTHON) scripts/mucaro.py serve --reload
 
+launch-smoke:
+	PYTHONPATH=.:backend $(PYTHON) scripts/launch_app.py --smoke-test --no-browser
+
 release:
 	PYTHONPATH=.:backend $(PYTHON) scripts/release_check.py
 
 certify:
 	PYTHONPATH=.:backend $(PYTHON) scripts/certify_release.py
+
+fresh-clone-cert:
+	$(PYTHON) scripts/certify_fresh_clone.py
 
 backend:
 	PYTHONPATH=.:backend uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000

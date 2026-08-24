@@ -74,6 +74,7 @@ python scripts/ingest_folder.py data/input
 python scripts/ask.py "What is the Execution Gate?"
 python scripts/validate_json.py
 python scripts/release_check.py
+python scripts/launch_app.py --smoke-test --no-browser
 ```
 
 ## Expected success markers
@@ -85,6 +86,7 @@ python scripts/release_check.py
 | `CITATION_OK` | The answer included source lineage |
 | `JSON_OK` | JSON schemas and exports validated |
 | `RELEASE_CHECK_OK` | The package passed local gates |
+| `DESKTOP_SMOKE_OK` | Desktop launcher started, passed health check, stopped, and closed its port |
 | `BOOTSTRAP_OK` | One-command setup completed |
 
 ## If something fails
@@ -101,6 +103,7 @@ Common failures:
 | `PY_IMPORT_MISSING` | Run `python -m pip install -r backend/requirements.txt` inside `.venv` |
 | `ERROR_FRONTEND_DEPS_MISSING` | Run `cd frontend && npm ci` |
 | `ERROR_NO_SOURCES` | Run `python scripts/ingest_folder.py data/input` |
+| `ERROR_PORT_IN_USE_NON_MUCARO_AI` | Choose another `--port` or stop the process using that port |
 
 ## First stable task
 

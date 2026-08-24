@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def run(cmd: list[str], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
+    print("RUN", " ".join(cmd))
+    return subprocess.run(cmd, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=check)
+
+
+def free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def origin_url() -> str:
+    proc = run(["git", "remote", "get-url", "origin"], cwd=ROOT)
+    return proc.stdout.strip()
+
+
+def assert_clean_worktree(repo: Path) -> None:
+    proc = run(["git", "status", "--short"], cwd=repo, check=False)
+    if proc.stdout.strip():
+        raise RuntimeError(f"FRESH_CLONE_DIRTY_WORKTREE\n{proc.stdout}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Certify Mucaro AI from a fresh clone and smoke-test desktop launch.")
+    parser.add_argument("--source", default=None, help="Git clone source. Defaults to origin URL.")
+    parser.add_argument("--ref", default="main", help="Branch, tag, or commit to checkout after clone.")
+    parser.add_argument("--keep", action="store_true", help="Keep temporary clone for debugging.")
+    args = parser.parse_args()
+
+    source = args.source or origin_url()
+    temp_root = Path(tempfile.mkdtemp(prefix="mucaro-ai-fresh-clone-"))
+    clone_dir = temp_root / "mucaro-ai"
+    try:
+        run(["git", "clone", "--depth", "1", "--branch", args.ref, source, str(clone_dir)], cwd=temp_root)
+        python = sys.executable
+        venv = clone_dir / ".venv"
+        run([python, "-m", "venv", str(venv)], cwd=clone_dir)
+        venv_python = venv / "bin" / "python"
+        venv_mucaro = venv / "bin" / "mucaro"
+        run([str(venv_python), "-m", "pip", "install", "--upgrade", "pip"], cwd=clone_dir)
+        run([str(venv_python), "-m", "pip", "install", "-e", ".[dev]"], cwd=clone_dir)
+        run(["npm", "ci", "--registry=https://registry.npmjs.org/"], cwd=clone_dir / "frontend")
+        run([str(venv_python), "scripts/release_check.py"], cwd=clone_dir)
+        run([str(venv_mucaro), "--help"], cwd=clone_dir)
+        run([str(venv_python), "scripts/launch_app.py", "--self-test"], cwd=clone_dir)
+        port = free_port()
+        run([
+            str(venv_python),
+            "scripts/launch_app.py",
+            "--smoke-test",
+            "--no-browser",
+            "--port",
+            str(port),
+            "--startup-timeout",
+            "30",
+        ], cwd=clone_dir)
+        assert_clean_worktree(clone_dir)
+        print(f"FRESH_CLONE_CERT_OK path={clone_dir}")
+        return 0
+    except Exception as exc:
+        print(f"FRESH_CLONE_CERT_FAILED {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        if args.keep:
+            print(f"FRESH_CLONE_KEPT {clone_dir}")
+        else:
+            shutil.rmtree(temp_root, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
