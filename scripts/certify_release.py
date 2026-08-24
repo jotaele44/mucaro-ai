@@ -117,6 +117,7 @@ def main() -> int:
         gate_no_large_files(files),
         gate_no_generated_tracked(files),
         gate_command("python_tests", [sys.executable, "-m", "pytest", "backend/tests", "-q"]),
+        gate_command("retrieval_eval", [sys.executable, "scripts/evaluate_retrieval.py"]),
         gate_command("json_validation", [sys.executable, "scripts/validate_json.py"]),
         gate_command("npm_audit", ["npm", "audit", "--audit-level=moderate"], cwd=ROOT / "frontend"),
         gate_command("frontend_build", ["npm", "run", "build"], cwd=ROOT / "frontend"),

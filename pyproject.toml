@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mucaro-ai"
-version = "0.1.2"
+version = "0.1.3"
 description = "Local-first planning-gated LLM lab with source-lineage RAG and CLI workflows."
 requires-python = ">=3.11"
 dependencies = [
@@ -17,7 +17,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+anthropic = [
+    "anthropic==0.75.0",
+]
 dev = [
+    "httpx==0.28.1",
     "pytest==9.0.2",
 ]
 

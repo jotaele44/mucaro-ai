@@ -4,6 +4,17 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+DEFAULT_CORS_ORIGINS = ("http://127.0.0.1:5173", "http://localhost:5173")
+DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
+
+def parse_positive_int(value: str | None, default: int) -> int:
+    try:
+        parsed = int(value or default)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
 
 def find_project_root() -> Path:
     env_root = os.getenv("MUCARO_AI_ROOT")
@@ -27,11 +38,19 @@ class Settings:
     sqlite_path: Path
     default_model_provider: str
     default_model_name: str
+    max_upload_bytes: int = DEFAULT_MAX_UPLOAD_BYTES
+    cors_origins: tuple[str, ...] = DEFAULT_CORS_ORIGINS
 
     @classmethod
     def load(cls) -> "Settings":
         root = find_project_root()
         data_dir = root / "data"
+        max_upload_bytes = parse_positive_int(os.getenv("MUCARO_AI_MAX_UPLOAD_BYTES"), DEFAULT_MAX_UPLOAD_BYTES)
+        cors_origins = tuple(
+            origin.strip()
+            for origin in os.getenv("MUCARO_AI_CORS_ORIGINS", ",".join(DEFAULT_CORS_ORIGINS)).split(",")
+            if origin.strip()
+        )
         return cls(
             project_root=root,
             data_dir=data_dir,
@@ -40,8 +59,10 @@ class Settings:
             export_dir=data_dir / "exports",
             index_dir=data_dir / "indexes",
             sqlite_path=data_dir / "processed" / "mucaro_ai.sqlite3",
-            default_model_provider="anthropic" if os.getenv("ANTHROPIC_API_KEY") else "mock",
+            default_model_provider=os.getenv("MUCARO_AI_MODEL_PROVIDER", "mock"),
             default_model_name=os.getenv("MUCARO_AI_MODEL", "claude-3-5-sonnet-latest"),
+            max_upload_bytes=max_upload_bytes,
+            cors_origins=cors_origins or DEFAULT_CORS_ORIGINS,
         )
 
     def ensure_dirs(self) -> None:

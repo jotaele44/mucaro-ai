@@ -83,9 +83,12 @@ python scripts\release_check.py
 
 Copy `.env.example` to `.env` and fill only what you need.
 
-- `ANTHROPIC_API_KEY`: enables Claude mode when `MUCARO_AI_LIVE_MODE=1`.
+- `ANTHROPIC_API_KEY`: required for Anthropic mode when `MUCARO_AI_LIVE_MODE=1`.
 - `MUCARO_AI_LIVE_MODE=1`: permits live Anthropic calls. Default is deterministic mock mode.
+- `MUCARO_AI_MODEL_PROVIDER`: default model provider. Default is `mock`.
 - `MUCARO_AI_MODEL`: model name for live mode.
+- `MUCARO_AI_MAX_UPLOAD_BYTES`: API upload limit. Default is 25 MB.
+- `MUCARO_AI_CORS_ORIGINS`: comma-separated browser origins for local frontend development.
 
 ## Run backend
 
@@ -151,6 +154,16 @@ PYTHONPATH=.:backend python -m backend.app.cli serve --reload
 
 The `ask` command exports answer traces under `data/exports/` and stores runs in the local SQLite database by default. Use `--no-persist` for a terminal-only answer trace.
 
+Live Anthropic mode is explicit:
+
+```bash
+python -m pip install -e ".[anthropic]"
+read -s ANTHROPIC_API_KEY
+export ANTHROPIC_API_KEY
+export MUCARO_AI_LIVE_MODE=1
+mucaro ask "How does source lineage work?" --provider anthropic
+```
+
 ## Validate JSON
 
 ```bash
@@ -188,6 +201,12 @@ Expected success:
 
 ```text
 CERTIFY_RELEASE_OK
+```
+
+The certification gate also runs the committed retrieval evaluation fixture:
+
+```bash
+python3 scripts/evaluate_retrieval.py
 ```
 
 ## Reference clones

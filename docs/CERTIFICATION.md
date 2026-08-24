@@ -23,6 +23,20 @@ Certified target:
 - Implementation evidence through commit: `80c1fb8c5118b85871daf5194ce798d647a2ceaa`
 - Python package version: `0.1.2`
 - Frontend package version: `0.1.2`
+- Final v0.1.2 commit: `3902f5d4adcdcc19610e06309b6f1ea73b0beb16`
+- Final v0.1.2 CI run: `32753426403`
+- Final v0.1.2 tag-based fresh clone: `FRESH_CLONE_CERT_OK`
+
+## Post-Certification Hardening Candidate
+
+Date: 2026-08-24
+
+Candidate target:
+
+- Candidate tag: `v0.1.3-local-hardening`
+- Candidate package version: `0.1.3`
+- Scope: API upload/runtime hardening, FastAPI integration coverage, parser evidence, retrieval eval gate, explicit live model routing, and improved frontend operator evidence display.
+- Candidate local evidence: `56 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `npm audit` 0 vulnerabilities, and frontend build passed before final release certification.
 
 ## Scope
 
@@ -63,7 +77,7 @@ Excluded by design:
 | Frontend build | PASS: `npm run build` succeeded |
 | Release certification | PASS: `CERTIFY_RELEASE_OK` |
 | Hosted CI | PASS: implementation run `32751159589` passed on commit `80c1fb8c5118b85871daf5194ce798d647a2ceaa`; final tag target must pass CI before tagging |
-| Fresh clone certification | PASS: `FRESH_CLONE_CERT_OK` required from the final tag target before completion |
+| Fresh clone certification | PASS: `FRESH_CLONE_CERT_OK` from final `v0.1.2-local-certified` tag |
 | Desktop launcher smoke | PASS: covered by fresh-clone `scripts/launch_app.py --smoke-test --no-browser` |
 
 ## Notes

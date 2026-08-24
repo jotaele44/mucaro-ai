@@ -35,9 +35,17 @@ def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
         "source_id": source_id,
         "source_path": str(target.relative_to(cfg.project_root)) if target.is_relative_to(cfg.project_root) else str(target),
         "source_sha256": file_sha,
+        "bytes": parse_result.get("bytes", path.stat().st_size),
         "file_name": path.name,
         "mime_type": parse_result.get("mime_type", detect_mime(target)),
         "parser": parse_result.get("parser", "unknown"),
+        "parser_warnings": parse_result.get("parser_warnings", warnings),
+        "parser_metadata": {
+            key: parse_result[key]
+            for key in ["delimiter", "headers", "row_count", "page_count", "parse_status"]
+            if key in parse_result
+        },
+        "parse_status": parse_result.get("parse_status", "OK"),
         "ingested_at": utc_now(),
         "lineage_status": lineage_status,
         "chunk_count": len(chunks),

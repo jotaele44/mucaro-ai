@@ -7,7 +7,7 @@ from .config import Settings, settings
 from .db import init_db, upsert_payload
 from .exports import export_answer_trace
 from .ingestion import get_chunks
-from .model_router import generate_answer
+from .model_router import ModelProviderError, generate_answer
 from .retrieval import retrieve
 from .utils import stable_id, utc_now
 
@@ -22,6 +22,7 @@ def answer_question(
     top_k: int = 5,
     model_provider: str | None = None,
     model_name: str | None = None,
+    allow_mock_fallback: bool = False,
     cfg: Settings = settings,
     persist: bool = True,
 ) -> dict[str, Any]:
@@ -41,12 +42,21 @@ def answer_question(
     if retrieval["status"].startswith("ERROR_"):
         return retrieval
     retrieved = retrieval["retrieved_chunks"]
-    model = generate_answer(
-        normalized_query,
-        retrieved,
-        model_provider=model_provider,
-        model_name=model_name,
-    )
+    try:
+        model = generate_answer(
+            normalized_query,
+            retrieved,
+            model_provider=model_provider,
+            model_name=model_name,
+            allow_mock_fallback=allow_mock_fallback,
+        )
+    except ModelProviderError as exc:
+        return {
+            "status": exc.status,
+            "query": normalized_query,
+            "retrieved_chunks": retrieved,
+            "detail": exc.detail,
+        }
     retrieved_ids = [chunk["chunk_id"] for chunk in retrieved]
     cited_ids = model.get("cited_chunk_ids", [])
     source_ids = [chunk["source_id"] for chunk in retrieved if chunk["chunk_id"] in cited_ids]
@@ -56,6 +66,7 @@ def answer_question(
         "model_provider": model["model_provider"],
         "model_name": model["model_name"],
         "prompt_template_id": "default_cited_rag_v1",
+        "retrieval_strategy": retrieved[0].get("retrieval_strategy", "unknown") if retrieved else "none",
         "retrieved_chunk_ids": retrieved_ids,
         "cited_chunk_ids": cited_ids,
         "source_ids": source_ids,

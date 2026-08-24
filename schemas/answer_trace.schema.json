@@ -11,6 +11,7 @@
     "model_provider": {"type": "string", "enum": ["mock", "anthropic"]},
     "model_name": {"type": "string", "minLength": 1},
     "prompt_template_id": {"type": "string", "minLength": 1},
+    "retrieval_strategy": {"type": "string", "minLength": 1},
     "retrieved_chunk_ids": {"type": "array", "items": {"type": "string"}},
     "cited_chunk_ids": {"type": "array", "items": {"type": "string"}},
     "source_ids": {"type": "array", "items": {"type": "string"}},

@@ -1,0 +1,42 @@
+{
+  "chunks": [
+    {
+      "chunk_id": "eval_approval_lock",
+      "source_id": "eval_source_gate",
+      "chunk_index": 0,
+      "text": "The Execution Gate requires planning state, readiness scoring, mode selection, approval lock, and run trace before execution."
+    },
+    {
+      "chunk_id": "eval_source_lineage",
+      "source_id": "eval_source_lineage",
+      "chunk_index": 0,
+      "text": "Source lineage preserves source IDs, chunk IDs, file hashes, parser warnings, and cited evidence for every answer trace."
+    },
+    {
+      "chunk_id": "eval_desktop_launcher",
+      "source_id": "eval_source_launcher",
+      "chunk_index": 0,
+      "text": "The desktop launcher builds the frontend, starts the backend, checks the health endpoint, stops the process, and confirms the port closes."
+    },
+    {
+      "chunk_id": "eval_csv_parser",
+      "source_id": "eval_source_ingestion",
+      "chunk_index": 0,
+      "text": "CSV ingestion records delimiter, headers, duplicate header warnings, row count, truncation status, and parser metadata."
+    },
+    {
+      "chunk_id": "eval_mock_model",
+      "source_id": "eval_source_model",
+      "chunk_index": 0,
+      "text": "Mock mode is the deterministic default. Anthropic live mode requires explicit opt in, API key configuration, and provider readiness."
+    }
+  ],
+  "queries": [
+    {"query": "What prevents execution before approval?", "expected_chunk_ids": ["eval_approval_lock"]},
+    {"query": "How are answer citations traced back to files?", "expected_chunk_ids": ["eval_source_lineage"]},
+    {"query": "How does the launcher prove the server stopped?", "expected_chunk_ids": ["eval_desktop_launcher"]},
+    {"query": "Which parser evidence is kept for CSV files?", "expected_chunk_ids": ["eval_csv_parser"]},
+    {"query": "When should Anthropic live calls run?", "expected_chunk_ids": ["eval_mock_model"]},
+    {"query": "What is the moon made of?", "expected_chunk_ids": []}
+  ]
+}

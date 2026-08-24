@@ -82,3 +82,17 @@ mucaro plan "Add CLI capability" --input mucaro-ai --format text
 mucaro validate --format text
 mucaro serve --host 127.0.0.1 --port 8000
 ```
+
+## Live Model Mode
+
+Mock mode is the default. To use Anthropic live mode, install the optional dependency group and opt in explicitly:
+
+```bash
+python -m pip install -e ".[anthropic]"
+read -s ANTHROPIC_API_KEY
+export ANTHROPIC_API_KEY
+export MUCARO_AI_LIVE_MODE=1
+mucaro ask "How does source lineage work?" --provider anthropic
+```
+
+If the provider is unavailable, `ask` returns a structured provider error. Use `--allow-mock-fallback` only when an explicit mock fallback is acceptable.

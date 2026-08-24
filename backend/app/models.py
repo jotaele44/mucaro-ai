@@ -8,6 +8,7 @@ class AskRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=20)
     model_provider: str | None = None
     model_name: str | None = None
+    allow_mock_fallback: bool = False
 
 
 class PlanRequest(BaseModel):

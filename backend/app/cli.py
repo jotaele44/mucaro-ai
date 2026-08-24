@@ -43,6 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("--top-k", type=int, default=5, help="Maximum retrieved chunks to use.")
     ask.add_argument("--provider", choices=["mock", "anthropic"], help="Model provider override.")
     ask.add_argument("--model", help="Model name override.")
+    ask.add_argument("--allow-mock-fallback", action="store_true", help="Permit mock fallback when a live provider is unavailable.")
     ask.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     ask.add_argument("--no-persist", action="store_true", help="Do not write the run to SQLite.")
     ask.set_defaults(handler=run_ask)
@@ -107,6 +108,7 @@ def run_ask(args: argparse.Namespace, cfg: Settings) -> int:
         top_k=args.top_k,
         model_provider=args.provider,
         model_name=args.model,
+        allow_mock_fallback=args.allow_mock_fallback,
         cfg=cfg,
         persist=not args.no_persist,
     )

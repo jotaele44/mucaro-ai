@@ -7,6 +7,37 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "does",
+    "for",
+    "from",
+    "how",
+    "in",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "should",
+    "the",
+    "to",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "why",
+    "with",
+}
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -42,4 +73,4 @@ def write_json(path: Path, payload: Any) -> None:
 
 
 def tokenize(text: str) -> list[str]:
-    return [t for t in re.findall(r"[a-zA-Z0-9_\-]+", text.lower()) if len(t) > 1]
+    return [t for t in re.findall(r"[a-zA-Z0-9_\-]+", text.lower()) if len(t) > 1 and t not in STOPWORDS]

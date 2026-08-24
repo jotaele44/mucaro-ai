@@ -4,13 +4,58 @@ import os
 from typing import Any
 
 
-def generate_answer(query: str, retrieved_chunks: list[dict[str, Any]], *, model_provider: str | None = None, model_name: str | None = None) -> dict[str, Any]:
-    provider = model_provider or ("anthropic" if os.getenv("ANTHROPIC_API_KEY") else "mock")
-    if provider == "anthropic" and os.getenv("ANTHROPIC_API_KEY"):
-        # Safe fallback: keep v1 deterministic unless anthropic SDK is available and explicitly enabled.
-        if os.getenv("MUCARO_AI_LIVE_MODE") == "1":
-            return _anthropic_answer(query, retrieved_chunks, model_name=model_name)
-    return _mock_answer(query, retrieved_chunks, model_name=model_name or "mock-cited-synthesizer-v1")
+class ModelProviderError(RuntimeError):
+    def __init__(self, status: str, detail: str) -> None:
+        super().__init__(detail)
+        self.status = status
+        self.detail = detail
+
+
+def generate_answer(
+    query: str,
+    retrieved_chunks: list[dict[str, Any]],
+    *,
+    model_provider: str | None = None,
+    model_name: str | None = None,
+    allow_mock_fallback: bool = False,
+) -> dict[str, Any]:
+    provider = model_provider or "mock"
+    if provider == "mock":
+        return _mock_answer(query, retrieved_chunks, model_name=model_name or "mock-cited-synthesizer-v1")
+    if provider != "anthropic":
+        raise ModelProviderError("ERROR_UNSUPPORTED_MODEL_PROVIDER", provider)
+    if os.getenv("MUCARO_AI_LIVE_MODE") != "1":
+        return _fallback_or_error(
+            query,
+            retrieved_chunks,
+            allow_mock_fallback=allow_mock_fallback,
+            status="ERROR_LIVE_MODE_DISABLED",
+            detail="Set MUCARO_AI_LIVE_MODE=1 to permit live Anthropic calls.",
+        )
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        return _fallback_or_error(
+            query,
+            retrieved_chunks,
+            allow_mock_fallback=allow_mock_fallback,
+            status="ERROR_MODEL_API_KEY_MISSING",
+            detail="Set ANTHROPIC_API_KEY before using model_provider=anthropic.",
+        )
+    return _anthropic_answer(query, retrieved_chunks, model_name=model_name, allow_mock_fallback=allow_mock_fallback)
+
+
+def _fallback_or_error(
+    query: str,
+    retrieved_chunks: list[dict[str, Any]],
+    *,
+    allow_mock_fallback: bool,
+    status: str,
+    detail: str,
+) -> dict[str, Any]:
+    if allow_mock_fallback:
+        answer = _mock_answer(query, retrieved_chunks, model_name=f"mock-fallback-{status.lower()}")
+        answer["provider_warning"] = status
+        return answer
+    raise ModelProviderError(status, detail)
 
 
 def _mock_answer(query: str, retrieved_chunks: list[dict[str, Any]], *, model_name: str) -> dict[str, Any]:
@@ -42,11 +87,23 @@ def _mock_answer(query: str, retrieved_chunks: list[dict[str, Any]], *, model_na
     }
 
 
-def _anthropic_answer(query: str, retrieved_chunks: list[dict[str, Any]], *, model_name: str | None = None) -> dict[str, Any]:
+def _anthropic_answer(
+    query: str,
+    retrieved_chunks: list[dict[str, Any]],
+    *,
+    model_name: str | None = None,
+    allow_mock_fallback: bool,
+) -> dict[str, Any]:
     try:
         from anthropic import Anthropic  # type: ignore
     except Exception:
-        return _mock_answer(query, retrieved_chunks, model_name="mock-fallback-anthropic-sdk-missing")
+        return _fallback_or_error(
+            query,
+            retrieved_chunks,
+            allow_mock_fallback=allow_mock_fallback,
+            status="ERROR_MODEL_SDK_MISSING",
+            detail='Install the optional dependency group with: python -m pip install -e ".[anthropic]"',
+        )
     client = Anthropic()
     context = "\n\n".join(
         f"chunk_id={c['chunk_id']} source_id={c['source_id']}\n{c['text']}" for c in retrieved_chunks[:5]
