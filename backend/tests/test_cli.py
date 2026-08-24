@@ -43,6 +43,17 @@ def test_cli_plan(tmp_path: Path, capsys):
     assert "codebase_build" in output
 
 
+def test_cli_plan_text_output(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["plan", "Add", "CLI", "capability", "--input", "mucaro-ai", "--format", "text"], cfg=cfg) == 0
+    output = capsys.readouterr().out
+    assert "OK" in output
+    assert "active_vector=codebase_build" in output
+    assert "recommended_mode=CLAUDE_CODE_MODE" in output
+    assert "readiness_percent=" in output
+
+
 def test_cli_help_lists_serve(capsys):
     try:
         main(["--help"])
@@ -50,6 +61,42 @@ def test_cli_help_lists_serve(capsys):
         assert exc.code == 0
     output = capsys.readouterr().out
     assert "serve" in output
+
+
+def test_cli_validate_text_output(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["validate", "--format", "text"], cfg=cfg) == 0
+    output = capsys.readouterr().out
+    assert "JSON_OK" in output
+    assert "checked=0" in output
+
+
+def test_cli_serve_passes_host_port_and_reload(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    captured = {}
+
+    def fake_run(app: str, *, host: str, port: int, reload: bool) -> None:
+        captured.update({"app": app, "host": host, "port": port, "reload": reload})
+
+    monkeypatch.setattr("uvicorn.run", fake_run)
+
+    assert main(["serve", "--host", "127.0.0.1", "--port", "8123", "--reload"], cfg=cfg) == 0
+    assert captured == {
+        "app": "backend.app.main:app",
+        "host": "127.0.0.1",
+        "port": 8123,
+        "reload": True,
+    }
+
+
+def test_cli_serve_rejects_invalid_port(capsys):
+    try:
+        main(["serve", "--port", "70000"])
+    except SystemExit as exc:
+        assert exc.code == 2
+    error_output = capsys.readouterr().err
+    assert "PORT_RANGE:1-65535" in error_output
 
 
 def test_cli_ingest_missing_path_returns_structured_error(tmp_path: Path, capsys):

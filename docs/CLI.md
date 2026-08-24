@@ -69,6 +69,8 @@ retrieval payloads where practical:
 | `ERROR_NO_RETRIEVAL_CONTEXT` | sources exist but no chunk matches the query |
 | `ERROR_NO_VALID_CHUNKS` | available chunks are malformed or empty |
 | `ERROR_INVALID_TOP_K` | `--top-k` is outside the supported range |
+| `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
+| `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
 
 ## Examples
@@ -76,7 +78,7 @@ retrieval payloads where practical:
 ```bash
 mucaro ingest data/input --format text
 mucaro ask "How does source lineage work?" --format json --no-persist
-mucaro plan "Add CLI capability" --input mucaro-ai
-mucaro validate
+mucaro plan "Add CLI capability" --input mucaro-ai --format text
+mucaro validate --format text
 mucaro serve --host 127.0.0.1 --port 8000
 ```

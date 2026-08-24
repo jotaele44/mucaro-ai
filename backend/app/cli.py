@@ -21,6 +21,16 @@ class MucaroCLIError(RuntimeError):
         self.exit_code = exit_code
 
 
+def parse_port(value: str) -> int:
+    try:
+        port = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("PORT_MUST_BE_INTEGER") from exc
+    if port < 1 or port > 65535:
+        raise argparse.ArgumentTypeError("PORT_RANGE:1-65535")
+    return port
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mucaro",
@@ -46,14 +56,16 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("request", nargs="+", help="Request to analyze.")
     plan.add_argument("--input", action="append", default=[], help="Available input, repeatable.")
     plan.add_argument("--approval-state", default="NOT_REQUESTED", help="Current approval state.")
+    plan.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     plan.set_defaults(handler=run_plan)
 
     validate = subcommands.add_parser("validate", help="Validate project JSON artifacts.")
+    validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     validate.set_defaults(handler=run_validate)
 
     serve = subcommands.add_parser("serve", help="Start the local API server.")
     serve.add_argument("--host", default="127.0.0.1", help="Host interface to bind.")
-    serve.add_argument("--port", type=int, default=8000, help="Port to bind.")
+    serve.add_argument("--port", type=parse_port, default=8000, help="Port to bind.")
     serve.add_argument("--reload", action="store_true", help="Restart when source files change.")
     serve.set_defaults(handler=run_serve)
 
@@ -73,6 +85,12 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
     elif "source" in payload:
         source = payload["source"]
         print(f"source_id={source.get('source_id')} chunks_added={payload.get('chunks_added', 0)}")
+    elif "readiness_percent" in payload:
+        print(f"active_vector={payload.get('active_vector')}")
+        print(f"recommended_mode={payload.get('recommended_mode')}")
+        print(f"readiness_percent={payload.get('readiness_percent')}")
+    elif "checked" in payload:
+        print(f"checked={len(payload.get('checked', []))}")
 
 
 def emit_error(status: str, detail: str, output_format: str = "json") -> None:
@@ -118,14 +136,13 @@ def run_plan(args: argparse.Namespace, cfg: Settings) -> int:
         inputs_available=args.input,
         approval_state=args.approval_state,
     )
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    emit_payload(result, args.format)
     return 0
 
 
 def run_validate(args: argparse.Namespace, cfg: Settings) -> int:
-    del args
     result = validate_project_json(cfg)
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    emit_payload(result, args.format)
     return 0 if result.get("status") == "JSON_OK" else 2
 
 
