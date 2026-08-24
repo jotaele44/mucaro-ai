@@ -13,7 +13,8 @@
         "ERROR_NO_SOURCES",
         "ERROR_NO_RETRIEVAL_CONTEXT",
         "ERROR_NO_VALID_CHUNKS",
-        "ERROR_INVALID_TOP_K"
+        "ERROR_INVALID_TOP_K",
+        "ERROR_INVALID_RETRIEVAL_STRATEGY"
       ]
     },
     "query": {"type": "string", "minLength": 1},

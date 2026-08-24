@@ -27,4 +27,10 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 
 ## Retrieval layer
 
-V1 uses deterministic lexical scoring. Chroma can be added behind the retrieval interface later without changing answer trace schema.
+V1 uses deterministic local hybrid retrieval:
+
+- `lexical_v2`: token overlap, cosine normalization, query coverage, stable tie order.
+- `vector_tfidf_v1`: local TF-IDF vectors with cosine similarity and no external service requirement.
+- `hybrid_tfidf_v1`: the default answer path, combining lexical and vector scores behind the stable retrieval result contract.
+
+Persistent embedding stores such as Chroma can still be added behind this interface later without changing the answer trace schema.

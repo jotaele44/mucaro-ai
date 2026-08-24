@@ -2,7 +2,8 @@
 
 | Item | Purpose | Status |
 |---|---|---|
-| Chroma integration | Persistent embedding/vector search | Queued |
+| Local hybrid retrieval | Deterministic lexical plus TF-IDF vector scoring | Complete in V1 |
+| Chroma integration | Persistent embedding/vector store for larger corpora | Queued |
 | LlamaIndex ingestion | Richer document ingestion and node parsing | Queued |
 | Unstructured parser expansion | Better PDFs, DOCX, HTML, emails | Queued |
 | LiteLLM model router | Provider-agnostic model routing | Queued |

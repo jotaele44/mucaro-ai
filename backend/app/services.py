@@ -8,7 +8,7 @@ from .db import init_db, upsert_payload
 from .exports import export_answer_trace
 from .ingestion import get_chunks
 from .model_router import generate_answer
-from .retrieval import lexical_retrieve
+from .retrieval import retrieve
 from .utils import stable_id, utc_now
 
 
@@ -37,7 +37,7 @@ def answer_question(
         }
     cfg.ensure_dirs()
     init_db(cfg.sqlite_path)
-    retrieval = lexical_retrieve(normalized_query, get_chunks(cfg), top_k=top_k)
+    retrieval = retrieve(normalized_query, get_chunks(cfg), top_k=top_k, strategy="hybrid")
     if retrieval["status"].startswith("ERROR_"):
         return retrieval
     retrieved = retrieval["retrieved_chunks"]
