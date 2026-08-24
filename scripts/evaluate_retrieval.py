@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -13,15 +14,37 @@ FIXTURE = ROOT / "backend" / "tests" / "fixtures" / "retrieval_eval.json"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "backend"))
 
+from backend.app.config import Settings  # noqa: E402
 from backend.app.retrieval import retrieve  # noqa: E402
+from backend.app.vector_index import build_persistent_index  # noqa: E402
 
 
 def load_fixture(path: Path = FIXTURE) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def make_eval_settings(root: Path) -> Settings:
+    return Settings(
+        project_root=root,
+        data_dir=root / "data",
+        input_dir=root / "data" / "input",
+        processed_dir=root / "data" / "processed",
+        export_dir=root / "data" / "exports",
+        index_dir=root / "data" / "indexes",
+        sqlite_path=root / "data" / "processed" / "eval.sqlite3",
+        default_model_provider="mock",
+        default_model_name="mock",
+    )
+
+
 def evaluate_strategy(strategy: str, fixture: dict[str, Any], *, top_k: int) -> dict[str, Any]:
     chunks = fixture["chunks"]
+    cfg = None
+    temp_dir = None
+    if strategy == "persistent":
+        temp_dir = tempfile.TemporaryDirectory(prefix="mucaro-retrieval-eval-")
+        cfg = make_eval_settings(Path(temp_dir.name))
+        build_persistent_index(chunks, cfg)
     rows = []
     hits = 0
     top1_hits = 0
@@ -30,7 +53,12 @@ def evaluate_strategy(strategy: str, fixture: dict[str, Any], *, top_k: int) -> 
     expected_no_context = 0
     for case in fixture["queries"]:
         expected = set(case["expected_chunk_ids"])
-        result = retrieve(case["query"], chunks, top_k=top_k, strategy=strategy)
+        result = retrieve(case["query"], chunks, top_k=top_k, strategy=strategy, cfg=cfg) if cfg else retrieve(
+            case["query"],
+            chunks,
+            top_k=top_k,
+            strategy=strategy,
+        )
         retrieved_ids = [chunk["chunk_id"] for chunk in result["retrieved_chunks"]]
         if expected:
             expected_with_context += 1
@@ -53,6 +81,8 @@ def evaluate_strategy(strategy: str, fixture: dict[str, Any], *, top_k: int) -> 
                 "top1_hit": top1_hit,
             }
         )
+    if temp_dir is not None:
+        temp_dir.cleanup()
     return {
         "strategy": strategy,
         "recall_at_k": round(hits / expected_with_context, 4) if expected_with_context else 0.0,
@@ -76,7 +106,7 @@ def main() -> int:
         "top_k": args.top_k,
         "strategies": [
             evaluate_strategy(strategy, fixture, top_k=args.top_k)
-            for strategy in ["lexical", "vector", "hybrid"]
+            for strategy in ["lexical", "vector", "hybrid", "persistent"]
         ],
     }
     hybrid = next(item for item in report["strategies"] if item["strategy"] == "hybrid")

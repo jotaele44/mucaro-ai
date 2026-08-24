@@ -68,6 +68,8 @@ retrieval payloads where practical:
 | `ERROR_NO_SOURCES` | `ask` ran before any source chunks were available |
 | `ERROR_NO_RETRIEVAL_CONTEXT` | sources exist but no chunk matches the query |
 | `ERROR_NO_VALID_CHUNKS` | available chunks are malformed or empty |
+| `ERROR_PERSISTENT_INDEX_MISSING` | `--strategy persistent` was requested before an index was built |
+| `ERROR_PERSISTENT_INDEX_STALE` | `--strategy persistent` index does not match current chunks |
 | `ERROR_INVALID_TOP_K` | `--top-k` is outside the supported range |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
@@ -78,10 +80,15 @@ retrieval payloads where practical:
 ```bash
 mucaro ingest data/input --format text
 mucaro ask "How does source lineage work?" --format json --no-persist
+mucaro ask "How does source lineage work?" --strategy persistent --format text
 mucaro plan "Add CLI capability" --input mucaro-ai --format text
 mucaro validate --format text
 mucaro serve --host 127.0.0.1 --port 8000
 ```
+
+## Retrieval Strategies
+
+`mucaro ask` defaults to `--strategy hybrid`, which recomputes deterministic lexical and TF-IDF scores from the current chunk file. Use `--strategy persistent` to query the local persisted TF-IDF index built during ingestion. Persistent retrieval fails closed when the index is missing or stale; run `mucaro ingest PATH` again to rebuild it.
 
 ## Live Model Mode
 

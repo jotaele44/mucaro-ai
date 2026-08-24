@@ -27,16 +27,31 @@ Certified target:
 - Final v0.1.2 CI run: `32753426403`
 - Final v0.1.2 tag-based fresh clone: `FRESH_CLONE_CERT_OK`
 
-## Post-Certification Hardening Candidate
+## Post-Certification Hardening
+
+Date: 2026-08-24
+
+Certified target:
+
+- Tag: `v0.1.3-local-hardening`
+- Package version: `0.1.3`
+- Commit: `101e457743a7a0e1b830cbd7e066b6b817af9184`
+- CI run: `32759653416`
+- Main fresh clone: `FRESH_CLONE_CERT_OK`
+- Tag fresh clone: `FRESH_CLONE_CERT_OK`
+- Scope: API upload/runtime hardening, FastAPI integration coverage, parser evidence, retrieval eval gate, explicit live model routing, and improved frontend operator evidence display.
+- Local evidence: `56 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `npm audit` 0 vulnerabilities, frontend build passed, and `CERTIFY_RELEASE_OK`.
+
+## Persistent Index Candidate
 
 Date: 2026-08-24
 
 Candidate target:
 
-- Candidate tag: `v0.1.3-local-hardening`
-- Candidate package version: `0.1.3`
-- Scope: API upload/runtime hardening, FastAPI integration coverage, parser evidence, retrieval eval gate, explicit live model routing, and improved frontend operator evidence display.
-- Candidate local evidence: `56 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `npm audit` 0 vulnerabilities, and frontend build passed before final release certification.
+- Candidate tag: `v0.1.4-local-persistent-index`
+- Candidate package version: `0.1.4`
+- Scope: explicit persistent local TF-IDF strategy, ingestion-time index rebuild, stale-index rejection, CLI/API strategy selection, and retrieval eval coverage for persistent retrieval.
+- Candidate local evidence: `61 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `npm audit` 0 vulnerabilities, and frontend build passed before final release certification.
 
 ## Scope
 

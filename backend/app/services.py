@@ -20,6 +20,7 @@ def answer_question(
     query: str,
     *,
     top_k: int = 5,
+    retrieval_strategy: str = "hybrid",
     model_provider: str | None = None,
     model_name: str | None = None,
     allow_mock_fallback: bool = False,
@@ -38,7 +39,7 @@ def answer_question(
         }
     cfg.ensure_dirs()
     init_db(cfg.sqlite_path)
-    retrieval = retrieve(normalized_query, get_chunks(cfg), top_k=top_k, strategy="hybrid")
+    retrieval = retrieve(normalized_query, get_chunks(cfg), top_k=top_k, strategy=retrieval_strategy, cfg=cfg)
     if retrieval["status"].startswith("ERROR_"):
         return retrieval
     retrieved = retrieval["retrieved_chunks"]

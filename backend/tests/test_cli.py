@@ -29,7 +29,7 @@ def test_cli_ingest_and_ask(tmp_path: Path, capsys):
     ingest_output = capsys.readouterr().out
     assert "INGEST_FOLDER_OK" in ingest_output
 
-    assert main(["ask", "What does source lineage require?", "--format", "text"], cfg=cfg) == 0
+    assert main(["ask", "What does source lineage require?", "--strategy", "persistent", "--format", "text"], cfg=cfg) == 0
     ask_output = capsys.readouterr().out
     assert "CITATION_OK" in ask_output
     assert "chunk_id=" in ask_output

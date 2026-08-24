@@ -5,6 +5,7 @@ from pathlib import Path
 from backend.app.config import Settings
 from backend.app.services import answer_question
 from backend.app.utils import write_json
+from backend.app.vector_index import build_persistent_index
 
 
 def make_settings(root: Path) -> Settings:
@@ -23,17 +24,16 @@ def make_settings(root: Path) -> Settings:
 
 def seed_chunks(cfg: Settings) -> None:
     cfg.ensure_dirs()
-    write_json(
-        cfg.processed_dir / "document_chunks.json",
-        [
-            {
-                "chunk_id": "chunk_a",
-                "source_id": "src_a",
-                "chunk_index": 0,
-                "text": "Source lineage requires cited chunk IDs.",
-            }
-        ],
-    )
+    chunks = [
+        {
+            "chunk_id": "chunk_a",
+            "source_id": "src_a",
+            "chunk_index": 0,
+            "text": "Source lineage requires cited chunk IDs.",
+        }
+    ]
+    write_json(cfg.processed_dir / "document_chunks.json", chunks)
+    build_persistent_index(chunks, cfg)
 
 
 def test_answer_question_returns_model_provider_error(tmp_path: Path, monkeypatch):
@@ -65,3 +65,19 @@ def test_answer_question_flags_uncited_live_answer(tmp_path: Path, monkeypatch):
 
     assert result["citation_status"] == "CITATION_ERROR"
     assert "ERROR_UNCITED_ANSWER" in result["validation_flags"]
+
+
+def test_answer_question_accepts_persistent_retrieval_strategy(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+
+    result = answer_question(
+        "What does source lineage require?",
+        retrieval_strategy="persistent",
+        model_provider="mock",
+        cfg=cfg,
+        persist=False,
+    )
+
+    assert result["citation_status"] == "CITATION_OK"
+    assert result["retrieval_strategy"] == "persistent_tfidf_v1"

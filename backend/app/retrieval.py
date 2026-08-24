@@ -4,8 +4,16 @@ import math
 from collections import Counter
 from typing import Any
 
+from .config import Settings, settings
 from .ingestion import get_chunks
 from .utils import tokenize
+from .vector_index import (
+    cosine_similarity,
+    fingerprint_chunks,
+    load_persistent_index,
+    tfidf_vector,
+    tfidf_vectors,
+)
 
 
 class RetrievalError(RuntimeError):
@@ -14,7 +22,7 @@ class RetrievalError(RuntimeError):
 
 MIN_TOP_K = 1
 MAX_TOP_K = 20
-RETRIEVAL_STRATEGIES = {"lexical", "vector", "hybrid"}
+RETRIEVAL_STRATEGIES = {"lexical", "vector", "hybrid", "persistent"}
 
 
 def _error(status: str, query: str, *, warnings: list[str] | None = None) -> dict[str, Any]:
@@ -86,35 +94,6 @@ def _lexical_score(q_counts: Counter[str], c_counts: Counter[str]) -> float:
     return (0.8 * cosine) + (0.2 * query_coverage)
 
 
-def _tfidf_vectors(tokenized_chunks: list[list[str]]) -> tuple[list[dict[str, float]], dict[str, float]]:
-    document_count = len(tokenized_chunks)
-    document_frequencies: Counter[str] = Counter()
-    for tokens in tokenized_chunks:
-        document_frequencies.update(set(tokens))
-    idf = {
-        term: math.log((1 + document_count) / (1 + document_frequency)) + 1
-        for term, document_frequency in document_frequencies.items()
-    }
-    return [_tfidf_vector(tokens, idf) for tokens in tokenized_chunks], idf
-
-
-def _tfidf_vector(tokens: list[str], idf: dict[str, float]) -> dict[str, float]:
-    counts = Counter(tokens)
-    weighted = {term: (1 + math.log(count)) * idf.get(term, 0.0) for term, count in counts.items()}
-    norm = math.sqrt(sum(value * value for value in weighted.values()))
-    if not norm:
-        return {}
-    return {term: value / norm for term, value in weighted.items()}
-
-
-def _cosine_similarity(left: dict[str, float], right: dict[str, float]) -> float:
-    if not left or not right:
-        return 0.0
-    if len(left) > len(right):
-        left, right = right, left
-    return sum(value * right.get(term, 0.0) for term, value in left.items())
-
-
 def _rank(scored: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(
         scored,
@@ -181,11 +160,11 @@ def vector_retrieve(query: str, chunks: list[dict[str, Any]] | None = None, *, t
         return early_result
     q_tokens = tokenize(query)
     tokenized_chunks = [tokenize(str(chunk.get("text", ""))) for chunk in normalized_chunks]
-    chunk_vectors, idf = _tfidf_vectors(tokenized_chunks)
-    query_vector = _tfidf_vector(q_tokens, idf)
+    chunk_vectors, idf = tfidf_vectors(tokenized_chunks)
+    query_vector = tfidf_vector(q_tokens, idf)
     scored: list[dict[str, Any]] = []
     for chunk, c_tokens, chunk_vector in zip(normalized_chunks, tokenized_chunks, chunk_vectors, strict=True):
-        score = _cosine_similarity(query_vector, chunk_vector)
+        score = cosine_similarity(query_vector, chunk_vector)
         if score <= 0:
             continue
         item = dict(chunk)
@@ -208,13 +187,13 @@ def hybrid_retrieve(query: str, chunks: list[dict[str, Any]] | None = None, *, t
     q_tokens = tokenize(query)
     q_counts = Counter(q_tokens)
     tokenized_chunks = [tokenize(str(chunk.get("text", ""))) for chunk in normalized_chunks]
-    chunk_vectors, idf = _tfidf_vectors(tokenized_chunks)
-    query_vector = _tfidf_vector(q_tokens, idf)
+    chunk_vectors, idf = tfidf_vectors(tokenized_chunks)
+    query_vector = tfidf_vector(q_tokens, idf)
     scored: list[dict[str, Any]] = []
     for chunk, c_tokens, chunk_vector in zip(normalized_chunks, tokenized_chunks, chunk_vectors, strict=True):
         c_counts = Counter(c_tokens)
         lexical_score = _lexical_score(q_counts, c_counts)
-        vector_score = _cosine_similarity(query_vector, chunk_vector)
+        vector_score = cosine_similarity(query_vector, chunk_vector)
         if lexical_score <= 0 and vector_score <= 0:
             continue
         score = (0.45 * lexical_score) + (0.55 * vector_score)
@@ -233,12 +212,70 @@ def hybrid_retrieve(query: str, chunks: list[dict[str, Any]] | None = None, *, t
     return result
 
 
+def persistent_retrieve(
+    query: str,
+    chunks: list[dict[str, Any]] | None = None,
+    *,
+    top_k: int = 5,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    validation_error = _validate_inputs(query, top_k)
+    if validation_error is not None:
+        return validation_error
+    chunks = get_chunks(cfg) if chunks is None else chunks
+    if not chunks:
+        return _error("ERROR_NO_SOURCES", query)
+    index = load_persistent_index(cfg)
+    if index is None:
+        return _error("ERROR_PERSISTENT_INDEX_MISSING", query, warnings=["RUN_INGEST_TO_BUILD_INDEX"])
+    expected_fingerprint = fingerprint_chunks(chunks)
+    if index.get("chunks_fingerprint") != expected_fingerprint:
+        return _error("ERROR_PERSISTENT_INDEX_STALE", query, warnings=["RUN_INGEST_TO_REBUILD_INDEX"])
+
+    idf = index.get("idf", {})
+    entries = index.get("entries", [])
+    if not isinstance(idf, dict) or not isinstance(entries, list) or not entries:
+        return _error("ERROR_PERSISTENT_INDEX_EMPTY", query)
+
+    q_tokens = tokenize(query)
+    query_vector = tfidf_vector(q_tokens, {str(term): float(value) for term, value in idf.items()})
+    scored: list[dict[str, Any]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        chunk = entry.get("chunk")
+        vector = entry.get("vector")
+        tokens = entry.get("tokens", [])
+        if not isinstance(chunk, dict) or not isinstance(vector, dict):
+            continue
+        vector_score = cosine_similarity(
+            query_vector,
+            {str(term): float(value) for term, value in vector.items()},
+        )
+        if vector_score <= 0:
+            continue
+        item = dict(chunk)
+        item["score"] = round(vector_score, 6)
+        item["vector_score"] = round(vector_score, 6)
+        item["retrieval_strategy"] = "persistent_tfidf_v1"
+        item["matched_terms"] = sorted(set(q_tokens).intersection(set(tokens)))[:20] if isinstance(tokens, list) else []
+        scored.append(item)
+    if not scored:
+        return _error("ERROR_NO_RETRIEVAL_CONTEXT", query, warnings=list(index.get("warnings", [])))
+    result: dict[str, Any] = {"status": "RETRIEVAL_OK", "query": query, "retrieved_chunks": _rank(scored)[:top_k]}
+    warnings = index.get("warnings", [])
+    if warnings:
+        result["warnings"] = sorted(set(warnings))
+    return result
+
+
 def retrieve(
     query: str,
     chunks: list[dict[str, Any]] | None = None,
     *,
     top_k: int = 5,
     strategy: str = "hybrid",
+    cfg: Settings = settings,
 ) -> dict[str, Any]:
     if strategy not in RETRIEVAL_STRATEGIES:
         return _error(
@@ -250,4 +287,6 @@ def retrieve(
         return lexical_retrieve(query, chunks, top_k=top_k)
     if strategy == "vector":
         return vector_retrieve(query, chunks, top_k=top_k)
+    if strategy == "persistent":
+        return persistent_retrieve(query, chunks, top_k=top_k, cfg=cfg)
     return hybrid_retrieve(query, chunks, top_k=top_k)

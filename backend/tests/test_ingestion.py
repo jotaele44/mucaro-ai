@@ -22,4 +22,7 @@ def test_ingest_file_tmp(tmp_path: Path):
     result = ingest_file(src, cfg)
     assert result["status"] == "INGEST_OK"
     assert result["source"]["chunk_count"] >= 1
+    assert result["index_status"] == "INDEX_OK"
+    assert result["indexed_chunk_count"] >= 1
     assert (cfg.processed_dir / "source_manifest.json").exists()
+    assert (cfg.index_dir / "tfidf_index.json").exists()

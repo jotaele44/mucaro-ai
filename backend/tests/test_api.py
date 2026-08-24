@@ -58,10 +58,14 @@ def test_api_happy_path_covers_operator_routes(tmp_path: Path):
     assert chunks.status_code == 200
     assert len(chunks.json()["chunks"]) >= 1
 
-    ask = client.post("/ask", json={"query": "What does source lineage require?", "model_provider": "mock"})
+    ask = client.post(
+        "/ask",
+        json={"query": "What does source lineage require?", "retrieval_strategy": "persistent", "model_provider": "mock"},
+    )
     assert ask.status_code == 200
     trace = ask.json()
     assert trace["citation_status"] == "CITATION_OK"
+    assert trace["retrieval_strategy"] == "persistent_tfidf_v1"
     assert trace["run_id"].startswith("run_")
 
     runs = client.get("/runs")
@@ -132,6 +136,14 @@ def test_api_invalid_top_k_is_validation_error(tmp_path: Path):
     client = make_client(tmp_path)
 
     response = client.post("/ask", json={"query": "What is source lineage?", "top_k": 0})
+
+    assert response.status_code == 422
+
+
+def test_api_invalid_retrieval_strategy_is_validation_error(tmp_path: Path):
+    client = make_client(tmp_path)
+
+    response = client.post("/ask", json={"query": "What is source lineage?", "retrieval_strategy": "not-real"})
 
     assert response.status_code == 422
 

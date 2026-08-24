@@ -9,6 +9,7 @@ from typing import Any, Sequence
 from .config import Settings, settings
 from .execution_gate import analyze_task
 from .ingestion import ingest_file, ingest_folder
+from .retrieval import RETRIEVAL_STRATEGIES
 from .services import answer_question
 from .validation import validate_project_json
 
@@ -41,6 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     ask = subcommands.add_parser("ask", help="Ask a cited retrieval question.")
     ask.add_argument("query", nargs="+", help="Question to answer from ingested local sources.")
     ask.add_argument("--top-k", type=int, default=5, help="Maximum retrieved chunks to use.")
+    ask.add_argument("--strategy", choices=sorted(RETRIEVAL_STRATEGIES), default="hybrid", help="Retrieval strategy to use.")
     ask.add_argument("--provider", choices=["mock", "anthropic"], help="Model provider override.")
     ask.add_argument("--model", help="Model name override.")
     ask.add_argument("--allow-mock-fallback", action="store_true", help="Permit mock fallback when a live provider is unavailable.")
@@ -106,6 +108,7 @@ def run_ask(args: argparse.Namespace, cfg: Settings) -> int:
     result = answer_question(
         " ".join(args.query),
         top_k=args.top_k,
+        retrieval_strategy=args.strategy,
         model_provider=args.provider,
         model_name=args.model,
         allow_mock_fallback=args.allow_mock_fallback,

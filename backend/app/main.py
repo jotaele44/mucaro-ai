@@ -57,7 +57,7 @@ async def read_limited_upload(upload: UploadFile, max_bytes: int) -> bytes:
 
 
 def create_app(cfg: Settings = settings) -> FastAPI:
-    app = FastAPI(title="Mucaro AI", version="0.1.3")
+    app = FastAPI(title="Mucaro AI", version="0.1.4")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),
@@ -111,6 +111,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         return answer_question(
             req.query,
             top_k=req.top_k,
+            retrieval_strategy=req.retrieval_strategy,
             model_provider=req.model_provider,
             model_name=req.model_name,
             allow_mock_fallback=req.allow_mock_fallback,

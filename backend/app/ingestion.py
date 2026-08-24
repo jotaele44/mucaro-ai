@@ -9,6 +9,7 @@ from .config import Settings, settings
 from .db import init_db, upsert_payload
 from .parser import detect_mime, parse_file
 from .utils import read_json, sha256_file, stable_id, utc_now, write_json
+from .vector_index import build_persistent_index
 
 MANIFEST_NAME = "source_manifest.json"
 CHUNKS_NAME = "document_chunks.json"
@@ -65,7 +66,15 @@ def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
     upsert_payload("sources", "source_id", source_payload, cfg.sqlite_path)
     for chunk in chunks:
         upsert_payload("chunks", "chunk_id", chunk, cfg.sqlite_path)
-    return {"status": "INGEST_OK", "source": source_payload, "chunks_added": len(chunks)}
+    index_payload = build_persistent_index(all_chunks, cfg)
+    return {
+        "status": "INGEST_OK",
+        "source": source_payload,
+        "chunks_added": len(chunks),
+        "index_status": index_payload["status"],
+        "index_version": index_payload["version"],
+        "indexed_chunk_count": index_payload["indexed_chunk_count"],
+    }
 
 
 def ingest_folder(folder: Path, cfg: Settings = settings) -> dict[str, Any]:

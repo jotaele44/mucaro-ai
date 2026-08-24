@@ -1,4 +1,22 @@
+from pathlib import Path
+
+from backend.app.config import Settings
 from backend.app.retrieval import lexical_retrieve, retrieve, vector_retrieve
+from backend.app.vector_index import build_persistent_index, index_path
+
+
+def make_settings(root: Path) -> Settings:
+    return Settings(
+        project_root=root,
+        data_dir=root / "data",
+        input_dir=root / "data" / "input",
+        processed_dir=root / "data" / "processed",
+        export_dir=root / "data" / "exports",
+        index_dir=root / "data" / "indexes",
+        sqlite_path=root / "data" / "processed" / "test.sqlite3",
+        default_model_provider="mock",
+        default_model_name="mock",
+    )
 
 
 def test_lexical_retrieval_returns_match():
@@ -86,7 +104,7 @@ def test_hybrid_retrieval_is_default_strategy():
 def test_retrieve_rejects_unknown_strategy():
     result = retrieve("source lineage", [], top_k=1, strategy="unknown")
     assert result["status"] == "ERROR_INVALID_RETRIEVAL_STRATEGY"
-    assert "RETRIEVAL_STRATEGY_ALLOWED:hybrid,lexical,vector" in result["warnings"]
+    assert "RETRIEVAL_STRATEGY_ALLOWED:hybrid,lexical,persistent,vector" in result["warnings"]
 
 
 def test_hybrid_retrieval_reports_duplicate_chunk_ids_and_bad_index():
@@ -99,3 +117,42 @@ def test_hybrid_retrieval_reports_duplicate_chunk_ids_and_bad_index():
     assert [chunk["source_id"] for chunk in result["retrieved_chunks"]] == ["src_a", "src_b"]
     assert "DUPLICATE_CHUNK_ID:chunk_id=chunk_a" in result["warnings"]
     assert "MALFORMED_CHUNK_INDEX:chunk_id=chunk_a" in result["warnings"]
+
+
+def test_persistent_retrieval_uses_local_index(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    chunks = [
+        {"chunk_id": "chunk_common", "source_id": "src_common", "text": "planning planning approval", "chunk_index": 0},
+        {"chunk_id": "chunk_rare", "source_id": "src_rare", "text": "planning lineage approval", "chunk_index": 1},
+    ]
+
+    index = build_persistent_index(chunks, cfg)
+    result = retrieve("planning lineage", chunks, top_k=1, strategy="persistent", cfg=cfg)
+
+    assert index_path(cfg).exists()
+    assert index["indexed_chunk_count"] == 2
+    assert result["status"] == "RETRIEVAL_OK"
+    assert result["retrieved_chunks"][0]["chunk_id"] == "chunk_rare"
+    assert result["retrieved_chunks"][0]["retrieval_strategy"] == "persistent_tfidf_v1"
+
+
+def test_persistent_retrieval_requires_built_index(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    chunks = [{"chunk_id": "chunk_a", "source_id": "src_a", "text": "source lineage", "chunk_index": 0}]
+
+    result = retrieve("source lineage", chunks, top_k=1, strategy="persistent", cfg=cfg)
+
+    assert result["status"] == "ERROR_PERSISTENT_INDEX_MISSING"
+    assert "RUN_INGEST_TO_BUILD_INDEX" in result["warnings"]
+
+
+def test_persistent_retrieval_rejects_stale_index(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    chunks = [{"chunk_id": "chunk_a", "source_id": "src_a", "text": "source lineage", "chunk_index": 0}]
+    build_persistent_index(chunks, cfg)
+    changed_chunks = [{"chunk_id": "chunk_a", "source_id": "src_a", "text": "different content", "chunk_index": 0}]
+
+    result = retrieve("source lineage", changed_chunks, top_k=1, strategy="persistent", cfg=cfg)
+
+    assert result["status"] == "ERROR_PERSISTENT_INDEX_STALE"
+    assert "RUN_INGEST_TO_REBUILD_INDEX" in result["warnings"]

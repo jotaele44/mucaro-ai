@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
 class AskRequest(BaseModel):
     query: str = Field(min_length=1)
     top_k: int = Field(default=5, ge=1, le=20)
+    retrieval_strategy: Literal["hybrid", "lexical", "vector", "persistent"] = "hybrid"
     model_provider: str | None = None
     model_name: str | None = None
     allow_mock_fallback: bool = False
