@@ -13,6 +13,7 @@ Observed success markers:
 - `npm audit` reported 0 vulnerabilities after Vite/package-lock repair
 - `npm run build` succeeded
 - `RELEASE_CHECK_OK`
+- `CERTIFY_RELEASE_OK` after dependency install, source-boundary scans, tests, JSON validation, frontend audit, and frontend build
 
 Local expected marker after first setup:
 

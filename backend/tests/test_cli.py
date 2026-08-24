@@ -50,3 +50,28 @@ def test_cli_help_lists_serve(capsys):
         assert exc.code == 0
     output = capsys.readouterr().out
     assert "serve" in output
+
+
+def test_cli_ingest_missing_path_returns_structured_error(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["ingest", "missing.md", "--format", "json"], cfg=cfg) == 2
+    error_output = capsys.readouterr().err
+    assert "ERROR_INPUT_PATH_NOT_FOUND" in error_output
+    assert "missing.md" in error_output
+
+
+def test_cli_ask_no_sources_returns_error_status(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["ask", "What is source lineage?", "--format", "json", "--no-persist"], cfg=cfg) == 2
+    output = capsys.readouterr().out
+    assert "ERROR_NO_SOURCES" in output
+
+
+def test_cli_ask_invalid_top_k_returns_error_status(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["ask", "What is source lineage?", "--top-k", "0", "--format", "json"], cfg=cfg) == 2
+    output = capsys.readouterr().out
+    assert "ERROR_INVALID_TOP_K" in output

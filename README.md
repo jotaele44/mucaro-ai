@@ -119,6 +119,7 @@ python scripts/ask.py "How does source lineage work?"
 ## Command line interface
 
 The CLI exposes the same local ingestion, planning, validation, and cited-answer flow used by the app.
+See `docs/CLI.md` for exit codes, structured error payloads, and output contracts.
 
 ```bash
 python scripts/mucaro.py ingest data/input
@@ -172,6 +173,21 @@ Expected success:
 
 ```text
 RELEASE_CHECK_OK
+```
+
+## Certification gate
+
+Use the certification gate before pushing release candidates. It combines source-boundary scans, tests, JSON validation, frontend audit, and frontend build:
+
+```bash
+npm ci --registry=https://registry.npmjs.org/ --prefix frontend
+python3 scripts/certify_release.py
+```
+
+Expected success:
+
+```text
+CERTIFY_RELEASE_OK
 ```
 
 ## Reference clones

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -10,6 +11,14 @@ from .execution_gate import analyze_task
 from .ingestion import ingest_file, ingest_folder
 from .services import answer_question
 from .validation import validate_project_json
+
+
+class MucaroCLIError(RuntimeError):
+    def __init__(self, status: str, detail: str, *, exit_code: int = 2) -> None:
+        super().__init__(detail)
+        self.status = status
+        self.detail = detail
+        self.exit_code = exit_code
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -66,6 +75,14 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"source_id={source.get('source_id')} chunks_added={payload.get('chunks_added', 0)}")
 
 
+def emit_error(status: str, detail: str, output_format: str = "json") -> None:
+    payload = {"status": status, "detail": detail}
+    if output_format == "json":
+        print(json.dumps(payload, indent=2, ensure_ascii=False), file=sys.stderr)
+        return
+    print(f"{status} {detail}", file=sys.stderr)
+
+
 def run_ask(args: argparse.Namespace, cfg: Settings) -> int:
     result = answer_question(
         " ".join(args.query),
@@ -85,6 +102,10 @@ def run_ingest(args: argparse.Namespace, cfg: Settings) -> int:
     path = Path(args.path)
     if not path.is_absolute():
         path = cfg.project_root / path
+    if not path.exists():
+        raise MucaroCLIError("ERROR_INPUT_PATH_NOT_FOUND", str(path))
+    if not path.is_file() and not path.is_dir():
+        raise MucaroCLIError("ERROR_INPUT_PATH_UNSUPPORTED", str(path))
     result = ingest_folder(path, cfg) if path.is_dir() else ingest_file(path, cfg)
     emit_payload(result, args.format)
     return 0
@@ -119,7 +140,17 @@ def run_serve(args: argparse.Namespace, cfg: Settings) -> int:
 def main(argv: Sequence[str] | None = None, cfg: Settings = settings) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    return args.handler(args, cfg)
+    try:
+        return args.handler(args, cfg)
+    except MucaroCLIError as exc:
+        emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
+        return exc.exit_code
+    except ValueError as exc:
+        emit_error("ERROR_INVALID_INPUT", str(exc), getattr(args, "format", "json"))
+        return 2
+    except OSError as exc:
+        emit_error("ERROR_FILESYSTEM", str(exc), getattr(args, "format", "json"))
+        return 2
 
 
 if __name__ == "__main__":

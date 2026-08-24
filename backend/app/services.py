@@ -12,6 +12,10 @@ from .retrieval import lexical_retrieve
 from .utils import stable_id, utc_now
 
 
+MIN_TOP_K = 1
+MAX_TOP_K = 20
+
+
 def answer_question(
     query: str,
     *,
@@ -24,6 +28,13 @@ def answer_question(
     normalized_query = query.strip()
     if not normalized_query:
         raise ValueError("EMPTY_QUERY")
+    if top_k < MIN_TOP_K or top_k > MAX_TOP_K:
+        return {
+            "status": "ERROR_INVALID_TOP_K",
+            "query": normalized_query,
+            "retrieved_chunks": [],
+            "warnings": [f"TOP_K_RANGE:{MIN_TOP_K}-{MAX_TOP_K}"],
+        }
     cfg.ensure_dirs()
     init_db(cfg.sqlite_path)
     retrieval = lexical_retrieve(normalized_query, get_chunks(cfg), top_k=top_k)

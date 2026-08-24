@@ -6,7 +6,16 @@
   "additionalProperties": false,
   "required": ["status", "query", "retrieved_chunks"],
   "properties": {
-    "status": {"type": "string", "enum": ["RETRIEVAL_OK", "ERROR_NO_SOURCES", "ERROR_NO_RETRIEVAL_CONTEXT"]},
+    "status": {
+      "type": "string",
+      "enum": [
+        "RETRIEVAL_OK",
+        "ERROR_NO_SOURCES",
+        "ERROR_NO_RETRIEVAL_CONTEXT",
+        "ERROR_NO_VALID_CHUNKS",
+        "ERROR_INVALID_TOP_K"
+      ]
+    },
     "query": {"type": "string", "minLength": 1},
     "retrieved_chunks": {
       "type": "array",
@@ -21,6 +30,7 @@
           "score": {"type": "number"}
         }
       }
-    }
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}}
   }
 }
