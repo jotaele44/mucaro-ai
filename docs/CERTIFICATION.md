@@ -9,6 +9,8 @@ The original local-prototype baseline remains frozen at:
 - Tag: `v0.1.0-local-prototype`
 - Commit: `fbc7f2cd785f9c55a8cf7ef9ab58837d55ba1529`
 - Prototype archive SHA256: `5718f66d8393a9661331ccae245049236022ff3de1c1e674d83d5ca2dc3663f7`
+- Interim successor tag: `v0.1.1-local-certified` at
+  `2fe0951b5bfc6243ae907f281377265d89021690`
 
 ## Successor Certification
 
@@ -16,16 +18,16 @@ Date: 2026-08-24
 
 Certified target:
 
-- Tag: `v0.1.1-local-certified`
+- Tag: `v0.1.2-local-certified`
 - Tag target: final certification commit containing this document
 - Implementation evidence through commit: `80c1fb8c5118b85871daf5194ce798d647a2ceaa`
-- Python package version: `0.1.1`
-- Frontend package version: `0.1.1`
+- Python package version: `0.1.2`
+- Frontend package version: `0.1.2`
 
 ## Scope
 
 This certification covers the committed `mucaro-ai` source tree intended for the
-`v0.1.1-local-certified` successor tag.
+`v0.1.2-local-certified` successor tag.
 
 Included:
 
@@ -49,19 +51,19 @@ Excluded by design:
 | Gate | Result |
 |---|---|
 | GitHub repo visibility | PASS: private |
-| Local/remote branch alignment | PASS: `main` pushed to `origin/main`; exact tag target recorded by `v0.1.1-local-certified` |
+| Local/remote branch alignment | PASS: `main` pushed to `origin/main`; exact tag target recorded by `v0.1.2-local-certified` |
 | GitHub issues | PASS: issues #1, #2, and #3 closed with evidence comments |
 | Prior prototype-name residue | PASS: no committed hits for prior prototype identifiers |
 | Secret-pattern scan | PASS: no committed secret material found; `.env.example` model name is an allowed non-secret example |
 | Large committed files | PASS: no committed file over 1 MB |
 | Generated artifact scan | PASS: no committed env, venv, node modules, dist, SQLite, exports, pycache, Finder metadata, or generated ingestion artifacts |
-| Backend tests | PASS: 30 tests passed |
+| Backend tests | PASS: 32 tests passed |
 | JSON schema validation | PASS: `JSON_OK checked=7` |
 | Frontend security audit | PASS: `npm audit --audit-level=moderate` found 0 vulnerabilities |
 | Frontend build | PASS: `npm run build` succeeded |
 | Release certification | PASS: `CERTIFY_RELEASE_OK` |
 | Hosted CI | PASS: implementation run `32751159589` passed on commit `80c1fb8c5118b85871daf5194ce798d647a2ceaa`; final tag target must pass CI before tagging |
-| Fresh clone certification | PASS: `FRESH_CLONE_CERT_OK` from remote `main` |
+| Fresh clone certification | PASS: `FRESH_CLONE_CERT_OK` required from the final tag target before completion |
 | Desktop launcher smoke | PASS: covered by fresh-clone `scripts/launch_app.py --smoke-test --no-browser` |
 
 ## Notes
@@ -77,5 +79,5 @@ Excluded by design:
 
 ## Status
 
-CERTIFIED for `v0.1.1-local-certified` successor tagging after local release,
+CERTIFIED for `v0.1.2-local-certified` successor tagging after local release,
 hosted CI, and fresh-clone gates pass on the final tag target.

@@ -1,6 +1,6 @@
 # Release Status
 
-Current package version: `0.1.1`.
+Current package version: `0.1.2`.
 
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, and fresh-clone validation.
@@ -10,7 +10,7 @@ Observed success markers:
 - `PREFLIGHT_OK`
 - `REFERENCE_EXTRACTION_OK`
 - `JSON_OK`
-- `30 passed` from pytest
+- `32 passed` from pytest
 - `INGEST_FOLDER_OK`
 - `CITATION_OK`
 - `npm audit` reported 0 vulnerabilities after Vite/package-lock repair
