@@ -14,7 +14,7 @@ Observed success markers:
 - `REFERENCE_EXTRACTION_OK`
 - `JSON_OK`
 - `56 passed` from pytest for the certified `v0.1.3-local-hardening` tag
-- `61 passed` from pytest for the `v0.1.4-local-persistent-index` candidate
+- `61 passed` from pytest for the certified `v0.1.4-local-persistent-index` tag
 - Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, hybrid, and persistent strategies
 - `INGEST_FOLDER_OK`
 - `CITATION_OK`
@@ -26,7 +26,7 @@ Observed success markers:
 - GitHub issues #1, #2, and #3 closed with evidence comments
 - GitHub Actions CI passed on the retrieval and CLI hardening commits
 - `v0.1.3-local-hardening` is certified on commit `101e457743a7a0e1b830cbd7e066b6b817af9184`
-- `v0.1.4-local-persistent-index` is the next candidate tag after persistent-index CI and fresh-clone validation
+- `v0.1.4-local-persistent-index` is certified on commit `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`
 
 Local expected marker after first setup:
 

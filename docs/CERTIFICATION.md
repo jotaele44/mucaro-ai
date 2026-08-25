@@ -42,16 +42,19 @@ Certified target:
 - Scope: API upload/runtime hardening, FastAPI integration coverage, parser evidence, retrieval eval gate, explicit live model routing, and improved frontend operator evidence display.
 - Local evidence: `56 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `npm audit` 0 vulnerabilities, frontend build passed, and `CERTIFY_RELEASE_OK`.
 
-## Persistent Index Candidate
+## Persistent Index Certification
 
 Date: 2026-08-24
 
-Candidate target:
+Certified target:
 
-- Candidate tag: `v0.1.4-local-persistent-index`
-- Candidate package version: `0.1.4`
+- Tag: `v0.1.4-local-persistent-index`
+- Package version: `0.1.4`
+- Commit: `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`
+- CI run: `32760785579`
 - Scope: explicit persistent local TF-IDF strategy, ingestion-time index rebuild, stale-index rejection, CLI/API strategy selection, and retrieval eval coverage for persistent retrieval.
-- Candidate local evidence: `61 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `npm audit` 0 vulnerabilities, and frontend build passed before final release certification.
+- Local evidence: `61 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `npm audit` 0 vulnerabilities, frontend build passed, and `CERTIFY_RELEASE_OK`.
+- Fresh clone evidence: `FRESH_CLONE_CERT_OK` from `v0.1.4-local-persistent-index`.
 
 ## Scope
 
@@ -98,9 +101,10 @@ Excluded by design:
 ## Notes
 
 - This is a bounded local-first certification, not a production-readiness claim.
-- Persistent vector databases such as Chroma remain a queued Phase 2 scalability
-  item. The certified retrieval upgrade is deterministic local TF-IDF vector and
-  hybrid retrieval behind the existing answer trace contract.
+- Persistent vector databases such as Chroma remain a queued scalability item.
+  The certified retrieval upgrade is deterministic local TF-IDF vector, hybrid,
+  and persistent local TF-IDF retrieval behind the existing answer trace
+  contract. See `docs/RETRIEVAL_UPGRADE_PLAN.md`.
 - The final pre-tag CI update moved GitHub Actions to current major versions:
   `actions/checkout@v7`, `actions/setup-python@v7`, and `actions/setup-node@v7`.
 - Reference repo cloning still depends on local internet/DNS access and remains
@@ -108,5 +112,5 @@ Excluded by design:
 
 ## Status
 
-CERTIFIED for `v0.1.2-local-certified` successor tagging after local release,
-hosted CI, and fresh-clone gates pass on the final tag target.
+CERTIFIED through `v0.1.4-local-persistent-index` after local release, hosted CI,
+retrieval eval, and fresh-clone gates passed on the final tag target.
