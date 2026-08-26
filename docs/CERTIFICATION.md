@@ -66,7 +66,7 @@ Candidate target:
 - Candidate package version: `0.1.14`
 - Baseline preserved: `v0.1.4-local-persistent-index` at `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`; interim combined tag `v0.1.9-all-vectors-certified` at `b5deea7170eb1c94b5238e9a923827e6dc913213`
 - Scope: source library delete/reindex controls, retrieval strategy UI, no-context recovery guidance, expanded retrieval eval corpus, optional local operator token boundary, workspace profiles, structured run history, conversation follow-up context, conversation rename/delete/search, directory access UI, desktop package self-test, CLI `--version`, early `ask --top-k` validation, CLI source listing, CLI source deletion, CLI reindexing, CLI index status, CLI conversation create/list/show/rename/delete/ask, CLI run list/summary/show, and opt-in `bm25_v1` retrieval.
-- Candidate local evidence: pending final run on the `v0.1.14-bm25-retrieval` target.
+- Candidate local evidence: `79 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `DESKTOP_PACKAGE_READY`, `npm audit` 0 vulnerabilities, frontend build passed, and `CERTIFY_RELEASE_OK`.
 - Required external receipt: hosted CI and fresh-clone certification must pass on the final pushed commit before tagging.
 
 ## Scope
