@@ -9,6 +9,16 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from .config import Settings, settings
+from .conversations import (
+    append_answer_turn,
+    build_conversation_context,
+    create_conversation,
+    delete_conversation,
+    get_conversation,
+    list_conversations,
+    rename_conversation,
+)
+from .db import list_payloads
 from .execution_gate import analyze_task
 from .ingestion import (
     delete_source,
@@ -58,7 +68,7 @@ def package_version() -> str:
     try:
         return importlib.metadata.version("mucaro-ai")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.12-dev"
+        return "0.1.13-dev"
 
 
 def parse_top_k(value: str) -> int:
@@ -115,6 +125,61 @@ def build_parser() -> argparse.ArgumentParser:
     sources_delete.add_argument("source_id", help="Source identifier to remove from the local source library.")
     sources_delete.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     sources_delete.set_defaults(handler=run_sources_delete)
+
+    conversations = subcommands.add_parser("conversations", help="Manage persistent local chat sessions.")
+    conversations_subcommands = conversations.add_subparsers(dest="conversations_command", required=True)
+
+    conversations_list = conversations_subcommands.add_parser("list", help="List saved conversations.")
+    conversations_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    conversations_list.set_defaults(handler=run_conversations_list)
+
+    conversations_create = conversations_subcommands.add_parser("create", help="Create a saved conversation.")
+    conversations_create.add_argument("--title", default=None, help="Optional conversation title.")
+    conversations_create.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    conversations_create.set_defaults(handler=run_conversations_create)
+
+    conversations_show = conversations_subcommands.add_parser("show", help="Show one saved conversation.")
+    conversations_show.add_argument("conversation_id", help="Conversation identifier.")
+    conversations_show.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    conversations_show.set_defaults(handler=run_conversations_show)
+
+    conversations_rename = conversations_subcommands.add_parser("rename", help="Rename one saved conversation.")
+    conversations_rename.add_argument("conversation_id", help="Conversation identifier.")
+    conversations_rename.add_argument("title", nargs="+", help="New conversation title.")
+    conversations_rename.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    conversations_rename.set_defaults(handler=run_conversations_rename)
+
+    conversations_delete = conversations_subcommands.add_parser("delete", help="Delete one saved conversation.")
+    conversations_delete.add_argument("conversation_id", help="Conversation identifier.")
+    conversations_delete.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    conversations_delete.set_defaults(handler=run_conversations_delete)
+
+    conversations_ask = conversations_subcommands.add_parser("ask", help="Ask inside a saved conversation.")
+    conversations_ask.add_argument("conversation_id", help="Conversation identifier.")
+    conversations_ask.add_argument("query", nargs="+", help="Question to answer from ingested local sources.")
+    conversations_ask.add_argument("--top-k", type=parse_top_k, default=5, help=f"Maximum retrieved chunks to use ({MIN_TOP_K}-{MAX_TOP_K}).")
+    conversations_ask.add_argument("--strategy", choices=sorted(RETRIEVAL_STRATEGIES), default="hybrid", help="Retrieval strategy to use.")
+    conversations_ask.add_argument("--provider", choices=["mock", "anthropic"], help="Model provider override.")
+    conversations_ask.add_argument("--model", help="Model name override.")
+    conversations_ask.add_argument("--allow-mock-fallback", action="store_true", help="Permit mock fallback when a live provider is unavailable.")
+    conversations_ask.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    conversations_ask.set_defaults(handler=run_conversations_ask)
+
+    runs = subcommands.add_parser("runs", help="Inspect persisted answer runs.")
+    runs_subcommands = runs.add_subparsers(dest="runs_command", required=True)
+
+    runs_list = runs_subcommands.add_parser("list", help="List persisted answer runs.")
+    runs_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    runs_list.set_defaults(handler=run_runs_list)
+
+    runs_summary = runs_subcommands.add_parser("summary", help="Summarize persisted answer runs.")
+    runs_summary.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    runs_summary.set_defaults(handler=run_runs_summary)
+
+    runs_show = runs_subcommands.add_parser("show", help="Show one persisted answer run.")
+    runs_show.add_argument("run_id", help="Run identifier.")
+    runs_show.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    runs_show.set_defaults(handler=run_runs_show)
 
     index = subcommands.add_parser("index", help="Inspect retrieval index health.")
     index_subcommands = index.add_subparsers(dest="index_command", required=True)
@@ -173,13 +238,50 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         return
     status = payload.get("status") or payload.get("citation_status") or "OK"
     print(status)
-    if "answer" in payload:
+    if "run_id" in payload:
+        print(f"run_id={payload.get('run_id')}")
+        print(f"citation_status={payload.get('citation_status')}")
+        print(f"retrieval_strategy={payload.get('retrieval_strategy')}")
+        if payload.get("answer"):
+            print(payload.get("answer"))
+    elif "answer" in payload:
         print(payload["answer"])
     elif "files_ingested" in payload:
         print(f"files_ingested={payload['files_ingested']}")
     elif "source" in payload:
         source = payload["source"]
         print(f"source_id={source.get('source_id')} chunks_added={payload.get('chunks_added', 0)}")
+    elif "answer" in payload and "conversation" in payload:
+        answer = payload.get("answer", {})
+        conversation = payload.get("conversation", {})
+        print(f"conversation_id={conversation.get('conversation_id')}")
+        if isinstance(answer, dict):
+            print(f"answer_status={answer.get('citation_status') or answer.get('status')}")
+            if answer.get("run_id"):
+                print(f"run_id={answer.get('run_id')}")
+            if answer.get("answer"):
+                print(answer.get("answer"))
+    elif "conversations" in payload:
+        print(f"conversations={len(payload.get('conversations', []))}")
+        for conversation in payload.get("conversations", []):
+            print(
+                f"{conversation.get('conversation_id')} {conversation.get('title')} "
+                f"turns={conversation.get('turn_count', 0)} status={conversation.get('last_status')}"
+            )
+    elif "conversation_id" in payload and "turns" in payload:
+        print(f"conversation_id={payload.get('conversation_id')}")
+        print(f"title={payload.get('title')}")
+        print(f"turns={len(payload.get('turns', []))}")
+        for turn in payload.get("turns", []):
+            print(f"{turn.get('role')} {turn.get('status')} {turn.get('run_id') or ''}".rstrip())
+    elif "runs" in payload:
+        print(f"runs={len(payload.get('runs', []))}")
+        for run in payload.get("runs", []):
+            print(f"{run.get('run_id')} {run.get('citation_status') or run.get('status')} {run.get('retrieval_strategy')}")
+    elif payload.get("status") == "RUN_HISTORY_OK":
+        print(f"run_count={payload.get('run_count', 0)}")
+        print(f"citation_ok={payload.get('citation_ok', 0)}")
+        print(f"latest_run_id={payload.get('latest_run_id')}")
     elif "sources" in payload:
         print(f"sources={len(payload.get('sources', []))}")
         index = payload.get("index", {})
@@ -211,6 +313,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(grant.get("canonical_root"))
     elif "canonical_root" in payload:
         print(f"canonical_root={payload.get('canonical_root')}")
+    elif payload.get("status") in {"CONVERSATION_DELETE_OK", "ERROR_CONVERSATION_NOT_FOUND"}:
+        print(f"conversation_id={payload.get('conversation_id')}")
+        print(f"removed={payload.get('removed')}")
     elif "path" in payload:
         print(f"path={payload.get('path')}")
 
@@ -276,6 +381,101 @@ def run_sources_delete(args: argparse.Namespace, cfg: Settings) -> int:
     result = delete_source(args.source_id, cfg)
     emit_payload(result, args.format)
     return 0 if result.get("status") == "SOURCE_DELETE_OK" else 2
+
+
+def run_conversations_list(args: argparse.Namespace, cfg: Settings) -> int:
+    result = {"status": "CONVERSATIONS_OK", "conversations": list_conversations(cfg)}
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_conversations_create(args: argparse.Namespace, cfg: Settings) -> int:
+    result = create_conversation(args.title, cfg)
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_conversations_show(args: argparse.Namespace, cfg: Settings) -> int:
+    conversation = get_conversation(args.conversation_id, cfg)
+    if conversation is None:
+        emit_payload({"status": "ERROR_CONVERSATION_NOT_FOUND", "conversation_id": args.conversation_id}, args.format)
+        return 2
+    emit_payload(conversation, args.format)
+    return 0
+
+
+def run_conversations_rename(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = rename_conversation(args.conversation_id, " ".join(args.title), cfg)
+    except KeyError:
+        emit_payload({"status": "ERROR_CONVERSATION_NOT_FOUND", "conversation_id": args.conversation_id}, args.format)
+        return 2
+    except ValueError as exc:
+        raise MucaroCLIError(str(exc), "Conversation title is required.") from exc
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_conversations_delete(args: argparse.Namespace, cfg: Settings) -> int:
+    result = delete_conversation(args.conversation_id, cfg)
+    emit_payload(result, args.format)
+    return 0 if result.get("status") == "CONVERSATION_DELETE_OK" else 2
+
+
+def run_conversations_ask(args: argparse.Namespace, cfg: Settings) -> int:
+    conversation = get_conversation(args.conversation_id, cfg)
+    if conversation is None:
+        emit_payload({"status": "ERROR_CONVERSATION_NOT_FOUND", "conversation_id": args.conversation_id}, args.format)
+        return 2
+    answer = answer_question(
+        " ".join(args.query),
+        top_k=args.top_k,
+        retrieval_strategy=args.strategy,
+        model_provider=args.provider,
+        model_name=args.model,
+        allow_mock_fallback=args.allow_mock_fallback,
+        conversation_context=build_conversation_context(conversation),
+        cfg=cfg,
+    )
+    updated = append_answer_turn(args.conversation_id, " ".join(args.query), answer, cfg)
+    emit_payload({"status": "CONVERSATION_ASK_OK", "answer": answer, "conversation": updated}, args.format)
+    if answer.get("status", "").startswith("ERROR_"):
+        return 2
+    return 0 if answer.get("citation_status") == "CITATION_OK" else 3
+
+
+def run_runs_list(args: argparse.Namespace, cfg: Settings) -> int:
+    result = {"status": "RUNS_OK", "runs": list_payloads("runs", cfg.sqlite_path)}
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_runs_summary(args: argparse.Namespace, cfg: Settings) -> int:
+    rows = list_payloads("runs", cfg.sqlite_path)
+    citation_ok = sum(1 for run in rows if run.get("citation_status") == "CITATION_OK")
+    by_strategy: dict[str, int] = {}
+    for run in rows:
+        strategy = str(run.get("retrieval_strategy") or "unknown")
+        by_strategy[strategy] = by_strategy.get(strategy, 0) + 1
+    result = {
+        "status": "RUN_HISTORY_OK",
+        "run_count": len(rows),
+        "citation_ok": citation_ok,
+        "citation_error": len(rows) - citation_ok,
+        "by_retrieval_strategy": by_strategy,
+        "latest_run_id": rows[-1].get("run_id") if rows else None,
+    }
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_runs_show(args: argparse.Namespace, cfg: Settings) -> int:
+    for run in list_payloads("runs", cfg.sqlite_path):
+        if run.get("run_id") == args.run_id:
+            emit_payload(run, args.format)
+            return 0
+    emit_payload({"status": "ERROR_RUN_NOT_FOUND", "run_id": args.run_id}, args.format)
+    return 2
 
 
 def run_index_status(args: argparse.Namespace, cfg: Settings) -> int:

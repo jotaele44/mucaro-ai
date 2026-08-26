@@ -133,6 +133,9 @@ python scripts/mucaro.py ingest ~/Documents/mucaro-sources
 python scripts/mucaro.py sources list --format text
 python scripts/mucaro.py index status --format json
 python scripts/mucaro.py sources reindex --format text
+python scripts/mucaro.py conversations create --title "Source lineage"
+python scripts/mucaro.py conversations ask CONVERSATION_ID "How does source lineage work?" --strategy persistent
+python scripts/mucaro.py runs summary --format text
 python scripts/mucaro.py ask "How does source lineage work?" --format text
 python scripts/mucaro.py ask "How does source lineage work?" --strategy persistent --format text
 python scripts/mucaro.py plan "Add a CLI capability" --input mucaro-ai
@@ -150,6 +153,9 @@ mucaro ingest ~/Documents/mucaro-sources
 mucaro sources list --format text
 mucaro index status --format json
 mucaro sources reindex --format text
+mucaro conversations create --title "Source lineage"
+mucaro conversations ask CONVERSATION_ID "How does source lineage work?" --strategy persistent
+mucaro runs summary --format text
 mucaro ask "How does source lineage work?" --format text
 mucaro ask "How does source lineage work?" --strategy persistent --format text
 mucaro plan "Add a CLI capability" --input mucaro-ai
@@ -176,6 +182,10 @@ The browser app includes the same permission workflow in the Directory Access pa
 The CLI can also inspect and maintain the local source library: `mucaro sources
 list`, `mucaro index status`, `mucaro sources reindex`, and `mucaro sources
 delete SOURCE_ID`.
+
+The installed CLI also manages saved chat sessions and run history with
+`mucaro conversations ...` and `mucaro runs ...`, matching the app's durable
+conversation and answer-trace model.
 
 The browser app also persists local chat sessions. Each conversation keeps ordered user and assistant turns, supports chat search, rename, and delete, uses recent turns for follow-up questions, and keeps cited answer traces exportable by `run_id`.
 

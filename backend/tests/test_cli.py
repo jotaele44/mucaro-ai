@@ -70,7 +70,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.12\n"
+    assert output == "mucaro 0.1.13\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -122,6 +122,88 @@ def test_cli_sources_list_reindex_and_delete(tmp_path: Path, capsys):
     list_output = capsys.readouterr().out
     assert "SOURCES_OK" in list_output
     assert "sources=0" in list_output
+
+
+def test_cli_conversations_ask_and_runs(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    input_dir = tmp_path / "data" / "input"
+    input_dir.mkdir(parents=True)
+    sample = input_dir / "sample.md"
+    sample.write_text("Source lineage requires cited chunk IDs and source IDs.", encoding="utf-8")
+
+    assert main(["ingest", "data/input", "--format", "json"], cfg=cfg) == 0
+    capsys.readouterr()
+
+    assert main(["conversations", "create", "--title", "Lineage", "--format", "json"], cfg=cfg) == 0
+    created = json.loads(capsys.readouterr().out)
+    conversation_id = created["conversation_id"]
+    assert created["title"] == "Lineage"
+
+    assert main(["conversations", "list", "--format", "text"], cfg=cfg) == 0
+    list_output = capsys.readouterr().out
+    assert "CONVERSATIONS_OK" in list_output
+    assert conversation_id in list_output
+
+    assert (
+        main(
+            [
+                "conversations",
+                "ask",
+                conversation_id,
+                "What",
+                "does",
+                "source",
+                "lineage",
+                "require?",
+                "--strategy",
+                "persistent",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    asked = json.loads(capsys.readouterr().out)
+    assert asked["answer"]["citation_status"] == "CITATION_OK"
+    assert asked["conversation"]["conversation_id"] == conversation_id
+    assert len(asked["conversation"]["turns"]) == 2
+    run_id = asked["answer"]["run_id"]
+
+    assert main(["runs", "summary", "--format", "json"], cfg=cfg) == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["status"] == "RUN_HISTORY_OK"
+    assert summary["run_count"] == 1
+    assert summary["latest_run_id"] == run_id
+
+    assert main(["runs", "show", run_id, "--format", "text"], cfg=cfg) == 0
+    run_output = capsys.readouterr().out
+    assert "CITATION_OK" in run_output
+    assert "persistent_tfidf_v1" in run_output
+
+    assert main(["conversations", "rename", conversation_id, "Renamed", "Lineage", "--format", "json"], cfg=cfg) == 0
+    renamed = json.loads(capsys.readouterr().out)
+    assert renamed["title"] == "Renamed Lineage"
+
+    assert main(["conversations", "delete", conversation_id, "--format", "json"], cfg=cfg) == 0
+    deleted = json.loads(capsys.readouterr().out)
+    assert deleted["status"] == "CONVERSATION_DELETE_OK"
+
+    assert main(["runs", "show", run_id, "--format", "json"], cfg=cfg) == 0
+    preserved = json.loads(capsys.readouterr().out)
+    assert preserved["run_id"] == run_id
+
+
+def test_cli_conversation_and_run_missing_ids(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["conversations", "show", "conv_missing", "--format", "json"], cfg=cfg) == 2
+    missing_conversation = json.loads(capsys.readouterr().out)
+    assert missing_conversation["status"] == "ERROR_CONVERSATION_NOT_FOUND"
+
+    assert main(["runs", "show", "run_missing", "--format", "json"], cfg=cfg) == 2
+    missing_run = json.loads(capsys.readouterr().out)
+    assert missing_run["status"] == "ERROR_RUN_NOT_FOUND"
 
 
 def test_cli_serve_passes_host_port_and_reload(tmp_path: Path, monkeypatch):

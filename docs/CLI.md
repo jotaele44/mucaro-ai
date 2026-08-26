@@ -36,6 +36,15 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro sources reindex` | Rebuild the local persistent retrieval index | 0 | 2 |
 | `mucaro sources delete SOURCE_ID` | Delete one ingested source and rebuild the index | 0 | 2 |
 | `mucaro index status` | Inspect local persistent index health | 0 | 2 |
+| `mucaro conversations list` | List saved local chat sessions | 0 | 2 |
+| `mucaro conversations create` | Create a saved local chat session | 0 | 2 |
+| `mucaro conversations ask CONVERSATION_ID QUERY` | Ask with saved conversation context | 0 | 2 or 3 |
+| `mucaro conversations show CONVERSATION_ID` | Show a saved conversation and its turns | 0 | 2 |
+| `mucaro conversations rename CONVERSATION_ID TITLE` | Rename a saved conversation | 0 | 2 |
+| `mucaro conversations delete CONVERSATION_ID` | Delete a saved conversation while preserving runs | 0 | 2 |
+| `mucaro runs list` | List persisted answer traces | 0 | 2 |
+| `mucaro runs summary` | Summarize persisted answer traces | 0 | 2 |
+| `mucaro runs show RUN_ID` | Show one persisted answer trace | 0 | 2 |
 | `mucaro plan REQUEST` | Analyze a task with the Planning Gate | 0 | 2 |
 | `mucaro permissions COMMAND` | Manage user-directory access grants | 0 | 2 |
 | `mucaro validate` | Validate JSON artifacts and schemas | 0 | 2 |
@@ -90,6 +99,8 @@ retrieval payloads where practical:
 | `INDEX_MISSING` | `index status` found no persistent index |
 | `INDEX_STALE` | `index status` found an index that no longer matches current chunks |
 | `ERROR_SOURCE_NOT_FOUND` | `sources delete` was given an unknown source ID |
+| `ERROR_CONVERSATION_NOT_FOUND` | a conversation command was given an unknown conversation ID |
+| `ERROR_RUN_NOT_FOUND` | `runs show` was given an unknown run ID |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
@@ -105,6 +116,11 @@ mucaro ingest ~/Documents/mucaro-sources --format json
 mucaro sources list --format text
 mucaro index status --format json
 mucaro sources reindex --format text
+mucaro conversations create --title "Source lineage" --format json
+mucaro conversations list --format text
+mucaro conversations ask CONVERSATION_ID "How does source lineage work?" --strategy persistent --format json
+mucaro runs summary --format text
+mucaro runs show RUN_ID --format json
 mucaro ask "How does source lineage work?" --format json --no-persist
 mucaro ask "How does source lineage work?" --strategy persistent --format text
 mucaro plan "Add CLI capability" --input mucaro-ai --format text
@@ -138,6 +154,14 @@ Use `mucaro index status` to check whether the persistent index is usable. Use
 files. Use `mucaro sources list` to inspect the local source library and
 `mucaro sources delete SOURCE_ID` to remove one source from the assistant's
 knowledge base.
+
+## Conversation And Run History
+
+Use `mucaro conversations create` to start a saved chat session and `mucaro
+conversations ask CONVERSATION_ID QUERY` to ask follow-up questions with recent
+turn context. Conversation deletion only removes the chat session; persisted
+answer traces remain inspectable through `mucaro runs list`, `mucaro runs
+summary`, and `mucaro runs show RUN_ID`.
 
 ## Live Model Mode
 

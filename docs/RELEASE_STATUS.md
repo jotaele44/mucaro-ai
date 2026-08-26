@@ -1,6 +1,6 @@
 # Release Status
 
-Current package version: `0.1.12`.
+Current package version: `0.1.13`.
 
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, fresh-clone validation, API upload
@@ -11,7 +11,8 @@ operator upgrades add source deletion/reindexing, retrieval strategy selection
 in the UI, expanded retrieval eval coverage, optional local operator auth,
 workspace profiles, structured run history, conversation rename/delete/search,
 desktop package self-testing, CLI `--version`, early `ask --top-k`
-validation, and CLI source/index management.
+validation, CLI source/index management, CLI conversation management, and CLI
+run-history inspection.
 
 Observed success markers:
 
@@ -35,7 +36,7 @@ Observed success markers:
 - `v0.1.3-local-hardening` is certified on commit `101e457743a7a0e1b830cbd7e066b6b817af9184`
 - `v0.1.4-local-persistent-index` is certified on commit `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`
 - `v0.1.9-all-vectors-certified` is certified on commit `b5deea7170eb1c94b5238e9a923827e6dc913213`
-- `v0.1.12-cli-source-index` is the current candidate target for the combined operator/admin/context baseline, chat management controls, CLI boundary hardening, CLI source/index management, and fresh-clone launcher certification
+- `v0.1.13-cli-assistant-history` is the current candidate target for the combined operator/admin/context baseline, chat management controls, CLI boundary hardening, CLI source/index management, CLI conversation/run history, and fresh-clone launcher certification
 
 Local expected marker after first setup:
 
