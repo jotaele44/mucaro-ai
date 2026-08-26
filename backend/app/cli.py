@@ -37,6 +37,7 @@ from .permissions import (
     load_directory_grants,
     revoke_directory,
 )
+from .product_audit import build_product_audit
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .services import answer_question
 from .validation import validate_project_json
@@ -70,7 +71,7 @@ def package_version() -> str:
     try:
         return importlib.metadata.version("mucaro-ai")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.15-dev"
+        return "0.1.16-dev"
 
 
 def parse_top_k(value: str) -> int:
@@ -116,6 +117,14 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--format", choices=["json", "text"], default="text", help="Output format.")
     doctor.add_argument("--strict", action="store_true", help="Exit nonzero when warnings or failures are present.")
     doctor.set_defaults(handler=run_doctor)
+
+    audit = subcommands.add_parser("audit", help="Audit product completion against the target objective.")
+    audit_subcommands = audit.add_subparsers(dest="audit_command", required=True)
+
+    audit_product = audit_subcommands.add_parser("product", help="Audit ChatGPT/Claude-like product gaps.")
+    audit_product.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    audit_product.add_argument("--strict", action="store_true", help="Exit nonzero while product gaps remain open.")
+    audit_product.set_defaults(handler=run_audit_product)
 
     sources = subcommands.add_parser("sources", help="Inspect and manage ingested sources.")
     sources_subcommands = sources.add_subparsers(dest="sources_command", required=True)
@@ -258,6 +267,17 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"{check.get('status')} {check.get('name')} {check.get('detail')}")
         for recommendation in payload.get("recommendations", []):
             print(f"recommendation={recommendation}")
+    elif status in {"PRODUCT_AUDIT_OK", "PRODUCT_AUDIT_OPEN", "PRODUCT_AUDIT_BLOCKED"}:
+        counts = payload.get("counts", {})
+        print(f"readiness_percent={payload.get('readiness_percent')}")
+        if isinstance(counts, dict):
+            print(f"pass={counts.get('pass', 0)}")
+            print(f"open={counts.get('open', 0)}")
+            print(f"blocked={counts.get('blocked', 0)}")
+            print(f"total={counts.get('total', 0)}")
+        print(f"next_recommended_vector={payload.get('next_recommended_vector')}")
+        for requirement in payload.get("requirements", []):
+            print(f"{requirement.get('status')} {requirement.get('requirement_id')} {requirement.get('gap')}")
     elif "answer" in payload and "conversation" in payload:
         answer = payload.get("answer", {})
         conversation = payload.get("conversation", {})
@@ -521,6 +541,14 @@ def run_doctor(args: argparse.Namespace, cfg: Settings) -> int:
     report = build_doctor_report(cfg)
     emit_payload(report, args.format)
     if args.strict and report["status"] != "DOCTOR_OK":
+        return 2
+    return 0
+
+
+def run_audit_product(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_product_audit(cfg)
+    emit_payload(report, args.format)
+    if args.strict and report["status"] != "PRODUCT_AUDIT_OK":
         return 2
     return 0
 

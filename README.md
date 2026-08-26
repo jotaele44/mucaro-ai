@@ -129,6 +129,7 @@ See `docs/CLI.md` for exit codes, retrieval strategies, structured error payload
 ```bash
 python scripts/mucaro.py ingest data/input
 python scripts/mucaro.py doctor
+python scripts/mucaro.py audit product --format text
 python scripts/mucaro.py permissions grant ~/Documents/mucaro-sources --yes
 python scripts/mucaro.py ingest ~/Documents/mucaro-sources
 python scripts/mucaro.py sources list --format text
@@ -150,6 +151,7 @@ After `python -m pip install -e ".[dev]"`, the installed console command is avai
 ```bash
 mucaro --version
 mucaro doctor
+mucaro audit product --format text
 mucaro ingest data/input
 mucaro permissions grant ~/Documents/mucaro-sources --yes
 mucaro ingest ~/Documents/mucaro-sources
@@ -184,6 +186,9 @@ Direct filesystem ingestion outside the project directory is permission-gated. G
 Use `mucaro doctor` to check local assistant readiness across source ingestion,
 index health, directory grants, model-provider setup, API auth posture, saved
 conversations, and answer runs.
+
+Use `mucaro audit product` to track what is complete versus still open against
+the full ChatGPT/Claude-like local assistant target.
 
 The browser app includes the same permission workflow in the Directory Access panel.
 

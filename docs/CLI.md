@@ -31,6 +31,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | Command | Purpose | Success Exit | Failure Exit |
 |---|---|---:|---:|
 | `mucaro doctor` | Check local assistant readiness | 0 | 2 with `--strict` warnings/failures |
+| `mucaro audit product` | Audit product gaps against the full assistant objective | 0 | 2 with `--strict` while gaps remain |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources and persistent index status | 0 | 2 |
@@ -104,6 +105,8 @@ retrieval payloads where practical:
 | `ERROR_RUN_NOT_FOUND` | `runs show` was given an unknown run ID |
 | `DOCTOR_WARN` | readiness check found missing or incomplete local setup |
 | `DOCTOR_FAIL` | readiness check found unsupported or invalid local setup |
+| `PRODUCT_AUDIT_OPEN` | product audit found remaining ChatGPT/Claude-comparability gaps |
+| `PRODUCT_AUDIT_BLOCKED` | product audit found a blocked requirement |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
@@ -114,6 +117,7 @@ retrieval payloads where practical:
 mucaro ingest data/input --format text
 mucaro --version
 mucaro doctor
+mucaro audit product --format text
 mucaro permissions grant ~/Documents/mucaro-sources --yes --format json
 mucaro permissions list --format text
 mucaro ingest ~/Documents/mucaro-sources --format json
@@ -156,6 +160,10 @@ granting access. The report checks project paths, local data directories,
 source/chunk counts, persistent index status, directory grants, model-provider
 readiness, API auth posture, conversations, and runs. Add `--strict` when
 automation should fail on warnings.
+
+Use `mucaro audit product` to classify the broader assistant objective as
+requirement rows with `PASS`, `OPEN`, or `BLOCKED` status. Add `--strict` when
+automation should fail while any product gap remains open.
 
 ## Retrieval Strategies
 

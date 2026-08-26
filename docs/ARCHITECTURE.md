@@ -44,6 +44,11 @@ same operational domains: paths, sources, chunks, persistent index status,
 directory grants, model-provider setup, API auth posture, conversations, and
 runs.
 
+The CLI `audit product` command provides a broader completion matrix for the
+ChatGPT/Claude-like local assistant objective. It intentionally reports OPEN
+while semantic vector-store retrieval, general tool-use, multimodal support,
+personalized memory, or production hardening remain incomplete.
+
 ## Packaging layer
 
 The desktop package flow is validated by `scripts/package_desktop.py --self-test`. It verifies launcher, bootstrap, frontend lockfile, and package metadata inputs without writing generated artifacts during certification.

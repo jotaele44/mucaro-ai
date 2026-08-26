@@ -71,7 +71,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.15\n"
+    assert output == "mucaro 0.1.16\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -115,6 +115,26 @@ def test_cli_doctor_reports_ready_state_after_local_setup(tmp_path: Path, capsys
     assert payload["summary"]["source_count"] == 1
     assert payload["summary"]["index_status"] == "INDEX_OK"
     assert payload["summary"]["auth_required"] is True
+
+
+def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["audit", "product", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "PRODUCT_AUDIT_OPEN"
+    assert payload["readiness_percent"] < 100
+    by_id = {row["requirement_id"]: row for row in payload["requirements"]}
+    assert by_id["permission_gated_user_directory"]["status"] == "PASS"
+    assert by_id["source_lineage_citations"]["status"] == "PASS"
+    assert by_id["semantic_vector_store"]["status"] == "OPEN"
+    assert by_id["tool_use_and_actions"]["status"] == "OPEN"
+    assert payload["next_recommended_vector"] == "semantic_vector_store"
+
+    assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 2
+    strict_output = capsys.readouterr().out
+    assert "PRODUCT_AUDIT_OPEN" in strict_output
+    assert "OPEN semantic_vector_store" in strict_output
 
 
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):
