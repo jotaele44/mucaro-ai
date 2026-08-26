@@ -140,6 +140,7 @@ python scripts/mucaro.py serve --reload
 After `python -m pip install -e ".[dev]"`, the installed console command is available:
 
 ```bash
+mucaro --version
 mucaro ingest data/input
 mucaro permissions grant ~/Documents/mucaro-sources --yes
 mucaro ingest ~/Documents/mucaro-sources

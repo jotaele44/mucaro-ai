@@ -17,6 +17,7 @@ After installation, use:
 
 ```bash
 mucaro --help
+mucaro --version
 ```
 
 For one-off development without installing the console entry point:
@@ -35,6 +36,11 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro permissions COMMAND` | Manage user-directory access grants | 0 | 2 |
 | `mucaro validate` | Validate JSON artifacts and schemas | 0 | 2 |
 | `mucaro serve` | Start the local FastAPI server | 0 | 2 |
+
+Global flags:
+
+- `--version` prints the installed package version for fresh-clone and support
+  receipts.
 
 ## Output Contracts
 
@@ -75,6 +81,8 @@ retrieval payloads where practical:
 | `ERROR_PERSISTENT_INDEX_MISSING` | `--strategy persistent` was requested before an index was built |
 | `ERROR_PERSISTENT_INDEX_STALE` | `--strategy persistent` index does not match current chunks |
 | `ERROR_INVALID_TOP_K` | `--top-k` is outside the supported range |
+| `TOP_K_RANGE:1-20` | CLI argument validation rejected `ask --top-k` before retrieval ran |
+| `TOP_K_MUST_BE_INTEGER` | CLI argument validation rejected a non-integer `ask --top-k` |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
@@ -83,6 +91,7 @@ retrieval payloads where practical:
 
 ```bash
 mucaro ingest data/input --format text
+mucaro --version
 mucaro permissions grant ~/Documents/mucaro-sources --yes --format json
 mucaro permissions list --format text
 mucaro ingest ~/Documents/mucaro-sources --format json

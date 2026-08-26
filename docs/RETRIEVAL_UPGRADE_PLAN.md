@@ -40,10 +40,12 @@ but it should not replace the default `hybrid` strategy until eval evidence
 shows a material improvement.
 
 The first development cycle keeps retrieval behavior unchanged and tightens the
-ingestion/access boundary first. This preserves the certified
-`persistent_tfidf_v1` contract while allowing larger local user-directory
-corpora to be ingested through an explicit permission gate for future retrieval
-evaluation.
+operator boundary first: directory access remains permission-gated, `ask
+--top-k` is validated before retrieval runs, and the installed `mucaro`
+console command exposes `--version` for fresh-clone receipts. This preserves the
+certified `persistent_tfidf_v1` contract while allowing larger local
+user-directory corpora to be ingested through an explicit permission gate for
+future retrieval evaluation.
 
 Candidate strategy name:
 

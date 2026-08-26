@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import json
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -16,7 +18,7 @@ from .permissions import (
     load_directory_grants,
     revoke_directory,
 )
-from .retrieval import RETRIEVAL_STRATEGIES
+from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .services import answer_question
 from .validation import validate_project_json
 
@@ -39,16 +41,40 @@ def parse_port(value: str) -> int:
     return port
 
 
+def package_version() -> str:
+    pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            return str(tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["version"])
+        except (KeyError, tomllib.TOMLDecodeError):
+            pass
+    try:
+        return importlib.metadata.version("mucaro-ai")
+    except importlib.metadata.PackageNotFoundError:
+        return "0.1.11-dev"
+
+
+def parse_top_k(value: str) -> int:
+    try:
+        top_k = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("TOP_K_MUST_BE_INTEGER") from exc
+    if top_k < MIN_TOP_K or top_k > MAX_TOP_K:
+        raise argparse.ArgumentTypeError(f"TOP_K_RANGE:{MIN_TOP_K}-{MAX_TOP_K}")
+    return top_k
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mucaro",
         description="Command line interface for the local-first Mucaro AI.",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {package_version()}")
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     ask = subcommands.add_parser("ask", help="Ask a cited retrieval question.")
     ask.add_argument("query", nargs="+", help="Question to answer from ingested local sources.")
-    ask.add_argument("--top-k", type=int, default=5, help="Maximum retrieved chunks to use.")
+    ask.add_argument("--top-k", type=parse_top_k, default=5, help=f"Maximum retrieved chunks to use ({MIN_TOP_K}-{MAX_TOP_K}).")
     ask.add_argument("--strategy", choices=sorted(RETRIEVAL_STRATEGIES), default="hybrid", help="Retrieval strategy to use.")
     ask.add_argument("--provider", choices=["mock", "anthropic"], help="Model provider override.")
     ask.add_argument("--model", help="Model name override.")

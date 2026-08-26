@@ -63,6 +63,15 @@ def test_cli_help_lists_serve(capsys):
     assert "serve" in output
 
 
+def test_cli_version(capsys):
+    try:
+        main(["--version"])
+    except SystemExit as exc:
+        assert exc.code == 0
+    output = capsys.readouterr().out
+    assert output == "mucaro 0.1.11\n"
+
+
 def test_cli_validate_text_output(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
@@ -152,6 +161,9 @@ def test_cli_ask_no_sources_returns_error_status(tmp_path: Path, capsys):
 def test_cli_ask_invalid_top_k_returns_error_status(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
-    assert main(["ask", "What is source lineage?", "--top-k", "0", "--format", "json"], cfg=cfg) == 2
-    output = capsys.readouterr().out
-    assert "ERROR_INVALID_TOP_K" in output
+    try:
+        main(["ask", "What is source lineage?", "--top-k", "0", "--format", "json"], cfg=cfg)
+    except SystemExit as exc:
+        assert exc.code == 2
+    error_output = capsys.readouterr().err
+    assert "TOP_K_RANGE:1-20" in error_output
