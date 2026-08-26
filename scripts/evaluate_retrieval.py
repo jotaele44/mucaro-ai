@@ -106,7 +106,7 @@ def main() -> int:
         "top_k": args.top_k,
         "strategies": [
             evaluate_strategy(strategy, fixture, top_k=args.top_k)
-            for strategy in ["lexical", "vector", "hybrid", "persistent"]
+            for strategy in ["lexical", "vector", "bm25", "hybrid", "persistent"]
         ],
     }
     hybrid = next(item for item in report["strategies"] if item["strategy"] == "hybrid")

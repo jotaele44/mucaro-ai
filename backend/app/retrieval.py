@@ -22,7 +22,9 @@ class RetrievalError(RuntimeError):
 
 MIN_TOP_K = 1
 MAX_TOP_K = 20
-RETRIEVAL_STRATEGIES = {"lexical", "vector", "hybrid", "persistent"}
+RETRIEVAL_STRATEGIES = {"lexical", "vector", "bm25", "hybrid", "persistent"}
+BM25_K1 = 1.2
+BM25_B = 0.75
 
 
 def _error(status: str, query: str, *, warnings: list[str] | None = None) -> dict[str, Any]:
@@ -180,6 +182,49 @@ def vector_retrieve(query: str, chunks: list[dict[str, Any]] | None = None, *, t
     return result
 
 
+def bm25_retrieve(query: str, chunks: list[dict[str, Any]] | None = None, *, top_k: int = 5) -> dict[str, Any]:
+    early_result, normalized_chunks, warnings = _prepare_chunks(query, chunks, top_k)
+    if early_result is not None:
+        return early_result
+    q_tokens = tokenize(query)
+    tokenized_chunks = [tokenize(str(chunk.get("text", ""))) for chunk in normalized_chunks]
+    doc_lengths = [len(tokens) for tokens in tokenized_chunks]
+    avg_doc_length = sum(doc_lengths) / len(doc_lengths) if doc_lengths else 0.0
+    document_count = len(tokenized_chunks)
+    document_frequencies: Counter[str] = Counter()
+    for tokens in tokenized_chunks:
+        document_frequencies.update(set(tokens))
+
+    scored: list[dict[str, Any]] = []
+    for chunk, c_tokens, doc_length in zip(normalized_chunks, tokenized_chunks, doc_lengths, strict=True):
+        if not c_tokens or avg_doc_length <= 0:
+            continue
+        c_counts = Counter(c_tokens)
+        score = 0.0
+        for term in sorted(set(q_tokens)):
+            term_frequency = c_counts.get(term, 0)
+            if term_frequency <= 0:
+                continue
+            doc_frequency = document_frequencies[term]
+            idf = math.log(1 + ((document_count - doc_frequency + 0.5) / (doc_frequency + 0.5)))
+            denominator = term_frequency + BM25_K1 * (1 - BM25_B + BM25_B * (doc_length / avg_doc_length))
+            score += idf * ((term_frequency * (BM25_K1 + 1)) / denominator)
+        if score <= 0:
+            continue
+        item = dict(chunk)
+        item["score"] = round(score, 6)
+        item["bm25_score"] = round(score, 6)
+        item["retrieval_strategy"] = "bm25_v1"
+        item["matched_terms"] = sorted(set(q_tokens).intersection(c_counts))[:20]
+        scored.append(item)
+    if not scored:
+        return _error("ERROR_NO_RETRIEVAL_CONTEXT", query, warnings=warnings)
+    result: dict[str, Any] = {"status": "RETRIEVAL_OK", "query": query, "retrieved_chunks": _rank(scored)[:top_k]}
+    if warnings:
+        result["warnings"] = sorted(set(warnings))
+    return result
+
+
 def hybrid_retrieve(query: str, chunks: list[dict[str, Any]] | None = None, *, top_k: int = 5) -> dict[str, Any]:
     early_result, normalized_chunks, warnings = _prepare_chunks(query, chunks, top_k)
     if early_result is not None:
@@ -287,6 +332,8 @@ def retrieve(
         return lexical_retrieve(query, chunks, top_k=top_k)
     if strategy == "vector":
         return vector_retrieve(query, chunks, top_k=top_k)
+    if strategy == "bm25":
+        return bm25_retrieve(query, chunks, top_k=top_k)
     if strategy == "persistent":
         return persistent_retrieve(query, chunks, top_k=top_k, cfg=cfg)
     return hybrid_retrieve(query, chunks, top_k=top_k)

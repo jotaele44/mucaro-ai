@@ -55,9 +55,10 @@ V1 uses deterministic local hybrid retrieval:
 
 - `lexical_v2`: token overlap, cosine normalization, query coverage, stable tie order.
 - `vector_tfidf_v1`: local TF-IDF vectors with cosine similarity and no external service requirement.
+- `bm25_v1`: local BM25 ranking with term-frequency and document-length normalization.
 - `hybrid_tfidf_v1`: the default answer path, combining lexical and vector scores behind the stable retrieval result contract.
 - `persistent_tfidf_v1`: opt-in persisted local TF-IDF index stored under `data/indexes/tfidf_index.json`, rebuilt during ingestion and rejected when stale.
-- `scripts/evaluate_retrieval.py`: committed retrieval fixture gate that reports recall@k, top-1 hit rate, and no-context accuracy for lexical/vector/hybrid/persistent strategies.
+- `scripts/evaluate_retrieval.py`: committed retrieval fixture gate that reports recall@k, top-1 hit rate, and no-context accuracy for lexical/vector/BM25/hybrid/persistent strategies.
 
 Persistent embedding stores such as Chroma can still be added behind this interface later without changing the answer trace schema.
 

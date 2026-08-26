@@ -147,7 +147,7 @@ the path needs a new grant.
 
 ## Retrieval Strategies
 
-`mucaro ask` defaults to `--strategy hybrid`, which recomputes deterministic lexical and TF-IDF scores from the current chunk file. Use `--strategy persistent` to query the local persisted TF-IDF index built during ingestion. Persistent retrieval fails closed when the index is missing or stale; run `mucaro ingest PATH` again to rebuild it.
+`mucaro ask` defaults to `--strategy hybrid`, which recomputes deterministic lexical and TF-IDF scores from the current chunk file. Use `--strategy bm25` for local BM25 ranking, or `--strategy persistent` to query the local persisted TF-IDF index built during ingestion. Persistent retrieval fails closed when the index is missing or stale; run `mucaro ingest PATH` again to rebuild it.
 
 Use `mucaro index status` to check whether the persistent index is usable. Use
 `mucaro sources reindex` to rebuild it from current chunks without ingesting new

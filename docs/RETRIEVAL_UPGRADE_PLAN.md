@@ -11,6 +11,7 @@ contracts.
 |---|---|---|
 | `lexical_v2` | Certified | Deterministic token overlap baseline |
 | `vector_tfidf_v1` | Certified | Local TF-IDF vector scoring |
+| `bm25_v1` | Candidate | Local BM25 ranking without external dependencies |
 | `hybrid_tfidf_v1` | Certified | Default answer retrieval strategy |
 | `persistent_tfidf_v1` | Certified | Local persisted TF-IDF index rebuilt during ingestion |
 
@@ -33,7 +34,9 @@ fails closed when missing or stale.
 
 ## Next Upgrade Boundary
 
-The next retrieval upgrade should add a pluggable embedding/vector-store adapter
+The current retrieval-quality cycle adds BM25 as an opt-in local ranking
+strategy without changing the default answer path. The next retrieval upgrade
+should add a pluggable embedding/vector-store adapter
 behind the existing `retrieve()` strategy boundary. Chroma remains the first
 candidate because it can run locally and fits the existing queued Phase 2 item,
 but it should not replace the default `hybrid` strategy until eval evidence

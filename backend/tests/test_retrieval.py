@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from backend.app.config import Settings
-from backend.app.retrieval import lexical_retrieve, retrieve, vector_retrieve
+from backend.app.retrieval import bm25_retrieve, lexical_retrieve, retrieve, vector_retrieve
 from backend.app.vector_index import build_persistent_index, index_path
 
 
@@ -101,10 +101,34 @@ def test_hybrid_retrieval_is_default_strategy():
     assert result["retrieved_chunks"][0]["vector_score"] > 0
 
 
+def test_bm25_retrieval_rewards_focused_matches():
+    chunks = [
+        {
+            "chunk_id": "chunk_repeated",
+            "source_id": "src_repeated",
+            "text": "planning planning planning approval approval approval general notes",
+            "chunk_index": 0,
+        },
+        {
+            "chunk_id": "chunk_focused",
+            "source_id": "src_focused",
+            "text": "approval lock source lineage citations",
+            "chunk_index": 0,
+        },
+    ]
+
+    result = bm25_retrieve("source lineage citations", chunks, top_k=1)
+
+    assert result["status"] == "RETRIEVAL_OK"
+    assert result["retrieved_chunks"][0]["chunk_id"] == "chunk_focused"
+    assert result["retrieved_chunks"][0]["retrieval_strategy"] == "bm25_v1"
+    assert result["retrieved_chunks"][0]["bm25_score"] > 0
+
+
 def test_retrieve_rejects_unknown_strategy():
     result = retrieve("source lineage", [], top_k=1, strategy="unknown")
     assert result["status"] == "ERROR_INVALID_RETRIEVAL_STRATEGY"
-    assert "RETRIEVAL_STRATEGY_ALLOWED:hybrid,lexical,persistent,vector" in result["warnings"]
+    assert "RETRIEVAL_STRATEGY_ALLOWED:bm25,hybrid,lexical,persistent,vector" in result["warnings"]
 
 
 def test_hybrid_retrieval_reports_duplicate_chunk_ids_and_bad_index():

@@ -5,6 +5,7 @@
 | Local hybrid retrieval | Deterministic lexical plus TF-IDF vector scoring | Complete in V1 |
 | Retrieval eval harness | recall@k, top-1, and no-context gate for retrieval changes | Complete in V1 |
 | Persistent local TF-IDF index | Local stored vector index with explicit `persistent` strategy | Complete in V1.4 |
+| Local BM25 retrieval | Opt-in BM25 ranking for stronger local term matching | Complete candidate in V1.14 |
 | Chroma integration | Persistent embedding/vector store for larger corpora | Planned in `docs/RETRIEVAL_UPGRADE_PLAN.md`; queued after larger eval corpus |
 | LlamaIndex ingestion | Richer document ingestion and node parsing | Queued |
 | Unstructured parser expansion | Better PDFs, DOCX, HTML, emails | Queued |

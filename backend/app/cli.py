@@ -68,7 +68,7 @@ def package_version() -> str:
     try:
         return importlib.metadata.version("mucaro-ai")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.13-dev"
+        return "0.1.14-dev"
 
 
 def parse_top_k(value: str) -> int:
