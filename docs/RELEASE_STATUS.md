@@ -25,6 +25,7 @@ Observed success markers:
 - `76 passed` from pytest for the current `v0.1.12-cli-source-index` candidate
 - `78 passed` from pytest for the current `v0.1.13-cli-assistant-history` candidate
 - `79 passed` from pytest for the current `v0.1.14-bm25-retrieval` candidate
+- `81 passed` from pytest for the current `v0.1.15-cli-doctor` candidate
 - Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, BM25, hybrid, and persistent strategies across the expanded corpus
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
