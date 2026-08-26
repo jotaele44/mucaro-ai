@@ -10,7 +10,14 @@ from typing import Any, Sequence
 
 from .config import Settings, settings
 from .execution_gate import analyze_task
-from .ingestion import ingest_file, ingest_folder
+from .ingestion import (
+    delete_source,
+    get_index_status,
+    get_sources,
+    ingest_file,
+    ingest_folder,
+    reindex_sources,
+)
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -51,7 +58,7 @@ def package_version() -> str:
     try:
         return importlib.metadata.version("mucaro-ai")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.11-dev"
+        return "0.1.12-dev"
 
 
 def parse_top_k(value: str) -> int:
@@ -92,6 +99,29 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ingest.add_argument("--format", choices=["json", "text"], default="text", help="Output format.")
     ingest.set_defaults(handler=run_ingest)
+
+    sources = subcommands.add_parser("sources", help="Inspect and manage ingested sources.")
+    sources_subcommands = sources.add_subparsers(dest="sources_command", required=True)
+
+    sources_list = sources_subcommands.add_parser("list", help="List ingested sources and index status.")
+    sources_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    sources_list.set_defaults(handler=run_sources_list)
+
+    sources_reindex = sources_subcommands.add_parser("reindex", help="Rebuild the local persistent retrieval index.")
+    sources_reindex.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    sources_reindex.set_defaults(handler=run_sources_reindex)
+
+    sources_delete = sources_subcommands.add_parser("delete", help="Delete one ingested source by source_id.")
+    sources_delete.add_argument("source_id", help="Source identifier to remove from the local source library.")
+    sources_delete.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    sources_delete.set_defaults(handler=run_sources_delete)
+
+    index = subcommands.add_parser("index", help="Inspect retrieval index health.")
+    index_subcommands = index.add_subparsers(dest="index_command", required=True)
+
+    index_status = index_subcommands.add_parser("status", help="Show local persistent index status.")
+    index_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    index_status.set_defaults(handler=run_index_status)
 
     permissions = subcommands.add_parser("permissions", help="Manage user-directory access grants.")
     permissions_subcommands = permissions.add_subparsers(dest="permission_command", required=True)
@@ -150,6 +180,25 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
     elif "source" in payload:
         source = payload["source"]
         print(f"source_id={source.get('source_id')} chunks_added={payload.get('chunks_added', 0)}")
+    elif "sources" in payload:
+        print(f"sources={len(payload.get('sources', []))}")
+        index = payload.get("index", {})
+        if isinstance(index, dict):
+            print(f"index_status={index.get('status')}")
+            print(f"indexed_chunk_count={index.get('indexed_chunk_count', 0)}")
+        for source in payload.get("sources", []):
+            print(f"{source.get('source_id')} {source.get('file_name')} chunks={source.get('chunk_count', 0)}")
+    elif "removed_chunks" in payload:
+        print(f"source_id={payload.get('source_id')}")
+        print(f"removed_chunks={payload.get('removed_chunks', 0)}")
+        print(f"remaining_sources={payload.get('remaining_sources', 0)}")
+    elif "index_status" in payload:
+        print(f"index_status={payload.get('index_status')}")
+        print(f"indexed_chunk_count={payload.get('indexed_chunk_count', 0)}")
+    elif payload.get("status") in {"INDEX_OK", "INDEX_STALE", "INDEX_MISSING"}:
+        print(f"chunk_count={payload.get('chunk_count', 0)}")
+        print(f"indexed_chunk_count={payload.get('indexed_chunk_count', 0)}")
+        print(f"stale={payload.get('stale')}")
     elif "readiness_percent" in payload:
         print(f"active_vector={payload.get('active_vector')}")
         print(f"recommended_mode={payload.get('recommended_mode')}")
@@ -209,6 +258,30 @@ def run_ingest(args: argparse.Namespace, cfg: Settings) -> int:
     result["directory_permission"] = permission
     emit_payload(result, args.format)
     return 0
+
+
+def run_sources_list(args: argparse.Namespace, cfg: Settings) -> int:
+    result = {"status": "SOURCES_OK", "sources": get_sources(cfg), "index": get_index_status(cfg)}
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_sources_reindex(args: argparse.Namespace, cfg: Settings) -> int:
+    result = reindex_sources(cfg)
+    emit_payload(result, args.format)
+    return 0 if result.get("status") == "REINDEX_OK" else 2
+
+
+def run_sources_delete(args: argparse.Namespace, cfg: Settings) -> int:
+    result = delete_source(args.source_id, cfg)
+    emit_payload(result, args.format)
+    return 0 if result.get("status") == "SOURCE_DELETE_OK" else 2
+
+
+def run_index_status(args: argparse.Namespace, cfg: Settings) -> int:
+    result = get_index_status(cfg)
+    emit_payload(result, args.format)
+    return 0 if result.get("status") == "INDEX_OK" else 2
 
 
 def prompt_for_directory_grant(root: Path, cfg: Settings) -> dict[str, Any]:

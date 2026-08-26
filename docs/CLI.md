@@ -32,6 +32,10 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 |---|---|---:|---:|
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
+| `mucaro sources list` | List ingested sources and persistent index status | 0 | 2 |
+| `mucaro sources reindex` | Rebuild the local persistent retrieval index | 0 | 2 |
+| `mucaro sources delete SOURCE_ID` | Delete one ingested source and rebuild the index | 0 | 2 |
+| `mucaro index status` | Inspect local persistent index health | 0 | 2 |
 | `mucaro plan REQUEST` | Analyze a task with the Planning Gate | 0 | 2 |
 | `mucaro permissions COMMAND` | Manage user-directory access grants | 0 | 2 |
 | `mucaro validate` | Validate JSON artifacts and schemas | 0 | 2 |
@@ -83,6 +87,9 @@ retrieval payloads where practical:
 | `ERROR_INVALID_TOP_K` | `--top-k` is outside the supported range |
 | `TOP_K_RANGE:1-20` | CLI argument validation rejected `ask --top-k` before retrieval ran |
 | `TOP_K_MUST_BE_INTEGER` | CLI argument validation rejected a non-integer `ask --top-k` |
+| `INDEX_MISSING` | `index status` found no persistent index |
+| `INDEX_STALE` | `index status` found an index that no longer matches current chunks |
+| `ERROR_SOURCE_NOT_FOUND` | `sources delete` was given an unknown source ID |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
@@ -95,6 +102,9 @@ mucaro --version
 mucaro permissions grant ~/Documents/mucaro-sources --yes --format json
 mucaro permissions list --format text
 mucaro ingest ~/Documents/mucaro-sources --format json
+mucaro sources list --format text
+mucaro index status --format json
+mucaro sources reindex --format text
 mucaro ask "How does source lineage work?" --format json --no-persist
 mucaro ask "How does source lineage work?" --strategy persistent --format text
 mucaro plan "Add CLI capability" --input mucaro-ai --format text
@@ -122,6 +132,12 @@ the path needs a new grant.
 ## Retrieval Strategies
 
 `mucaro ask` defaults to `--strategy hybrid`, which recomputes deterministic lexical and TF-IDF scores from the current chunk file. Use `--strategy persistent` to query the local persisted TF-IDF index built during ingestion. Persistent retrieval fails closed when the index is missing or stale; run `mucaro ingest PATH` again to rebuild it.
+
+Use `mucaro index status` to check whether the persistent index is usable. Use
+`mucaro sources reindex` to rebuild it from current chunks without ingesting new
+files. Use `mucaro sources list` to inspect the local source library and
+`mucaro sources delete SOURCE_ID` to remove one source from the assistant's
+knowledge base.
 
 ## Live Model Mode
 

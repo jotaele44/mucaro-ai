@@ -29,7 +29,7 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 - Directory permission boundary: direct path ingestion outside the project root requires a local grant recorded under `data/processed/directory_permissions.json`.
 - Conversation records: local chat sessions store ordered user/assistant turns and reference answer traces by `run_id`.
 - Workspace profiles: local JSON records under `data/processed/workspace_profiles.json` describe named workspace/runtime profiles.
-- Source library controls: operators can reindex all chunks, inspect persisted index status, and delete managed sources while rebuilding the index.
+- Source library controls: operators can reindex all chunks, inspect persisted index status, and delete managed sources while rebuilding the index from both the API/browser surface and the installed CLI.
 - Run history: `/runs`, `/runs/summary`, and `/runs/{run_id}` provide scan-friendly history plus full trace retrieval.
 - Parser evidence: source manifests include byte counts, parser warnings, parse status, and format metadata such as CSV delimiter/header/row counts.
 

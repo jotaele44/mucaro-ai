@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from backend.app.cli import main
@@ -69,7 +70,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.11\n"
+    assert output == "mucaro 0.1.12\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -79,6 +80,48 @@ def test_cli_validate_text_output(tmp_path: Path, capsys):
     output = capsys.readouterr().out
     assert "JSON_OK" in output
     assert "checked=0" in output
+
+
+def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["index", "status", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "INDEX_MISSING"
+    assert payload["chunk_count"] == 0
+    assert payload["stale"] is False
+
+
+def test_cli_sources_list_reindex_and_delete(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    input_dir = tmp_path / "data" / "input"
+    input_dir.mkdir(parents=True)
+    sample = input_dir / "sample.md"
+    sample.write_text("Local assistants need approved files and rebuildable indexes.", encoding="utf-8")
+
+    assert main(["ingest", "data/input", "--format", "json"], cfg=cfg) == 0
+    capsys.readouterr()
+
+    assert main(["sources", "list", "--format", "json"], cfg=cfg) == 0
+    sources_payload = json.loads(capsys.readouterr().out)
+    assert sources_payload["status"] == "SOURCES_OK"
+    assert sources_payload["index"]["status"] == "INDEX_OK"
+    source_id = sources_payload["sources"][0]["source_id"]
+
+    assert main(["sources", "reindex", "--format", "text"], cfg=cfg) == 0
+    reindex_output = capsys.readouterr().out
+    assert "REINDEX_OK" in reindex_output
+    assert "index_status=INDEX_OK" in reindex_output
+
+    assert main(["sources", "delete", source_id, "--format", "json"], cfg=cfg) == 0
+    delete_payload = json.loads(capsys.readouterr().out)
+    assert delete_payload["status"] == "SOURCE_DELETE_OK"
+    assert delete_payload["remaining_sources"] == 0
+
+    assert main(["sources", "list", "--format", "text"], cfg=cfg) == 0
+    list_output = capsys.readouterr().out
+    assert "SOURCES_OK" in list_output
+    assert "sources=0" in list_output
 
 
 def test_cli_serve_passes_host_port_and_reload(tmp_path: Path, monkeypatch):

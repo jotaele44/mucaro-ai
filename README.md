@@ -130,6 +130,9 @@ See `docs/CLI.md` for exit codes, retrieval strategies, structured error payload
 python scripts/mucaro.py ingest data/input
 python scripts/mucaro.py permissions grant ~/Documents/mucaro-sources --yes
 python scripts/mucaro.py ingest ~/Documents/mucaro-sources
+python scripts/mucaro.py sources list --format text
+python scripts/mucaro.py index status --format json
+python scripts/mucaro.py sources reindex --format text
 python scripts/mucaro.py ask "How does source lineage work?" --format text
 python scripts/mucaro.py ask "How does source lineage work?" --strategy persistent --format text
 python scripts/mucaro.py plan "Add a CLI capability" --input mucaro-ai
@@ -144,6 +147,9 @@ mucaro --version
 mucaro ingest data/input
 mucaro permissions grant ~/Documents/mucaro-sources --yes
 mucaro ingest ~/Documents/mucaro-sources
+mucaro sources list --format text
+mucaro index status --format json
+mucaro sources reindex --format text
 mucaro ask "How does source lineage work?" --format text
 mucaro ask "How does source lineage work?" --strategy persistent --format text
 mucaro plan "Add a CLI capability" --input mucaro-ai
@@ -166,6 +172,10 @@ The `ask` command exports answer traces under `data/exports/` and stores runs in
 Direct filesystem ingestion outside the project directory is permission-gated. Grant a containing directory before ingesting user-directory paths, or use `ingest --grant-directory-access` from an interactive terminal to prompt at ingestion time. See `docs/DIRECTORY_PERMISSIONS.md`.
 
 The browser app includes the same permission workflow in the Directory Access panel.
+
+The CLI can also inspect and maintain the local source library: `mucaro sources
+list`, `mucaro index status`, `mucaro sources reindex`, and `mucaro sources
+delete SOURCE_ID`.
 
 The browser app also persists local chat sessions. Each conversation keeps ordered user and assistant turns, supports chat search, rename, and delete, uses recent turns for follow-up questions, and keeps cited answer traces exportable by `run_id`.
 
