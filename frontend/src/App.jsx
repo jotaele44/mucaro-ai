@@ -353,6 +353,7 @@ function App() {
                 Retrieval
                 <select value={retrievalStrategy} onChange={(e) => setRetrievalStrategy(e.target.value)}>
                   <option value="hybrid">hybrid</option>
+                  <option value="semantic">semantic</option>
                   <option value="persistent">persistent</option>
                   <option value="bm25">bm25</option>
                   <option value="vector">vector</option>

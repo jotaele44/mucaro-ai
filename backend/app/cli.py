@@ -71,7 +71,7 @@ def package_version() -> str:
     try:
         return importlib.metadata.version("mucaro-ai")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.16-dev"
+        return "0.1.17-dev"
 
 
 def parse_top_k(value: str) -> int:
@@ -260,6 +260,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"version={payload.get('version')}")
             print(f"sources={summary.get('source_count', 0)}")
             print(f"index_status={summary.get('index_status')}")
+            print(f"semantic_store_status={summary.get('semantic_store_status')}")
             print(f"grants={summary.get('directory_grant_count', 0)}")
             print(f"conversations={summary.get('conversation_count', 0)}")
             print(f"runs={summary.get('run_count', 0)}")
@@ -328,6 +329,10 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         if isinstance(index, dict):
             print(f"index_status={index.get('status')}")
             print(f"indexed_chunk_count={index.get('indexed_chunk_count', 0)}")
+            semantic_store = index.get("semantic_store", {})
+            if isinstance(semantic_store, dict):
+                print(f"semantic_store_status={semantic_store.get('status')}")
+                print(f"semantic_store_indexed_chunk_count={semantic_store.get('indexed_chunk_count', 0)}")
         for source in payload.get("sources", []):
             print(f"{source.get('source_id')} {source.get('file_name')} chunks={source.get('chunk_count', 0)}")
     elif "removed_chunks" in payload:
@@ -337,10 +342,17 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
     elif "index_status" in payload:
         print(f"index_status={payload.get('index_status')}")
         print(f"indexed_chunk_count={payload.get('indexed_chunk_count', 0)}")
+        if payload.get("semantic_store_status"):
+            print(f"semantic_store_status={payload.get('semantic_store_status')}")
+            print(f"semantic_store_indexed_chunk_count={payload.get('semantic_store_indexed_chunk_count', 0)}")
     elif payload.get("status") in {"INDEX_OK", "INDEX_STALE", "INDEX_MISSING"}:
         print(f"chunk_count={payload.get('chunk_count', 0)}")
         print(f"indexed_chunk_count={payload.get('indexed_chunk_count', 0)}")
         print(f"stale={payload.get('stale')}")
+        semantic_store = payload.get("semantic_store", {})
+        if isinstance(semantic_store, dict):
+            print(f"semantic_store_status={semantic_store.get('status')}")
+            print(f"semantic_store_stale={semantic_store.get('stale')}")
     elif "readiness_percent" in payload:
         print(f"active_vector={payload.get('active_vector')}")
         print(f"recommended_mode={payload.get('recommended_mode')}")
@@ -460,6 +472,7 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
         recommendations.append("Ingest approved local files before asking source-grounded questions.")
 
     index = get_index_status(cfg)
+    semantic_store = index.get("semantic_store", {})
     checks.append(
         _doctor_check(
             "persistent_index",
@@ -469,6 +482,15 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
     )
     if index.get("status") != "INDEX_OK":
         recommendations.append("Run `mucaro sources reindex` after ingesting sources to repair the persistent index.")
+    checks.append(
+        _doctor_check(
+            "semantic_store",
+            "PASS" if isinstance(semantic_store, dict) and semantic_store.get("status") == "SEMANTIC_STORE_OK" else "WARN",
+            str(semantic_store.get("status") if isinstance(semantic_store, dict) else "SEMANTIC_STORE_UNKNOWN"),
+        )
+    )
+    if not isinstance(semantic_store, dict) or semantic_store.get("status") != "SEMANTIC_STORE_OK":
+        recommendations.append("Run `mucaro sources reindex` after ingesting sources to repair the semantic store.")
 
     try:
         grants = load_directory_grants(cfg)
@@ -525,6 +547,7 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
             "source_count": len(sources),
             "chunk_count": len(chunks),
             "index_status": index.get("status"),
+            "semantic_store_status": semantic_store.get("status") if isinstance(semantic_store, dict) else "SEMANTIC_STORE_UNKNOWN",
             "directory_grant_count": len(grants),
             "conversation_count": conversation_count,
             "run_count": run_count,

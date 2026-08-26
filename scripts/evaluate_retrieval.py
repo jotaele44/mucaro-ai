@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from backend.app.config import Settings  # noqa: E402
 from backend.app.retrieval import retrieve  # noqa: E402
+from backend.app.semantic_store import build_semantic_store  # noqa: E402
 from backend.app.vector_index import build_persistent_index  # noqa: E402
 
 
@@ -41,10 +42,13 @@ def evaluate_strategy(strategy: str, fixture: dict[str, Any], *, top_k: int) -> 
     chunks = fixture["chunks"]
     cfg = None
     temp_dir = None
-    if strategy == "persistent":
+    if strategy in {"persistent", "semantic"}:
         temp_dir = tempfile.TemporaryDirectory(prefix="mucaro-retrieval-eval-")
         cfg = make_eval_settings(Path(temp_dir.name))
-        build_persistent_index(chunks, cfg)
+        if strategy == "persistent":
+            build_persistent_index(chunks, cfg)
+        else:
+            build_semantic_store(chunks, cfg)
     rows = []
     hits = 0
     top1_hits = 0
@@ -97,6 +101,8 @@ def main() -> int:
     parser.add_argument("--fixture", type=Path, default=FIXTURE)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--min-hybrid-recall", type=float, default=0.80)
+    parser.add_argument("--min-semantic-recall", type=float, default=0.80)
+    parser.add_argument("--min-semantic-no-context", type=float, default=1.00)
     parser.add_argument("--format", choices=["text", "json"], default="text")
     args = parser.parse_args()
 
@@ -106,13 +112,20 @@ def main() -> int:
         "top_k": args.top_k,
         "strategies": [
             evaluate_strategy(strategy, fixture, top_k=args.top_k)
-            for strategy in ["lexical", "vector", "bm25", "hybrid", "persistent"]
+            for strategy in ["lexical", "vector", "bm25", "hybrid", "persistent", "semantic"]
         ],
     }
     hybrid = next(item for item in report["strategies"] if item["strategy"] == "hybrid")
-    passed = hybrid["recall_at_k"] >= args.min_hybrid_recall
+    semantic = next(item for item in report["strategies"] if item["strategy"] == "semantic")
+    passed = (
+        hybrid["recall_at_k"] >= args.min_hybrid_recall
+        and semantic["recall_at_k"] >= args.min_semantic_recall
+        and semantic["no_context_accuracy"] >= args.min_semantic_no_context
+    )
     report["status"] = "RETRIEVAL_EVAL_OK" if passed else "RETRIEVAL_EVAL_FAILED"
     report["min_hybrid_recall"] = args.min_hybrid_recall
+    report["min_semantic_recall"] = args.min_semantic_recall
+    report["min_semantic_no_context"] = args.min_semantic_no_context
 
     if args.format == "json":
         print(json.dumps(report, indent=2, ensure_ascii=False))

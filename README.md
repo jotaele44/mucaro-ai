@@ -141,6 +141,7 @@ python scripts/mucaro.py runs summary --format text
 python scripts/mucaro.py ask "How does source lineage work?" --format text
 python scripts/mucaro.py ask "How does source lineage work?" --strategy bm25 --format text
 python scripts/mucaro.py ask "How does source lineage work?" --strategy persistent --format text
+python scripts/mucaro.py ask "How does source lineage work?" --strategy semantic --format text
 python scripts/mucaro.py plan "Add a CLI capability" --input mucaro-ai
 python scripts/mucaro.py validate
 python scripts/mucaro.py serve --reload
@@ -164,6 +165,7 @@ mucaro runs summary --format text
 mucaro ask "How does source lineage work?" --format text
 mucaro ask "How does source lineage work?" --strategy bm25 --format text
 mucaro ask "How does source lineage work?" --strategy persistent --format text
+mucaro ask "How does source lineage work?" --strategy semantic --format text
 mucaro plan "Add a CLI capability" --input mucaro-ai
 mucaro validate
 mucaro serve --reload
@@ -179,13 +181,13 @@ PYTHONPATH=.:backend python -m backend.app.cli validate
 PYTHONPATH=.:backend python -m backend.app.cli serve --reload
 ```
 
-The `ask` command exports answer traces under `data/exports/` and stores runs in the local SQLite database by default. Use `--no-persist` for a terminal-only answer trace. The default retrieval strategy is `hybrid`; `--strategy bm25` uses local BM25 ranking, and `--strategy persistent` uses the local TF-IDF index rebuilt during ingestion and fails closed if the index is missing or stale.
+The `ask` command exports answer traces under `data/exports/` and stores runs in the local SQLite database by default. Use `--no-persist` for a terminal-only answer trace. The default retrieval strategy is `hybrid`; `--strategy bm25` uses local BM25 ranking, `--strategy persistent` uses the local TF-IDF index, and `--strategy semantic` uses the local embedding store rebuilt during ingestion. Persistent and semantic retrieval fail closed if their stores are missing or stale.
 
 Direct filesystem ingestion outside the project directory is permission-gated. Grant a containing directory before ingesting user-directory paths, or use `ingest --grant-directory-access` from an interactive terminal to prompt at ingestion time. See `docs/DIRECTORY_PERMISSIONS.md`.
 
 Use `mucaro doctor` to check local assistant readiness across source ingestion,
-index health, directory grants, model-provider setup, API auth posture, saved
-conversations, and answer runs.
+index health, semantic-store health, directory grants, model-provider setup,
+API auth posture, saved conversations, and answer runs.
 
 Use `mucaro audit product` to track what is complete versus still open against
 the full ChatGPT/Claude-like local assistant target.

@@ -6,6 +6,7 @@ from typing import Any
 
 from .config import Settings, settings
 from .ingestion import get_chunks
+from .semantic_store import load_semantic_store, query_semantic_store
 from .utils import tokenize
 from .vector_index import (
     cosine_similarity,
@@ -22,7 +23,7 @@ class RetrievalError(RuntimeError):
 
 MIN_TOP_K = 1
 MAX_TOP_K = 20
-RETRIEVAL_STRATEGIES = {"lexical", "vector", "bm25", "hybrid", "persistent"}
+RETRIEVAL_STRATEGIES = {"lexical", "vector", "bm25", "hybrid", "persistent", "semantic"}
 BM25_K1 = 1.2
 BM25_B = 0.75
 
@@ -314,6 +315,39 @@ def persistent_retrieve(
     return result
 
 
+def semantic_retrieve(
+    query: str,
+    chunks: list[dict[str, Any]] | None = None,
+    *,
+    top_k: int = 5,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    validation_error = _validate_inputs(query, top_k)
+    if validation_error is not None:
+        return validation_error
+    chunks = get_chunks(cfg) if chunks is None else chunks
+    if not chunks:
+        return _error("ERROR_NO_SOURCES", query)
+    store = load_semantic_store(cfg)
+    if store is None:
+        return _error("ERROR_SEMANTIC_STORE_MISSING", query, warnings=["RUN_SOURCES_REINDEX_TO_BUILD_SEMANTIC_STORE"])
+    expected_fingerprint = fingerprint_chunks(chunks)
+    if store.get("chunks_fingerprint") != expected_fingerprint:
+        return _error("ERROR_SEMANTIC_STORE_STALE", query, warnings=["RUN_SOURCES_REINDEX_TO_REBUILD_SEMANTIC_STORE"])
+    entries = store.get("entries", [])
+    if not isinstance(entries, list) or not entries:
+        return _error("ERROR_SEMANTIC_STORE_EMPTY", query)
+
+    scored = query_semantic_store(query, store, top_k=top_k)
+    if not scored:
+        return _error("ERROR_NO_RETRIEVAL_CONTEXT", query, warnings=list(store.get("warnings", [])))
+    result: dict[str, Any] = {"status": "RETRIEVAL_OK", "query": query, "retrieved_chunks": scored}
+    warnings = store.get("warnings", [])
+    if warnings:
+        result["warnings"] = sorted(set(warnings))
+    return result
+
+
 def retrieve(
     query: str,
     chunks: list[dict[str, Any]] | None = None,
@@ -336,4 +370,6 @@ def retrieve(
         return bm25_retrieve(query, chunks, top_k=top_k)
     if strategy == "persistent":
         return persistent_retrieve(query, chunks, top_k=top_k, cfg=cfg)
+    if strategy == "semantic":
+        return semantic_retrieve(query, chunks, top_k=top_k, cfg=cfg)
     return hybrid_retrieve(query, chunks, top_k=top_k)

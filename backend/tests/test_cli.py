@@ -71,7 +71,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.16\n"
+    assert output == "mucaro 0.1.17\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -91,6 +91,7 @@ def test_cli_doctor_reports_warning_state_without_sources(tmp_path: Path, capsys
     assert payload["status"] == "DOCTOR_WARN"
     assert payload["summary"]["source_count"] == 0
     assert payload["summary"]["index_status"] == "INDEX_MISSING"
+    assert payload["summary"]["semantic_store_status"] == "SEMANTIC_STORE_MISSING"
     assert any(check["name"] == "source_library" and check["status"] == "WARN" for check in payload["checks"])
 
     assert main(["doctor", "--strict", "--format", "text"], cfg=cfg) == 2
@@ -114,6 +115,7 @@ def test_cli_doctor_reports_ready_state_after_local_setup(tmp_path: Path, capsys
     assert payload["status"] == "DOCTOR_OK"
     assert payload["summary"]["source_count"] == 1
     assert payload["summary"]["index_status"] == "INDEX_OK"
+    assert payload["summary"]["semantic_store_status"] == "SEMANTIC_STORE_OK"
     assert payload["summary"]["auth_required"] is True
 
 
@@ -127,14 +129,14 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     by_id = {row["requirement_id"]: row for row in payload["requirements"]}
     assert by_id["permission_gated_user_directory"]["status"] == "PASS"
     assert by_id["source_lineage_citations"]["status"] == "PASS"
-    assert by_id["semantic_vector_store"]["status"] == "OPEN"
+    assert by_id["semantic_vector_store"]["status"] == "PASS"
     assert by_id["tool_use_and_actions"]["status"] == "OPEN"
-    assert payload["next_recommended_vector"] == "semantic_vector_store"
+    assert payload["next_recommended_vector"] == "tool_use_and_actions"
 
     assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out
     assert "PRODUCT_AUDIT_OPEN" in strict_output
-    assert "OPEN semantic_vector_store" in strict_output
+    assert "OPEN tool_use_and_actions" in strict_output
 
 
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):
@@ -145,6 +147,7 @@ def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):
     assert payload["status"] == "INDEX_MISSING"
     assert payload["chunk_count"] == 0
     assert payload["stale"] is False
+    assert payload["semantic_store"]["status"] == "SEMANTIC_STORE_MISSING"
 
 
 def test_cli_sources_list_reindex_and_delete(tmp_path: Path, capsys):
@@ -161,12 +164,14 @@ def test_cli_sources_list_reindex_and_delete(tmp_path: Path, capsys):
     sources_payload = json.loads(capsys.readouterr().out)
     assert sources_payload["status"] == "SOURCES_OK"
     assert sources_payload["index"]["status"] == "INDEX_OK"
+    assert sources_payload["index"]["semantic_store"]["status"] == "SEMANTIC_STORE_OK"
     source_id = sources_payload["sources"][0]["source_id"]
 
     assert main(["sources", "reindex", "--format", "text"], cfg=cfg) == 0
     reindex_output = capsys.readouterr().out
     assert "REINDEX_OK" in reindex_output
     assert "index_status=INDEX_OK" in reindex_output
+    assert "semantic_store_status=SEMANTIC_STORE_OK" in reindex_output
 
     assert main(["sources", "delete", source_id, "--format", "json"], cfg=cfg) == 0
     delete_payload = json.loads(capsys.readouterr().out)

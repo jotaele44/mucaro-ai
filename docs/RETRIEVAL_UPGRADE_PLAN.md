@@ -14,9 +14,11 @@ contracts.
 | `bm25_v1` | Candidate | Local BM25 ranking without external dependencies |
 | `hybrid_tfidf_v1` | Certified | Default answer retrieval strategy |
 | `persistent_tfidf_v1` | Certified | Local persisted TF-IDF index rebuilt during ingestion |
+| `local_semantic_hash_store_v1` | Candidate | Local persisted hash-embedding store rebuilt during ingestion |
 
-The current persistent index is stored under `data/indexes/tfidf_index.json` and
-fails closed when missing or stale.
+The current persistent index is stored under `data/indexes/tfidf_index.json`.
+The local semantic store is stored under `data/indexes/semantic_store.json`.
+Both stores fail closed when missing or stale.
 
 ## Invariants
 
@@ -32,51 +34,40 @@ fails closed when missing or stale.
 - Ranking must remain deterministic for ties.
 - No external vector service may become required for the default local path.
 
-## Next Upgrade Boundary
+## Current Upgrade Boundary
 
-The current retrieval-quality cycle adds BM25 as an opt-in local ranking
-strategy without changing the default answer path. The next retrieval upgrade
-should add a pluggable embedding/vector-store adapter
-behind the existing `retrieve()` strategy boundary. Chroma remains the first
-candidate because it can run locally and fits the existing queued Phase 2 item,
-but it should not replace the default `hybrid` strategy until eval evidence
-shows a material improvement.
+The first semantic-store cycle adds `strategy="semantic"` behind the existing
+`retrieve()` boundary without changing the default `hybrid` answer path. The
+store uses deterministic local hash embeddings, preserves the answer-trace
+schema, rebuilds during ingestion/reindex/delete, and fails closed when the
+store is missing or stale.
 
-The first development cycle keeps retrieval behavior unchanged and tightens the
-operator boundary first: directory access remains permission-gated, `ask
---top-k` is validated before retrieval runs, and the installed `mucaro`
-console command exposes `--version` for fresh-clone receipts. This preserves the
-certified `persistent_tfidf_v1` contract while allowing larger local
-user-directory corpora to be ingested through an explicit permission gate for
-future retrieval evaluation.
-
-Candidate strategy name:
-
-```text
-chroma_local_v1
-```
+Future model-backed embeddings or Chroma-style stores should use this boundary
+instead of changing the answer service contract. They should not replace the
+default `hybrid` strategy until eval evidence shows a material improvement.
 
 ## Required Gates Before Enabling Chroma
 
 | Gate | Required Result |
 |---|---|
-| Fixture eval | `RETRIEVAL_EVAL_OK` with Chroma included |
+| Fixture eval | `RETRIEVAL_EVAL_OK` with the candidate strategy included |
 | Determinism check | Stable top-k order for ties or explicit tie-break metadata |
 | Empty corpus | Explicit error status, no exception |
 | Missing index/store | Explicit repair warning |
 | Stale index/store | Fingerprint mismatch rejected |
 | Answer trace compatibility | No schema change required |
-| Fresh clone | Chroma optional dependency does not break default install |
+| Fresh clone | Optional dependency does not break default install |
 | Dependency audit | No moderate+ npm or Python known-vulnerability gate failures |
 
 ## Implementation Order
 
-1. Add an optional dependency group for Chroma or another local vector store.
-2. Add an adapter module that exposes build, load, fingerprint, and query
-   operations without changing `answer_question()`.
-3. Add `strategy="chroma"` to `retrieve()` only after tests cover missing and
-   stale store states.
-4. Extend `scripts/evaluate_retrieval.py` to include the new strategy when the
+1. Add an optional dependency group for Chroma or another model embedding store
+   when the privacy and eval gates are ready.
+2. Implement the provider behind the existing build, load, fingerprint, and
+   query operations without changing `answer_question()`.
+3. Add the provider strategy only after tests cover missing and stale store
+   states.
+4. Extend `scripts/evaluate_retrieval.py` to include the new strategy when any
    optional dependency is installed.
 5. Keep `hybrid` as default until larger-corpus evals prove the new strategy is
    better under recall@k, top-1 hit rate, and no-context accuracy.
@@ -93,4 +84,6 @@ chroma_local_v1
 ## Readiness
 
 Current state: `persistent_tfidf_v1` is certified as the first local persistence
-upgrade. Chroma or embedding-backed retrieval is planned but not yet certified.
+upgrade. `local_semantic_hash_store_v1` is the current semantic-store candidate
+for certification. Chroma or model-backed embeddings remain future quality
+upgrades behind the same boundary.

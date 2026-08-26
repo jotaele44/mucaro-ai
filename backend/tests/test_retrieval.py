@@ -2,6 +2,7 @@ from pathlib import Path
 
 from backend.app.config import Settings
 from backend.app.retrieval import bm25_retrieve, lexical_retrieve, retrieve, vector_retrieve
+from backend.app.semantic_store import build_semantic_store, semantic_store_path
 from backend.app.vector_index import build_persistent_index, index_path
 
 
@@ -128,7 +129,7 @@ def test_bm25_retrieval_rewards_focused_matches():
 def test_retrieve_rejects_unknown_strategy():
     result = retrieve("source lineage", [], top_k=1, strategy="unknown")
     assert result["status"] == "ERROR_INVALID_RETRIEVAL_STRATEGY"
-    assert "RETRIEVAL_STRATEGY_ALLOWED:bm25,hybrid,lexical,persistent,vector" in result["warnings"]
+    assert "RETRIEVAL_STRATEGY_ALLOWED:bm25,hybrid,lexical,persistent,semantic,vector" in result["warnings"]
 
 
 def test_hybrid_retrieval_reports_duplicate_chunk_ids_and_bad_index():
@@ -180,3 +181,54 @@ def test_persistent_retrieval_rejects_stale_index(tmp_path: Path):
 
     assert result["status"] == "ERROR_PERSISTENT_INDEX_STALE"
     assert "RUN_INGEST_TO_REBUILD_INDEX" in result["warnings"]
+
+
+def test_semantic_retrieval_uses_local_store(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    chunks = [
+        {"chunk_id": "chunk_common", "source_id": "src_common", "text": "planning planning approval", "chunk_index": 0},
+        {"chunk_id": "chunk_semantic", "source_id": "src_semantic", "text": "source lineage citations", "chunk_index": 1},
+    ]
+
+    store = build_semantic_store(chunks, cfg)
+    result = retrieve("source citation lineage", chunks, top_k=1, strategy="semantic", cfg=cfg)
+
+    assert semantic_store_path(cfg).exists()
+    assert store["indexed_chunk_count"] == 2
+    assert result["status"] == "RETRIEVAL_OK"
+    assert result["retrieved_chunks"][0]["chunk_id"] == "chunk_semantic"
+    assert result["retrieved_chunks"][0]["retrieval_strategy"] == "local_semantic_hash_store_v1"
+    assert result["retrieved_chunks"][0]["semantic_score"] > 0
+
+
+def test_semantic_retrieval_requires_built_store(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    chunks = [{"chunk_id": "chunk_a", "source_id": "src_a", "text": "source lineage", "chunk_index": 0}]
+
+    result = retrieve("source lineage", chunks, top_k=1, strategy="semantic", cfg=cfg)
+
+    assert result["status"] == "ERROR_SEMANTIC_STORE_MISSING"
+    assert "RUN_SOURCES_REINDEX_TO_BUILD_SEMANTIC_STORE" in result["warnings"]
+
+
+def test_semantic_retrieval_rejects_stale_store(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    chunks = [{"chunk_id": "chunk_a", "source_id": "src_a", "text": "source lineage", "chunk_index": 0}]
+    build_semantic_store(chunks, cfg)
+    changed_chunks = [{"chunk_id": "chunk_a", "source_id": "src_a", "text": "different content", "chunk_index": 0}]
+
+    result = retrieve("source lineage", changed_chunks, top_k=1, strategy="semantic", cfg=cfg)
+
+    assert result["status"] == "ERROR_SEMANTIC_STORE_STALE"
+    assert "RUN_SOURCES_REINDEX_TO_REBUILD_SEMANTIC_STORE" in result["warnings"]
+
+
+def test_semantic_retrieval_fails_closed_on_weak_context(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    chunks = [{"chunk_id": "chunk_a", "source_id": "src_a", "text": "source lineage citations", "chunk_index": 0}]
+    build_semantic_store(chunks, cfg)
+
+    result = retrieve("moon minerals", chunks, top_k=1, strategy="semantic", cfg=cfg)
+
+    assert result["status"] == "ERROR_NO_RETRIEVAL_CONTEXT"
+    assert result["retrieved_chunks"] == []

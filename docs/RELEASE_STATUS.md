@@ -1,6 +1,6 @@
 # Release Status
 
-Current package version: `0.1.16`.
+Current package version: `0.1.17`.
 
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, fresh-clone validation, API upload
@@ -13,7 +13,7 @@ workspace profiles, structured run history, conversation rename/delete/search,
 desktop package self-testing, CLI `--version`, early `ask --top-k`
 validation, CLI source/index management, CLI conversation management, CLI
 run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
-and executable product-gap auditing.
+executable product-gap auditing, and an opt-in local semantic embedding store.
 
 Observed success markers:
 
@@ -27,7 +27,8 @@ Observed success markers:
 - `79 passed` from pytest for the current `v0.1.14-bm25-retrieval` candidate
 - `81 passed` from pytest for the current `v0.1.15-cli-doctor` candidate
 - `82 passed` from pytest for the current `v0.1.16-product-audit` candidate
-- Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, BM25, hybrid, and persistent strategies across the expanded corpus
+- `86 passed` from pytest for the current `v0.1.17-semantic-store` candidate
+- Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, BM25, hybrid, persistent, and semantic strategies across the expanded corpus
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
 - `CITATION_OK`
@@ -41,7 +42,7 @@ Observed success markers:
 - `v0.1.3-local-hardening` is certified on commit `101e457743a7a0e1b830cbd7e066b6b817af9184`
 - `v0.1.4-local-persistent-index` is certified on commit `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`
 - `v0.1.9-all-vectors-certified` is certified on commit `b5deea7170eb1c94b5238e9a923827e6dc913213`
-- `v0.1.16-product-audit` is the current candidate target for the combined operator/admin/context baseline, chat management controls, CLI boundary hardening, CLI source/index management, CLI conversation/run history, BM25 retrieval, CLI diagnostics, product-gap auditing, and fresh-clone launcher certification
+- `v0.1.17-semantic-store` is the current candidate target for semantic-store retrieval, product-audit advancement, and fresh-clone launcher certification
 
 Local expected marker after first setup:
 
@@ -50,6 +51,7 @@ Local expected marker after first setup:
 Known environment-dependent item:
 
 - Reference repo cloning still depends on local internet/DNS access. Use `bash scripts/clone_references.sh`.
-- Chroma integration remains queued for larger-corpus Phase 2 work; the V1.4
-  retrieval layer includes local TF-IDF hybrid retrieval, opt-in BM25 retrieval,
-  plus an explicit persistent local TF-IDF index.
+- Chroma or model-backed embeddings remain queued for a future quality upgrade;
+  the current retrieval layer includes local TF-IDF hybrid retrieval, opt-in
+  BM25 retrieval, explicit persistent local TF-IDF, and an opt-in local
+  semantic hash-embedding store.

@@ -8,6 +8,7 @@ from .chunker import chunk_text
 from .config import Settings, settings
 from .db import delete_chunks_for_source, delete_payload, init_db, upsert_payload
 from .parser import detect_mime, parse_file
+from .semantic_store import build_semantic_store, get_semantic_store_status
 from .utils import read_json, sha256_file, stable_id, utc_now, write_json
 from .vector_index import build_persistent_index, fingerprint_chunks, load_persistent_index
 
@@ -67,6 +68,7 @@ def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
     for chunk in chunks:
         upsert_payload("chunks", "chunk_id", chunk, cfg.sqlite_path)
     index_payload = build_persistent_index(all_chunks, cfg)
+    semantic_payload = build_semantic_store(all_chunks, cfg)
     return {
         "status": "INGEST_OK",
         "source": source_payload,
@@ -74,6 +76,9 @@ def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
         "index_status": index_payload["status"],
         "index_version": index_payload["version"],
         "indexed_chunk_count": index_payload["indexed_chunk_count"],
+        "semantic_store_status": semantic_payload["status"],
+        "semantic_store_version": semantic_payload["version"],
+        "semantic_store_indexed_chunk_count": semantic_payload["indexed_chunk_count"],
     }
 
 
@@ -102,12 +107,16 @@ def reindex_sources(cfg: Settings = settings) -> dict[str, Any]:
     cfg.ensure_dirs()
     chunks = get_chunks(cfg)
     index_payload = build_persistent_index(chunks, cfg)
+    semantic_payload = build_semantic_store(chunks, cfg)
     return {
         "status": "REINDEX_OK",
         "index_status": index_payload["status"],
         "index_version": index_payload["version"],
         "chunk_count": index_payload["chunk_count"],
         "indexed_chunk_count": index_payload["indexed_chunk_count"],
+        "semantic_store_status": semantic_payload["status"],
+        "semantic_store_version": semantic_payload["version"],
+        "semantic_store_indexed_chunk_count": semantic_payload["indexed_chunk_count"],
         "warnings": index_payload.get("warnings", []),
     }
 
@@ -121,6 +130,7 @@ def get_index_status(cfg: Settings = settings) -> dict[str, Any]:
             "chunk_count": len(chunks),
             "indexed_chunk_count": 0,
             "stale": bool(chunks),
+            "semantic_store": get_semantic_store_status(chunks, cfg),
         }
     current_fingerprint = fingerprint_chunks(chunks)
     stale = index.get("chunks_fingerprint") != current_fingerprint
@@ -131,6 +141,7 @@ def get_index_status(cfg: Settings = settings) -> dict[str, Any]:
         "chunk_count": len(chunks),
         "indexed_chunk_count": index.get("indexed_chunk_count", 0),
         "stale": stale,
+        "semantic_store": get_semantic_store_status(chunks, cfg),
         "warnings": index.get("warnings", []),
     }
 
@@ -167,6 +178,7 @@ def delete_source(source_id: str, cfg: Settings = settings) -> dict[str, Any]:
     delete_payload("sources", "source_id", source_id, cfg.sqlite_path)
     delete_chunks_for_source(source_id, cfg.sqlite_path)
     index_payload = build_persistent_index(kept_chunks, cfg)
+    semantic_payload = build_semantic_store(kept_chunks, cfg)
     return {
         "status": "SOURCE_DELETE_OK",
         "source_id": source_id,
@@ -175,4 +187,6 @@ def delete_source(source_id: str, cfg: Settings = settings) -> dict[str, Any]:
         "remaining_sources": len(kept_manifest),
         "index_status": index_payload["status"],
         "indexed_chunk_count": index_payload["indexed_chunk_count"],
+        "semantic_store_status": semantic_payload["status"],
+        "semantic_store_indexed_chunk_count": semantic_payload["indexed_chunk_count"],
     }

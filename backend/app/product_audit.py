@@ -112,10 +112,10 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "semantic_vector_store",
             "retrieval_grounding",
             "Embedding-backed semantic retrieval for larger corpora.",
-            "OPEN",
-            "docs/RETRIEVAL_UPGRADE_PLAN.md queues Chroma/local vector-store work",
-            "No embedding/vector-store adapter is implemented yet.",
-            "Add optional local vector-store adapter with missing/stale-store tests.",
+            _status_from_files(cfg, [("backend", "app", "semantic_store.py")]),
+            "backend/app/semantic_store.py, semantic retrieval strategy, and missing/stale-store tests",
+            "Current embeddings are deterministic local hash embeddings; higher-quality model embeddings remain an upgrade.",
+            "Add optional model embedding adapters only after eval evidence and privacy gates are defined.",
         ),
         ProductRequirement(
             "durable_conversations",
@@ -208,5 +208,5 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
         "readiness_percent": readiness_percent,
         "counts": counts,
         "requirements": rows,
-        "next_recommended_vector": "semantic_vector_store",
+        "next_recommended_vector": "tool_use_and_actions",
     }

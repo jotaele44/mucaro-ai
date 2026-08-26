@@ -34,10 +34,10 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro audit product` | Audit product gaps against the full assistant objective | 0 | 2 with `--strict` while gaps remain |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
-| `mucaro sources list` | List ingested sources and persistent index status | 0 | 2 |
-| `mucaro sources reindex` | Rebuild the local persistent retrieval index | 0 | 2 |
+| `mucaro sources list` | List ingested sources, persistent index status, and semantic-store status | 0 | 2 |
+| `mucaro sources reindex` | Rebuild the local persistent index and semantic store | 0 | 2 |
 | `mucaro sources delete SOURCE_ID` | Delete one ingested source and rebuild the index | 0 | 2 |
-| `mucaro index status` | Inspect local persistent index health | 0 | 2 |
+| `mucaro index status` | Inspect local persistent index and semantic-store health | 0 | 2 |
 | `mucaro conversations list` | List saved local chat sessions | 0 | 2 |
 | `mucaro conversations create` | Create a saved local chat session | 0 | 2 |
 | `mucaro conversations ask CONVERSATION_ID QUERY` | Ask with saved conversation context | 0 | 2 or 3 |
@@ -95,6 +95,8 @@ retrieval payloads where practical:
 | `ERROR_NO_VALID_CHUNKS` | available chunks are malformed or empty |
 | `ERROR_PERSISTENT_INDEX_MISSING` | `--strategy persistent` was requested before an index was built |
 | `ERROR_PERSISTENT_INDEX_STALE` | `--strategy persistent` index does not match current chunks |
+| `ERROR_SEMANTIC_STORE_MISSING` | `--strategy semantic` was requested before a semantic store was built |
+| `ERROR_SEMANTIC_STORE_STALE` | `--strategy semantic` store does not match current chunks |
 | `ERROR_INVALID_TOP_K` | `--top-k` is outside the supported range |
 | `TOP_K_RANGE:1-20` | CLI argument validation rejected `ask --top-k` before retrieval ran |
 | `TOP_K_MUST_BE_INTEGER` | CLI argument validation rejected a non-integer `ask --top-k` |
@@ -131,6 +133,7 @@ mucaro runs summary --format text
 mucaro runs show RUN_ID --format json
 mucaro ask "How does source lineage work?" --format json --no-persist
 mucaro ask "How does source lineage work?" --strategy persistent --format text
+mucaro ask "How does source lineage work?" --strategy semantic --format text
 mucaro plan "Add CLI capability" --input mucaro-ai --format text
 mucaro validate --format text
 mucaro serve --host 127.0.0.1 --port 8000
@@ -157,8 +160,8 @@ the path needs a new grant.
 
 Use `mucaro doctor` to inspect local readiness without ingesting files or
 granting access. The report checks project paths, local data directories,
-source/chunk counts, persistent index status, directory grants, model-provider
-readiness, API auth posture, conversations, and runs. Add `--strict` when
+source/chunk counts, persistent index status, semantic-store status, directory
+grants, model-provider readiness, API auth posture, conversations, and runs. Add `--strict` when
 automation should fail on warnings.
 
 Use `mucaro audit product` to classify the broader assistant objective as
@@ -167,11 +170,11 @@ automation should fail while any product gap remains open.
 
 ## Retrieval Strategies
 
-`mucaro ask` defaults to `--strategy hybrid`, which recomputes deterministic lexical and TF-IDF scores from the current chunk file. Use `--strategy bm25` for local BM25 ranking, or `--strategy persistent` to query the local persisted TF-IDF index built during ingestion. Persistent retrieval fails closed when the index is missing or stale; run `mucaro ingest PATH` again to rebuild it.
+`mucaro ask` defaults to `--strategy hybrid`, which recomputes deterministic lexical and TF-IDF scores from the current chunk file. Use `--strategy bm25` for local BM25 ranking, `--strategy persistent` to query the local persisted TF-IDF index, or `--strategy semantic` to query the local embedding store built during ingestion. Persistent and semantic retrieval fail closed when their stores are missing or stale; run `mucaro sources reindex` after ingesting sources to rebuild them.
 
-Use `mucaro index status` to check whether the persistent index is usable. Use
-`mucaro sources reindex` to rebuild it from current chunks without ingesting new
-files. Use `mucaro sources list` to inspect the local source library and
+Use `mucaro index status` to check whether the persistent index and semantic
+store are usable. Use `mucaro sources reindex` to rebuild them from current
+chunks without ingesting new files. Use `mucaro sources list` to inspect the local source library and
 `mucaro sources delete SOURCE_ID` to remove one source from the assistant's
 knowledge base.
 

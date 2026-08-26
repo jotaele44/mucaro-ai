@@ -62,11 +62,11 @@ Date: 2026-08-25
 
 Candidate target:
 
-- Candidate tag: `v0.1.16-product-audit`
-- Candidate package version: `0.1.16`
+- Candidate tag: `v0.1.17-semantic-store`
+- Candidate package version: `0.1.17`
 - Baseline preserved: `v0.1.4-local-persistent-index` at `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`; interim combined tag `v0.1.9-all-vectors-certified` at `b5deea7170eb1c94b5238e9a923827e6dc913213`
-- Scope: source library delete/reindex controls, retrieval strategy UI, no-context recovery guidance, expanded retrieval eval corpus, optional local operator token boundary, workspace profiles, structured run history, conversation follow-up context, conversation rename/delete/search, directory access UI, desktop package self-test, CLI `--version`, early `ask --top-k` validation, CLI source listing, CLI source deletion, CLI reindexing, CLI index status, CLI conversation create/list/show/rename/delete/ask, CLI run list/summary/show, opt-in `bm25_v1` retrieval, CLI readiness diagnostics, and executable product-gap auditing.
-- Candidate local evidence: `82 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `DESKTOP_PACKAGE_READY`, `npm audit` 0 vulnerabilities, frontend build passed, and `CERTIFY_RELEASE_OK`.
+- Scope: source library delete/reindex controls, retrieval strategy UI, no-context recovery guidance, expanded retrieval eval corpus, optional local operator token boundary, workspace profiles, structured run history, conversation follow-up context, conversation rename/delete/search, directory access UI, desktop package self-test, CLI `--version`, early `ask --top-k` validation, CLI source listing, CLI source deletion, CLI reindexing, CLI index status, CLI conversation create/list/show/rename/delete/ask, CLI run list/summary/show, opt-in `bm25_v1` retrieval, CLI readiness diagnostics, executable product-gap auditing, and opt-in `local_semantic_hash_store_v1` retrieval.
+- Candidate local evidence: `86 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=10`, `DESKTOP_PACKAGE_READY`, `npm audit` 0 vulnerabilities, frontend build passed, and `CERTIFY_RELEASE_OK`.
 - Required external receipt: hosted CI and fresh-clone certification must pass on the final pushed commit before tagging.
 
 ## Scope
@@ -80,7 +80,8 @@ Included:
   package lockfile, and CLI packaging metadata.
 - CLI surface: `mucaro ask`, `mucaro ingest`, `mucaro plan`, `mucaro validate`,
   and `mucaro serve`.
-- Retrieval surface: `lexical_v2`, `vector_tfidf_v1`, and default
+- Retrieval surface: `lexical_v2`, `vector_tfidf_v1`, `bm25_v1`,
+  `persistent_tfidf_v1`, `local_semantic_hash_store_v1`, and default
   `hybrid_tfidf_v1` answer retrieval.
 - Desktop launcher smoke path, editable install path, local release gates, hosted
   CI, and fresh-clone certification.
