@@ -40,6 +40,8 @@ class Settings:
     default_model_name: str
     max_upload_bytes: int = DEFAULT_MAX_UPLOAD_BYTES
     cors_origins: tuple[str, ...] = DEFAULT_CORS_ORIGINS
+    operator_token: str | None = None
+    workspace_profile: str = "default"
 
     @classmethod
     def load(cls) -> "Settings":
@@ -63,6 +65,8 @@ class Settings:
             default_model_name=os.getenv("MUCARO_AI_MODEL", "claude-3-5-sonnet-latest"),
             max_upload_bytes=max_upload_bytes,
             cors_origins=cors_origins or DEFAULT_CORS_ORIGINS,
+            operator_token=os.getenv("MUCARO_AI_OPERATOR_TOKEN") or None,
+            workspace_profile=os.getenv("MUCARO_AI_WORKSPACE_PROFILE", "default"),
         )
 
     def ensure_dirs(self) -> None:

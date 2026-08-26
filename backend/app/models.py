@@ -18,6 +18,11 @@ class ConversationCreateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=120)
 
 
+class WorkspaceProfileRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    notes: str = Field(default="", max_length=500)
+
+
 class PlanRequest(BaseModel):
     user_request: str = Field(min_length=1)
     inputs_available: list[str] = Field(default_factory=list)

@@ -8,23 +8,34 @@ import "./styles.css";
 function App() {
   const [health, setHealth] = useState(null);
   const [sources, setSources] = useState([]);
+  const [indexStatus, setIndexStatus] = useState(null);
   const [chunks, setChunks] = useState([]);
   const [conversations, setConversations] = useState([]);
+  const [runSummary, setRunSummary] = useState(null);
+  const [config, setConfig] = useState(null);
+  const [workspaces, setWorkspaces] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [answer, setAnswer] = useState(null);
   const [selectedSourceId, setSelectedSourceId] = useState(null);
+  const [retrievalStrategy, setRetrievalStrategy] = useState("hybrid");
+  const [operatorToken, setOperatorToken] = useState(api.getOperatorToken());
   const [query, setQuery] = useState("How does source lineage work?");
   const [status, setStatus] = useState("Idle");
   const [error, setError] = useState(null);
 
   async function refresh() {
     setHealth(await api.health());
+    setConfig(await api.config());
     const src = await api.sources();
     setSources(src.sources || []);
+    setIndexStatus(src.index || null);
     const chunkPayload = await api.chunks();
     setChunks(chunkPayload.chunks || []);
     const conversationPayload = await api.conversations();
     setConversations(conversationPayload.conversations || []);
+    setRunSummary(await api.runSummary());
+    const workspacePayload = await api.workspaces();
+    setWorkspaces(workspacePayload.workspaces || []);
   }
 
   useEffect(() => { refresh().catch((err) => setStatus(err.message)); }, []);
@@ -55,7 +66,7 @@ function App() {
         conversation = await api.createConversation({ title: "New chat" });
         setActiveConversation(conversation);
       }
-      const payload = await api.askConversation(conversation.conversation_id, { query, top_k: 5, model_provider: "mock" });
+      const payload = await api.askConversation(conversation.conversation_id, { query, top_k: 5, retrieval_strategy: retrievalStrategy, model_provider: "mock" });
       const result = payload.answer;
       setAnswer(result);
       setActiveConversation(payload.conversation);
@@ -66,6 +77,53 @@ function App() {
       setError(err.message);
       setStatus("ASK_ERROR");
     }
+  }
+
+  async function reindex() {
+    setStatus("Reindexing...");
+    setError(null);
+    try {
+      const result = await api.reindexSources();
+      setStatus(result.status || "REINDEX_OK");
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+      setStatus("REINDEX_ERROR");
+    }
+  }
+
+  async function removeSelectedSource() {
+    if (!selectedSource) return;
+    setStatus("Deleting source...");
+    setError(null);
+    try {
+      const result = await api.deleteSource(selectedSource.source_id);
+      setStatus(result.status || "SOURCE_DELETE_OK");
+      setSelectedSourceId(null);
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+      setStatus("SOURCE_DELETE_ERROR");
+    }
+  }
+
+  async function saveCurrentWorkspace() {
+    setStatus("Saving workspace...");
+    setError(null);
+    try {
+      const result = await api.saveWorkspace({ name: config?.workspace_profile || "default", notes: "Saved from operator console." });
+      setStatus(result.status || "WORKSPACE_PROFILE_SAVED");
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+      setStatus("WORKSPACE_ERROR");
+    }
+  }
+
+  async function saveOperatorToken() {
+    api.setOperatorToken(operatorToken);
+    setStatus(operatorToken.trim() ? "OPERATOR_TOKEN_SAVED" : "OPERATOR_TOKEN_CLEARED");
+    await refresh();
   }
 
   async function newChat() {
@@ -126,6 +184,7 @@ function App() {
           <div><strong>Status:</strong> {status}</div>
           <div><strong>Backend:</strong> {health ? health.status : "offline"}</div>
           <div><strong>Provider:</strong> {health ? health.model_provider : "unknown"}</div>
+          <div><strong>Auth:</strong> {config?.auth?.status || "unknown"}</div>
         </header>
         {error && <div className="notice error">{error}</div>}
         <PlanningGate />
@@ -136,7 +195,38 @@ function App() {
         </section>
         <DirectoryIntake onIngested={refresh} />
         <section className="panel">
-          <h2>Source Manifest</h2>
+          <div className="panel-header">
+            <h2>Workspace Profile</h2>
+            <button onClick={saveCurrentWorkspace}>Save Profile</button>
+          </div>
+          <dl>
+            <div><dt>Active</dt><dd>{config?.workspace_profile || "default"}</dd></div>
+            <div><dt>Project Root</dt><dd>{config?.project_root || "unknown"}</dd></div>
+            <div><dt>Data Dir</dt><dd>{config?.data_dir || "unknown"}</dd></div>
+            <div><dt>Profiles</dt><dd>{workspaces.map((workspace) => workspace.name).join(", ") || "none"}</dd></div>
+          </dl>
+          <div className="token-row">
+            <label>
+              Operator Token
+              <input
+                value={operatorToken}
+                onChange={(event) => setOperatorToken(event.target.value)}
+                type="password"
+                placeholder={config?.auth?.auth_required ? "Required for mutating actions" : "Optional"}
+              />
+            </label>
+            <button onClick={saveOperatorToken}>Use Token</button>
+          </div>
+        </section>
+        <section className="panel">
+          <div className="panel-header">
+            <h2>Source Manifest</h2>
+            <div className="button-row">
+              <span className="badge">{indexStatus?.status || "INDEX_UNKNOWN"}</span>
+              <button onClick={reindex}>Reindex</button>
+              <button className="secondary" onClick={removeSelectedSource} disabled={!selectedSource}>Delete Source</button>
+            </div>
+          </div>
           <table>
             <thead><tr><th>Source</th><th>File</th><th>Status</th><th>Chunks</th><th>Parser</th></tr></thead>
             <tbody>{sources.map((s) => (
@@ -157,6 +247,7 @@ function App() {
                 <div><dt>Bytes</dt><dd>{selectedSource.bytes ?? "unknown"}</dd></div>
                 <div><dt>Parse</dt><dd>{selectedSource.parse_status || "unknown"}</dd></div>
                 <div><dt>Warnings</dt><dd>{(selectedSource.warnings || []).join(", ") || "none"}</dd></div>
+                <div><dt>Path</dt><dd>{selectedSource.source_path || "unknown"}</dd></div>
               </dl>
             </div>
           )}
@@ -166,6 +257,13 @@ function App() {
             <h2>RAG Chat</h2>
             <button onClick={newChat}>New Chat</button>
           </div>
+          {runSummary && (
+            <div className="summary-strip">
+              <span>Runs: {runSummary.run_count}</span>
+              <span>Cited OK: {runSummary.citation_ok}</span>
+              <span>Latest: {runSummary.latest_run_id || "none"}</span>
+            </div>
+          )}
           <div className="chat-layout">
             <section className="chat-list">
               <h3>Chat Sessions</h3>
@@ -192,9 +290,19 @@ function App() {
                   ))}
                 </div>
               )}
+              <label className="inline-control">
+                Retrieval
+                <select value={retrievalStrategy} onChange={(e) => setRetrievalStrategy(e.target.value)}>
+                  <option value="hybrid">hybrid</option>
+                  <option value="persistent">persistent</option>
+                  <option value="vector">vector</option>
+                  <option value="lexical">lexical</option>
+                </select>
+              </label>
               <input value={query} onChange={(e) => setQuery(e.target.value)} />
               <button onClick={ask}>Ask with citations</button>
               {hasNoSourceAnswer && <div className="notice">No sources are available yet. Ingest a file first, then ask again.</div>}
+              {answer?.status === "ERROR_NO_RETRIEVAL_CONTEXT" && <div className="notice">No matching context was found. Try a broader query, switch retrieval strategy, or reindex sources.</div>}
             </section>
           </div>
           {answer && !answer.status && (

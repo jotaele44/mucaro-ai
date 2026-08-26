@@ -56,6 +56,18 @@ Certified target:
 - Local evidence: `61 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `npm audit` 0 vulnerabilities, frontend build passed, and `CERTIFY_RELEASE_OK`.
 - Fresh clone evidence: `FRESH_CLONE_CERT_OK` from `v0.1.4-local-persistent-index`.
 
+## A/B/C Operator Candidate
+
+Date: 2026-08-25
+
+Candidate target:
+
+- Candidate tag: `v0.1.9-all-vectors`
+- Candidate package version: `0.1.9`
+- Baseline preserved: `v0.1.4-local-persistent-index` at `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`
+- Scope: source library delete/reindex controls, retrieval strategy UI, no-context recovery guidance, expanded retrieval eval corpus, optional local operator token boundary, workspace profiles, structured run history, conversation follow-up context, directory access UI, and desktop package self-test.
+- Required external receipt: final `pytest`, retrieval eval, JSON validation, desktop package self-test, frontend audit/build, release certification, hosted CI, and fresh-clone certification are recorded at release time.
+
 ## Scope
 
 This certification covers the committed `mucaro-ai` source tree intended for the

@@ -1,12 +1,15 @@
 # Release Status
 
-Current package version: `0.1.4`.
+Current package version: `0.1.9`.
 
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, fresh-clone validation, API upload
 hardening, parser evidence, retrieval evaluation gates, explicit live-model
 routing, frontend evidence display, and an explicit persistent local TF-IDF
-retrieval strategy backed by `data/indexes/tfidf_index.json`.
+retrieval strategy backed by `data/indexes/tfidf_index.json`. Post-baseline
+operator upgrades add source deletion/reindexing, retrieval strategy selection
+in the UI, expanded retrieval eval coverage, optional local operator auth,
+workspace profiles, structured run history, and desktop package self-testing.
 
 Observed success markers:
 
@@ -15,7 +18,8 @@ Observed success markers:
 - `JSON_OK`
 - `56 passed` from pytest for the certified `v0.1.3-local-hardening` tag
 - `61 passed` from pytest for the certified `v0.1.4-local-persistent-index` tag
-- Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, hybrid, and persistent strategies
+- Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, hybrid, and persistent strategies across the expanded corpus
+- Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
 - `CITATION_OK`
 - `npm audit` reported 0 vulnerabilities after Vite/package-lock repair
@@ -27,6 +31,7 @@ Observed success markers:
 - GitHub Actions CI passed on the retrieval and CLI hardening commits
 - `v0.1.3-local-hardening` is certified on commit `101e457743a7a0e1b830cbd7e066b6b817af9184`
 - `v0.1.4-local-persistent-index` is certified on commit `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`
+- `v0.1.9-all-vectors` is the current candidate target for the combined operator/admin/context baseline
 
 Local expected marker after first setup:
 

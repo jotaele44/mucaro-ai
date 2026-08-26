@@ -71,3 +71,18 @@ def list_payloads(table: str, sqlite_path: Path | None = None) -> list[dict[str,
     with get_connection(sqlite_path) as conn:
         rows = conn.execute(f"SELECT payload_json FROM {table} ORDER BY rowid ASC").fetchall()
     return [json.loads(row["payload_json"]) for row in rows]
+
+
+def delete_payload(table: str, key_field: str, key: str, sqlite_path: Path | None = None) -> int:
+    allowed = {"sources", "chunks", "runs", "execution_gates", "conversations"}
+    if table not in allowed:
+        raise ValueError(f"Invalid table {table}")
+    with get_connection(sqlite_path) as conn:
+        cursor = conn.execute(f"DELETE FROM {table} WHERE {key_field} = ?", (key,))
+        return int(cursor.rowcount)
+
+
+def delete_chunks_for_source(source_id: str, sqlite_path: Path | None = None) -> int:
+    with get_connection(sqlite_path) as conn:
+        cursor = conn.execute("DELETE FROM chunks WHERE source_id = ?", (source_id,))
+        return int(cursor.rowcount)

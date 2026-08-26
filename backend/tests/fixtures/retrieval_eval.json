@@ -29,6 +29,36 @@
       "source_id": "eval_source_model",
       "chunk_index": 0,
       "text": "Mock mode is the deterministic default. Anthropic live mode requires explicit opt in, API key configuration, and provider readiness."
+    },
+    {
+      "chunk_id": "eval_directory_permission",
+      "source_id": "eval_source_permissions",
+      "chunk_index": 0,
+      "text": "Directory ingestion is permission gated. External paths require an explicit directory grant before ingest-path reads a file or folder."
+    },
+    {
+      "chunk_id": "eval_persistent_index",
+      "source_id": "eval_source_index",
+      "chunk_index": 0,
+      "text": "Persistent retrieval uses a local TF-IDF index under data indexes, rebuilds during ingestion, and fails closed when the chunk fingerprint is stale."
+    },
+    {
+      "chunk_id": "eval_chat_history",
+      "source_id": "eval_source_chat",
+      "chunk_index": 0,
+      "text": "Chat sessions persist conversation turns, include prior user and assistant turns as bounded context, and store answer traces for follow-up questions."
+    },
+    {
+      "chunk_id": "eval_operator_auth",
+      "source_id": "eval_source_auth",
+      "chunk_index": 0,
+      "text": "The local operator auth boundary is optional. When MUCARO_AI_OPERATOR_TOKEN is set, mutating API routes require a bearer or X-Mucaro-Token header."
+    },
+    {
+      "chunk_id": "eval_distractor_runtime",
+      "source_id": "eval_source_distractor",
+      "chunk_index": 0,
+      "text": "Runtime status panels show backend health, provider name, upload progress, and frontend build status for normal local operations."
     }
   ],
   "queries": [
@@ -37,6 +67,10 @@
     {"query": "How does the launcher prove the server stopped?", "expected_chunk_ids": ["eval_desktop_launcher"]},
     {"query": "Which parser evidence is kept for CSV files?", "expected_chunk_ids": ["eval_csv_parser"]},
     {"query": "When should Anthropic live calls run?", "expected_chunk_ids": ["eval_mock_model"]},
+    {"query": "What must happen before ingesting an external folder?", "expected_chunk_ids": ["eval_directory_permission"]},
+    {"query": "How does persistent retrieval know an index is stale?", "expected_chunk_ids": ["eval_persistent_index"]},
+    {"query": "How are follow-up chat questions given prior context?", "expected_chunk_ids": ["eval_chat_history"]},
+    {"query": "What protects local mutating API routes when configured?", "expected_chunk_ids": ["eval_operator_auth"]},
     {"query": "What is the moon made of?", "expected_chunk_ids": []}
   ]
 }

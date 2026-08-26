@@ -6,10 +6,10 @@ from typing import Any
 
 from .chunker import chunk_text
 from .config import Settings, settings
-from .db import init_db, upsert_payload
+from .db import delete_chunks_for_source, delete_payload, init_db, upsert_payload
 from .parser import detect_mime, parse_file
 from .utils import read_json, sha256_file, stable_id, utc_now, write_json
-from .vector_index import build_persistent_index
+from .vector_index import build_persistent_index, fingerprint_chunks, load_persistent_index
 
 MANIFEST_NAME = "source_manifest.json"
 CHUNKS_NAME = "document_chunks.json"
@@ -96,3 +96,83 @@ def get_sources(cfg: Settings = settings) -> list[dict[str, Any]]:
 
 def get_chunks(cfg: Settings = settings) -> list[dict[str, Any]]:
     return read_json(cfg.processed_dir / CHUNKS_NAME, [])
+
+
+def reindex_sources(cfg: Settings = settings) -> dict[str, Any]:
+    cfg.ensure_dirs()
+    chunks = get_chunks(cfg)
+    index_payload = build_persistent_index(chunks, cfg)
+    return {
+        "status": "REINDEX_OK",
+        "index_status": index_payload["status"],
+        "index_version": index_payload["version"],
+        "chunk_count": index_payload["chunk_count"],
+        "indexed_chunk_count": index_payload["indexed_chunk_count"],
+        "warnings": index_payload.get("warnings", []),
+    }
+
+
+def get_index_status(cfg: Settings = settings) -> dict[str, Any]:
+    chunks = get_chunks(cfg)
+    index = load_persistent_index(cfg)
+    if index is None:
+        return {
+            "status": "INDEX_MISSING",
+            "chunk_count": len(chunks),
+            "indexed_chunk_count": 0,
+            "stale": bool(chunks),
+        }
+    current_fingerprint = fingerprint_chunks(chunks)
+    stale = index.get("chunks_fingerprint") != current_fingerprint
+    return {
+        "status": "INDEX_STALE" if stale else "INDEX_OK",
+        "version": index.get("version"),
+        "built_at": index.get("built_at"),
+        "chunk_count": len(chunks),
+        "indexed_chunk_count": index.get("indexed_chunk_count", 0),
+        "stale": stale,
+        "warnings": index.get("warnings", []),
+    }
+
+
+def delete_source(source_id: str, cfg: Settings = settings) -> dict[str, Any]:
+    cfg.ensure_dirs()
+    init_db(cfg.sqlite_path)
+    manifest_path = cfg.processed_dir / MANIFEST_NAME
+    chunk_path = cfg.processed_dir / CHUNKS_NAME
+    manifest = get_sources(cfg)
+    source = next((item for item in manifest if item.get("source_id") == source_id), None)
+    if source is None:
+        return {"status": "ERROR_SOURCE_NOT_FOUND", "source_id": source_id}
+
+    kept_manifest = [item for item in manifest if item.get("source_id") != source_id]
+    chunks = get_chunks(cfg)
+    kept_chunks = [chunk for chunk in chunks if chunk.get("source_id") != source_id]
+    removed_chunks = len(chunks) - len(kept_chunks)
+    write_json(manifest_path, kept_manifest)
+    write_json(chunk_path, kept_chunks)
+
+    managed_file_removed = False
+    source_path = source.get("source_path")
+    if isinstance(source_path, str):
+        candidate = (cfg.project_root / source_path).resolve()
+        try:
+            is_managed_input = candidate.is_relative_to(cfg.input_dir.resolve())
+        except ValueError:
+            is_managed_input = False
+        if is_managed_input and candidate.exists() and candidate.is_file():
+            candidate.unlink()
+            managed_file_removed = True
+
+    delete_payload("sources", "source_id", source_id, cfg.sqlite_path)
+    delete_chunks_for_source(source_id, cfg.sqlite_path)
+    index_payload = build_persistent_index(kept_chunks, cfg)
+    return {
+        "status": "SOURCE_DELETE_OK",
+        "source_id": source_id,
+        "removed_chunks": removed_chunks,
+        "managed_file_removed": managed_file_removed,
+        "remaining_sources": len(kept_manifest),
+        "index_status": index_payload["status"],
+        "indexed_chunk_count": index_payload["indexed_chunk_count"],
+    }

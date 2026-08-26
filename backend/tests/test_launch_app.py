@@ -20,6 +20,18 @@ def test_launch_app_self_test():
     assert "LAUNCH_APP_SELF_TEST_OK" in proc.stdout
 
 
+def test_package_desktop_self_test():
+    proc = subprocess.run(
+        [sys.executable, "scripts/package_desktop.py", "--self-test"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    assert proc.returncode == 0
+    assert "DESKTOP_PACKAGE_READY" in proc.stdout
+
+
 def test_launch_app_reports_missing_frontend_deps(tmp_path, monkeypatch):
     frontend = tmp_path / "frontend"
     frontend.mkdir()

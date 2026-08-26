@@ -89,6 +89,8 @@ Copy `.env.example` to `.env` and fill only what you need.
 - `MUCARO_AI_MODEL`: model name for live mode.
 - `MUCARO_AI_MAX_UPLOAD_BYTES`: API upload limit. Default is 25 MB.
 - `MUCARO_AI_CORS_ORIGINS`: comma-separated browser origins for local frontend development.
+- `MUCARO_AI_OPERATOR_TOKEN`: optional local operator token required for mutating API actions when set.
+- `MUCARO_AI_WORKSPACE_PROFILE`: runtime workspace profile name. Default is `default`.
 
 ## Run backend
 
@@ -166,6 +168,8 @@ The browser app includes the same permission workflow in the Directory Access pa
 
 The browser app also persists local chat sessions. Each conversation keeps ordered user and assistant turns, uses recent turns for follow-up questions, and keeps cited answer traces exportable by `run_id`.
 
+The API exposes local admin surfaces for source deletion, reindexing, run detail, config inspection, and workspace profiles. When `MUCARO_AI_OPERATOR_TOKEN` is set, mutating routes require `Authorization: Bearer <token>` or `X-Mucaro-Token: <token>`.
+
 Live Anthropic mode is explicit:
 
 ```bash
@@ -236,6 +240,7 @@ python scripts/extract_reference_patterns.py
 - Mock mode is default.
 - Execution Gate approval is required before mutation-oriented execution.
 - Uploaded files are stored locally under `data/input/`.
+- Set `MUCARO_AI_OPERATOR_TOKEN` before exposing the local API beyond a trusted loopback-only development session.
 - Every answer trace must include source IDs and cited chunk IDs or validation flags.
 
 ## Phase 2 roadmap

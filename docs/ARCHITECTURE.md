@@ -28,7 +28,20 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 - API upload boundary: sanitizes upload filenames, rejects traversal/generated/unsupported names, and enforces `MUCARO_AI_MAX_UPLOAD_BYTES` with a 25 MB default.
 - Directory permission boundary: direct path ingestion outside the project root requires a local grant recorded under `data/processed/directory_permissions.json`.
 - Conversation records: local chat sessions store ordered user/assistant turns and reference answer traces by `run_id`.
+- Workspace profiles: local JSON records under `data/processed/workspace_profiles.json` describe named workspace/runtime profiles.
+- Source library controls: operators can reindex all chunks, inspect persisted index status, and delete managed sources while rebuilding the index.
+- Run history: `/runs`, `/runs/summary`, and `/runs/{run_id}` provide scan-friendly history plus full trace retrieval.
 - Parser evidence: source manifests include byte counts, parser warnings, parse status, and format metadata such as CSV delimiter/header/row counts.
+
+## Operator layer
+
+The API is local-first and loopback-oriented by default. If `MUCARO_AI_OPERATOR_TOKEN` is configured, mutating routes require either `Authorization: Bearer <token>` or `X-Mucaro-Token: <token>`.
+
+Read-only inspection routes expose health, config, sources, chunks, conversations, runs, workspace profiles, and exports. Mutating routes include planning/approval writes, upload/path ingestion, directory grant changes, source deletion/reindexing, chat creation/asking, and workspace profile saves.
+
+## Packaging layer
+
+The desktop package flow is validated by `scripts/package_desktop.py --self-test`. It verifies launcher, bootstrap, frontend lockfile, and package metadata inputs without writing generated artifacts during certification.
 
 ## Conversation layer
 

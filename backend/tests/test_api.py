@@ -8,7 +8,12 @@ from backend.app.config import Settings
 from backend.app.main import create_app, sanitize_upload_filename
 
 
-def make_settings(root: Path, *, max_upload_bytes: int = 25 * 1024 * 1024) -> Settings:
+def make_settings(
+    root: Path,
+    *,
+    max_upload_bytes: int = 25 * 1024 * 1024,
+    operator_token: str | None = None,
+) -> Settings:
     return Settings(
         project_root=root,
         data_dir=root / "data",
@@ -20,11 +25,17 @@ def make_settings(root: Path, *, max_upload_bytes: int = 25 * 1024 * 1024) -> Se
         default_model_provider="mock",
         default_model_name="mock",
         max_upload_bytes=max_upload_bytes,
+        operator_token=operator_token,
     )
 
 
-def make_client(tmp_path: Path, *, max_upload_bytes: int = 25 * 1024 * 1024) -> TestClient:
-    return TestClient(create_app(make_settings(tmp_path, max_upload_bytes=max_upload_bytes)))
+def make_client(
+    tmp_path: Path,
+    *,
+    max_upload_bytes: int = 25 * 1024 * 1024,
+    operator_token: str | None = None,
+) -> TestClient:
+    return TestClient(create_app(make_settings(tmp_path, max_upload_bytes=max_upload_bytes, operator_token=operator_token)))
 
 
 def test_api_happy_path_covers_operator_routes(tmp_path: Path):
@@ -79,6 +90,34 @@ def test_api_happy_path_covers_operator_routes(tmp_path: Path):
     validate = client.post("/validate")
     assert validate.status_code == 200
     assert validate.json()["status"] == "JSON_OK"
+
+
+def test_api_optional_operator_auth_protects_mutations(tmp_path: Path):
+    client = make_client(tmp_path, operator_token="secret-token")
+
+    config = client.get("/config")
+    assert config.status_code == 200
+    assert config.json()["auth"]["auth_required"] is True
+
+    rejected = client.post("/plan", json={"user_request": "Add CLI capability"})
+    assert rejected.status_code == 401
+    assert rejected.json()["detail"]["status"] == "ERROR_OPERATOR_AUTH_REQUIRED"
+
+    allowed = client.post(
+        "/plan",
+        json={"user_request": "Add CLI capability"},
+        headers={"X-Mucaro-Token": "secret-token"},
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["task_id"].startswith("task_")
+
+    bearer_allowed = client.post(
+        "/conversations",
+        json={"title": "Authorized chat"},
+        headers={"Authorization": "Bearer secret-token"},
+    )
+    assert bearer_allowed.status_code == 200
+    assert bearer_allowed.json()["title"] == "Authorized chat"
 
 
 def test_api_ingest_rejects_empty_filename(tmp_path: Path):
@@ -236,6 +275,55 @@ def test_api_conversation_follow_up_uses_prior_turn_context(tmp_path: Path):
     assert answer["conversation_context_turn_count"] == 2
     assert "Conversation context turns used: 2" in answer["answer"]
     assert "What does source lineage require?" in answer["answer"]
+
+
+def test_api_source_management_run_detail_and_workspace_profiles(tmp_path: Path):
+    client = make_client(tmp_path)
+    ingest = client.post(
+        "/ingest",
+        files={"upload": ("source.md", b"Source lineage requires cited chunk IDs and source IDs.", "text/markdown")},
+    )
+    assert ingest.status_code == 200
+    source_id = ingest.json()["source"]["source_id"]
+
+    sources = client.get("/sources")
+    assert sources.status_code == 200
+    assert sources.json()["index"]["status"] == "INDEX_OK"
+
+    reindex = client.post("/sources/reindex")
+    assert reindex.status_code == 200
+    assert reindex.json()["status"] == "REINDEX_OK"
+
+    ask = client.post(
+        "/ask",
+        json={"query": "What does source lineage require?", "retrieval_strategy": "persistent", "model_provider": "mock"},
+    )
+    assert ask.status_code == 200
+    run_id = ask.json()["run_id"]
+    run_detail = client.get(f"/runs/{run_id}")
+    assert run_detail.status_code == 200
+    assert run_detail.json()["run_id"] == run_id
+    run_summary = client.get("/runs/summary")
+    assert run_summary.status_code == 200
+    assert run_summary.json()["status"] == "RUN_HISTORY_OK"
+    assert run_summary.json()["by_retrieval_strategy"]["persistent_tfidf_v1"] == 1
+
+    workspaces = client.get("/workspaces")
+    assert workspaces.status_code == 200
+    assert any(profile["name"] == "default" for profile in workspaces.json()["workspaces"])
+    saved = client.post("/workspaces", json={"name": "research", "notes": "local corpus"})
+    assert saved.status_code == 200
+    assert saved.json()["profile"]["name"] == "research"
+
+    deleted = client.delete(f"/sources/{source_id}")
+    assert deleted.status_code == 200
+    assert deleted.json()["status"] == "SOURCE_DELETE_OK"
+    assert deleted.json()["removed_chunks"] >= 1
+    assert client.get("/sources").json()["sources"] == []
+
+    missing_delete = client.delete(f"/sources/{source_id}")
+    assert missing_delete.status_code == 404
+    assert missing_delete.json()["detail"]["status"] == "ERROR_SOURCE_NOT_FOUND"
 
 
 def test_api_invalid_top_k_is_validation_error(tmp_path: Path):
