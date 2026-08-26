@@ -120,6 +120,54 @@ def test_api_optional_operator_auth_protects_mutations(tmp_path: Path):
     assert bearer_allowed.json()["title"] == "Authorized chat"
 
 
+def test_api_tool_runtime_requires_approval_and_audits_execution(tmp_path: Path):
+    client = make_client(tmp_path)
+
+    tools = client.get("/tools")
+    assert tools.status_code == 200
+    assert any(tool["name"] == "source_library.status" for tool in tools.json()["tools"])
+
+    requested = client.post(
+        "/tools/requests",
+        json={"tool_name": "source_library.status", "arguments": {}, "reason": "api readiness"},
+    )
+    assert requested.status_code == 200
+    tool_call_id = requested.json()["tool_call"]["tool_call_id"]
+    assert requested.json()["tool_call"]["status"] == "PENDING_APPROVAL"
+
+    blocked = client.post(f"/tools/requests/{tool_call_id}/run")
+    assert blocked.status_code == 400
+    assert blocked.json()["detail"]["status"] == "ERROR_TOOL_APPROVAL_REQUIRED"
+
+    approved = client.post(f"/tools/requests/{tool_call_id}/approve", json={"reason": "operator approved"})
+    assert approved.status_code == 200
+    assert approved.json()["tool_call"]["status"] == "APPROVED"
+
+    executed = client.post(f"/tools/requests/{tool_call_id}/run")
+    assert executed.status_code == 200
+    assert executed.json()["status"] == "TOOL_CALL_EXECUTED"
+    assert executed.json()["result"]["status"] == "SOURCE_LIBRARY_STATUS_OK"
+
+    audit = client.get("/tools/audit")
+    assert audit.status_code == 200
+    assert [event["event"] for event in audit.json()["events"]] == [
+        "TOOL_CALL_REQUESTED",
+        "TOOL_CALL_APPROVED",
+        "TOOL_CALL_EXECUTED",
+    ]
+
+
+def test_api_tool_runtime_rejects_unknown_tools(tmp_path: Path):
+    client = make_client(tmp_path)
+
+    rejected = client.post("/tools/requests", json={"tool_name": "shell.exec", "arguments": {"cmd": "date"}})
+
+    assert rejected.status_code == 400
+    assert rejected.json()["detail"]["status"] == "ERROR_TOOL_NOT_ALLOWED"
+    audit = client.get("/tools/audit")
+    assert audit.json()["events"][0]["event"] == "TOOL_REQUEST_REJECTED"
+
+
 def test_api_ingest_rejects_empty_filename(tmp_path: Path):
     client = make_client(tmp_path)
 

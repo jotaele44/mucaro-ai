@@ -1,6 +1,6 @@
 # Release Status
 
-Current package version: `0.1.17`.
+Current package version: `0.1.18`.
 
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, fresh-clone validation, API upload
@@ -13,7 +13,8 @@ workspace profiles, structured run history, conversation rename/delete/search,
 desktop package self-testing, CLI `--version`, early `ask --top-k`
 validation, CLI source/index management, CLI conversation management, CLI
 run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
-executable product-gap auditing, and an opt-in local semantic embedding store.
+executable product-gap auditing, an opt-in local semantic embedding store, and
+an approval-gated local tool runtime.
 
 Observed success markers:
 
@@ -28,6 +29,7 @@ Observed success markers:
 - `81 passed` from pytest for the current `v0.1.15-cli-doctor` candidate
 - `82 passed` from pytest for the current `v0.1.16-product-audit` candidate
 - `86 passed` from pytest for the current `v0.1.17-semantic-store` candidate
+- Tool runtime candidate adds allowlisted tools, explicit approval, deny-by-default execution, and audit events.
 - Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, BM25, hybrid, persistent, and semantic strategies across the expanded corpus
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
@@ -42,7 +44,7 @@ Observed success markers:
 - `v0.1.3-local-hardening` is certified on commit `101e457743a7a0e1b830cbd7e066b6b817af9184`
 - `v0.1.4-local-persistent-index` is certified on commit `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`
 - `v0.1.9-all-vectors-certified` is certified on commit `b5deea7170eb1c94b5238e9a923827e6dc913213`
-- `v0.1.17-semantic-store` is the current candidate target for semantic-store retrieval, product-audit advancement, and fresh-clone launcher certification
+- `v0.1.18-tool-runtime` is the current candidate target for approval-gated tool runtime, product-audit advancement, and fresh-clone launcher certification
 
 Local expected marker after first setup:
 

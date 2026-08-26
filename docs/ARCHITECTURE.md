@@ -12,6 +12,7 @@ User Request
   → Chunking
   → Retrieval
   → Model Router
+  → Tool Runtime
   → Citation Validator
   → Answer Trace Export
 ```
@@ -29,6 +30,7 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 - Directory permission boundary: direct path ingestion outside the project root requires a local grant recorded under `data/processed/directory_permissions.json`.
 - Conversation records: local chat sessions store ordered user/assistant turns and reference answer traces by `run_id`.
 - Workspace profiles: local JSON records under `data/processed/workspace_profiles.json` describe named workspace/runtime profiles.
+- Tool runtime records: `data/processed/tool_calls.json` stores current tool-call state; `data/processed/tool_audit_log.json` stores request, approval, denial, and execution audit events.
 - Source library controls: operators can reindex all chunks, inspect persisted index status, and delete managed sources while rebuilding the index from both the API/browser surface and the installed CLI.
 - Run history: `/runs`, `/runs/summary`, and `/runs/{run_id}` provide scan-friendly history plus full trace retrieval.
 - Parser evidence: source manifests include byte counts, parser warnings, parse status, and format metadata such as CSV delimiter/header/row counts.
@@ -37,17 +39,33 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 
 The API is local-first and loopback-oriented by default. If `MUCARO_AI_OPERATOR_TOKEN` is configured, mutating routes require either `Authorization: Bearer <token>` or `X-Mucaro-Token: <token>`.
 
-Read-only inspection routes expose health, config, sources, chunks, conversations, runs, workspace profiles, and exports. Mutating routes include planning/approval writes, upload/path ingestion, directory grant changes, source deletion/reindexing, chat creation/asking, and workspace profile saves.
+Read-only inspection routes expose health, config, sources, chunks, conversations, runs, workspace profiles, tools, tool audit events, and exports. Mutating routes include planning/approval writes, upload/path ingestion, directory grant changes, source deletion/reindexing, chat creation/asking, workspace profile saves, and tool-call request/approval/execution.
 
 The CLI `doctor` command provides a read-only local readiness report over the
 same operational domains: paths, sources, chunks, persistent index status,
-directory grants, model-provider setup, API auth posture, conversations, and
-runs.
+directory grants, model-provider setup, API auth posture, conversations, runs,
+and the local tool runtime.
 
 The CLI `audit product` command provides a broader completion matrix for the
 ChatGPT/Claude-like local assistant objective. It intentionally reports OPEN
-while semantic vector-store retrieval, general tool-use, multimodal support,
-personalized memory, or production hardening remain incomplete.
+while multimodal support, personalized memory, or production hardening remain
+incomplete.
+
+## Tool layer
+
+The tool runtime is deny-by-default. Operators can list locally allowlisted
+tools, create a pending request for a specific tool and JSON argument object,
+approve or deny that request, then execute only an approved `tool_call_id`.
+Unknown tools are rejected and recorded as audit events.
+
+The initial allowlist is intentionally read-only:
+
+- `source_library.status`
+- `product.audit`
+- `workspace_profiles.list`
+
+Broader write/action tools should be added one at a time with explicit policy,
+operator UX, and regression tests for approval and audit behavior.
 
 ## Packaging layer
 

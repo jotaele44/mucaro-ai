@@ -157,10 +157,10 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "tool_use_and_actions",
             "model_layer",
             "Assistant can safely use tools beyond retrieval-backed answering.",
-            "OPEN",
-            "Planning gate and local operations exist, but no general tool-use runtime is certified.",
-            "No ChatGPT/Claude-like tool execution framework is implemented.",
-            "Add a permissioned tool runtime with approval, audit logs, and deny-by-default policy.",
+            _status_from_files(cfg, [("backend", "app", "tools.py")]),
+            "backend/app/tools.py with allowlisted tools, explicit approvals, execution gates, and audit events",
+            "The initial allowlist is intentionally read-only; broader action tools remain future scoped work.",
+            "Add narrowly scoped write/action tools only with per-tool policies and stronger UX review.",
         ),
         ProductRequirement(
             "multimodal_interface",
@@ -208,5 +208,5 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
         "readiness_percent": readiness_percent,
         "counts": counts,
         "requirements": rows,
-        "next_recommended_vector": "tool_use_and_actions",
+        "next_recommended_vector": "multimodal_interface",
     }

@@ -40,6 +40,16 @@ from .permissions import (
 from .product_audit import build_product_audit
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .services import answer_question
+from .tools import (
+    ToolRuntimeError,
+    approve_tool_call,
+    deny_tool_call,
+    list_tool_audit_events,
+    list_tool_calls,
+    list_tools,
+    request_tool_call,
+    run_tool_call,
+)
 from .validation import validate_project_json
 
 
@@ -71,7 +81,17 @@ def package_version() -> str:
     try:
         return importlib.metadata.version("mucaro-ai")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.17-dev"
+        return "0.1.18-dev"
+
+
+def parse_json_object(value: str) -> dict[str, Any]:
+    try:
+        payload = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise argparse.ArgumentTypeError("JSON_OBJECT_INVALID") from exc
+    if not isinstance(payload, dict):
+        raise argparse.ArgumentTypeError("JSON_OBJECT_REQUIRED")
+    return payload
 
 
 def parse_top_k(value: str) -> int:
@@ -197,6 +217,45 @@ def build_parser() -> argparse.ArgumentParser:
     runs_show.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     runs_show.set_defaults(handler=run_runs_show)
 
+    tools = subcommands.add_parser("tools", help="Request and audit approved local tool calls.")
+    tools_subcommands = tools.add_subparsers(dest="tools_command", required=True)
+
+    tools_list = tools_subcommands.add_parser("list", help="List locally allowed tools.")
+    tools_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tools_list.set_defaults(handler=run_tools_list)
+
+    tools_requests = tools_subcommands.add_parser("requests", help="List tool-call requests.")
+    tools_requests.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tools_requests.set_defaults(handler=run_tools_requests)
+
+    tools_request = tools_subcommands.add_parser("request", help="Create a pending tool-call request.")
+    tools_request.add_argument("tool_name", help="Allowed tool name.")
+    tools_request.add_argument("--arguments", type=parse_json_object, default={}, help="JSON object passed to the tool.")
+    tools_request.add_argument("--reason", help="Optional reason recorded in the tool audit log.")
+    tools_request.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tools_request.set_defaults(handler=run_tools_request)
+
+    tools_approve = tools_subcommands.add_parser("approve", help="Approve one pending tool-call request.")
+    tools_approve.add_argument("tool_call_id", help="Tool call identifier.")
+    tools_approve.add_argument("--reason", help="Optional approval reason.")
+    tools_approve.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tools_approve.set_defaults(handler=run_tools_approve)
+
+    tools_deny = tools_subcommands.add_parser("deny", help="Deny one pending tool-call request.")
+    tools_deny.add_argument("tool_call_id", help="Tool call identifier.")
+    tools_deny.add_argument("--reason", help="Optional denial reason.")
+    tools_deny.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tools_deny.set_defaults(handler=run_tools_deny)
+
+    tools_run = tools_subcommands.add_parser("run", help="Execute one approved tool-call request.")
+    tools_run.add_argument("tool_call_id", help="Tool call identifier.")
+    tools_run.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tools_run.set_defaults(handler=run_tools_run)
+
+    tools_audit = tools_subcommands.add_parser("audit", help="List tool runtime audit events.")
+    tools_audit.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tools_audit.set_defaults(handler=run_tools_audit)
+
     index = subcommands.add_parser("index", help="Inspect retrieval index health.")
     index_subcommands = index.add_subparsers(dest="index_command", required=True)
 
@@ -319,6 +378,29 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"runs={len(payload.get('runs', []))}")
         for run in payload.get("runs", []):
             print(f"{run.get('run_id')} {run.get('citation_status') or run.get('status')} {run.get('retrieval_strategy')}")
+    elif "tools" in payload:
+        print(f"tools={len(payload.get('tools', []))}")
+        for tool in payload.get("tools", []):
+            print(
+                f"{tool.get('name')} approval={tool.get('requires_approval')} mutates={tool.get('mutates_state')}"
+            )
+    elif "tool_calls" in payload:
+        print(f"tool_calls={len(payload.get('tool_calls', []))}")
+        for call in payload.get("tool_calls", []):
+            print(f"{call.get('tool_call_id')} {call.get('status')} {call.get('tool_name')}")
+    elif "tool_call" in payload:
+        call = payload.get("tool_call", {})
+        if isinstance(call, dict):
+            print(f"tool_call_id={call.get('tool_call_id')}")
+            print(f"tool_name={call.get('tool_name')}")
+            print(f"tool_status={call.get('status')}")
+        result = payload.get("result")
+        if isinstance(result, dict):
+            print(f"result_status={result.get('status')}")
+    elif "events" in payload:
+        print(f"events={len(payload.get('events', []))}")
+        for event in payload.get("events", []):
+            print(f"{event.get('event_id')} {event.get('event')} {event.get('status')}")
     elif payload.get("status") == "RUN_HISTORY_OK":
         print(f"run_count={payload.get('run_count', 0)}")
         print(f"citation_ok={payload.get('citation_ok', 0)}")
@@ -535,6 +617,8 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
     conversation_count = _safe_payload_count("conversations", cfg)
     run_count = _safe_payload_count("runs", cfg)
     checks.append(_doctor_check("assistant_history", "PASS", f"conversations={conversation_count} runs={run_count}"))
+    tools = list_tools().get("tools", [])
+    checks.append(_doctor_check("tool_runtime", "PASS" if tools else "WARN", f"allowed_tools={len(tools)}"))
 
     failed = [check for check in checks if check["status"] == "FAIL"]
     warned = [check for check in checks if check["status"] == "WARN"]
@@ -551,6 +635,7 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
             "directory_grant_count": len(grants),
             "conversation_count": conversation_count,
             "run_count": run_count,
+            "tool_count": len(tools),
             "model_provider": cfg.default_model_provider,
             "live_mode": live_mode,
             "auth_required": bool(cfg.operator_token),
@@ -687,6 +772,68 @@ def run_runs_show(args: argparse.Namespace, cfg: Settings) -> int:
             return 0
     emit_payload({"status": "ERROR_RUN_NOT_FOUND", "run_id": args.run_id}, args.format)
     return 2
+
+
+def run_tools_list(args: argparse.Namespace, cfg: Settings) -> int:
+    del cfg
+    emit_payload(list_tools(), args.format)
+    return 0
+
+
+def run_tools_requests(args: argparse.Namespace, cfg: Settings) -> int:
+    emit_payload(list_tool_calls(cfg), args.format)
+    return 0
+
+
+def run_tools_request(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = request_tool_call(
+            args.tool_name,
+            args.arguments,
+            cfg=cfg,
+            requested_by="cli",
+            reason=args.reason,
+        )
+    except ToolRuntimeError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_tools_approve(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = approve_tool_call(args.tool_call_id, cfg=cfg, approved_by="cli", reason=args.reason)
+    except ToolRuntimeError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_tools_deny(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = deny_tool_call(args.tool_call_id, cfg=cfg, denied_by="cli", reason=args.reason)
+    except ToolRuntimeError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_tools_run(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = run_tool_call(args.tool_call_id, cfg=cfg, executed_by="cli")
+    except ToolRuntimeError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_tools_audit(args: argparse.Namespace, cfg: Settings) -> int:
+    emit_payload(list_tool_audit_events(cfg), args.format)
+    return 0
 
 
 def run_index_status(args: argparse.Namespace, cfg: Settings) -> int:

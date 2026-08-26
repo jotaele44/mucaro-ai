@@ -138,6 +138,8 @@ python scripts/mucaro.py sources reindex --format text
 python scripts/mucaro.py conversations create --title "Source lineage"
 python scripts/mucaro.py conversations ask CONVERSATION_ID "How does source lineage work?" --strategy persistent
 python scripts/mucaro.py runs summary --format text
+python scripts/mucaro.py tools list --format text
+python scripts/mucaro.py tools request source_library.status --reason "readiness check" --format json
 python scripts/mucaro.py ask "How does source lineage work?" --format text
 python scripts/mucaro.py ask "How does source lineage work?" --strategy bm25 --format text
 python scripts/mucaro.py ask "How does source lineage work?" --strategy persistent --format text
@@ -162,6 +164,8 @@ mucaro sources reindex --format text
 mucaro conversations create --title "Source lineage"
 mucaro conversations ask CONVERSATION_ID "How does source lineage work?" --strategy persistent
 mucaro runs summary --format text
+mucaro tools list --format text
+mucaro tools request source_library.status --reason "readiness check" --format json
 mucaro ask "How does source lineage work?" --format text
 mucaro ask "How does source lineage work?" --strategy bm25 --format text
 mucaro ask "How does source lineage work?" --strategy persistent --format text
@@ -202,9 +206,14 @@ The installed CLI also manages saved chat sessions and run history with
 `mucaro conversations ...` and `mucaro runs ...`, matching the app's durable
 conversation and answer-trace model.
 
+The CLI also exposes the local tool runtime with `mucaro tools ...`. Tool calls
+are deny-by-default: request a tool call, approve or deny the pending
+`tool_call_id`, then run only approved calls. Every request, decision, and
+execution is recorded in the local tool audit log.
+
 The browser app also persists local chat sessions. Each conversation keeps ordered user and assistant turns, supports chat search, rename, and delete, uses recent turns for follow-up questions, and keeps cited answer traces exportable by `run_id`.
 
-The API exposes local admin surfaces for source deletion, reindexing, run detail, config inspection, and workspace profiles. When `MUCARO_AI_OPERATOR_TOKEN` is set, mutating routes require `Authorization: Bearer <token>` or `X-Mucaro-Token: <token>`.
+The API exposes local admin surfaces for source deletion, reindexing, run detail, config inspection, workspace profiles, and approved tool calls. When `MUCARO_AI_OPERATOR_TOKEN` is set, mutating routes require `Authorization: Bearer <token>` or `X-Mucaro-Token: <token>`.
 
 Live Anthropic mode is explicit:
 
@@ -275,6 +284,7 @@ python scripts/extract_reference_patterns.py
 - No API keys are logged.
 - Mock mode is default.
 - Execution Gate approval is required before mutation-oriented execution.
+- Tool calls require explicit approval and are recorded in a local audit log.
 - Uploaded files are stored locally under `data/input/`.
 - Set `MUCARO_AI_OPERATOR_TOKEN` before exposing the local API beyond a trusted loopback-only development session.
 - Every answer trace must include source IDs and cited chunk IDs or validation flags.

@@ -71,7 +71,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.17\n"
+    assert output == "mucaro 0.1.18\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -92,7 +92,9 @@ def test_cli_doctor_reports_warning_state_without_sources(tmp_path: Path, capsys
     assert payload["summary"]["source_count"] == 0
     assert payload["summary"]["index_status"] == "INDEX_MISSING"
     assert payload["summary"]["semantic_store_status"] == "SEMANTIC_STORE_MISSING"
+    assert payload["summary"]["tool_count"] >= 1
     assert any(check["name"] == "source_library" and check["status"] == "WARN" for check in payload["checks"])
+    assert any(check["name"] == "tool_runtime" and check["status"] == "PASS" for check in payload["checks"])
 
     assert main(["doctor", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out
@@ -130,13 +132,14 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert by_id["permission_gated_user_directory"]["status"] == "PASS"
     assert by_id["source_lineage_citations"]["status"] == "PASS"
     assert by_id["semantic_vector_store"]["status"] == "PASS"
-    assert by_id["tool_use_and_actions"]["status"] == "OPEN"
-    assert payload["next_recommended_vector"] == "tool_use_and_actions"
+    assert by_id["tool_use_and_actions"]["status"] == "PASS"
+    assert by_id["multimodal_interface"]["status"] == "OPEN"
+    assert payload["next_recommended_vector"] == "multimodal_interface"
 
     assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out
     assert "PRODUCT_AUDIT_OPEN" in strict_output
-    assert "OPEN tool_use_and_actions" in strict_output
+    assert "OPEN multimodal_interface" in strict_output
 
 
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):
@@ -264,6 +267,55 @@ def test_cli_conversation_and_run_missing_ids(tmp_path: Path, capsys):
     assert main(["runs", "show", "run_missing", "--format", "json"], cfg=cfg) == 2
     missing_run = json.loads(capsys.readouterr().out)
     assert missing_run["status"] == "ERROR_RUN_NOT_FOUND"
+
+
+def test_cli_tools_require_approval_and_audit_execution(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["tools", "list", "--format", "text"], cfg=cfg) == 0
+    tools_output = capsys.readouterr().out
+    assert "TOOLS_OK" in tools_output
+    assert "source_library.status" in tools_output
+
+    assert (
+        main(
+            [
+                "tools",
+                "request",
+                "source_library.status",
+                "--reason",
+                "readiness check",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    requested = json.loads(capsys.readouterr().out)
+    tool_call_id = requested["tool_call"]["tool_call_id"]
+    assert requested["tool_call"]["status"] == "PENDING_APPROVAL"
+
+    assert main(["tools", "run", tool_call_id, "--format", "json"], cfg=cfg) == 2
+    denied_run = json.loads(capsys.readouterr().err)
+    assert denied_run["status"] == "ERROR_TOOL_APPROVAL_REQUIRED"
+
+    assert main(["tools", "approve", tool_call_id, "--format", "json"], cfg=cfg) == 0
+    approved = json.loads(capsys.readouterr().out)
+    assert approved["tool_call"]["status"] == "APPROVED"
+
+    assert main(["tools", "run", tool_call_id, "--format", "json"], cfg=cfg) == 0
+    executed = json.loads(capsys.readouterr().out)
+    assert executed["status"] == "TOOL_CALL_EXECUTED"
+    assert executed["result"]["status"] == "SOURCE_LIBRARY_STATUS_OK"
+
+    assert main(["tools", "audit", "--format", "json"], cfg=cfg) == 0
+    audit = json.loads(capsys.readouterr().out)
+    assert [event["event"] for event in audit["events"]] == [
+        "TOOL_CALL_REQUESTED",
+        "TOOL_CALL_APPROVED",
+        "TOOL_CALL_EXECUTED",
+    ]
 
 
 def test_cli_serve_passes_host_port_and_reload(tmp_path: Path, monkeypatch):

@@ -29,6 +29,8 @@ from .models import (
     DirectoryPermissionRequest,
     IngestPathRequest,
     PlanRequest,
+    ToolCallRequest,
+    ToolDecisionRequest,
     WorkspaceProfileRequest,
 )
 from .permissions import (
@@ -39,6 +41,16 @@ from .permissions import (
     revoke_directory,
 )
 from .services import answer_question
+from .tools import (
+    ToolRuntimeError,
+    approve_tool_call,
+    deny_tool_call,
+    list_tool_audit_events,
+    list_tool_calls,
+    list_tools,
+    request_tool_call,
+    run_tool_call,
+)
 from .validation import validate_project_json
 from .workspaces import list_workspace_profiles, upsert_workspace_profile
 
@@ -84,7 +96,7 @@ async def read_limited_upload(upload: UploadFile, max_bytes: int) -> bytes:
 
 
 def create_app(cfg: Settings = settings) -> FastAPI:
-    app = FastAPI(title="Mucaro AI", version="0.1.16")
+    app = FastAPI(title="Mucaro AI", version="0.1.18")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),
@@ -302,6 +314,54 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             if run.get("run_id") == run_id:
                 return run
         raise api_error("ERROR_RUN_NOT_FOUND", "Run not found.", status_code=404, run_id=run_id)
+
+    @app.get("/tools")
+    def tools() -> dict:
+        return list_tools()
+
+    @app.get("/tools/requests")
+    def tool_requests() -> dict:
+        return list_tool_calls(cfg)
+
+    @app.post("/tools/requests")
+    def create_tool_request(req: ToolCallRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return request_tool_call(req.tool_name, req.arguments, cfg=cfg, requested_by="api", reason=req.reason)
+        except ToolRuntimeError as exc:
+            raise api_error(exc.status, exc.detail, status_code=400) from exc
+
+    @app.post("/tools/requests/{tool_call_id}/approve")
+    def approve_tool_request(
+        tool_call_id: str,
+        req: ToolDecisionRequest | None = None,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return approve_tool_call(tool_call_id, cfg=cfg, approved_by="api", reason=req.reason if req else None)
+        except ToolRuntimeError as exc:
+            raise api_error(exc.status, exc.detail, status_code=400) from exc
+
+    @app.post("/tools/requests/{tool_call_id}/deny")
+    def deny_tool_request(
+        tool_call_id: str,
+        req: ToolDecisionRequest | None = None,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return deny_tool_call(tool_call_id, cfg=cfg, denied_by="api", reason=req.reason if req else None)
+        except ToolRuntimeError as exc:
+            raise api_error(exc.status, exc.detail, status_code=400) from exc
+
+    @app.post("/tools/requests/{tool_call_id}/run")
+    def run_tool_request(tool_call_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return run_tool_call(tool_call_id, cfg=cfg, executed_by="api")
+        except ToolRuntimeError as exc:
+            raise api_error(exc.status, exc.detail, status_code=400) from exc
+
+    @app.get("/tools/audit")
+    def tool_audit() -> dict:
+        return list_tool_audit_events(cfg)
 
     @app.get("/workspaces")
     def workspaces() -> dict:

@@ -45,3 +45,13 @@ class DirectoryPermissionRequest(BaseModel):
 
 class IngestPathRequest(BaseModel):
     path: str = Field(min_length=1)
+
+
+class ToolCallRequest(BaseModel):
+    tool_name: str = Field(min_length=1, max_length=120)
+    arguments: dict = Field(default_factory=dict)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class ToolDecisionRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)

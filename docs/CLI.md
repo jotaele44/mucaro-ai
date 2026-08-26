@@ -47,6 +47,12 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro runs list` | List persisted answer traces | 0 | 2 |
 | `mucaro runs summary` | Summarize persisted answer traces | 0 | 2 |
 | `mucaro runs show RUN_ID` | Show one persisted answer trace | 0 | 2 |
+| `mucaro tools list` | List locally allowlisted tools | 0 | 2 |
+| `mucaro tools request TOOL_NAME` | Create a pending tool-call request | 0 | 2 |
+| `mucaro tools approve TOOL_CALL_ID` | Approve a pending tool call | 0 | 2 |
+| `mucaro tools deny TOOL_CALL_ID` | Deny a pending tool call | 0 | 2 |
+| `mucaro tools run TOOL_CALL_ID` | Execute an approved tool call | 0 | 2 |
+| `mucaro tools audit` | Inspect local tool runtime audit events | 0 | 2 |
 | `mucaro plan REQUEST` | Analyze a task with the Planning Gate | 0 | 2 |
 | `mucaro permissions COMMAND` | Manage user-directory access grants | 0 | 2 |
 | `mucaro validate` | Validate JSON artifacts and schemas | 0 | 2 |
@@ -105,6 +111,12 @@ retrieval payloads where practical:
 | `ERROR_SOURCE_NOT_FOUND` | `sources delete` was given an unknown source ID |
 | `ERROR_CONVERSATION_NOT_FOUND` | a conversation command was given an unknown conversation ID |
 | `ERROR_RUN_NOT_FOUND` | `runs show` was given an unknown run ID |
+| `ERROR_TOOL_NOT_ALLOWED` | requested tool is not in the local allowlist |
+| `ERROR_TOOL_APPROVAL_REQUIRED` | tool execution was attempted before approval |
+| `ERROR_TOOL_CALL_NOT_FOUND` | tool command was given an unknown tool call ID |
+| `ERROR_TOOL_CALL_NOT_PENDING` | approval or denial was attempted after the pending state |
+| `ERROR_TOOL_CALL_DENIED` | denied tool call cannot be executed |
+| `ERROR_TOOL_CALL_ALREADY_EXECUTED` | tool call execution was attempted more than once |
 | `DOCTOR_WARN` | readiness check found missing or incomplete local setup |
 | `DOCTOR_FAIL` | readiness check found unsupported or invalid local setup |
 | `PRODUCT_AUDIT_OPEN` | product audit found remaining ChatGPT/Claude-comparability gaps |
@@ -131,6 +143,11 @@ mucaro conversations list --format text
 mucaro conversations ask CONVERSATION_ID "How does source lineage work?" --strategy persistent --format json
 mucaro runs summary --format text
 mucaro runs show RUN_ID --format json
+mucaro tools list --format text
+mucaro tools request source_library.status --reason "readiness check" --format json
+mucaro tools approve TOOL_CALL_ID --format json
+mucaro tools run TOOL_CALL_ID --format json
+mucaro tools audit --format text
 mucaro ask "How does source lineage work?" --format json --no-persist
 mucaro ask "How does source lineage work?" --strategy persistent --format text
 mucaro ask "How does source lineage work?" --strategy semantic --format text
@@ -161,7 +178,8 @@ the path needs a new grant.
 Use `mucaro doctor` to inspect local readiness without ingesting files or
 granting access. The report checks project paths, local data directories,
 source/chunk counts, persistent index status, semantic-store status, directory
-grants, model-provider readiness, API auth posture, conversations, and runs. Add `--strict` when
+grants, model-provider readiness, API auth posture, conversations, runs, and
+the local tool runtime. Add `--strict` when
 automation should fail on warnings.
 
 Use `mucaro audit product` to classify the broader assistant objective as
@@ -185,6 +203,23 @@ conversations ask CONVERSATION_ID QUERY` to ask follow-up questions with recent
 turn context. Conversation deletion only removes the chat session; persisted
 answer traces remain inspectable through `mucaro runs list`, `mucaro runs
 summary`, and `mucaro runs show RUN_ID`.
+
+## Tool Runtime
+
+`mucaro tools ...` is the local approval-gated tool surface. The runtime is
+deny-by-default: unknown tools are rejected, known tools start as
+`PENDING_APPROVAL`, and `mucaro tools run TOOL_CALL_ID` fails until the call is
+approved.
+
+Initial allowlisted tools are read-only:
+
+- `source_library.status`
+- `product.audit`
+- `workspace_profiles.list`
+
+Tool call state is stored under `data/processed/tool_calls.json`. Audit events
+are stored under `data/processed/tool_audit_log.json`. These files are local
+runtime state and should not be committed.
 
 ## Live Model Mode
 
