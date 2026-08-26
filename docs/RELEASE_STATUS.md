@@ -1,6 +1,6 @@
 # Release Status
 
-Current package version: `0.1.9`.
+Current package version: `0.1.10`.
 
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, fresh-clone validation, API upload
@@ -32,7 +32,8 @@ Observed success markers:
 - GitHub Actions CI passed on the retrieval and CLI hardening commits
 - `v0.1.3-local-hardening` is certified on commit `101e457743a7a0e1b830cbd7e066b6b817af9184`
 - `v0.1.4-local-persistent-index` is certified on commit `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`
-- `v0.1.9-all-vectors` is the current candidate target for the combined operator/admin/context baseline
+- `v0.1.9-all-vectors-certified` is certified on commit `b5deea7170eb1c94b5238e9a923827e6dc913213`
+- `v0.1.10-chat-management` is the current candidate target for the combined operator/admin/context baseline plus chat management controls
 
 Local expected marker after first setup:
 

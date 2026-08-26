@@ -56,15 +56,15 @@ Certified target:
 - Local evidence: `61 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `npm audit` 0 vulnerabilities, frontend build passed, and `CERTIFY_RELEASE_OK`.
 - Fresh clone evidence: `FRESH_CLONE_CERT_OK` from `v0.1.4-local-persistent-index`.
 
-## A/B/C Operator Candidate
+## A/B/C Operator And Chat Management Candidate
 
 Date: 2026-08-25
 
 Candidate target:
 
-- Candidate tag: `v0.1.9-all-vectors`
-- Candidate package version: `0.1.9`
-- Baseline preserved: `v0.1.4-local-persistent-index` at `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`
+- Candidate tag: `v0.1.10-chat-management`
+- Candidate package version: `0.1.10`
+- Baseline preserved: `v0.1.4-local-persistent-index` at `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`; interim combined tag `v0.1.9-all-vectors-certified` at `b5deea7170eb1c94b5238e9a923827e6dc913213`
 - Scope: source library delete/reindex controls, retrieval strategy UI, no-context recovery guidance, expanded retrieval eval corpus, optional local operator token boundary, workspace profiles, structured run history, conversation follow-up context, conversation rename/delete/search, directory access UI, and desktop package self-test.
 - Candidate local evidence: `72 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=7`, `DESKTOP_PACKAGE_READY`, `npm audit` 0 vulnerabilities, frontend build passed, and `CERTIFY_RELEASE_OK`.
 - Required external receipt: hosted CI and fresh-clone certification must pass on the final pushed commit before tagging.
