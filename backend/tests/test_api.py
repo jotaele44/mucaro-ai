@@ -244,6 +244,43 @@ def test_api_conversation_persists_cited_chat_turns(tmp_path: Path):
     assert missing.json()["detail"]["status"] == "ERROR_CONVERSATION_NOT_FOUND"
 
 
+def test_api_conversation_rename_and_delete_preserve_runs(tmp_path: Path):
+    client = make_client(tmp_path)
+    ingest = client.post(
+        "/ingest",
+        files={"upload": ("source.md", b"Source lineage requires cited chunk IDs and source IDs.", "text/markdown")},
+    )
+    assert ingest.status_code == 200
+    conversation_id = client.post("/conversations", json={"title": "Scratch"}).json()["conversation_id"]
+    ask = client.post(
+        f"/conversations/{conversation_id}/ask",
+        json={"query": "What does source lineage require?", "retrieval_strategy": "persistent", "model_provider": "mock"},
+    )
+    assert ask.status_code == 200
+    run_id = ask.json()["answer"]["run_id"]
+
+    renamed = client.patch(f"/conversations/{conversation_id}", json={"title": "Source Lineage Notes"})
+    assert renamed.status_code == 200
+    assert renamed.json()["title"] == "Source Lineage Notes"
+
+    listed = client.get("/conversations")
+    assert listed.status_code == 200
+    assert listed.json()["conversations"][0]["title"] == "Source Lineage Notes"
+
+    deleted = client.delete(f"/conversations/{conversation_id}")
+    assert deleted.status_code == 200
+    assert deleted.json()["status"] == "CONVERSATION_DELETE_OK"
+    assert client.get(f"/conversations/{conversation_id}").status_code == 404
+
+    run_detail = client.get(f"/runs/{run_id}")
+    assert run_detail.status_code == 200
+    assert run_detail.json()["run_id"] == run_id
+
+    missing_delete = client.delete(f"/conversations/{conversation_id}")
+    assert missing_delete.status_code == 404
+    assert missing_delete.json()["detail"]["status"] == "ERROR_CONVERSATION_NOT_FOUND"
+
+
 def test_api_conversation_follow_up_uses_prior_turn_context(tmp_path: Path):
     client = make_client(tmp_path)
     ingest = client.post(

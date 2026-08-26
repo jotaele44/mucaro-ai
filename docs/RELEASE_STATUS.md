@@ -9,7 +9,8 @@ routing, frontend evidence display, and an explicit persistent local TF-IDF
 retrieval strategy backed by `data/indexes/tfidf_index.json`. Post-baseline
 operator upgrades add source deletion/reindexing, retrieval strategy selection
 in the UI, expanded retrieval eval coverage, optional local operator auth,
-workspace profiles, structured run history, and desktop package self-testing.
+workspace profiles, structured run history, conversation rename/delete/search,
+and desktop package self-testing.
 
 Observed success markers:
 

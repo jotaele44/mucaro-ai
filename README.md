@@ -166,7 +166,7 @@ Direct filesystem ingestion outside the project directory is permission-gated. G
 
 The browser app includes the same permission workflow in the Directory Access panel.
 
-The browser app also persists local chat sessions. Each conversation keeps ordered user and assistant turns, uses recent turns for follow-up questions, and keeps cited answer traces exportable by `run_id`.
+The browser app also persists local chat sessions. Each conversation keeps ordered user and assistant turns, supports chat search, rename, and delete, uses recent turns for follow-up questions, and keeps cited answer traces exportable by `run_id`.
 
 The API exposes local admin surfaces for source deletion, reindexing, run detail, config inspection, and workspace profiles. When `MUCARO_AI_OPERATOR_TOKEN` is set, mutating routes require `Authorization: Bearer <token>` or `X-Mucaro-Token: <token>`.
 

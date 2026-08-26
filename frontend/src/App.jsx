@@ -19,6 +19,8 @@ function App() {
   const [selectedSourceId, setSelectedSourceId] = useState(null);
   const [retrievalStrategy, setRetrievalStrategy] = useState("hybrid");
   const [operatorToken, setOperatorToken] = useState(api.getOperatorToken());
+  const [chatFilter, setChatFilter] = useState("");
+  const [renameTitle, setRenameTitle] = useState("");
   const [query, setQuery] = useState("How does source lineage work?");
   const [status, setStatus] = useState("Idle");
   const [error, setError] = useState(null);
@@ -132,6 +134,7 @@ function App() {
     try {
       const conversation = await api.createConversation({ title: "New chat" });
       setActiveConversation(conversation);
+      setRenameTitle(conversation.title || "New chat");
       setAnswer(null);
       setStatus("CHAT_READY");
       await refresh();
@@ -147,6 +150,7 @@ function App() {
     try {
       const conversation = await api.conversation(conversationId);
       setActiveConversation(conversation);
+      setRenameTitle(conversation.title || "");
       const lastAssistant = [...(conversation.turns || [])].reverse().find((turn) => turn.role === "assistant");
       setAnswer(lastAssistant?.answer_trace || null);
       setStatus("CHAT_READY");
@@ -156,7 +160,44 @@ function App() {
     }
   }
 
+  async function renameActiveConversation() {
+    if (!activeConversation || !renameTitle.trim()) return;
+    setStatus("Renaming chat...");
+    setError(null);
+    try {
+      const conversation = await api.renameConversation(activeConversation.conversation_id, { title: renameTitle });
+      setActiveConversation(conversation);
+      setStatus("CHAT_RENAMED");
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+      setStatus("CHAT_RENAME_ERROR");
+    }
+  }
+
+  async function deleteActiveConversation() {
+    if (!activeConversation) return;
+    setStatus("Deleting chat...");
+    setError(null);
+    try {
+      await api.deleteConversation(activeConversation.conversation_id);
+      setActiveConversation(null);
+      setRenameTitle("");
+      setAnswer(null);
+      setStatus("CHAT_DELETED");
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+      setStatus("CHAT_DELETE_ERROR");
+    }
+  }
+
   const selectedSource = sources.find((source) => source.source_id === selectedSourceId) || sources[0];
+  const filteredConversations = conversations.filter((conversation) => {
+    const needle = chatFilter.trim().toLowerCase();
+    if (!needle) return true;
+    return `${conversation.title || ""} ${conversation.last_status || ""}`.toLowerCase().includes(needle);
+  });
   const citedChunks = answer
     ? chunks.filter((chunk) => (answer.cited_chunk_ids || []).includes(chunk.chunk_id))
     : [];
@@ -267,8 +308,15 @@ function App() {
           <div className="chat-layout">
             <section className="chat-list">
               <h3>Chat Sessions</h3>
+              <input
+                className="compact-input"
+                value={chatFilter}
+                onChange={(event) => setChatFilter(event.target.value)}
+                placeholder="Search chats"
+              />
               {conversations.length === 0 && <p className="hint">No saved chats yet.</p>}
-              {conversations.map((conversation) => (
+              {conversations.length > 0 && filteredConversations.length === 0 && <p className="hint">No chats match the filter.</p>}
+              {filteredConversations.map((conversation) => (
                 <button
                   className={activeConversation?.conversation_id === conversation.conversation_id ? "chat-tab active" : "chat-tab"}
                   key={conversation.conversation_id}
@@ -280,6 +328,17 @@ function App() {
               ))}
             </section>
             <section className="chat-surface">
+              {activeConversation && (
+                <div className="chat-management">
+                  <input
+                    value={renameTitle}
+                    onChange={(event) => setRenameTitle(event.target.value)}
+                    placeholder="Chat title"
+                  />
+                  <button onClick={renameActiveConversation}>Rename</button>
+                  <button className="secondary" onClick={deleteActiveConversation}>Delete</button>
+                </div>
+              )}
               {activeConversation && (
                 <div className="turn-list">
                   {(activeConversation.turns || []).map((turn) => (

@@ -12,6 +12,7 @@ header { display: flex; gap: 18px; background: white; border-radius: 12px; paddi
 .badge { background: #111827; color: white; padding: 4px 9px; border-radius: 999px; font-size: 12px; }
 textarea { width: 100%; min-height: 90px; margin: 10px 0; }
 input { padding: 10px; margin: 8px 8px 8px 0; min-width: 340px; }
+input.compact-input { box-sizing: border-box; min-width: 0; width: 100%; margin: 0 0 10px; }
 select { padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; background: white; }
 button { padding: 10px 14px; border: 0; border-radius: 8px; background: #111827; color: white; cursor: pointer; }
 button:disabled { background: #9ca3af; cursor: not-allowed; }
@@ -60,6 +61,8 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .chat-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 14px; }
 .chat-list, .chat-surface { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: #fbfcfe; }
 .chat-list h3 { margin: 0 0 10px; font-size: 16px; }
+.chat-management { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; margin-bottom: 12px; align-items: center; }
+.chat-management input { box-sizing: border-box; min-width: 0; width: 100%; margin: 0; }
 .chat-tab { width: 100%; display: grid; gap: 4px; margin-bottom: 8px; text-align: left; background: #eef2f6; color: #17202a; }
 .chat-tab.active { background: #111827; color: white; }
 .chat-tab small { color: inherit; opacity: 0.75; }
@@ -76,7 +79,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
   main { grid-template-columns: 1fr; }
   aside { padding: 18px; }
   header, .answer-grid, .chat-layout { display: grid; grid-template-columns: 1fr; }
-  .path-form, .grant-row, .token-row { display: grid; grid-template-columns: 1fr; }
+  .path-form, .grant-row, .token-row, .chat-management { display: grid; grid-template-columns: 1fr; }
   input { min-width: 0; width: calc(100% - 24px); }
   dl div { grid-template-columns: 1fr; }
 }

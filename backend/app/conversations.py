@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .config import Settings, settings
-from .db import init_db, list_payloads, upsert_payload
+from .db import delete_payload, init_db, list_payloads, upsert_payload
 from .utils import stable_id, utc_now
 
 DEFAULT_TITLE = "New chat"
@@ -57,6 +57,29 @@ def get_conversation(conversation_id: str, cfg: Settings = settings) -> dict[str
         if conversation.get("conversation_id") == conversation_id:
             return conversation
     return None
+
+
+def rename_conversation(conversation_id: str, title: str, cfg: Settings = settings) -> dict[str, Any]:
+    conversation = get_conversation(conversation_id, cfg)
+    if conversation is None:
+        raise KeyError(conversation_id)
+    resolved_title = " ".join(title.strip().split())
+    if not resolved_title:
+        raise ValueError("ERROR_CONVERSATION_TITLE_REQUIRED")
+    conversation["title"] = resolved_title[:120]
+    conversation["updated_at"] = utc_now()
+    upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
+    return conversation
+
+
+def delete_conversation(conversation_id: str, cfg: Settings = settings) -> dict[str, Any]:
+    init_db(cfg.sqlite_path)
+    removed = delete_payload("conversations", "conversation_id", conversation_id, cfg.sqlite_path)
+    return {
+        "status": "CONVERSATION_DELETE_OK" if removed else "ERROR_CONVERSATION_NOT_FOUND",
+        "conversation_id": conversation_id,
+        "removed": removed,
+    }
 
 
 def build_conversation_context(conversation: dict[str, Any]) -> list[dict[str, Any]]:

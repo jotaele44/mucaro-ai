@@ -45,9 +45,9 @@ The desktop package flow is validated by `scripts/package_desktop.py --self-test
 
 ## Conversation layer
 
-Conversations are local SQLite-backed chat sessions. The `/conversations` API creates and lists sessions, while `/conversations/{conversation_id}/ask` routes through the same cited RAG service as `/ask`, passes recent turns as bounded conversation context, and appends the user turn plus assistant answer to the selected session.
+Conversations are local SQLite-backed chat sessions. The `/conversations` API creates and lists sessions; `PATCH /conversations/{conversation_id}` renames sessions; `DELETE /conversations/{conversation_id}` removes a session record; `/conversations/{conversation_id}/ask` routes through the same cited RAG service as `/ask`, passes recent turns as bounded conversation context, and appends the user turn plus assistant answer to the selected session.
 
-Answer traces remain separately stored under `runs` and `data/exports/`, so chat history does not replace citation auditability. Prior turns help interpret follow-up questions but are not treated as source evidence; chunk IDs and source IDs still come from retrieval.
+Answer traces remain separately stored under `runs` and `data/exports/`, so chat history does not replace citation auditability. Deleting a conversation does not delete the answer traces it previously referenced. Prior turns help interpret follow-up questions but are not treated as source evidence; chunk IDs and source IDs still come from retrieval.
 
 ## Retrieval layer
 

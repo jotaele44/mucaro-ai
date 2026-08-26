@@ -13,8 +13,10 @@ from .conversations import (
     append_answer_turn,
     build_conversation_context,
     create_conversation,
+    delete_conversation,
     get_conversation,
     list_conversations,
+    rename_conversation,
 )
 from .db import init_db, list_payloads, upsert_payload
 from .execution_gate import analyze_task, approve_execution
@@ -23,6 +25,7 @@ from .models import (
     ApprovalRequest,
     AskRequest,
     ConversationCreateRequest,
+    ConversationUpdateRequest,
     DirectoryPermissionRequest,
     IngestPathRequest,
     PlanRequest,
@@ -81,7 +84,7 @@ async def read_limited_upload(upload: UploadFile, max_bytes: int) -> bytes:
 
 
 def create_app(cfg: Settings = settings) -> FastAPI:
-    app = FastAPI(title="Mucaro AI", version="0.1.9")
+    app = FastAPI(title="Mucaro AI", version="0.1.10")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),
@@ -229,6 +232,26 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         if payload is None:
             raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
         return payload
+
+    @app.patch("/conversations/{conversation_id}")
+    def rename_chat(
+        conversation_id: str,
+        req: ConversationUpdateRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return rename_conversation(conversation_id, req.title, cfg)
+        except KeyError as exc:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
+        except ValueError as exc:
+            raise api_error(str(exc), "Conversation title is required.") from exc
+
+    @app.delete("/conversations/{conversation_id}")
+    def delete_chat(conversation_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        result = delete_conversation(conversation_id, cfg)
+        if result["status"] == "ERROR_CONVERSATION_NOT_FOUND":
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        return result
 
     @app.post("/conversations/{conversation_id}/ask")
     def ask_conversation(conversation_id: str, req: AskRequest, _auth: dict = Depends(require_auth)) -> dict:
