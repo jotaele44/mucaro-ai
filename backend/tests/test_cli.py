@@ -5,7 +5,7 @@ from backend.app.cli import main
 from backend.app.config import Settings
 
 
-def make_settings(root: Path) -> Settings:
+def make_settings(root: Path, *, operator_token: str | None = None) -> Settings:
     return Settings(
         project_root=root,
         data_dir=root / "data",
@@ -16,6 +16,7 @@ def make_settings(root: Path) -> Settings:
         sqlite_path=root / "data" / "processed" / "test.sqlite3",
         default_model_provider="mock",
         default_model_name="mock",
+        operator_token=operator_token,
     )
 
 
@@ -70,7 +71,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.14\n"
+    assert output == "mucaro 0.1.15\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -80,6 +81,40 @@ def test_cli_validate_text_output(tmp_path: Path, capsys):
     output = capsys.readouterr().out
     assert "JSON_OK" in output
     assert "checked=0" in output
+
+
+def test_cli_doctor_reports_warning_state_without_sources(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["doctor", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "DOCTOR_WARN"
+    assert payload["summary"]["source_count"] == 0
+    assert payload["summary"]["index_status"] == "INDEX_MISSING"
+    assert any(check["name"] == "source_library" and check["status"] == "WARN" for check in payload["checks"])
+
+    assert main(["doctor", "--strict", "--format", "text"], cfg=cfg) == 2
+    strict_output = capsys.readouterr().out
+    assert "DOCTOR_WARN" in strict_output
+    assert "recommendation=" in strict_output
+
+
+def test_cli_doctor_reports_ready_state_after_local_setup(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path, operator_token="local-token")
+    input_dir = tmp_path / "data" / "input"
+    input_dir.mkdir(parents=True)
+    sample = input_dir / "sample.md"
+    sample.write_text("Source lineage requires cited chunk IDs and source IDs.", encoding="utf-8")
+
+    assert main(["ingest", "data/input", "--format", "json"], cfg=cfg) == 0
+    capsys.readouterr()
+
+    assert main(["doctor", "--strict", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "DOCTOR_OK"
+    assert payload["summary"]["source_count"] == 1
+    assert payload["summary"]["index_status"] == "INDEX_OK"
+    assert payload["summary"]["auth_required"] is True
 
 
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):

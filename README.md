@@ -128,6 +128,7 @@ See `docs/CLI.md` for exit codes, retrieval strategies, structured error payload
 
 ```bash
 python scripts/mucaro.py ingest data/input
+python scripts/mucaro.py doctor
 python scripts/mucaro.py permissions grant ~/Documents/mucaro-sources --yes
 python scripts/mucaro.py ingest ~/Documents/mucaro-sources
 python scripts/mucaro.py sources list --format text
@@ -148,6 +149,7 @@ After `python -m pip install -e ".[dev]"`, the installed console command is avai
 
 ```bash
 mucaro --version
+mucaro doctor
 mucaro ingest data/input
 mucaro permissions grant ~/Documents/mucaro-sources --yes
 mucaro ingest ~/Documents/mucaro-sources
@@ -178,6 +180,10 @@ PYTHONPATH=.:backend python -m backend.app.cli serve --reload
 The `ask` command exports answer traces under `data/exports/` and stores runs in the local SQLite database by default. Use `--no-persist` for a terminal-only answer trace. The default retrieval strategy is `hybrid`; `--strategy bm25` uses local BM25 ranking, and `--strategy persistent` uses the local TF-IDF index rebuilt during ingestion and fails closed if the index is missing or stale.
 
 Direct filesystem ingestion outside the project directory is permission-gated. Grant a containing directory before ingesting user-directory paths, or use `ingest --grant-directory-access` from an interactive terminal to prompt at ingestion time. See `docs/DIRECTORY_PERMISSIONS.md`.
+
+Use `mucaro doctor` to check local assistant readiness across source ingestion,
+index health, directory grants, model-provider setup, API auth posture, saved
+conversations, and answer runs.
 
 The browser app includes the same permission workflow in the Directory Access panel.
 

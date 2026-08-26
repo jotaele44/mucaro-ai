@@ -30,6 +30,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 
 | Command | Purpose | Success Exit | Failure Exit |
 |---|---|---:|---:|
+| `mucaro doctor` | Check local assistant readiness | 0 | 2 with `--strict` warnings/failures |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources and persistent index status | 0 | 2 |
@@ -101,6 +102,8 @@ retrieval payloads where practical:
 | `ERROR_SOURCE_NOT_FOUND` | `sources delete` was given an unknown source ID |
 | `ERROR_CONVERSATION_NOT_FOUND` | a conversation command was given an unknown conversation ID |
 | `ERROR_RUN_NOT_FOUND` | `runs show` was given an unknown run ID |
+| `DOCTOR_WARN` | readiness check found missing or incomplete local setup |
+| `DOCTOR_FAIL` | readiness check found unsupported or invalid local setup |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
@@ -110,6 +113,7 @@ retrieval payloads where practical:
 ```bash
 mucaro ingest data/input --format text
 mucaro --version
+mucaro doctor
 mucaro permissions grant ~/Documents/mucaro-sources --yes --format json
 mucaro permissions list --format text
 mucaro ingest ~/Documents/mucaro-sources --format json
@@ -144,6 +148,14 @@ The ledger is stored under `data/processed/directory_permissions.json`, which is
 local runtime state and should not be committed. Interactive operators can use
 `mucaro ingest PATH --grant-directory-access` to receive a terminal prompt when
 the path needs a new grant.
+
+## Diagnostics
+
+Use `mucaro doctor` to inspect local readiness without ingesting files or
+granting access. The report checks project paths, local data directories,
+source/chunk counts, persistent index status, directory grants, model-provider
+readiness, API auth posture, conversations, and runs. Add `--strict` when
+automation should fail on warnings.
 
 ## Retrieval Strategies
 

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import importlib.metadata
+import importlib.util
 import json
+import os
 import sys
 import tomllib
 from pathlib import Path
@@ -68,7 +70,7 @@ def package_version() -> str:
     try:
         return importlib.metadata.version("mucaro-ai")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.14-dev"
+        return "0.1.15-dev"
 
 
 def parse_top_k(value: str) -> int:
@@ -109,6 +111,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ingest.add_argument("--format", choices=["json", "text"], default="text", help="Output format.")
     ingest.set_defaults(handler=run_ingest)
+
+    doctor = subcommands.add_parser("doctor", help="Check local assistant readiness.")
+    doctor.add_argument("--format", choices=["json", "text"], default="text", help="Output format.")
+    doctor.add_argument("--strict", action="store_true", help="Exit nonzero when warnings or failures are present.")
+    doctor.set_defaults(handler=run_doctor)
 
     sources = subcommands.add_parser("sources", help="Inspect and manage ingested sources.")
     sources_subcommands = sources.add_subparsers(dest="sources_command", required=True)
@@ -238,7 +245,30 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         return
     status = payload.get("status") or payload.get("citation_status") or "OK"
     print(status)
-    if "run_id" in payload:
+    if status in {"DOCTOR_OK", "DOCTOR_WARN", "DOCTOR_FAIL"}:
+        summary = payload.get("summary", {})
+        if isinstance(summary, dict):
+            print(f"version={payload.get('version')}")
+            print(f"sources={summary.get('source_count', 0)}")
+            print(f"index_status={summary.get('index_status')}")
+            print(f"grants={summary.get('directory_grant_count', 0)}")
+            print(f"conversations={summary.get('conversation_count', 0)}")
+            print(f"runs={summary.get('run_count', 0)}")
+        for check in payload.get("checks", []):
+            print(f"{check.get('status')} {check.get('name')} {check.get('detail')}")
+        for recommendation in payload.get("recommendations", []):
+            print(f"recommendation={recommendation}")
+    elif "answer" in payload and "conversation" in payload:
+        answer = payload.get("answer", {})
+        conversation = payload.get("conversation", {})
+        print(f"conversation_id={conversation.get('conversation_id')}")
+        if isinstance(answer, dict):
+            print(f"answer_status={answer.get('citation_status') or answer.get('status')}")
+            if answer.get("run_id"):
+                print(f"run_id={answer.get('run_id')}")
+            if answer.get("answer"):
+                print(answer.get("answer"))
+    elif "run_id" in payload:
         print(f"run_id={payload.get('run_id')}")
         print(f"citation_status={payload.get('citation_status')}")
         print(f"retrieval_strategy={payload.get('retrieval_strategy')}")
@@ -251,16 +281,6 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
     elif "source" in payload:
         source = payload["source"]
         print(f"source_id={source.get('source_id')} chunks_added={payload.get('chunks_added', 0)}")
-    elif "answer" in payload and "conversation" in payload:
-        answer = payload.get("answer", {})
-        conversation = payload.get("conversation", {})
-        print(f"conversation_id={conversation.get('conversation_id')}")
-        if isinstance(answer, dict):
-            print(f"answer_status={answer.get('citation_status') or answer.get('status')}")
-            if answer.get("run_id"):
-                print(f"run_id={answer.get('run_id')}")
-            if answer.get("answer"):
-                print(answer.get("answer"))
     elif "conversations" in payload:
         print(f"conversations={len(payload.get('conversations', []))}")
         for conversation in payload.get("conversations", []):
@@ -362,6 +382,146 @@ def run_ingest(args: argparse.Namespace, cfg: Settings) -> int:
     result = ingest_folder(path, cfg) if path.is_dir() else ingest_file(path, cfg)
     result["directory_permission"] = permission
     emit_payload(result, args.format)
+    return 0
+
+
+def _doctor_check(name: str, status: str, detail: str) -> dict[str, str]:
+    return {"name": name, "status": status, "detail": detail}
+
+
+def _safe_payload_count(table: str, cfg: Settings) -> int:
+    if not cfg.sqlite_path.exists():
+        return 0
+    return len(list_payloads(table, cfg.sqlite_path))
+
+
+def build_doctor_report(cfg: Settings) -> dict[str, Any]:
+    checks: list[dict[str, str]] = []
+    recommendations: list[str] = []
+
+    checks.append(
+        _doctor_check(
+            "project_root",
+            "PASS" if cfg.project_root.exists() else "FAIL",
+            str(cfg.project_root),
+        )
+    )
+    missing_dirs = [
+        str(path)
+        for path in [cfg.data_dir, cfg.input_dir, cfg.processed_dir, cfg.export_dir, cfg.index_dir]
+        if not path.exists()
+    ]
+    checks.append(
+        _doctor_check(
+            "data_directories",
+            "PASS" if not missing_dirs else "WARN",
+            "all present" if not missing_dirs else f"missing={len(missing_dirs)}",
+        )
+    )
+    if missing_dirs:
+        recommendations.append("Run `mucaro ingest data/input` or start the app once to initialize local data directories.")
+
+    sources = get_sources(cfg)
+    chunks = []
+    try:
+        from .ingestion import get_chunks
+
+        chunks = get_chunks(cfg)
+    except Exception:
+        chunks = []
+    checks.append(
+        _doctor_check(
+            "source_library",
+            "PASS" if sources and chunks else "WARN",
+            f"sources={len(sources)} chunks={len(chunks)}",
+        )
+    )
+    if not sources or not chunks:
+        recommendations.append("Ingest approved local files before asking source-grounded questions.")
+
+    index = get_index_status(cfg)
+    checks.append(
+        _doctor_check(
+            "persistent_index",
+            "PASS" if index.get("status") == "INDEX_OK" else "WARN",
+            str(index.get("status")),
+        )
+    )
+    if index.get("status") != "INDEX_OK":
+        recommendations.append("Run `mucaro sources reindex` after ingesting sources to repair the persistent index.")
+
+    try:
+        grants = load_directory_grants(cfg)
+        checks.append(_doctor_check("directory_permissions", "PASS", f"grants={len(grants)}"))
+    except DirectoryPermissionError as exc:
+        grants = []
+        checks.append(_doctor_check("directory_permissions", "FAIL", exc.status))
+        recommendations.append("Repair or remove the directory permission ledger under data/processed.")
+
+    live_mode = os.getenv("MUCARO_AI_LIVE_MODE") == "1"
+    api_key_present = bool(os.getenv("ANTHROPIC_API_KEY"))
+    anthropic_sdk_present = importlib.util.find_spec("anthropic") is not None
+    if cfg.default_model_provider == "mock":
+        model_status = "PASS"
+        model_detail = "mock provider"
+    elif cfg.default_model_provider == "anthropic":
+        model_ready = live_mode and api_key_present and anthropic_sdk_present
+        model_status = "PASS" if model_ready else "WARN"
+        model_detail = (
+            f"live_mode={live_mode} api_key_present={api_key_present} sdk_present={anthropic_sdk_present}"
+        )
+        if not model_ready:
+            recommendations.append(
+                "For live Anthropic mode, install `.[anthropic]`, set MUCARO_AI_LIVE_MODE=1, and set ANTHROPIC_API_KEY."
+            )
+    else:
+        model_status = "FAIL"
+        model_detail = f"unsupported provider={cfg.default_model_provider}"
+        recommendations.append("Set MUCARO_AI_MODEL_PROVIDER to `mock` or `anthropic`.")
+    checks.append(_doctor_check("model_provider", model_status, model_detail))
+
+    checks.append(
+        _doctor_check(
+            "operator_auth",
+            "PASS" if cfg.operator_token else "WARN",
+            "enabled" if cfg.operator_token else "disabled",
+        )
+    )
+    if not cfg.operator_token:
+        recommendations.append("Set MUCARO_AI_OPERATOR_TOKEN when exposing the local API beyond a private machine.")
+
+    conversation_count = _safe_payload_count("conversations", cfg)
+    run_count = _safe_payload_count("runs", cfg)
+    checks.append(_doctor_check("assistant_history", "PASS", f"conversations={conversation_count} runs={run_count}"))
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    warned = [check for check in checks if check["status"] == "WARN"]
+    status = "DOCTOR_FAIL" if failed else "DOCTOR_WARN" if warned else "DOCTOR_OK"
+    return {
+        "status": status,
+        "version": package_version(),
+        "project_root": str(cfg.project_root),
+        "summary": {
+            "source_count": len(sources),
+            "chunk_count": len(chunks),
+            "index_status": index.get("status"),
+            "directory_grant_count": len(grants),
+            "conversation_count": conversation_count,
+            "run_count": run_count,
+            "model_provider": cfg.default_model_provider,
+            "live_mode": live_mode,
+            "auth_required": bool(cfg.operator_token),
+        },
+        "checks": checks,
+        "recommendations": sorted(set(recommendations)),
+    }
+
+
+def run_doctor(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_doctor_report(cfg)
+    emit_payload(report, args.format)
+    if args.strict and report["status"] != "DOCTOR_OK":
+        return 2
     return 0
 
 

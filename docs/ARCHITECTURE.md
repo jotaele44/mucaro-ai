@@ -39,6 +39,11 @@ The API is local-first and loopback-oriented by default. If `MUCARO_AI_OPERATOR_
 
 Read-only inspection routes expose health, config, sources, chunks, conversations, runs, workspace profiles, and exports. Mutating routes include planning/approval writes, upload/path ingestion, directory grant changes, source deletion/reindexing, chat creation/asking, and workspace profile saves.
 
+The CLI `doctor` command provides a read-only local readiness report over the
+same operational domains: paths, sources, chunks, persistent index status,
+directory grants, model-provider setup, API auth posture, conversations, and
+runs.
+
 ## Packaging layer
 
 The desktop package flow is validated by `scripts/package_desktop.py --self-test`. It verifies launcher, bootstrap, frontend lockfile, and package metadata inputs without writing generated artifacts during certification.
