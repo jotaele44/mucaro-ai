@@ -6,6 +6,7 @@ User Request
   → Readiness Score
   → Mode Selector
   → Approval Lock
+  → Conversation Session
   → File Ingestion
   → Source Manifest
   → Chunking
@@ -21,12 +22,19 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 
 ## Data layer
 
-- SQLite: metadata and run records.
+- SQLite: metadata, conversation sessions, and run records.
 - JSON files: inspectable manifest, chunks, schemas, exports.
 - Local folders: `data/input`, `data/processed`, `data/exports`, `data/indexes`.
 - API upload boundary: sanitizes upload filenames, rejects traversal/generated/unsupported names, and enforces `MUCARO_AI_MAX_UPLOAD_BYTES` with a 25 MB default.
 - Directory permission boundary: direct path ingestion outside the project root requires a local grant recorded under `data/processed/directory_permissions.json`.
+- Conversation records: local chat sessions store ordered user/assistant turns and reference answer traces by `run_id`.
 - Parser evidence: source manifests include byte counts, parser warnings, parse status, and format metadata such as CSV delimiter/header/row counts.
+
+## Conversation layer
+
+Conversations are local SQLite-backed chat sessions. The `/conversations` API creates and lists sessions, while `/conversations/{conversation_id}/ask` routes through the same cited RAG service as `/ask` and appends the user turn plus assistant answer to the selected session.
+
+Answer traces remain separately stored under `runs` and `data/exports/`, so chat history does not replace citation auditability.
 
 ## Retrieval layer
 

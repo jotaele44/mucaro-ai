@@ -9,6 +9,8 @@ function App() {
   const [health, setHealth] = useState(null);
   const [sources, setSources] = useState([]);
   const [chunks, setChunks] = useState([]);
+  const [conversations, setConversations] = useState([]);
+  const [activeConversation, setActiveConversation] = useState(null);
   const [answer, setAnswer] = useState(null);
   const [selectedSourceId, setSelectedSourceId] = useState(null);
   const [query, setQuery] = useState("How does source lineage work?");
@@ -21,6 +23,8 @@ function App() {
     setSources(src.sources || []);
     const chunkPayload = await api.chunks();
     setChunks(chunkPayload.chunks || []);
+    const conversationPayload = await api.conversations();
+    setConversations(conversationPayload.conversations || []);
   }
 
   useEffect(() => { refresh().catch((err) => setStatus(err.message)); }, []);
@@ -46,12 +50,51 @@ function App() {
     setStatus("Asking...");
     setError(null);
     try {
-      const result = await api.ask({ query, top_k: 5, model_provider: "mock" });
+      let conversation = activeConversation;
+      if (!conversation) {
+        conversation = await api.createConversation({ title: "New chat" });
+        setActiveConversation(conversation);
+      }
+      const payload = await api.askConversation(conversation.conversation_id, { query, top_k: 5, model_provider: "mock" });
+      const result = payload.answer;
       setAnswer(result);
+      setActiveConversation(payload.conversation);
       setStatus(result.citation_status || result.status || "DONE");
+      const conversationPayload = await api.conversations();
+      setConversations(conversationPayload.conversations || []);
     } catch (err) {
       setError(err.message);
       setStatus("ASK_ERROR");
+    }
+  }
+
+  async function newChat() {
+    setStatus("Creating chat...");
+    setError(null);
+    try {
+      const conversation = await api.createConversation({ title: "New chat" });
+      setActiveConversation(conversation);
+      setAnswer(null);
+      setStatus("CHAT_READY");
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+      setStatus("CHAT_ERROR");
+    }
+  }
+
+  async function selectConversation(conversationId) {
+    setStatus("Loading chat...");
+    setError(null);
+    try {
+      const conversation = await api.conversation(conversationId);
+      setActiveConversation(conversation);
+      const lastAssistant = [...(conversation.turns || [])].reverse().find((turn) => turn.role === "assistant");
+      setAnswer(lastAssistant?.answer_trace || null);
+      setStatus("CHAT_READY");
+    } catch (err) {
+      setError(err.message);
+      setStatus("CHAT_ERROR");
     }
   }
 
@@ -71,6 +114,7 @@ function App() {
           <a>Planning Gate</a>
           <a>File Intake</a>
           <a>Directory Access</a>
+          <a>Chat Sessions</a>
           <a>Source Manifest</a>
           <a>RAG Chat</a>
           <a>Citation Inspector</a>
@@ -118,10 +162,41 @@ function App() {
           )}
         </section>
         <section className="panel">
-          <h2>RAG Chat</h2>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} />
-          <button onClick={ask}>Ask with citations</button>
-          {hasNoSourceAnswer && <div className="notice">No sources are available yet. Ingest a file first, then ask again.</div>}
+          <div className="panel-header">
+            <h2>RAG Chat</h2>
+            <button onClick={newChat}>New Chat</button>
+          </div>
+          <div className="chat-layout">
+            <section className="chat-list">
+              <h3>Chat Sessions</h3>
+              {conversations.length === 0 && <p className="hint">No saved chats yet.</p>}
+              {conversations.map((conversation) => (
+                <button
+                  className={activeConversation?.conversation_id === conversation.conversation_id ? "chat-tab active" : "chat-tab"}
+                  key={conversation.conversation_id}
+                  onClick={() => selectConversation(conversation.conversation_id)}
+                >
+                  <span>{conversation.title}</span>
+                  <small>{conversation.turn_count} turns</small>
+                </button>
+              ))}
+            </section>
+            <section className="chat-surface">
+              {activeConversation && (
+                <div className="turn-list">
+                  {(activeConversation.turns || []).map((turn) => (
+                    <article className={`turn ${turn.role}`} key={turn.turn_id}>
+                      <strong>{turn.role}</strong>
+                      <p>{turn.content}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+              <input value={query} onChange={(e) => setQuery(e.target.value)} />
+              <button onClick={ask}>Ask with citations</button>
+              {hasNoSourceAnswer && <div className="notice">No sources are available yet. Ingest a file first, then ask again.</div>}
+            </section>
+          </div>
           {answer && !answer.status && (
             <div className="answer-grid">
               <section>

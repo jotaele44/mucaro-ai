@@ -165,6 +165,46 @@ def test_api_ask_without_sources_returns_structured_error(tmp_path: Path):
     assert response.json()["status"] == "ERROR_NO_SOURCES"
 
 
+def test_api_conversation_persists_cited_chat_turns(tmp_path: Path):
+    client = make_client(tmp_path)
+    ingest = client.post(
+        "/ingest",
+        files={"upload": ("source.md", b"Source lineage requires cited chunk IDs and source IDs.", "text/markdown")},
+    )
+    assert ingest.status_code == 200
+
+    created = client.post("/conversations", json={"title": "Source lineage chat"})
+    assert created.status_code == 200
+    conversation_id = created.json()["conversation_id"]
+
+    ask = client.post(
+        f"/conversations/{conversation_id}/ask",
+        json={"query": "What does source lineage require?", "retrieval_strategy": "persistent", "model_provider": "mock"},
+    )
+    assert ask.status_code == 200
+    payload = ask.json()
+    assert payload["answer"]["citation_status"] == "CITATION_OK"
+    assert payload["conversation"]["conversation_id"] == conversation_id
+    assert [turn["role"] for turn in payload["conversation"]["turns"]] == ["user", "assistant"]
+    assert payload["conversation"]["turns"][1]["run_id"] == payload["answer"]["run_id"]
+
+    listed = client.get("/conversations")
+    assert listed.status_code == 200
+    assert listed.json()["conversations"][0]["conversation_id"] == conversation_id
+    assert listed.json()["conversations"][0]["turn_count"] == 2
+
+    fetched = client.get(f"/conversations/{conversation_id}")
+    assert fetched.status_code == 200
+    assert fetched.json()["turns"][1]["answer_trace"]["citation_status"] == "CITATION_OK"
+
+    missing = client.post(
+        "/conversations/conv_missing/ask",
+        json={"query": "What does source lineage require?", "model_provider": "mock"},
+    )
+    assert missing.status_code == 404
+    assert missing.json()["detail"]["status"] == "ERROR_CONVERSATION_NOT_FOUND"
+
+
 def test_api_invalid_top_k_is_validation_error(tmp_path: Path):
     client = make_client(tmp_path)
 

@@ -14,6 +14,10 @@ class AskRequest(BaseModel):
     allow_mock_fallback: bool = False
 
 
+class ConversationCreateRequest(BaseModel):
+    title: str | None = Field(default=None, max_length=120)
+
+
 class PlanRequest(BaseModel):
     user_request: str = Field(min_length=1)
     inputs_available: list[str] = Field(default_factory=list)

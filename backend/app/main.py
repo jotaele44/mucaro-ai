@@ -8,10 +8,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import Settings, settings
+from .conversations import append_answer_turn, create_conversation, get_conversation, list_conversations
 from .db import init_db, list_payloads, upsert_payload
 from .execution_gate import analyze_task, approve_execution
 from .ingestion import get_chunks, get_sources, ingest_file, ingest_folder
-from .models import ApprovalRequest, AskRequest, DirectoryPermissionRequest, IngestPathRequest, PlanRequest
+from .models import (
+    ApprovalRequest,
+    AskRequest,
+    ConversationCreateRequest,
+    DirectoryPermissionRequest,
+    IngestPathRequest,
+    PlanRequest,
+)
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -64,7 +72,7 @@ async def read_limited_upload(upload: UploadFile, max_bytes: int) -> bytes:
 
 
 def create_app(cfg: Settings = settings) -> FastAPI:
-    app = FastAPI(title="Mucaro AI", version="0.1.6")
+    app = FastAPI(title="Mucaro AI", version="0.1.7")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),
@@ -166,6 +174,40 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             allow_mock_fallback=req.allow_mock_fallback,
             cfg=cfg,
         )
+
+    @app.get("/conversations")
+    def conversations() -> dict:
+        return {"conversations": list_conversations(cfg)}
+
+    @app.post("/conversations")
+    def create_chat(req: ConversationCreateRequest) -> dict:
+        return create_conversation(req.title, cfg)
+
+    @app.get("/conversations/{conversation_id}")
+    def conversation(conversation_id: str) -> dict:
+        payload = get_conversation(conversation_id, cfg)
+        if payload is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        return payload
+
+    @app.post("/conversations/{conversation_id}/ask")
+    def ask_conversation(conversation_id: str, req: AskRequest) -> dict:
+        if get_conversation(conversation_id, cfg) is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        answer = answer_question(
+            req.query,
+            top_k=req.top_k,
+            retrieval_strategy=req.retrieval_strategy,
+            model_provider=req.model_provider,
+            model_name=req.model_name,
+            allow_mock_fallback=req.allow_mock_fallback,
+            cfg=cfg,
+        )
+        try:
+            conversation_payload = append_answer_turn(conversation_id, req.query, answer, cfg)
+        except KeyError as exc:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
+        return {"answer": answer, "conversation": conversation_payload}
 
     @app.get("/runs")
     def runs() -> dict:
