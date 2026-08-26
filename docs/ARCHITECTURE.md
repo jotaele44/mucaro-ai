@@ -25,6 +25,7 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 - JSON files: inspectable manifest, chunks, schemas, exports.
 - Local folders: `data/input`, `data/processed`, `data/exports`, `data/indexes`.
 - API upload boundary: sanitizes upload filenames, rejects traversal/generated/unsupported names, and enforces `MUCARO_AI_MAX_UPLOAD_BYTES` with a 25 MB default.
+- Directory permission boundary: direct path ingestion outside the project root requires a local grant recorded under `data/processed/directory_permissions.json`.
 - Parser evidence: source manifests include byte counts, parser warnings, parse status, and format metadata such as CSV delimiter/header/row counts.
 
 ## Retrieval layer

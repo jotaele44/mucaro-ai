@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from backend.app.config import Settings
 from backend.app.ingestion import ingest_folder
 

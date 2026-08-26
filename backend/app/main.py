@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,8 +10,15 @@ from fastapi.staticfiles import StaticFiles
 from .config import Settings, settings
 from .db import init_db, list_payloads, upsert_payload
 from .execution_gate import analyze_task, approve_execution
-from .ingestion import get_chunks, get_sources, ingest_file
-from .models import ApprovalRequest, AskRequest, PlanRequest
+from .ingestion import get_chunks, get_sources, ingest_file, ingest_folder
+from .models import ApprovalRequest, AskRequest, DirectoryPermissionRequest, IngestPathRequest, PlanRequest
+from .permissions import (
+    DirectoryPermissionError,
+    check_directory_permission,
+    grant_directory,
+    load_directory_grants,
+    revoke_directory,
+)
 from .services import answer_question
 from .validation import validate_project_json
 
@@ -57,7 +64,7 @@ async def read_limited_upload(upload: UploadFile, max_bytes: int) -> bytes:
 
 
 def create_app(cfg: Settings = settings) -> FastAPI:
-    app = FastAPI(title="Mucaro AI", version="0.1.4")
+    app = FastAPI(title="Mucaro AI", version="0.1.5")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),
@@ -97,6 +104,48 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             return ingest_file(target, cfg)
         except Exception as exc:
             raise api_error("ERROR_INGEST_FAILED", type(exc).__name__, filename=safe_name) from exc
+
+    @app.post("/ingest-path")
+    def ingest_path(req: IngestPathRequest) -> dict:
+        path = Path(req.path).expanduser().resolve()
+        if not path.exists():
+            raise api_error("ERROR_INPUT_PATH_NOT_FOUND", str(path), status_code=404)
+        if not path.is_file() and not path.is_dir():
+            raise api_error("ERROR_INPUT_PATH_UNSUPPORTED", str(path))
+        permission = check_directory_permission(path, cfg)
+        if permission["status"] != "PERMISSION_OK":
+            raise api_error(str(permission["status"]), str(permission["detail"]), status_code=403, path=permission["path"])
+        try:
+            result = ingest_folder(path, cfg) if path.is_dir() else ingest_file(path, cfg)
+        except Exception as exc:
+            raise api_error("ERROR_INGEST_FAILED", type(exc).__name__, path=str(path)) from exc
+        result["directory_permission"] = permission
+        return result
+
+    @app.get("/permissions/directories")
+    def directory_permissions() -> dict:
+        return {"status": "DIRECTORY_PERMISSIONS_OK", "grants": load_directory_grants(cfg)}
+
+    @app.post("/permissions/directories/check")
+    def check_directory(req: DirectoryPermissionRequest) -> dict:
+        try:
+            return check_directory_permission(req.path, cfg)
+        except DirectoryPermissionError as exc:
+            raise api_error(exc.status, exc.detail, status_code=400) from exc
+
+    @app.post("/permissions/directories/grant")
+    def grant_directory_permission(req: DirectoryPermissionRequest) -> dict:
+        try:
+            return grant_directory(req.path, cfg, granted_by="api", reason=req.reason)
+        except DirectoryPermissionError as exc:
+            raise api_error(exc.status, exc.detail, status_code=400) from exc
+
+    @app.post("/permissions/directories/revoke")
+    def revoke_directory_permission(req: DirectoryPermissionRequest) -> dict:
+        try:
+            return revoke_directory(req.path, cfg)
+        except DirectoryPermissionError as exc:
+            raise api_error(exc.status, exc.detail, status_code=400) from exc
 
     @app.get("/sources")
     def sources() -> dict:

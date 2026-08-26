@@ -9,6 +9,13 @@ from typing import Any, Sequence
 from .config import Settings, settings
 from .execution_gate import analyze_task
 from .ingestion import ingest_file, ingest_folder
+from .permissions import (
+    DirectoryPermissionError,
+    check_directory_permission,
+    grant_directory,
+    load_directory_grants,
+    revoke_directory,
+)
 from .retrieval import RETRIEVAL_STRATEGIES
 from .services import answer_question
 from .validation import validate_project_json
@@ -52,8 +59,37 @@ def build_parser() -> argparse.ArgumentParser:
 
     ingest = subcommands.add_parser("ingest", help="Ingest a supported file or folder.")
     ingest.add_argument("path", nargs="?", default="data/input", help="File or folder to ingest.")
+    ingest.add_argument(
+        "--grant-directory-access",
+        action="store_true",
+        help="Prompt to grant access when PATH is outside the project directory.",
+    )
     ingest.add_argument("--format", choices=["json", "text"], default="text", help="Output format.")
     ingest.set_defaults(handler=run_ingest)
+
+    permissions = subcommands.add_parser("permissions", help="Manage user-directory access grants.")
+    permissions_subcommands = permissions.add_subparsers(dest="permission_command", required=True)
+
+    permissions_grant = permissions_subcommands.add_parser("grant", help="Grant access to a file's containing folder or a folder.")
+    permissions_grant.add_argument("path", help="File or directory path to authorize.")
+    permissions_grant.add_argument("--yes", action="store_true", help="Confirm the grant without an interactive prompt.")
+    permissions_grant.add_argument("--reason", help="Optional reason recorded in the local permission ledger.")
+    permissions_grant.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    permissions_grant.set_defaults(handler=run_permissions_grant)
+
+    permissions_list = permissions_subcommands.add_parser("list", help="List directory access grants.")
+    permissions_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    permissions_list.set_defaults(handler=run_permissions_list)
+
+    permissions_check = permissions_subcommands.add_parser("check", help="Check whether a path is currently accessible.")
+    permissions_check.add_argument("path", help="File or directory path to check.")
+    permissions_check.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    permissions_check.set_defaults(handler=run_permissions_check)
+
+    permissions_revoke = permissions_subcommands.add_parser("revoke", help="Revoke an exact directory access grant.")
+    permissions_revoke.add_argument("path", help="File or directory path whose containing grant should be revoked.")
+    permissions_revoke.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    permissions_revoke.set_defaults(handler=run_permissions_revoke)
 
     plan = subcommands.add_parser("plan", help="Analyze a request with the Planning Gate.")
     plan.add_argument("request", nargs="+", help="Request to analyze.")
@@ -94,6 +130,14 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"readiness_percent={payload.get('readiness_percent')}")
     elif "checked" in payload:
         print(f"checked={len(payload.get('checked', []))}")
+    elif "grants" in payload:
+        print(f"grants={len(payload.get('grants', []))}")
+        for grant in payload.get("grants", []):
+            print(grant.get("canonical_root"))
+    elif "canonical_root" in payload:
+        print(f"canonical_root={payload.get('canonical_root')}")
+    elif "path" in payload:
+        print(f"path={payload.get('path')}")
 
 
 def emit_error(status: str, detail: str, output_format: str = "json") -> None:
@@ -129,9 +173,32 @@ def run_ingest(args: argparse.Namespace, cfg: Settings) -> int:
         raise MucaroCLIError("ERROR_INPUT_PATH_NOT_FOUND", str(path))
     if not path.is_file() and not path.is_dir():
         raise MucaroCLIError("ERROR_INPUT_PATH_UNSUPPORTED", str(path))
+    permission = check_directory_permission(path, cfg)
+    if permission["status"] != "PERMISSION_OK":
+        if not args.grant_directory_access:
+            raise MucaroCLIError(str(permission["status"]), str(permission["detail"]))
+        grant = prompt_for_directory_grant(Path(str(permission["canonical_root"])), cfg)
+        permission = {"status": "PERMISSION_OK", "scope": "granted_directory", "grant": grant}
     result = ingest_folder(path, cfg) if path.is_dir() else ingest_file(path, cfg)
+    result["directory_permission"] = permission
     emit_payload(result, args.format)
     return 0
+
+
+def prompt_for_directory_grant(root: Path, cfg: Settings) -> dict[str, Any]:
+    if not sys.stdin.isatty():
+        raise MucaroCLIError(
+            "ERROR_PERMISSION_CONFIRMATION_REQUIRED",
+            f"Run `mucaro permissions grant {root} --yes` before ingesting this path.",
+        )
+    print(f"Allow Mucaro AI to access files under: {root}? [y/N] ", end="", file=sys.stderr)
+    answer = sys.stdin.readline().strip().lower()
+    if answer not in {"y", "yes"}:
+        raise MucaroCLIError("ERROR_DIRECTORY_PERMISSION_DENIED", str(root))
+    try:
+        return grant_directory(root, cfg, granted_by="cli_prompt", reason="ingest --grant-directory-access")
+    except DirectoryPermissionError as exc:
+        raise MucaroCLIError(exc.status, exc.detail) from exc
 
 
 def run_plan(args: argparse.Namespace, cfg: Settings) -> int:
@@ -151,6 +218,46 @@ def run_validate(args: argparse.Namespace, cfg: Settings) -> int:
     return 0 if result.get("status") == "JSON_OK" else 2
 
 
+def run_permissions_grant(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        path = Path(args.path).expanduser().resolve()
+        if not args.yes:
+            if not sys.stdin.isatty():
+                raise MucaroCLIError(
+                    "ERROR_PERMISSION_CONFIRMATION_REQUIRED",
+                    f"Run `mucaro permissions grant {path} --yes` after confirming this directory should be accessible.",
+                )
+            print(f"Allow Mucaro AI to access files under: {path}? [y/N] ", end="", file=sys.stderr)
+            if sys.stdin.readline().strip().lower() not in {"y", "yes"}:
+                raise MucaroCLIError("ERROR_DIRECTORY_PERMISSION_DENIED", str(path))
+        result = grant_directory(path, cfg, granted_by="cli", reason=args.reason)
+    except DirectoryPermissionError as exc:
+        raise MucaroCLIError(exc.status, exc.detail) from exc
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_permissions_list(args: argparse.Namespace, cfg: Settings) -> int:
+    result = {"status": "DIRECTORY_PERMISSIONS_OK", "grants": load_directory_grants(cfg)}
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_permissions_check(args: argparse.Namespace, cfg: Settings) -> int:
+    result = check_directory_permission(args.path, cfg)
+    emit_payload(result, args.format)
+    return 0 if result.get("status") == "PERMISSION_OK" else 2
+
+
+def run_permissions_revoke(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = revoke_directory(args.path, cfg)
+    except DirectoryPermissionError as exc:
+        raise MucaroCLIError(exc.status, exc.detail) from exc
+    emit_payload(result, args.format)
+    return 0
+
+
 def run_serve(args: argparse.Namespace, cfg: Settings) -> int:
     del cfg
     import uvicorn
@@ -167,6 +274,9 @@ def main(argv: Sequence[str] | None = None, cfg: Settings = settings) -> int:
     except MucaroCLIError as exc:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
         return exc.exit_code
+    except DirectoryPermissionError as exc:
+        emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
+        return 2
     except ValueError as exc:
         emit_error("ERROR_INVALID_INPUT", str(exc), getattr(args, "format", "json"))
         return 2

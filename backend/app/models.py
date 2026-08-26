@@ -23,3 +23,12 @@ class PlanRequest(BaseModel):
 class ApprovalRequest(BaseModel):
     gate: dict
     approved_mode: str
+
+
+class DirectoryPermissionRequest(BaseModel):
+    path: str = Field(min_length=1)
+    reason: str | None = None
+
+
+class IngestPathRequest(BaseModel):
+    path: str = Field(min_length=1)

@@ -123,6 +123,39 @@ def test_api_ingest_rejects_oversized_upload(tmp_path: Path):
     assert response.json()["detail"]["status"] == "ERROR_UPLOAD_TOO_LARGE"
 
 
+def test_api_ingest_path_requires_then_accepts_directory_permission(tmp_path: Path):
+    project = tmp_path / "project"
+    external = tmp_path / "external"
+    external.mkdir()
+    sample = external / "source.md"
+    sample.write_text("External path ingestion is permission-gated.", encoding="utf-8")
+    client = make_client(project)
+
+    denied = client.post("/ingest-path", json={"path": str(external)})
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["status"] == "ERROR_DIRECTORY_PERMISSION_REQUIRED"
+
+    grant = client.post(
+        "/permissions/directories/grant",
+        json={"path": str(external), "reason": "api regression"},
+    )
+    assert grant.status_code == 200
+    assert grant.json()["status"] == "DIRECTORY_PERMISSION_GRANTED"
+
+    grants = client.get("/permissions/directories")
+    assert grants.status_code == 200
+    assert len(grants.json()["grants"]) == 1
+
+    ingest = client.post("/ingest-path", json={"path": str(external)})
+    assert ingest.status_code == 200
+    assert ingest.json()["status"] == "INGEST_FOLDER_OK"
+    assert ingest.json()["directory_permission"]["status"] == "PERMISSION_OK"
+
+    revoke = client.post("/permissions/directories/revoke", json={"path": str(external)})
+    assert revoke.status_code == 200
+    assert revoke.json()["status"] == "DIRECTORY_PERMISSION_REVOKED"
+
+
 def test_api_ask_without_sources_returns_structured_error(tmp_path: Path):
     client = make_client(tmp_path)
 

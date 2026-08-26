@@ -32,6 +32,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro plan REQUEST` | Analyze a task with the Planning Gate | 0 | 2 |
+| `mucaro permissions COMMAND` | Manage user-directory access grants | 0 | 2 |
 | `mucaro validate` | Validate JSON artifacts and schemas | 0 | 2 |
 | `mucaro serve` | Start the local FastAPI server | 0 | 2 |
 
@@ -65,6 +66,9 @@ retrieval payloads where practical:
 |---|---|
 | `ERROR_INPUT_PATH_NOT_FOUND` | `ingest` path does not exist |
 | `ERROR_INPUT_PATH_UNSUPPORTED` | `ingest` path is neither a file nor folder |
+| `ERROR_DIRECTORY_PERMISSION_REQUIRED` | direct filesystem ingest needs a prior directory grant |
+| `ERROR_PERMISSION_CONFIRMATION_REQUIRED` | a directory grant was requested without `--yes` in a non-interactive terminal |
+| `ERROR_DIRECTORY_PERMISSION_TOO_BROAD` | a directory grant targeted the filesystem root |
 | `ERROR_NO_SOURCES` | `ask` ran before any source chunks were available |
 | `ERROR_NO_RETRIEVAL_CONTEXT` | sources exist but no chunk matches the query |
 | `ERROR_NO_VALID_CHUNKS` | available chunks are malformed or empty |
@@ -79,12 +83,32 @@ retrieval payloads where practical:
 
 ```bash
 mucaro ingest data/input --format text
+mucaro permissions grant ~/Documents/mucaro-sources --yes --format json
+mucaro permissions list --format text
+mucaro ingest ~/Documents/mucaro-sources --format json
 mucaro ask "How does source lineage work?" --format json --no-persist
 mucaro ask "How does source lineage work?" --strategy persistent --format text
 mucaro plan "Add CLI capability" --input mucaro-ai --format text
 mucaro validate --format text
 mucaro serve --host 127.0.0.1 --port 8000
 ```
+
+## Directory Permissions
+
+Project-local paths under the repository root are accessible by default. Direct
+filesystem paths outside the project root require an explicit local grant:
+
+```bash
+mucaro permissions grant ~/Documents/mucaro-sources --yes
+mucaro permissions check ~/Documents/mucaro-sources/source.md
+mucaro ingest ~/Documents/mucaro-sources
+mucaro permissions revoke ~/Documents/mucaro-sources
+```
+
+The ledger is stored under `data/processed/directory_permissions.json`, which is
+local runtime state and should not be committed. Interactive operators can use
+`mucaro ingest PATH --grant-directory-access` to receive a terminal prompt when
+the path needs a new grant.
 
 ## Retrieval Strategies
 

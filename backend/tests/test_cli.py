@@ -108,6 +108,39 @@ def test_cli_ingest_missing_path_returns_structured_error(tmp_path: Path, capsys
     assert "missing.md" in error_output
 
 
+def test_cli_ingest_external_path_requires_permission(tmp_path: Path, capsys):
+    project = tmp_path / "project"
+    cfg = make_settings(project)
+    external = tmp_path / "external"
+    external.mkdir()
+    sample = external / "sample.md"
+    sample.write_text("External directory access is permission-gated.", encoding="utf-8")
+
+    assert main(["ingest", str(external), "--format", "json"], cfg=cfg) == 2
+    error_output = capsys.readouterr().err
+    assert "ERROR_DIRECTORY_PERMISSION_REQUIRED" in error_output
+
+    assert main(["permissions", "grant", str(external), "--yes", "--format", "json"], cfg=cfg) == 0
+    grant_output = capsys.readouterr().out
+    assert "DIRECTORY_PERMISSION_GRANTED" in grant_output
+
+    assert main(["ingest", str(external), "--format", "json"], cfg=cfg) == 0
+    ingest_output = capsys.readouterr().out
+    assert "INGEST_FOLDER_OK" in ingest_output
+    assert "PERMISSION_OK" in ingest_output
+
+
+def test_cli_permission_grant_requires_confirmation_when_not_yes(tmp_path: Path, capsys):
+    project = tmp_path / "project"
+    cfg = make_settings(project)
+    external = tmp_path / "external"
+    external.mkdir()
+
+    assert main(["permissions", "grant", str(external), "--format", "json"], cfg=cfg) == 2
+    error_output = capsys.readouterr().err
+    assert "ERROR_PERMISSION_CONFIRMATION_REQUIRED" in error_output
+
+
 def test_cli_ask_no_sources_returns_error_status(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
