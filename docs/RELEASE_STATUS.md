@@ -20,6 +20,7 @@ Observed success markers:
 - `JSON_OK`
 - `56 passed` from pytest for the certified `v0.1.3-local-hardening` tag
 - `61 passed` from pytest for the certified `v0.1.4-local-persistent-index` tag
+- `76 passed` from pytest for the current `v0.1.12-cli-source-index` candidate
 - Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, hybrid, and persistent strategies across the expanded corpus
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
