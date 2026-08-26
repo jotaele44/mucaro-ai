@@ -36,6 +36,19 @@ The `/ingest` upload route remains separate and copies uploaded files into
 `data/input`. The `/ingest-path` route is for direct local filesystem access and
 therefore requires a matching grant when the path is outside the project root.
 
+## Browser Flow
+
+The local frontend exposes the same contract in the Directory Access panel:
+
+1. Enter a local file or directory path.
+2. Check access.
+3. Confirm the prompted granted root.
+4. Grant access or grant and ingest.
+5. Revoke the grant when it is no longer needed.
+
+Browser directory access still goes through the backend `/ingest-path` route, so
+the UI cannot bypass the server-side permission gate.
+
 ## Local State
 
 The ledger lives at:

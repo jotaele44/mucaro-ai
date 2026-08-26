@@ -162,6 +162,8 @@ The `ask` command exports answer traces under `data/exports/` and stores runs in
 
 Direct filesystem ingestion outside the project directory is permission-gated. Grant a containing directory before ingesting user-directory paths, or use `ingest --grant-directory-access` from an interactive terminal to prompt at ingestion time. See `docs/DIRECTORY_PERMISSIONS.md`.
 
+The browser app includes the same permission workflow in the Directory Access panel.
+
 Live Anthropic mode is explicit:
 
 ```bash

@@ -14,6 +14,7 @@ textarea { width: 100%; min-height: 90px; margin: 10px 0; }
 input { padding: 10px; margin: 8px 8px 8px 0; min-width: 340px; }
 button { padding: 10px 14px; border: 0; border-radius: 8px; background: #111827; color: white; cursor: pointer; }
 button:disabled { background: #9ca3af; cursor: not-allowed; }
+button.secondary { background: #e5e7eb; color: #17202a; }
 .button-row { display: flex; gap: 10px; }
 .gate-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .gate-grid > div { background: #f9fafb; border: 1px solid #e5e7eb; padding: 10px; border-radius: 8px; }
@@ -26,6 +27,20 @@ pre { white-space: pre-wrap; background: #0f172a; color: #e5e7eb; padding: 14px;
 .notice { margin-top: 12px; padding: 12px; border-radius: 8px; background: #eef6ff; border: 1px solid #b9d9ff; color: #17324d; }
 .error { background: #fff1f2; border-color: #fecdd3; color: #7f1d1d; }
 .hint { color: #4b5563; font-size: 14px; }
+.path-form { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.6fr); gap: 12px; }
+.path-form label { display: grid; gap: 6px; font-weight: 700; color: #374151; }
+.path-form input { box-sizing: border-box; min-width: 0; width: 100%; margin: 0; font-weight: 400; color: #17202a; }
+.permission-status,
+.permission-confirm,
+.grant-list { margin-top: 14px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: #fbfcfe; }
+.permission-confirm { border-color: #f6c76f; background: #fffaf0; }
+.permission-confirm h3,
+.grant-list h3 { margin: 0 0 10px; font-size: 16px; }
+.grant-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid #e5e7eb; padding-top: 10px; margin-top: 10px; }
+.grant-row:first-of-type { border-top: 0; padding-top: 0; }
+.grant-row strong,
+.grant-row small { display: block; overflow-wrap: anywhere; }
+.grant-row small { color: #6b7280; margin-top: 4px; }
 .source-detail { margin-top: 14px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: #fbfcfe; }
 .source-detail h3, .answer-grid h3 { margin: 0 0 10px; font-size: 16px; }
 dl { display: grid; gap: 8px; margin: 0; }
@@ -43,6 +58,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
   main { grid-template-columns: 1fr; }
   aside { padding: 18px; }
   header, .answer-grid { display: grid; grid-template-columns: 1fr; }
+  .path-form, .grant-row { display: grid; grid-template-columns: 1fr; }
   input { min-width: 0; width: calc(100% - 24px); }
   dl div { grid-template-columns: 1fr; }
 }

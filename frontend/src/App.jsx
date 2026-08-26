@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api } from "./api.js";
+import { DirectoryIntake } from "./components/DirectoryIntake.jsx";
 import { PlanningGate } from "./components/PlanningGate.jsx";
 import "./styles.css";
 
@@ -69,6 +70,7 @@ function App() {
           <a>Mission Control</a>
           <a>Planning Gate</a>
           <a>File Intake</a>
+          <a>Directory Access</a>
           <a>Source Manifest</a>
           <a>RAG Chat</a>
           <a>Citation Inspector</a>
@@ -88,6 +90,7 @@ function App() {
           <input type="file" onChange={upload} />
           {sources.length === 0 && <p className="hint">No sources ingested yet. Add a TXT, MD, CSV, JSON, or PDF file before asking source-grounded questions.</p>}
         </section>
+        <DirectoryIntake onIngested={refresh} />
         <section className="panel">
           <h2>Source Manifest</h2>
           <table>

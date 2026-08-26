@@ -28,6 +28,11 @@ export const api = {
   sources: () => request("/sources"),
   chunks: () => request("/chunks"),
   ask: (payload) => request("/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
+  directoryPermissions: () => request("/permissions/directories"),
+  checkDirectoryPermission: (payload) => request("/permissions/directories/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
+  grantDirectoryPermission: (payload) => request("/permissions/directories/grant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
+  revokeDirectoryPermission: (payload) => request("/permissions/directories/revoke", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
+  ingestPath: (payload) => request("/ingest-path", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
   ingest: (file) => {
     const form = new FormData();
     form.append("upload", file);
