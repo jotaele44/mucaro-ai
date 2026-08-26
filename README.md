@@ -164,7 +164,7 @@ Direct filesystem ingestion outside the project directory is permission-gated. G
 
 The browser app includes the same permission workflow in the Directory Access panel.
 
-The browser app also persists local chat sessions. Each conversation keeps ordered user and assistant turns while cited answer traces remain exportable by `run_id`.
+The browser app also persists local chat sessions. Each conversation keeps ordered user and assistant turns, uses recent turns for follow-up questions, and keeps cited answer traces exportable by `run_id`.
 
 Live Anthropic mode is explicit:
 

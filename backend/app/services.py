@@ -24,6 +24,7 @@ def answer_question(
     model_provider: str | None = None,
     model_name: str | None = None,
     allow_mock_fallback: bool = False,
+    conversation_context: list[dict[str, Any]] | None = None,
     cfg: Settings = settings,
     persist: bool = True,
 ) -> dict[str, Any]:
@@ -50,6 +51,7 @@ def answer_question(
             model_provider=model_provider,
             model_name=model_name,
             allow_mock_fallback=allow_mock_fallback,
+            conversation_context=conversation_context or [],
         )
     except ModelProviderError as exc:
         return {
@@ -66,7 +68,8 @@ def answer_question(
         "query": normalized_query,
         "model_provider": model["model_provider"],
         "model_name": model["model_name"],
-        "prompt_template_id": "default_cited_rag_v1",
+        "prompt_template_id": "default_cited_rag_with_history_v1" if conversation_context else "default_cited_rag_v1",
+        "conversation_context_turn_count": len(conversation_context or []),
         "retrieval_strategy": retrieved[0].get("retrieval_strategy", "unknown") if retrieved else "none",
         "retrieved_chunk_ids": retrieved_ids,
         "cited_chunk_ids": cited_ids,

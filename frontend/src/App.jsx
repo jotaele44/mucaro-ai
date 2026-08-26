@@ -206,6 +206,7 @@ function App() {
                   <div><dt>Run</dt><dd>{answer.run_id}</dd></div>
                   <div><dt>Model</dt><dd>{answer.model_provider} / {answer.model_name}</dd></div>
                   <div><dt>Retrieval</dt><dd>{answer.retrieval_strategy || "unknown"}</dd></div>
+                  <div><dt>History Turns</dt><dd>{answer.conversation_context_turn_count ?? 0}</dd></div>
                   <div><dt>Confidence</dt><dd>{answer.confidence}</dd></div>
                 </dl>
                 {answer.run_id && <a className="export-link" href={`${api.baseUrl}/exports/${answer.run_id}`}>Open JSON export</a>}

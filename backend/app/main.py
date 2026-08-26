@@ -8,7 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import Settings, settings
-from .conversations import append_answer_turn, create_conversation, get_conversation, list_conversations
+from .conversations import (
+    append_answer_turn,
+    build_conversation_context,
+    create_conversation,
+    get_conversation,
+    list_conversations,
+)
 from .db import init_db, list_payloads, upsert_payload
 from .execution_gate import analyze_task, approve_execution
 from .ingestion import get_chunks, get_sources, ingest_file, ingest_folder
@@ -72,7 +78,7 @@ async def read_limited_upload(upload: UploadFile, max_bytes: int) -> bytes:
 
 
 def create_app(cfg: Settings = settings) -> FastAPI:
-    app = FastAPI(title="Mucaro AI", version="0.1.7")
+    app = FastAPI(title="Mucaro AI", version="0.1.8")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),
@@ -192,8 +198,10 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.post("/conversations/{conversation_id}/ask")
     def ask_conversation(conversation_id: str, req: AskRequest) -> dict:
-        if get_conversation(conversation_id, cfg) is None:
+        existing_conversation = get_conversation(conversation_id, cfg)
+        if existing_conversation is None:
             raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        conversation_context = build_conversation_context(existing_conversation)
         answer = answer_question(
             req.query,
             top_k=req.top_k,
@@ -201,6 +209,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             model_provider=req.model_provider,
             model_name=req.model_name,
             allow_mock_fallback=req.allow_mock_fallback,
+            conversation_context=conversation_context,
             cfg=cfg,
         )
         try:

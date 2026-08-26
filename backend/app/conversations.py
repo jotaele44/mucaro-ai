@@ -7,6 +7,8 @@ from .db import init_db, list_payloads, upsert_payload
 from .utils import stable_id, utc_now
 
 DEFAULT_TITLE = "New chat"
+MAX_CONTEXT_TURNS = 8
+MAX_CONTEXT_CHARS = 2400
 
 
 def _title_from_query(query: str) -> str:
@@ -55,6 +57,30 @@ def get_conversation(conversation_id: str, cfg: Settings = settings) -> dict[str
         if conversation.get("conversation_id") == conversation_id:
             return conversation
     return None
+
+
+def build_conversation_context(conversation: dict[str, Any]) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    remaining = MAX_CONTEXT_CHARS
+    for turn in reversed(conversation.get("turns", [])[-MAX_CONTEXT_TURNS:]):
+        content = " ".join(str(turn.get("content", "")).split())
+        if not content:
+            continue
+        clipped = content[:remaining]
+        if not clipped:
+            break
+        selected.append(
+            {
+                "role": turn.get("role", "unknown"),
+                "content": clipped,
+                "status": turn.get("status", ""),
+                "run_id": turn.get("run_id"),
+            }
+        )
+        remaining -= len(clipped)
+        if remaining <= 0:
+            break
+    return list(reversed(selected))
 
 
 def append_answer_turn(

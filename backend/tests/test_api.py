@@ -205,6 +205,39 @@ def test_api_conversation_persists_cited_chat_turns(tmp_path: Path):
     assert missing.json()["detail"]["status"] == "ERROR_CONVERSATION_NOT_FOUND"
 
 
+def test_api_conversation_follow_up_uses_prior_turn_context(tmp_path: Path):
+    client = make_client(tmp_path)
+    ingest = client.post(
+        "/ingest",
+        files={"upload": ("source.md", b"Source lineage requires cited chunk IDs and source IDs.", "text/markdown")},
+    )
+    assert ingest.status_code == 200
+    conversation_id = client.post("/conversations", json={"title": "Follow-up chat"}).json()["conversation_id"]
+
+    first = client.post(
+        f"/conversations/{conversation_id}/ask",
+        json={"query": "What does source lineage require?", "retrieval_strategy": "persistent", "model_provider": "mock"},
+    )
+    assert first.status_code == 200
+    assert first.json()["answer"]["conversation_context_turn_count"] == 0
+
+    second = client.post(
+        f"/conversations/{conversation_id}/ask",
+        json={
+            "query": "Using source lineage, answer with my previous question in mind.",
+            "retrieval_strategy": "persistent",
+            "model_provider": "mock",
+        },
+    )
+    assert second.status_code == 200
+    answer = second.json()["answer"]
+    assert answer["citation_status"] == "CITATION_OK"
+    assert answer["prompt_template_id"] == "default_cited_rag_with_history_v1"
+    assert answer["conversation_context_turn_count"] == 2
+    assert "Conversation context turns used: 2" in answer["answer"]
+    assert "What does source lineage require?" in answer["answer"]
+
+
 def test_api_invalid_top_k_is_validation_error(tmp_path: Path):
     client = make_client(tmp_path)
 
