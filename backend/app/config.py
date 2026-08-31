@@ -16,6 +16,12 @@ def parse_positive_int(value: str | None, default: int) -> int:
     return parsed if parsed > 0 else default
 
 
+def parse_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def find_project_root() -> Path:
     env_root = os.getenv("MUCARO_AI_ROOT")
     if env_root:
@@ -42,6 +48,8 @@ class Settings:
     cors_origins: tuple[str, ...] = DEFAULT_CORS_ORIGINS
     operator_token: str | None = None
     workspace_profile: str = "default"
+    deployment_profile: str = "local"
+    allow_public_bind: bool = False
 
     @classmethod
     def load(cls) -> "Settings":
@@ -67,6 +75,8 @@ class Settings:
             cors_origins=cors_origins or DEFAULT_CORS_ORIGINS,
             operator_token=os.getenv("MUCARO_AI_OPERATOR_TOKEN") or None,
             workspace_profile=os.getenv("MUCARO_AI_WORKSPACE_PROFILE", "default"),
+            deployment_profile=os.getenv("MUCARO_AI_DEPLOYMENT_PROFILE", "local").strip().lower() or "local",
+            allow_public_bind=parse_bool(os.getenv("MUCARO_AI_ALLOW_PUBLIC_BIND"), False),
         )
 
     def ensure_dirs(self) -> None:

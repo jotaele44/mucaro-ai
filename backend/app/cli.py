@@ -47,6 +47,7 @@ from .permissions import (
 )
 from .product_audit import build_product_audit
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
+from .security import SecurityProfileError, build_security_report, enforce_startup_security
 from .services import answer_question
 from .tools import (
     ToolRuntimeError,
@@ -89,7 +90,7 @@ def package_version() -> str:
     try:
         return importlib.metadata.version("mucaro-ai")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.20-dev"
+        return "0.1.21-dev"
 
 
 def parse_json_object(value: str) -> dict[str, Any]:
@@ -302,6 +303,14 @@ def build_parser() -> argparse.ArgumentParser:
     memory_export.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     memory_export.set_defaults(handler=run_memory_export)
 
+    security = subcommands.add_parser("security", help="Inspect production security readiness.")
+    security_subcommands = security.add_subparsers(dest="security_command", required=True)
+
+    security_status = security_subcommands.add_parser("status", help="Show local security profile status.")
+    security_status.add_argument("--host", default=None, help="Optional bind host to evaluate.")
+    security_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    security_status.set_defaults(handler=run_security_status)
+
     index = subcommands.add_parser("index", help="Inspect retrieval index health.")
     index_subcommands = index.add_subparsers(dest="index_command", required=True)
 
@@ -465,6 +474,13 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
     elif payload.get("status") in {"MEMORY_DELETE_OK", "ERROR_MEMORY_NOT_FOUND"}:
         print(f"memory_id={payload.get('memory_id')}")
         print(f"removed={payload.get('removed', 0)}")
+    elif payload.get("status") in {"SECURITY_OK", "SECURITY_WARN", "SECURITY_FAIL"}:
+        print(f"deployment_profile={payload.get('deployment_profile')}")
+        print(f"production_ready={payload.get('production_ready')}")
+        for check in payload.get("checks", []):
+            print(f"{check.get('status')} {check.get('name')} {check.get('detail')}")
+        for recommendation in payload.get("recommendations", []):
+            print(f"recommendation={recommendation}")
     elif payload.get("status") == "RUN_HISTORY_OK":
         print(f"run_count={payload.get('run_count', 0)}")
         print(f"citation_ok={payload.get('citation_ok', 0)}")
@@ -677,6 +693,10 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
     )
     if not cfg.operator_token:
         recommendations.append("Set MUCARO_AI_OPERATOR_TOKEN when exposing the local API beyond a private machine.")
+    security = build_security_report(cfg)
+    security_check_status = "FAIL" if security["status"] == "SECURITY_FAIL" else "WARN" if security["status"] == "SECURITY_WARN" else "PASS"
+    checks.append(_doctor_check("security_profile", security_check_status, security["status"]))
+    recommendations.extend(security.get("recommendations", []))
 
     conversation_count = _safe_payload_count("conversations", cfg)
     run_count = _safe_payload_count("runs", cfg)
@@ -713,6 +733,8 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
             "model_provider": cfg.default_model_provider,
             "live_mode": live_mode,
             "auth_required": bool(cfg.operator_token),
+            "deployment_profile": cfg.deployment_profile,
+            "security_status": security.get("status"),
         },
         "checks": checks,
         "recommendations": sorted(set(recommendations)),
@@ -948,6 +970,12 @@ def run_memory_export(args: argparse.Namespace, cfg: Settings) -> int:
     return 0
 
 
+def run_security_status(args: argparse.Namespace, cfg: Settings) -> int:
+    result = build_security_report(cfg, bind_host=args.host)
+    emit_payload(result, args.format)
+    return 0 if result.get("status") != "SECURITY_FAIL" else 2
+
+
 def run_index_status(args: argparse.Namespace, cfg: Settings) -> int:
     result = get_index_status(cfg)
     emit_payload(result, args.format)
@@ -1028,9 +1056,13 @@ def run_permissions_revoke(args: argparse.Namespace, cfg: Settings) -> int:
 
 
 def run_serve(args: argparse.Namespace, cfg: Settings) -> int:
-    del cfg
     import uvicorn
 
+    try:
+        enforce_startup_security(cfg, bind_host=args.host)
+    except SecurityProfileError as exc:
+        emit_error(exc.status, exc.detail)
+        return 2
     uvicorn.run("backend.app.main:app", host=args.host, port=args.port, reload=args.reload)
     return 0
 

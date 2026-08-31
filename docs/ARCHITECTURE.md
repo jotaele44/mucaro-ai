@@ -6,6 +6,7 @@ User Request
   → Readiness Score
   → Mode Selector
   → Approval Lock
+  → Security Profile
   → Explicit Memory Context
   → Conversation Session
   → File Ingestion
@@ -28,6 +29,8 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 - JSON files: inspectable manifest, chunks, schemas, exports.
 - Local folders: `data/input`, `data/processed`, `data/exports`, `data/indexes`.
 - API upload boundary: sanitizes upload filenames, rejects traversal/generated/unsupported names, and enforces `MUCARO_AI_MAX_UPLOAD_BYTES` with a 25 MB default.
+- Security profile boundary: local mode is loopback-first and production mode
+  fails startup unless operator auth and explicit CORS guardrails are present.
 - Directory permission boundary: direct path ingestion outside the project root requires a local grant recorded under `data/processed/directory_permissions.json`.
 - Conversation records: local chat sessions store ordered user/assistant turns and reference answer traces by `run_id`.
 - Explicit memory records: local JSON records under
@@ -46,7 +49,7 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 
 The API is local-first and loopback-oriented by default. If `MUCARO_AI_OPERATOR_TOKEN` is configured, mutating routes require either `Authorization: Bearer <token>` or `X-Mucaro-Token: <token>`.
 
-Read-only inspection routes expose health, config, sources, chunks,
+Read-only inspection routes expose health, config, security, sources, chunks,
 conversations, runs, memory, workspace profiles, tools, tool audit events, and
 exports. Mutating routes include planning/approval writes, upload/path
 ingestion, directory grant changes, source deletion/reindexing, chat
@@ -56,13 +59,26 @@ tool-call request/approval/execution.
 The CLI `doctor` command provides a read-only local readiness report over the
 same operational domains: paths, sources, chunks, persistent index status,
 directory grants, model-provider setup, API auth posture, conversations, runs,
-explicit memory, and the local tool runtime.
+explicit memory, production-security posture, and the local tool runtime.
 
 The CLI `audit product` command provides a broader completion matrix for the
-ChatGPT/Claude-like local assistant objective. It intentionally reports OPEN
-while production hardening remains incomplete. The multimodal requirement is
+ChatGPT/Claude-like local assistant objective. The multimodal requirement is
 scoped to metadata ingestion in this release; rich image, audio, and video
-understanding remains a model-layer upgrade.
+understanding remains a model-layer upgrade. Production hardening is scoped to a
+single-operator local app profile, not a multi-tenant SaaS.
+
+## Security layer
+
+Startup security is fail-closed for production mode.
+`MUCARO_AI_DEPLOYMENT_PROFILE=production` requires a strong
+`MUCARO_AI_OPERATOR_TOKEN` and explicit non-wildcard
+`MUCARO_AI_CORS_ORIGINS`. Local mode allows ordinary loopback startup, warns
+when auth is disabled, and blocks non-loopback CLI serving unless
+`MUCARO_AI_ALLOW_PUBLIC_BIND=1` is set.
+
+The `/security` API route and `mucaro security status` expose the same checks.
+These checks are readiness gates for single-operator deployment posture; true
+multi-tenant account isolation remains outside this local-first product scope.
 
 ## Tool layer
 

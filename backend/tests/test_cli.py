@@ -71,7 +71,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.20\n"
+    assert output == "mucaro 0.1.21\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -127,8 +127,8 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
 
     assert main(["audit", "product", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["status"] == "PRODUCT_AUDIT_OPEN"
-    assert payload["readiness_percent"] < 100
+    assert payload["status"] == "PRODUCT_AUDIT_OK"
+    assert payload["readiness_percent"] == 100.0
     by_id = {row["requirement_id"]: row for row in payload["requirements"]}
     assert by_id["permission_gated_user_directory"]["status"] == "PASS"
     assert by_id["source_lineage_citations"]["status"] == "PASS"
@@ -136,13 +136,13 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert by_id["tool_use_and_actions"]["status"] == "PASS"
     assert by_id["multimodal_interface"]["status"] == "PASS"
     assert by_id["personalization_memory"]["status"] == "PASS"
-    assert by_id["production_security"]["status"] == "OPEN"
-    assert payload["next_recommended_vector"] == "production_security"
+    assert by_id["production_security"]["status"] == "PASS"
+    assert payload["next_recommended_vector"] == "complete"
 
-    assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 2
+    assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 0
     strict_output = capsys.readouterr().out
-    assert "PRODUCT_AUDIT_OPEN" in strict_output
-    assert "OPEN production_security" in strict_output
+    assert "PRODUCT_AUDIT_OK" in strict_output
+    assert "PASS production_security" in strict_output
 
 
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):
@@ -357,6 +357,30 @@ def test_cli_memory_controls_and_export(tmp_path: Path, capsys):
     deleted = json.loads(capsys.readouterr().out)
     assert deleted["status"] == "MEMORY_DELETE_OK"
     assert deleted["remaining_memories"] == 0
+
+
+def test_cli_security_status_and_serve_public_bind_guard(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path, operator_token="x" * 32)
+
+    assert main(["security", "status", "--host", "127.0.0.1", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "SECURITY_OK"
+
+    assert main(["security", "status", "--host", "0.0.0.0", "--format", "text"], cfg=cfg) == 2
+    output = capsys.readouterr().out
+    assert "SECURITY_FAIL" in output
+    assert "bind_host" in output
+
+    called = False
+
+    def fake_run(*args, **kwargs) -> None:
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr("uvicorn.run", fake_run)
+
+    assert main(["serve", "--host", "0.0.0.0"], cfg=cfg) == 2
+    assert called is False
 
 
 def test_cli_serve_passes_host_port_and_reload(tmp_path: Path, monkeypatch):

@@ -62,13 +62,14 @@ Date: 2026-08-25
 
 Candidate target:
 
-- Candidate tag: `v0.1.20-explicit-memory`
-- Candidate package version: `0.1.20`
+- Candidate tag: `v0.1.21-production-security`
+- Candidate package version: `0.1.21`
 - Baseline preserved: `v0.1.4-local-persistent-index` at `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`; interim combined tag `v0.1.9-all-vectors-certified` at `b5deea7170eb1c94b5238e9a923827e6dc913213`
-- Scope: source library delete/reindex controls, retrieval strategy UI, no-context recovery guidance, expanded retrieval eval corpus, optional local operator token boundary, workspace profiles, structured run history, conversation follow-up context, conversation rename/delete/search, directory access UI, desktop package self-test, CLI `--version`, early `ask --top-k` validation, CLI source listing, CLI source deletion, CLI reindexing, CLI index status, CLI conversation create/list/show/rename/delete/ask, CLI run list/summary/show, opt-in `bm25_v1` retrieval, CLI readiness diagnostics, executable product-gap auditing, opt-in `local_semantic_hash_store_v1` retrieval, approval-gated local tool runtime, metadata-only image/audio/video ingestion, and explicit local memory controls.
-- Candidate local evidence: `102 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=10`,
+- Scope: source library delete/reindex controls, retrieval strategy UI, no-context recovery guidance, expanded retrieval eval corpus, optional local operator token boundary, workspace profiles, structured run history, conversation follow-up context, conversation rename/delete/search, directory access UI, desktop package self-test, CLI `--version`, early `ask --top-k` validation, CLI source listing, CLI source deletion, CLI reindexing, CLI index status, CLI conversation create/list/show/rename/delete/ask, CLI run list/summary/show, opt-in `bm25_v1` retrieval, CLI readiness diagnostics, executable product-gap auditing, opt-in `local_semantic_hash_store_v1` retrieval, approval-gated local tool runtime, metadata-only image/audio/video ingestion, explicit local memory controls, and production-security profile checks.
+- Candidate local evidence: `109 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=10`,
   `DESKTOP_PACKAGE_READY`, `npm audit` 0 vulnerabilities, frontend build passed,
-  clean `worktree_clean`, and `CERTIFY_RELEASE_OK`.
+  `PRODUCT_AUDIT_OK` at `100.0%`, clean `worktree_clean`, and
+  `CERTIFY_RELEASE_OK`.
 - Required external receipt: hosted CI and fresh-clone certification must pass on the final pushed commit before tagging.
 
 ## Scope
@@ -95,6 +96,9 @@ Included:
 - Memory surface: opt-in local memory save/list/enable/disable/delete/export
   through API, browser, and CLI; enabled memory is passed as answer context and
   recorded by memory ID without becoming cited source evidence.
+- Security surface: production profile startup checks, high-entropy operator
+  token requirement, explicit CORS requirement, `/security` inspection, CLI
+  security status, and local-mode public-bind guard.
 - Desktop launcher smoke path, editable install path, local release gates, hosted
   CI, and fresh-clone certification.
 

@@ -53,6 +53,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro memory disable MEMORY_ID` | Disable one memory item without deleting it | 0 | 2 |
 | `mucaro memory delete MEMORY_ID` | Delete one memory item | 0 | 2 |
 | `mucaro memory export` | Export all explicit memory items | 0 | 2 |
+| `mucaro security status` | Inspect local or production security readiness | 0 | 2 |
 | `mucaro tools list` | List locally allowlisted tools | 0 | 2 |
 | `mucaro tools request TOOL_NAME` | Create a pending tool-call request | 0 | 2 |
 | `mucaro tools approve TOOL_CALL_ID` | Approve a pending tool call | 0 | 2 |
@@ -127,6 +128,7 @@ retrieval payloads where practical:
 | `ERROR_MEMORY_KIND_UNSUPPORTED` | memory kind is not one of the supported types |
 | `ERROR_MEMORY_CONTENT_REQUIRED` | memory content was empty after normalization |
 | `ERROR_MEMORY_CONTENT_TOO_LONG` | memory content exceeded the local limit |
+| `ERROR_SECURITY_PROFILE_NOT_READY` | production or public-bind security checks failed |
 | `ERROR_TOOL_NOT_ALLOWED` | requested tool is not in the local allowlist |
 | `ERROR_TOOL_APPROVAL_REQUIRED` | tool execution was attempted before approval |
 | `ERROR_TOOL_CALL_NOT_FOUND` | tool command was given an unknown tool call ID |
@@ -163,6 +165,7 @@ mucaro memory remember "Prefer concise technical answers" --kind preference --fo
 mucaro memory list --format text
 mucaro memory disable MEMORY_ID --format json
 mucaro memory export --format json
+mucaro security status --host 127.0.0.1 --format text
 mucaro tools list --format text
 mucaro tools request source_library.status --reason "readiness check" --format json
 mucaro tools approve TOOL_CALL_ID --format json
@@ -198,8 +201,8 @@ the path needs a new grant.
 Use `mucaro doctor` to inspect local readiness without ingesting files or
 granting access. The report checks project paths, local data directories,
 source/chunk counts, persistent index status, semantic-store status, directory
-grants, model-provider readiness, API auth posture, conversations, runs, and
-the local tool runtime. Add `--strict` when
+grants, model-provider readiness, API auth posture, conversations, runs,
+explicit memory, production-security posture, and the local tool runtime. Add `--strict` when
 automation should fail on warnings.
 
 Use `mucaro audit product` to classify the broader assistant objective as
@@ -239,6 +242,22 @@ mucaro memory disable MEMORY_ID
 mucaro memory enable MEMORY_ID
 mucaro memory export --format json
 mucaro memory delete MEMORY_ID
+```
+
+## Security Profile
+
+Use `mucaro security status` to inspect whether the app is safe for the chosen
+runtime posture. Local mode is loopback-oriented. Non-loopback `mucaro serve
+--host` values fail unless `MUCARO_AI_ALLOW_PUBLIC_BIND=1` is set. Production
+mode requires a high-entropy `MUCARO_AI_OPERATOR_TOKEN` and explicit
+`MUCARO_AI_CORS_ORIGINS`.
+
+```bash
+mucaro security status --host 127.0.0.1 --format text
+MUCARO_AI_DEPLOYMENT_PROFILE=production \
+MUCARO_AI_OPERATOR_TOKEN="replace-with-a-long-random-token" \
+MUCARO_AI_CORS_ORIGINS="https://mucaro.example" \
+mucaro security status --format json
 ```
 
 ## Tool Runtime

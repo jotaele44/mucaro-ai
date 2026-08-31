@@ -91,6 +91,8 @@ Copy `.env.example` to `.env` and fill only what you need.
 - `MUCARO_AI_CORS_ORIGINS`: comma-separated browser origins for local frontend development.
 - `MUCARO_AI_OPERATOR_TOKEN`: optional local operator token required for mutating API actions when set.
 - `MUCARO_AI_WORKSPACE_PROFILE`: runtime workspace profile name. Default is `default`.
+- `MUCARO_AI_DEPLOYMENT_PROFILE`: `local` or `production`. Production mode requires a strong operator token and explicit CORS origins.
+- `MUCARO_AI_ALLOW_PUBLIC_BIND=1`: explicitly permits non-loopback binding in local mode.
 
 ## Run backend
 
@@ -145,6 +147,7 @@ python scripts/mucaro.py conversations ask CONVERSATION_ID "How does source line
 python scripts/mucaro.py runs summary --format text
 python scripts/mucaro.py memory remember "Prefer concise technical answers" --kind preference
 python scripts/mucaro.py memory list --format text
+python scripts/mucaro.py security status --host 127.0.0.1 --format text
 python scripts/mucaro.py tools list --format text
 python scripts/mucaro.py tools request source_library.status --reason "readiness check" --format json
 python scripts/mucaro.py ask "How does source lineage work?" --format text
@@ -173,6 +176,7 @@ mucaro conversations ask CONVERSATION_ID "How does source lineage work?" --strat
 mucaro runs summary --format text
 mucaro memory remember "Prefer concise technical answers" --kind preference
 mucaro memory list --format text
+mucaro security status --host 127.0.0.1 --format text
 mucaro tools list --format text
 mucaro tools request source_library.status --reason "readiness check" --format json
 mucaro ask "How does source lineage work?" --format text
@@ -200,7 +204,8 @@ Direct filesystem ingestion outside the project directory is permission-gated. G
 
 Use `mucaro doctor` to check local assistant readiness across source ingestion,
 index health, semantic-store health, directory grants, model-provider setup,
-API auth posture, saved conversations, explicit memory, and answer runs.
+API auth posture, saved conversations, explicit memory, production-security
+posture, and answer runs.
 
 Use `mucaro audit product` to track what is complete versus still open against
 the full ChatGPT/Claude-like local assistant target.
@@ -231,6 +236,12 @@ The API exposes local admin surfaces for source deletion, reindexing, run
 detail, config inspection, workspace profiles, explicit memory, and approved
 tool calls. When `MUCARO_AI_OPERATOR_TOKEN` is set, mutating routes require
 `Authorization: Bearer <token>` or `X-Mucaro-Token: <token>`.
+
+Production security is opt-in and fail-closed. Set
+`MUCARO_AI_DEPLOYMENT_PROFILE=production`, a high-entropy
+`MUCARO_AI_OPERATOR_TOKEN`, and explicit `MUCARO_AI_CORS_ORIGINS` before broader
+network exposure. Local mode blocks non-loopback `mucaro serve --host` values
+unless `MUCARO_AI_ALLOW_PUBLIC_BIND=1` is set.
 
 Live Anthropic mode is explicit:
 

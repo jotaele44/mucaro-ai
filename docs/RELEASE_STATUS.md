@@ -1,6 +1,6 @@
 # Release Status
 
-Current package version: `0.1.20`.
+Current package version: `0.1.21`.
 
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, fresh-clone validation, API upload
@@ -13,11 +13,11 @@ workspace profiles, structured run history, conversation rename/delete/search,
 desktop package self-testing, CLI `--version`, early `ask --top-k`
 validation, CLI source/index management, CLI conversation management, CLI
 run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
-executable product-gap auditing, an opt-in local semantic embedding store, and
-an approval-gated local tool runtime and metadata-only image/audio/video
-ingestion.
-The current candidate adds local memory controls through the API, browser, CLI,
-answer traces, and approved tool inspection.
+executable product-gap auditing, an opt-in local semantic embedding store,
+approval-gated local tool runtime, metadata-only image/audio/video ingestion,
+and explicit local memory.
+The current candidate adds production-security profile checks, fail-closed
+startup validation, and public-bind safeguards.
 
 Observed success markers:
 
@@ -38,10 +38,15 @@ Observed success markers:
   `0 BLOCKED`, and `86.7%` readiness.
 - Local release certification for `v0.1.19-multimodal-metadata` reports
   `CERTIFY_RELEASE_OK`.
-- `102 passed` from pytest for the current `v0.1.20-explicit-memory` candidate
+- `102 passed` from pytest for the certified `v0.1.20-explicit-memory` candidate
 - Product audit after explicit memory controls reports `14 PASS`, `1 OPEN`,
   `0 BLOCKED`, and `93.3%` readiness.
 - Local release certification for `v0.1.20-explicit-memory` reports
+  `CERTIFY_RELEASE_OK`.
+- `109 passed` from pytest for the current `v0.1.21-production-security` candidate
+- Product audit after production-security profile checks reports `15 PASS`,
+  `0 OPEN`, `0 BLOCKED`, and `100.0%` readiness.
+- Local release certification for `v0.1.21-production-security` reports
   `CERTIFY_RELEASE_OK`.
 - Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, BM25, hybrid, persistent, and semantic strategies across the expanded corpus
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
@@ -60,8 +65,10 @@ Observed success markers:
 - `v0.1.18-tool-runtime` is certified for approval-gated tool runtime, product-audit advancement, and fresh-clone launcher certification
 - `v0.1.19-multimodal-metadata` is certified for scoped
   multimodal metadata ingestion and fresh-clone launcher certification
-- `v0.1.20-explicit-memory` is the current candidate target for opt-in local
+- `v0.1.20-explicit-memory` is certified for opt-in local
   memory controls and answer-context wiring
+- `v0.1.21-production-security` is the current candidate target for
+  production-security profile checks and full product-audit closure
 
 Local expected marker after first setup:
 
@@ -76,5 +83,5 @@ Known environment-dependent item:
   semantic hash-embedding store.
 - Model-backed multimodal understanding remains queued; current media support
   is metadata-only and source-lineage oriented.
-- Production security remains queued; current memory support is local,
-  operator-controlled runtime state.
+- Multi-tenant SaaS isolation remains out of scope; current production security
+  covers a single-operator local-first deployment profile.

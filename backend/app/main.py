@@ -51,6 +51,7 @@ from .permissions import (
     load_directory_grants,
     revoke_directory,
 )
+from .security import SecurityProfileError, build_security_report, enforce_startup_security
 from .services import answer_question
 from .tools import (
     ToolRuntimeError,
@@ -107,7 +108,11 @@ async def read_limited_upload(upload: UploadFile, max_bytes: int) -> bytes:
 
 
 def create_app(cfg: Settings = settings) -> FastAPI:
-    app = FastAPI(title="Mucaro AI", version="0.1.20")
+    try:
+        enforce_startup_security(cfg)
+    except SecurityProfileError as exc:
+        raise RuntimeError(f"{exc.status}: {exc.detail}") from exc
+    app = FastAPI(title="Mucaro AI", version="0.1.21")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),
@@ -140,7 +145,12 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             "max_upload_bytes": cfg.max_upload_bytes,
             "cors_origins": list(cfg.cors_origins),
             "auth": auth_status(cfg),
+            "security": build_security_report(cfg),
         }
+
+    @app.get("/security")
+    def security_status() -> dict:
+        return build_security_report(cfg)
 
     @app.post("/plan")
     def plan(req: PlanRequest, _auth: dict = Depends(require_auth)) -> dict:

@@ -24,6 +24,7 @@ backend/app/multimodal.py
 backend/app/parser.py
 backend/app/retrieval.py
 backend/app/schemas.py
+backend/app/security.py
 backend/app/utils.py
 backend/app/validation.py
 backend/pyproject.toml

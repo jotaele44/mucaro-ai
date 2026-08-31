@@ -124,6 +124,18 @@ def test_api_optional_operator_auth_protects_mutations(tmp_path: Path):
     assert bearer_allowed.json()["title"] == "Authorized chat"
 
 
+def test_api_security_status_reports_profile(tmp_path: Path):
+    client = make_client(tmp_path, operator_token="x" * 32)
+
+    response = client.get("/security")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "SECURITY_OK"
+    assert payload["deployment_profile"] == "local"
+    assert payload["checks"]
+
+
 def test_api_tool_runtime_requires_approval_and_audits_execution(tmp_path: Path):
     client = make_client(tmp_path)
 

@@ -184,10 +184,10 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "production_security",
             "operations",
             "Assistant is hardened for broader network exposure.",
-            "OPEN",
-            "Optional local operator token and secret scans exist.",
-            "No production auth, multi-user isolation, or deployment hardening is certified.",
-            "Keep local-first default; add production profile only with explicit threat model.",
+            _status_from_files(cfg, [("backend", "app", "security.py")]),
+            "Production profile enforces operator auth and CORS guardrails; local mode blocks public bind unless explicitly allowed.",
+            "Multi-tenant SaaS isolation is excluded by design for this local-first app.",
+            "Keep production profile fail-closed and extend only with explicit threat-model changes.",
         ),
     ]
 
@@ -208,5 +208,5 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
         "readiness_percent": readiness_percent,
         "counts": counts,
         "requirements": rows,
-        "next_recommended_vector": "production_security",
+        "next_recommended_vector": "complete" if status == "PRODUCT_AUDIT_OK" else "production_security",
     }
