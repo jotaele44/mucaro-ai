@@ -33,6 +33,7 @@ from .models import (
     ToolDecisionRequest,
     WorkspaceProfileRequest,
 )
+from .multimodal import MULTIMODAL_SUFFIXES
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -54,7 +55,7 @@ from .tools import (
 from .validation import validate_project_json
 from .workspaces import list_workspace_profiles, upsert_workspace_profile
 
-SUPPORTED_UPLOAD_SUFFIXES = {".txt", ".md", ".csv", ".json", ".pdf"}
+SUPPORTED_UPLOAD_SUFFIXES = {".txt", ".md", ".csv", ".json", ".pdf"} | MULTIMODAL_SUFFIXES
 GENERATED_NAME_PATTERN = re.compile(r"^(src_|run_|chunk_)", re.IGNORECASE)
 
 
@@ -96,7 +97,7 @@ async def read_limited_upload(upload: UploadFile, max_bytes: int) -> bytes:
 
 
 def create_app(cfg: Settings = settings) -> FastAPI:
-    app = FastAPI(title="Mucaro AI", version="0.1.18")
+    app = FastAPI(title="Mucaro AI", version="0.1.19")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),

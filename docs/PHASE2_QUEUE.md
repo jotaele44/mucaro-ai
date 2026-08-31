@@ -8,7 +8,7 @@
 | Local BM25 retrieval | Opt-in BM25 ranking for stronger local term matching | Complete candidate in V1.14 |
 | Chroma integration | Persistent embedding/vector store for larger corpora | Planned in `docs/RETRIEVAL_UPGRADE_PLAN.md`; queued after larger eval corpus |
 | LlamaIndex ingestion | Richer document ingestion and node parsing | Queued |
-| Unstructured parser expansion | Better PDFs, DOCX, HTML, emails | Queued |
+| Unstructured parser expansion | Better PDFs, DOCX, HTML, emails, and model-backed media understanding beyond metadata | Queued |
 | LiteLLM model router | Provider-agnostic model routing | Queued |
 | GraphRAG entity layer | People/org/place/event graph extraction | Queued |
 | MCP external tools | GitHub, Drive, PostGIS, local tools | Queued |

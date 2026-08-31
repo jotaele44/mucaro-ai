@@ -63,6 +63,12 @@ Global flags:
 - `--version` prints the installed package version for fresh-clone and support
   receipts.
 
+Supported ingest inputs are TXT, MD, CSV, JSON, PDF, PNG, JPEG, GIF, WEBP, WAV,
+MP3, M4A, MP4, MOV, and WEBM. Media files are metadata-only in this release:
+they preserve source lineage, byte counts, dimensions or container facts where
+available, and parser warnings, but do not perform semantic image/audio/video
+understanding.
+
 ## Output Contracts
 
 Use `--format json` when automation needs structured output.

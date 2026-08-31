@@ -1,6 +1,6 @@
 # Release Status
 
-Current package version: `0.1.18`.
+Current package version: `0.1.19`.
 
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, fresh-clone validation, API upload
@@ -15,6 +15,8 @@ validation, CLI source/index management, CLI conversation management, CLI
 run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
 executable product-gap auditing, an opt-in local semantic embedding store, and
 an approval-gated local tool runtime.
+The next candidate adds metadata-only image/audio/video ingestion through the
+parser, API, CLI folder ingestion, source manifests, and local retrieval indexes.
 
 Observed success markers:
 
@@ -30,6 +32,11 @@ Observed success markers:
 - `82 passed` from pytest for the current `v0.1.16-product-audit` candidate
 - `86 passed` from pytest for the current `v0.1.17-semantic-store` candidate
 - Tool runtime candidate adds allowlisted tools, explicit approval, deny-by-default execution, and audit events.
+- `98 passed` from pytest for the current `v0.1.19-multimodal-metadata` candidate
+- Product audit after multimodal metadata ingestion reports `13 PASS`, `2 OPEN`,
+  `0 BLOCKED`, and `86.7%` readiness.
+- Local release certification for `v0.1.19-multimodal-metadata` reports
+  `CERTIFY_RELEASE_OK`.
 - Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, BM25, hybrid, persistent, and semantic strategies across the expanded corpus
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
@@ -44,7 +51,9 @@ Observed success markers:
 - `v0.1.3-local-hardening` is certified on commit `101e457743a7a0e1b830cbd7e066b6b817af9184`
 - `v0.1.4-local-persistent-index` is certified on commit `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`
 - `v0.1.9-all-vectors-certified` is certified on commit `b5deea7170eb1c94b5238e9a923827e6dc913213`
-- `v0.1.18-tool-runtime` is the current candidate target for approval-gated tool runtime, product-audit advancement, and fresh-clone launcher certification
+- `v0.1.18-tool-runtime` is certified for approval-gated tool runtime, product-audit advancement, and fresh-clone launcher certification
+- `v0.1.19-multimodal-metadata` is the current candidate target for scoped
+  multimodal metadata ingestion and fresh-clone launcher certification
 
 Local expected marker after first setup:
 
@@ -57,3 +66,5 @@ Known environment-dependent item:
   the current retrieval layer includes local TF-IDF hybrid retrieval, opt-in
   BM25 retrieval, explicit persistent local TF-IDF, and an opt-in local
   semantic hash-embedding store.
+- Model-backed multimodal understanding remains queued; current media support
+  is metadata-only and source-lineage oriented.

@@ -7,6 +7,7 @@ from typing import Any
 from .chunker import chunk_text
 from .config import Settings, settings
 from .db import delete_chunks_for_source, delete_payload, init_db, upsert_payload
+from .multimodal import MULTIMODAL_SUFFIXES
 from .parser import detect_mime, parse_file
 from .semantic_store import build_semantic_store, get_semantic_store_status
 from .utils import read_json, sha256_file, stable_id, utc_now, write_json
@@ -43,9 +44,9 @@ def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
         "parser": parse_result.get("parser", "unknown"),
         "parser_warnings": parse_result.get("parser_warnings", warnings),
         "parser_metadata": {
-            key: parse_result[key]
-            for key in ["delimiter", "headers", "row_count", "page_count", "parse_status"]
-            if key in parse_result
+            key: value
+            for key, value in parse_result.items()
+            if key not in {"text", "parser", "mime_type", "warnings", "parser_warnings", "bytes"}
         },
         "parse_status": parse_result.get("parse_status", "OK"),
         "ingested_at": utc_now(),
@@ -85,7 +86,7 @@ def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
 def ingest_folder(folder: Path, cfg: Settings = settings) -> dict[str, Any]:
     if not folder.exists() or not folder.is_dir():
         raise FileNotFoundError(f"Input folder not found: {folder}")
-    supported = {".txt", ".md", ".csv", ".json", ".pdf"}
+    supported = {".txt", ".md", ".csv", ".json", ".pdf"} | MULTIMODAL_SUFFIXES
     results = []
     for path in sorted(folder.iterdir()):
         if path.name.startswith("src_"):

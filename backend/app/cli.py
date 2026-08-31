@@ -81,7 +81,7 @@ def package_version() -> str:
     try:
         return importlib.metadata.version("mucaro-ai")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.18-dev"
+        return "0.1.19-dev"
 
 
 def parse_json_object(value: str) -> dict[str, Any]:

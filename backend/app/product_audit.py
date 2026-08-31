@@ -83,8 +83,8 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "local_file_access",
             "Assistant can ingest common local document formats.",
             _status_from_files(cfg, [("backend", "app", "parser.py"), ("backend", "app", "ingestion.py")]),
-            "TXT, MD, CSV, JSON, and PDF parsing paths",
-            "DOCX, HTML, email, image, audio, and video ingestion remain open.",
+            "TXT, MD, CSV, JSON, PDF, and metadata-only image/audio/video parsing paths",
+            "DOCX, HTML, and email ingestion remain open; media content understanding is metadata-only.",
             "Expand parsers without weakening source-lineage manifests.",
         ),
         ProductRequirement(
@@ -166,10 +166,10 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "multimodal_interface",
             "assistant_surface",
             "Assistant can work with images/audio/video and rich multimodal inputs.",
-            "OPEN",
-            "Current ingestion is document/text oriented.",
-            "No multimodal understanding path is implemented.",
-            "Add scoped multimodal ingestion and model-provider support after tool/runtime hardening.",
+            _status_from_files(cfg, [("backend", "app", "multimodal.py")]),
+            "Scoped image/audio/video metadata ingestion through parser, API, CLI, and source-lineage manifests.",
+            "Semantic image, audio, or video understanding still requires a live multimodal model adapter.",
+            "Add model-backed multimodal understanding and richer media previews.",
         ),
         ProductRequirement(
             "personalization_memory",
@@ -208,5 +208,5 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
         "readiness_percent": readiness_percent,
         "counts": counts,
         "requirements": rows,
-        "next_recommended_vector": "multimodal_interface",
+        "next_recommended_vector": "personalization_memory",
     }

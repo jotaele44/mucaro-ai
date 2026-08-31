@@ -71,7 +71,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.18\n"
+    assert output == "mucaro 0.1.19\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -133,13 +133,14 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert by_id["source_lineage_citations"]["status"] == "PASS"
     assert by_id["semantic_vector_store"]["status"] == "PASS"
     assert by_id["tool_use_and_actions"]["status"] == "PASS"
-    assert by_id["multimodal_interface"]["status"] == "OPEN"
-    assert payload["next_recommended_vector"] == "multimodal_interface"
+    assert by_id["multimodal_interface"]["status"] == "PASS"
+    assert by_id["personalization_memory"]["status"] == "OPEN"
+    assert payload["next_recommended_vector"] == "personalization_memory"
 
     assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out
     assert "PRODUCT_AUDIT_OPEN" in strict_output
-    assert "OPEN multimodal_interface" in strict_output
+    assert "OPEN personalization_memory" in strict_output
 
 
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):

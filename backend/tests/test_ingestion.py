@@ -1,7 +1,11 @@
 from pathlib import Path
 
 from backend.app.config import Settings
-from backend.app.ingestion import ingest_file
+from backend.app.ingestion import ingest_file, ingest_folder
+
+
+def minimal_png(width: int = 2, height: int = 3) -> bytes:
+    return b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + width.to_bytes(4, "big") + height.to_bytes(4, "big")
 
 
 def test_ingest_file_tmp(tmp_path: Path):
@@ -26,3 +30,56 @@ def test_ingest_file_tmp(tmp_path: Path):
     assert result["indexed_chunk_count"] >= 1
     assert (cfg.processed_dir / "source_manifest.json").exists()
     assert (cfg.index_dir / "tfidf_index.json").exists()
+
+
+def test_ingest_file_preserves_image_metadata_in_manifest(tmp_path: Path):
+    root = tmp_path / "proj"
+    cfg = Settings(
+        project_root=root,
+        data_dir=root / "data",
+        input_dir=root / "data" / "input",
+        processed_dir=root / "data" / "processed",
+        export_dir=root / "data" / "exports",
+        index_dir=root / "data" / "indexes",
+        sqlite_path=root / "data" / "processed" / "test.sqlite3",
+        default_model_provider="mock",
+        default_model_name="mock",
+    )
+    src = tmp_path / "sample.png"
+    src.write_bytes(minimal_png())
+
+    result = ingest_file(src, cfg)
+
+    assert result["status"] == "INGEST_OK"
+    assert result["source"]["parser"] == "image_metadata_v1"
+    assert result["source"]["parser_metadata"]["media_kind"] == "image"
+    assert result["source"]["parser_metadata"]["width"] == 2
+    assert result["source"]["parser_metadata"]["height"] == 3
+    assert result["source"]["chunk_count"] >= 1
+    assert result["semantic_store_status"] == "SEMANTIC_STORE_OK"
+    assert result["source"]["source_path"].startswith("data/input/")
+
+
+def test_ingest_folder_accepts_media_files(tmp_path: Path):
+    root = tmp_path / "proj"
+    cfg = Settings(
+        project_root=root,
+        data_dir=root / "data",
+        input_dir=root / "data" / "input",
+        processed_dir=root / "data" / "processed",
+        export_dir=root / "data" / "exports",
+        index_dir=root / "data" / "indexes",
+        sqlite_path=root / "data" / "processed" / "test.sqlite3",
+        default_model_provider="mock",
+        default_model_name="mock",
+    )
+    folder = tmp_path / "sources"
+    folder.mkdir()
+    (folder / "note.md").write_text("Source lineage remains text grounded.", encoding="utf-8")
+    (folder / "sample.png").write_bytes(minimal_png())
+
+    result = ingest_folder(folder, cfg)
+
+    assert result["status"] == "INGEST_FOLDER_OK"
+    assert result["files_ingested"] == 2
+    assert {item["source"]["parser"] for item in result["results"]} == {"text_utf8", "image_metadata_v1"}

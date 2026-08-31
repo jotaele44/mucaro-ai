@@ -8,6 +8,10 @@ from backend.app.config import Settings
 from backend.app.main import create_app, sanitize_upload_filename
 
 
+def minimal_png(width: int = 2, height: int = 3) -> bytes:
+    return b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + width.to_bytes(4, "big") + height.to_bytes(4, "big")
+
+
 def make_settings(
     root: Path,
     *,
@@ -199,6 +203,21 @@ def test_api_ingest_rejects_unsupported_extension(tmp_path: Path):
 
     assert response.status_code == 400
     assert response.json()["detail"]["status"] == "ERROR_UNSUPPORTED_FILE_TYPE"
+
+
+def test_api_ingest_accepts_png_metadata_upload(tmp_path: Path):
+    client = make_client(tmp_path)
+
+    response = client.post("/ingest", files={"upload": ("sample.png", minimal_png(), "image/png")})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "INGEST_OK"
+    assert payload["source"]["parser"] == "image_metadata_v1"
+    assert payload["source"]["mime_type"] == "image/png"
+    assert payload["source"]["parser_metadata"]["media_kind"] == "image"
+    assert payload["source"]["parser_metadata"]["width"] == 2
+    assert payload["source"]["parser_metadata"]["height"] == 3
 
 
 def test_api_ingest_rejects_oversized_upload(tmp_path: Path):

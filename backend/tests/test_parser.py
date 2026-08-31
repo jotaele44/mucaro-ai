@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import wave
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,10 @@ def make_settings(root: Path) -> Settings:
         default_model_provider="mock",
         default_model_name="mock",
     )
+
+
+def minimal_png(width: int = 2, height: int = 3) -> bytes:
+    return b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + width.to_bytes(4, "big") + height.to_bytes(4, "big")
 
 
 def test_csv_parser_records_delimiter_row_count_and_duplicate_headers(tmp_path: Path):
@@ -91,3 +96,51 @@ def test_pdf_parser_unavailable_reports_warning(tmp_path: Path, monkeypatch):
     assert result["parse_status"] == "PARTIAL"
     assert result["parser"] == "pdf_unavailable"
     assert "PDF_PARSER_UNAVAILABLE_INSTALL_PYPDF" in result["warnings"]
+
+
+def test_png_parser_records_metadata_text_and_dimensions(tmp_path: Path):
+    path = tmp_path / "sample.png"
+    path.write_bytes(minimal_png(width=2, height=3))
+
+    result = parse_file(path)
+
+    assert result["parser"] == "image_metadata_v1"
+    assert result["media_kind"] == "image"
+    assert result["mime_type"] == "image/png"
+    assert result["width"] == 2
+    assert result["height"] == 3
+    assert result["parse_status"] == "OK"
+    assert "Multimodal source: sample.png" in result["text"]
+
+
+def test_wav_parser_records_metadata_duration_and_channels(tmp_path: Path):
+    path = tmp_path / "sample.wav"
+    with wave.open(str(path), "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(8000)
+        audio.writeframes(b"\x00\x00" * 800)
+
+    result = parse_file(path)
+
+    assert result["parser"] == "audio_metadata_v1"
+    assert result["media_kind"] == "audio"
+    assert result["mime_type"] == "audio/wav"
+    assert result["duration_seconds"] == 0.1
+    assert result["sample_rate"] == 8000
+    assert result["channels"] == 1
+    assert result["parse_status"] == "OK"
+
+
+def test_mp4_parser_records_container_and_duration_warning(tmp_path: Path):
+    path = tmp_path / "sample.mp4"
+    path.write_bytes(b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isomiso2")
+
+    result = parse_file(path)
+
+    assert result["parser"] == "video_metadata_v1"
+    assert result["media_kind"] == "video"
+    assert result["mime_type"] == "video/mp4"
+    assert result["container"] == "iso_base_media"
+    assert "VIDEO_DURATION_UNAVAILABLE" in result["warnings"]
+    assert result["parse_status"] == "PARTIAL"

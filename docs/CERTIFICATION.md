@@ -62,11 +62,13 @@ Date: 2026-08-25
 
 Candidate target:
 
-- Candidate tag: `v0.1.18-tool-runtime`
-- Candidate package version: `0.1.18`
+- Candidate tag: `v0.1.19-multimodal-metadata`
+- Candidate package version: `0.1.19`
 - Baseline preserved: `v0.1.4-local-persistent-index` at `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`; interim combined tag `v0.1.9-all-vectors-certified` at `b5deea7170eb1c94b5238e9a923827e6dc913213`
-- Scope: source library delete/reindex controls, retrieval strategy UI, no-context recovery guidance, expanded retrieval eval corpus, optional local operator token boundary, workspace profiles, structured run history, conversation follow-up context, conversation rename/delete/search, directory access UI, desktop package self-test, CLI `--version`, early `ask --top-k` validation, CLI source listing, CLI source deletion, CLI reindexing, CLI index status, CLI conversation create/list/show/rename/delete/ask, CLI run list/summary/show, opt-in `bm25_v1` retrieval, CLI readiness diagnostics, executable product-gap auditing, opt-in `local_semantic_hash_store_v1` retrieval, and approval-gated local tool runtime.
-- Candidate local evidence: `92 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=10`, `DESKTOP_PACKAGE_READY`, `npm audit` 0 vulnerabilities, frontend build passed, and `CERTIFY_RELEASE_OK`.
+- Scope: source library delete/reindex controls, retrieval strategy UI, no-context recovery guidance, expanded retrieval eval corpus, optional local operator token boundary, workspace profiles, structured run history, conversation follow-up context, conversation rename/delete/search, directory access UI, desktop package self-test, CLI `--version`, early `ask --top-k` validation, CLI source listing, CLI source deletion, CLI reindexing, CLI index status, CLI conversation create/list/show/rename/delete/ask, CLI run list/summary/show, opt-in `bm25_v1` retrieval, CLI readiness diagnostics, executable product-gap auditing, opt-in `local_semantic_hash_store_v1` retrieval, approval-gated local tool runtime, and metadata-only image/audio/video ingestion.
+- Candidate local evidence: `98 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=10`,
+  `DESKTOP_PACKAGE_READY`, `npm audit` 0 vulnerabilities, frontend build passed,
+  clean `worktree_clean`, and `CERTIFY_RELEASE_OK`.
 - Required external receipt: hosted CI and fresh-clone certification must pass on the final pushed commit before tagging.
 
 ## Scope
@@ -86,6 +88,10 @@ Included:
 - Tool surface: `source_library.status`, `product.audit`, and
   `workspace_profiles.list` behind pending-request, explicit-approval,
   deny-by-default execution, and local audit events.
+- Multimodal metadata surface: PNG, JPEG, GIF, WEBP, WAV, MP3, M4A, MP4, MOV,
+  and WEBM ingestion through parser, API upload, CLI folder ingestion, source
+  manifests, and local indexes. This is metadata-only and excludes semantic
+  image/audio/video understanding.
 - Desktop launcher smoke path, editable install path, local release gates, hosted
   CI, and fresh-clone certification.
 

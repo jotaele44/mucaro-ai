@@ -113,7 +113,12 @@ npm run dev
 python scripts/ingest_folder.py data/input
 ```
 
-Supported v1 types: TXT, MD, CSV, JSON, PDF with pypdf installed. PDF parsing is marked partial if the parser is unavailable or text extraction fails.
+Supported v1 types: TXT, MD, CSV, JSON, PDF with pypdf installed, plus
+metadata-only media ingestion for PNG, JPEG, GIF, WEBP, WAV, MP3, M4A, MP4,
+MOV, and WEBM. PDF parsing is marked partial if the parser is unavailable or
+text extraction fails. Media parsing records local file metadata for lineage and
+retrieval, but does not claim semantic image, audio, or video understanding
+until a multimodal model adapter is added.
 
 ## Ask a question
 

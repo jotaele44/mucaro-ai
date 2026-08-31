@@ -232,7 +232,7 @@ function App() {
         <section className="panel">
           <h2>File Intake</h2>
           <input type="file" onChange={upload} />
-          {sources.length === 0 && <p className="hint">No sources ingested yet. Add a TXT, MD, CSV, JSON, or PDF file before asking source-grounded questions.</p>}
+          {sources.length === 0 && <p className="hint">No sources ingested yet. Add a document or media file before asking source-grounded questions.</p>}
         </section>
         <DirectoryIntake onIngested={refresh} />
         <section className="panel">

@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .multimodal import MULTIMODAL_SUFFIXES, parse_multimodal_metadata
+
 
 class ParseError(RuntimeError):
     pass
@@ -18,6 +20,17 @@ def detect_mime(path: Path) -> str:
         ".csv": "text/csv",
         ".json": "application/json",
         ".pdf": "application/pdf",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".wav": "audio/wav",
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".mp4": "video/mp4",
+        ".mov": "video/quicktime",
+        ".webm": "video/webm",
     }.get(suffix, "application/octet-stream")
 
 
@@ -48,6 +61,8 @@ def parse_file(path: Path) -> dict[str, Any]:
             return _parse_json(path)
         if suffix == ".pdf":
             return _parse_pdf(path)
+        if suffix in MULTIMODAL_SUFFIXES:
+            return parse_multimodal_metadata(path, mime_type=mime)
         raw = path.read_text(encoding="utf-8", errors="replace")
         return {
             "text": raw,

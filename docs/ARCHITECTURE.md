@@ -34,6 +34,9 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 - Source library controls: operators can reindex all chunks, inspect persisted index status, and delete managed sources while rebuilding the index from both the API/browser surface and the installed CLI.
 - Run history: `/runs`, `/runs/summary`, and `/runs/{run_id}` provide scan-friendly history plus full trace retrieval.
 - Parser evidence: source manifests include byte counts, parser warnings, parse status, and format metadata such as CSV delimiter/header/row counts.
+- Multimodal metadata boundary: image/audio/video ingestion records local media
+  metadata and warnings as cited source chunks; semantic media understanding is
+  deferred to a future model-backed adapter.
 
 ## Operator layer
 
@@ -48,8 +51,9 @@ and the local tool runtime.
 
 The CLI `audit product` command provides a broader completion matrix for the
 ChatGPT/Claude-like local assistant objective. It intentionally reports OPEN
-while multimodal support, personalized memory, or production hardening remain
-incomplete.
+while personalized memory or production hardening remain incomplete. The
+multimodal requirement is scoped to metadata ingestion in this release; rich
+image, audio, and video understanding remains a model-layer upgrade.
 
 ## Tool layer
 
