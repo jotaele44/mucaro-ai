@@ -30,6 +30,14 @@ from .ingestion import (
     ingest_folder,
     reindex_sources,
 )
+from .memory import (
+    MemoryError,
+    delete_memory_item,
+    export_memory,
+    list_memory_items,
+    remember_memory_item,
+    set_memory_enabled,
+)
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -81,7 +89,7 @@ def package_version() -> str:
     try:
         return importlib.metadata.version("mucaro-ai")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.19-dev"
+        return "0.1.20-dev"
 
 
 def parse_json_object(value: str) -> dict[str, Any]:
@@ -256,6 +264,44 @@ def build_parser() -> argparse.ArgumentParser:
     tools_audit.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tools_audit.set_defaults(handler=run_tools_audit)
 
+    memory = subcommands.add_parser("memory", help="Manage explicit local assistant memory.")
+    memory_subcommands = memory.add_subparsers(dest="memory_command", required=True)
+
+    memory_list = memory_subcommands.add_parser("list", help="List saved memory items.")
+    memory_list.add_argument("--active-only", action="store_true", help="Only show enabled memory items.")
+    memory_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    memory_list.set_defaults(handler=run_memory_list)
+
+    memory_remember = memory_subcommands.add_parser("remember", help="Save an explicit memory item.")
+    memory_remember.add_argument("content", nargs="+", help="Memory content to save.")
+    memory_remember.add_argument(
+        "--kind",
+        choices=["preference", "profile", "instruction", "fact"],
+        default="preference",
+        help="Memory item type.",
+    )
+    memory_remember.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    memory_remember.set_defaults(handler=run_memory_remember)
+
+    memory_enable = memory_subcommands.add_parser("enable", help="Enable one memory item.")
+    memory_enable.add_argument("memory_id", help="Memory identifier.")
+    memory_enable.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    memory_enable.set_defaults(handler=run_memory_enable)
+
+    memory_disable = memory_subcommands.add_parser("disable", help="Disable one memory item without deleting it.")
+    memory_disable.add_argument("memory_id", help="Memory identifier.")
+    memory_disable.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    memory_disable.set_defaults(handler=run_memory_disable)
+
+    memory_delete = memory_subcommands.add_parser("delete", help="Delete one memory item.")
+    memory_delete.add_argument("memory_id", help="Memory identifier.")
+    memory_delete.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    memory_delete.set_defaults(handler=run_memory_delete)
+
+    memory_export = memory_subcommands.add_parser("export", help="Export all saved memory items.")
+    memory_export.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    memory_export.set_defaults(handler=run_memory_export)
+
     index = subcommands.add_parser("index", help="Inspect retrieval index health.")
     index_subcommands = index.add_subparsers(dest="index_command", required=True)
 
@@ -323,6 +369,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"grants={summary.get('directory_grant_count', 0)}")
             print(f"conversations={summary.get('conversation_count', 0)}")
             print(f"runs={summary.get('run_count', 0)}")
+            print(f"memories={summary.get('memory_count', 0)}")
+            print(f"enabled_memories={summary.get('enabled_memory_count', 0)}")
         for check in payload.get("checks", []):
             print(f"{check.get('status')} {check.get('name')} {check.get('detail')}")
         for recommendation in payload.get("recommendations", []):
@@ -401,6 +449,22 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"events={len(payload.get('events', []))}")
         for event in payload.get("events", []):
             print(f"{event.get('event_id')} {event.get('event')} {event.get('status')}")
+    elif "memories" in payload:
+        print(f"memories={len(payload.get('memories', []))}")
+        print(f"enabled={payload.get('enabled_count', 0)}")
+        for item in payload.get("memories", []):
+            state = "enabled" if item.get("enabled") else "disabled"
+            print(f"{item.get('memory_id')} {state} {item.get('kind')} {item.get('content')}")
+    elif "memory" in payload:
+        item = payload.get("memory", {})
+        if isinstance(item, dict):
+            state = "enabled" if item.get("enabled") else "disabled"
+            print(f"memory_id={item.get('memory_id')}")
+            print(f"memory_status={state}")
+            print(f"kind={item.get('kind')}")
+    elif payload.get("status") in {"MEMORY_DELETE_OK", "ERROR_MEMORY_NOT_FOUND"}:
+        print(f"memory_id={payload.get('memory_id')}")
+        print(f"removed={payload.get('removed', 0)}")
     elif payload.get("status") == "RUN_HISTORY_OK":
         print(f"run_count={payload.get('run_count', 0)}")
         print(f"citation_ok={payload.get('citation_ok', 0)}")
@@ -616,7 +680,15 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
 
     conversation_count = _safe_payload_count("conversations", cfg)
     run_count = _safe_payload_count("runs", cfg)
+    memory_payload = list_memory_items(cfg)
     checks.append(_doctor_check("assistant_history", "PASS", f"conversations={conversation_count} runs={run_count}"))
+    checks.append(
+        _doctor_check(
+            "assistant_memory",
+            "PASS",
+            f"memories={memory_payload.get('memory_count', 0)} enabled={memory_payload.get('enabled_count', 0)}",
+        )
+    )
     tools = list_tools().get("tools", [])
     checks.append(_doctor_check("tool_runtime", "PASS" if tools else "WARN", f"allowed_tools={len(tools)}"))
 
@@ -635,6 +707,8 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
             "directory_grant_count": len(grants),
             "conversation_count": conversation_count,
             "run_count": run_count,
+            "memory_count": memory_payload.get("memory_count", 0),
+            "enabled_memory_count": memory_payload.get("enabled_count", 0),
             "tool_count": len(tools),
             "model_provider": cfg.default_model_provider,
             "live_mode": live_mode,
@@ -833,6 +907,44 @@ def run_tools_run(args: argparse.Namespace, cfg: Settings) -> int:
 
 def run_tools_audit(args: argparse.Namespace, cfg: Settings) -> int:
     emit_payload(list_tool_audit_events(cfg), args.format)
+    return 0
+
+
+def run_memory_list(args: argparse.Namespace, cfg: Settings) -> int:
+    emit_payload(list_memory_items(cfg, include_disabled=not args.active_only), args.format)
+    return 0
+
+
+def run_memory_remember(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = remember_memory_item(" ".join(args.content), cfg, kind=args.kind, source="cli")
+    except MemoryError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_memory_enable(args: argparse.Namespace, cfg: Settings) -> int:
+    result = set_memory_enabled(args.memory_id, True, cfg)
+    emit_payload(result, args.format)
+    return 0 if result.get("status") == "MEMORY_UPDATED" else 2
+
+
+def run_memory_disable(args: argparse.Namespace, cfg: Settings) -> int:
+    result = set_memory_enabled(args.memory_id, False, cfg)
+    emit_payload(result, args.format)
+    return 0 if result.get("status") == "MEMORY_UPDATED" else 2
+
+
+def run_memory_delete(args: argparse.Namespace, cfg: Settings) -> int:
+    result = delete_memory_item(args.memory_id, cfg)
+    emit_payload(result, args.format)
+    return 0 if result.get("status") == "MEMORY_DELETE_OK" else 2
+
+
+def run_memory_export(args: argparse.Namespace, cfg: Settings) -> int:
+    emit_payload(export_memory(cfg), args.format)
     return 0
 
 

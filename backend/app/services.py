@@ -7,6 +7,7 @@ from .config import Settings, settings
 from .db import init_db, upsert_payload
 from .exports import export_answer_trace
 from .ingestion import get_chunks
+from .memory import active_memory_context
 from .model_router import ModelProviderError, generate_answer
 from .retrieval import retrieve
 from .utils import stable_id, utc_now
@@ -25,6 +26,7 @@ def answer_question(
     model_name: str | None = None,
     allow_mock_fallback: bool = False,
     conversation_context: list[dict[str, Any]] | None = None,
+    memory_context: list[dict[str, Any]] | None = None,
     cfg: Settings = settings,
     persist: bool = True,
 ) -> dict[str, Any]:
@@ -44,6 +46,7 @@ def answer_question(
     if retrieval["status"].startswith("ERROR_"):
         return retrieval
     retrieved = retrieval["retrieved_chunks"]
+    selected_memory_context = memory_context if memory_context is not None else active_memory_context(cfg)
     try:
         model = generate_answer(
             normalized_query,
@@ -52,6 +55,7 @@ def answer_question(
             model_name=model_name,
             allow_mock_fallback=allow_mock_fallback,
             conversation_context=conversation_context or [],
+            memory_context=selected_memory_context,
         )
     except ModelProviderError as exc:
         return {
@@ -70,6 +74,12 @@ def answer_question(
         "model_name": model["model_name"],
         "prompt_template_id": "default_cited_rag_with_history_v1" if conversation_context else "default_cited_rag_v1",
         "conversation_context_turn_count": len(conversation_context or []),
+        "memory_context_count": len(selected_memory_context),
+        "memory_ids": [
+            str(item.get("memory_id"))
+            for item in selected_memory_context
+            if item.get("memory_id")
+        ],
         "retrieval_strategy": retrieved[0].get("retrieval_strategy", "unknown") if retrieved else "none",
         "retrieved_chunk_ids": retrieved_ids,
         "cited_chunk_ids": cited_ids,

@@ -28,12 +28,22 @@ from .models import (
     ConversationUpdateRequest,
     DirectoryPermissionRequest,
     IngestPathRequest,
+    MemoryCreateRequest,
+    MemoryUpdateRequest,
     PlanRequest,
     ToolCallRequest,
     ToolDecisionRequest,
     WorkspaceProfileRequest,
 )
 from .multimodal import MULTIMODAL_SUFFIXES
+from .memory import (
+    MemoryError,
+    delete_memory_item,
+    export_memory,
+    list_memory_items,
+    remember_memory_item,
+    set_memory_enabled,
+)
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -97,7 +107,7 @@ async def read_limited_upload(upload: UploadFile, max_bytes: int) -> bytes:
 
 
 def create_app(cfg: Settings = settings) -> FastAPI:
-    app = FastAPI(title="Mucaro AI", version="0.1.19")
+    app = FastAPI(title="Mucaro AI", version="0.1.20")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),
@@ -315,6 +325,35 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             if run.get("run_id") == run_id:
                 return run
         raise api_error("ERROR_RUN_NOT_FOUND", "Run not found.", status_code=404, run_id=run_id)
+
+    @app.get("/memory")
+    def memory() -> dict:
+        return list_memory_items(cfg)
+
+    @app.post("/memory")
+    def remember(req: MemoryCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return remember_memory_item(req.content, cfg, kind=req.kind, source="api")
+        except MemoryError as exc:
+            raise api_error(exc.status, exc.detail, status_code=400) from exc
+
+    @app.patch("/memory/{memory_id}")
+    def update_memory(memory_id: str, req: MemoryUpdateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        result = set_memory_enabled(memory_id, req.enabled, cfg)
+        if result["status"] == "ERROR_MEMORY_NOT_FOUND":
+            raise api_error("ERROR_MEMORY_NOT_FOUND", "Memory item not found.", status_code=404, memory_id=memory_id)
+        return result
+
+    @app.delete("/memory/{memory_id}")
+    def delete_memory(memory_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        result = delete_memory_item(memory_id, cfg)
+        if result["status"] == "ERROR_MEMORY_NOT_FOUND":
+            raise api_error("ERROR_MEMORY_NOT_FOUND", "Memory item not found.", status_code=404, memory_id=memory_id)
+        return result
+
+    @app.get("/memory/export")
+    def memory_export() -> dict:
+        return export_memory(cfg)
 
     @app.get("/tools")
     def tools() -> dict:

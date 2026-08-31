@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from .config import Settings, settings
 from .ingestion import get_chunks, get_index_status, get_sources
+from .memory import list_memory_items
 from .product_audit import build_product_audit
 from .utils import read_json, stable_id, utc_now, write_json
 from .workspaces import list_workspace_profiles
@@ -60,6 +61,11 @@ def _workspace_profiles(arguments: dict[str, Any], cfg: Settings) -> dict[str, A
     return {"status": "WORKSPACE_PROFILES_OK", "workspaces": list_workspace_profiles(cfg)}
 
 
+def _memory_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    include_disabled = bool(arguments.get("include_disabled", True))
+    return list_memory_items(cfg, include_disabled=include_disabled)
+
+
 TOOL_REGISTRY: dict[str, ToolDefinition] = {
     "source_library.status": ToolDefinition(
         name="source_library.status",
@@ -81,6 +87,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_workspace_profiles,
+    ),
+    "memory.list": ToolDefinition(
+        name="memory.list",
+        description="List explicit local memory items.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_memory_list,
     ),
 }
 

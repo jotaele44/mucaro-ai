@@ -19,6 +19,7 @@ def generate_answer(
     model_name: str | None = None,
     allow_mock_fallback: bool = False,
     conversation_context: list[dict[str, Any]] | None = None,
+    memory_context: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     provider = model_provider or "mock"
     if provider == "mock":
@@ -27,6 +28,7 @@ def generate_answer(
             retrieved_chunks,
             model_name=model_name or "mock-cited-synthesizer-v1",
             conversation_context=conversation_context or [],
+            memory_context=memory_context or [],
         )
     if provider != "anthropic":
         raise ModelProviderError("ERROR_UNSUPPORTED_MODEL_PROVIDER", provider)
@@ -38,6 +40,7 @@ def generate_answer(
             status="ERROR_LIVE_MODE_DISABLED",
             detail="Set MUCARO_AI_LIVE_MODE=1 to permit live Anthropic calls.",
             conversation_context=conversation_context or [],
+            memory_context=memory_context or [],
         )
     if not os.getenv("ANTHROPIC_API_KEY"):
         return _fallback_or_error(
@@ -47,6 +50,7 @@ def generate_answer(
             status="ERROR_MODEL_API_KEY_MISSING",
             detail="Set ANTHROPIC_API_KEY before using model_provider=anthropic.",
             conversation_context=conversation_context or [],
+            memory_context=memory_context or [],
         )
     return _anthropic_answer(
         query,
@@ -54,6 +58,7 @@ def generate_answer(
         model_name=model_name,
         allow_mock_fallback=allow_mock_fallback,
         conversation_context=conversation_context or [],
+        memory_context=memory_context or [],
     )
 
 
@@ -65,6 +70,7 @@ def _fallback_or_error(
     status: str,
     detail: str,
     conversation_context: list[dict[str, Any]],
+    memory_context: list[dict[str, Any]],
 ) -> dict[str, Any]:
     if allow_mock_fallback:
         answer = _mock_answer(
@@ -72,6 +78,7 @@ def _fallback_or_error(
             retrieved_chunks,
             model_name=f"mock-fallback-{status.lower()}",
             conversation_context=conversation_context,
+            memory_context=memory_context,
         )
         answer["provider_warning"] = status
         return answer
@@ -88,12 +95,23 @@ def _format_conversation_context(conversation_context: list[dict[str, Any]]) -> 
     return lines
 
 
+def _format_memory_context(memory_context: list[dict[str, Any]]) -> list[str]:
+    lines = []
+    for item in memory_context:
+        kind = str(item.get("kind", "memory"))
+        content = " ".join(str(item.get("content", "")).split())[:320]
+        if content:
+            lines.append(f"- {kind}: {content}")
+    return lines
+
+
 def _mock_answer(
     query: str,
     retrieved_chunks: list[dict[str, Any]],
     *,
     model_name: str,
     conversation_context: list[dict[str, Any]],
+    memory_context: list[dict[str, Any]],
 ) -> dict[str, Any]:
     if not retrieved_chunks:
         return {
@@ -108,11 +126,14 @@ def _mock_answer(
         snippet = " ".join(str(chunk.get("text", "")).split())[:240]
         source_lines.append(f"[{idx}] {snippet} (chunk_id={chunk['chunk_id']})")
     context_lines = _format_conversation_context(conversation_context)
+    memory_lines = _format_memory_context(memory_context)
     answer = "\n".join(
         [
             f"Mock cited answer for query: {query}",
             f"Conversation context turns used: {len(context_lines)}",
+            f"Memory items used: {len(memory_lines)}",
             *(["Conversation context:", *context_lines] if context_lines else []),
+            *(["Memory context:", *memory_lines] if memory_lines else []),
             "Evidence summary:",
             *source_lines,
             "Validation note: mock mode uses retrieved text directly and requires cited chunk IDs.",
@@ -133,6 +154,7 @@ def _anthropic_answer(
     model_name: str | None = None,
     allow_mock_fallback: bool,
     conversation_context: list[dict[str, Any]],
+    memory_context: list[dict[str, Any]],
 ) -> dict[str, Any]:
     try:
         from anthropic import Anthropic  # type: ignore
@@ -144,6 +166,7 @@ def _anthropic_answer(
             status="ERROR_MODEL_SDK_MISSING",
             detail='Install the optional dependency group with: python -m pip install -e ".[anthropic]"',
             conversation_context=conversation_context,
+            memory_context=memory_context,
         )
     client = Anthropic()
     context = "\n\n".join(
@@ -152,8 +175,10 @@ def _anthropic_answer(
     prompt = (
         "Answer using only the provided context. Cite chunk IDs explicitly. "
         "Use conversation history only to interpret the user's follow-up, not as source evidence. "
+        "Use memory only for user preferences or durable profile context, not as source evidence. "
         "If context is insufficient, say so.\n\n"
         f"Conversation history:\n{chr(10).join(_format_conversation_context(conversation_context)) or 'none'}\n\n"
+        f"Memory:\n{chr(10).join(_format_memory_context(memory_context)) or 'none'}\n\n"
         f"Question: {query}\n\nContext:\n{context}"
     )
     response = client.messages.create(

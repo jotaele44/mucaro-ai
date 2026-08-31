@@ -47,6 +47,12 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro runs list` | List persisted answer traces | 0 | 2 |
 | `mucaro runs summary` | Summarize persisted answer traces | 0 | 2 |
 | `mucaro runs show RUN_ID` | Show one persisted answer trace | 0 | 2 |
+| `mucaro memory list` | List explicit local memory items | 0 | 2 |
+| `mucaro memory remember CONTENT` | Save an explicit memory item | 0 | 2 |
+| `mucaro memory enable MEMORY_ID` | Re-enable one memory item | 0 | 2 |
+| `mucaro memory disable MEMORY_ID` | Disable one memory item without deleting it | 0 | 2 |
+| `mucaro memory delete MEMORY_ID` | Delete one memory item | 0 | 2 |
+| `mucaro memory export` | Export all explicit memory items | 0 | 2 |
 | `mucaro tools list` | List locally allowlisted tools | 0 | 2 |
 | `mucaro tools request TOOL_NAME` | Create a pending tool-call request | 0 | 2 |
 | `mucaro tools approve TOOL_CALL_ID` | Approve a pending tool call | 0 | 2 |
@@ -117,6 +123,10 @@ retrieval payloads where practical:
 | `ERROR_SOURCE_NOT_FOUND` | `sources delete` was given an unknown source ID |
 | `ERROR_CONVERSATION_NOT_FOUND` | a conversation command was given an unknown conversation ID |
 | `ERROR_RUN_NOT_FOUND` | `runs show` was given an unknown run ID |
+| `ERROR_MEMORY_NOT_FOUND` | a memory command was given an unknown memory ID |
+| `ERROR_MEMORY_KIND_UNSUPPORTED` | memory kind is not one of the supported types |
+| `ERROR_MEMORY_CONTENT_REQUIRED` | memory content was empty after normalization |
+| `ERROR_MEMORY_CONTENT_TOO_LONG` | memory content exceeded the local limit |
 | `ERROR_TOOL_NOT_ALLOWED` | requested tool is not in the local allowlist |
 | `ERROR_TOOL_APPROVAL_REQUIRED` | tool execution was attempted before approval |
 | `ERROR_TOOL_CALL_NOT_FOUND` | tool command was given an unknown tool call ID |
@@ -149,6 +159,10 @@ mucaro conversations list --format text
 mucaro conversations ask CONVERSATION_ID "How does source lineage work?" --strategy persistent --format json
 mucaro runs summary --format text
 mucaro runs show RUN_ID --format json
+mucaro memory remember "Prefer concise technical answers" --kind preference --format json
+mucaro memory list --format text
+mucaro memory disable MEMORY_ID --format json
+mucaro memory export --format json
 mucaro tools list --format text
 mucaro tools request source_library.status --reason "readiness check" --format json
 mucaro tools approve TOOL_CALL_ID --format json
@@ -210,6 +224,23 @@ turn context. Conversation deletion only removes the chat session; persisted
 answer traces remain inspectable through `mucaro runs list`, `mucaro runs
 summary`, and `mucaro runs show RUN_ID`.
 
+## Explicit Memory
+
+Use `mucaro memory remember CONTENT` to save a user-approved preference, profile
+detail, instruction, or fact. Memory is never inferred from conversations in
+this release. Enabled memory is passed to the model as preference/profile
+context and recorded in answer traces by `memory_id`; it is not treated as cited
+source evidence.
+
+```bash
+mucaro memory remember "Prefer concise technical answers" --kind preference
+mucaro memory list --active-only --format text
+mucaro memory disable MEMORY_ID
+mucaro memory enable MEMORY_ID
+mucaro memory export --format json
+mucaro memory delete MEMORY_ID
+```
+
 ## Tool Runtime
 
 `mucaro tools ...` is the local approval-gated tool surface. The runtime is
@@ -222,6 +253,7 @@ Initial allowlisted tools are read-only:
 - `source_library.status`
 - `product.audit`
 - `workspace_profiles.list`
+- `memory.list`
 
 Tool call state is stored under `data/processed/tool_calls.json`. Audit events
 are stored under `data/processed/tool_audit_log.json`. These files are local

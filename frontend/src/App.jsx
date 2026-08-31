@@ -12,6 +12,7 @@ function App() {
   const [chunks, setChunks] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [runSummary, setRunSummary] = useState(null);
+  const [memory, setMemory] = useState([]);
   const [config, setConfig] = useState(null);
   const [workspaces, setWorkspaces] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
@@ -21,6 +22,8 @@ function App() {
   const [operatorToken, setOperatorToken] = useState(api.getOperatorToken());
   const [chatFilter, setChatFilter] = useState("");
   const [renameTitle, setRenameTitle] = useState("");
+  const [memoryContent, setMemoryContent] = useState("");
+  const [memoryKind, setMemoryKind] = useState("preference");
   const [query, setQuery] = useState("How does source lineage work?");
   const [status, setStatus] = useState("Idle");
   const [error, setError] = useState(null);
@@ -36,6 +39,8 @@ function App() {
     const conversationPayload = await api.conversations();
     setConversations(conversationPayload.conversations || []);
     setRunSummary(await api.runSummary());
+    const memoryPayload = await api.memory();
+    setMemory(memoryPayload.memories || []);
     const workspacePayload = await api.workspaces();
     setWorkspaces(workspacePayload.workspaces || []);
   }
@@ -128,6 +133,47 @@ function App() {
     await refresh();
   }
 
+  async function rememberPreference() {
+    if (!memoryContent.trim()) return;
+    setStatus("Saving memory...");
+    setError(null);
+    try {
+      const result = await api.remember({ kind: memoryKind, content: memoryContent });
+      setMemoryContent("");
+      setStatus(result.status || "MEMORY_SAVED");
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+      setStatus("MEMORY_ERROR");
+    }
+  }
+
+  async function toggleMemory(item) {
+    setStatus("Updating memory...");
+    setError(null);
+    try {
+      const result = await api.updateMemory(item.memory_id, { enabled: !item.enabled });
+      setStatus(result.status || "MEMORY_UPDATED");
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+      setStatus("MEMORY_ERROR");
+    }
+  }
+
+  async function deleteMemory(item) {
+    setStatus("Deleting memory...");
+    setError(null);
+    try {
+      const result = await api.deleteMemory(item.memory_id);
+      setStatus(result.status || "MEMORY_DELETE_OK");
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+      setStatus("MEMORY_ERROR");
+    }
+  }
+
   async function newChat() {
     setStatus("Creating chat...");
     setError(null);
@@ -213,6 +259,7 @@ function App() {
           <a>Planning Gate</a>
           <a>File Intake</a>
           <a>Directory Access</a>
+          <a>Memory</a>
           <a>Chat Sessions</a>
           <a>Source Manifest</a>
           <a>RAG Chat</a>
@@ -235,6 +282,42 @@ function App() {
           {sources.length === 0 && <p className="hint">No sources ingested yet. Add a document or media file before asking source-grounded questions.</p>}
         </section>
         <DirectoryIntake onIngested={refresh} />
+        <section className="panel">
+          <div className="panel-header">
+            <h2>Memory</h2>
+            <a className="export-link" href={`${api.baseUrl}/memory/export`}>Export JSON</a>
+          </div>
+          <div className="memory-form">
+            <select value={memoryKind} onChange={(event) => setMemoryKind(event.target.value)}>
+              <option value="preference">preference</option>
+              <option value="profile">profile</option>
+              <option value="instruction">instruction</option>
+              <option value="fact">fact</option>
+            </select>
+            <input
+              value={memoryContent}
+              onChange={(event) => setMemoryContent(event.target.value)}
+              placeholder="Save an explicit preference or profile fact"
+            />
+            <button onClick={rememberPreference} disabled={!memoryContent.trim()}>Remember</button>
+          </div>
+          {memory.length === 0 && <p className="hint">No saved memory items.</p>}
+          <div className="memory-list">
+            {memory.map((item) => (
+              <article className={item.enabled ? "memory-item" : "memory-item disabled"} key={item.memory_id}>
+                <div>
+                  <strong>{item.kind}</strong>
+                  <p>{item.content}</p>
+                  <small>{item.memory_id}</small>
+                </div>
+                <div className="button-row">
+                  <button className="secondary" onClick={() => toggleMemory(item)}>{item.enabled ? "Disable" : "Enable"}</button>
+                  <button className="secondary" onClick={() => deleteMemory(item)}>Delete</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
         <section className="panel">
           <div className="panel-header">
             <h2>Workspace Profile</h2>

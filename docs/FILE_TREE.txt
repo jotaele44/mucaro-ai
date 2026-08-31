@@ -17,6 +17,7 @@ backend/app/execution_gate.py
 backend/app/exports.py
 backend/app/ingestion.py
 backend/app/main.py
+backend/app/memory.py
 backend/app/model_router.py
 backend/app/models.py
 backend/app/multimodal.py

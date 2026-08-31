@@ -24,6 +24,14 @@ button.secondary { background: #e5e7eb; color: #17202a; }
 .token-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-top: 14px; }
 .token-row label { display: grid; gap: 6px; font-weight: 700; color: #374151; }
 .token-row input { box-sizing: border-box; width: 100%; min-width: 0; margin: 0; }
+.memory-form { display: grid; grid-template-columns: 160px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.memory-form input { box-sizing: border-box; min-width: 0; width: 100%; margin: 0; }
+.memory-list { display: grid; gap: 10px; margin-top: 12px; }
+.memory-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: #fbfcfe; }
+.memory-item.disabled { opacity: 0.62; }
+.memory-item strong { display: block; text-transform: capitalize; }
+.memory-item p { margin: 5px 0; overflow-wrap: anywhere; }
+.memory-item small { color: #6b7280; overflow-wrap: anywhere; }
 .gate-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .gate-grid > div { background: #f9fafb; border: 1px solid #e5e7eb; padding: 10px; border-radius: 8px; }
 .gate-grid .wide { grid-column: span 3; }
@@ -79,7 +87,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
   main { grid-template-columns: 1fr; }
   aside { padding: 18px; }
   header, .answer-grid, .chat-layout { display: grid; grid-template-columns: 1fr; }
-  .path-form, .grant-row, .token-row, .chat-management { display: grid; grid-template-columns: 1fr; }
+  .path-form, .grant-row, .token-row, .chat-management, .memory-form, .memory-item { display: grid; grid-template-columns: 1fr; }
   input { min-width: 0; width: calc(100% - 24px); }
   dl div { grid-template-columns: 1fr; }
 }

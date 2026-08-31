@@ -172,6 +172,52 @@ def test_api_tool_runtime_rejects_unknown_tools(tmp_path: Path):
     assert audit.json()["events"][0]["event"] == "TOOL_REQUEST_REJECTED"
 
 
+def test_api_memory_controls_are_explicit_and_user_managed(tmp_path: Path):
+    client = make_client(tmp_path)
+
+    saved = client.post("/memory", json={"kind": "preference", "content": "Prefer concise technical answers."})
+    assert saved.status_code == 200
+    memory = saved.json()["memory"]
+    assert saved.json()["status"] == "MEMORY_SAVED"
+    assert memory["enabled"] is True
+    assert memory["content"] == "Prefer concise technical answers."
+
+    listed = client.get("/memory")
+    assert listed.status_code == 200
+    assert listed.json()["memory_count"] == 1
+    assert listed.json()["enabled_count"] == 1
+
+    disabled = client.patch(f"/memory/{memory['memory_id']}", json={"enabled": False})
+    assert disabled.status_code == 200
+    assert disabled.json()["memory"]["enabled"] is False
+
+    exported = client.get("/memory/export")
+    assert exported.status_code == 200
+    assert exported.json()["status"] == "MEMORY_EXPORT_OK"
+    assert exported.json()["memory_count"] == 1
+
+    deleted = client.delete(f"/memory/{memory['memory_id']}")
+    assert deleted.status_code == 200
+    assert deleted.json()["status"] == "MEMORY_DELETE_OK"
+    assert deleted.json()["remaining_memories"] == 0
+
+
+def test_api_memory_mutations_require_operator_auth_when_enabled(tmp_path: Path):
+    client = make_client(tmp_path, operator_token="secret-token")
+
+    rejected = client.post("/memory", json={"content": "Prefer tables."})
+    assert rejected.status_code == 401
+    assert rejected.json()["detail"]["status"] == "ERROR_OPERATOR_AUTH_REQUIRED"
+
+    allowed = client.post(
+        "/memory",
+        json={"content": "Prefer tables."},
+        headers={"X-Mucaro-Token": "secret-token"},
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["status"] == "MEMORY_SAVED"
+
+
 def test_api_ingest_rejects_empty_filename(tmp_path: Path):
     client = make_client(tmp_path)
 
@@ -379,6 +425,31 @@ def test_api_conversation_follow_up_uses_prior_turn_context(tmp_path: Path):
     assert answer["conversation_context_turn_count"] == 2
     assert "Conversation context turns used: 2" in answer["answer"]
     assert "What does source lineage require?" in answer["answer"]
+
+
+def test_api_ask_uses_enabled_memory_without_treating_it_as_source(tmp_path: Path):
+    client = make_client(tmp_path)
+    ingest = client.post(
+        "/ingest",
+        files={"upload": ("source.md", b"Source lineage requires cited chunk IDs and source IDs.", "text/markdown")},
+    )
+    assert ingest.status_code == 200
+    saved = client.post("/memory", json={"kind": "preference", "content": "Prefer short answers."})
+    assert saved.status_code == 200
+    memory_id = saved.json()["memory"]["memory_id"]
+
+    ask = client.post(
+        "/ask",
+        json={"query": "What does source lineage require?", "retrieval_strategy": "persistent", "model_provider": "mock"},
+    )
+
+    assert ask.status_code == 200
+    payload = ask.json()
+    assert payload["citation_status"] == "CITATION_OK"
+    assert payload["memory_context_count"] == 1
+    assert payload["memory_ids"] == [memory_id]
+    assert "Memory items used: 1" in payload["answer"]
+    assert memory_id not in payload["source_ids"]
 
 
 def test_api_source_management_run_detail_and_workspace_profiles(tmp_path: Path):

@@ -175,10 +175,10 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "personalization_memory",
             "assistant_memory",
             "Assistant has explicit user-controlled long-term preferences or memory.",
-            "OPEN",
-            "Workspace profiles and conversations exist.",
-            "No explicit preference memory store or memory controls are certified.",
-            "Design opt-in memory with inspect/delete/export controls.",
+            _status_from_files(cfg, [("backend", "app", "memory.py")]),
+            "Explicit local memory store with API, CLI, and browser controls for opt-in save, list, enable/disable, delete, export, and answer-context wiring.",
+            "",
+            "Keep memory user-controlled and separate from cited source evidence.",
         ),
         ProductRequirement(
             "production_security",
@@ -208,5 +208,5 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
         "readiness_percent": readiness_percent,
         "counts": counts,
         "requirements": rows,
-        "next_recommended_vector": "personalization_memory",
+        "next_recommended_vector": "production_security",
     }

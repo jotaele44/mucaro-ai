@@ -71,7 +71,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.19\n"
+    assert output == "mucaro 0.1.20\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -119,6 +119,7 @@ def test_cli_doctor_reports_ready_state_after_local_setup(tmp_path: Path, capsys
     assert payload["summary"]["index_status"] == "INDEX_OK"
     assert payload["summary"]["semantic_store_status"] == "SEMANTIC_STORE_OK"
     assert payload["summary"]["auth_required"] is True
+    assert payload["summary"]["memory_count"] == 0
 
 
 def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
@@ -134,13 +135,14 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert by_id["semantic_vector_store"]["status"] == "PASS"
     assert by_id["tool_use_and_actions"]["status"] == "PASS"
     assert by_id["multimodal_interface"]["status"] == "PASS"
-    assert by_id["personalization_memory"]["status"] == "OPEN"
-    assert payload["next_recommended_vector"] == "personalization_memory"
+    assert by_id["personalization_memory"]["status"] == "PASS"
+    assert by_id["production_security"]["status"] == "OPEN"
+    assert payload["next_recommended_vector"] == "production_security"
 
     assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out
     assert "PRODUCT_AUDIT_OPEN" in strict_output
-    assert "OPEN personalization_memory" in strict_output
+    assert "OPEN production_security" in strict_output
 
 
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):
@@ -277,6 +279,7 @@ def test_cli_tools_require_approval_and_audit_execution(tmp_path: Path, capsys):
     tools_output = capsys.readouterr().out
     assert "TOOLS_OK" in tools_output
     assert "source_library.status" in tools_output
+    assert "memory.list" in tools_output
 
     assert (
         main(
@@ -317,6 +320,43 @@ def test_cli_tools_require_approval_and_audit_execution(tmp_path: Path, capsys):
         "TOOL_CALL_APPROVED",
         "TOOL_CALL_EXECUTED",
     ]
+
+
+def test_cli_memory_controls_and_export(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["memory", "remember", "Prefer", "concise", "answers.", "--kind", "preference", "--format", "json"], cfg=cfg) == 0
+    saved = json.loads(capsys.readouterr().out)
+    memory_id = saved["memory"]["memory_id"]
+    assert saved["status"] == "MEMORY_SAVED"
+    assert saved["memory"]["enabled"] is True
+
+    assert main(["memory", "list", "--format", "text"], cfg=cfg) == 0
+    list_output = capsys.readouterr().out
+    assert "MEMORY_OK" in list_output
+    assert "enabled=1" in list_output
+    assert memory_id in list_output
+
+    assert main(["memory", "disable", memory_id, "--format", "json"], cfg=cfg) == 0
+    disabled = json.loads(capsys.readouterr().out)
+    assert disabled["memory"]["enabled"] is False
+
+    assert main(["memory", "list", "--active-only", "--format", "json"], cfg=cfg) == 0
+    active_only = json.loads(capsys.readouterr().out)
+    assert active_only["memory_count"] == 0
+
+    assert main(["memory", "enable", memory_id, "--format", "json"], cfg=cfg) == 0
+    assert json.loads(capsys.readouterr().out)["memory"]["enabled"] is True
+
+    assert main(["memory", "export", "--format", "json"], cfg=cfg) == 0
+    exported = json.loads(capsys.readouterr().out)
+    assert exported["status"] == "MEMORY_EXPORT_OK"
+    assert exported["memory_count"] == 1
+
+    assert main(["memory", "delete", memory_id, "--format", "json"], cfg=cfg) == 0
+    deleted = json.loads(capsys.readouterr().out)
+    assert deleted["status"] == "MEMORY_DELETE_OK"
+    assert deleted["remaining_memories"] == 0
 
 
 def test_cli_serve_passes_host_port_and_reload(tmp_path: Path, monkeypatch):
