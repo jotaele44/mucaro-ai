@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import socket
 import subprocess
@@ -10,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+COMMIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def run(cmd: list[str], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -34,6 +36,15 @@ def assert_clean_worktree(repo: Path) -> None:
         raise RuntimeError(f"FRESH_CLONE_DIRTY_WORKTREE\n{proc.stdout}")
 
 
+def clone_ref(source: str, ref: str, temp_root: Path, clone_dir: Path) -> None:
+    if COMMIT_SHA_RE.fullmatch(ref):
+        run(["git", "clone", "--no-checkout", source, str(clone_dir)], cwd=temp_root)
+        run(["git", "fetch", "--depth", "1", "origin", ref], cwd=clone_dir)
+        run(["git", "checkout", "--detach", ref], cwd=clone_dir)
+        return
+    run(["git", "clone", "--depth", "1", "--branch", ref, source, str(clone_dir)], cwd=temp_root)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Certify Mucaro AI from a fresh clone and smoke-test desktop launch.")
     parser.add_argument("--source", default=None, help="Git clone source. Defaults to origin URL.")
@@ -45,7 +56,7 @@ def main() -> int:
     temp_root = Path(tempfile.mkdtemp(prefix="mucaro-ai-fresh-clone-"))
     clone_dir = temp_root / "mucaro-ai"
     try:
-        run(["git", "clone", "--depth", "1", "--branch", args.ref, source, str(clone_dir)], cwd=temp_root)
+        clone_ref(source, args.ref, temp_root, clone_dir)
         python = sys.executable
         venv = clone_dir / ".venv"
         run([python, "-m", "venv", str(venv)], cwd=clone_dir)

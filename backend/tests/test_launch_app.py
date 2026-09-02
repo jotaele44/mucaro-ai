@@ -5,6 +5,7 @@ import sys
 
 import pytest
 
+import scripts.certify_fresh_clone as certify_fresh_clone
 import scripts.launch_app as launch_app
 
 
@@ -30,6 +31,57 @@ def test_package_desktop_self_test():
     )
     assert proc.returncode == 0
     assert "DESKTOP_PACKAGE_READY" in proc.stdout
+
+
+def test_fresh_clone_uses_shallow_branch_clone_for_named_refs(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_run(cmd, *, cwd, check=True):
+        del check
+        calls.append((cmd, cwd))
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(certify_fresh_clone, "run", fake_run)
+
+    clone_dir = tmp_path / "mucaro-ai"
+    certify_fresh_clone.clone_ref("https://github.com/example/mucaro-ai.git", "main", tmp_path, clone_dir)
+
+    assert calls == [
+        (
+            [
+                "git",
+                "clone",
+                "--depth",
+                "1",
+                "--branch",
+                "main",
+                "https://github.com/example/mucaro-ai.git",
+                str(clone_dir),
+            ],
+            tmp_path,
+        )
+    ]
+
+
+def test_fresh_clone_fetches_exact_commit_sha(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_run(cmd, *, cwd, check=True):
+        del check
+        calls.append((cmd, cwd))
+        return subprocess.CompletedProcess(cmd, 0, "")
+
+    monkeypatch.setattr(certify_fresh_clone, "run", fake_run)
+
+    clone_dir = tmp_path / "mucaro-ai"
+    commit_sha = "8e8cf79b03daebaf12caa51050f6143f52fc6e44"
+    certify_fresh_clone.clone_ref("https://github.com/example/mucaro-ai.git", commit_sha, tmp_path, clone_dir)
+
+    assert calls == [
+        (["git", "clone", "--no-checkout", "https://github.com/example/mucaro-ai.git", str(clone_dir)], tmp_path),
+        (["git", "fetch", "--depth", "1", "origin", commit_sha], clone_dir),
+        (["git", "checkout", "--detach", commit_sha], clone_dir),
+    ]
 
 
 def test_launch_app_reports_missing_frontend_deps(tmp_path, monkeypatch):
