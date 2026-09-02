@@ -17,10 +17,11 @@ executable product-gap auditing, an opt-in local semantic embedding store,
 approval-gated local tool runtime, metadata-only image/audio/video ingestion,
 and explicit local memory.
 The production-security baseline added profile checks, fail-closed startup
-validation, and public-bind safeguards. The current development candidate adds
+validation, and public-bind safeguards. The current certification target adds
 CLI certification-readiness status so operators can inspect product audit,
 doctor, JSON validation, Git metadata, worktree cleanliness, tag-at-HEAD, and
-upstream state before running heavier release or fresh-clone gates.
+upstream state before running heavier release or fresh-clone gates. It also
+repairs fresh-clone certification for exact commit SHAs.
 
 Observed success markers:
 
@@ -51,6 +52,18 @@ Observed success markers:
   `0 OPEN`, `0 BLOCKED`, and `100.0%` readiness.
 - Local release certification for `v0.1.21-production-security` reports
   `CERTIFY_RELEASE_OK`.
+- `112 passed` from pytest for the current
+  `v0.1.22-cli-certification-status` target
+- Local `mucaro certify status` reports product audit, JSON validation, Git
+  repository, clean worktree, and upstream checks passing on commit
+  `37c4fc5fde0e0fcfa63edd7a3100dd9bb82a3846`; expected warnings remain for
+  local-mode auth and no tag before the release tag is created.
+- Local release certification for `v0.1.22-cli-certification-status` reports
+  `CERTIFY_RELEASE_OK`.
+- Hosted CI run `33642841335` passed on commit
+  `37c4fc5fde0e0fcfa63edd7a3100dd9bb82a3846`.
+- Exact-SHA fresh-clone certification reports `FRESH_CLONE_CERT_OK` for commit
+  `37c4fc5fde0e0fcfa63edd7a3100dd9bb82a3846`.
 - Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, BM25, hybrid, persistent, and semantic strategies across the expanded corpus
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
@@ -70,10 +83,10 @@ Observed success markers:
   multimodal metadata ingestion and fresh-clone launcher certification
 - `v0.1.20-explicit-memory` is certified for opt-in local
   memory controls and answer-context wiring
-- `v0.1.21-production-security` is the current candidate target for
-  production-security profile checks and full product-audit closure
-- `v0.1.22` is the current development candidate for CLI
-  certification-readiness status
+- `v0.1.21-production-security` is certified for production-security profile
+  checks and full product-audit closure
+- `v0.1.22-cli-certification-status` is the current certification target for
+  CLI certification-readiness status and exact-SHA fresh-clone certification
 
 Local expected marker after first setup:
 
