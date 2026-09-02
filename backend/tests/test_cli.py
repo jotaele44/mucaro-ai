@@ -62,6 +62,7 @@ def test_cli_help_lists_serve(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
+    assert "certify" in output
     assert "serve" in output
 
 
@@ -71,7 +72,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.21\n"
+    assert output == "mucaro 0.1.22\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -143,6 +144,34 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     strict_output = capsys.readouterr().out
     assert "PRODUCT_AUDIT_OK" in strict_output
     assert "PASS production_security" in strict_output
+
+
+def test_cli_certify_status_reports_release_readiness(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["certify", "status", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CERTIFICATION_WARN"
+    assert payload["version"] == "0.1.22"
+    assert payload["project_root"] == str(tmp_path)
+    assert payload["product_audit_status"] == "PRODUCT_AUDIT_OK"
+    assert payload["json_status"] == "JSON_OK"
+    assert payload["git"]["head_sha"] is None
+    gates = {gate["name"]: gate for gate in payload["gates"]}
+    assert gates["product_audit"]["status"] == "PASS"
+    assert gates["json_validation"]["status"] == "PASS"
+    assert gates["git_repository"]["status"] == "WARN"
+    assert gates["baseline_tag"]["status"] == "WARN"
+    assert payload["next_commands"] == [
+        "python3 scripts/certify_release.py",
+        "python3 scripts/certify_fresh_clone.py --ref main",
+    ]
+
+    assert main(["certify", "status", "--strict", "--format", "text"], cfg=cfg) == 2
+    strict_output = capsys.readouterr().out
+    assert "CERTIFICATION_WARN" in strict_output
+    assert "WARN git_repository git metadata unavailable" in strict_output
+    assert "command=python3 scripts/certify_release.py" in strict_output
 
 
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):

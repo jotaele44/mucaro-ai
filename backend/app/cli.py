@@ -5,6 +5,7 @@ import importlib.metadata
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -154,6 +155,17 @@ def build_parser() -> argparse.ArgumentParser:
     audit_product.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     audit_product.add_argument("--strict", action="store_true", help="Exit nonzero while product gaps remain open.")
     audit_product.set_defaults(handler=run_audit_product)
+
+    certify = subcommands.add_parser("certify", help="Inspect release certification readiness.")
+    certify_subcommands = certify.add_subparsers(dest="certify_command", required=True)
+
+    certify_status = certify_subcommands.add_parser(
+        "status",
+        help="Show local release readiness before running full certification gates.",
+    )
+    certify_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    certify_status.add_argument("--strict", action="store_true", help="Exit nonzero when warnings or failures are present.")
+    certify_status.set_defaults(handler=run_certify_status)
 
     sources = subcommands.add_parser("sources", help="Inspect and manage ingested sources.")
     sources_subcommands = sources.add_subparsers(dest="sources_command", required=True)
@@ -368,7 +380,22 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         return
     status = payload.get("status") or payload.get("citation_status") or "OK"
     print(status)
-    if status in {"DOCTOR_OK", "DOCTOR_WARN", "DOCTOR_FAIL"}:
+    if status in {"CERTIFICATION_READY", "CERTIFICATION_WARN", "CERTIFICATION_FAIL"}:
+        print(f"version={payload.get('version')}")
+        print(f"project_root={payload.get('project_root')}")
+        git = payload.get("git", {})
+        if isinstance(git, dict):
+            print(f"branch={git.get('branch')}")
+            print(f"head_sha={git.get('head_sha')}")
+            print(f"tags_at_head={','.join(git.get('tags_at_head', []))}")
+            print(f"worktree_clean={git.get('worktree_clean')}")
+            print(f"upstream={git.get('upstream')}")
+        for gate in payload.get("gates", []):
+            detail = str(gate.get("detail")).replace("\n", "\\n")
+            print(f"{gate.get('status')} {gate.get('name')} {detail}")
+        for command in payload.get("next_commands", []):
+            print(f"command={command}")
+    elif status in {"DOCTOR_OK", "DOCTOR_WARN", "DOCTOR_FAIL"}:
         summary = payload.get("summary", {})
         if isinstance(summary, dict):
             print(f"version={payload.get('version')}")
@@ -753,6 +780,126 @@ def run_audit_product(args: argparse.Namespace, cfg: Settings) -> int:
     report = build_product_audit(cfg)
     emit_payload(report, args.format)
     if args.strict and report["status"] != "PRODUCT_AUDIT_OK":
+        return 2
+    return 0
+
+
+def _git_output(cfg: Settings, args: list[str]) -> tuple[bool, str]:
+    try:
+        proc = subprocess.run(
+            ["git", *args],
+            cwd=cfg.project_root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+    except OSError as exc:
+        return False, str(exc)
+    return proc.returncode == 0, proc.stdout.strip()
+
+
+def _redact_remote_url(remote_url: str) -> str:
+    if "://" not in remote_url:
+        return remote_url
+    scheme, rest = remote_url.split("://", 1)
+    if "@" not in rest:
+        return remote_url
+    return f"{scheme}://<redacted>@{rest.split('@', 1)[1]}"
+
+
+def _certification_gate(name: str, status: str, detail: str) -> dict[str, str]:
+    return {"name": name, "status": status, "detail": detail}
+
+
+def build_certification_status(cfg: Settings) -> dict[str, Any]:
+    audit = build_product_audit(cfg)
+    doctor = build_doctor_report(cfg)
+    validation = validate_project_json(cfg)
+
+    branch_ok, branch = _git_output(cfg, ["branch", "--show-current"])
+    head_ok, head_sha = _git_output(cfg, ["rev-parse", "HEAD"])
+    status_ok, worktree_status = _git_output(cfg, ["status", "--short"])
+    tags_ok, tags_output = _git_output(cfg, ["tag", "--points-at", "HEAD"])
+    upstream_ok, upstream = _git_output(cfg, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+    remote_ok, remote_url = _git_output(cfg, ["remote", "get-url", "origin"])
+
+    tags_at_head = [line for line in tags_output.splitlines() if line.strip()] if tags_ok else []
+    worktree_clean = status_ok and not worktree_status
+
+    gates = [
+        _certification_gate(
+            "product_audit",
+            "PASS" if audit.get("status") == "PRODUCT_AUDIT_OK" else "FAIL",
+            str(audit.get("status")),
+        ),
+        _certification_gate(
+            "doctor",
+            "PASS" if doctor.get("status") == "DOCTOR_OK" else "WARN" if doctor.get("status") == "DOCTOR_WARN" else "FAIL",
+            str(doctor.get("status")),
+        ),
+        _certification_gate(
+            "json_validation",
+            "PASS" if validation.get("status") == "JSON_OK" else "FAIL",
+            str(validation.get("status")),
+        ),
+        _certification_gate(
+            "git_repository",
+            "PASS" if head_ok else "WARN",
+            head_sha if head_ok else "git metadata unavailable",
+        ),
+        _certification_gate(
+            "worktree_clean",
+            "PASS" if worktree_clean else "FAIL" if status_ok else "WARN",
+            "clean" if worktree_clean else worktree_status or "git status unavailable",
+        ),
+        _certification_gate(
+            "baseline_tag",
+            "PASS" if tags_at_head else "WARN",
+            ",".join(tags_at_head) if tags_at_head else "no tag points at HEAD",
+        ),
+        _certification_gate(
+            "upstream",
+            "PASS" if upstream_ok else "WARN",
+            upstream if upstream_ok else "no upstream configured",
+        ),
+    ]
+
+    failed = [gate for gate in gates if gate["status"] == "FAIL"]
+    warned = [gate for gate in gates if gate["status"] == "WARN"]
+    status = "CERTIFICATION_FAIL" if failed else "CERTIFICATION_WARN" if warned else "CERTIFICATION_READY"
+
+    git_payload = {
+        "branch": branch if branch_ok else None,
+        "head_sha": head_sha if head_ok else None,
+        "tags_at_head": tags_at_head,
+        "worktree_clean": worktree_clean if status_ok else None,
+        "upstream": upstream if upstream_ok else None,
+        "origin": _redact_remote_url(remote_url) if remote_ok else None,
+    }
+    ref = tags_at_head[0] if tags_at_head else head_sha if head_ok else "main"
+    return {
+        "status": status,
+        "version": package_version(),
+        "project_root": str(cfg.project_root),
+        "git": git_payload,
+        "gates": gates,
+        "doctor_status": doctor.get("status"),
+        "product_audit_status": audit.get("status"),
+        "json_status": validation.get("status"),
+        "next_commands": [
+            "python3 scripts/certify_release.py",
+            f"python3 scripts/certify_fresh_clone.py --ref {ref}",
+        ],
+    }
+
+
+def run_certify_status(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_certification_status(cfg)
+    emit_payload(report, args.format)
+    if report["status"] == "CERTIFICATION_FAIL":
+        return 2
+    if args.strict and report["status"] != "CERTIFICATION_READY":
         return 2
     return 0
 

@@ -31,6 +31,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | Command | Purpose | Success Exit | Failure Exit |
 |---|---|---:|---:|
 | `mucaro doctor` | Check local assistant readiness | 0 | 2 with `--strict` warnings/failures |
+| `mucaro certify status` | Inspect release readiness before running full certification gates | 0 | 2 on failures, or with `--strict` warnings/failures |
 | `mucaro audit product` | Audit product gaps against the full assistant objective | 0 | 2 with `--strict` while gaps remain |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
@@ -137,6 +138,8 @@ retrieval payloads where practical:
 | `ERROR_TOOL_CALL_ALREADY_EXECUTED` | tool call execution was attempted more than once |
 | `DOCTOR_WARN` | readiness check found missing or incomplete local setup |
 | `DOCTOR_FAIL` | readiness check found unsupported or invalid local setup |
+| `CERTIFICATION_WARN` | release readiness has warnings such as local-mode auth disabled, missing tag, missing upstream, or unavailable Git metadata |
+| `CERTIFICATION_FAIL` | release readiness has a hard blocker such as product audit failure, JSON validation failure, or dirty worktree |
 | `PRODUCT_AUDIT_OPEN` | product audit found remaining ChatGPT/Claude-comparability gaps |
 | `PRODUCT_AUDIT_BLOCKED` | product audit found a blocked requirement |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
@@ -149,6 +152,7 @@ retrieval payloads where practical:
 mucaro ingest data/input --format text
 mucaro --version
 mucaro doctor
+mucaro certify status --format text
 mucaro audit product --format text
 mucaro permissions grant ~/Documents/mucaro-sources --yes --format json
 mucaro permissions list --format text
@@ -204,6 +208,13 @@ source/chunk counts, persistent index status, semantic-store status, directory
 grants, model-provider readiness, API auth posture, conversations, runs,
 explicit memory, production-security posture, and the local tool runtime. Add `--strict` when
 automation should fail on warnings.
+
+Use `mucaro certify status` before tagging or pushing release candidates. It is
+a read-only readiness receipt over product audit, doctor, JSON validation, Git
+HEAD, worktree cleanliness, tag-at-HEAD, and upstream configuration. Add
+`--strict` when automation should fail on warnings, then run the reported
+`scripts/certify_release.py` and `scripts/certify_fresh_clone.py` commands for
+the heavier gates.
 
 Use `mucaro audit product` to classify the broader assistant objective as
 requirement rows with `PASS`, `OPEN`, or `BLOCKED` status. Add `--strict` when

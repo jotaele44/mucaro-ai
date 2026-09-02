@@ -1,6 +1,6 @@
 # Release Status
 
-Current package version: `0.1.21`.
+Current package version: `0.1.22`.
 
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, fresh-clone validation, API upload
@@ -16,8 +16,11 @@ run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
 executable product-gap auditing, an opt-in local semantic embedding store,
 approval-gated local tool runtime, metadata-only image/audio/video ingestion,
 and explicit local memory.
-The current candidate adds production-security profile checks, fail-closed
-startup validation, and public-bind safeguards.
+The production-security baseline added profile checks, fail-closed startup
+validation, and public-bind safeguards. The current development candidate adds
+CLI certification-readiness status so operators can inspect product audit,
+doctor, JSON validation, Git metadata, worktree cleanliness, tag-at-HEAD, and
+upstream state before running heavier release or fresh-clone gates.
 
 Observed success markers:
 
@@ -69,6 +72,8 @@ Observed success markers:
   memory controls and answer-context wiring
 - `v0.1.21-production-security` is the current candidate target for
   production-security profile checks and full product-audit closure
+- `v0.1.22` is the current development candidate for CLI
+  certification-readiness status
 
 Local expected marker after first setup:
 
