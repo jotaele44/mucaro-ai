@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/repo_capability.schema.json",
+  "title": "Repository Capability Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repo_id", "membership_status", "roles", "baseline_required", "lockstep_participant", "capabilities"],
+  "properties": {
+    "schema": {"const": "repo-capability-contract/1.0"},
+    "repo_id": {"type": "string", "minLength": 1},
+    "membership_status": {"enum": ["PROVISIONAL", "ACTIVE", "DEGRADED", "SUSPENDED", "RETIRED"]},
+    "roles": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "baseline_required": {"type": "boolean"},
+    "lockstep_participant": {"type": "boolean"},
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["state"],
+        "properties": {
+          "state": {"enum": ["ABSENT", "CANDIDATE", "PARTIAL", "AVAILABLE", "CERTIFIED", "DEPRECATED", "BLOCKED"]},
+          "contract": {"type": ["string", "null"]},
+          "notes": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}
