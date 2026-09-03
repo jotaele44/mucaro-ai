@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/skill_mount.schema.json",
+  "title": "Skill Mount Manifest 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repo_id", "mounts"],
+  "properties": {
+    "schema": {"const": "skill-mount-manifest/1.0"},
+    "repo_id": {"type": "string", "minLength": 1},
+    "mounts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["skill_id", "version", "digest", "state", "runtime", "capabilities"],
+        "properties": {
+          "skill_id": {"type": "string", "minLength": 1},
+          "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+          "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "state": {"enum": ["MOUNTED", "ACTIVE", "BLOCKED", "REVOKED", "SUPERSEDED"]},
+          "runtime": {"enum": ["IN_PROCESS", "LOCAL_WORKER", "CONTAINER", "SERVICE", "FEDERATION_WORKER"]},
+          "capabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}
