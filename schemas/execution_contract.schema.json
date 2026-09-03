@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/execution_contract.schema.json",
+  "title": "Execution Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "execution_id", "skill_id", "skill_version", "skill_digest", "runtime", "status", "started_at"],
+  "properties": {
+    "schema": {"const": "execution-contract/1.0"},
+    "execution_id": {"type": "string", "minLength": 1},
+    "skill_id": {"type": "string", "minLength": 1},
+    "skill_version": {"type": "string", "minLength": 1},
+    "skill_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "runtime": {"enum": ["IN_PROCESS", "LOCAL_WORKER", "CONTAINER", "SERVICE", "FEDERATION_WORKER"]},
+    "status": {"enum": ["PASS", "FAIL", "BLOCKED", "OPEN"]},
+    "started_at": {"type": "string", "minLength": 1},
+    "finished_at": {"type": ["string", "null"]},
+    "executed_by": {"type": ["string", "null"]},
+    "input_artifacts": {"type": "array", "items": {"type": "object"}},
+    "output_artifacts": {"type": "array", "items": {"type": "object"}},
+    "error": {"type": ["object", "null"]}
+  }
+}
