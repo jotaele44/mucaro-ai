@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/model_runtime.schema.json",
+  "title": "Model Runtime Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "provider_id", "model_id", "mode", "capabilities", "live_calls_enabled"],
+  "properties": {
+    "schema": {"const": "model-runtime-contract/1.0"},
+    "provider_id": {"type": "string", "minLength": 1},
+    "model_id": {"type": "string", "minLength": 1},
+    "mode": {"enum": ["MOCK", "LOCAL", "REMOTE"]},
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["text.generate", "embedding.generate", "vision.analyze", "audio.analyze", "tool.call"]}
+    },
+    "live_calls_enabled": {"type": "boolean"},
+    "endpoint_class": {"type": ["string", "null"]},
+    "notes": {"type": ["string", "null"]}
+  }
+}
