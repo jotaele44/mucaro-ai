@@ -78,12 +78,13 @@ Global flags:
 - `--version` prints the installed package version for fresh-clone and support
   receipts.
 
-Supported ingest inputs are TXT, MD, HTML, HTM, CSV, JSON, PDF, PNG, JPEG, GIF,
-WEBP, WAV, MP3, M4A, MP4, MOV, and WEBM. HTML files are parsed as local
-documents with visible text, title metadata, and link counts. Media files are
-metadata-only in this release: they preserve source lineage, byte counts,
-dimensions or container facts where available, and parser warnings, but do not
-perform semantic image/audio/video understanding.
+Supported ingest inputs are TXT, MD, HTML, HTM, DOCX, CSV, JSON, PDF, PNG,
+JPEG, GIF, WEBP, WAV, MP3, M4A, MP4, MOV, and WEBM. HTML files are parsed as
+local documents with visible text, title metadata, and link counts. DOCX files
+are parsed as local OpenXML documents with paragraph/table text and core
+properties. Media files are metadata-only in this release: they preserve source
+lineage, byte counts, dimensions or container facts where available, and parser
+warnings, but do not perform semantic image/audio/video understanding.
 
 ## Output Contracts
 

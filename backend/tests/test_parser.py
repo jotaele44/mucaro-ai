@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 import wave
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,35 @@ def make_settings(root: Path) -> Settings:
 
 def minimal_png(width: int = 2, height: int = 3) -> bytes:
     return b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + width.to_bytes(4, "big") + height.to_bytes(4, "big")
+
+
+def write_minimal_docx(path: Path, *, title: str = "Mucaro DOCX Brief") -> None:
+    document_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>DOCX source lineage requires cited chunks.</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>Field</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>Evidence</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+  </w:body>
+</w:document>
+"""
+    core_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties
+  xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:dcterms="http://purl.org/dc/terms/">
+  <dc:title>{title}</dc:title>
+  <dc:creator>Mucaro Test</dc:creator>
+</cp:coreProperties>
+"""
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("[Content_Types].xml", "<Types/>")
+        archive.writestr("word/document.xml", document_xml)
+        archive.writestr("docProps/core.xml", core_xml)
 
 
 def test_csv_parser_records_delimiter_row_count_and_duplicate_headers(tmp_path: Path):
@@ -104,6 +134,39 @@ def test_ingest_html_manifest_includes_parser_evidence(tmp_path: Path):
     assert source["parser"] == "html_text_v1"
     assert source["parser_metadata"]["title"] == "Brief"
     assert source["parser_metadata"]["text_length"] == len("Cited HTML source.")
+    assert source["lineage_status"] == "VALID"
+    assert result["chunks_added"] == 1
+
+
+def test_docx_parser_extracts_paragraph_table_text_and_metadata(tmp_path: Path):
+    path = tmp_path / "brief.docx"
+    write_minimal_docx(path)
+
+    result = parse_file(path)
+
+    assert result["parser"] == "docx_text_v1"
+    assert result["mime_type"] == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    assert result["parse_status"] == "OK"
+    assert result["paragraph_count"] == 3
+    assert result["table_count"] == 1
+    assert result["text"] == "DOCX source lineage requires cited chunks.\nField | Evidence"
+    assert result["text_length"] == len(result["text"])
+    assert result["core_properties"]["title"] == "Mucaro DOCX Brief"
+    assert result["core_properties"]["creator"] == "Mucaro Test"
+
+
+def test_ingest_docx_manifest_includes_parser_evidence(tmp_path: Path):
+    cfg = make_settings(tmp_path / "proj")
+    src = tmp_path / "brief.docx"
+    write_minimal_docx(src, title="Brief")
+
+    result = ingest_file(src, cfg)
+    source = result["source"]
+
+    assert source["parser"] == "docx_text_v1"
+    assert source["parser_metadata"]["paragraph_count"] == 3
+    assert source["parser_metadata"]["table_count"] == 1
+    assert source["parser_metadata"]["core_properties"]["title"] == "Brief"
     assert source["lineage_status"] == "VALID"
     assert result["chunks_added"] == 1
 

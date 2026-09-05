@@ -16,6 +16,7 @@ from .vector_index import build_persistent_index, fingerprint_chunks, load_persi
 MANIFEST_NAME = "source_manifest.json"
 CHUNKS_NAME = "document_chunks.json"
 HTML_SUFFIXES = {".html", ".htm"}
+DOCX_SUFFIXES = {".docx"}
 
 
 def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
@@ -87,7 +88,7 @@ def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
 def ingest_folder(folder: Path, cfg: Settings = settings) -> dict[str, Any]:
     if not folder.exists() or not folder.is_dir():
         raise FileNotFoundError(f"Input folder not found: {folder}")
-    supported = {".txt", ".md", ".csv", ".json", ".pdf"} | HTML_SUFFIXES | MULTIMODAL_SUFFIXES
+    supported = {".txt", ".md", ".csv", ".json", ".pdf"} | HTML_SUFFIXES | DOCX_SUFFIXES | MULTIMODAL_SUFFIXES
     results = []
     for path in sorted(folder.iterdir()):
         if path.name.startswith("src_"):

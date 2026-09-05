@@ -14,7 +14,7 @@ rename/delete/search, desktop package self-testing, CLI `--version`, early `ask 
 validation, CLI source/index management, CLI conversation management, CLI
 run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
 executable product-gap auditing, an opt-in local semantic embedding store,
-approval-gated local tool runtime, local HTML document ingestion, metadata-only image/audio/video ingestion,
+approval-gated local tool runtime, local HTML/DOCX document ingestion, metadata-only image/audio/video ingestion,
 explicit local memory, CLI-exposed retrieval evaluation, and CLI-exposed
 packaging readiness with a governed source-artifact policy. The current
 retrieval-quality baseline adds expected-binding recall, context precision,
@@ -163,6 +163,11 @@ Observed success markers:
   source manifest, excludes script/style/template content from retrieval text,
   and remains under the same source-lineage and permissioned-ingest boundary as
   other local documents.
+- DOCX files are now first-class local document-ingestion inputs. The parser
+  reads the OpenXML document body, extracts paragraph and table text, preserves
+  paragraph/table counts plus core document properties in the source manifest,
+  and keeps extraction under the same source-lineage and permissioned-ingest
+  boundary as other local documents.
 - `mucaro release state` classifies bounded release progress across
   `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`, `FRESH_CLONE_CERTIFIED`,
   `SOURCE_ARTIFACT_PACKAGING`, `GITHUB_GOVERNANCE_OPEN`,

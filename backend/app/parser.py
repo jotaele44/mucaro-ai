@@ -2,15 +2,23 @@ from __future__ import annotations
 
 import csv
 import json
+import zipfile
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree
 
 from .multimodal import MULTIMODAL_SUFFIXES, parse_multimodal_metadata
 
 
 class ParseError(RuntimeError):
     pass
+
+
+WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+CORE_NS = "{http://schemas.openxmlformats.org/package/2006/metadata/core-properties}"
+DUBLIN_CORE_NS = "{http://purl.org/dc/elements/1.1/}"
+DUBLIN_CORE_TERMS_NS = "{http://purl.org/dc/terms/}"
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -124,6 +132,7 @@ def detect_mime(path: Path) -> str:
         ".md": "text/markdown",
         ".html": "text/html",
         ".htm": "text/html",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ".csv": "text/csv",
         ".json": "application/json",
         ".pdf": "application/pdf",
@@ -168,6 +177,8 @@ def parse_file(path: Path) -> dict[str, Any]:
             return _parse_json(path)
         if suffix in {".html", ".htm"}:
             return _parse_html(path)
+        if suffix == ".docx":
+            return _parse_docx(path)
         if suffix == ".pdf":
             return _parse_pdf(path)
         if suffix in MULTIMODAL_SUFFIXES:
@@ -246,6 +257,91 @@ def _parse_html(path: Path) -> dict[str, Any]:
             text_length=len(parser.text),
         ),
     }
+
+
+def _docx_text(node: ElementTree.Element) -> str:
+    parts: list[str] = []
+    for element in node.iter():
+        if element.tag == f"{WORD_NS}t" and element.text:
+            parts.append(element.text)
+        elif element.tag == f"{WORD_NS}tab":
+            parts.append("\t")
+        elif element.tag in {f"{WORD_NS}br", f"{WORD_NS}cr"}:
+            parts.append("\n")
+    return "".join(parts).strip()
+
+
+def _docx_core_metadata(archive: zipfile.ZipFile) -> dict[str, str]:
+    if "docProps/core.xml" not in archive.namelist():
+        return {}
+    root = ElementTree.fromstring(archive.read("docProps/core.xml"))
+    fields = {
+        "title": f"{DUBLIN_CORE_NS}title",
+        "creator": f"{DUBLIN_CORE_NS}creator",
+        "subject": f"{DUBLIN_CORE_NS}subject",
+        "description": f"{DUBLIN_CORE_NS}description",
+        "created": f"{DUBLIN_CORE_TERMS_NS}created",
+        "modified": f"{DUBLIN_CORE_TERMS_NS}modified",
+        "last_modified_by": f"{CORE_NS}lastModifiedBy",
+    }
+    metadata: dict[str, str] = {}
+    for key, tag in fields.items():
+        value = root.findtext(tag)
+        if value:
+            metadata[key] = value
+    return metadata
+
+
+def _parse_docx(path: Path) -> dict[str, Any]:
+    warnings: list[str] = []
+    with zipfile.ZipFile(path) as archive:
+        names = set(archive.namelist())
+        if "word/document.xml" not in names:
+            warnings.append("DOCX_DOCUMENT_XML_MISSING")
+            return {
+                "text": "",
+                **_base_result(
+                    path,
+                    parser="docx_text_v1",
+                    mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    warnings=warnings,
+                    paragraph_count=0,
+                    table_count=0,
+                    text_length=0,
+                    core_properties={},
+                ),
+            }
+        root = ElementTree.fromstring(archive.read("word/document.xml"))
+        body = root.find(f".//{WORD_NS}body")
+        blocks = list(body) if body is not None else []
+        lines: list[str] = []
+        for block in blocks:
+            if block.tag == f"{WORD_NS}p":
+                text = _docx_text(block)
+                if text:
+                    lines.append(text)
+            elif block.tag == f"{WORD_NS}tbl":
+                for row in block.findall(f".//{WORD_NS}tr"):
+                    cells = [_docx_text(cell) for cell in row.findall(f"./{WORD_NS}tc")]
+                    cells = [cell for cell in cells if cell]
+                    if cells:
+                        lines.append(" | ".join(cells))
+        text = "\n".join(lines).strip()
+        if not text:
+            warnings.append("DOCX_NO_TEXT")
+        return {
+            "text": text,
+            **_base_result(
+                path,
+                parser="docx_text_v1",
+                mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                warnings=warnings,
+                paragraph_count=sum(1 for _ in root.iter(f"{WORD_NS}p")),
+                table_count=sum(1 for _ in root.iter(f"{WORD_NS}tbl")),
+                text_length=len(text),
+                core_properties=_docx_core_metadata(archive),
+            ),
+        }
 
 
 def _parse_pdf(path: Path) -> dict[str, Any]:

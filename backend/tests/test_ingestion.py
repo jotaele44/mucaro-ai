@@ -1,3 +1,4 @@
+import zipfile
 from pathlib import Path
 
 from backend.app.config import Settings
@@ -6,6 +7,17 @@ from backend.app.ingestion import ingest_file, ingest_folder
 
 def minimal_png(width: int = 2, height: int = 3) -> bytes:
     return b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + width.to_bytes(4, "big") + height.to_bytes(4, "big")
+
+
+def write_minimal_docx(path: Path) -> None:
+    document_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:r><w:t>DOCX folder ingest source.</w:t></w:r></w:p></w:body>
+</w:document>
+"""
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("[Content_Types].xml", "<Types/>")
+        archive.writestr("word/document.xml", document_xml)
 
 
 def test_ingest_file_tmp(tmp_path: Path):
@@ -77,10 +89,16 @@ def test_ingest_folder_accepts_media_and_html_files(tmp_path: Path):
     folder.mkdir()
     (folder / "note.md").write_text("Source lineage remains text grounded.", encoding="utf-8")
     (folder / "brief.html").write_text("<html><body><p>HTML source lineage remains grounded.</p></body></html>", encoding="utf-8")
+    write_minimal_docx(folder / "brief.docx")
     (folder / "sample.png").write_bytes(minimal_png())
 
     result = ingest_folder(folder, cfg)
 
     assert result["status"] == "INGEST_FOLDER_OK"
-    assert result["files_ingested"] == 3
-    assert {item["source"]["parser"] for item in result["results"]} == {"text_utf8", "html_text_v1", "image_metadata_v1"}
+    assert result["files_ingested"] == 4
+    assert {item["source"]["parser"] for item in result["results"]} == {
+        "text_utf8",
+        "html_text_v1",
+        "docx_text_v1",
+        "image_metadata_v1",
+    }
