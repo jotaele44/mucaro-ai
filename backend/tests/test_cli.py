@@ -1035,6 +1035,13 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert payload["startup_blocker"]["status"] == "FAIL"
     assert payload["github_actions"]["check_suites"]["total_count"] == 2
     assert payload["github_actions"]["check_suites"]["suites"][0]["latest_check_runs_count"] == 0
+    assert payload["github_support_summary"]["classification"] == "HOSTED_STARTUP_BEFORE_JOBS"
+    assert payload["github_support_summary"]["check_suite_counts"] == {
+        "total": 2,
+        "github_actions": 2,
+        "github_actions_zero_check_run_startup_failures": 2,
+        "queued_external": 0,
+    }
     assert payload["startup_blocker"]["isolated_before_jobs"] is True
     assert "private_branch_protection_plan_gate" in payload["startup_blocker"]["suspected_causes"]
     assert "github_branch_protection_api=WARN:HTTP 403" in payload["github_governance_evidence"]
@@ -1045,6 +1052,8 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert f"head_sha={head_sha}" in text_output
     assert "startup_blocker_status=FAIL" in text_output
     assert "startup_blocker_causes=" in text_output
+    assert "github_support_classification=HOSTED_STARTUP_BEFORE_JOBS" in text_output
+    assert "github_support_check_suite_counts=github_actions=2 zero_check_run_startup_failures=2 queued_external=0" in text_output
     assert "receipt_count=5" in text_output
     assert "receipt_valid=5" in text_output
     assert "next_action=Upgrade GitHub plan or make the repository public" in text_output
@@ -1515,6 +1524,15 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert payload["check_suites"]["total_count"] == 1
     assert payload["check_suites"]["suites"][0]["id"] == 44
     assert payload["check_suites"]["suites"][0]["latest_check_runs_count"] == 0
+    assert payload["support_summary"]["classification"] == "HOSTED_STARTUP_BEFORE_JOBS"
+    assert payload["support_summary"]["ci_run_id"] == 11
+    assert payload["support_summary"]["startup_probe_run_id"] == 22
+    assert payload["support_summary"]["check_suite_counts"] == {
+        "total": 1,
+        "github_actions": 1,
+        "github_actions_zero_check_run_startup_failures": 1,
+        "queued_external": 0,
+    }
     assert payload["startup_blocker"]["status"] == "FAIL"
     assert payload["startup_blocker"]["isolated_before_jobs"] is True
     assert "private_branch_protection_plan_gate" in payload["startup_blocker"]["suspected_causes"]
@@ -1542,6 +1560,10 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert "run=startup_probe id=22 status=completed conclusion=startup_failure" in text_output
     assert "check_suites_total=1" in text_output
     assert "check_suite id=44 app=github-actions status=completed conclusion=startup_failure check_runs=0" in text_output
+    assert "support_classification=HOSTED_STARTUP_BEFORE_JOBS" in text_output
+    assert "support_ci_run_id=11" in text_output
+    assert "support_startup_probe_run_id=22" in text_output
+    assert "support_check_suite_counts=github_actions=1 zero_check_run_startup_failures=1 queued_external=0" in text_output
     assert "FAIL startup_layer_isolated" in text_output
     assert "FAIL github_actions_check_suites_before_runs" in text_output
     assert "next_action=Upgrade GitHub plan or make the repository public" in text_output

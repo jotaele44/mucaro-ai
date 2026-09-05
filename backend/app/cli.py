@@ -596,6 +596,19 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                         f"status={suite.get('status')} conclusion={suite.get('conclusion')} "
                         f"check_runs={suite.get('latest_check_runs_count')} url={suite.get('url')}"
                     )
+        support_summary = payload.get("support_summary", {})
+        if isinstance(support_summary, dict):
+            print(f"support_classification={support_summary.get('classification')}")
+            print(f"support_ci_run_id={support_summary.get('ci_run_id')}")
+            print(f"support_startup_probe_run_id={support_summary.get('startup_probe_run_id')}")
+            counts = support_summary.get("check_suite_counts", {})
+            if isinstance(counts, dict):
+                print(
+                    "support_check_suite_counts="
+                    f"github_actions={counts.get('github_actions')} "
+                    f"zero_check_run_startup_failures={counts.get('github_actions_zero_check_run_startup_failures')} "
+                    f"queued_external={counts.get('queued_external')}"
+                )
         for action in payload.get("next_actions", []):
             print(f"next_action={action}")
     elif status in {"RETRIEVAL_EVAL_OK", "RETRIEVAL_EVAL_FAILED"}:
@@ -711,6 +724,19 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             causes = startup_blocker.get("suspected_causes", [])
             if isinstance(causes, list):
                 print(f"startup_blocker_causes={','.join(str(cause) for cause in causes)}")
+        support_summary = payload.get("github_support_summary", {})
+        if isinstance(support_summary, dict):
+            print(f"github_support_classification={support_summary.get('classification')}")
+            print(f"github_support_ci_run_id={support_summary.get('ci_run_id')}")
+            print(f"github_support_startup_probe_run_id={support_summary.get('startup_probe_run_id')}")
+            counts = support_summary.get("check_suite_counts", {})
+            if isinstance(counts, dict):
+                print(
+                    "github_support_check_suite_counts="
+                    f"github_actions={counts.get('github_actions')} "
+                    f"zero_check_run_startup_failures={counts.get('github_actions_zero_check_run_startup_failures')} "
+                    f"queued_external={counts.get('queued_external')}"
+                )
         github_evidence = payload.get("github_governance_evidence")
         if github_evidence:
             github_evidence_text = str(github_evidence).replace("\n", "\\n")
@@ -1250,6 +1276,7 @@ def build_release_governance_report(
         {},
     )
     startup_blocker = github_actions.get("startup_blocker", {})
+    support_summary = github_actions.get("support_summary", {})
     next_commands = [str(command) for command in release_state.get("next_commands", [])]
     next_actions: list[str] = []
     for action in github_actions.get("next_actions", []):
@@ -1271,6 +1298,7 @@ def build_release_governance_report(
         "github_governance_evidence": github_state.get("evidence"),
         "governed_release_evidence": governed_state.get("evidence"),
         "startup_blocker": startup_blocker,
+        "github_support_summary": support_summary,
         "git": git_payload,
         "release_states": release_state.get("states", []),
         "github_actions": github_actions,
@@ -1931,6 +1959,31 @@ def _github_actions_check_suite_blocker(check_suites: dict[str, Any]) -> bool:
     )
 
 
+def _github_actions_check_suite_counts(check_suites: dict[str, Any]) -> dict[str, int]:
+    suites = check_suites.get("suites", [])
+    if not isinstance(suites, list):
+        suites = []
+    github_actions_suites = [suite for suite in suites if isinstance(suite, dict) and suite.get("app") == "github-actions"]
+    zero_check_run_startup_failures = [
+        suite
+        for suite in github_actions_suites
+        if suite.get("status") == "completed"
+        and suite.get("conclusion") == "startup_failure"
+        and suite.get("latest_check_runs_count") == 0
+    ]
+    queued_external_suites = [
+        suite
+        for suite in suites
+        if isinstance(suite, dict) and suite.get("app") != "github-actions" and suite.get("status") == "queued"
+    ]
+    return {
+        "total": len(suites),
+        "github_actions": len(github_actions_suites),
+        "github_actions_zero_check_run_startup_failures": len(zero_check_run_startup_failures),
+        "queued_external": len(queued_external_suites),
+    }
+
+
 def _run_summary(latest: dict[str, Any] | None, jobs_count: int | None = None) -> dict[str, Any] | None:
     if latest is None:
         return None
@@ -1976,6 +2029,43 @@ def _classify_latest_run(
     if status == "completed":
         return _certification_gate(name, "FAIL", f"{status} {conclusion or 'unknown'} {run_head}{jobs_detail}{evidence_detail}")
     return _certification_gate(name, "WARN", f"{status} {conclusion or 'pending'} {run_head}{jobs_detail}{evidence_detail}")
+
+
+def _github_actions_support_summary(
+    *,
+    status: str,
+    repo: str,
+    branch: str | None,
+    head_sha: str | None,
+    runs: dict[str, Any],
+    check_suites: dict[str, Any],
+    startup_blocker: dict[str, Any],
+    branch_protection: dict[str, Any],
+    billing: dict[str, Any],
+    next_actions: list[str],
+) -> dict[str, Any]:
+    ci_run = runs.get("ci") if isinstance(runs.get("ci"), dict) else {}
+    startup_probe_run = runs.get("startup_probe") if isinstance(runs.get("startup_probe"), dict) else {}
+    return {
+        "status": status,
+        "repo": repo,
+        "branch": branch,
+        "head_sha": head_sha,
+        "classification": "HOSTED_STARTUP_BEFORE_JOBS" if startup_blocker.get("isolated_before_jobs") else "HOSTED_GOVERNANCE_REVIEW",
+        "ci_run_id": ci_run.get("database_id"),
+        "ci_run_url": ci_run.get("url"),
+        "ci_jobs_count": ci_run.get("jobs_count"),
+        "startup_probe_run_id": startup_probe_run.get("database_id"),
+        "startup_probe_run_url": startup_probe_run.get("url"),
+        "startup_probe_jobs_count": startup_probe_run.get("jobs_count"),
+        "check_suite_counts": _github_actions_check_suite_counts(check_suites),
+        "branch_protection_available": branch_protection.get("available"),
+        "branch_protection_error": branch_protection.get("error"),
+        "billing_available": billing.get("available"),
+        "billing_error": billing.get("error"),
+        "suspected_causes": startup_blocker.get("suspected_causes", []),
+        "next_actions": next_actions,
+    }
 
 
 def build_github_actions_diagnostic_status(
@@ -2176,6 +2266,23 @@ def build_github_actions_diagnostic_status(
     failed = [check for check in checks if check["status"] == "FAIL"]
     warned = [check for check in checks if check["status"] == "WARN"]
     status = "GITHUB_ACTIONS_DIAGNOSTIC_FAIL" if failed else "GITHUB_ACTIONS_DIAGNOSTIC_WARN" if warned else "GITHUB_ACTIONS_DIAGNOSTIC_OK"
+    runs = {
+        "ci": _run_summary(ci_latest, ci_jobs_count),
+        "startup_probe": _run_summary(probe_latest, probe_jobs_count),
+    }
+    next_actions = sorted(set(next_actions))
+    support_summary = _github_actions_support_summary(
+        status=status,
+        repo=repo,
+        branch=branch if branch_ok else None,
+        head_sha=head_sha if head_ok else None,
+        runs=runs,
+        check_suites=check_suites,
+        startup_blocker=startup_blocker,
+        branch_protection=branch_protection,
+        billing=billing,
+        next_actions=next_actions,
+    )
     return {
         "status": status,
         "repo": repo,
@@ -2187,12 +2294,10 @@ def build_github_actions_diagnostic_status(
         "check_suites": check_suites,
         "startup_blocker": startup_blocker,
         "workflows": workflows,
-        "runs": {
-            "ci": _run_summary(ci_latest, ci_jobs_count),
-            "startup_probe": _run_summary(probe_latest, probe_jobs_count),
-        },
+        "runs": runs,
         "billing": billing,
-        "next_actions": sorted(set(next_actions)),
+        "support_summary": support_summary,
+        "next_actions": next_actions,
     }
 
 

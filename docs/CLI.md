@@ -310,9 +310,11 @@ Actions suites. If private branch protection is plan-gated, the diagnostic
 reports a `branch_protection_api` warning separately from hosted CI startup so
 governance work can distinguish repository policy from build failures.
 The JSON output also includes a `startup_blocker` object with
-`isolated_before_jobs`, `suspected_causes`, and `next_actions` fields so
-automation can distinguish hosted-runner startup failure from branch-protection
-plan limits and billing-visibility gaps.
+`isolated_before_jobs`, `suspected_causes`, and `next_actions` fields plus a
+compact `support_summary` object with run handles, check-suite counts, branch
+protection availability, billing visibility, suspected causes, and next actions.
+Governance reports copy that object to `github_support_summary` so the saved
+handoff artifact has a single support-ready block.
 
 Use `mucaro audit product` to classify the broader governed assistant objective
 as requirement rows with `PASS`, `OPEN`, or `BLOCKED` status. The audit includes
