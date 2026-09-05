@@ -58,6 +58,56 @@ def test_ingest_source_manifest_includes_parser_evidence(tmp_path: Path):
     assert source["parser_metadata"]["row_count"] == 1
 
 
+def test_html_parser_extracts_visible_text_and_metadata(tmp_path: Path):
+    path = tmp_path / "brief.html"
+    path.write_text(
+        """
+        <!doctype html>
+        <html>
+          <head>
+            <title>Mucaro Source Brief</title>
+            <style>.hidden { display: none; }</style>
+            <script>window.secret = "ignore me";</script>
+          </head>
+          <body>
+            <h1>Planning Gate</h1>
+            <p>HTML ingestion preserves &amp; decodes visible text.</p>
+            <a href="https://example.test/source">source</a>
+          </body>
+        </html>
+        """,
+        encoding="utf-8",
+    )
+
+    result = parse_file(path)
+
+    assert result["parser"] == "html_text_v1"
+    assert result["mime_type"] == "text/html"
+    assert result["title"] == "Mucaro Source Brief"
+    assert result["link_count"] == 1
+    assert result["parse_status"] == "OK"
+    assert "Planning Gate" in result["text"]
+    assert "HTML ingestion preserves & decodes visible text." in result["text"]
+    assert "ignore me" not in result["text"]
+    assert result["text_length"] == len(result["text"])
+
+
+def test_ingest_html_manifest_includes_parser_evidence(tmp_path: Path):
+    cfg = make_settings(tmp_path / "proj")
+    src = tmp_path / "brief.html"
+    src.write_text("<html><head><title>Brief</title></head><body><p>Cited HTML source.</p></body></html>", encoding="utf-8")
+
+    result = ingest_file(src, cfg)
+    source = result["source"]
+
+    assert source["mime_type"] == "text/html"
+    assert source["parser"] == "html_text_v1"
+    assert source["parser_metadata"]["title"] == "Brief"
+    assert source["parser_metadata"]["text_length"] == len("Cited HTML source.")
+    assert source["lineage_status"] == "VALID"
+    assert result["chunks_added"] == 1
+
+
 def test_invalid_json_raises_parse_error(tmp_path: Path):
     path = tmp_path / "bad.json"
     path.write_text('{"broken": ', encoding="utf-8")

@@ -60,7 +60,7 @@ def test_ingest_file_preserves_image_metadata_in_manifest(tmp_path: Path):
     assert result["source"]["source_path"].startswith("data/input/")
 
 
-def test_ingest_folder_accepts_media_files(tmp_path: Path):
+def test_ingest_folder_accepts_media_and_html_files(tmp_path: Path):
     root = tmp_path / "proj"
     cfg = Settings(
         project_root=root,
@@ -76,10 +76,11 @@ def test_ingest_folder_accepts_media_files(tmp_path: Path):
     folder = tmp_path / "sources"
     folder.mkdir()
     (folder / "note.md").write_text("Source lineage remains text grounded.", encoding="utf-8")
+    (folder / "brief.html").write_text("<html><body><p>HTML source lineage remains grounded.</p></body></html>", encoding="utf-8")
     (folder / "sample.png").write_bytes(minimal_png())
 
     result = ingest_folder(folder, cfg)
 
     assert result["status"] == "INGEST_FOLDER_OK"
-    assert result["files_ingested"] == 2
-    assert {item["source"]["parser"] for item in result["results"]} == {"text_utf8", "image_metadata_v1"}
+    assert result["files_ingested"] == 3
+    assert {item["source"]["parser"] for item in result["results"]} == {"text_utf8", "html_text_v1", "image_metadata_v1"}
