@@ -167,6 +167,7 @@ def build_parser() -> argparse.ArgumentParser:
     eval_retrieval.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE, help="Retrieval evaluation fixture path.")
     eval_retrieval.add_argument("--top-k", type=parse_top_k, default=5, help=f"Maximum retrieved chunks to score ({MIN_TOP_K}-{MAX_TOP_K}).")
     eval_retrieval.add_argument("--min-hybrid-recall", type=float, default=0.80, help="Minimum recall@k required for hybrid retrieval.")
+    eval_retrieval.add_argument("--min-no-context-accuracy", type=float, default=1.00, help="Minimum no-context accuracy required for every retrieval strategy.")
     eval_retrieval.add_argument("--min-semantic-recall", type=float, default=0.80, help="Minimum recall@k required for semantic retrieval.")
     eval_retrieval.add_argument("--min-semantic-no-context", type=float, default=1.00, help="Minimum no-context accuracy required for semantic retrieval.")
     eval_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
@@ -520,6 +521,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 detail = str(check.get("detail")).replace("\n", "\\n")
                 print(f"{check.get('status')} {check.get('name')} {detail}")
         print(f"min_hybrid_recall={payload.get('min_hybrid_recall')}")
+        print(f"min_no_context_accuracy={payload.get('min_no_context_accuracy')}")
         print(f"min_semantic_recall={payload.get('min_semantic_recall')}")
         print(f"min_semantic_no_context={payload.get('min_semantic_no_context')}")
         for line in format_retrieval_eval_text(payload)[:-1]:
@@ -998,6 +1000,7 @@ def run_eval_retrieval(args: argparse.Namespace, cfg: Settings) -> int:
         fixture_path=args.fixture,
         top_k=args.top_k,
         min_hybrid_recall=args.min_hybrid_recall,
+        min_no_context_accuracy=args.min_no_context_accuracy,
         min_semantic_recall=args.min_semantic_recall,
         min_semantic_no_context=args.min_semantic_no_context,
     )

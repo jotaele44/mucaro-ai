@@ -52,6 +52,12 @@ must both meet minimum floors, multi-binding cases must be present, query
 categories must cover multiple product surfaces, and benchmark counts are
 reported beside retrieval scores.
 
+Release certification also runs `backend/tests/fixtures/retrieval_eval_large.json`
+as a larger deterministic corpus. That larger fixture exercises the same local
+retrieval strategies across more source IDs, more query categories, multi-binding
+queries, and additional no-context cases. The evaluation gate requires
+no-context accuracy across every strategy, not only the semantic store.
+
 Future model-backed embeddings or Chroma-style stores should use this boundary
 instead of changing the answer service contract. They should not replace the
 default `hybrid` strategy until eval evidence shows a material improvement.
@@ -62,6 +68,8 @@ default `hybrid` strategy until eval evidence shows a material improvement.
 |---|---|
 | Fixture eval | `RETRIEVAL_EVAL_OK` with the candidate strategy included |
 | Fixture contract | `RETRIEVAL_FIXTURE_OK` with no dangling expected IDs, source diversity, multi-binding cases, category coverage, and positive/no-context minimums |
+| Large-corpus eval | `RETRIEVAL_EVAL_OK` for `backend/tests/fixtures/retrieval_eval_large.json` during release certification |
+| No-context accuracy | Every evaluated strategy meets the configured `--min-no-context-accuracy` threshold |
 | Determinism check | Stable top-k order for ties or explicit tie-break metadata |
 | Empty corpus | Explicit error status, no exception |
 | Missing index/store | Explicit repair warning |

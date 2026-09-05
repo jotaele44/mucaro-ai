@@ -142,6 +142,10 @@ Observed success markers:
   lexical, vector, BM25, hybrid, persistent, and semantic strategies across 25
   chunks, 31 queries, 25 positive queries, 6 no-context queries, 28 expected
   bindings, 25 source IDs, 3 multi-binding queries, and 20 query categories.
+- Large retrieval eval gate: `RETRIEVAL_EVAL_OK` with
+  `RETRIEVAL_FIXTURE_OK` for the larger deterministic fixture across 51 chunks,
+  65 queries, 55 positive queries, 10 no-context queries, 60 expected bindings,
+  51 source IDs, 5 multi-binding queries, and 20 query categories.
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
 - `CITATION_OK`

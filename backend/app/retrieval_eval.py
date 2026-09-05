@@ -285,6 +285,7 @@ def build_retrieval_eval_report(
     fixture_path: Path = DEFAULT_FIXTURE,
     top_k: int = 5,
     min_hybrid_recall: float = 0.80,
+    min_no_context_accuracy: float = 1.00,
     min_semantic_recall: float = 0.80,
     min_semantic_no_context: float = 1.00,
 ) -> dict[str, Any]:
@@ -299,6 +300,7 @@ def build_retrieval_eval_report(
             "fixture_validation": fixture_validation,
             "counts": fixture_validation["counts"] | {"strategies": 0},
             "min_hybrid_recall": min_hybrid_recall,
+            "min_no_context_accuracy": min_no_context_accuracy,
             "min_semantic_recall": min_semantic_recall,
             "min_semantic_no_context": min_semantic_no_context,
         }
@@ -310,6 +312,7 @@ def build_retrieval_eval_report(
             for strategy in DEFAULT_STRATEGIES
         ],
         "min_hybrid_recall": min_hybrid_recall,
+        "min_no_context_accuracy": min_no_context_accuracy,
         "min_semantic_recall": min_semantic_recall,
         "min_semantic_no_context": min_semantic_no_context,
         "fixture_validation": fixture_validation,
@@ -319,6 +322,7 @@ def build_retrieval_eval_report(
     semantic = by_strategy["semantic"]
     passed = (
         hybrid["recall_at_k"] >= min_hybrid_recall
+        and all(strategy["no_context_accuracy"] >= min_no_context_accuracy for strategy in report["strategies"])
         and semantic["recall_at_k"] >= min_semantic_recall
         and semantic["no_context_accuracy"] >= min_semantic_no_context
     )

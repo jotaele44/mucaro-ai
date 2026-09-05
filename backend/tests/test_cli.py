@@ -189,9 +189,34 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert "multi_binding_queries=3" in text_output
     assert "query_categories=20" in text_output
     assert "fixture_validation=RETRIEVAL_FIXTURE_OK" in text_output
+    assert "min_no_context_accuracy=1.0" in text_output
     assert "hybrid recall@5=" in text_output
     assert "semantic recall@5=" in text_output
     assert "RETRIEVAL_EVAL_OK" in text_output
+
+
+def test_cli_eval_retrieval_fails_when_any_strategy_returns_unrelated_context(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert (
+        main(
+            [
+                "eval",
+                "retrieval",
+                "--fixture",
+                "backend/tests/fixtures/retrieval_eval_large.json",
+                "--min-no-context-accuracy",
+                "1.1",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RETRIEVAL_EVAL_FAILED"
+    assert payload["min_no_context_accuracy"] == 1.1
 
 
 def test_cli_eval_retrieval_fails_when_thresholds_are_not_met(tmp_path: Path, capsys):

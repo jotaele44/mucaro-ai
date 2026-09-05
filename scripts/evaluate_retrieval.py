@@ -34,6 +34,7 @@ def main() -> int:
     parser.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE)
     parser.add_argument("--top-k", type=parse_top_k, default=5)
     parser.add_argument("--min-hybrid-recall", type=float, default=0.80)
+    parser.add_argument("--min-no-context-accuracy", type=float, default=1.00)
     parser.add_argument("--min-semantic-recall", type=float, default=0.80)
     parser.add_argument("--min-semantic-no-context", type=float, default=1.00)
     parser.add_argument("--format", choices=["text", "json"], default="text")
@@ -43,6 +44,7 @@ def main() -> int:
         fixture_path=args.fixture,
         top_k=args.top_k,
         min_hybrid_recall=args.min_hybrid_recall,
+        min_no_context_accuracy=args.min_no_context_accuracy,
         min_semantic_recall=args.min_semantic_recall,
         min_semantic_no_context=args.min_semantic_no_context,
     )

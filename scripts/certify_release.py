@@ -152,6 +152,15 @@ def main() -> int:
         gate_no_generated_tracked(files),
         gate_command("python_tests", [sys.executable, "-m", "pytest", "backend/tests", "-q"]),
         gate_command("retrieval_eval", [sys.executable, "scripts/evaluate_retrieval.py"]),
+        gate_command(
+            "retrieval_eval_large",
+            [
+                sys.executable,
+                "scripts/evaluate_retrieval.py",
+                "--fixture",
+                "backend/tests/fixtures/retrieval_eval_large.json",
+            ],
+        ),
         gate_command("json_validation", [sys.executable, "scripts/validate_json.py"]),
         gate_command("desktop_package_self_test", [sys.executable, "scripts/package_desktop.py", "--self-test"]),
     ]

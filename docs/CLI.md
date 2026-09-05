@@ -282,7 +282,9 @@ Use `mucaro eval retrieval` to run the committed retrieval-quality fixture from
 the supported CLI surface. The command reports the fixture path, chunk/query
 counts, positive/no-context query counts, expected binding counts, fixture
 validation checks, evaluated strategy count, recall thresholds, per-strategy
-`recall@k`, top-1 hit rate, and no-context accuracy. It returns
+`recall@k`, top-1 hit rate, and no-context accuracy. The
+`--min-no-context-accuracy` threshold applies to every evaluated strategy so
+unrelated source matches fail the gate instead of passing as weak context. It returns
 `RETRIEVAL_EVAL_INVALID` for malformed benchmark fixtures and
 `RETRIEVAL_EVAL_FAILED` when configured thresholds are not met, so release
 automation can fail on invalid or regressed retrieval evidence.
