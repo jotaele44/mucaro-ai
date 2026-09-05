@@ -500,6 +500,12 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"repo={payload.get('repo')}")
         print(f"branch={payload.get('branch')}")
         print(f"head_sha={payload.get('head_sha')}")
+        startup_blocker = payload.get("startup_blocker", {})
+        if isinstance(startup_blocker, dict):
+            print(f"startup_blocker_status={startup_blocker.get('status')}")
+            causes = startup_blocker.get("suspected_causes", [])
+            if isinstance(causes, list):
+                print(f"startup_blocker_causes={','.join(str(cause) for cause in causes)}")
         for check in payload.get("checks", []):
             detail = str(check.get("detail")).replace("\n", "\\n")
             print(f"{check.get('status')} {check.get('name')} {detail}")
@@ -1207,6 +1213,43 @@ def _run_failed_before_jobs(latest: dict[str, Any], jobs_count: int | None) -> b
     )
 
 
+def _github_startup_blocker(
+    *,
+    ci_latest: dict[str, Any] | None,
+    ci_jobs_count: int | None,
+    probe_latest: dict[str, Any] | None = None,
+    probe_jobs_count: int | None = None,
+    branch_protection_error: str | None = None,
+    billing_error: str | None = None,
+    self_hosted_runner_count: int | None = None,
+) -> dict[str, Any]:
+    ci_before_jobs = bool(ci_latest and _run_failed_before_jobs(ci_latest, ci_jobs_count))
+    probe_before_jobs = bool(probe_latest and _run_failed_before_jobs(probe_latest, probe_jobs_count))
+    isolated = ci_before_jobs and (probe_latest is None or probe_before_jobs)
+    suspected_causes: list[str] = []
+    next_actions: list[str] = []
+    if isolated:
+        suspected_causes.extend(["actions_billing_or_spending_limit", "hosted_runner_availability", "account_or_repository_policy"])
+        next_actions.append("Inspect repository Settings -> Actions -> General and Settings -> Actions -> Runners.")
+    if branch_protection_error and ("Upgrade to GitHub Pro" in branch_protection_error or "make this repository public" in branch_protection_error):
+        suspected_causes.append("private_branch_protection_plan_gate")
+        next_actions.append("Upgrade GitHub plan or make the repository public before enforcing private-repo branch protection.")
+    if billing_error:
+        suspected_causes.append("actions_billing_visibility_unverified")
+        next_actions.append("Run `gh auth refresh -h github.com -s user` and inspect GitHub Actions billing/minutes.")
+    return {
+        "status": "FAIL" if isolated else "OPEN" if suspected_causes else "PASS",
+        "ci_before_jobs": ci_before_jobs,
+        "probe_before_jobs": probe_before_jobs,
+        "isolated_before_jobs": isolated,
+        "self_hosted_runner_count": self_hosted_runner_count,
+        "branch_protection_error": branch_protection_error,
+        "billing_error": billing_error,
+        "suspected_causes": sorted(set(suspected_causes)),
+        "next_actions": sorted(set(next_actions)),
+    }
+
+
 def build_github_governance_status(
     cfg: Settings,
     *,
@@ -1224,6 +1267,8 @@ def build_github_governance_status(
         "branch_protected": None,
         "required_status_checks": None,
         "latest_ci": None,
+        "branch_protection_api": None,
+        "startup_blocker": None,
         "remote_tag_bindings": [],
         "errors": [],
     }
@@ -1259,6 +1304,17 @@ def build_github_governance_status(
         if protected and required_checks:
             detail = "protected with required status checks"
         gates.append(_certification_gate("github_branch_protection", "PASS" if protected else "WARN", detail))
+
+    protection_error_for_blocker: str | None = None
+    protection_api_ok, protection_api_payload, protection_api_error = _gh_json(cfg, ["api", f"repos/{repo}/branches/{branch}/protection"])
+    github["branch_protection_api"] = {"available": protection_api_ok}
+    if protection_api_ok and isinstance(protection_api_payload, dict):
+        github["branch_protection_api"]["required_status_checks"] = protection_api_payload.get("required_status_checks")
+        gates.append(_certification_gate("github_branch_protection_api", "PASS", "branch protection endpoint readable"))
+    else:
+        protection_error_for_blocker = protection_api_error
+        github["branch_protection_api"]["error"] = protection_api_error
+        gates.append(_certification_gate("github_branch_protection_api", "WARN", protection_api_error or "branch protection endpoint unavailable"))
 
     ci_ok, ci_payload, ci_error = _gh_json(
         cfg,
@@ -1318,6 +1374,11 @@ def build_github_governance_status(
                             "FAIL",
                             "workflow failed before GitHub created jobs; inspect Actions billing, spending limit, runner availability, and account policy",
                         )
+                    )
+                    github["startup_blocker"] = _github_startup_blocker(
+                        ci_latest=latest,
+                        ci_jobs_count=jobs_count,
+                        branch_protection_error=protection_error_for_blocker,
                     )
             elif ci_matches_head:
                 gates.append(
@@ -1467,8 +1528,10 @@ def build_github_actions_diagnostic_status(
         checks.append(_certification_gate("workflow_token_permissions", "WARN", token_error or "workflow token permission lookup failed"))
 
     branch_protection: dict[str, Any] = {"available": False}
+    branch_protection_error_for_blocker: str | None = None
     if not branch_ok:
         branch_protection["error"] = "branch unavailable"
+        branch_protection_error_for_blocker = "branch unavailable"
         checks.append(_certification_gate("branch_protection_api", "WARN", "branch unavailable"))
     else:
         protection_ok, protection_payload, protection_error = _gh_json(cfg, ["api", f"repos/{repo}/branches/{branch}/protection"])
@@ -1478,14 +1541,17 @@ def build_github_actions_diagnostic_status(
             checks.append(_certification_gate("branch_protection_api", "PASS", "branch protection endpoint readable"))
         else:
             branch_protection["error"] = protection_error
+            branch_protection_error_for_blocker = protection_error
             checks.append(_certification_gate("branch_protection_api", "WARN", protection_error or "branch protection endpoint unavailable"))
             if protection_error and ("Upgrade to GitHub Pro" in protection_error or "make this repository public" in protection_error):
                 next_actions.append("Upgrade GitHub plan or make the repository public before enforcing private-repo branch protection.")
 
     runners_ok, runners_payload, runners_error = _gh_json(cfg, ["api", f"repos/{repo}/actions/runners"])
     runner_inventory: dict[str, Any] = {"available": runners_ok}
+    self_hosted_runner_count: int | None = None
     if runners_ok and isinstance(runners_payload, dict):
         total_count = runners_payload.get("total_count")
+        self_hosted_runner_count = total_count if isinstance(total_count, int) else None
         runner_inventory["self_hosted_total_count"] = total_count
         checks.append(
             _certification_gate(
@@ -1564,6 +1630,15 @@ def build_github_actions_diagnostic_status(
         checks.append(_certification_gate("actions_billing", "WARN", billing_error or "billing endpoint unavailable"))
         next_actions.append("Run `gh auth refresh -h github.com -s user` and inspect GitHub Actions billing/minutes.")
 
+    startup_blocker = _github_startup_blocker(
+        ci_latest=ci_latest,
+        ci_jobs_count=ci_jobs_count,
+        probe_latest=probe_latest,
+        probe_jobs_count=probe_jobs_count,
+        branch_protection_error=branch_protection_error_for_blocker,
+        billing_error=billing_error,
+        self_hosted_runner_count=self_hosted_runner_count,
+    )
     if (
         ci_latest
         and probe_latest
@@ -1582,6 +1657,7 @@ def build_github_actions_diagnostic_status(
             )
         )
         next_actions.append("Inspect repository Settings -> Actions -> General and Settings -> Actions -> Runners.")
+    next_actions.extend(startup_blocker["next_actions"])
 
     failed = [check for check in checks if check["status"] == "FAIL"]
     warned = [check for check in checks if check["status"] == "WARN"]
@@ -1594,6 +1670,7 @@ def build_github_actions_diagnostic_status(
         "checks": checks,
         "branch_protection": branch_protection,
         "runner_inventory": runner_inventory,
+        "startup_blocker": startup_blocker,
         "workflows": workflows,
         "runs": {
             "ci": _run_summary(ci_latest, ci_jobs_count),
@@ -1757,6 +1834,7 @@ def build_release_state_report(
     github_gate_names = {
         "github_branch",
         "github_branch_protection",
+        "github_branch_protection_api",
         "github_ci_jobs_lookup",
         "github_hosted_runner_startup",
         "github_latest_ci",

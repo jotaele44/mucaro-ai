@@ -101,7 +101,8 @@ Observed success markers:
   availability and self-hosted runner inventory as explicit read-only
   diagnostics. The current private repo branch-protection API reports a plan
   gate requiring GitHub Pro or public visibility, while hosted CI startup still
-  fails before job creation.
+  fails before job creation. The diagnostic also emits a structured
+  `startup_blocker` summary for automation and release-state handoff.
 - Local release certification for `v0.1.23` reports `CERTIFY_RELEASE_OK` on
   commit `f48828b8dd5648554b65dba1ca86a07db099f7d3`, including `122 passed`,
   retrieval eval, JSON validation, desktop package self-test, frontend audit,

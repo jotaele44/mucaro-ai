@@ -282,6 +282,10 @@ the project build/test stack. If private branch protection is plan-gated, the
 diagnostic reports a `branch_protection_api` warning separately from hosted CI
 startup so governance work can distinguish repository policy from build
 failures.
+The JSON output also includes a `startup_blocker` object with
+`isolated_before_jobs`, `suspected_causes`, and `next_actions` fields so
+automation can distinguish hosted-runner startup failure from branch-protection
+plan limits and billing-visibility gaps.
 
 Use `mucaro audit product` to classify the broader governed assistant objective
 as requirement rows with `PASS`, `OPEN`, or `BLOCKED` status. The audit includes

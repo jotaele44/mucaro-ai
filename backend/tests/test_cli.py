@@ -614,6 +614,8 @@ def test_cli_certify_status_includes_github_governance(tmp_path: Path, capsys, m
             return True, f"{'b' * 40}\trefs/tags/{tag_name}\n{head_sha}\trefs/tags/{tag_name}^{{}}"
         if args[:3] == ["gh", "api", "repos/jotaele44/mucaro-ai/branches/main"]:
             return True, json.dumps({"protected": False, "protection": {"required_status_checks": {"contexts": []}}})
+        if args[:3] == ["gh", "api", "repos/jotaele44/mucaro-ai/branches/main/protection"]:
+            return False, json.dumps({"message": "Upgrade to GitHub Pro or make this repository public", "status": "403"})
         if args[:7] == ["gh", "run", "list", "--repo", "jotaele44/mucaro-ai", "--workflow", "CI"]:
             return True, json.dumps(
                 [
@@ -647,6 +649,7 @@ def test_cli_certify_status_includes_github_governance(tmp_path: Path, capsys, m
     assert payload["github"]["latest_ci"]["head_sha"] == head_sha
     assert gates["github_repo"]["status"] == "PASS"
     assert gates["github_branch_protection"]["status"] == "WARN"
+    assert gates["github_branch_protection_api"]["status"] == "WARN"
     assert gates["github_latest_ci"]["status"] == "PASS"
     assert gates["github_tag_binding"]["status"] == "PASS"
 
@@ -678,6 +681,8 @@ def test_cli_release_state_reports_github_governance_open(tmp_path: Path, capsys
             return True, "https://github.com/jotaele44/mucaro-ai.git"
         if args[:3] == ["gh", "api", "repos/jotaele44/mucaro-ai/branches/main"]:
             return True, json.dumps({"protected": False, "protection": {"required_status_checks": {"contexts": []}}})
+        if args[:3] == ["gh", "api", "repos/jotaele44/mucaro-ai/branches/main/protection"]:
+            return False, json.dumps({"message": "Upgrade to GitHub Pro or make this repository public", "status": "403"})
         if args[:7] == ["gh", "run", "list", "--repo", "jotaele44/mucaro-ai", "--workflow", "CI"]:
             return True, json.dumps(
                 [
@@ -716,6 +721,7 @@ def test_cli_release_state_reports_github_governance_open(tmp_path: Path, capsys
     assert states["PYTHON_DIST_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["GITHUB_GOVERNANCE_OPEN"]["status"] == "OPEN"
     assert "github_hosted_runner_startup=FAIL" in states["GITHUB_GOVERNANCE_OPEN"]["evidence"]
+    assert "github_branch_protection_api=WARN:HTTP 403: Upgrade to GitHub Pro" in states["GITHUB_GOVERNANCE_OPEN"]["evidence"]
     assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
 
     assert main(["release", "state", "--include-github", "--strict", "--format", "text"], cfg=cfg) == 2
@@ -1048,6 +1054,9 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert payload["status"] == "GITHUB_ACTIONS_DIAGNOSTIC_FAIL"
     assert payload["runs"]["ci"]["jobs_count"] == 0
     assert payload["runs"]["startup_probe"]["jobs_count"] == 0
+    assert payload["startup_blocker"]["status"] == "FAIL"
+    assert payload["startup_blocker"]["isolated_before_jobs"] is True
+    assert "private_branch_protection_plan_gate" in payload["startup_blocker"]["suspected_causes"]
     assert checks["latest_ci"]["status"] == "FAIL"
     assert checks["startup_probe"]["status"] == "FAIL"
     assert checks["startup_layer_isolated"]["status"] == "FAIL"
@@ -1060,6 +1069,8 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert main(["certify", "github-actions", "--format", "text"], cfg=cfg) == 2
     text_output = capsys.readouterr().out
     assert "GITHUB_ACTIONS_DIAGNOSTIC_FAIL" in text_output
+    assert "startup_blocker_status=FAIL" in text_output
+    assert "private_branch_protection_plan_gate" in text_output
     assert "WARN branch_protection_api HTTP 403: Upgrade to GitHub Pro" in text_output
     assert "PASS self_hosted_runner_inventory self_hosted_total_count=0" in text_output
     assert "FAIL startup_layer_isolated" in text_output
