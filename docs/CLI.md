@@ -233,8 +233,11 @@ workflow, job counts, and account billing endpoint access. It is read-only and
 returns `GITHUB_ACTIONS_DIAGNOSTIC_FAIL` when hosted startup is isolated outside
 the project build/test stack.
 
-Use `mucaro audit product` to classify the broader assistant objective as
-requirement rows with `PASS`, `OPEN`, or `BLOCKED` status. Add `--strict` when
+Use `mucaro audit product` to classify the broader governed assistant objective
+as requirement rows with `PASS`, `OPEN`, or `BLOCKED` status. The audit includes
+assistant capability rows plus release-governance rows, so an otherwise working
+local build still reports `PRODUCT_AUDIT_OPEN` while hosted CI, branch
+protection, or governed tag binding remains unresolved. Add `--strict` when
 automation should fail while any product gap remains open.
 
 Use `mucaro eval retrieval` to run the committed retrieval-quality fixture from

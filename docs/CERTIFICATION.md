@@ -68,8 +68,11 @@ Candidate target:
 - Scope: source library delete/reindex controls, retrieval strategy UI, no-context recovery guidance, expanded retrieval eval corpus, optional local operator token boundary, workspace profiles, structured run history, conversation follow-up context, conversation rename/delete/search, directory access UI, desktop package self-test, CLI `--version`, early `ask --top-k` validation, CLI source listing, CLI source deletion, CLI reindexing, CLI index status, CLI conversation create/list/show/rename/delete/ask, CLI run list/summary/show, opt-in `bm25_v1` retrieval, CLI readiness diagnostics, executable product-gap auditing, opt-in `local_semantic_hash_store_v1` retrieval, approval-gated local tool runtime, metadata-only image/audio/video ingestion, explicit local memory controls, and production-security profile checks.
 - Candidate local evidence: `109 passed`, `RETRIEVAL_EVAL_OK`, `JSON_OK checked=10`,
   `DESKTOP_PACKAGE_READY`, `npm audit` 0 vulnerabilities, frontend build passed,
-  `PRODUCT_AUDIT_OK` at `100.0%`, clean `worktree_clean`, and
-  `CERTIFY_RELEASE_OK`.
+  historical `PRODUCT_AUDIT_OK` at `100.0%` for the pre-governance assistant
+  scope, clean `worktree_clean`, and `CERTIFY_RELEASE_OK`.
+- Current governed-release product audit scope includes packaging and GitHub
+  release governance rows. It must remain `PRODUCT_AUDIT_OPEN` until hosted CI,
+  branch protection, and governed tag binding are proven for the current HEAD.
 - Required external receipt: hosted CI and fresh-clone certification must pass on the final pushed commit before tagging. Current release candidates must also build `PACKAGE_ARTIFACT_READY` from the same clean source state before a governed tag.
 
 ## Scope

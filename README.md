@@ -228,7 +228,9 @@ job counts, and billing endpoint access. This keeps GitHub startup triage in
 the same operator CLI boundary as release certification.
 
 Use `mucaro audit product` to track what is complete versus still open against
-the full ChatGPT/Claude-like local assistant target.
+the governed local-first assistant target. The audit includes both assistant
+capabilities and release-governance requirements, so current local feature
+coverage can pass while the GitHub-governed release row remains open.
 
 Use `mucaro eval retrieval --format text` to run the committed retrieval
 quality fixture from the supported CLI. It reports per-strategy recall,

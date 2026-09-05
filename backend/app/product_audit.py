@@ -8,8 +8,12 @@ from .config import Settings, settings
 
 CODE_ROOT = Path(__file__).resolve().parents[2]
 OBJECTIVE = (
-    "Have a custom built LLM program that is comparable to ChatGPT and Claude "
-    "and has the ability to access the user directory after prompting the user for permission."
+    "Transform Mucaro AI from a validated local prototype into a governed, "
+    "release-grade, local-first AI workbench with hardened CLI workflows, "
+    "measurable retrieval quality, permissioned source ingestion, cited answer "
+    "traceability, explicit memory controls, approved tool execution, "
+    "repeatable fresh-clone certification, and a clear path toward "
+    "production-quality packaging."
 )
 
 
@@ -189,6 +193,31 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Multi-tenant SaaS isolation is excluded by design for this local-first app.",
             "Keep production profile fail-closed and extend only with explicit threat-model changes.",
         ),
+        ProductRequirement(
+            "source_artifact_packaging",
+            "operations",
+            "Release candidates produce governed source artifacts with exact receipts.",
+            _status_from_files(
+                cfg,
+                [
+                    ("backend", "app", "packaging.py"),
+                    ("docs", "PACKAGING_POLICY.md"),
+                    ("scripts", "certify_release.py"),
+                ],
+            ),
+            "mucaro package status/build, docs/PACKAGING_POLICY.md, and the release package_artifact gate",
+            "",
+            "Keep generated artifact receipts bound to exact Git HEAD before any governed release tag.",
+        ),
+        ProductRequirement(
+            "github_release_governance",
+            "operations",
+            "Governed releases require current-head hosted CI, protected branch policy, and tag binding.",
+            "OPEN",
+            "mucaro certify status --include-github and mucaro certify github-actions",
+            "Hosted GitHub Actions startup currently fails before jobs; branch protection is not enforced; no governed tag is bound to the current HEAD.",
+            "Repair hosted Actions startup, enable branch protection after CI is healthy, then tag only after current-head GitHub governance passes.",
+        ),
     ]
 
     rows = [requirement.as_dict() for requirement in requirements]
@@ -202,11 +231,15 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
     if counts["blocked"]:
         status = "PRODUCT_AUDIT_BLOCKED"
     readiness_percent = round((counts["pass"] / counts["total"]) * 100, 1) if counts["total"] else 0.0
+    next_recommended_vector = "complete" if status == "PRODUCT_AUDIT_OK" else next(
+        (row["requirement_id"] for row in rows if row["status"] in {"BLOCKED", "OPEN"}),
+        "complete",
+    )
     return {
         "status": status,
         "objective": OBJECTIVE,
         "readiness_percent": readiness_percent,
         "counts": counts,
         "requirements": rows,
-        "next_recommended_vector": "complete" if status == "PRODUCT_AUDIT_OK" else "production_security",
+        "next_recommended_vector": next_recommended_vector,
     }

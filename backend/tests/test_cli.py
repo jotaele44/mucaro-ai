@@ -130,8 +130,9 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
 
     assert main(["audit", "product", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["status"] == "PRODUCT_AUDIT_OK"
-    assert payload["readiness_percent"] == 100.0
+    assert payload["status"] == "PRODUCT_AUDIT_OPEN"
+    assert payload["readiness_percent"] == 94.1
+    assert payload["counts"] == {"pass": 16, "open": 1, "blocked": 0, "total": 17}
     by_id = {row["requirement_id"]: row for row in payload["requirements"]}
     assert by_id["permission_gated_user_directory"]["status"] == "PASS"
     assert by_id["source_lineage_citations"]["status"] == "PASS"
@@ -140,12 +141,15 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert by_id["multimodal_interface"]["status"] == "PASS"
     assert by_id["personalization_memory"]["status"] == "PASS"
     assert by_id["production_security"]["status"] == "PASS"
-    assert payload["next_recommended_vector"] == "complete"
+    assert by_id["source_artifact_packaging"]["status"] == "PASS"
+    assert by_id["github_release_governance"]["status"] == "OPEN"
+    assert payload["next_recommended_vector"] == "github_release_governance"
 
-    assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 0
+    assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out
-    assert "PRODUCT_AUDIT_OK" in strict_output
-    assert "PASS production_security" in strict_output
+    assert "PRODUCT_AUDIT_OPEN" in strict_output
+    assert "PASS source_artifact_packaging" in strict_output
+    assert "OPEN github_release_governance" in strict_output
 
 
 def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
@@ -389,17 +393,18 @@ def test_cli_package_build_blocks_dirty_worktree(tmp_path: Path, capsys):
 def test_cli_certify_status_reports_release_readiness(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
-    assert main(["certify", "status", "--format", "json"], cfg=cfg) == 0
+    assert main(["certify", "status", "--format", "json"], cfg=cfg) == 2
     payload = json.loads(capsys.readouterr().out)
-    assert payload["status"] == "CERTIFICATION_WARN"
+    assert payload["status"] == "CERTIFICATION_FAIL"
     assert payload["version"] == "0.1.23"
     assert payload["project_root"] == str(tmp_path)
-    assert payload["product_audit_status"] == "PRODUCT_AUDIT_OK"
+    assert payload["product_audit_status"] == "PRODUCT_AUDIT_OPEN"
     assert payload["json_status"] == "JSON_OK"
     assert payload["github"] == {"enabled": False}
     assert payload["git"]["head_sha"] is None
     gates = {gate["name"]: gate for gate in payload["gates"]}
-    assert gates["product_audit"]["status"] == "PASS"
+    assert gates["product_audit"]["status"] == "FAIL"
+    assert gates["product_audit"]["detail"] == "PRODUCT_AUDIT_OPEN"
     assert gates["json_validation"]["status"] == "PASS"
     assert gates["git_repository"]["status"] == "WARN"
     assert gates["baseline_tag"]["status"] == "WARN"
@@ -410,7 +415,8 @@ def test_cli_certify_status_reports_release_readiness(tmp_path: Path, capsys):
 
     assert main(["certify", "status", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out
-    assert "CERTIFICATION_WARN" in strict_output
+    assert "CERTIFICATION_FAIL" in strict_output
+    assert "FAIL product_audit PRODUCT_AUDIT_OPEN" in strict_output
     assert "WARN git_repository git metadata unavailable" in strict_output
     assert "command=python3 scripts/certify_release.py" in strict_output
 
@@ -457,9 +463,12 @@ def test_cli_certify_status_includes_github_governance(tmp_path: Path, capsys, m
 
     monkeypatch.setattr(cli, "_command_output", fake_command_output)
 
-    assert main(["certify", "status", "--include-github", "--format", "json"], cfg=cfg) == 0
+    assert main(["certify", "status", "--include-github", "--format", "json"], cfg=cfg) == 2
     payload = json.loads(capsys.readouterr().out)
     gates = {gate["name"]: gate for gate in payload["gates"]}
+    assert payload["status"] == "CERTIFICATION_FAIL"
+    assert payload["product_audit_status"] == "PRODUCT_AUDIT_OPEN"
+    assert gates["product_audit"]["status"] == "FAIL"
     assert payload["github"]["enabled"] is True
     assert payload["github"]["repo"] == "jotaele44/mucaro-ai"
     assert payload["github"]["workflow"] == "CI"
