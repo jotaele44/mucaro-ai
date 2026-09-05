@@ -220,7 +220,8 @@ the heavier gates. Add `--include-github` when network access and authenticated
 tag-binding checks. GitHub governance checks are read-only and never mutate
 repository settings. The default hosted workflow name is `CI`; use
 `--github-workflow NAME` with `--include-github` if the release workflow is
-renamed.
+renamed. A completed hosted CI run for the current HEAD must conclude
+successfully; an unsuccessful completed run is a failed certification gate.
 
 Use `mucaro audit product` to classify the broader assistant objective as
 requirement rows with `PASS`, `OPEN`, or `BLOCKED` status. Add `--strict` when

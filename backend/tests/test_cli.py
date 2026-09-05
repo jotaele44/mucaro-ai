@@ -273,6 +273,32 @@ def test_github_governance_fails_when_latest_ci_is_for_different_head(tmp_path: 
     assert f"does not match HEAD {head_sha}" in by_name["github_latest_ci"]["detail"]
 
 
+def test_github_governance_fails_when_current_head_ci_fails(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "a" * 40
+
+    def fake_gh_json(_cfg: Settings, args: list[str]):
+        if args[:2] == ["api", "repos/jotaele44/mucaro-ai/branches/main"]:
+            return True, {"protected": True, "protection": {"required_status_checks": {"contexts": ["validate"]}}}, ""
+        if args[:2] == ["run", "list"]:
+            return True, [{"status": "completed", "conclusion": "startup_failure", "headSha": head_sha}], ""
+        return False, None, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_gh_json", fake_gh_json)
+
+    _github, gates = cli.build_github_governance_status(
+        cfg,
+        repo="jotaele44/mucaro-ai",
+        branch="main",
+        head_sha=head_sha,
+        tags_at_head=[],
+        workflow_name="CI",
+    )
+    by_name = {gate["name"]: gate for gate in gates}
+    assert by_name["github_latest_ci"]["status"] == "FAIL"
+    assert f"completed startup_failure {head_sha}" in by_name["github_latest_ci"]["detail"]
+
+
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 

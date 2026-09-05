@@ -975,6 +975,14 @@ def build_github_governance_status(
             ci_passed = latest.get("status") == "completed" and latest.get("conclusion") == "success"
             if ci_matches_head and ci_passed:
                 gates.append(_certification_gate("github_latest_ci", "PASS", f"success {latest.get('headSha')}"))
+            elif ci_matches_head and latest.get("status") == "completed":
+                gates.append(
+                    _certification_gate(
+                        "github_latest_ci",
+                        "FAIL",
+                        f"{latest.get('status')} {latest.get('conclusion') or 'unknown'} {latest.get('headSha')}",
+                    )
+                )
             elif ci_matches_head:
                 gates.append(
                     _certification_gate(
