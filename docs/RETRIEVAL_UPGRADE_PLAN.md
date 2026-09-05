@@ -74,6 +74,8 @@ default `hybrid` strategy until eval evidence shows a material improvement.
 | Large-corpus eval | `RETRIEVAL_EVAL_OK` for `backend/tests/fixtures/retrieval_eval_large.json` during release certification |
 | No-context accuracy | Every evaluated strategy meets the configured `--min-no-context-accuracy` threshold |
 | Expected-binding recall | Every evaluated strategy meets the configured `--min-expected-binding-recall` threshold |
+| Category recall | Optional `--min-category-recall` can fail any positive-query category below the configured threshold |
+| Category expected-binding recall | Optional `--min-category-binding-recall` can fail any positive-query category that misses required expected chunks |
 | Context precision | Hybrid and semantic retrieval meet their configured precision thresholds so noisy top-k context is visible |
 | Multi-binding full hit | Every evaluated strategy meets the configured `--min-multi-binding-full-hit` threshold for multi-source questions |
 | Determinism check | Stable top-k order for ties or explicit tie-break metadata |

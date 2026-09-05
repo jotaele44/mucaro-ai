@@ -172,6 +172,9 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
         "strategies": 6,
     }
     assert payload["fixture_validation"]["status"] == "RETRIEVAL_FIXTURE_OK"
+    assert payload["min_category_recall"] == 0.0
+    assert payload["min_category_binding_recall"] == 0.0
+    assert payload["category_threshold_failures"] == []
     assert {strategy["strategy"] for strategy in payload["strategies"]} == {
         "lexical",
         "vector",
@@ -220,6 +223,8 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert "min_no_context_accuracy=1.0" in text_output
     assert "min_hybrid_precision=0.2" in text_output
     assert "min_expected_binding_recall=0.95" in text_output
+    assert "min_category_recall=0.0" in text_output
+    assert "min_category_binding_recall=0.0" in text_output
     assert "binding_recall=1.00" in text_output
     assert "precision=0.29" in text_output
     assert "multi_full=1.00" in text_output
@@ -227,6 +232,57 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert "hybrid recall@5=" in text_output
     assert "semantic recall@5=" in text_output
     assert "RETRIEVAL_EVAL_OK" in text_output
+
+
+def test_cli_eval_retrieval_fails_when_category_thresholds_are_not_met(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert (
+        main(
+            [
+                "eval",
+                "retrieval",
+                "--fixture",
+                "backend/tests/fixtures/retrieval_eval_large.json",
+                "--min-category-binding-recall",
+                "1.0",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RETRIEVAL_EVAL_FAILED"
+    assert payload["min_category_binding_recall"] == 1.0
+    assert {
+        (failure["strategy"], failure["category"])
+        for failure in payload["category_threshold_failures"]
+    } >= {
+        ("bm25", "multi_binding"),
+        ("semantic", "multi_binding"),
+    }
+
+    assert (
+        main(
+            [
+                "eval",
+                "retrieval",
+                "--fixture",
+                "backend/tests/fixtures/retrieval_eval_large.json",
+                "--min-category-binding-recall",
+                "1.0",
+                "--format",
+                "text",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    text_output = capsys.readouterr().out
+    assert "category_threshold_failure strategy=bm25 category=multi_binding" in text_output
+    assert "RETRIEVAL_EVAL_FAILED" in text_output
 
 
 def test_cli_eval_retrieval_fails_when_any_strategy_returns_unrelated_context(tmp_path: Path, capsys):

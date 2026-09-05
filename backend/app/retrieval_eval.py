@@ -394,6 +394,8 @@ def build_retrieval_eval_report(
     min_semantic_precision: float = 0.20,
     min_expected_binding_recall: float = 0.95,
     min_multi_binding_full_hit: float = 0.60,
+    min_category_recall: float = 0.0,
+    min_category_binding_recall: float = 0.0,
 ) -> dict[str, Any]:
     fixture = load_retrieval_eval_fixture(fixture_path)
     fixture_validation = validate_retrieval_eval_fixture(fixture)
@@ -413,6 +415,9 @@ def build_retrieval_eval_report(
             "min_semantic_precision": min_semantic_precision,
             "min_expected_binding_recall": min_expected_binding_recall,
             "min_multi_binding_full_hit": min_multi_binding_full_hit,
+            "min_category_recall": min_category_recall,
+            "min_category_binding_recall": min_category_binding_recall,
+            "category_threshold_failures": [],
         }
     report: dict[str, Any] = {
         "fixture": str(fixture_path.relative_to(ROOT) if fixture_path.is_relative_to(ROOT) else fixture_path),
@@ -429,11 +434,28 @@ def build_retrieval_eval_report(
         "min_semantic_precision": min_semantic_precision,
         "min_expected_binding_recall": min_expected_binding_recall,
         "min_multi_binding_full_hit": min_multi_binding_full_hit,
+        "min_category_recall": min_category_recall,
+        "min_category_binding_recall": min_category_binding_recall,
         "fixture_validation": fixture_validation,
     }
     by_strategy = {item["strategy"]: item for item in report["strategies"]}
     hybrid = by_strategy["hybrid"]
     semantic = by_strategy["semantic"]
+    category_threshold_failures = [
+        {
+            "strategy": strategy["strategy"],
+            "category": category["category"],
+            "recall_at_k": category["recall_at_k"],
+            "expected_binding_recall_at_k": category["expected_binding_recall_at_k"],
+        }
+        for strategy in report["strategies"]
+        for category in strategy.get("category_metrics", [])
+        if category["positive_queries"] > 0
+        and (
+            category["recall_at_k"] < min_category_recall
+            or category["expected_binding_recall_at_k"] < min_category_binding_recall
+        )
+    ]
     passed = (
         hybrid["recall_at_k"] >= min_hybrid_recall
         and hybrid["context_precision_at_k"] >= min_hybrid_precision
@@ -443,8 +465,10 @@ def build_retrieval_eval_report(
         and semantic["recall_at_k"] >= min_semantic_recall
         and semantic["context_precision_at_k"] >= min_semantic_precision
         and semantic["no_context_accuracy"] >= min_semantic_no_context
+        and not category_threshold_failures
     )
     report["status"] = "RETRIEVAL_EVAL_OK" if passed else "RETRIEVAL_EVAL_FAILED"
+    report["category_threshold_failures"] = category_threshold_failures
     report["counts"] = {
         "chunks": len(fixture.get("chunks", [])),
         "queries": len(fixture.get("queries", [])),
@@ -488,6 +512,13 @@ def format_retrieval_eval_text(report: dict[str, Any]) -> list[str]:
                 f"binding_recall={category['expected_binding_recall_at_k']:.2f} "
                 f"precision={category['context_precision_at_k']:.2f} "
                 f"no_context={category['no_context_accuracy']:.2f}"
+            )
+    for failure in report.get("category_threshold_failures", []):
+        if isinstance(failure, dict):
+            lines.append(
+                f"category_threshold_failure strategy={failure.get('strategy')} "
+                f"category={failure.get('category')} recall={failure.get('recall_at_k')} "
+                f"binding_recall={failure.get('expected_binding_recall_at_k')}"
             )
     lines.append(str(report.get("status")))
     return lines

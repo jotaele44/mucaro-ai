@@ -326,7 +326,9 @@ retrieval area. The `--min-no-context-accuracy`, `--min-expected-binding-recall`
 `--min-multi-binding-full-hit` thresholds apply across evaluated strategies so
 unrelated context, partial multi-source retrieval, and missing expected
 bindings fail the gate instead of passing as weak context. Hybrid and semantic
-retrieval also have dedicated precision thresholds. It returns
+retrieval also have dedicated precision thresholds. Use `--min-category-recall`
+and `--min-category-binding-recall` to promote per-category positive-query
+metrics into hard gates once the category expectations are release-ready. It returns
 `RETRIEVAL_EVAL_INVALID` for malformed benchmark fixtures and
 `RETRIEVAL_EVAL_FAILED` when configured thresholds are not met, so release
 automation can fail on invalid or regressed retrieval evidence.

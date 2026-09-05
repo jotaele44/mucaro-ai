@@ -180,6 +180,13 @@ def build_parser() -> argparse.ArgumentParser:
     eval_retrieval.add_argument("--min-semantic-precision", type=float, default=0.20, help="Minimum context precision@k required for semantic retrieval.")
     eval_retrieval.add_argument("--min-expected-binding-recall", type=float, default=0.95, help="Minimum expected binding recall@k required for every retrieval strategy.")
     eval_retrieval.add_argument("--min-multi-binding-full-hit", type=float, default=0.60, help="Minimum multi-binding full-hit rate required for every retrieval strategy.")
+    eval_retrieval.add_argument("--min-category-recall", type=float, default=0.0, help="Optional minimum recall@k required for every positive-query category.")
+    eval_retrieval.add_argument(
+        "--min-category-binding-recall",
+        type=float,
+        default=0.0,
+        help="Optional minimum expected-binding recall@k required for every positive-query category.",
+    )
     eval_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     eval_retrieval.set_defaults(handler=run_eval_retrieval)
 
@@ -580,6 +587,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"min_semantic_precision={payload.get('min_semantic_precision')}")
         print(f"min_expected_binding_recall={payload.get('min_expected_binding_recall')}")
         print(f"min_multi_binding_full_hit={payload.get('min_multi_binding_full_hit')}")
+        print(f"min_category_recall={payload.get('min_category_recall')}")
+        print(f"min_category_binding_recall={payload.get('min_category_binding_recall')}")
         for line in format_retrieval_eval_text(payload)[:-1]:
             print(line)
     elif status in {"PACKAGE_READY", "PACKAGE_WARN", "PACKAGE_FAIL"}:
@@ -1121,6 +1130,8 @@ def run_eval_retrieval(args: argparse.Namespace, cfg: Settings) -> int:
         min_semantic_precision=args.min_semantic_precision,
         min_expected_binding_recall=args.min_expected_binding_recall,
         min_multi_binding_full_hit=args.min_multi_binding_full_hit,
+        min_category_recall=args.min_category_recall,
+        min_category_binding_recall=args.min_category_binding_recall,
     )
     emit_payload(report, args.format)
     return 0 if report["status"] == "RETRIEVAL_EVAL_OK" else 2
