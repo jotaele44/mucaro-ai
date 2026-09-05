@@ -234,7 +234,8 @@ current repo into explicit release states: canonical local baseline, local
 release certification pending, fresh-clone certification pending, source
 artifact packaging, GitHub governance open, governed release ready, and
 production ready. The command is read-only and reports `UNVERIFIED` for states
-that require a separate heavy certification script.
+that require a matching exact-HEAD receipt from a separate heavy certification
+script.
 
 Use `mucaro audit product` to track what is complete versus still open against
 the governed local-first assistant target. The audit includes both assistant

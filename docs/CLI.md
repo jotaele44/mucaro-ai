@@ -222,8 +222,9 @@ release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `GITHUB_GOVERNANCE_OPEN`, `GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`.
 The command reuses existing audit, package, Git, and optional GitHub governance
 receipts. It does not run heavy certification scripts, so those states remain
-`UNVERIFIED` until the operator runs the reported commands. Add
-`--include-github` when authenticated `gh` evidence is available.
+`UNVERIFIED` until the operator runs the reported commands and creates matching
+exact-HEAD receipts under `data/exports/release_receipts`. Add `--include-github`
+when authenticated `gh` evidence is available.
 
 Use `mucaro certify status` before tagging or pushing release candidates. It is
 a read-only readiness receipt over product audit, doctor, JSON validation, Git

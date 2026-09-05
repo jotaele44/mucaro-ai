@@ -5,6 +5,7 @@ from pathlib import Path
 import backend.app.cli as cli
 from backend.app.cli import main
 from backend.app.config import Settings
+from backend.app.release_receipts import write_release_receipt
 
 
 def make_settings(root: Path, *, operator_token: str | None = None) -> Settings:
@@ -547,6 +548,62 @@ def test_cli_release_state_reports_github_governance_open(tmp_path: Path, capsys
     assert "RELEASE_STATE_OPEN" in text_output
     assert "current_state=GITHUB_GOVERNANCE_OPEN" in text_output
     assert "OPEN GITHUB_GOVERNANCE_OPEN" in text_output
+
+
+def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    head_sha = "d" * 40
+
+    write_release_receipt(
+        tmp_path,
+        receipt_type="local_release",
+        status="CERTIFY_RELEASE_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_release.py"],
+        payload={"gates": []},
+    )
+    write_release_receipt(
+        tmp_path,
+        receipt_type="fresh_clone",
+        status="FRESH_CLONE_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_fresh_clone.py", "--ref", head_sha],
+        payload={"checks": []},
+    )
+    write_release_receipt(
+        tmp_path,
+        receipt_type="fresh_clone",
+        status="FRESH_CLONE_CERT_OK",
+        head_sha="e" * 40,
+        command=["python3", "scripts/certify_fresh_clone.py", "--ref", "e" * 40],
+        payload={"checks": ["stale"]},
+    )
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "branch", "--show-current"]:
+            return True, "main"
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        if args == ["git", "tag", "--points-at", "HEAD"]:
+            return True, ""
+        if args == ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]:
+            return True, "origin/main"
+        if args == ["git", "remote", "get-url", "origin"]:
+            return True, "https://github.com/jotaele44/mucaro-ai.git"
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    assert main(["release", "state", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    states = {row["state"]: row for row in payload["states"]}
+    assert states["LOCAL_RELEASE_CERTIFIED"]["status"] == "PASS"
+    assert states["FRESH_CLONE_CERTIFIED"]["status"] == "PASS"
+    assert payload["receipts"]["local_release"]["head_sha"] == head_sha
+    assert payload["receipts"]["fresh_clone"]["head_sha"] == head_sha
 
 
 def test_github_governance_fails_when_latest_ci_is_for_different_head(tmp_path: Path, monkeypatch):

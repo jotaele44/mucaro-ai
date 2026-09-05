@@ -49,6 +49,7 @@ from .permissions import (
     revoke_directory,
 )
 from .product_audit import build_product_audit
+from .release_receipts import load_release_receipt
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .retrieval_eval import DEFAULT_FIXTURE, build_retrieval_eval_report, format_retrieval_eval_text
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
@@ -1533,6 +1534,16 @@ def _release_state(state: str, status: str, evidence: str, next_step: str) -> di
     }
 
 
+def _receipt_state(receipt: dict[str, Any] | None, ok_status: str) -> tuple[str, str]:
+    if receipt is None:
+        return "UNVERIFIED", "No exact-HEAD receipt found."
+    receipt_status = str(receipt.get("status"))
+    evidence = f"receipt={receipt.get('created_utc')} status={receipt_status}"
+    if receipt_status == ok_status:
+        return "PASS", evidence
+    return "FAIL", evidence
+
+
 def build_release_state_report(
     cfg: Settings,
     *,
@@ -1557,6 +1568,11 @@ def build_release_state_report(
     github_tag = _gate_by_name(gate_rows, "github_tag_binding")
 
     package_not_failed = package.get("status") != "PACKAGE_FAIL"
+    head_sha = certification.get("git", {}).get("head_sha") if isinstance(certification.get("git"), dict) else None
+    local_release_receipt = load_release_receipt(cfg.project_root, receipt_type="local_release", head_sha=head_sha)
+    fresh_clone_receipt = load_release_receipt(cfg.project_root, receipt_type="fresh_clone", head_sha=head_sha)
+    local_release_status, local_release_evidence = _receipt_state(local_release_receipt, "CERTIFY_RELEASE_OK")
+    fresh_clone_status, fresh_clone_evidence = _receipt_state(fresh_clone_receipt, "FRESH_CLONE_CERT_OK")
     canonical_local_pass = (
         git_repository is not None
         and git_repository.get("status") == "PASS"
@@ -1597,15 +1613,15 @@ def build_release_state_report(
         ),
         _release_state(
             "LOCAL_RELEASE_CERTIFIED",
-            "UNVERIFIED",
-            "This read-only command does not run the heavy local release certification script.",
+            local_release_status,
+            local_release_evidence,
             "Run python3 scripts/certify_release.py on the exact current HEAD.",
         ),
         _release_state(
             "FRESH_CLONE_CERTIFIED",
-            "UNVERIFIED",
-            "Fresh-clone certification requires an isolated clone of a branch, tag, or exact commit.",
-            f"Run python3 scripts/certify_fresh_clone.py --ref {certification.get('git', {}).get('head_sha') or 'main'}.",
+            fresh_clone_status,
+            fresh_clone_evidence,
+            f"Run python3 scripts/certify_fresh_clone.py --ref {head_sha or 'main'}.",
         ),
         _release_state(
             "SOURCE_ARTIFACT_PACKAGING",
@@ -1659,6 +1675,10 @@ def build_release_state_report(
         "version": package_version(),
         "project_root": str(cfg.project_root),
         "git": certification.get("git"),
+        "receipts": {
+            "local_release": local_release_receipt,
+            "fresh_clone": fresh_clone_receipt,
+        },
         "product_audit_status": audit.get("status"),
         "package_status": package.get("status"),
         "certification_status": certification.get("status"),

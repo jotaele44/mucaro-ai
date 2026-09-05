@@ -11,6 +11,10 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from backend.app.release_receipts import write_release_receipt  # noqa: E402
+
 COMMIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
@@ -28,6 +32,18 @@ def free_port() -> int:
 def origin_url() -> str:
     proc = run(["git", "remote", "get-url", "origin"], cwd=ROOT)
     return proc.stdout.strip()
+
+
+def git_head(repo: Path) -> str:
+    proc = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    return proc.stdout.strip() if proc.returncode == 0 else "UNKNOWN_HEAD"
 
 
 def assert_clean_worktree(repo: Path) -> None:
@@ -55,8 +71,10 @@ def main() -> int:
     source = args.source or origin_url()
     temp_root = Path(tempfile.mkdtemp(prefix="mucaro-ai-fresh-clone-"))
     clone_dir = temp_root / "mucaro-ai"
+    checked_out_sha = args.ref if COMMIT_SHA_RE.fullmatch(args.ref) else git_head(ROOT)
     try:
         clone_ref(source, args.ref, temp_root, clone_dir)
+        checked_out_sha = git_head(clone_dir)
         python = sys.executable
         venv = clone_dir / ".venv"
         run([python, "-m", "venv", str(venv)], cwd=clone_dir)
@@ -80,9 +98,50 @@ def main() -> int:
             "30",
         ], cwd=clone_dir)
         assert_clean_worktree(clone_dir)
+        receipt = write_release_receipt(
+            ROOT,
+            receipt_type="fresh_clone",
+            status="FRESH_CLONE_CERT_OK",
+            head_sha=checked_out_sha,
+            command=[sys.executable, "scripts/certify_fresh_clone.py", "--ref", args.ref],
+            payload={
+                "source": source,
+                "ref": args.ref,
+                "clone_dir": str(clone_dir),
+                "kept": args.keep,
+                "checks": [
+                    "clone_ref",
+                    "venv",
+                    "pip_install",
+                    "npm_ci",
+                    "release_check",
+                    "cli_help",
+                    "launcher_self_test",
+                    "launcher_smoke_test",
+                    "clean_clone_worktree",
+                ],
+            },
+        )
+        print(f"FRESH_CLONE_RECEIPT {receipt.relative_to(ROOT)}")
         print(f"FRESH_CLONE_CERT_OK path={clone_dir}")
         return 0
     except Exception as exc:
+        receipt = write_release_receipt(
+            ROOT,
+            receipt_type="fresh_clone",
+            status="FRESH_CLONE_CERT_FAILED",
+            head_sha=checked_out_sha,
+            command=[sys.executable, "scripts/certify_fresh_clone.py", "--ref", args.ref],
+            payload={
+                "source": source,
+                "ref": args.ref,
+                "clone_dir": str(clone_dir),
+                "kept": args.keep,
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            },
+        )
+        print(f"FRESH_CLONE_RECEIPT {receipt.relative_to(ROOT)}")
         print(f"FRESH_CLONE_CERT_FAILED {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
     finally:

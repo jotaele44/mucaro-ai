@@ -9,6 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from backend.app.release_receipts import write_release_receipt  # noqa: E402
+
 ENV_KEY_PATTERN = "ANTHROPIC" + "_API" + "_KEY"
 SECRET_PATTERN = re.compile(
     r"(sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
@@ -106,9 +110,22 @@ def gate_command(name: str, cmd: list[str], *, cwd: Path = ROOT) -> Gate:
     return Gate(name, status, detail)
 
 
+def git_head() -> str:
+    proc = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    return proc.stdout.strip() if proc.returncode == 0 else "UNKNOWN_HEAD"
+
+
 def main() -> int:
     env = os.environ.copy()
     env["PYTHONPATH"] = f"{ROOT}:{ROOT / 'backend'}"
+    head_sha = git_head()
     files = tracked_files()
     gates = [
         gate_worktree_clean(),
@@ -127,6 +144,19 @@ def main() -> int:
     failed = [gate for gate in gates if gate.status != "PASS"]
     for gate in gates:
         print(f"{gate.status} {gate.name} {gate.detail}")
+    status = "CERTIFY_RELEASE_FAILED" if failed else "CERTIFY_RELEASE_OK"
+    receipt = write_release_receipt(
+        ROOT,
+        receipt_type="local_release",
+        status=status,
+        head_sha=head_sha,
+        command=[sys.executable, "scripts/certify_release.py"],
+        payload={
+            "gates": [{"name": gate.name, "status": gate.status, "detail": gate.detail} for gate in gates],
+            "failed_gates": [gate.name for gate in failed],
+        },
+    )
+    print(f"RELEASE_RECEIPT {receipt.relative_to(ROOT)}")
     if failed:
         print("CERTIFY_RELEASE_FAILED")
         return 2

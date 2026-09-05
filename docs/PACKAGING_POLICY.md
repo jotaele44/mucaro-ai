@@ -33,6 +33,11 @@ Each artifact manifest records:
 - tracked member count
 - per-member path, size, and SHA-256
 
+Release and fresh-clone certification scripts also write exact-HEAD JSON
+receipts under `data/exports/release_receipts`. The `mucaro release state`
+command uses only receipts whose `head_sha` matches the current Git `HEAD`;
+older receipts remain history, not current certification proof.
+
 ## Release Gates
 
 Before a governed release tag, the operator must have:
