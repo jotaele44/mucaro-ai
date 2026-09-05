@@ -85,6 +85,12 @@ Observed success markers:
   GitHub-hosted `CI` run for commit
   `f48828b8dd5648554b65dba1ca86a07db099f7d3` reports `startup_failure`, so the
   GitHub-governed baseline remains open and untagged.
+- A manual-only `CI Startup Probe` workflow was added to isolate hosted runner
+  startup from the Mucaro build/test stack. Run `33972500645` for commit
+  `b70c5a859a879e651304091b57505b74c49f6953` also reports
+  `startup_failure` with `0` jobs and no logs, so the active hosted blocker is
+  at the GitHub Actions startup/account/repository-runner layer, not in the
+  Python, Node, checkout, or release-certification steps.
 - Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, BM25, hybrid, persistent, and semantic strategies across the expanded corpus
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
@@ -131,3 +137,6 @@ Known environment-dependent item:
   certification pass, but the GitHub-governed baseline must not be tagged until
   the hosted `CI` gate succeeds for the current HEAD or the release scope is
   explicitly narrowed.
+- The `CI Startup Probe` workflow is a diagnostic gate only. Remove it after
+  GitHub-hosted runner startup is repaired, or keep it manual-only if continued
+  startup isolation is useful for release operations.
