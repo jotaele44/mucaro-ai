@@ -40,7 +40,7 @@ from .memory import (
     remember_memory_item,
     set_memory_enabled,
 )
-from .packaging import build_package_status, build_release_artifacts
+from .packaging import build_package_status, build_release_artifacts, verify_release_artifact
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -385,6 +385,12 @@ def build_parser() -> argparse.ArgumentParser:
     package_build.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     package_build.set_defaults(handler=run_package_build)
 
+    package_verify = package_subcommands.add_parser("verify", help="Verify a governed source-release artifact manifest.")
+    package_verify.add_argument("manifest", type=Path, help="Artifact manifest path to verify.")
+    package_verify.add_argument("--require-current-head", action="store_true", help="Require manifest head_sha to match current Git HEAD.")
+    package_verify.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    package_verify.set_defaults(handler=run_package_verify)
+
     release = subcommands.add_parser("release", help="Inspect bounded release-state progress.")
     release_subcommands = release.add_subparsers(dest="release_command", required=True)
 
@@ -540,9 +546,12 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"{check.get('status')} {check.get('name')} {detail}")
         for command in payload.get("next_commands", []):
             print(f"command={command}")
-    elif status in {"PACKAGE_ARTIFACT_READY", "PACKAGE_ARTIFACT_BLOCKED"}:
+    elif status in {"PACKAGE_ARTIFACT_READY", "PACKAGE_ARTIFACT_BLOCKED", "PACKAGE_ARTIFACT_VERIFIED", "PACKAGE_ARTIFACT_VERIFY_FAILED"}:
         print(f"project_root={payload.get('project_root')}")
-        print(f"output_dir={payload.get('output_dir')}")
+        if payload.get("output_dir"):
+            print(f"output_dir={payload.get('output_dir')}")
+        if payload.get("manifest_path"):
+            print(f"manifest_path={payload.get('manifest_path')}")
         for check in payload.get("checks", []):
             detail = str(check.get("detail")).replace("\n", "\\n")
             print(f"{check.get('status')} {check.get('name')} {detail}")
@@ -553,8 +562,10 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"artifact_size_bytes={artifact.get('size_bytes')}")
         manifest = payload.get("manifest")
         if isinstance(manifest, dict):
-            print(f"manifest_path={manifest.get('path')}")
-            print(f"manifest_sha256={manifest.get('sha256')}")
+            if manifest.get("path"):
+                print(f"manifest_path={manifest.get('path')}")
+            if manifest.get("sha256"):
+                print(f"manifest_sha256={manifest.get('sha256')}")
             print(f"manifest_member_count={manifest.get('member_count')}")
     elif status in {"RELEASE_STATE_READY", "RELEASE_STATE_OPEN"}:
         print(f"current_state={payload.get('current_state')}")
@@ -1022,6 +1033,12 @@ def run_package_build(args: argparse.Namespace, cfg: Settings) -> int:
     report = build_release_artifacts(cfg.project_root, output_dir=args.output_dir, allow_dirty=args.allow_dirty)
     emit_payload(report, args.format)
     return 0 if report["status"] == "PACKAGE_ARTIFACT_READY" else 2
+
+
+def run_package_verify(args: argparse.Namespace, cfg: Settings) -> int:
+    report = verify_release_artifact(args.manifest, root=cfg.project_root, require_current_head=args.require_current_head)
+    emit_payload(report, args.format)
+    return 0 if report["status"] == "PACKAGE_ARTIFACT_VERIFIED" else 2
 
 
 def run_release_state(args: argparse.Namespace, cfg: Settings) -> int:

@@ -1,5 +1,6 @@
 import json
 import subprocess
+import zipfile
 from pathlib import Path
 
 import backend.app.cli as cli
@@ -407,6 +408,78 @@ def test_cli_package_build_writes_source_artifact_manifest(tmp_path: Path, capsy
     assert manifest_payload["head_sha"]
     assert manifest_payload["member_count"] >= 1
     assert {member["path"] for member in manifest_payload["members"]} >= {"pyproject.toml", "README.md"}
+
+    assert main(["package", "verify", str(manifest), "--require-current-head", "--format", "json"], cfg=cfg) == 0
+    verify_payload = json.loads(capsys.readouterr().out)
+    verify_checks = {check["name"]: check for check in verify_payload["checks"]}
+    assert verify_payload["status"] == "PACKAGE_ARTIFACT_VERIFIED"
+    assert verify_payload["manifest"]["head_sha"] == manifest_payload["head_sha"]
+    assert verify_checks["current_head_binding"]["status"] == "PASS"
+    assert verify_checks["archive_member_hashes"]["status"] == "PASS"
+
+
+def test_cli_package_verify_fails_on_archive_drift(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    commit_fixture_repo(tmp_path)
+    output_dir = tmp_path / "artifacts"
+
+    assert main(["package", "build", "--output-dir", str(output_dir), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    artifact = Path(payload["artifact"]["path"])
+    manifest = Path(payload["manifest"]["path"])
+
+    with zipfile.ZipFile(artifact, "a") as archive:
+        archive.writestr("mucaro-ai-0.1.23/untracked.txt", "unexpected")
+
+    assert main(["package", "verify", str(manifest), "--format", "json"], cfg=cfg) == 2
+    verify_payload = json.loads(capsys.readouterr().out)
+    verify_checks = {check["name"]: check for check in verify_payload["checks"]}
+    assert verify_payload["status"] == "PACKAGE_ARTIFACT_VERIFY_FAILED"
+    assert verify_checks["archive_sha256"]["status"] == "FAIL"
+    assert verify_checks["archive_member_set"]["status"] == "FAIL"
+
+
+def test_cli_package_verify_fails_on_malformed_manifest_members(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    commit_fixture_repo(tmp_path)
+    output_dir = tmp_path / "artifacts"
+
+    assert main(["package", "build", "--output-dir", str(output_dir), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    manifest = Path(payload["manifest"]["path"])
+    manifest_payload = json.loads(manifest.read_text(encoding="utf-8"))
+    manifest_payload["members"] = {}
+    manifest.write_text(json.dumps(manifest_payload), encoding="utf-8")
+
+    assert main(["package", "verify", str(manifest), "--format", "json"], cfg=cfg) == 2
+    verify_payload = json.loads(capsys.readouterr().out)
+    verify_checks = {check["name"]: check for check in verify_payload["checks"]}
+    assert verify_payload["status"] == "PACKAGE_ARTIFACT_VERIFY_FAILED"
+    assert verify_checks["manifest_members"]["status"] == "FAIL"
+
+
+def test_cli_package_verify_fails_on_duplicate_archive_members(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    commit_fixture_repo(tmp_path)
+    output_dir = tmp_path / "artifacts"
+
+    assert main(["package", "build", "--output-dir", str(output_dir), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    artifact = Path(payload["artifact"]["path"])
+    manifest = Path(payload["manifest"]["path"])
+
+    with zipfile.ZipFile(artifact, "a") as archive:
+        archive.writestr("mucaro-ai-0.1.23/README.md", "# Duplicate member\n")
+
+    assert main(["package", "verify", str(manifest), "--format", "json"], cfg=cfg) == 2
+    verify_payload = json.loads(capsys.readouterr().out)
+    verify_checks = {check["name"]: check for check in verify_payload["checks"]}
+    assert verify_payload["status"] == "PACKAGE_ARTIFACT_VERIFY_FAILED"
+    assert verify_checks["archive_member_duplicates"]["status"] == "FAIL"
+    assert verify_checks["archive_member_set"]["status"] == "FAIL"
 
 
 def test_cli_package_build_blocks_dirty_worktree(tmp_path: Path, capsys):

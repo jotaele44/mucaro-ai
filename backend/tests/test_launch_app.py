@@ -64,10 +64,16 @@ def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
         "gate_package_artifact",
         lambda: (fake_gate("package_artifact", detail="manifest_member_count=1"), {"status": "PACKAGE_ARTIFACT_READY"}),
     )
+    monkeypatch.setattr(
+        certify_release,
+        "gate_package_artifact_verification",
+        lambda package_artifact: fake_gate("package_artifact_verify", detail="manifest_member_count=1"),
+    )
 
     assert certify_release.main() == 0
     output = capsys.readouterr().out
     assert "PASS package_artifact manifest_member_count=1" in output
+    assert "PASS package_artifact_verify manifest_member_count=1" in output
     assert "CERTIFY_RELEASE_OK" in output
 
 

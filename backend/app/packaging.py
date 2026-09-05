@@ -5,7 +5,8 @@ import json
 import subprocess
 import tomllib
 import zipfile
-from pathlib import Path
+from collections import Counter
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 
@@ -71,6 +72,10 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
 def _git_output(root: Path, args: list[str]) -> tuple[bool, str]:
     proc = subprocess.run(
         ["git", *args],
@@ -91,6 +96,16 @@ def _tracked_source_files(root: Path) -> tuple[list[str], str | None]:
     if not files:
         return [], "no tracked files"
     return files, None
+
+
+def _resolve_package_path(root: Path, value: Path) -> Path:
+    expanded = value.expanduser()
+    return expanded if expanded.is_absolute() else root / expanded
+
+
+def _zip_path_safe(path: str) -> bool:
+    parsed = PurePosixPath(path)
+    return not parsed.is_absolute() and ".." not in parsed.parts and bool(parsed.parts)
 
 
 def build_desktop_package_manifest(root: Path = ROOT) -> dict[str, Any]:
@@ -276,6 +291,7 @@ def build_package_status(root: Path = ROOT) -> dict[str, Any]:
         "next_commands": [
             "python3 scripts/package_desktop.py --self-test",
             "PYTHONPATH=.:backend python3 scripts/mucaro.py package build --format text",
+            "PYTHONPATH=.:backend python3 scripts/mucaro.py package verify MANIFEST_PATH --require-current-head --format text",
             "python3 scripts/certify_release.py",
             'python3 scripts/certify_fresh_clone.py --ref "$(git rev-parse HEAD)"',
         ],
@@ -404,5 +420,177 @@ def build_release_artifacts(
             "path": str(manifest_path),
             "sha256": _sha256_file(manifest_path),
             "member_count": len(members),
+        },
+    }
+
+
+def verify_release_artifact(
+    manifest_path: Path,
+    *,
+    root: Path = ROOT,
+    require_current_head: bool = False,
+) -> dict[str, Any]:
+    manifest_path = _resolve_package_path(root, manifest_path)
+    checks: list[dict[str, str]] = []
+    checks.append(_check("manifest_exists", "PASS" if manifest_path.exists() else "FAIL", str(manifest_path)))
+    if not manifest_path.exists():
+        return {
+            "status": "PACKAGE_ARTIFACT_VERIFY_FAILED",
+            "project_root": str(root),
+            "manifest_path": str(manifest_path),
+            "checks": checks,
+            "artifact": None,
+            "manifest": None,
+        }
+
+    try:
+        manifest = _load_json(manifest_path)
+        checks.append(_check("manifest_json", "PASS", "valid JSON object"))
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        checks.append(_check("manifest_json", "FAIL", str(exc)))
+        return {
+            "status": "PACKAGE_ARTIFACT_VERIFY_FAILED",
+            "project_root": str(root),
+            "manifest_path": str(manifest_path),
+            "checks": checks,
+            "artifact": None,
+            "manifest": None,
+        }
+
+    artifact_format = manifest.get("artifact_format")
+    package_name = manifest.get("package_name")
+    version = manifest.get("version")
+    head_sha = manifest.get("head_sha")
+    members = manifest.get("members")
+    checks.append(
+        _check(
+            "manifest_identity",
+            "PASS"
+            if (
+                artifact_format == "source_zip_with_json_manifest_v1"
+                and package_name == PYTHON_PACKAGE_NAME
+                and isinstance(version, str)
+                and isinstance(head_sha, str)
+            )
+            else "FAIL",
+            f"format={artifact_format} package={package_name} version={version} head_sha={head_sha}",
+        )
+    )
+
+    if require_current_head:
+        head_ok, current_head = _git_output(root, ["rev-parse", "HEAD"])
+        checks.append(
+            _check(
+                "current_head_binding",
+                "PASS" if head_ok and current_head == head_sha else "FAIL",
+                f"manifest={head_sha} current={current_head if head_ok else 'unavailable'}",
+            )
+        )
+
+    archive_value = manifest.get("archive_path")
+    archive_path = _resolve_package_path(manifest_path.parent, Path(archive_value)) if isinstance(archive_value, str) else None
+    checks.append(_check("archive_path", "PASS" if archive_path and archive_path.exists() else "FAIL", str(archive_path or archive_value)))
+
+    manifest_member_count = manifest.get("member_count")
+    members_is_list = isinstance(members, list)
+    member_rows = members if members_is_list else []
+    member_paths = [member.get("path") for member in member_rows if isinstance(member, dict)]
+    duplicate_member_paths = sorted(path for path, count in Counter(member_paths).items() if isinstance(path, str) and count > 1)
+    malformed_members = 0
+    for member in member_rows:
+        if not isinstance(member, dict):
+            malformed_members += 1
+            continue
+        path = member.get("path")
+        size_bytes = member.get("size_bytes")
+        sha256 = member.get("sha256")
+        if not isinstance(path, str) or not _zip_path_safe(path) or not isinstance(size_bytes, int) or not isinstance(sha256, str) or len(sha256) != 64:
+            malformed_members += 1
+    checks.append(
+        _check(
+            "manifest_members",
+            "PASS"
+            if members_is_list
+            and isinstance(manifest_member_count, int)
+            and manifest_member_count == len(member_rows)
+            and not duplicate_member_paths
+            and malformed_members == 0
+            else "FAIL",
+            f"declared={manifest_member_count} actual={len(member_rows)} malformed={malformed_members} duplicates={','.join(duplicate_member_paths) or 'none'}",
+        )
+    )
+
+    if archive_path and archive_path.exists():
+        archive_sha = _sha256_file(archive_path)
+        archive_size = archive_path.stat().st_size
+        checks.append(
+            _check(
+                "archive_sha256",
+                "PASS" if archive_sha == manifest.get("archive_sha256") else "FAIL",
+                f"manifest={manifest.get('archive_sha256')} actual={archive_sha}",
+            )
+        )
+        checks.append(
+            _check(
+                "archive_size",
+                "PASS" if archive_size == manifest.get("archive_size_bytes") else "FAIL",
+                f"manifest={manifest.get('archive_size_bytes')} actual={archive_size}",
+            )
+        )
+
+        try:
+            with zipfile.ZipFile(archive_path) as archive:
+                infos = [info for info in archive.infolist() if not info.is_dir()]
+                duplicate_archive_paths = sorted(path for path, count in Counter(info.filename for info in infos).items() if count > 1)
+                unsafe = sorted(info.filename for info in infos if not _zip_path_safe(info.filename))
+                archive_root = f"{package_name}-{version}"
+                expected_names = {f"{archive_root}/{member['path']}" for member in member_rows if isinstance(member, dict) and isinstance(member.get("path"), str)}
+                actual_names = {info.filename for info in infos}
+                checks.append(_check("archive_member_paths_safe", "PASS" if not unsafe else "FAIL", ",".join(unsafe) or "safe"))
+                checks.append(
+                    _check(
+                        "archive_member_duplicates",
+                        "PASS" if not duplicate_archive_paths else "FAIL",
+                        ",".join(duplicate_archive_paths) or "none",
+                    )
+                )
+                checks.append(
+                    _check(
+                        "archive_member_set",
+                        "PASS" if actual_names == expected_names and not duplicate_archive_paths else "FAIL",
+                        f"expected={len(expected_names)} actual={len(actual_names)} missing={len(expected_names - actual_names)} extra={len(actual_names - expected_names)}",
+                    )
+                )
+                member_by_name = {f"{archive_root}/{member['path']}": member for member in member_rows if isinstance(member, dict) and isinstance(member.get("path"), str)}
+                mismatches: list[str] = []
+                for info in infos:
+                    member = member_by_name.get(info.filename)
+                    if not member:
+                        continue
+                    data = archive.read(info)
+                    if info.file_size != member.get("size_bytes") or _sha256_bytes(data) != member.get("sha256"):
+                        mismatches.append(info.filename)
+                checks.append(_check("archive_member_hashes", "PASS" if not mismatches else "FAIL", ",".join(mismatches) or "all match"))
+        except zipfile.BadZipFile as exc:
+            checks.append(_check("archive_zip_readable", "FAIL", str(exc)))
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": "PACKAGE_ARTIFACT_VERIFY_FAILED" if failed else "PACKAGE_ARTIFACT_VERIFIED",
+        "project_root": str(root),
+        "manifest_path": str(manifest_path),
+        "checks": checks,
+        "artifact": {
+            "path": str(archive_path) if archive_path else None,
+            "sha256": manifest.get("archive_sha256"),
+            "size_bytes": manifest.get("archive_size_bytes"),
+        },
+        "manifest": {
+            "artifact_format": artifact_format,
+            "package_name": package_name,
+            "version": version,
+            "head_sha": head_sha,
+            "member_count": manifest_member_count,
+            "sha256": _sha256_file(manifest_path),
         },
     }

@@ -12,6 +12,7 @@ Build it from a clean Git worktree:
 
 ```bash
 PYTHONPATH=.:backend python3 scripts/mucaro.py package build --format text
+PYTHONPATH=.:backend python3 scripts/mucaro.py package verify data/exports/packages/MANIFEST.json --require-current-head --format text
 ```
 
 The command writes generated files under `data/exports/packages`, which is
@@ -44,6 +45,15 @@ the package artifact payload from `mucaro package build --format json`, linking
 the certification receipt to the source ZIP SHA-256, manifest SHA-256, and
 member count produced for the same source state.
 
+`mucaro package verify MANIFEST` validates an existing artifact after it has
+been written. Verification checks that the manifest is valid JSON, the artifact
+format and package identity match the supported source-ZIP policy, the archive
+path exists, the archive size and SHA-256 match the manifest, all ZIP member
+paths are safe, the archive member set exactly matches the manifest, and every
+member's size and SHA-256 match. Use `--require-current-head` before release or
+distribution decisions so the manifest's `head_sha` must match the current Git
+checkout.
+
 ## Release Gates
 
 Before a governed release tag, the operator must have:
@@ -52,6 +62,7 @@ Before a governed release tag, the operator must have:
 - `CERTIFY_RELEASE_OK`
 - `FRESH_CLONE_CERT_OK` for the exact pushed SHA
 - `PACKAGE_ARTIFACT_READY` for the same source state
+- `PACKAGE_ARTIFACT_VERIFIED` for the generated artifact manifest
 - hosted GitHub Actions success for the exact pushed SHA
 - branch protection and tag binding reviewed for the release scope
 

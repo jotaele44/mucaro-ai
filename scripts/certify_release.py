@@ -127,6 +127,40 @@ def gate_package_artifact() -> tuple[Gate, dict | None]:
     return Gate("package_artifact", "PASS", f"manifest_member_count={member_count}"), payload
 
 
+def gate_package_artifact_verification(package_artifact: dict | None) -> Gate:
+    if not isinstance(package_artifact, dict):
+        return Gate("package_artifact_verify", "FAIL", "package artifact payload unavailable")
+    manifest = package_artifact.get("manifest")
+    manifest_path = manifest.get("path") if isinstance(manifest, dict) else None
+    if not isinstance(manifest_path, str) or not manifest_path.strip():
+        return Gate("package_artifact_verify", "FAIL", "package artifact manifest path unavailable")
+    proc = run(
+        [
+            sys.executable,
+            "scripts/mucaro.py",
+            "package",
+            "verify",
+            manifest_path,
+            "--require-current-head",
+            "--format",
+            "json",
+        ],
+        check=False,
+    )
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        payload = None
+    if proc.returncode != 0:
+        detail = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else f"returncode={proc.returncode}"
+        return Gate("package_artifact_verify", "FAIL", detail)
+    if not isinstance(payload, dict):
+        return Gate("package_artifact_verify", "FAIL", "package artifact verification JSON invalid")
+    manifest_summary = payload.get("manifest", {})
+    member_count = manifest_summary.get("member_count") if isinstance(manifest_summary, dict) else None
+    return Gate("package_artifact_verify", "PASS", f"manifest_member_count={member_count}")
+
+
 def git_head() -> str:
     proc = subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -166,6 +200,7 @@ def main() -> int:
     ]
     package_gate, package_artifact = gate_package_artifact()
     gates.append(package_gate)
+    gates.append(gate_package_artifact_verification(package_artifact))
     gates.extend(
         [
             gate_command("npm_audit", ["npm", "audit", "--audit-level=moderate"], cwd=ROOT / "frontend"),

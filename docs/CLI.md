@@ -60,6 +60,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro security status` | Inspect local or production security readiness | 0 | 2 |
 | `mucaro package status` | Inspect packaging and distribution readiness | 0 | 2 on failures, or with `--strict` warnings/failures |
 | `mucaro package build` | Build the governed source ZIP and artifact manifest | 0 | 2 |
+| `mucaro package verify MANIFEST` | Verify a governed source ZIP against its artifact manifest | 0 | 2 |
 | `mucaro tools list` | List locally allowlisted tools | 0 | 2 |
 | `mucaro tools request TOOL_NAME` | Create a pending tool-call request | 0 | 2 |
 | `mucaro tools approve TOOL_CALL_ID` | Approve a pending tool call | 0 | 2 |
@@ -186,6 +187,9 @@ mucaro memory list --format text
 mucaro memory disable MEMORY_ID --format json
 mucaro memory export --format json
 mucaro security status --host 127.0.0.1 --format text
+mucaro package status --format text
+mucaro package build --format text
+mucaro package verify data/exports/packages/MANIFEST.json --require-current-head --format text
 mucaro tools list --format text
 mucaro tools request source_library.status --reason "readiness check" --format json
 mucaro tools approve TOOL_CALL_ID --format json
@@ -302,6 +306,13 @@ tracked-source ZIP plus JSON manifest under `data/exports/packages`. The command
 refuses dirty worktrees by default, records the exact Git `HEAD`, and includes
 SHA-256 receipts for the archive and every tracked source member. Use
 `--allow-dirty` only for diagnostics, not governed release tags.
+
+Use `mucaro package verify MANIFEST` to verify a previously built source
+artifact. The verifier checks manifest JSON shape, package identity, archive
+path existence, archive SHA-256, archive size, ZIP path safety, exact archive
+member set, and per-member size/hash bindings. Add `--require-current-head` when
+the manifest must bind to the current checkout before a release or distribution
+decision.
 
 ## Retrieval Strategies
 
