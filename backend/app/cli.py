@@ -383,6 +383,24 @@ def build_parser() -> argparse.ArgumentParser:
     package_build.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     package_build.set_defaults(handler=run_package_build)
 
+    release = subcommands.add_parser("release", help="Inspect bounded release-state progress.")
+    release_subcommands = release.add_subparsers(dest="release_command", required=True)
+
+    release_state = release_subcommands.add_parser("state", help="Classify the current release path into explicit states.")
+    release_state.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_state.add_argument("--strict", action="store_true", help="Exit nonzero until the governed release state is ready.")
+    release_state.add_argument(
+        "--include-github",
+        action="store_true",
+        help="Include read-only GitHub governance evidence when gh is available.",
+    )
+    release_state.add_argument(
+        "--github-workflow",
+        default="CI",
+        help="GitHub Actions workflow name to use for hosted CI evidence with --include-github.",
+    )
+    release_state.set_defaults(handler=run_release_state)
+
     permissions = subcommands.add_parser("permissions", help="Manage user-directory access grants.")
     permissions_subcommands = permissions.add_subparsers(dest="permission_command", required=True)
 
@@ -519,6 +537,20 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"manifest_path={manifest.get('path')}")
             print(f"manifest_sha256={manifest.get('sha256')}")
             print(f"manifest_member_count={manifest.get('member_count')}")
+    elif status in {"RELEASE_STATE_READY", "RELEASE_STATE_OPEN"}:
+        print(f"current_state={payload.get('current_state')}")
+        print(f"highest_local_state={payload.get('highest_local_state')}")
+        print(f"include_github={payload.get('include_github')}")
+        git_payload = payload.get("git", {})
+        if isinstance(git_payload, dict):
+            print(f"head_sha={git_payload.get('head_sha')}")
+            print(f"worktree_clean={git_payload.get('worktree_clean')}")
+            print(f"upstream={git_payload.get('upstream')}")
+        for state in payload.get("states", []):
+            detail = str(state.get("evidence")).replace("\n", "\\n")
+            print(f"{state.get('status')} {state.get('state')} {detail}")
+        for command in payload.get("next_commands", []):
+            print(f"command={command}")
     elif status in {"DOCTOR_OK", "DOCTOR_WARN", "DOCTOR_FAIL"}:
         summary = payload.get("summary", {})
         if isinstance(summary, dict):
@@ -935,6 +967,18 @@ def run_package_build(args: argparse.Namespace, cfg: Settings) -> int:
     report = build_release_artifacts(cfg.project_root, output_dir=args.output_dir, allow_dirty=args.allow_dirty)
     emit_payload(report, args.format)
     return 0 if report["status"] == "PACKAGE_ARTIFACT_READY" else 2
+
+
+def run_release_state(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_release_state_report(
+        cfg,
+        include_github=args.include_github,
+        github_workflow=args.github_workflow,
+    )
+    emit_payload(report, args.format)
+    if args.strict and report["status"] != "RELEASE_STATE_READY":
+        return 2
+    return 0
 
 
 def _git_output(cfg: Settings, args: list[str]) -> tuple[bool, str]:
@@ -1465,6 +1509,161 @@ def build_certification_status(
             "python3 scripts/certify_release.py",
             f"python3 scripts/certify_fresh_clone.py --ref {ref}",
         ],
+    }
+
+
+def _gate_by_name(gates: list[dict[str, str]], name: str) -> dict[str, str] | None:
+    return next((gate for gate in gates if gate.get("name") == name), None)
+
+
+def _requirement_status(audit: dict[str, Any], requirement_id: str) -> str | None:
+    for row in audit.get("requirements", []):
+        if isinstance(row, dict) and row.get("requirement_id") == requirement_id:
+            status = row.get("status")
+            return status if isinstance(status, str) else None
+    return None
+
+
+def _release_state(state: str, status: str, evidence: str, next_step: str) -> dict[str, str]:
+    return {
+        "state": state,
+        "status": status,
+        "evidence": evidence,
+        "next_step": next_step,
+    }
+
+
+def build_release_state_report(
+    cfg: Settings,
+    *,
+    include_github: bool = False,
+    github_workflow: str = "CI",
+) -> dict[str, Any]:
+    audit = build_product_audit(cfg)
+    package = build_package_status(cfg.project_root)
+    certification = build_certification_status(
+        cfg,
+        include_github=include_github,
+        github_workflow=github_workflow,
+    )
+    gates = certification.get("gates", [])
+    gate_rows = [gate for gate in gates if isinstance(gate, dict)]
+
+    git_repository = _gate_by_name(gate_rows, "git_repository")
+    worktree_clean = _gate_by_name(gate_rows, "worktree_clean")
+    upstream = _gate_by_name(gate_rows, "upstream")
+    github_latest_ci = _gate_by_name(gate_rows, "github_latest_ci")
+    github_branch = _gate_by_name(gate_rows, "github_branch_protection")
+    github_tag = _gate_by_name(gate_rows, "github_tag_binding")
+
+    package_not_failed = package.get("status") != "PACKAGE_FAIL"
+    canonical_local_pass = (
+        git_repository is not None
+        and git_repository.get("status") == "PASS"
+        and worktree_clean is not None
+        and worktree_clean.get("status") == "PASS"
+        and upstream is not None
+        and upstream.get("status") == "PASS"
+        and package_not_failed
+    )
+    source_artifact_pass = _requirement_status(audit, "source_artifact_packaging") == "PASS"
+    github_requirement_open = _requirement_status(audit, "github_release_governance") == "OPEN"
+    github_gate_blockers = [
+        gate
+        for gate in [github_latest_ci, github_branch, github_tag]
+        if gate is not None and gate.get("status") != "PASS"
+    ]
+    github_open = include_github and (github_requirement_open or bool(github_gate_blockers))
+    governed_ready = include_github and certification.get("status") == "CERTIFICATION_READY"
+
+    highest_local_state = "CANONICAL_LOCAL" if canonical_local_pass else "PROTOTYPE"
+    if governed_ready:
+        current_state = "GOVERNED_RELEASE_READY"
+    elif github_open:
+        current_state = "GITHUB_GOVERNANCE_OPEN"
+    else:
+        current_state = highest_local_state
+
+    states = [
+        _release_state(
+            "CANONICAL_LOCAL",
+            "PASS" if canonical_local_pass else "OPEN",
+            (
+                "git repository, clean worktree, upstream, and package inputs are present"
+                if canonical_local_pass
+                else "one or more canonical local gates are missing or failing"
+            ),
+            "Repair local Git/package gates before release certification." if not canonical_local_pass else "Keep local canonical state clean.",
+        ),
+        _release_state(
+            "LOCAL_RELEASE_CERTIFIED",
+            "UNVERIFIED",
+            "This read-only command does not run the heavy local release certification script.",
+            "Run python3 scripts/certify_release.py on the exact current HEAD.",
+        ),
+        _release_state(
+            "FRESH_CLONE_CERTIFIED",
+            "UNVERIFIED",
+            "Fresh-clone certification requires an isolated clone of a branch, tag, or exact commit.",
+            f"Run python3 scripts/certify_fresh_clone.py --ref {certification.get('git', {}).get('head_sha') or 'main'}.",
+        ),
+        _release_state(
+            "SOURCE_ARTIFACT_PACKAGING",
+            "PASS" if source_artifact_pass and package_not_failed else "OPEN",
+            str(package.get("status")),
+            "Run mucaro package build --format text from a clean worktree.",
+        ),
+        _release_state(
+            "GITHUB_GOVERNANCE_OPEN",
+            "OPEN" if github_open else "UNVERIFIED" if not include_github else "PASS",
+            (
+                "; ".join(f"{gate.get('name')}={gate.get('status')}:{gate.get('detail')}" for gate in github_gate_blockers)
+                if github_gate_blockers
+                else "GitHub checks were not requested." if not include_github else "GitHub governance gates passed."
+            ),
+            "Run mucaro release state --include-github after hosted CI, branch protection, and tag binding are ready.",
+        ),
+        _release_state(
+            "GOVERNED_RELEASE_READY",
+            "PASS" if governed_ready else "OPEN",
+            str(certification.get("status")),
+            "Do not tag until mucaro certify status --include-github reports CERTIFICATION_READY.",
+        ),
+        _release_state(
+            "PRODUCTION_READY",
+            "OPEN",
+            "Production readiness also needs model/provider hardening, larger-corpus retrieval evidence, packaging distribution, and sustained user workflow validation.",
+            "Continue development beyond the governed local-first release baseline.",
+        ),
+    ]
+
+    next_commands = [
+        "python3 scripts/certify_release.py",
+        f"python3 scripts/certify_fresh_clone.py --ref {certification.get('git', {}).get('head_sha') or 'main'}",
+    ]
+    if not include_github:
+        next_commands.insert(0, "mucaro release state --include-github --format text")
+    if github_open:
+        next_commands.extend(
+            [
+                "mucaro certify github-actions --format text",
+                "gh auth refresh -h github.com -s user",
+            ]
+        )
+
+    return {
+        "status": "RELEASE_STATE_READY" if governed_ready else "RELEASE_STATE_OPEN",
+        "current_state": current_state,
+        "highest_local_state": highest_local_state,
+        "include_github": include_github,
+        "version": package_version(),
+        "project_root": str(cfg.project_root),
+        "git": certification.get("git"),
+        "product_audit_status": audit.get("status"),
+        "package_status": package.get("status"),
+        "certification_status": certification.get("status"),
+        "states": states,
+        "next_commands": sorted(set(next_commands)),
     }
 
 

@@ -31,6 +31,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | Command | Purpose | Success Exit | Failure Exit |
 |---|---|---:|---:|
 | `mucaro doctor` | Check local assistant readiness | 0 | 2 with `--strict` warnings/failures |
+| `mucaro release state` | Classify bounded release-state progress | 0 | 2 with `--strict` until governed release is ready |
 | `mucaro certify status` | Inspect release readiness before running full certification gates | 0 | 2 on failures, or with `--strict` warnings/failures |
 | `mucaro audit product` | Audit product gaps against the full assistant objective | 0 | 2 with `--strict` while gaps remain |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
@@ -140,6 +141,8 @@ retrieval payloads where practical:
 | `ERROR_TOOL_CALL_ALREADY_EXECUTED` | tool call execution was attempted more than once |
 | `DOCTOR_WARN` | readiness check found missing or incomplete local setup |
 | `DOCTOR_FAIL` | readiness check found unsupported or invalid local setup |
+| `RELEASE_STATE_OPEN` | release-state classifier found open or unverified release states |
+| `RELEASE_STATE_READY` | release-state classifier found the governed release state ready |
 | `CERTIFICATION_WARN` | release readiness has warnings such as local-mode auth disabled, missing tag, missing upstream, unavailable Git metadata, or unenforced GitHub governance |
 | `CERTIFICATION_FAIL` | release readiness has a hard blocker such as product audit failure, JSON validation failure, or dirty worktree |
 | `PRODUCT_AUDIT_OPEN` | product audit found remaining ChatGPT/Claude-comparability gaps |
@@ -154,6 +157,7 @@ retrieval payloads where practical:
 mucaro ingest data/input --format text
 mucaro --version
 mucaro doctor
+mucaro release state --include-github --format text
 mucaro certify status --format text
 mucaro certify status --include-github --format text
 mucaro audit product --format text
@@ -211,6 +215,15 @@ source/chunk counts, persistent index status, semantic-store status, directory
 grants, model-provider readiness, API auth posture, conversations, runs,
 explicit memory, production-security posture, and the local tool runtime. Add `--strict` when
 automation should fail on warnings.
+
+Use `mucaro release state` to classify the current repo against the bounded
+release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
+`FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,
+`GITHUB_GOVERNANCE_OPEN`, `GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`.
+The command reuses existing audit, package, Git, and optional GitHub governance
+receipts. It does not run heavy certification scripts, so those states remain
+`UNVERIFIED` until the operator runs the reported commands. Add
+`--include-github` when authenticated `gh` evidence is available.
 
 Use `mucaro certify status` before tagging or pushing release candidates. It is
 a read-only readiness receipt over product audit, doctor, JSON validation, Git

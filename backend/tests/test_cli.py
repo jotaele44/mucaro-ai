@@ -487,6 +487,68 @@ def test_cli_certify_status_includes_github_governance(tmp_path: Path, capsys, m
     assert f"PASS github_latest_ci success {head_sha}" in text_output
 
 
+def test_cli_release_state_reports_github_governance_open(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    head_sha = "c" * 40
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "branch", "--show-current"]:
+            return True, "main"
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        if args == ["git", "tag", "--points-at", "HEAD"]:
+            return True, ""
+        if args == ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]:
+            return True, "origin/main"
+        if args == ["git", "remote", "get-url", "origin"]:
+            return True, "https://github.com/jotaele44/mucaro-ai.git"
+        if args[:3] == ["gh", "api", "repos/jotaele44/mucaro-ai/branches/main"]:
+            return True, json.dumps({"protected": False, "protection": {"required_status_checks": {"contexts": []}}})
+        if args[:7] == ["gh", "run", "list", "--repo", "jotaele44/mucaro-ai", "--workflow", "CI"]:
+            return True, json.dumps(
+                [
+                    {
+                        "databaseId": 7,
+                        "status": "completed",
+                        "conclusion": "startup_failure",
+                        "headSha": head_sha,
+                        "url": "https://github.com/jotaele44/mucaro-ai/actions/runs/7",
+                        "name": "CI",
+                        "event": "workflow_dispatch",
+                        "createdAt": "2026-09-05T00:00:00Z",
+                        "updatedAt": "2026-09-05T00:00:01Z",
+                    }
+                ]
+            )
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    assert main(["release", "state", "--include-github", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    states = {row["state"]: row for row in payload["states"]}
+    assert payload["status"] == "RELEASE_STATE_OPEN"
+    assert payload["current_state"] == "GITHUB_GOVERNANCE_OPEN"
+    assert payload["highest_local_state"] == "CANONICAL_LOCAL"
+    assert payload["product_audit_status"] == "PRODUCT_AUDIT_OPEN"
+    assert payload["package_status"] == "PACKAGE_WARN"
+    assert states["CANONICAL_LOCAL"]["status"] == "PASS"
+    assert states["LOCAL_RELEASE_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["FRESH_CLONE_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["SOURCE_ARTIFACT_PACKAGING"]["status"] == "PASS"
+    assert states["GITHUB_GOVERNANCE_OPEN"]["status"] == "OPEN"
+    assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
+
+    assert main(["release", "state", "--include-github", "--strict", "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "RELEASE_STATE_OPEN" in text_output
+    assert "current_state=GITHUB_GOVERNANCE_OPEN" in text_output
+    assert "OPEN GITHUB_GOVERNANCE_OPEN" in text_output
+
+
 def test_github_governance_fails_when_latest_ci_is_for_different_head(tmp_path: Path, monkeypatch):
     cfg = make_settings(tmp_path)
     head_sha = "a" * 40

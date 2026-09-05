@@ -136,6 +136,7 @@ See `docs/CLI.md` for exit codes, retrieval strategies, structured error payload
 ```bash
 python scripts/mucaro.py ingest data/input
 python scripts/mucaro.py doctor
+python scripts/mucaro.py release state --include-github --format text
 python scripts/mucaro.py certify status --format text
 python scripts/mucaro.py certify status --include-github --format text
 python scripts/mucaro.py audit product --format text
@@ -166,6 +167,7 @@ After `python -m pip install -e ".[dev]"`, the installed console command is avai
 ```bash
 mucaro --version
 mucaro doctor
+mucaro release state --include-github --format text
 mucaro certify status --format text
 mucaro certify status --include-github --format text
 mucaro audit product --format text
@@ -226,6 +228,13 @@ github-actions --format text` for a read-only diagnostic receipt over
 repository Actions permissions, workflow registration, latest CI/probe runs,
 job counts, and billing endpoint access. This keeps GitHub startup triage in
 the same operator CLI boundary as release certification.
+
+Use `mucaro release state --include-github --format text` to classify the
+current repo into explicit release states: canonical local baseline, local
+release certification pending, fresh-clone certification pending, source
+artifact packaging, GitHub governance open, governed release ready, and
+production ready. The command is read-only and reports `UNVERIFIED` for states
+that require a separate heavy certification script.
 
 Use `mucaro audit product` to track what is complete versus still open against
 the governed local-first assistant target. The audit includes both assistant

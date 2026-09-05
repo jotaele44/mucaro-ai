@@ -109,6 +109,12 @@ Observed success markers:
   assistant capabilities and source-artifact packaging pass, while
   `github_release_governance` remains open because hosted CI startup, branch
   protection, and governed tag binding are not yet proven.
+- `mucaro release state` classifies bounded release progress across
+  `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`, `FRESH_CLONE_CERTIFIED`,
+  `SOURCE_ARTIFACT_PACKAGING`, `GITHUB_GOVERNANCE_OPEN`,
+  `GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`. It keeps heavy local and
+  fresh-clone certification states `UNVERIFIED` unless those scripts are run
+  separately for the exact current HEAD.
 - Local release certification for audit commit
   `2848d6f54880a716d5fa61467e5d8a6b5bb5f301` reports
   `CERTIFY_RELEASE_OK`, including `133 passed`, retrieval eval, JSON
