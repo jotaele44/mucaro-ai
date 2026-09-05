@@ -2687,7 +2687,7 @@ def build_release_state_report(
         _release_state(
             "PRODUCTION_READY",
             "OPEN",
-            "Production readiness also needs model/provider hardening, larger-corpus retrieval evidence, packaging distribution, and sustained user workflow validation.",
+            "Production readiness also needs additional provider validation, larger-corpus retrieval evidence, packaging distribution, and sustained user workflow validation.",
             "Continue development beyond the governed local-first release baseline.",
         ),
     ]
