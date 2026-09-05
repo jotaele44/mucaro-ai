@@ -989,6 +989,34 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
             return True, {"total_count": 0, "jobs": []}, ""
         if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/22/jobs"]:
             return True, {"total_count": 0, "jobs": []}, ""
+        if args == ["api", f"repos/jotaele44/mucaro-ai/commits/{head_sha}/check-suites"]:
+            return True, {
+                "total_count": 2,
+                "check_suites": [
+                    {
+                        "id": 33,
+                        "app": {"slug": "github-actions"},
+                        "status": "completed",
+                        "conclusion": "startup_failure",
+                        "latest_check_runs_count": 0,
+                        "url": "https://api.github.com/repos/jotaele44/mucaro-ai/check-suites/33",
+                        "check_runs_url": "https://api.github.com/repos/jotaele44/mucaro-ai/check-suites/33/check-runs",
+                        "created_at": "2026-09-05T00:00:00Z",
+                        "updated_at": "2026-09-05T00:00:01Z",
+                    },
+                    {
+                        "id": 34,
+                        "app": {"slug": "github-actions"},
+                        "status": "completed",
+                        "conclusion": "startup_failure",
+                        "latest_check_runs_count": 0,
+                        "url": "https://api.github.com/repos/jotaele44/mucaro-ai/check-suites/34",
+                        "check_runs_url": "https://api.github.com/repos/jotaele44/mucaro-ai/check-suites/34/check-runs",
+                        "created_at": "2026-09-05T00:00:00Z",
+                        "updated_at": "2026-09-05T00:00:01Z",
+                    },
+                ],
+            }, ""
         if args == ["api", "users/jotaele44/settings/billing/actions"]:
             return False, None, "HTTP 404: Not Found"
         return False, None, f"unexpected command: {args}"
@@ -1005,6 +1033,8 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert payload["current_head_receipts_summary"]["total"] == 5
     assert payload["current_head_receipts_summary"]["valid"] == 5
     assert payload["startup_blocker"]["status"] == "FAIL"
+    assert payload["github_actions"]["check_suites"]["total_count"] == 2
+    assert payload["github_actions"]["check_suites"]["suites"][0]["latest_check_runs_count"] == 0
     assert payload["startup_blocker"]["isolated_before_jobs"] is True
     assert "private_branch_protection_plan_gate" in payload["startup_blocker"]["suspected_causes"]
     assert "github_branch_protection_api=WARN:HTTP 403" in payload["github_governance_evidence"]
@@ -1069,6 +1099,8 @@ def test_cli_release_governance_report_verifies_saved_artifact(tmp_path: Path, c
             return True, [], ""
         if args == ["api", "users/jotaele44/settings/billing/actions"]:
             return False, None, "HTTP 404: Not Found"
+        if args == ["api", f"repos/jotaele44/mucaro-ai/commits/{head_sha}/check-suites"]:
+            return True, {"total_count": 0, "check_suites": []}, ""
         return False, None, f"unexpected command: {args}"
 
     monkeypatch.setattr(cli, "_command_output", fake_command_output)
@@ -1448,6 +1480,23 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
             return True, {"total_count": 0, "jobs": []}, ""
         if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/22/jobs"]:
             return True, {"total_count": 0, "jobs": []}, ""
+        if args == ["api", f"repos/jotaele44/mucaro-ai/commits/{head_sha}/check-suites"]:
+            return True, {
+                "total_count": 1,
+                "check_suites": [
+                    {
+                        "id": 44,
+                        "app": {"slug": "github-actions"},
+                        "status": "completed",
+                        "conclusion": "startup_failure",
+                        "latest_check_runs_count": 0,
+                        "url": "https://api.github.com/repos/jotaele44/mucaro-ai/check-suites/44",
+                        "check_runs_url": "https://api.github.com/repos/jotaele44/mucaro-ai/check-suites/44/check-runs",
+                        "created_at": "2026-09-05T00:00:00Z",
+                        "updated_at": "2026-09-05T00:00:01Z",
+                    }
+                ],
+            }, ""
         if args == ["api", "users/jotaele44/settings/billing/actions"]:
             return False, None, "HTTP 404: requires user scope"
         return False, None, f"unexpected command: {args}"
@@ -1463,12 +1512,17 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert payload["runs"]["ci"]["jobs_count"] == 0
     assert payload["runs"]["startup_probe"]["database_id"] == 22
     assert payload["runs"]["startup_probe"]["jobs_count"] == 0
+    assert payload["check_suites"]["total_count"] == 1
+    assert payload["check_suites"]["suites"][0]["id"] == 44
+    assert payload["check_suites"]["suites"][0]["latest_check_runs_count"] == 0
     assert payload["startup_blocker"]["status"] == "FAIL"
     assert payload["startup_blocker"]["isolated_before_jobs"] is True
     assert "private_branch_protection_plan_gate" in payload["startup_blocker"]["suspected_causes"]
     assert checks["latest_ci"]["status"] == "FAIL"
     assert checks["startup_probe"]["status"] == "FAIL"
     assert checks["startup_layer_isolated"]["status"] == "FAIL"
+    assert checks["check_suites_lookup"]["status"] == "PASS"
+    assert checks["github_actions_check_suites_before_runs"]["status"] == "FAIL"
     assert checks["branch_protection_api"]["status"] == "WARN"
     assert checks["self_hosted_runner_inventory"]["status"] == "PASS"
     assert checks["actions_billing"]["status"] == "WARN"
@@ -1486,7 +1540,10 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert "run_id=11" in text_output
     assert "run=ci id=11 status=completed conclusion=startup_failure" in text_output
     assert "run=startup_probe id=22 status=completed conclusion=startup_failure" in text_output
+    assert "check_suites_total=1" in text_output
+    assert "check_suite id=44 app=github-actions status=completed conclusion=startup_failure check_runs=0" in text_output
     assert "FAIL startup_layer_isolated" in text_output
+    assert "FAIL github_actions_check_suites_before_runs" in text_output
     assert "next_action=Upgrade GitHub plan or make the repository public" in text_output
     assert "next_action=Run `gh auth refresh -h github.com -s user`" in text_output
 

@@ -303,10 +303,12 @@ workflow, job counts, and account billing endpoint access. It is read-only and
 returns `GITHUB_ACTIONS_DIAGNOSTIC_FAIL` when hosted startup is isolated outside
 the project build/test stack. Text output includes current CI and startup-probe
 run IDs, job counts, head SHAs, and run URLs so account-policy or GitHub-support
-follow-up can reference exact failed runs. If private branch protection is
-plan-gated, the diagnostic reports a `branch_protection_api` warning separately
-from hosted CI startup so governance work can distinguish repository policy from
-build failures.
+follow-up can reference exact failed runs. It also summarizes commit check
+suites, including check-suite IDs, app slugs, conclusions, and check-run counts,
+so zero-job workflow failures can be cross-checked against zero-check-run GitHub
+Actions suites. If private branch protection is plan-gated, the diagnostic
+reports a `branch_protection_api` warning separately from hosted CI startup so
+governance work can distinguish repository policy from build failures.
 The JSON output also includes a `startup_blocker` object with
 `isolated_before_jobs`, `suspected_causes`, and `next_actions` fields so
 automation can distinguish hosted-runner startup failure from branch-protection

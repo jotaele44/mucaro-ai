@@ -586,6 +586,16 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                         f"conclusion={run.get('conclusion')} head_sha={run.get('head_sha')} "
                         f"jobs={run.get('jobs_count')} url={run.get('url')}"
                     )
+        check_suites = payload.get("check_suites", {})
+        if isinstance(check_suites, dict):
+            print(f"check_suites_total={check_suites.get('total_count')}")
+            for suite in check_suites.get("suites", []):
+                if isinstance(suite, dict):
+                    print(
+                        f"check_suite id={suite.get('id')} app={suite.get('app')} "
+                        f"status={suite.get('status')} conclusion={suite.get('conclusion')} "
+                        f"check_runs={suite.get('latest_check_runs_count')} url={suite.get('url')}"
+                    )
         for action in payload.get("next_actions", []):
             print(f"next_action={action}")
     elif status in {"RETRIEVAL_EVAL_OK", "RETRIEVAL_EVAL_FAILED"}:
@@ -1873,6 +1883,54 @@ def _workflow_run_jobs_count(cfg: Settings, *, repo: str, run_id: Any) -> tuple[
     return total_count if isinstance(total_count, int) else None, None
 
 
+def _commit_check_suites(cfg: Settings, *, repo: str, head_sha: str | None) -> tuple[dict[str, Any], str | None]:
+    if not head_sha:
+        return {"available": False, "total_count": None, "suites": []}, "head SHA unavailable"
+    ok, payload, error = _gh_json(cfg, ["api", f"repos/{repo}/commits/{head_sha}/check-suites"])
+    if not ok or not isinstance(payload, dict):
+        return {"available": False, "total_count": None, "suites": []}, error or "check-suite lookup failed"
+    raw_suites = payload.get("check_suites", [])
+    suites = []
+    if isinstance(raw_suites, list):
+        for row in raw_suites:
+            if not isinstance(row, dict):
+                continue
+            app = row.get("app")
+            app_slug = app.get("slug") if isinstance(app, dict) else None
+            suites.append(
+                {
+                    "id": row.get("id"),
+                    "app": app_slug,
+                    "status": row.get("status"),
+                    "conclusion": row.get("conclusion"),
+                    "latest_check_runs_count": row.get("latest_check_runs_count"),
+                    "url": row.get("url"),
+                    "check_runs_url": row.get("check_runs_url"),
+                    "created_at": row.get("created_at"),
+                    "updated_at": row.get("updated_at"),
+                }
+            )
+    total_count = payload.get("total_count")
+    return {
+        "available": True,
+        "total_count": total_count if isinstance(total_count, int) else len(suites),
+        "suites": suites,
+    }, None
+
+
+def _github_actions_check_suite_blocker(check_suites: dict[str, Any]) -> bool:
+    suites = check_suites.get("suites", [])
+    if not isinstance(suites, list):
+        return False
+    github_actions_suites = [suite for suite in suites if isinstance(suite, dict) and suite.get("app") == "github-actions"]
+    return bool(github_actions_suites) and all(
+        suite.get("status") == "completed"
+        and suite.get("conclusion") == "startup_failure"
+        and suite.get("latest_check_runs_count") == 0
+        for suite in github_actions_suites
+    )
+
+
 def _run_summary(latest: dict[str, Any] | None, jobs_count: int | None = None) -> dict[str, Any] | None:
     if latest is None:
         return None
@@ -2055,6 +2113,26 @@ def build_github_actions_diagnostic_status(
         )
     )
 
+    check_suites, check_suites_error = _commit_check_suites(cfg, repo=repo, head_sha=head_sha if head_ok else None)
+    if check_suites_error:
+        checks.append(_certification_gate("check_suites_lookup", "WARN", check_suites_error))
+    else:
+        checks.append(
+            _certification_gate(
+                "check_suites_lookup",
+                "PASS",
+                f"total_count={check_suites.get('total_count')}",
+            )
+        )
+    if _github_actions_check_suite_blocker(check_suites):
+        checks.append(
+            _certification_gate(
+                "github_actions_check_suites_before_runs",
+                "FAIL",
+                "GitHub Actions check suites completed startup_failure with latest_check_runs_count=0",
+            )
+        )
+
     owner = repo.split("/", 1)[0]
     billing_ok, billing_payload, billing_error = _gh_json(cfg, ["api", f"users/{owner}/settings/billing/actions"])
     billing: dict[str, Any] = {"available": billing_ok}
@@ -2106,6 +2184,7 @@ def build_github_actions_diagnostic_status(
         "checks": checks,
         "branch_protection": branch_protection,
         "runner_inventory": runner_inventory,
+        "check_suites": check_suites,
         "startup_blocker": startup_blocker,
         "workflows": workflows,
         "runs": {
