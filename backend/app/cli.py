@@ -1704,8 +1704,10 @@ def build_release_state_report(
     head_sha = certification.get("git", {}).get("head_sha") if isinstance(certification.get("git"), dict) else None
     local_release_receipt = load_release_receipt(cfg.project_root, receipt_type="local_release", head_sha=head_sha)
     fresh_clone_receipt = load_release_receipt(cfg.project_root, receipt_type="fresh_clone", head_sha=head_sha)
+    source_artifact_receipt = load_release_receipt(cfg.project_root, receipt_type="source_artifact", head_sha=head_sha)
     local_release_status, local_release_evidence = _receipt_state(local_release_receipt, "CERTIFY_RELEASE_OK")
     fresh_clone_status, fresh_clone_evidence = _receipt_state(fresh_clone_receipt, "FRESH_CLONE_CERT_OK")
+    source_artifact_status, source_artifact_evidence = _receipt_state(source_artifact_receipt, "SOURCE_ARTIFACT_CERT_OK")
     canonical_local_pass = (
         git_repository is not None
         and git_repository.get("status") == "PASS"
@@ -1716,16 +1718,20 @@ def build_release_state_report(
         and package_not_failed
     )
     source_artifact_pass = _requirement_status(audit, "source_artifact_packaging") == "PASS"
+    source_artifact_certified = source_artifact_status == "PASS"
     github_requirement_open = _requirement_status(audit, "github_release_governance") == "OPEN"
     github_gate_blockers = [gate for gate in gate_rows if gate.get("name") in github_gate_names and gate.get("status") != "PASS"]
     github_open = include_github and (github_requirement_open or bool(github_gate_blockers))
-    governed_ready = include_github and certification.get("status") == "CERTIFICATION_READY"
+    source_artifact_open = include_github and not source_artifact_certified
+    governed_ready = include_github and certification.get("status") == "CERTIFICATION_READY" and source_artifact_certified
 
     highest_local_state = "CANONICAL_LOCAL" if canonical_local_pass else "PROTOTYPE"
     if governed_ready:
         current_state = "GOVERNED_RELEASE_READY"
     elif github_open:
         current_state = "GITHUB_GOVERNANCE_OPEN"
+    elif source_artifact_open:
+        current_state = "SOURCE_ARTIFACT_CERTIFICATION_OPEN"
     else:
         current_state = highest_local_state
 
@@ -1759,6 +1765,12 @@ def build_release_state_report(
             "Run mucaro package build --format text from a clean worktree.",
         ),
         _release_state(
+            "SOURCE_ARTIFACT_CERTIFIED",
+            source_artifact_status,
+            source_artifact_evidence,
+            "Run python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json.",
+        ),
+        _release_state(
             "GITHUB_GOVERNANCE_OPEN",
             "OPEN" if github_open else "UNVERIFIED" if not include_github else "PASS",
             (
@@ -1785,6 +1797,7 @@ def build_release_state_report(
     next_commands = [
         "python3 scripts/certify_release.py",
         f"python3 scripts/certify_fresh_clone.py --ref {certification.get('git', {}).get('head_sha') or 'main'}",
+        "python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json",
     ]
     if not include_github:
         next_commands.insert(0, "mucaro release state --include-github --format text")
@@ -1807,6 +1820,7 @@ def build_release_state_report(
         "receipts": {
             "local_release": local_release_receipt,
             "fresh_clone": fresh_clone_receipt,
+            "source_artifact": source_artifact_receipt,
         },
         "product_audit_status": audit.get("status"),
         "package_status": package.get("status"),

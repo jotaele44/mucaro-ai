@@ -646,6 +646,7 @@ def test_cli_release_state_reports_github_governance_open(tmp_path: Path, capsys
     assert states["LOCAL_RELEASE_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["FRESH_CLONE_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["SOURCE_ARTIFACT_PACKAGING"]["status"] == "PASS"
+    assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["GITHUB_GOVERNANCE_OPEN"]["status"] == "OPEN"
     assert "github_hosted_runner_startup=FAIL" in states["GITHUB_GOVERNANCE_OPEN"]["evidence"]
     assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
@@ -680,6 +681,14 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     )
     write_release_receipt(
         tmp_path,
+        receipt_type="source_artifact",
+        status="SOURCE_ARTIFACT_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_source_artifact.py", "manifest.json"],
+        payload={"checks": []},
+    )
+    write_release_receipt(
+        tmp_path,
         receipt_type="fresh_clone",
         status="FRESH_CLONE_CERT_OK",
         head_sha="e" * 40,
@@ -709,8 +718,71 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     states = {row["state"]: row for row in payload["states"]}
     assert states["LOCAL_RELEASE_CERTIFIED"]["status"] == "PASS"
     assert states["FRESH_CLONE_CERTIFIED"]["status"] == "PASS"
+    assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "PASS"
     assert payload["receipts"]["local_release"]["head_sha"] == head_sha
     assert payload["receipts"]["fresh_clone"]["head_sha"] == head_sha
+    assert payload["receipts"]["source_artifact"]["head_sha"] == head_sha
+
+
+def test_cli_release_state_requires_source_artifact_receipt_for_governed_ready(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "a" * 40
+
+    def fake_product_audit(_cfg: Settings):
+        return {
+            "status": "PRODUCT_AUDIT_READY",
+            "requirements": [
+                {"requirement_id": "source_artifact_packaging", "status": "PASS"},
+                {"requirement_id": "github_release_governance", "status": "PASS"},
+            ],
+        }
+
+    def fake_package_status(_root: Path):
+        return {"status": "PACKAGE_READY"}
+
+    def fake_certification_status(_cfg: Settings, *, include_github: bool = False, github_workflow: str = "CI"):
+        del include_github, github_workflow
+        return {
+            "status": "CERTIFICATION_READY",
+            "git": {"head_sha": head_sha},
+            "gates": [
+                {"name": "git_repository", "status": "PASS", "detail": "ok"},
+                {"name": "worktree_clean", "status": "PASS", "detail": "clean"},
+                {"name": "upstream", "status": "PASS", "detail": "origin/main"},
+                {"name": "github_latest_ci", "status": "PASS", "detail": "success"},
+                {"name": "github_branch_protection", "status": "PASS", "detail": "protected"},
+                {"name": "github_tag_binding", "status": "PASS", "detail": "bound"},
+            ],
+        }
+
+    monkeypatch.setattr(cli, "build_product_audit", fake_product_audit)
+    monkeypatch.setattr(cli, "build_package_status", fake_package_status)
+    monkeypatch.setattr(cli, "build_certification_status", fake_certification_status)
+
+    assert main(["release", "state", "--include-github", "--strict", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    states = {row["state"]: row for row in payload["states"]}
+    assert payload["status"] == "RELEASE_STATE_OPEN"
+    assert payload["current_state"] == "SOURCE_ARTIFACT_CERTIFICATION_OPEN"
+    assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
+
+    write_release_receipt(
+        tmp_path,
+        receipt_type="source_artifact",
+        status="SOURCE_ARTIFACT_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_source_artifact.py", "manifest.json"],
+        payload={"checks": []},
+    )
+
+    assert main(["release", "state", "--include-github", "--strict", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    states = {row["state"]: row for row in payload["states"]}
+    assert payload["status"] == "RELEASE_STATE_READY"
+    assert payload["current_state"] == "GOVERNED_RELEASE_READY"
+    assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "PASS"
+    assert states["GOVERNED_RELEASE_READY"]["status"] == "PASS"
 
 
 def test_cli_release_receipts_lists_and_shows_exact_head_receipts(tmp_path: Path, capsys, monkeypatch):

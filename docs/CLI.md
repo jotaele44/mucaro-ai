@@ -190,6 +190,7 @@ mucaro security status --host 127.0.0.1 --format text
 mucaro package status --format text
 mucaro package build --format text
 mucaro package verify data/exports/packages/MANIFEST.json --require-current-head --format text
+python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json
 mucaro tools list --format text
 mucaro tools request source_library.status --reason "readiness check" --format json
 mucaro tools approve TOOL_CALL_ID --format json
@@ -232,14 +233,15 @@ automation should fail on warnings.
 Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,
-`GITHUB_GOVERNANCE_OPEN`, `GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`.
-The command reuses existing audit, package, Git, and optional GitHub governance
-receipts. It does not run heavy certification scripts, so those states remain
-`UNVERIFIED` until the operator runs the reported commands and creates matching
-exact-HEAD receipts under `data/exports/release_receipts`. Add `--include-github`
-when authenticated `gh` evidence is available. The GitHub governance row reports
-all non-passing GitHub release gates, including hosted-runner startup
-classification when current-head CI fails before jobs are created.
+`SOURCE_ARTIFACT_CERTIFIED`, `GITHUB_GOVERNANCE_OPEN`,
+`GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`. The command reuses existing
+audit, package, Git, artifact, and optional GitHub governance receipts. It does
+not run heavy certification scripts, so those states remain `UNVERIFIED` until
+the operator runs the reported commands and creates matching exact-HEAD receipts
+under `data/exports/release_receipts`. Add `--include-github` when authenticated
+`gh` evidence is available. The GitHub governance row reports all non-passing
+GitHub release gates, including hosted-runner startup classification when
+current-head CI fails before jobs are created.
 
 Use `mucaro release receipts` to list local release and fresh-clone
 certification receipts. Add `--current-head` to filter the list to receipts
@@ -309,10 +311,19 @@ SHA-256 receipts for the archive and every tracked source member. Use
 
 Use `mucaro package verify MANIFEST` to verify a previously built source
 artifact. The verifier checks manifest JSON shape, package identity, archive
-path existence, archive SHA-256, archive size, ZIP path safety, exact archive
-member set, and per-member size/hash bindings. Add `--require-current-head` when
-the manifest must bind to the current checkout before a release or distribution
-decision.
+path existence, archive SHA-256, archive size, ZIP path safety, duplicate
+archive members, exact archive member set, and per-member size/hash bindings.
+Add `--require-current-head` when the manifest must bind to the current checkout
+before a release or distribution decision.
+
+Use `python3 scripts/certify_source_artifact.py MANIFEST` after building and
+verifying an artifact when the release decision needs installability evidence
+from the ZIP itself. The script verifies the manifest against the current Git
+HEAD, extracts the source archive to a temporary directory, creates a clean
+virtual environment from the extracted source, installs `.[dev]`, installs
+frontend dependencies, runs `scripts/release_check.py`, checks the installed
+`mucaro` entry point, runs the desktop package self-test, and writes a
+`source_artifact` release receipt for the exact manifest `head_sha`.
 
 ## Retrieval Strategies
 

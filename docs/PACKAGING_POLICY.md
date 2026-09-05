@@ -13,6 +13,7 @@ Build it from a clean Git worktree:
 ```bash
 PYTHONPATH=.:backend python3 scripts/mucaro.py package build --format text
 PYTHONPATH=.:backend python3 scripts/mucaro.py package verify data/exports/packages/MANIFEST.json --require-current-head --format text
+python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json
 ```
 
 The command writes generated files under `data/exports/packages`, which is
@@ -49,10 +50,19 @@ member count produced for the same source state.
 been written. Verification checks that the manifest is valid JSON, the artifact
 format and package identity match the supported source-ZIP policy, the archive
 path exists, the archive size and SHA-256 match the manifest, all ZIP member
-paths are safe, the archive member set exactly matches the manifest, and every
-member's size and SHA-256 match. Use `--require-current-head` before release or
-distribution decisions so the manifest's `head_sha` must match the current Git
-checkout.
+paths are safe, duplicate archive members are absent, the archive member set
+exactly matches the manifest, and every member's size and SHA-256 match. Use
+`--require-current-head` before release or distribution decisions so the
+manifest's `head_sha` must match the current Git checkout.
+
+`scripts/certify_source_artifact.py MANIFEST` validates installability from the
+source ZIP itself. It verifies the manifest against the current Git `HEAD`,
+extracts the archive to a temporary directory, creates a fresh virtual
+environment, installs the extracted package with development dependencies,
+installs frontend dependencies, runs `scripts/release_check.py`, checks the
+installed `mucaro` entry point, and runs the desktop package self-test. A
+passing run writes a `SOURCE_ARTIFACT_CERT_OK` receipt whose `head_sha` is taken
+from the verified manifest.
 
 ## Release Gates
 
@@ -63,6 +73,7 @@ Before a governed release tag, the operator must have:
 - `FRESH_CLONE_CERT_OK` for the exact pushed SHA
 - `PACKAGE_ARTIFACT_READY` for the same source state
 - `PACKAGE_ARTIFACT_VERIFIED` for the generated artifact manifest
+- `SOURCE_ARTIFACT_CERT_OK` for the generated artifact manifest
 - hosted GitHub Actions success for the exact pushed SHA
 - branch protection and tag binding reviewed for the release scope
 

@@ -7,6 +7,7 @@ import pytest
 
 import scripts.certify_fresh_clone as certify_fresh_clone
 import scripts.certify_release as certify_release
+import scripts.certify_source_artifact as certify_source_artifact
 import scripts.launch_app as launch_app
 
 
@@ -126,6 +127,36 @@ def test_fresh_clone_fetches_exact_commit_sha(tmp_path, monkeypatch):
         (["git", "fetch", "--depth", "1", "origin", commit_sha], clone_dir),
         (["git", "checkout", "--detach", commit_sha], clone_dir),
     ]
+
+
+def test_source_artifact_extracts_expected_archive_root(tmp_path):
+    archive_path = tmp_path / "source.zip"
+    with certify_source_artifact.zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("mucaro-ai-0.1.23/README.md", "# Mucaro AI\n")
+    manifest = {
+        "package_name": "mucaro-ai",
+        "version": "0.1.23",
+        "archive_path": str(archive_path),
+    }
+
+    source_dir = certify_source_artifact.extract_source_archive(manifest, tmp_path / "extract")
+
+    assert source_dir == tmp_path / "extract" / "mucaro-ai-0.1.23"
+    assert (source_dir / "README.md").read_text(encoding="utf-8") == "# Mucaro AI\n"
+
+
+def test_source_artifact_rejects_unexpected_archive_root(tmp_path):
+    archive_path = tmp_path / "source.zip"
+    with certify_source_artifact.zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("wrong-root/README.md", "# Mucaro AI\n")
+    manifest = {
+        "package_name": "mucaro-ai",
+        "version": "0.1.23",
+        "archive_path": str(archive_path),
+    }
+
+    with pytest.raises(ValueError, match="unexpected archive root"):
+        certify_source_artifact.extract_source_archive(manifest, tmp_path / "extract")
 
 
 def test_launch_app_reports_missing_frontend_deps(tmp_path, monkeypatch):
