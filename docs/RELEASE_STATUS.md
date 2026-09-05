@@ -139,4 +139,6 @@ Known environment-dependent item:
   explicitly narrowed.
 - The `CI Startup Probe` workflow is a diagnostic gate only. Remove it after
   GitHub-hosted runner startup is repaired, or keep it manual-only if continued
-  startup isolation is useful for release operations.
+  startup isolation is useful for release operations. See
+  `docs/GITHUB_ACTIONS_STARTUP_DIAGNOSTIC.md` for the current evidence and
+  operator checks.
