@@ -68,7 +68,9 @@ from the verified manifest.
 `scripts/certify_python_distribution.py` validates the standard Python
 distribution layer. It builds both wheel and sdist artifacts under
 `data/exports/python_dist`, records SHA-256 and member counts for each
-distribution artifact, installs the built wheel into a separate clean virtual
+distribution artifact, verifies wheel `METADATA` name/version and console-script
+entry point, verifies required sdist source members, writes a Python
+distribution manifest, installs the built wheel into a separate clean virtual
 environment, verifies the installed `mucaro` entry point, and imports installed
 package modules. A passing run writes a `PYTHON_DIST_CERT_OK` receipt for the
 current Git `HEAD`.

@@ -332,9 +332,11 @@ standard Python distribution artifacts. The script creates a clean build
 environment, builds both sdist and wheel artifacts under
 `data/exports/python_dist`, installs the built wheel into a separate clean
 virtual environment, verifies `mucaro --version`, verifies `mucaro --help`,
-imports the installed package modules, records SHA-256 and member counts for
-the wheel and sdist, and writes a `python_dist` release receipt for the exact
-current Git `HEAD`.
+imports the installed package modules, verifies wheel `METADATA` name/version
+and console-script entry point, verifies required sdist source members, records
+SHA-256 and member counts for the wheel and sdist, writes a Python distribution
+manifest, and writes a `python_dist` release receipt for the exact current Git
+`HEAD`.
 
 ## Retrieval Strategies
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import io
 import subprocess
 import sys
+import tarfile
 
 import pytest
 
@@ -173,6 +175,69 @@ def test_python_distribution_summarizes_wheel_artifact(tmp_path):
     assert summary["member_count"] == 2
     assert isinstance(summary["sha256"], str)
     assert len(summary["sha256"]) == 64
+
+
+def test_python_distribution_verifies_wheel_metadata(tmp_path):
+    wheel = tmp_path / "mucaro_ai-0.1.23-py3-none-any.whl"
+    with certify_python_distribution.zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("backend/app/cli.py", "")
+        archive.writestr(
+            "mucaro_ai-0.1.23.dist-info/METADATA",
+            "Name: mucaro-ai\nVersion: 0.1.23\nRequires-Python: >=3.11\n",
+        )
+        archive.writestr("mucaro_ai-0.1.23.dist-info/entry_points.txt", "[console_scripts]\nmucaro = backend.app.cli:main\n")
+
+    result = certify_python_distribution.verify_wheel_metadata(
+        wheel,
+        {"name": "mucaro-ai", "version": "0.1.23", "requires_python": ">=3.11"},
+    )
+
+    assert result["status"] == "PASS"
+    assert result["errors"] == []
+    assert result["metadata"]["mucaro_entrypoint"] == "backend.app.cli:main"
+
+
+def test_python_distribution_rejects_bad_wheel_entrypoint(tmp_path):
+    wheel = tmp_path / "mucaro_ai-0.1.23-py3-none-any.whl"
+    with certify_python_distribution.zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("backend/app/cli.py", "")
+        archive.writestr(
+            "mucaro_ai-0.1.23.dist-info/METADATA",
+            "Name: mucaro-ai\nVersion: 0.1.23\nRequires-Python: >=3.11\n",
+        )
+        archive.writestr("mucaro_ai-0.1.23.dist-info/entry_points.txt", "[console_scripts]\nmucaro = wrong.module:main\n")
+
+    result = certify_python_distribution.verify_wheel_metadata(
+        wheel,
+        {"name": "mucaro-ai", "version": "0.1.23", "requires_python": ">=3.11"},
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["errors"] == ["mucaro_entrypoint=wrong.module:main expected=backend.app.cli:main"]
+
+
+def test_python_distribution_verifies_sdist_members(tmp_path):
+    sdist = tmp_path / "mucaro_ai-0.1.23.tar.gz"
+    with tarfile.open(sdist, "w:gz") as archive:
+        for name, text in {
+            "mucaro_ai-0.1.23/PKG-INFO": "Name: mucaro-ai\nVersion: 0.1.23\n",
+            "mucaro_ai-0.1.23/pyproject.toml": "",
+            "mucaro_ai-0.1.23/README.md": "# Mucaro AI\n",
+            "mucaro_ai-0.1.23/backend/app/cli.py": "",
+            "mucaro_ai-0.1.23/backend/app/packaging.py": "",
+        }.items():
+            data = text.encode("utf-8")
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+
+    result = certify_python_distribution.verify_sdist_members(
+        sdist,
+        {"name": "mucaro-ai", "version": "0.1.23", "requires_python": ">=3.11"},
+    )
+
+    assert result["status"] == "PASS"
+    assert result["missing_members"] == []
 
 
 def test_launch_app_reports_missing_frontend_deps(tmp_path, monkeypatch):
