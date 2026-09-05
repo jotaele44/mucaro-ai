@@ -54,6 +54,12 @@ from .product_audit import build_product_audit
 from .release_receipts import find_release_receipt, list_release_receipts, load_release_receipt, summarize_release_receipts
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .retrieval_eval import DEFAULT_FIXTURE, build_retrieval_eval_report, format_retrieval_eval_text
+from .retrieval_quality_certification import (
+    RETRIEVAL_QUALITY_OK,
+    RETRIEVAL_QUALITY_PROFILE,
+    build_retrieval_quality_certification,
+    format_retrieval_quality_certification_text,
+)
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
 from .services import answer_question
 from .tools import (
@@ -224,6 +230,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Manual-only startup probe workflow name to inspect.",
     )
     certify_github.set_defaults(handler=run_certify_github_actions)
+
+    certify_retrieval = certify_subcommands.add_parser(
+        "retrieval-quality",
+        help="Certify release retrieval quality against the calibrated fixture profile.",
+    )
+    certify_retrieval.add_argument(
+        "--profile",
+        default=RETRIEVAL_QUALITY_PROFILE,
+        help="Named retrieval-quality profile to record in the release receipt.",
+    )
+    certify_retrieval.add_argument(
+        "--top-k",
+        type=parse_top_k,
+        default=5,
+        help=f"Maximum retrieved chunks to score ({MIN_TOP_K}-{MAX_TOP_K}).",
+    )
+    certify_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    certify_retrieval.set_defaults(handler=run_certify_retrieval_quality)
 
     sources = subcommands.add_parser("sources", help="Inspect and manage ingested sources.")
     sources_subcommands = sources.add_subparsers(dest="sources_command", required=True)
@@ -590,6 +614,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"min_category_recall={payload.get('min_category_recall')}")
         print(f"min_category_binding_recall={payload.get('min_category_binding_recall')}")
         for line in format_retrieval_eval_text(payload)[:-1]:
+            print(line)
+    elif status in {"RETRIEVAL_QUALITY_CERT_OK", "RETRIEVAL_QUALITY_CERT_FAILED"}:
+        for line in format_retrieval_quality_certification_text(payload)[:-1]:
             print(line)
     elif status in {"PACKAGE_READY", "PACKAGE_WARN", "PACKAGE_FAIL"}:
         print(f"project_root={payload.get('project_root')}")
@@ -2219,10 +2246,19 @@ def build_release_state_report(
     fresh_clone_receipt = load_release_receipt(cfg.project_root, receipt_type="fresh_clone", head_sha=head_sha)
     source_artifact_receipt = load_release_receipt(cfg.project_root, receipt_type="source_artifact", head_sha=head_sha)
     python_dist_receipt = load_release_receipt(cfg.project_root, receipt_type="python_dist", head_sha=head_sha)
+    retrieval_quality_receipt = load_release_receipt(
+        cfg.project_root,
+        receipt_type="retrieval_quality",
+        head_sha=head_sha,
+    )
     local_release_status, local_release_evidence = _receipt_state(local_release_receipt, "CERTIFY_RELEASE_OK")
     fresh_clone_status, fresh_clone_evidence = _receipt_state(fresh_clone_receipt, "FRESH_CLONE_CERT_OK")
     source_artifact_status, source_artifact_evidence = _receipt_state(source_artifact_receipt, "SOURCE_ARTIFACT_CERT_OK")
     python_dist_status, python_dist_evidence = _receipt_state(python_dist_receipt, "PYTHON_DIST_CERT_OK")
+    retrieval_quality_status, retrieval_quality_evidence = _receipt_state(
+        retrieval_quality_receipt,
+        "RETRIEVAL_QUALITY_CERT_OK",
+    )
     canonical_local_pass = (
         git_repository is not None
         and git_repository.get("status") == "PASS"
@@ -2238,7 +2274,14 @@ def build_release_state_report(
     github_gate_blockers = [gate for gate in gate_rows if gate.get("name") in github_gate_names and gate.get("status") != "PASS"]
     github_open = include_github and (github_requirement_open or bool(github_gate_blockers))
     source_artifact_open = include_github and not source_artifact_certified
-    governed_ready = include_github and certification.get("status") == "CERTIFICATION_READY" and source_artifact_certified
+    retrieval_quality_certified = retrieval_quality_status == "PASS"
+    retrieval_quality_open = include_github and not retrieval_quality_certified
+    governed_ready = (
+        include_github
+        and certification.get("status") == "CERTIFICATION_READY"
+        and source_artifact_certified
+        and retrieval_quality_certified
+    )
 
     highest_local_state = "CANONICAL_LOCAL" if canonical_local_pass else "PROTOTYPE"
     if governed_ready:
@@ -2247,6 +2290,8 @@ def build_release_state_report(
         current_state = "GITHUB_GOVERNANCE_OPEN"
     elif source_artifact_open:
         current_state = "SOURCE_ARTIFACT_CERTIFICATION_OPEN"
+    elif retrieval_quality_open:
+        current_state = "RETRIEVAL_QUALITY_CERTIFICATION_OPEN"
     else:
         current_state = highest_local_state
 
@@ -2292,6 +2337,12 @@ def build_release_state_report(
             "Run python3 scripts/certify_python_distribution.py.",
         ),
         _release_state(
+            "RETRIEVAL_QUALITY_CERTIFIED",
+            retrieval_quality_status,
+            retrieval_quality_evidence,
+            "Run python3 scripts/certify_retrieval_quality.py.",
+        ),
+        _release_state(
             "GITHUB_GOVERNANCE_OPEN",
             "OPEN" if github_open else "UNVERIFIED" if not include_github else "PASS",
             (
@@ -2320,6 +2371,7 @@ def build_release_state_report(
         f"python3 scripts/certify_fresh_clone.py --ref {certification.get('git', {}).get('head_sha') or 'main'}",
         "python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json",
         "python3 scripts/certify_python_distribution.py",
+        "python3 scripts/certify_retrieval_quality.py",
     ]
     if not include_github:
         next_commands.insert(0, "mucaro release state --include-github --format text")
@@ -2344,6 +2396,7 @@ def build_release_state_report(
             "fresh_clone": fresh_clone_receipt,
             "source_artifact": source_artifact_receipt,
             "python_dist": python_dist_receipt,
+            "retrieval_quality": retrieval_quality_receipt,
         },
         "product_audit_status": audit.get("status"),
         "package_status": package.get("status"),
@@ -2379,6 +2432,22 @@ def run_certify_github_actions(args: argparse.Namespace, cfg: Settings) -> int:
     if args.strict and report["status"] != "GITHUB_ACTIONS_DIAGNOSTIC_OK":
         return 2
     return 0
+
+
+def run_certify_retrieval_quality(args: argparse.Namespace, cfg: Settings) -> int:
+    command = ["mucaro", "certify", "retrieval-quality"]
+    if args.profile != RETRIEVAL_QUALITY_PROFILE:
+        command.extend(["--profile", args.profile])
+    if args.top_k != 5:
+        command.extend(["--top-k", str(args.top_k)])
+    report = build_retrieval_quality_certification(
+        cfg.project_root,
+        profile=args.profile,
+        top_k=args.top_k,
+        command=command,
+    )
+    emit_payload(report, args.format)
+    return 0 if report["status"] == RETRIEVAL_QUALITY_OK else 2
 
 
 def run_sources_list(args: argparse.Namespace, cfg: Settings) -> int:

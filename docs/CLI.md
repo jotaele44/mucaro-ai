@@ -239,15 +239,18 @@ Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,
 `SOURCE_ARTIFACT_CERTIFIED`, `PYTHON_DIST_CERTIFIED`,
-`GITHUB_GOVERNANCE_OPEN`, `GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`.
+`RETRIEVAL_QUALITY_CERTIFIED`, `GITHUB_GOVERNANCE_OPEN`,
+`GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`.
 The command reuses existing audit, package, Git,
-artifact, Python distribution, and optional GitHub governance receipts. It does
-not run heavy certification scripts, so those states remain `UNVERIFIED` until
-the operator runs the reported commands and creates matching exact-HEAD receipts
-under `data/exports/release_receipts`. Add `--include-github` when authenticated
-`gh` evidence is available. The GitHub governance row reports all non-passing
-GitHub release gates, including hosted-runner startup classification when
-current-head CI fails before jobs are created.
+artifact, Python distribution, retrieval-quality, and optional GitHub
+governance receipts. It does not run heavy certification scripts, so those
+states remain `UNVERIFIED` until the operator runs the reported commands and
+creates matching exact-HEAD receipts under `data/exports/release_receipts`. Add
+`--include-github` when authenticated `gh` evidence is available. The GitHub
+governance row reports all non-passing GitHub release gates, including
+hosted-runner startup classification when current-head CI fails before jobs are
+created. When source-artifact evidence is present but retrieval-quality evidence
+is not, the current state is `RETRIEVAL_QUALITY_CERTIFICATION_OPEN`.
 
 Use `mucaro release governance-report` to build a single current-head handoff
 payload for governed release work. The report combines release-state
@@ -332,6 +335,16 @@ metrics into hard gates once the category expectations are release-ready. It ret
 `RETRIEVAL_EVAL_INVALID` for malformed benchmark fixtures and
 `RETRIEVAL_EVAL_FAILED` when configured thresholds are not met, so release
 automation can fail on invalid or regressed retrieval evidence.
+
+Use `mucaro certify retrieval-quality` when the release needs exact-head
+retrieval evidence instead of an ad hoc score. The certification profile runs
+the default fixture with strict category binding recall and the larger fixture
+with calibrated multi-binding category recall. It writes a
+`retrieval_quality` receipt under `data/exports/release_receipts`, records the
+profile, exact `HEAD`, thresholds, fixture counts, category threshold failures,
+and full eval reports, and returns `RETRIEVAL_QUALITY_CERT_OK` only when every
+case passes. `mucaro release state` consumes that receipt as
+`RETRIEVAL_QUALITY_CERTIFIED`.
 
 Use `mucaro package status` to inspect packaging readiness without writing
 artifacts. The command checks required package inputs, Python/frontend package

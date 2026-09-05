@@ -129,6 +129,11 @@ Observed success markers:
   compatibility wrapper for release automation. The fixture gate validates
   benchmark shape, unique chunk IDs, expected chunk bindings, and positive plus
   no-context coverage before scoring strategies.
+- `mucaro certify retrieval-quality` now turns the default and large retrieval
+  fixtures into an exact-head `retrieval_quality` release receipt. The profile
+  records per-fixture thresholds, query/category counts, category threshold
+  failures, and full eval reports, and `mucaro release state` reports
+  `RETRIEVAL_QUALITY_CERTIFIED` from that receipt.
 - `mucaro package status` exposes package metadata, version consistency,
   launcher entrypoint, desktop package manifest, optional generated outputs, and
   current distribution blockers through the supported CLI boundary while

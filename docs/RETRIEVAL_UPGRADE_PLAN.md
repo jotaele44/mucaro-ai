@@ -61,6 +61,12 @@ retrieval strategies across more source IDs, more query categories, multi-bindin
 queries, and additional no-context cases. The evaluation gate requires
 no-context accuracy across every strategy, not only the semantic store.
 
+`mucaro certify retrieval-quality` promotes those fixture checks into an
+exact-head release receipt. The current `v0.1.23-local-release` profile runs the
+default fixture with strict per-category expected-binding recall and the large
+fixture with a calibrated multi-binding category threshold, preserving the full
+eval reports in a `retrieval_quality` receipt for release-state inspection.
+
 Future model-backed embeddings or Chroma-style stores should use this boundary
 instead of changing the answer service contract. They should not replace the
 default `hybrid` strategy until eval evidence shows a material improvement.
@@ -72,6 +78,7 @@ default `hybrid` strategy until eval evidence shows a material improvement.
 | Fixture eval | `RETRIEVAL_EVAL_OK` with the candidate strategy included |
 | Fixture contract | `RETRIEVAL_FIXTURE_OK` with no dangling expected IDs, source diversity, multi-binding cases, category coverage, and positive/no-context minimums |
 | Large-corpus eval | `RETRIEVAL_EVAL_OK` for `backend/tests/fixtures/retrieval_eval_large.json` during release certification |
+| Retrieval-quality receipt | `RETRIEVAL_QUALITY_CERT_OK` from `mucaro certify retrieval-quality` on the exact release `HEAD` |
 | No-context accuracy | Every evaluated strategy meets the configured `--min-no-context-accuracy` threshold |
 | Expected-binding recall | Every evaluated strategy meets the configured `--min-expected-binding-recall` threshold |
 | Category recall | Optional `--min-category-recall` can fail any positive-query category below the configured threshold |

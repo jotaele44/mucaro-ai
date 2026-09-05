@@ -141,6 +141,7 @@ V1 uses deterministic local hybrid retrieval:
 - `persistent_tfidf_v1`: opt-in persisted local TF-IDF index stored under `data/indexes/tfidf_index.json`, rebuilt during ingestion and rejected when stale.
 - `local_semantic_hash_store_v2`: opt-in persisted local embedding store stored under `data/indexes/semantic_store.json`, rebuilt during ingestion, rejected when stale, and constrained to normalized matched-term hits before returning cited context. The v2 scorer keeps deterministic hash embeddings local while adding rare-term matched evidence so source-lineage terms such as `lineage`, `file`, and `citation` are less likely to be buried by broad aggregate similarity.
 - `scripts/evaluate_retrieval.py`: committed retrieval fixture gate that validates benchmark shape, source diversity, multi-binding cases, query category coverage, and reports recall@k, expected-binding recall, context precision, full-binding hit rate, multi-binding full-hit rate, top-1 hit rate, and no-context accuracy for lexical/vector/BM25/hybrid/persistent/semantic strategies. Release certification runs both the default fixture and the larger deterministic fixture.
+- `scripts/certify_retrieval_quality.py`: exact-head retrieval-quality certifier that runs the calibrated release fixture profile, writes a `retrieval_quality` receipt, and backs the `RETRIEVAL_QUALITY_CERTIFIED` release-state row.
 
 Higher-quality embedding providers or stores such as Chroma can still be added behind this interface later without changing the answer trace schema.
 
