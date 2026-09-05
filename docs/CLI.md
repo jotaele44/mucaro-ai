@@ -150,6 +150,8 @@ retrieval payloads where practical:
 | `ERROR_RELEASE_RECEIPT_NOT_FOUND` | requested release receipt does not exist |
 | `CERTIFICATION_WARN` | release readiness has warnings such as local-mode auth disabled, missing tag, missing upstream, unavailable Git metadata, or unenforced GitHub governance |
 | `CERTIFICATION_FAIL` | release readiness has a hard blocker such as product audit failure, JSON validation failure, or dirty worktree |
+| `GITHUB_ACTIONS_DIAGNOSTIC_WARN` | hosted Actions diagnostic found incomplete read-only evidence but no hard failure |
+| `GITHUB_ACTIONS_DIAGNOSTIC_FAIL` | hosted Actions diagnostic found a hard failure, such as current-head CI startup failure before jobs |
 | `PRODUCT_AUDIT_OPEN` | product audit found remaining ChatGPT/Claude-comparability gaps |
 | `PRODUCT_AUDIT_BLOCKED` | product audit found a blocked requirement |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
@@ -252,7 +254,12 @@ tag-binding checks. GitHub governance checks are read-only and never mutate
 repository settings. The default hosted workflow name is `CI`; use
 `--github-workflow NAME` with `--include-github` if the release workflow is
 renamed. A completed hosted CI run for the current HEAD must conclude
-successfully; an unsuccessful completed run is a failed certification gate.
+successfully; an unsuccessful completed run is a failed certification gate. If
+the current-head run reports `startup_failure` with `jobs_count=0`, the JSON
+payload marks `github.latest_ci.startup_layer` as `before_jobs` and adds a
+`github_hosted_runner_startup` failure gate. That gate is diagnostic evidence
+for GitHub Actions billing, spending-limit, runner-availability, or account
+policy checks; it does not replace the required `github_latest_ci` pass.
 
 Use `mucaro certify github-actions` when the GitHub governance gate fails and
 the operator needs a narrower hosted-runner diagnostic receipt. The command

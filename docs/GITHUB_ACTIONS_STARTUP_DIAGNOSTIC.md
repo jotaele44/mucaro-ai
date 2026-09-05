@@ -10,7 +10,7 @@ governance candidate.
 - Local release gate: `CERTIFY_RELEASE_OK`
 - Exact-SHA fresh-clone gate: `FRESH_CLONE_CERT_OK`
 - GitHub governance gate: `CERTIFICATION_FAIL`
-- Blocking gate: `github_latest_ci`
+- Blocking gates: `github_latest_ci`, `github_hosted_runner_startup`
 
 Use `git rev-parse HEAD` before each release attempt; documentation commits move
 the live HEAD, so the exact release candidate SHA must be re-bound at the time
@@ -18,6 +18,16 @@ of certification.
 
 The named `CI` workflow has repeatedly completed with `startup_failure` before
 GitHub created jobs or logs. Diagnostic examples:
+
+```text
+workflow=CI
+run=33982897890
+event=workflow_dispatch
+head_sha=9c20736676bc16d3bfa549c77509cf21e4ab114f
+status=completed
+conclusion=startup_failure
+jobs=0
+```
 
 ```text
 workflow=CI
@@ -51,6 +61,16 @@ jobs=0
 
 The manual-only `CI Startup Probe` workflow also failed before jobs or logs.
 Diagnostic examples:
+
+```text
+workflow=CI Startup Probe
+run=33982897791
+event=workflow_dispatch
+head_sha=9c20736676bc16d3bfa549c77509cf21e4ab114f
+status=completed
+conclusion=startup_failure
+jobs=0
+```
 
 ```text
 workflow=CI Startup Probe
@@ -115,6 +135,22 @@ token_scopes=gist,read:org,repo,workflow
 
 The current token cannot inspect account Actions billing because that endpoint
 requires the `user` scope.
+
+## CLI Classification
+
+`mucaro certify status --include-github` records the current-head CI run under
+`github.latest_ci`. When GitHub reports `startup_failure` and the jobs endpoint
+returns `0`, the payload also records:
+
+```text
+github.latest_ci.jobs_count=0
+github.latest_ci.startup_layer=before_jobs
+FAIL github_hosted_runner_startup workflow failed before GitHub created jobs
+```
+
+This is a diagnostic gate only. It explains why hosted governance is blocked,
+but the release rule still requires `github_latest_ci` to pass for the exact
+current `HEAD`.
 
 ## Next Checks
 

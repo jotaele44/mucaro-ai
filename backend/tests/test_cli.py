@@ -714,12 +714,14 @@ def test_github_governance_fails_when_current_head_ci_fails(tmp_path: Path, monk
         if args[:2] == ["api", "repos/jotaele44/mucaro-ai/branches/main"]:
             return True, {"protected": True, "protection": {"required_status_checks": {"contexts": ["validate"]}}}, ""
         if args[:2] == ["run", "list"]:
-            return True, [{"status": "completed", "conclusion": "startup_failure", "headSha": head_sha}], ""
+            return True, [{"databaseId": 9, "status": "completed", "conclusion": "startup_failure", "headSha": head_sha}], ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/9/jobs"]:
+            return True, {"total_count": 0, "jobs": []}, ""
         return False, None, f"unexpected command: {args}"
 
     monkeypatch.setattr(cli, "_gh_json", fake_gh_json)
 
-    _github, gates = cli.build_github_governance_status(
+    github, gates = cli.build_github_governance_status(
         cfg,
         repo="jotaele44/mucaro-ai",
         branch="main",
@@ -730,6 +732,9 @@ def test_github_governance_fails_when_current_head_ci_fails(tmp_path: Path, monk
     by_name = {gate["name"]: gate for gate in gates}
     assert by_name["github_latest_ci"]["status"] == "FAIL"
     assert f"completed startup_failure {head_sha}" in by_name["github_latest_ci"]["detail"]
+    assert by_name["github_hosted_runner_startup"]["status"] == "FAIL"
+    assert github["latest_ci"]["jobs_count"] == 0
+    assert github["latest_ci"]["startup_layer"] == "before_jobs"
 
 
 def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsys, monkeypatch):

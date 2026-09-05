@@ -1144,6 +1144,14 @@ def _find_remote_tag_commit(cfg: Settings, tag_name: str, head_sha: str | None) 
     return True, f"{tag_name} -> {resolved}"
 
 
+def _run_failed_before_jobs(latest: dict[str, Any], jobs_count: int | None) -> bool:
+    return (
+        latest.get("status") == "completed"
+        and latest.get("conclusion") == "startup_failure"
+        and jobs_count == 0
+    )
+
+
 def build_github_governance_status(
     cfg: Settings,
     *,
@@ -1220,12 +1228,18 @@ def build_github_governance_status(
     else:
         latest = ci_payload[0]
         if isinstance(latest, dict):
+            jobs_count: int | None = None
+            jobs_error: str | None = None
+            if latest.get("status") == "completed" and latest.get("conclusion") == "startup_failure":
+                jobs_count, jobs_error = _workflow_run_jobs_count(cfg, repo=repo, run_id=latest.get("databaseId"))
             latest_ci = {
                 "database_id": latest.get("databaseId"),
                 "status": latest.get("status"),
                 "conclusion": latest.get("conclusion"),
                 "head_sha": latest.get("headSha"),
                 "url": latest.get("url"),
+                "jobs_count": jobs_count,
+                "startup_layer": "before_jobs" if _run_failed_before_jobs(latest, jobs_count) else None,
             }
             github["latest_ci"] = latest_ci
             ci_matches_head = not head_sha or latest.get("headSha") == head_sha
@@ -1240,6 +1254,16 @@ def build_github_governance_status(
                         f"{latest.get('status')} {latest.get('conclusion') or 'unknown'} {latest.get('headSha')}",
                     )
                 )
+                if jobs_error:
+                    gates.append(_certification_gate("github_ci_jobs_lookup", "WARN", jobs_error))
+                elif _run_failed_before_jobs(latest, jobs_count):
+                    gates.append(
+                        _certification_gate(
+                            "github_hosted_runner_startup",
+                            "FAIL",
+                            "workflow failed before GitHub created jobs; inspect Actions billing, spending limit, runner availability, and account policy",
+                        )
+                    )
             elif ci_matches_head:
                 gates.append(
                     _certification_gate(
@@ -1460,8 +1484,8 @@ def build_github_actions_diagnostic_status(
         and probe_latest.get("status") == "completed"
         and ci_latest.get("conclusion") == "startup_failure"
         and probe_latest.get("conclusion") == "startup_failure"
-        and ci_jobs_count == 0
-        and probe_jobs_count == 0
+        and _run_failed_before_jobs(ci_latest, ci_jobs_count)
+        and _run_failed_before_jobs(probe_latest, probe_jobs_count)
     ):
         checks.append(
             _certification_gate(
