@@ -299,6 +299,69 @@ def test_github_governance_fails_when_current_head_ci_fails(tmp_path: Path, monk
     assert f"completed startup_failure {head_sha}" in by_name["github_latest_ci"]["detail"]
 
 
+def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "a" * 40
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "branch", "--show-current"]:
+            return True, "main"
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "remote", "get-url", "origin"]:
+            return True, "https://github.com/jotaele44/mucaro-ai.git"
+        return False, f"unexpected command: {args}"
+
+    def fake_gh_json(_cfg: Settings, args: list[str]):
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/permissions"]:
+            return True, {"enabled": True, "allowed_actions": "all"}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/permissions/workflow"]:
+            return True, {"default_workflow_permissions": "read"}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/workflows"]:
+            return True, {
+                "workflows": [
+                    {"id": 1, "name": "CI", "path": ".github/workflows/ci.yml", "state": "active"},
+                    {
+                        "id": 2,
+                        "name": "CI Startup Probe",
+                        "path": ".github/workflows/ci-startup-probe.yml",
+                        "state": "active",
+                    },
+                ]
+            }, ""
+        if args[:2] == ["run", "list"] and "CI Startup Probe" in args:
+            return True, [{"databaseId": 22, "status": "completed", "conclusion": "startup_failure", "headSha": head_sha}], ""
+        if args[:2] == ["run", "list"] and "CI" in args:
+            return True, [{"databaseId": 11, "status": "completed", "conclusion": "startup_failure", "headSha": head_sha}], ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/11/jobs"]:
+            return True, {"total_count": 0, "jobs": []}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/22/jobs"]:
+            return True, {"total_count": 0, "jobs": []}, ""
+        if args == ["api", "users/jotaele44/settings/billing/actions"]:
+            return False, None, "HTTP 404: requires user scope"
+        return False, None, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+    monkeypatch.setattr(cli, "_gh_json", fake_gh_json)
+
+    assert main(["certify", "github-actions", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "GITHUB_ACTIONS_DIAGNOSTIC_FAIL"
+    assert payload["runs"]["ci"]["jobs_count"] == 0
+    assert payload["runs"]["startup_probe"]["jobs_count"] == 0
+    assert checks["latest_ci"]["status"] == "FAIL"
+    assert checks["startup_probe"]["status"] == "FAIL"
+    assert checks["startup_layer_isolated"]["status"] == "FAIL"
+    assert checks["actions_billing"]["status"] == "WARN"
+
+    assert main(["certify", "github-actions", "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "GITHUB_ACTIONS_DIAGNOSTIC_FAIL" in text_output
+    assert "FAIL startup_layer_isolated" in text_output
+    assert "next_action=Run `gh auth refresh -h github.com -s user`" in text_output
+
+
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 

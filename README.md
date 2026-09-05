@@ -221,6 +221,12 @@ default hosted workflow is `CI`; use `--github-workflow NAME` if the release
 workflow is renamed. If the latest hosted CI run is for the current HEAD and
 concludes unsuccessfully, the GitHub CI gate fails.
 
+When hosted CI fails before jobs or logs exist, run `mucaro certify
+github-actions --format text` for a read-only diagnostic receipt over
+repository Actions permissions, workflow registration, latest CI/probe runs,
+job counts, and billing endpoint access. This keeps GitHub startup triage in
+the same operator CLI boundary as release certification.
+
 Use `mucaro audit product` to track what is complete versus still open against
 the full ChatGPT/Claude-like local assistant target.
 

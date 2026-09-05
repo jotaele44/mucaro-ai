@@ -223,6 +223,14 @@ repository settings. The default hosted workflow name is `CI`; use
 renamed. A completed hosted CI run for the current HEAD must conclude
 successfully; an unsuccessful completed run is a failed certification gate.
 
+Use `mucaro certify github-actions` when the GitHub governance gate fails and
+the operator needs a narrower hosted-runner diagnostic receipt. The command
+checks repository Actions permissions, workflow token permissions, workflow
+registration, the latest named release workflow, the optional startup probe
+workflow, job counts, and account billing endpoint access. It is read-only and
+returns `GITHUB_ACTIONS_DIAGNOSTIC_FAIL` when hosted startup is isolated outside
+the project build/test stack.
+
 Use `mucaro audit product` to classify the broader assistant objective as
 requirement rows with `PASS`, `OPEN`, or `BLOCKED` status. Add `--strict` when
 automation should fail while any product gap remains open.

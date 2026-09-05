@@ -178,6 +178,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     certify_status.set_defaults(handler=run_certify_status)
 
+    certify_github = certify_subcommands.add_parser(
+        "github-actions",
+        help="Diagnose read-only GitHub Actions governance and hosted runner startup.",
+    )
+    certify_github.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    certify_github.add_argument("--strict", action="store_true", help="Exit nonzero when warnings or failures are present.")
+    certify_github.add_argument("--workflow", default="CI", help="Primary GitHub Actions workflow name to inspect.")
+    certify_github.add_argument(
+        "--probe-workflow",
+        default="CI Startup Probe",
+        help="Manual-only startup probe workflow name to inspect.",
+    )
+    certify_github.set_defaults(handler=run_certify_github_actions)
+
     sources = subcommands.add_parser("sources", help="Inspect and manage ingested sources.")
     sources_subcommands = sources.add_subparsers(dest="sources_command", required=True)
 
@@ -414,6 +428,15 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"{gate.get('status')} {gate.get('name')} {detail}")
         for command in payload.get("next_commands", []):
             print(f"command={command}")
+    elif status in {"GITHUB_ACTIONS_DIAGNOSTIC_OK", "GITHUB_ACTIONS_DIAGNOSTIC_WARN", "GITHUB_ACTIONS_DIAGNOSTIC_FAIL"}:
+        print(f"repo={payload.get('repo')}")
+        print(f"branch={payload.get('branch')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        for check in payload.get("checks", []):
+            detail = str(check.get("detail")).replace("\n", "\\n")
+            print(f"{check.get('status')} {check.get('name')} {detail}")
+        for action in payload.get("next_actions", []):
+            print(f"next_action={action}")
     elif status in {"DOCTOR_OK", "DOCTOR_WARN", "DOCTOR_FAIL"}:
         summary = payload.get("summary", {})
         if isinstance(summary, dict):
@@ -1011,6 +1034,229 @@ def build_github_governance_status(
     return github, gates
 
 
+def _latest_workflow_run(
+    cfg: Settings,
+    *,
+    repo: str,
+    workflow_name: str,
+    branch: str | None,
+) -> tuple[dict[str, Any] | None, str | None]:
+    args = [
+        "run",
+        "list",
+        "--repo",
+        repo,
+        "--workflow",
+        workflow_name,
+        "--limit",
+        "1",
+        "--json",
+        "databaseId,status,conclusion,headSha,url,name,event,createdAt,updatedAt",
+    ]
+    if branch:
+        args.extend(["--branch", branch])
+    ok, payload, error = _gh_json(cfg, args)
+    if not ok or not isinstance(payload, list) or not payload:
+        return None, error or "workflow run lookup failed"
+    latest = payload[0]
+    if not isinstance(latest, dict):
+        return None, "workflow run payload invalid"
+    return latest, None
+
+
+def _workflow_run_jobs_count(cfg: Settings, *, repo: str, run_id: Any) -> tuple[int | None, str | None]:
+    if not run_id:
+        return None, "run id unavailable"
+    ok, payload, error = _gh_json(cfg, ["api", f"repos/{repo}/actions/runs/{run_id}/jobs"])
+    if not ok or not isinstance(payload, dict):
+        return None, error or "workflow jobs lookup failed"
+    total_count = payload.get("total_count")
+    return total_count if isinstance(total_count, int) else None, None
+
+
+def _run_summary(latest: dict[str, Any] | None, jobs_count: int | None = None) -> dict[str, Any] | None:
+    if latest is None:
+        return None
+    return {
+        "database_id": latest.get("databaseId"),
+        "status": latest.get("status"),
+        "conclusion": latest.get("conclusion"),
+        "head_sha": latest.get("headSha"),
+        "url": latest.get("url"),
+        "jobs_count": jobs_count,
+    }
+
+
+def _classify_latest_run(
+    *,
+    name: str,
+    latest: dict[str, Any] | None,
+    error: str | None,
+    head_sha: str | None,
+    jobs_count: int | None,
+) -> dict[str, str]:
+    if latest is None:
+        return _certification_gate(name, "WARN", error or "latest workflow run unavailable")
+    run_head = latest.get("headSha")
+    status = latest.get("status")
+    conclusion = latest.get("conclusion")
+    jobs_detail = f" jobs={jobs_count}" if jobs_count is not None else ""
+    if head_sha and run_head != head_sha:
+        return _certification_gate(name, "FAIL", f"latest {run_head} does not match HEAD {head_sha}{jobs_detail}")
+    if status == "completed" and conclusion == "success":
+        return _certification_gate(name, "PASS", f"success {run_head}{jobs_detail}")
+    if status == "completed":
+        return _certification_gate(name, "FAIL", f"{status} {conclusion or 'unknown'} {run_head}{jobs_detail}")
+    return _certification_gate(name, "WARN", f"{status} {conclusion or 'pending'} {run_head}{jobs_detail}")
+
+
+def build_github_actions_diagnostic_status(
+    cfg: Settings,
+    *,
+    workflow_name: str = "CI",
+    probe_workflow_name: str = "CI Startup Probe",
+) -> dict[str, Any]:
+    branch_ok, branch = _git_output(cfg, ["branch", "--show-current"])
+    head_ok, head_sha = _git_output(cfg, ["rev-parse", "HEAD"])
+    remote_ok, remote_url = _git_output(cfg, ["remote", "get-url", "origin"])
+    repo = _github_repo_from_origin(remote_url if remote_ok else None)
+    checks: list[dict[str, str]] = []
+    next_actions: list[str] = []
+
+    if not repo:
+        checks.append(_certification_gate("github_repo", "FAIL", "origin is not a github.com repository"))
+        return {
+            "status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+            "repo": None,
+            "branch": branch if branch_ok else None,
+            "head_sha": head_sha if head_ok else None,
+            "checks": checks,
+            "workflows": {},
+            "next_actions": ["Configure origin to a GitHub repository before running hosted governance diagnostics."],
+        }
+    checks.append(_certification_gate("github_repo", "PASS", repo))
+
+    actions_ok, actions_payload, actions_error = _gh_json(cfg, ["api", f"repos/{repo}/actions/permissions"])
+    if actions_ok and isinstance(actions_payload, dict):
+        enabled = actions_payload.get("enabled") is True
+        allowed_actions = actions_payload.get("allowed_actions")
+        checks.append(_certification_gate("actions_enabled", "PASS" if enabled else "FAIL", f"enabled={enabled} allowed_actions={allowed_actions}"))
+        if not enabled:
+            next_actions.append("Enable GitHub Actions in repository Settings -> Actions -> General.")
+    else:
+        checks.append(_certification_gate("actions_enabled", "WARN", actions_error or "actions permission lookup failed"))
+
+    token_ok, token_payload, token_error = _gh_json(cfg, ["api", f"repos/{repo}/actions/permissions/workflow"])
+    if token_ok and isinstance(token_payload, dict):
+        default_permissions = token_payload.get("default_workflow_permissions")
+        checks.append(_certification_gate("workflow_token_permissions", "PASS", f"default_workflow_permissions={default_permissions}"))
+    else:
+        checks.append(_certification_gate("workflow_token_permissions", "WARN", token_error or "workflow token permission lookup failed"))
+
+    workflows_ok, workflows_payload, workflows_error = _gh_json(cfg, ["api", f"repos/{repo}/actions/workflows"])
+    workflows: dict[str, Any] = {}
+    if workflows_ok and isinstance(workflows_payload, dict):
+        workflow_rows = workflows_payload.get("workflows", [])
+        if isinstance(workflow_rows, list):
+            for row in workflow_rows:
+                if isinstance(row, dict):
+                    workflows[str(row.get("name"))] = {
+                        "id": row.get("id"),
+                        "name": row.get("name"),
+                        "path": row.get("path"),
+                        "state": row.get("state"),
+                    }
+        for expected in [workflow_name, probe_workflow_name]:
+            row = workflows.get(expected)
+            if row and row.get("state") == "active":
+                checks.append(_certification_gate(f"workflow_registered:{expected}", "PASS", f"{row.get('path')} active"))
+            else:
+                checks.append(_certification_gate(f"workflow_registered:{expected}", "WARN", "workflow not registered active"))
+    else:
+        checks.append(_certification_gate("workflow_registry", "WARN", workflows_error or "workflow registry lookup failed"))
+
+    ci_latest, ci_error = _latest_workflow_run(cfg, repo=repo, workflow_name=workflow_name, branch=branch if branch_ok else None)
+    ci_jobs_count, ci_jobs_error = _workflow_run_jobs_count(cfg, repo=repo, run_id=ci_latest.get("databaseId") if ci_latest else None)
+    if ci_jobs_error and ci_latest:
+        checks.append(_certification_gate("ci_jobs_lookup", "WARN", ci_jobs_error))
+    checks.append(
+        _classify_latest_run(
+            name="latest_ci",
+            latest=ci_latest,
+            error=ci_error,
+            head_sha=head_sha if head_ok else None,
+            jobs_count=ci_jobs_count,
+        )
+    )
+
+    probe_latest, probe_error = _latest_workflow_run(
+        cfg,
+        repo=repo,
+        workflow_name=probe_workflow_name,
+        branch=branch if branch_ok else None,
+    )
+    probe_jobs_count, probe_jobs_error = _workflow_run_jobs_count(cfg, repo=repo, run_id=probe_latest.get("databaseId") if probe_latest else None)
+    if probe_jobs_error and probe_latest:
+        checks.append(_certification_gate("probe_jobs_lookup", "WARN", probe_jobs_error))
+    checks.append(
+        _classify_latest_run(
+            name="startup_probe",
+            latest=probe_latest,
+            error=probe_error,
+            head_sha=head_sha if head_ok else None,
+            jobs_count=probe_jobs_count,
+        )
+    )
+
+    owner = repo.split("/", 1)[0]
+    billing_ok, billing_payload, billing_error = _gh_json(cfg, ["api", f"users/{owner}/settings/billing/actions"])
+    billing: dict[str, Any] = {"available": billing_ok}
+    if billing_ok and isinstance(billing_payload, dict):
+        billing.update(billing_payload)
+        checks.append(_certification_gate("actions_billing", "PASS", "billing endpoint readable"))
+    else:
+        billing["error"] = billing_error
+        checks.append(_certification_gate("actions_billing", "WARN", billing_error or "billing endpoint unavailable"))
+        next_actions.append("Run `gh auth refresh -h github.com -s user` and inspect GitHub Actions billing/minutes.")
+
+    if (
+        ci_latest
+        and probe_latest
+        and ci_latest.get("status") == "completed"
+        and probe_latest.get("status") == "completed"
+        and ci_latest.get("conclusion") == "startup_failure"
+        and probe_latest.get("conclusion") == "startup_failure"
+        and ci_jobs_count == 0
+        and probe_jobs_count == 0
+    ):
+        checks.append(
+            _certification_gate(
+                "startup_layer_isolated",
+                "FAIL",
+                "CI and startup probe both failed before jobs; inspect account billing, spending limit, and runner availability",
+            )
+        )
+        next_actions.append("Inspect repository Settings -> Actions -> General and Settings -> Actions -> Runners.")
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    warned = [check for check in checks if check["status"] == "WARN"]
+    status = "GITHUB_ACTIONS_DIAGNOSTIC_FAIL" if failed else "GITHUB_ACTIONS_DIAGNOSTIC_WARN" if warned else "GITHUB_ACTIONS_DIAGNOSTIC_OK"
+    return {
+        "status": status,
+        "repo": repo,
+        "branch": branch if branch_ok else None,
+        "head_sha": head_sha if head_ok else None,
+        "checks": checks,
+        "workflows": workflows,
+        "runs": {
+            "ci": _run_summary(ci_latest, ci_jobs_count),
+            "startup_probe": _run_summary(probe_latest, probe_jobs_count),
+        },
+        "billing": billing,
+        "next_actions": sorted(set(next_actions)),
+    }
+
+
 def build_certification_status(
     cfg: Settings,
     *,
@@ -1121,6 +1367,20 @@ def run_certify_status(args: argparse.Namespace, cfg: Settings) -> int:
     if report["status"] == "CERTIFICATION_FAIL":
         return 2
     if args.strict and report["status"] != "CERTIFICATION_READY":
+        return 2
+    return 0
+
+
+def run_certify_github_actions(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_github_actions_diagnostic_status(
+        cfg,
+        workflow_name=args.workflow,
+        probe_workflow_name=args.probe_workflow,
+    )
+    emit_payload(report, args.format)
+    if report["status"] == "GITHUB_ACTIONS_DIAGNOSTIC_FAIL":
+        return 2
+    if args.strict and report["status"] != "GITHUB_ACTIONS_DIAGNOSTIC_OK":
         return 2
     return 0
 

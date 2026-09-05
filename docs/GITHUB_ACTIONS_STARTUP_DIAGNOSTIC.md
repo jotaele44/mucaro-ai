@@ -98,6 +98,12 @@ requires the `user` scope.
 
 ## Next Checks
 
+Start with the Mucaro diagnostic receipt:
+
+```bash
+PYTHONPATH=.:backend python3 scripts/mucaro.py certify github-actions --format text
+```
+
 Run these checks from a trusted operator terminal:
 
 ```bash

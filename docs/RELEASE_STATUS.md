@@ -142,3 +142,7 @@ Known environment-dependent item:
   startup isolation is useful for release operations. See
   `docs/GITHUB_ACTIONS_STARTUP_DIAGNOSTIC.md` for the current evidence and
   operator checks.
+- `mucaro certify github-actions` provides a read-only diagnostic receipt for
+  the hosted startup blocker, including Actions permissions, workflow
+  registration, latest `CI` and probe runs, job counts, and billing endpoint
+  access status.
