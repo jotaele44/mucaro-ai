@@ -39,7 +39,10 @@ command uses only receipts whose `head_sha` matches the current Git `HEAD`;
 older receipts remain history, not current certification proof.
 Use `mucaro release receipts --current-head --format text` to audit matching
 receipts and `mucaro release receipt RECEIPT_ID --format json` to inspect a
-specific receipt with its computed file SHA-256.
+specific receipt with its computed file SHA-256. Local release receipts include
+the package artifact payload from `mucaro package build --format json`, linking
+the certification receipt to the source ZIP SHA-256, manifest SHA-256, and
+member count produced for the same source state.
 
 ## Release Gates
 

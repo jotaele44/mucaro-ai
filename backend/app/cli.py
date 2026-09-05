@@ -49,7 +49,7 @@ from .permissions import (
     revoke_directory,
 )
 from .product_audit import build_product_audit
-from .release_receipts import find_release_receipt, list_release_receipts, load_release_receipt
+from .release_receipts import find_release_receipt, list_release_receipts, load_release_receipt, summarize_release_receipts
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .retrieval_eval import DEFAULT_FIXTURE, build_retrieval_eval_report, format_retrieval_eval_text
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
@@ -571,18 +571,24 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"current_head={payload.get('current_head')}")
         if "count" in payload:
             print(f"count={payload.get('count')}")
+        summary_counts = payload.get("summary")
+        if isinstance(summary_counts, dict) and "total" in summary_counts:
+            print(f"valid={summary_counts.get('valid')}")
+            print(f"invalid={summary_counts.get('invalid')}")
+            print(f"by_type={json.dumps(summary_counts.get('by_type', {}), sort_keys=True)}")
+            print(f"by_status={json.dumps(summary_counts.get('by_status', {}), sort_keys=True)}")
         rows = payload.get("receipts", [])
         if isinstance(rows, list):
             for row in rows:
                 if isinstance(row, dict):
                     print(
-                        f"{'PASS' if row.get('valid') else 'FAIL'} {row.get('receipt_id')} "
+                        f"{'VALID' if row.get('valid') else 'INVALID'} {row.get('receipt_id')} "
                         f"{row.get('receipt_type')} {row.get('status')} {row.get('head_sha')} {row.get('file_sha256')}"
                     )
         summary = payload.get("summary")
-        if isinstance(summary, dict):
+        if status == "RELEASE_RECEIPT_OK" and isinstance(summary, dict):
             print(
-                f"{'PASS' if summary.get('valid') else 'FAIL'} {summary.get('receipt_id')} "
+                f"{'VALID' if summary.get('valid') else 'INVALID'} {summary.get('receipt_id')} "
                 f"{summary.get('receipt_type')} {summary.get('status')} {summary.get('head_sha')} {summary.get('file_sha256')}"
             )
             if summary.get("validation_error"):
@@ -1033,6 +1039,7 @@ def run_release_receipts(args: argparse.Namespace, cfg: Settings) -> int:
         "project_root": str(cfg.project_root),
         "current_head": current_head,
         "count": len(receipts),
+        "summary": summarize_release_receipts(receipts),
         "receipts": receipts,
     }
     emit_payload(payload, args.format)

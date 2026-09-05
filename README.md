@@ -241,7 +241,8 @@ script.
 
 Use `mucaro release receipts --current-head --format text` and `mucaro release
 receipt RECEIPT_ID --format json` to inspect local release and fresh-clone
-certification receipts, including schema validity and receipt file SHA-256.
+certification receipts, including schema validity, summary counts, and receipt
+file SHA-256.
 
 Use `mucaro audit product` to track what is complete versus still open against
 the governed local-first assistant target. The audit includes both assistant

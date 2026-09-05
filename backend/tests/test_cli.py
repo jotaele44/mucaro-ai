@@ -610,6 +610,7 @@ def test_cli_release_receipts_lists_and_shows_exact_head_receipts(tmp_path: Path
     cfg = make_settings(tmp_path)
     head_sha = "f" * 40
     stale_sha = "1" * 40
+    receipt_dir = tmp_path / "data" / "exports" / "release_receipts"
 
     current_receipt = write_release_receipt(
         tmp_path,
@@ -627,6 +628,7 @@ def test_cli_release_receipts_lists_and_shows_exact_head_receipts(tmp_path: Path
         command=["python3", "scripts/certify_fresh_clone.py", "--ref", stale_sha],
         payload={"checks": ["stale"]},
     )
+    (receipt_dir / "broken.json").write_text("{not-json\n", encoding="utf-8")
 
     def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
         if args == ["git", "rev-parse", "HEAD"]:
@@ -643,6 +645,9 @@ def test_cli_release_receipts_lists_and_shows_exact_head_receipts(tmp_path: Path
     assert payload["receipts"][0]["receipt_id"] == current_receipt.stem
     assert payload["receipts"][0]["valid"] is True
     assert payload["receipts"][0]["file_sha256"]
+    assert payload["summary"]["total"] == 1
+    assert payload["summary"]["valid"] == 1
+    assert payload["summary"]["invalid"] == 0
 
     assert main(["release", "receipt", current_receipt.stem, "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -656,6 +661,15 @@ def test_cli_release_receipts_lists_and_shows_exact_head_receipts(tmp_path: Path
 
     assert main(["release", "receipt", "../outside", "--format", "text"], cfg=cfg) == 2
     assert "ERROR_RELEASE_RECEIPT_NOT_FOUND" in capsys.readouterr().err
+
+    assert main(["release", "receipts", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["summary"]["total"] == 3
+    assert payload["summary"]["valid"] == 2
+    assert payload["summary"]["invalid"] == 1
+    broken = next(row for row in payload["receipts"] if row["receipt_id"] == "broken")
+    assert broken["valid"] is False
+    assert broken["validation_error"].startswith("json_invalid:")
 
 
 def test_github_governance_fails_when_latest_ci_is_for_different_head(tmp_path: Path, monkeypatch):

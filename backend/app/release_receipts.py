@@ -111,6 +111,29 @@ def list_release_receipts(root: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def summarize_release_receipts(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    by_type: dict[str, int] = {}
+    by_status: dict[str, int] = {}
+    valid = 0
+    invalid = 0
+    for row in rows:
+        if row.get("valid"):
+            valid += 1
+        else:
+            invalid += 1
+        receipt_type = str(row.get("receipt_type") or "UNKNOWN")
+        status = str(row.get("status") or "UNKNOWN")
+        by_type[receipt_type] = by_type.get(receipt_type, 0) + 1
+        by_status[status] = by_status.get(status, 0) + 1
+    return {
+        "total": len(rows),
+        "valid": valid,
+        "invalid": invalid,
+        "by_type": by_type,
+        "by_status": by_status,
+    }
+
+
 def find_release_receipt(root: Path, receipt_id: str) -> dict[str, Any] | None:
     if Path(receipt_id).name != receipt_id:
         return None

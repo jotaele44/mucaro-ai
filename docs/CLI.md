@@ -237,8 +237,9 @@ Use `mucaro release receipts` to list local release and fresh-clone
 certification receipts. Add `--current-head` to filter the list to receipts
 whose `head_sha` matches the current Git `HEAD`. Each row includes receipt
 validity, receipt type, certification status, bound head SHA, and receipt file
-SHA-256. Use `mucaro release receipt RECEIPT_ID` to inspect the full JSON
-receipt by file stem or filename.
+SHA-256. The listing also summarizes valid/invalid counts by receipt type and
+status. Use `mucaro release receipt RECEIPT_ID` to inspect the full JSON receipt
+by file stem or filename.
 
 Use `mucaro certify status` before tagging or pushing release candidates. It is
 a read-only readiness receipt over product audit, doctor, JSON validation, Git

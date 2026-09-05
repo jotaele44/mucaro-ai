@@ -47,6 +47,10 @@ def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
         calls.append((name, cmd, cwd))
         return fake_gate(name)
 
+    def fake_write_release_receipt(*args, **kwargs):
+        del args, kwargs
+        return certify_release.ROOT / "data" / "exports" / "release_receipts" / "local_release-test.json"
+
     monkeypatch.setattr(certify_release, "tracked_files", fake_tracked_files)
     monkeypatch.setattr(certify_release, "gate_worktree_clean", lambda: fake_gate("worktree_clean"))
     monkeypatch.setattr(certify_release, "gate_no_prior_names", lambda files: fake_gate("prior_name_residue"))
@@ -54,10 +58,17 @@ def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
     monkeypatch.setattr(certify_release, "gate_no_large_files", lambda files: fake_gate("large_file_scan"))
     monkeypatch.setattr(certify_release, "gate_no_generated_tracked", lambda files: fake_gate("generated_artifact_scan"))
     monkeypatch.setattr(certify_release, "gate_command", fake_gate_command)
+    monkeypatch.setattr(certify_release, "write_release_receipt", fake_write_release_receipt)
+    monkeypatch.setattr(
+        certify_release,
+        "gate_package_artifact",
+        lambda: (fake_gate("package_artifact", detail="manifest_member_count=1"), {"status": "PACKAGE_ARTIFACT_READY"}),
+    )
 
     assert certify_release.main() == 0
-    assert "CERTIFY_RELEASE_OK" in capsys.readouterr().out
-    assert ("package_artifact", [sys.executable, "scripts/mucaro.py", "package", "build", "--format", "text"], certify_release.ROOT) in calls
+    output = capsys.readouterr().out
+    assert "PASS package_artifact manifest_member_count=1" in output
+    assert "CERTIFY_RELEASE_OK" in output
 
 
 def test_fresh_clone_uses_shallow_branch_clone_for_named_refs(tmp_path, monkeypatch):

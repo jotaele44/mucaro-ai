@@ -118,7 +118,8 @@ Observed success markers:
 - `mucaro release receipts` and `mucaro release receipt RECEIPT_ID` expose the
   local release/fresh-clone certification receipt ledger through the supported
   CLI boundary, including schema validity, bound head SHA, status, and computed
-  receipt file SHA-256.
+  receipt file SHA-256. Receipt listings also summarize valid/invalid counts by
+  receipt type and status.
 - Local release certification for audit commit
   `2848d6f54880a716d5fa61467e5d8a6b5bb5f301` reports
   `CERTIFY_RELEASE_OK`, including `133 passed`, retrieval eval, JSON

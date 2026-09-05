@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -110,6 +111,22 @@ def gate_command(name: str, cmd: list[str], *, cwd: Path = ROOT) -> Gate:
     return Gate(name, status, detail)
 
 
+def gate_package_artifact() -> tuple[Gate, dict | None]:
+    proc = run([sys.executable, "scripts/mucaro.py", "package", "build", "--format", "json"], check=False)
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        payload = None
+    if proc.returncode != 0:
+        detail = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else f"returncode={proc.returncode}"
+        return Gate("package_artifact", "FAIL", detail), payload
+    if not isinstance(payload, dict):
+        return Gate("package_artifact", "FAIL", "package artifact JSON invalid"), None
+    manifest = payload.get("manifest", {})
+    member_count = manifest.get("member_count") if isinstance(manifest, dict) else None
+    return Gate("package_artifact", "PASS", f"manifest_member_count={member_count}"), payload
+
+
 def git_head() -> str:
     proc = subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -137,10 +154,15 @@ def main() -> int:
         gate_command("retrieval_eval", [sys.executable, "scripts/evaluate_retrieval.py"]),
         gate_command("json_validation", [sys.executable, "scripts/validate_json.py"]),
         gate_command("desktop_package_self_test", [sys.executable, "scripts/package_desktop.py", "--self-test"]),
-        gate_command("package_artifact", [sys.executable, "scripts/mucaro.py", "package", "build", "--format", "text"]),
-        gate_command("npm_audit", ["npm", "audit", "--audit-level=moderate"], cwd=ROOT / "frontend"),
-        gate_command("frontend_build", ["npm", "run", "build"], cwd=ROOT / "frontend"),
     ]
+    package_gate, package_artifact = gate_package_artifact()
+    gates.append(package_gate)
+    gates.extend(
+        [
+            gate_command("npm_audit", ["npm", "audit", "--audit-level=moderate"], cwd=ROOT / "frontend"),
+            gate_command("frontend_build", ["npm", "run", "build"], cwd=ROOT / "frontend"),
+        ]
+    )
     failed = [gate for gate in gates if gate.status != "PASS"]
     for gate in gates:
         print(f"{gate.status} {gate.name} {gate.detail}")
@@ -154,6 +176,7 @@ def main() -> int:
         payload={
             "gates": [{"name": gate.name, "status": gate.status, "detail": gate.detail} for gate in gates],
             "failed_gates": [gate.name for gate in failed],
+            "package_artifact": package_artifact,
         },
     )
     print(f"RELEASE_RECEIPT {receipt.relative_to(ROOT)}")
