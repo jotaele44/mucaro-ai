@@ -374,7 +374,7 @@ manifest, and writes a `python_dist` release receipt for the exact current Git
 
 ## Retrieval Strategies
 
-`mucaro ask` defaults to `--strategy hybrid`, which recomputes deterministic lexical and TF-IDF scores from the current chunk file. Use `--strategy bm25` for local BM25 ranking, `--strategy persistent` to query the local persisted TF-IDF index, or `--strategy semantic` to query the local embedding store built during ingestion. The local semantic hash store requires matched terms before returning a cited chunk, reducing false-positive context from hash similarity alone. Persistent and semantic retrieval fail closed when their stores are missing or stale; run `mucaro sources reindex` after ingesting sources to rebuild them.
+`mucaro ask` defaults to `--strategy hybrid`, which recomputes deterministic lexical and TF-IDF scores from the current chunk file. Use `--strategy bm25` for local BM25 ranking, `--strategy persistent` to query the local persisted TF-IDF index, or `--strategy semantic` to query the local embedding store built during ingestion. The local semantic hash store requires normalized matched terms before returning a cited chunk and weights rarer matched terms during ranking, reducing false-positive context from hash similarity alone while improving source-lineage recall. Persistent and semantic retrieval fail closed when their stores are missing or stale; run `mucaro sources reindex` after ingesting sources to rebuild them.
 
 Use `mucaro index status` to check whether the persistent index and semantic
 store are usable. Use `mucaro sources reindex` to rebuild them from current

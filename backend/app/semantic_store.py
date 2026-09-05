@@ -9,10 +9,35 @@ from .utils import tokenize, utc_now, write_json, read_json
 from .vector_index import cosine_similarity, fingerprint_chunks
 
 STORE_NAME = "semantic_store.json"
-STORE_VERSION = "local_semantic_hash_store_v1"
-EMBEDDING_MODEL = "local_hash_embedding_v1"
+STORE_VERSION = "local_semantic_hash_store_v2"
+EMBEDDING_MODEL = "local_hash_embedding_v2"
 EMBEDDING_DIMENSIONS = 384
 MIN_SEMANTIC_SCORE = 0.1
+SEMANTIC_VECTOR_WEIGHT = 0.70
+SEMANTIC_MATCHED_TERM_WEIGHT = 0.30
+SEMANTIC_TOKEN_ALIASES = {
+    "bound": ("bind", "binding", "tie", "tied"),
+    "chunk": ("chunks",),
+    "chunks": ("chunk",),
+    "citation": ("cite", "cited", "citations"),
+    "citations": ("citation", "cite", "cited"),
+    "cite": ("citation", "citations", "cited"),
+    "cited": ("citation", "citations", "cite"),
+    "cites": ("citation", "citations", "cite"),
+    "citing": ("citation", "citations", "cite"),
+    "file": ("files", "path", "paths"),
+    "files": ("file", "path", "paths"),
+    "hash": ("hashes",),
+    "hashes": ("hash",),
+    "id": ("ids",),
+    "ids": ("id",),
+    "path": ("file", "files", "paths"),
+    "paths": ("file", "files", "path"),
+    "tie": ("bind", "binding", "bound", "tied"),
+    "tied": ("bind", "binding", "bound", "tie"),
+    "trace": ("traces",),
+    "traces": ("trace",),
+}
 
 
 def semantic_store_path(cfg: Settings = settings):
@@ -26,8 +51,22 @@ def _feature_sign_and_index(feature: str, dimensions: int) -> tuple[int, float]:
     return index, sign
 
 
+def semantic_search_tokens(text: str) -> list[str]:
+    search_tokens: set[str] = set()
+    for token in tokenize(text):
+        search_tokens.add(token)
+        search_tokens.update(SEMANTIC_TOKEN_ALIASES.get(token, ()))
+        if token.endswith("ies") and len(token) > 4:
+            search_tokens.add(f"{token[:-3]}y")
+        if token.endswith("ed") and len(token) > 4:
+            search_tokens.add(token[:-1])
+        if token.endswith("s") and len(token) > 3:
+            search_tokens.add(token[:-1])
+    return sorted(search_tokens)
+
+
 def _token_features(text: str) -> list[str]:
-    tokens = tokenize(text)
+    tokens = semantic_search_tokens(text)
     features: list[str] = []
     for token in tokens:
         features.append(f"tok:{token}")
@@ -94,6 +133,7 @@ def build_semantic_store(chunks: list[dict[str, Any]], cfg: Settings = settings)
                 "chunk": chunk,
                 "embedding": embedding,
                 "tokens": tokenize(str(chunk.get("text", ""))),
+                "search_tokens": semantic_search_tokens(str(chunk.get("text", ""))),
             }
         )
     payload = {
@@ -149,29 +189,48 @@ def get_semantic_store_status(chunks: list[dict[str, Any]], cfg: Settings = sett
 def query_semantic_store(query: str, store: dict[str, Any], *, top_k: int) -> list[dict[str, Any]]:
     query_embedding = embed_text(query)
     q_tokens = set(tokenize(query))
-    scored: list[dict[str, Any]] = []
-    for entry in store.get("entries", []):
-        if not isinstance(entry, dict):
+    q_search_tokens = set(semantic_search_tokens(query))
+    entries = [entry for entry in store.get("entries", []) if isinstance(entry, dict)]
+    search_document_frequency: dict[str, int] = {}
+    for entry in entries:
+        search_tokens = entry.get("search_tokens", entry.get("tokens", []))
+        if not isinstance(search_tokens, list):
             continue
+        for token in set(search_tokens):
+            search_document_frequency[str(token)] = search_document_frequency.get(str(token), 0) + 1
+    query_weight_total = sum(
+        1 / max(1, search_document_frequency.get(token, len(entries) + 1))
+        for token in q_search_tokens
+    )
+    scored: list[dict[str, Any]] = []
+    for entry in entries:
         chunk = entry.get("chunk")
         embedding = entry.get("embedding")
         tokens = entry.get("tokens", [])
+        search_tokens = entry.get("search_tokens", tokens)
         if not isinstance(chunk, dict) or not isinstance(embedding, list):
             continue
-        matched_terms = sorted(q_tokens.intersection(set(tokens))) if isinstance(tokens, list) else []
+        if not isinstance(tokens, list) or not isinstance(search_tokens, list):
+            continue
+        matched_terms = sorted(q_search_tokens.intersection(set(search_tokens)))
         if not matched_terms:
             continue
-        score = cosine_similarity(
+        semantic_score = cosine_similarity(
             {str(index): value for index, value in enumerate(query_embedding) if value},
             {str(index): float(value) for index, value in enumerate(embedding) if value},
         )
+        matched_term_weight = sum(1 / max(1, search_document_frequency.get(term, len(entries) + 1)) for term in matched_terms)
+        matched_term_score = matched_term_weight / max(query_weight_total, 1)
+        score = (SEMANTIC_VECTOR_WEIGHT * semantic_score) + (SEMANTIC_MATCHED_TERM_WEIGHT * matched_term_score)
         if score < MIN_SEMANTIC_SCORE:
             continue
         item = dict(chunk)
         item["score"] = round(score, 6)
-        item["semantic_score"] = round(score, 6)
+        item["semantic_score"] = round(semantic_score, 6)
+        item["matched_term_score"] = round(matched_term_score, 6)
         item["retrieval_strategy"] = STORE_VERSION
         item["matched_terms"] = matched_terms[:20]
+        item["exact_matched_terms"] = sorted(q_tokens.intersection(set(tokens)))[:20]
         scored.append(item)
     return sorted(
         scored,

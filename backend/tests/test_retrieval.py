@@ -2,7 +2,7 @@ from pathlib import Path
 
 from backend.app.config import Settings
 from backend.app.retrieval import bm25_retrieve, lexical_retrieve, retrieve, vector_retrieve
-from backend.app.semantic_store import build_semantic_store, semantic_store_path
+from backend.app.semantic_store import STORE_VERSION, build_semantic_store, semantic_store_path
 from backend.app.vector_index import build_persistent_index, index_path
 
 
@@ -195,10 +195,39 @@ def test_semantic_retrieval_uses_local_store(tmp_path: Path):
 
     assert semantic_store_path(cfg).exists()
     assert store["indexed_chunk_count"] == 2
+    assert store["version"] == STORE_VERSION
     assert result["status"] == "RETRIEVAL_OK"
     assert result["retrieved_chunks"][0]["chunk_id"] == "chunk_semantic"
-    assert result["retrieved_chunks"][0]["retrieval_strategy"] == "local_semantic_hash_store_v1"
+    assert result["retrieved_chunks"][0]["retrieval_strategy"] == "local_semantic_hash_store_v2"
     assert result["retrieved_chunks"][0]["semantic_score"] > 0
+    assert result["retrieved_chunks"][0]["matched_term_score"] > 0
+
+
+def test_semantic_retrieval_weights_rare_lineage_terms(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    chunks = [
+        {
+            "chunk_id": "chunk_expected",
+            "source_id": "src_expected",
+            "text": "Source lineage records source IDs, chunk IDs, file SHA-256 hashes, parser warnings, byte counts, and source paths for cited answer traces.",
+            "chunk_index": 0,
+        },
+        {
+            "chunk_id": "chunk_distractor",
+            "source_id": "src_distractor",
+            "text": "Conversation ask uses bounded prior turns as chat context while keeping source citations tied to retrieved chunks.",
+            "chunk_index": 1,
+        },
+    ]
+    build_semantic_store(chunks, cfg)
+
+    result = retrieve("Which lineage fields tie citations to files?", chunks, top_k=1, strategy="semantic", cfg=cfg)
+
+    assert result["status"] == "RETRIEVAL_OK"
+    top = result["retrieved_chunks"][0]
+    assert top["chunk_id"] == "chunk_expected"
+    assert "lineage" in top["matched_terms"]
+    assert "file" in top["matched_terms"]
 
 
 def test_semantic_retrieval_requires_built_store(tmp_path: Path):

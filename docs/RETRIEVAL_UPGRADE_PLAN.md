@@ -14,12 +14,15 @@ contracts.
 | `bm25_v1` | Candidate | Local BM25 ranking without external dependencies |
 | `hybrid_tfidf_v1` | Certified | Default answer retrieval strategy |
 | `persistent_tfidf_v1` | Certified | Local persisted TF-IDF index rebuilt during ingestion |
-| `local_semantic_hash_store_v1` | Candidate | Local persisted hash-embedding store rebuilt during ingestion, constrained by matched-term evidence |
+| `local_semantic_hash_store_v2` | Candidate | Local persisted hash-embedding store rebuilt during ingestion, constrained by normalized matched-term evidence and rare-term weighting |
 
 The current persistent index is stored under `data/indexes/tfidf_index.json`.
 The local semantic store is stored under `data/indexes/semantic_store.json`.
 Both stores fail closed when missing or stale. The local semantic hash store also
-fails closed when hash similarity exists without matched query terms.
+fails closed when hash similarity exists without normalized matched query terms.
+The v2 semantic store preserves the local deterministic embedding boundary while
+ranking with a small rare-term matched-evidence component so domain-specific
+source-lineage terms are not hidden by broad hash-vector similarity.
 
 ## Invariants
 
@@ -109,7 +112,7 @@ default `hybrid` strategy until eval evidence shows a material improvement.
 ## Readiness
 
 Current state: `persistent_tfidf_v1` is certified as the first local persistence
-upgrade. `local_semantic_hash_store_v1` is the current semantic-store candidate
-for certification with matched-term false-positive protection and fixture-shape
-validation. Chroma or model-backed embeddings remain future quality upgrades
-behind the same boundary.
+upgrade. `local_semantic_hash_store_v2` is the current semantic-store candidate
+for certification with normalized matched-term false-positive protection,
+rare-term scoring, and fixture-shape validation. Chroma or model-backed
+embeddings remain future quality upgrades behind the same boundary.
