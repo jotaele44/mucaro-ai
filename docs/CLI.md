@@ -245,6 +245,13 @@ under `data/exports/release_receipts`. Add `--include-github` when authenticated
 GitHub release gates, including hosted-runner startup classification when
 current-head CI fails before jobs are created.
 
+Use `mucaro release governance-report` to build a single current-head handoff
+payload for governed release work. The report combines release-state
+classification, product-audit status, package status, current-head release
+receipt summaries, GitHub Actions diagnostics, startup-blocker causes, hosted
+run evidence, and exact next actions. Use `--strict` when automation should fail
+until `GOVERNANCE_REPORT_READY`.
+
 Use `mucaro release receipts` to list local release and fresh-clone
 certification receipts. Add `--current-head` to filter the list to receipts
 whose `head_sha` matches the current Git `HEAD`. Each row includes receipt

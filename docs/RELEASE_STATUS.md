@@ -103,6 +103,10 @@ Observed success markers:
   gate requiring GitHub Pro or public visibility, while hosted CI startup still
   fails before job creation. The diagnostic also emits a structured
   `startup_blocker` summary for automation and release-state handoff.
+- `mucaro release governance-report` combines release-state classification,
+  product-audit status, package status, current-head receipt summaries, GitHub
+  Actions diagnostics, startup-blocker causes, hosted run evidence, and exact
+  commands/actions into one current-head handoff payload.
 - Local release certification for `v0.1.23` reports `CERTIFY_RELEASE_OK` on
   commit `f48828b8dd5648554b65dba1ca86a07db099f7d3`, including `122 passed`,
   retrieval eval, JSON validation, desktop package self-test, frontend audit,

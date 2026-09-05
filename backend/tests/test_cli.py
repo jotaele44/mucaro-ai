@@ -807,6 +807,101 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     assert payload["receipts"]["python_dist"]["head_sha"] == head_sha
 
 
+def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    head_sha = "9" * 40
+    tag_name = "v0.1.23-structured-startup-blocker"
+
+    for receipt_type, status in [
+        ("local_release", "CERTIFY_RELEASE_OK"),
+        ("fresh_clone", "FRESH_CLONE_CERT_OK"),
+        ("source_artifact", "SOURCE_ARTIFACT_CERT_OK"),
+        ("python_dist", "PYTHON_DIST_CERT_OK"),
+    ]:
+        write_release_receipt(
+            tmp_path,
+            receipt_type=receipt_type,
+            status=status,
+            head_sha=head_sha,
+            command=["mucaro", "test"],
+            payload={"checks": []},
+        )
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "branch", "--show-current"]:
+            return True, "main"
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        if args == ["git", "tag", "--points-at", "HEAD"]:
+            return True, tag_name
+        if args == ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]:
+            return True, "origin/main"
+        if args == ["git", "remote", "get-url", "origin"]:
+            return True, "https://github.com/jotaele44/mucaro-ai.git"
+        if args[:3] == ["git", "ls-remote", "origin"]:
+            return True, f"{'a' * 40}\trefs/tags/{tag_name}\n{head_sha}\trefs/tags/{tag_name}^{{}}"
+        return False, f"unexpected command: {args}"
+
+    def fake_gh_json(_cfg: Settings, args: list[str]):
+        if args == ["api", "repos/jotaele44/mucaro-ai/branches/main"]:
+            return True, {"protected": False, "protection": {"required_status_checks": {"contexts": []}}}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/branches/main/protection"]:
+            return False, None, "HTTP 403: Upgrade to GitHub Pro or make this repository public"
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/permissions"]:
+            return True, {"enabled": True, "allowed_actions": "all"}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/permissions/workflow"]:
+            return True, {"default_workflow_permissions": "read"}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/runners"]:
+            return True, {"total_count": 0, "runners": []}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/workflows"]:
+            return True, {
+                "workflows": [
+                    {"id": 1, "name": "CI", "path": ".github/workflows/ci.yml", "state": "active"},
+                    {"id": 2, "name": "CI Startup Probe", "path": ".github/workflows/ci-startup-probe.yml", "state": "active"},
+                ]
+            }, ""
+        if args[:2] == ["run", "list"] and "CI Startup Probe" in args:
+            return True, [{"databaseId": 22, "status": "completed", "conclusion": "startup_failure", "headSha": head_sha}], ""
+        if args[:2] == ["run", "list"] and "CI" in args:
+            return True, [{"databaseId": 11, "status": "completed", "conclusion": "startup_failure", "headSha": head_sha}], ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/11/jobs"]:
+            return True, {"total_count": 0, "jobs": []}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/22/jobs"]:
+            return True, {"total_count": 0, "jobs": []}, ""
+        if args == ["api", "users/jotaele44/settings/billing/actions"]:
+            return False, None, "HTTP 404: Not Found"
+        return False, None, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+    monkeypatch.setattr(cli, "_gh_json", fake_gh_json)
+
+    assert main(["release", "governance-report", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "GOVERNANCE_REPORT_OPEN"
+    assert payload["current_state"] == "GITHUB_GOVERNANCE_OPEN"
+    assert payload["head_sha"] == head_sha
+    assert payload["tags_at_head"] == [tag_name]
+    assert payload["current_head_receipts_summary"]["total"] == 4
+    assert payload["current_head_receipts_summary"]["valid"] == 4
+    assert payload["startup_blocker"]["status"] == "FAIL"
+    assert payload["startup_blocker"]["isolated_before_jobs"] is True
+    assert "private_branch_protection_plan_gate" in payload["startup_blocker"]["suspected_causes"]
+    assert "github_branch_protection_api=WARN:HTTP 403" in payload["github_governance_evidence"]
+
+    assert main(["release", "governance-report", "--strict", "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "GOVERNANCE_REPORT_OPEN" in text_output
+    assert f"head_sha={head_sha}" in text_output
+    assert "startup_blocker_status=FAIL" in text_output
+    assert "startup_blocker_causes=" in text_output
+    assert "receipt_count=4" in text_output
+    assert "receipt_valid=4" in text_output
+    assert "next_action=Upgrade GitHub plan or make the repository public" in text_output
+
+
 def test_cli_release_state_requires_source_artifact_receipt_for_governed_ready(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     head_sha = "a" * 40

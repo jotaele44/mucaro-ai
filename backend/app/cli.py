@@ -413,6 +413,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     release_state.set_defaults(handler=run_release_state)
 
+    release_governance = release_subcommands.add_parser(
+        "governance-report",
+        help="Build a current-head governance handoff report.",
+    )
+    release_governance.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_governance.add_argument("--strict", action="store_true", help="Exit nonzero until governed release state is ready.")
+    release_governance.add_argument(
+        "--github-workflow",
+        default="CI",
+        help="Primary GitHub Actions workflow name to inspect.",
+    )
+    release_governance.add_argument(
+        "--probe-workflow",
+        default="CI Startup Probe",
+        help="Manual-only startup probe workflow name to inspect.",
+    )
+    release_governance.set_defaults(handler=run_release_governance_report)
+
     release_receipts = release_subcommands.add_parser("receipts", help="List local release certification receipts.")
     release_receipts.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     release_receipts.add_argument("--current-head", action="store_true", help="Only show receipts for the current Git HEAD.")
@@ -595,6 +613,39 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"{state.get('status')} {state.get('state')} {detail}")
         for command in payload.get("next_commands", []):
             print(f"command={command}")
+    elif status in {"GOVERNANCE_REPORT_READY", "GOVERNANCE_REPORT_OPEN"}:
+        print(f"current_state={payload.get('current_state')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        print(f"tag_at_head={','.join(payload.get('tags_at_head', []))}")
+        print(f"product_audit_status={payload.get('product_audit_status')}")
+        print(f"package_status={payload.get('package_status')}")
+        print(f"release_state_status={payload.get('release_state_status')}")
+        print(f"github_actions_status={payload.get('github_actions_status')}")
+        receipt_summary = payload.get("current_head_receipts_summary", {})
+        if isinstance(receipt_summary, dict):
+            print(f"receipt_count={receipt_summary.get('total')}")
+            print(f"receipt_valid={receipt_summary.get('valid')}")
+            print(f"receipt_invalid={receipt_summary.get('invalid')}")
+        startup_blocker = payload.get("startup_blocker", {})
+        if isinstance(startup_blocker, dict):
+            print(f"startup_blocker_status={startup_blocker.get('status')}")
+            causes = startup_blocker.get("suspected_causes", [])
+            if isinstance(causes, list):
+                print(f"startup_blocker_causes={','.join(str(cause) for cause in causes)}")
+        github_evidence = payload.get("github_governance_evidence")
+        if github_evidence:
+            github_evidence_text = str(github_evidence).replace("\n", "\\n")
+            print(f"github_governance_evidence={github_evidence_text}")
+        for receipt in payload.get("current_head_receipts", []):
+            if isinstance(receipt, dict):
+                print(
+                    f"receipt={receipt.get('receipt_id')} {receipt.get('receipt_type')} "
+                    f"{receipt.get('status')} {receipt.get('file_sha256')}"
+                )
+        for command in payload.get("next_commands", []):
+            print(f"command={command}")
+        for action in payload.get("next_actions", []):
+            print(f"next_action={action}")
     elif status in {"RELEASE_RECEIPTS_OK", "RELEASE_RECEIPT_OK"}:
         if payload.get("receipt_id"):
             print(f"receipt_id={payload.get('receipt_id')}")
@@ -1067,6 +1118,81 @@ def run_release_state(args: argparse.Namespace, cfg: Settings) -> int:
     )
     emit_payload(report, args.format)
     if args.strict and report["status"] != "RELEASE_STATE_READY":
+        return 2
+    return 0
+
+
+def build_release_governance_report(
+    cfg: Settings,
+    *,
+    github_workflow: str = "CI",
+    probe_workflow: str = "CI Startup Probe",
+) -> dict[str, Any]:
+    release_state = build_release_state_report(
+        cfg,
+        include_github=True,
+        github_workflow=github_workflow,
+    )
+    github_actions = build_github_actions_diagnostic_status(
+        cfg,
+        workflow_name=github_workflow,
+        probe_workflow_name=probe_workflow,
+    )
+    product_audit = build_product_audit(cfg)
+    package = build_package_status(cfg.project_root)
+    git_payload = release_state.get("git", {}) if isinstance(release_state.get("git"), dict) else {}
+    head_sha = git_payload.get("head_sha")
+    receipts = list_release_receipts(cfg.project_root)
+    current_head_receipts = [row for row in receipts if row.get("head_sha") == head_sha]
+    states = release_state.get("states", [])
+    github_state = next(
+        (state for state in states if isinstance(state, dict) and state.get("state") == "GITHUB_GOVERNANCE_OPEN"),
+        {},
+    )
+    governed_state = next(
+        (state for state in states if isinstance(state, dict) and state.get("state") == "GOVERNED_RELEASE_READY"),
+        {},
+    )
+    startup_blocker = github_actions.get("startup_blocker", {})
+    next_commands = [str(command) for command in release_state.get("next_commands", [])]
+    next_actions: list[str] = []
+    for action in github_actions.get("next_actions", []):
+        next_actions.append(str(action))
+    governed_ready = release_state.get("status") == "RELEASE_STATE_READY" and governed_state.get("status") == "PASS"
+    return {
+        "status": "GOVERNANCE_REPORT_READY" if governed_ready else "GOVERNANCE_REPORT_OPEN",
+        "version": package_version(),
+        "project_root": str(cfg.project_root),
+        "current_state": release_state.get("current_state"),
+        "head_sha": head_sha,
+        "tags_at_head": git_payload.get("tags_at_head", []),
+        "release_state_status": release_state.get("status"),
+        "product_audit_status": product_audit.get("status"),
+        "product_audit_counts": product_audit.get("counts"),
+        "package_status": package.get("status"),
+        "certification_status": release_state.get("certification_status"),
+        "github_actions_status": github_actions.get("status"),
+        "github_governance_evidence": github_state.get("evidence"),
+        "governed_release_evidence": governed_state.get("evidence"),
+        "startup_blocker": startup_blocker,
+        "git": git_payload,
+        "release_states": release_state.get("states", []),
+        "github_actions": github_actions,
+        "current_head_receipts_summary": summarize_release_receipts(current_head_receipts),
+        "current_head_receipts": current_head_receipts,
+        "next_commands": sorted(set(next_commands)),
+        "next_actions": sorted(set(next_actions)),
+    }
+
+
+def run_release_governance_report(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_release_governance_report(
+        cfg,
+        github_workflow=args.github_workflow,
+        probe_workflow=args.probe_workflow,
+    )
+    emit_payload(report, args.format)
+    if args.strict and report["status"] != "GOVERNANCE_REPORT_READY":
         return 2
     return 0
 
