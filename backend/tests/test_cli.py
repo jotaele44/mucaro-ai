@@ -187,6 +187,26 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert hybrid["multi_binding_full_hit_rate"] == 1.0
     assert hybrid["positive_retrieved_chunks"] == 98
     assert hybrid["relevant_retrieved_chunks"] == 28
+    assert len(hybrid["category_metrics"]) == 20
+    categories = {category["category"]: category for category in hybrid["category_metrics"]}
+    assert categories["conversation_context"] == {
+        "category": "conversation_context",
+        "queries": 2,
+        "positive_queries": 2,
+        "no_context_queries": 0,
+        "recall_at_k": 1.0,
+        "expected_binding_recall_at_k": 1.0,
+        "context_precision_at_k": 0.5,
+        "top1_hit_rate": 1.0,
+        "full_binding_hit_rate": 1.0,
+        "multi_binding_full_hit_rate": 1.0,
+        "no_context_accuracy": 1.0,
+        "expected_bindings": 3,
+        "positive_retrieved_chunks": 6,
+        "relevant_retrieved_chunks": 3,
+    }
+    first_case = hybrid["cases"][0]
+    assert first_case["category"] in categories
 
     assert main(["eval", "retrieval", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
@@ -203,6 +223,7 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert "binding_recall=1.00" in text_output
     assert "precision=0.29" in text_output
     assert "multi_full=1.00" in text_output
+    assert "hybrid category=cli_contract queries=1 positives=1 recall@5=1.00 binding_recall=1.00 precision=0.20" in text_output
     assert "hybrid recall@5=" in text_output
     assert "semantic recall@5=" in text_output
     assert "RETRIEVAL_EVAL_OK" in text_output

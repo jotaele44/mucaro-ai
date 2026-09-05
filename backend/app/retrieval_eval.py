@@ -22,6 +22,7 @@ MIN_NO_CONTEXT_QUERIES = 6
 MIN_SOURCE_IDS = 20
 MIN_MULTI_BINDING_QUERIES = 2
 MIN_QUERY_CATEGORIES = 8
+UNCATEGORIZED_QUERY_CATEGORY = "uncategorized"
 
 
 def load_retrieval_eval_fixture(path: Path = DEFAULT_FIXTURE) -> Any:
@@ -218,6 +219,61 @@ def make_eval_settings(root: Path) -> Settings:
     )
 
 
+def _empty_category_bucket(category: str) -> dict[str, Any]:
+    return {
+        "category": category,
+        "queries": 0,
+        "positive_queries": 0,
+        "no_context_queries": 0,
+        "hits": 0,
+        "top1_hits": 0,
+        "no_context_hits": 0,
+        "full_binding_hits": 0,
+        "multi_binding_cases": 0,
+        "multi_binding_full_hits": 0,
+        "total_expected_bindings": 0,
+        "retrieved_for_positive": 0,
+        "relevant_retrieved": 0,
+    }
+
+
+def _category_from_case(case: dict[str, Any]) -> str:
+    category = case.get("category")
+    return category.strip() if isinstance(category, str) and category.strip() else UNCATEGORIZED_QUERY_CATEGORY
+
+
+def _finalize_category_bucket(bucket: dict[str, Any]) -> dict[str, Any]:
+    positive_queries = bucket["positive_queries"]
+    no_context_queries = bucket["no_context_queries"]
+    multi_binding_cases = bucket["multi_binding_cases"]
+    return {
+        "category": bucket["category"],
+        "queries": bucket["queries"],
+        "positive_queries": positive_queries,
+        "no_context_queries": no_context_queries,
+        "recall_at_k": round(bucket["hits"] / positive_queries, 4) if positive_queries else 1.0,
+        "expected_binding_recall_at_k": (
+            round(bucket["relevant_retrieved"] / bucket["total_expected_bindings"], 4)
+            if bucket["total_expected_bindings"]
+            else 1.0
+        ),
+        "context_precision_at_k": (
+            round(bucket["relevant_retrieved"] / bucket["retrieved_for_positive"], 4)
+            if bucket["retrieved_for_positive"]
+            else 1.0
+        ),
+        "top1_hit_rate": round(bucket["top1_hits"] / positive_queries, 4) if positive_queries else 1.0,
+        "full_binding_hit_rate": round(bucket["full_binding_hits"] / positive_queries, 4) if positive_queries else 1.0,
+        "multi_binding_full_hit_rate": (
+            round(bucket["multi_binding_full_hits"] / multi_binding_cases, 4) if multi_binding_cases else 1.0
+        ),
+        "no_context_accuracy": round(bucket["no_context_hits"] / no_context_queries, 4) if no_context_queries else 1.0,
+        "expected_bindings": bucket["total_expected_bindings"],
+        "positive_retrieved_chunks": bucket["retrieved_for_positive"],
+        "relevant_retrieved_chunks": bucket["relevant_retrieved"],
+    }
+
+
 def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k: int) -> dict[str, Any]:
     chunks = fixture["chunks"]
     cfg = None
@@ -242,9 +298,13 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
     full_binding_hits = 0
     multi_binding_cases = 0
     multi_binding_full_hits = 0
+    category_buckets: dict[str, dict[str, Any]] = {}
     try:
         for case in fixture["queries"]:
             expected = set(case["expected_chunk_ids"])
+            category = _category_from_case(case)
+            category_bucket = category_buckets.setdefault(category, _empty_category_bucket(category))
+            category_bucket["queries"] += 1
             result = (
                 retrieve(case["query"], chunks, top_k=top_k, strategy=strategy, cfg=cfg)
                 if cfg
@@ -258,24 +318,36 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
                 total_expected_bindings += len(expected)
                 retrieved_for_positive += len(retrieved_ids)
                 relevant_retrieved += len(matched_expected)
+                category_bucket["positive_queries"] += 1
+                category_bucket["total_expected_bindings"] += len(expected)
+                category_bucket["retrieved_for_positive"] += len(retrieved_ids)
+                category_bucket["relevant_retrieved"] += len(matched_expected)
                 hit = bool(expected.intersection(retrieved_ids))
                 top1_hit = bool(retrieved_ids and retrieved_ids[0] in expected)
                 full_binding_hit = expected.issubset(retrieved)
                 full_binding_hits += int(full_binding_hit)
+                category_bucket["hits"] += int(hit)
+                category_bucket["top1_hits"] += int(top1_hit)
+                category_bucket["full_binding_hits"] += int(full_binding_hit)
                 if len(expected) > 1:
                     multi_binding_cases += 1
                     multi_binding_full_hits += int(full_binding_hit)
+                    category_bucket["multi_binding_cases"] += 1
+                    category_bucket["multi_binding_full_hits"] += int(full_binding_hit)
                 hits += int(hit)
                 top1_hits += int(top1_hit)
             else:
                 expected_no_context += 1
                 no_context_hits += int(result["status"] == "ERROR_NO_RETRIEVAL_CONTEXT")
+                category_bucket["no_context_queries"] += 1
+                category_bucket["no_context_hits"] += int(result["status"] == "ERROR_NO_RETRIEVAL_CONTEXT")
                 hit = result["status"] == "ERROR_NO_RETRIEVAL_CONTEXT"
                 top1_hit = False
                 full_binding_hit = False
             rows.append(
                 {
                     "case_type": "positive" if expected else "no_context",
+                    "category": category,
                     "query": case["query"],
                     "expected_chunk_ids": sorted(expected),
                     "retrieved_chunk_ids": retrieved_ids,
@@ -302,6 +374,10 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
         "positive_retrieved_chunks": retrieved_for_positive,
         "relevant_retrieved_chunks": relevant_retrieved,
         "expected_bindings": total_expected_bindings,
+        "category_metrics": [
+            _finalize_category_bucket(category_buckets[category])
+            for category in sorted(category_buckets)
+        ],
         "cases": rows,
     }
 
@@ -395,5 +471,23 @@ def format_retrieval_eval_text(report: dict[str, Any]) -> list[str]:
             f"multi_full={strategy['multi_binding_full_hit_rate']:.2f} "
             f"no_context={strategy['no_context_accuracy']:.2f}"
         )
+        weakest_categories = sorted(
+            strategy.get("category_metrics", []),
+            key=lambda row: (
+                row["expected_binding_recall_at_k"],
+                row["recall_at_k"],
+                row["context_precision_at_k"],
+                row["category"],
+            ),
+        )[:3]
+        for category in weakest_categories:
+            lines.append(
+                f"{strategy['strategy']} category={category['category']} "
+                f"queries={category['queries']} positives={category['positive_queries']} "
+                f"recall@{top_k}={category['recall_at_k']:.2f} "
+                f"binding_recall={category['expected_binding_recall_at_k']:.2f} "
+                f"precision={category['context_precision_at_k']:.2f} "
+                f"no_context={category['no_context_accuracy']:.2f}"
+            )
     lines.append(str(report.get("status")))
     return lines

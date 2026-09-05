@@ -319,8 +319,10 @@ the supported CLI surface. The command reports the fixture path, chunk/query
 counts, positive/no-context query counts, expected binding counts, fixture
 validation checks, evaluated strategy count, recall thresholds, per-strategy
 `recall@k`, expected-binding recall, context precision, top-1 hit rate,
-full-binding hit rate, multi-binding full-hit rate, and no-context accuracy.
-The `--min-no-context-accuracy`, `--min-expected-binding-recall`, and
+full-binding hit rate, multi-binding full-hit rate, no-context accuracy, and
+per-category quality slices for each strategy. The category slices preserve the
+fixture's query categories so broad aggregate scores cannot hide a weak
+retrieval area. The `--min-no-context-accuracy`, `--min-expected-binding-recall`, and
 `--min-multi-binding-full-hit` thresholds apply across evaluated strategies so
 unrelated context, partial multi-source retrieval, and missing expected
 bindings fail the gate instead of passing as weak context. Hybrid and semantic
