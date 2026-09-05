@@ -21,6 +21,16 @@ GitHub created jobs or logs. Diagnostic examples:
 
 ```text
 workflow=CI
+run=33980714464
+event=workflow_dispatch
+head_sha=2848d6f54880a716d5fa61467e5d8a6b5bb5f301
+status=completed
+conclusion=startup_failure
+jobs=0
+```
+
+```text
+workflow=CI
 run=33972601223
 event=workflow_dispatch
 head_sha=8baef57c3188990c29bf7cb83ad3003aa1828d18
@@ -41,6 +51,16 @@ jobs=0
 
 The manual-only `CI Startup Probe` workflow also failed before jobs or logs.
 Diagnostic examples:
+
+```text
+workflow=CI Startup Probe
+run=33980714466
+event=workflow_dispatch
+head_sha=2848d6f54880a716d5fa61467e5d8a6b5bb5f301
+status=completed
+conclusion=startup_failure
+jobs=0
+```
 
 ```text
 workflow=CI Startup Probe

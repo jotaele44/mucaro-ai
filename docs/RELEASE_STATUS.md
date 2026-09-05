@@ -109,6 +109,18 @@ Observed success markers:
   assistant capabilities and source-artifact packaging pass, while
   `github_release_governance` remains open because hosted CI startup, branch
   protection, and governed tag binding are not yet proven.
+- Local release certification for audit commit
+  `2848d6f54880a716d5fa61467e5d8a6b5bb5f301` reports
+  `CERTIFY_RELEASE_OK`, including `133 passed`, retrieval eval, JSON
+  validation, desktop package self-test, source artifact build, npm audit, and
+  frontend build.
+- Exact-SHA fresh-clone certification reports `FRESH_CLONE_CERT_OK` for commit
+  `2848d6f54880a716d5fa61467e5d8a6b5bb5f301`, including clean clone install,
+  CLI help, launcher self-test, and desktop smoke test.
+- Hosted `CI` run `33980714464` and `CI Startup Probe` run
+  `33980714466` both report `startup_failure` with `0` jobs for commit
+  `2848d6f54880a716d5fa61467e5d8a6b5bb5f301`; the governed release remains
+  untagged.
 - A manual-only `CI Startup Probe` workflow was added to isolate hosted runner
   startup from the Mucaro build/test stack. Run `33972500645` for commit
   `b70c5a859a879e651304091b57505b74c49f6953` also reports
