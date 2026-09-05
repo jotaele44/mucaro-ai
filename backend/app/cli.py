@@ -1665,9 +1665,14 @@ def build_release_state_report(
     git_repository = _gate_by_name(gate_rows, "git_repository")
     worktree_clean = _gate_by_name(gate_rows, "worktree_clean")
     upstream = _gate_by_name(gate_rows, "upstream")
-    github_latest_ci = _gate_by_name(gate_rows, "github_latest_ci")
-    github_branch = _gate_by_name(gate_rows, "github_branch_protection")
-    github_tag = _gate_by_name(gate_rows, "github_tag_binding")
+    github_gate_names = {
+        "github_branch",
+        "github_branch_protection",
+        "github_ci_jobs_lookup",
+        "github_hosted_runner_startup",
+        "github_latest_ci",
+        "github_tag_binding",
+    }
 
     package_not_failed = package.get("status") != "PACKAGE_FAIL"
     head_sha = certification.get("git", {}).get("head_sha") if isinstance(certification.get("git"), dict) else None
@@ -1686,11 +1691,7 @@ def build_release_state_report(
     )
     source_artifact_pass = _requirement_status(audit, "source_artifact_packaging") == "PASS"
     github_requirement_open = _requirement_status(audit, "github_release_governance") == "OPEN"
-    github_gate_blockers = [
-        gate
-        for gate in [github_latest_ci, github_branch, github_tag]
-        if gate is not None and gate.get("status") != "PASS"
-    ]
+    github_gate_blockers = [gate for gate in gate_rows if gate.get("name") in github_gate_names and gate.get("status") != "PASS"]
     github_open = include_github and (github_requirement_open or bool(github_gate_blockers))
     governed_ready = include_github and certification.get("status") == "CERTIFICATION_READY"
 

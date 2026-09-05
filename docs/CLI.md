@@ -233,7 +233,9 @@ The command reuses existing audit, package, Git, and optional GitHub governance
 receipts. It does not run heavy certification scripts, so those states remain
 `UNVERIFIED` until the operator runs the reported commands and creates matching
 exact-HEAD receipts under `data/exports/release_receipts`. Add `--include-github`
-when authenticated `gh` evidence is available.
+when authenticated `gh` evidence is available. The GitHub governance row reports
+all non-passing GitHub release gates, including hosted-runner startup
+classification when current-head CI fails before jobs are created.
 
 Use `mucaro release receipts` to list local release and fresh-clone
 certification receipts. Add `--current-head` to filter the list to receipts

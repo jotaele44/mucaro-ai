@@ -524,6 +524,8 @@ def test_cli_release_state_reports_github_governance_open(tmp_path: Path, capsys
                     }
                 ]
             )
+        if args == ["gh", "api", "repos/jotaele44/mucaro-ai/actions/runs/7/jobs"]:
+            return True, json.dumps({"total_count": 0, "jobs": []})
         return False, f"unexpected command: {args}"
 
     monkeypatch.setattr(cli, "_command_output", fake_command_output)
@@ -541,6 +543,7 @@ def test_cli_release_state_reports_github_governance_open(tmp_path: Path, capsys
     assert states["FRESH_CLONE_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["SOURCE_ARTIFACT_PACKAGING"]["status"] == "PASS"
     assert states["GITHUB_GOVERNANCE_OPEN"]["status"] == "OPEN"
+    assert "github_hosted_runner_startup=FAIL" in states["GITHUB_GOVERNANCE_OPEN"]["evidence"]
     assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
 
     assert main(["release", "state", "--include-github", "--strict", "--format", "text"], cfg=cfg) == 2
