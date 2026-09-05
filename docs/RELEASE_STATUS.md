@@ -106,7 +106,9 @@ Observed success markers:
 - `mucaro release governance-report` combines release-state classification,
   product-audit status, package status, current-head receipt summaries, GitHub
   Actions diagnostics, startup-blocker causes, hosted run evidence, and exact
-  commands/actions into one current-head handoff payload.
+  commands/actions into one current-head handoff payload. Add `--save` to
+  persist the JSON handoff artifact under `data/exports/governance_reports` with
+  path, SHA-256, and byte-size metadata in the CLI response.
 - Local release certification for `v0.1.23` reports `CERTIFY_RELEASE_OK` on
   commit `f48828b8dd5648554b65dba1ca86a07db099f7d3`, including `122 passed`,
   retrieval eval, JSON validation, desktop package self-test, frontend audit,

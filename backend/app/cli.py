@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.metadata
 import importlib.util
 import json
@@ -8,6 +9,7 @@ import os
 import subprocess
 import sys
 import tomllib
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlparse
@@ -73,6 +75,10 @@ class MucaroCLIError(RuntimeError):
         self.status = status
         self.detail = detail
         self.exit_code = exit_code
+
+
+GOVERNANCE_REPORT_SCHEMA_VERSION = "mucaro_governance_report_v1"
+GOVERNANCE_REPORT_DIR = Path("data") / "exports" / "governance_reports"
 
 
 def parse_port(value: str) -> int:
@@ -419,6 +425,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     release_governance.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     release_governance.add_argument("--strict", action="store_true", help="Exit nonzero until governed release state is ready.")
+    release_governance.add_argument("--save", action="store_true", help="Write a JSON governance report artifact under data/exports/governance_reports.")
+    release_governance.add_argument("--output", type=Path, help="Optional JSON artifact path. Implies --save.")
     release_governance.add_argument(
         "--github-workflow",
         default="CI",
@@ -621,6 +629,11 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"package_status={payload.get('package_status')}")
         print(f"release_state_status={payload.get('release_state_status')}")
         print(f"github_actions_status={payload.get('github_actions_status')}")
+        export = payload.get("export")
+        if isinstance(export, dict):
+            print(f"export_path={export.get('path')}")
+            print(f"export_sha256={export.get('sha256')}")
+            print(f"export_size_bytes={export.get('size_bytes')}")
         receipt_summary = payload.get("current_head_receipts_summary", {})
         if isinstance(receipt_summary, dict):
             print(f"receipt_count={receipt_summary.get('total')}")
@@ -1185,12 +1198,39 @@ def build_release_governance_report(
     }
 
 
+def write_release_governance_report(
+    cfg: Settings,
+    report: dict[str, Any],
+    *,
+    output_path: Path | None = None,
+) -> dict[str, Any]:
+    head_sha = str(report.get("head_sha") or "unknown")
+    path = output_path or cfg.project_root / GOVERNANCE_REPORT_DIR / f"governance-report-{head_sha[:12]}.json"
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    artifact = {
+        "schema_version": GOVERNANCE_REPORT_SCHEMA_VERSION,
+        "created_utc": _utc_now(),
+        "report": report,
+    }
+    path.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return {
+        "path": str(path),
+        "sha256": _sha256_file(path),
+        "size_bytes": path.stat().st_size,
+        "schema_version": GOVERNANCE_REPORT_SCHEMA_VERSION,
+    }
+
+
 def run_release_governance_report(args: argparse.Namespace, cfg: Settings) -> int:
     report = build_release_governance_report(
         cfg,
         github_workflow=args.github_workflow,
         probe_workflow=args.probe_workflow,
     )
+    if args.save or args.output:
+        report = {**report, "export": write_release_governance_report(cfg, report, output_path=args.output)}
     emit_payload(report, args.format)
     if args.strict and report["status"] != "GOVERNANCE_REPORT_READY":
         return 2
@@ -1247,6 +1287,18 @@ def _command_output(cfg: Settings, args: list[str]) -> tuple[bool, str]:
     except OSError as exc:
         return False, str(exc)
     return proc.returncode == 0, proc.stdout.strip()
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _format_gh_error(output: str) -> str:

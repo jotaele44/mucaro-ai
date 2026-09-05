@@ -249,8 +249,12 @@ Use `mucaro release governance-report` to build a single current-head handoff
 payload for governed release work. The report combines release-state
 classification, product-audit status, package status, current-head release
 receipt summaries, GitHub Actions diagnostics, startup-blocker causes, hosted
-run evidence, and exact next actions. Use `--strict` when automation should fail
-until `GOVERNANCE_REPORT_READY`.
+run evidence, and exact next actions. Add `--save` to write the JSON artifact
+under `data/exports/governance_reports`, or pass `--output PATH` to choose the
+artifact path. The saved artifact records a schema version, creation time, and
+the report payload; the CLI response includes the artifact path, SHA-256, and
+size. Use `--strict` when automation should fail until
+`GOVERNANCE_REPORT_READY`.
 
 Use `mucaro release receipts` to list local release and fresh-clone
 certification receipts. Add `--current-head` to filter the list to receipts

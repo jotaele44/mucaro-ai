@@ -901,6 +901,16 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert "receipt_valid=4" in text_output
     assert "next_action=Upgrade GitHub plan or make the repository public" in text_output
 
+    output_path = tmp_path / "data" / "exports" / "governance_reports" / "handoff.json"
+    assert main(["release", "governance-report", "--save", "--output", str(output_path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["export"]["path"] == str(output_path)
+    assert payload["export"]["sha256"]
+    saved = json.loads(output_path.read_text(encoding="utf-8"))
+    assert saved["schema_version"] == "mucaro_governance_report_v1"
+    assert saved["report"]["head_sha"] == head_sha
+    assert saved["report"]["startup_blocker"]["status"] == "FAIL"
+
 
 def test_cli_release_state_requires_source_artifact_receipt_for_governed_ready(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
