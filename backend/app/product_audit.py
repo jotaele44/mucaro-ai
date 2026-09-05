@@ -98,7 +98,7 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Assistant can ingest common local document formats.",
             _status_from_files(cfg, [("backend", "app", "parser.py"), ("backend", "app", "ingestion.py")]),
             "TXT, MD, HTML, DOCX, EML, CSV, JSON, PDF, and metadata-only image/audio/video parsing paths",
-            "Outlook MSG and email attachment extraction remain open; media content understanding is metadata-only.",
+            "Outlook MSG extraction remains open; media content understanding is metadata-only.",
             "Expand parsers without weakening source-lineage manifests.",
         ),
         ProductRequirement(
@@ -297,7 +297,7 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
                 "semantic_vector_store",
             ),
             "Directory grants, parsers, source lineage, deterministic strategies, and semantic-store scaffolding are present.",
-            "Outlook MSG ingestion, email attachment extraction, higher-quality embeddings, and semantic media understanding remain upgrade vectors.",
+            "Outlook MSG ingestion, higher-quality embeddings, and semantic media understanding remain upgrade vectors.",
             "Expand parser and embedding adapters behind explicit permission, provenance, and evaluation gates.",
         ),
         ProductRoadmapStage(

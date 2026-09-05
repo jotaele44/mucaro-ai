@@ -14,7 +14,7 @@ rename/delete/search, desktop package self-testing, CLI `--version`, early `ask 
 validation, CLI source/index management, CLI conversation management, CLI
 run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
 executable product-gap auditing, an opt-in local semantic embedding store,
-approval-gated local tool runtime, local HTML/DOCX/EML document ingestion, metadata-only image/audio/video ingestion,
+approval-gated local tool runtime, local HTML/DOCX/EML document ingestion, bounded text-like EML attachment extraction, metadata-only image/audio/video ingestion,
 explicit local memory, CLI-exposed retrieval evaluation, and CLI-exposed
 packaging readiness with a governed source-artifact policy. The current
 retrieval-quality baseline adds expected-binding recall, context precision,
@@ -173,9 +173,11 @@ Observed success markers:
   boundary as other local documents.
 - EML files are now first-class local document-ingestion inputs. The parser
   reads RFC 822/MIME messages, extracts selected headers and body text, uses the
-  shared HTML extractor when only an HTML body is available, and records skipped
-  attachments as source-manifest metadata and parser warnings rather than
-  silently treating them as ingested evidence.
+  shared HTML extractor when only an HTML body is available, extracts bounded
+  text-like TXT, Markdown, HTML, CSV, and JSON attachments under explicit
+  attachment markers, and records skipped attachments as source-manifest
+  metadata and parser warnings rather than silently treating them as ingested
+  evidence.
 - `mucaro release state` classifies bounded release progress across
   `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`, `FRESH_CLONE_CERTIFIED`,
   `SOURCE_ARTIFACT_PACKAGING`, `GITHUB_GOVERNANCE_OPEN`,

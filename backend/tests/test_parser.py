@@ -207,7 +207,17 @@ def test_eml_parser_extracts_plain_body_headers_and_attachment_metadata(tmp_path
     assert result["headers"]["message_id"] == "<brief@example.test>"
     assert result["body_part_count"] == 1
     assert result["attachment_count"] == 1
-    assert result["attachments"] == [{"filename": "evidence.pdf", "content_type": "application/pdf"}]
+    assert result["extracted_attachment_count"] == 0
+    assert result["skipped_attachment_count"] == 1
+    assert result["attachments"] == [
+        {
+            "filename": "evidence.pdf",
+            "content_type": "application/pdf",
+            "size_bytes": len("placeholder"),
+            "extracted": False,
+            "skip_reason": "UNSUPPORTED_ATTACHMENT_TYPE",
+        }
+    ]
     assert "EMAIL_ATTACHMENTS_SKIPPED:1" in result["warnings"]
     assert result["parse_status"] == "PARTIAL"
     assert "Email source lineage requires cited chunks." in result["text"]
@@ -237,9 +247,68 @@ def test_eml_parser_uses_html_body_when_plain_text_is_missing(tmp_path: Path):
     assert result["parser"] == "email_rfc822_v1"
     assert result["body_part_count"] == 1
     assert result["attachment_count"] == 0
+    assert result["extracted_attachment_count"] == 0
+    assert result["skipped_attachment_count"] == 0
     assert "EMAIL_HTML_BODY_USED" in result["warnings"]
     assert "HTML Mail" in result["text"]
     assert "Cited & decoded body." in result["text"]
+
+
+def test_eml_parser_extracts_text_like_attachments_with_explicit_markers(tmp_path: Path):
+    path = tmp_path / "brief-with-attachments.eml"
+    path.write_text(
+        "\n".join(
+            [
+                "From: sender@example.test",
+                "To: reviewer@example.test",
+                "Subject: Mucaro Attachment Brief",
+                "MIME-Version: 1.0",
+                'Content-Type: multipart/mixed; boundary="outer"',
+                "",
+                "--outer",
+                "Content-Type: text/plain; charset=utf-8",
+                "",
+                "Email body cites the attached local note.",
+                "--outer",
+                "Content-Type: text/plain; charset=utf-8",
+                'Content-Disposition: attachment; filename="field-note.txt"',
+                "",
+                "Attachment alpha records pump station inspection evidence.",
+                "--outer",
+                "Content-Type: application/json",
+                'Content-Disposition: attachment; filename="facts.json"',
+                "",
+                '{"status":"verified","source":"operator"}',
+                "--outer",
+                "Content-Type: application/pdf",
+                'Content-Disposition: attachment; filename="scan.pdf"',
+                "",
+                "binary placeholder",
+                "--outer--",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = parse_file(path)
+
+    assert result["parser"] == "email_rfc822_v1"
+    assert result["attachment_count"] == 3
+    assert result["extracted_attachment_count"] == 2
+    assert result["skipped_attachment_count"] == 1
+    assert "EMAIL_ATTACHMENTS_EXTRACTED:2" in result["warnings"]
+    assert "EMAIL_ATTACHMENTS_SKIPPED:1" in result["warnings"]
+    assert "[EMAIL ATTACHMENT filename=field-note.txt content_type=text/plain]" in result["text"]
+    assert "Attachment alpha records pump station inspection evidence." in result["text"]
+    assert "[EMAIL ATTACHMENT filename=facts.json content_type=application/json]" in result["text"]
+    assert '"source": "operator"' in result["text"]
+    assert "binary placeholder" not in result["text"]
+    assert result["attachments"][0]["extracted"] is True
+    assert result["attachments"][0]["extraction_parser"] == "email_attachment_text_v1"
+    assert result["attachments"][1]["extracted"] is True
+    assert result["attachments"][1]["extraction_parser"] == "email_attachment_json_v1"
+    assert result["attachments"][2]["extracted"] is False
+    assert result["attachments"][2]["skip_reason"] == "UNSUPPORTED_ATTACHMENT_TYPE"
 
 
 def test_ingest_eml_manifest_includes_parser_evidence(tmp_path: Path):
@@ -258,6 +327,8 @@ def test_ingest_eml_manifest_includes_parser_evidence(tmp_path: Path):
     assert source["parser_metadata"]["headers"]["subject"] == "Brief"
     assert source["parser_metadata"]["body_part_count"] == 1
     assert source["parser_metadata"]["attachment_count"] == 0
+    assert source["parser_metadata"]["extracted_attachment_count"] == 0
+    assert source["parser_metadata"]["skipped_attachment_count"] == 0
     assert source["lineage_status"] == "VALID"
     assert result["chunks_added"] == 1
 

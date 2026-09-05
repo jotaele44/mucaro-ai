@@ -22,6 +22,15 @@ WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 CORE_NS = "{http://schemas.openxmlformats.org/package/2006/metadata/core-properties}"
 DUBLIN_CORE_NS = "{http://purl.org/dc/elements/1.1/}"
 DUBLIN_CORE_TERMS_NS = "{http://purl.org/dc/terms/}"
+EMAIL_ATTACHMENT_TEXT_BYTE_LIMIT = 200_000
+EMAIL_ATTACHMENT_TEXT_TYPES = {
+    "application/json",
+    "text/csv",
+    "text/html",
+    "text/markdown",
+    "text/plain",
+}
+EMAIL_ATTACHMENT_TEXT_SUFFIXES = {".csv", ".htm", ".html", ".json", ".md", ".txt"}
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -382,11 +391,43 @@ def _email_html_text(raw_html: str) -> str:
     return parser.text
 
 
+def _email_attachment_payload_bytes(part: Message) -> bytes:
+    payload = part.get_payload(decode=True)
+    if payload is not None:
+        return payload
+    raw_payload = part.get_payload()
+    if isinstance(raw_payload, str):
+        charset = part.get_content_charset() or "utf-8"
+        return raw_payload.encode(charset, errors="replace")
+    return b""
+
+
+def _email_attachment_is_text_like(filename: str, content_type: str) -> bool:
+    suffix = Path(filename).suffix.lower() if filename else ""
+    return content_type in EMAIL_ATTACHMENT_TEXT_TYPES or suffix in EMAIL_ATTACHMENT_TEXT_SUFFIXES
+
+
+def _email_attachment_text(part: Message, *, filename: str, content_type: str) -> tuple[str, str]:
+    raw = _email_attachment_payload_bytes(part)
+    charset = part.get_content_charset() or "utf-8"
+    decoded = raw.decode(charset, errors="replace").strip()
+    if content_type == "text/html" or Path(filename).suffix.lower() in {".htm", ".html"}:
+        return _email_html_text(decoded).strip(), "email_attachment_html_text_v1"
+    if content_type == "application/json" or Path(filename).suffix.lower() == ".json":
+        try:
+            parsed = json.loads(decoded)
+        except json.JSONDecodeError:
+            return decoded, "email_attachment_text_v1"
+        return json.dumps(parsed, ensure_ascii=False, indent=2, sort_keys=True), "email_attachment_json_v1"
+    return decoded, "email_attachment_text_v1"
+
+
 def _parse_eml(path: Path) -> dict[str, Any]:
     message = BytesParser(policy=policy.default).parsebytes(path.read_bytes())
     text_parts: list[str] = []
     html_parts: list[str] = []
-    attachments: list[dict[str, str]] = []
+    attachment_text_parts: list[str] = []
+    attachments: list[dict[str, Any]] = []
     body_part_count = 0
     parts = list(message.walk()) if message.is_multipart() else [message]
     for part in parts:
@@ -396,11 +437,31 @@ def _parse_eml(path: Path) -> dict[str, Any]:
         content_type = part.get_content_type()
         filename = part.get_filename()
         if content_disposition == "attachment" or filename:
+            filename_text = str(filename or "")
+            attachment: dict[str, Any] = {
+                "filename": filename_text,
+                "content_type": content_type,
+                "size_bytes": len(_email_attachment_payload_bytes(part)),
+                "extracted": False,
+                "skip_reason": "UNSUPPORTED_ATTACHMENT_TYPE",
+            }
+            if attachment["size_bytes"] > EMAIL_ATTACHMENT_TEXT_BYTE_LIMIT:
+                attachment["skip_reason"] = f"ATTACHMENT_TOO_LARGE:limit={EMAIL_ATTACHMENT_TEXT_BYTE_LIMIT}"
+            elif _email_attachment_is_text_like(filename_text, content_type):
+                extracted_text, attachment_parser = _email_attachment_text(part, filename=filename_text, content_type=content_type)
+                if extracted_text:
+                    attachment["extracted"] = True
+                    attachment["extraction_parser"] = attachment_parser
+                    attachment["text_length"] = len(extracted_text)
+                    attachment.pop("skip_reason", None)
+                    label = filename_text or "unnamed"
+                    attachment_text_parts.append(
+                        f"[EMAIL ATTACHMENT filename={label} content_type={content_type}]\n{extracted_text}"
+                    )
+                else:
+                    attachment["skip_reason"] = "ATTACHMENT_NO_TEXT"
             attachments.append(
-                {
-                    "filename": str(filename or ""),
-                    "content_type": content_type,
-                }
+                attachment
             )
             continue
         if content_type == "text/plain":
@@ -415,8 +476,12 @@ def _parse_eml(path: Path) -> dict[str, Any]:
                 html_parts.append(text)
 
     warnings: list[str] = []
-    if attachments:
-        warnings.append(f"EMAIL_ATTACHMENTS_SKIPPED:{len(attachments)}")
+    extracted_attachment_count = sum(1 for attachment in attachments if attachment.get("extracted"))
+    skipped_attachment_count = len(attachments) - extracted_attachment_count
+    if extracted_attachment_count:
+        warnings.append(f"EMAIL_ATTACHMENTS_EXTRACTED:{extracted_attachment_count}")
+    if skipped_attachment_count:
+        warnings.append(f"EMAIL_ATTACHMENTS_SKIPPED:{skipped_attachment_count}")
     if text_parts:
         body_text = "\n\n".join(text_parts)
     elif html_parts:
@@ -427,7 +492,8 @@ def _parse_eml(path: Path) -> dict[str, Any]:
         warnings.append("EMAIL_NO_BODY_TEXT")
     headers = _email_headers(message)
     header_lines = [f"{key}: {value}" for key, value in headers.items()]
-    text = "\n".join(header_lines + ([""] if header_lines and body_text else []) + ([body_text] if body_text else [])).strip()
+    content_sections = [section for section in [body_text, *attachment_text_parts] if section]
+    text = "\n".join(header_lines + ([""] if header_lines and content_sections else []) + content_sections).strip()
     return {
         "text": text,
         **_base_result(
@@ -438,6 +504,8 @@ def _parse_eml(path: Path) -> dict[str, Any]:
             headers=headers,
             body_part_count=body_part_count,
             attachment_count=len(attachments),
+            extracted_attachment_count=extracted_attachment_count,
+            skipped_attachment_count=skipped_attachment_count,
             attachments=attachments,
             text_length=len(text),
         ),

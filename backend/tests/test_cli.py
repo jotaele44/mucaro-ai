@@ -283,11 +283,11 @@ def test_cli_eval_retrieval_reports_mixed_format_quality_metrics(tmp_path: Path,
     assert payload["fixture_validation"]["status"] == "RETRIEVAL_FIXTURE_OK"
     hybrid = next(strategy for strategy in payload["strategies"] if strategy["strategy"] == "hybrid")
     assert hybrid["expected_binding_recall_at_k"] == 1.0
-    assert hybrid["context_precision_at_k"] == 0.2385
+    assert hybrid["context_precision_at_k"] == 0.2366
     assert hybrid["full_binding_hit_rate"] == 1.0
     assert hybrid["multi_binding_full_hit_rate"] == 1.0
     assert hybrid["no_context_accuracy"] == 1.0
-    assert hybrid["positive_retrieved_chunks"] == 130
+    assert hybrid["positive_retrieved_chunks"] == 131
     assert hybrid["relevant_retrieved_chunks"] == 31
     categories = {category["category"]: category for category in hybrid["category_metrics"]}
     assert set(categories) == {

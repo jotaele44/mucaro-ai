@@ -21,6 +21,9 @@ and available core document properties in the source manifest.
 
 EML inputs also follow the same chain. The parser reads local RFC 822/MIME
 messages, extracts selected headers and body text for chunking, preserves body
-part counts, attachment counts, attachment names/content types, parser ID, and
-parser warnings in the source manifest, and records skipped attachments
-explicitly instead of folding them into the message body.
+part counts, attachment counts, extracted/skipped attachment counts, attachment
+names/content types, parser ID, and parser warnings in the source manifest.
+Text-like TXT, Markdown, HTML, CSV, and JSON attachments are extracted behind a
+bounded allowlist and appended to retrieval text under explicit attachment
+markers. Other attachment types remain listed with skip reasons instead of
+being silently folded into cited evidence.

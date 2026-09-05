@@ -83,10 +83,12 @@ JPEG, GIF, WEBP, WAV, MP3, M4A, MP4, MOV, and WEBM. HTML files are parsed as
 local documents with visible text, title metadata, and link counts. DOCX files
 are parsed as local OpenXML documents with paragraph/table text and core
 properties. EML files are parsed as local RFC 822/MIME messages with selected
-headers, body text, and attachment metadata; attachments are listed but not
-silently ingested. Media files are metadata-only in this release: they preserve
-source lineage, byte counts, dimensions or container facts where available, and
-parser warnings, but do not perform semantic image/audio/video understanding.
+headers, body text, and attachment metadata. Text-like EML attachments are
+extracted only for bounded allowlisted types: TXT, MD, HTML, CSV, and JSON.
+Other attachments remain listed with skip reasons instead of being silently
+ingested. Media files are metadata-only in this release: they preserve source
+lineage, byte counts, dimensions or container facts where available, and parser
+warnings, but do not perform semantic image/audio/video understanding.
 
 ## Output Contracts
 
