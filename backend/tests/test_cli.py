@@ -270,25 +270,25 @@ def test_cli_eval_retrieval_reports_mixed_format_quality_metrics(tmp_path: Path,
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "RETRIEVAL_EVAL_OK"
     assert payload["counts"] == {
-        "chunks": 25,
-        "queries": 34,
-        "positive_queries": 28,
+        "chunks": 26,
+        "queries": 36,
+        "positive_queries": 30,
         "no_context_queries": 6,
-        "expected_bindings": 31,
-        "source_ids": 25,
-        "multi_binding_queries": 3,
-        "query_categories": 12,
+        "expected_bindings": 34,
+        "source_ids": 26,
+        "multi_binding_queries": 4,
+        "query_categories": 13,
         "strategies": 6,
     }
     assert payload["fixture_validation"]["status"] == "RETRIEVAL_FIXTURE_OK"
     hybrid = next(strategy for strategy in payload["strategies"] if strategy["strategy"] == "hybrid")
     assert hybrid["expected_binding_recall_at_k"] == 1.0
-    assert hybrid["context_precision_at_k"] == 0.2366
+    assert hybrid["context_precision_at_k"] == 0.2411
     assert hybrid["full_binding_hit_rate"] == 1.0
     assert hybrid["multi_binding_full_hit_rate"] == 1.0
     assert hybrid["no_context_accuracy"] == 1.0
-    assert hybrid["positive_retrieved_chunks"] == 131
-    assert hybrid["relevant_retrieved_chunks"] == 31
+    assert hybrid["positive_retrieved_chunks"] == 141
+    assert hybrid["relevant_retrieved_chunks"] == 34
     categories = {category["category"]: category for category in hybrid["category_metrics"]}
     assert set(categories) == {
         "csv",
@@ -298,6 +298,7 @@ def test_cli_eval_retrieval_reports_mixed_format_quality_metrics(tmp_path: Path,
         "json",
         "markdown",
         "media",
+        "msg",
         "multi_format",
         "no_context",
         "pdf",
@@ -310,9 +311,9 @@ def test_cli_eval_retrieval_reports_mixed_format_quality_metrics(tmp_path: Path,
     assert main(["eval", "retrieval", "--fixture", fixture, "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "fixture=backend/tests/fixtures/retrieval_eval_mixed_formats.json" in text_output
-    assert "positive_queries=28" in text_output
-    assert "expected_bindings=31" in text_output
-    assert "query_categories=12" in text_output
+    assert "positive_queries=30" in text_output
+    assert "expected_bindings=34" in text_output
+    assert "query_categories=13" in text_output
     assert "hybrid category=csv queries=2 positives=2 recall@5=1.00" in text_output
     assert "hybrid category=html queries=3 positives=3 recall@5=1.00" in text_output
     assert "hybrid category=media queries=3 positives=3 recall@5=1.00" in text_output

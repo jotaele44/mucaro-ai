@@ -27,3 +27,11 @@ Text-like TXT, Markdown, HTML, CSV, and JSON attachments are extracted behind a
 bounded allowlist and appended to retrieval text under explicit attachment
 markers. Other attachment types remain listed with skip reasons instead of
 being silently folded into cited evidence.
+
+MSG inputs follow a narrower provisional chain. The parser treats local Outlook
+`.msg` files as binary sources, verifies the compound-file signature when
+present, and extracts bounded printable text segments into cited chunks when
+recoverable. The source manifest records `outlook_msg_text_probe_v1`,
+`structured_properties_extracted=false`, parser warnings, extracted segment
+counts, byte count, file hash, and source path so this heuristic evidence cannot
+be confused with full Outlook property extraction.

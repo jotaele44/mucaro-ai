@@ -64,9 +64,9 @@ no-context accuracy across every strategy, not only the semantic store.
 Release certification also runs
 `backend/tests/fixtures/retrieval_eval_mixed_formats.json` as a mixed-format
 corpus for the current ingestion surface. That fixture covers TXT, Markdown,
-HTML, DOCX, EML, CSV, JSON, PDF, metadata-only media, traceability, and
-multi-format source questions so parser upgrades have retrieval evidence beyond
-unit-level extraction checks.
+HTML, DOCX, EML, MSG text probing, CSV, JSON, PDF, metadata-only media,
+traceability, and multi-format source questions so parser upgrades have
+retrieval evidence beyond unit-level extraction checks.
 
 `mucaro certify retrieval-quality` promotes those fixture checks into an
 exact-head release receipt. The current `v0.1.23-local-release` profile runs the

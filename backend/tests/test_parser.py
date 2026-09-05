@@ -333,6 +333,52 @@ def test_ingest_eml_manifest_includes_parser_evidence(tmp_path: Path):
     assert result["chunks_added"] == 1
 
 
+def test_msg_parser_extracts_bounded_binary_text_probe(tmp_path: Path):
+    path = tmp_path / "brief.msg"
+    path.write_bytes(
+        b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+        + b"\x00" * 128
+        + "Subject: Mucaro MSG Brief".encode("utf-16le")
+        + b"\x00" * 16
+        + "Body: Outlook MSG source lineage probe text.".encode("utf-16le")
+    )
+
+    result = parse_file(path)
+
+    assert result["parser"] == "outlook_msg_text_probe_v1"
+    assert result["mime_type"] == "application/vnd.ms-outlook"
+    assert result["parse_status"] == "PARTIAL"
+    assert "MSG_HEURISTIC_TEXT_EXTRACTION" in result["warnings"]
+    assert "MSG_COMPOUND_MAGIC_MISSING" not in result["warnings"]
+    assert "Subject: Mucaro MSG Brief" in result["text"]
+    assert "Body: Outlook MSG source lineage probe text." in result["text"]
+    assert result["text_length"] == len(result["text"])
+    assert result["extracted_text_segments"] >= 2
+    assert result["structured_properties_extracted"] is False
+
+
+def test_ingest_msg_manifest_includes_probe_scope(tmp_path: Path):
+    cfg = make_settings(tmp_path / "proj")
+    src = tmp_path / "brief.msg"
+    src.write_bytes(
+        b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+        + b"\x00" * 128
+        + "Subject: Manifest MSG Brief".encode("utf-16le")
+        + b"\x00" * 16
+        + "Body: MSG manifest source text.".encode("utf-16le")
+    )
+
+    result = ingest_file(src, cfg)
+    source = result["source"]
+
+    assert source["mime_type"] == "application/vnd.ms-outlook"
+    assert source["parser"] == "outlook_msg_text_probe_v1"
+    assert source["parser_metadata"]["structured_properties_extracted"] is False
+    assert source["parser_metadata"]["extracted_text_segments"] >= 2
+    assert source["lineage_status"] == "VALID"
+    assert result["chunks_added"] >= 1
+
+
 def test_invalid_json_raises_parse_error(tmp_path: Path):
     path = tmp_path / "bad.json"
     path.write_text('{"broken": ', encoding="utf-8")

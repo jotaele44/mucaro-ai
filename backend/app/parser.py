@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import zipfile
 from email import policy
 from email.message import Message
@@ -31,6 +32,8 @@ EMAIL_ATTACHMENT_TEXT_TYPES = {
     "text/plain",
 }
 EMAIL_ATTACHMENT_TEXT_SUFFIXES = {".csv", ".htm", ".html", ".json", ".md", ".txt"}
+MSG_COMPOUND_FILE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+MSG_TEXT_SEGMENT_LIMIT = 80
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -146,6 +149,7 @@ def detect_mime(path: Path) -> str:
         ".htm": "text/html",
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ".eml": "message/rfc822",
+        ".msg": "application/vnd.ms-outlook",
         ".csv": "text/csv",
         ".json": "application/json",
         ".pdf": "application/pdf",
@@ -194,6 +198,8 @@ def parse_file(path: Path) -> dict[str, Any]:
             return _parse_docx(path)
         if suffix == ".eml":
             return _parse_eml(path)
+        if suffix == ".msg":
+            return _parse_msg(path)
         if suffix == ".pdf":
             return _parse_pdf(path)
         if suffix in MULTIMODAL_SUFFIXES:
@@ -422,6 +428,54 @@ def _email_attachment_text(part: Message, *, filename: str, content_type: str) -
     return decoded, "email_attachment_text_v1"
 
 
+def _clean_msg_text_segment(value: str) -> str:
+    text = " ".join(value.replace("\x00", " ").split())
+    return text if len(text) >= 4 and any(char.isalpha() for char in text) else ""
+
+
+def _msg_text_segments(raw: bytes) -> list[str]:
+    segments: list[str] = []
+    seen: set[str] = set()
+    patterns = [
+        (re.compile(rb"[\x09\x0a\x0d\x20-\x7e]{4,}"), "utf-8"),
+        (re.compile(rb"(?:[\x09\x0a\x0d\x20-\x7e]\x00){4,}"), "utf-16le"),
+    ]
+    for pattern, encoding in patterns:
+        for match in pattern.finditer(raw):
+            text = _clean_msg_text_segment(match.group(0).decode(encoding, errors="replace"))
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            segments.append(text)
+            if len(segments) >= MSG_TEXT_SEGMENT_LIMIT:
+                return segments
+    return segments
+
+
+def _parse_msg(path: Path) -> dict[str, Any]:
+    raw = path.read_bytes()
+    warnings = ["MSG_HEURISTIC_TEXT_EXTRACTION"]
+    if not raw.startswith(MSG_COMPOUND_FILE_MAGIC):
+        warnings.append("MSG_COMPOUND_MAGIC_MISSING")
+    segments = _msg_text_segments(raw)
+    if not segments:
+        warnings.append("MSG_NO_TEXT_PROBE_MATCH")
+    text = "\n".join(segments)
+    return {
+        "text": text,
+        **_base_result(
+            path,
+            parser="outlook_msg_text_probe_v1",
+            mime_type="application/vnd.ms-outlook",
+            warnings=warnings,
+            text_length=len(text),
+            extracted_text_segments=len(segments),
+            structured_properties_extracted=False,
+            text_segment_limit=MSG_TEXT_SEGMENT_LIMIT,
+        ),
+    }
+
+
 def _parse_eml(path: Path) -> dict[str, Any]:
     message = BytesParser(policy=policy.default).parsebytes(path.read_bytes())
     text_parts: list[str] = []
@@ -460,9 +514,7 @@ def _parse_eml(path: Path) -> dict[str, Any]:
                     )
                 else:
                     attachment["skip_reason"] = "ATTACHMENT_NO_TEXT"
-            attachments.append(
-                attachment
-            )
+            attachments.append(attachment)
             continue
         if content_type == "text/plain":
             body_part_count += 1

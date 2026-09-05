@@ -17,7 +17,7 @@ MANIFEST_NAME = "source_manifest.json"
 CHUNKS_NAME = "document_chunks.json"
 HTML_SUFFIXES = {".html", ".htm"}
 DOCX_SUFFIXES = {".docx"}
-EMAIL_SUFFIXES = {".eml"}
+EMAIL_SUFFIXES = {".eml", ".msg"}
 
 
 def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:

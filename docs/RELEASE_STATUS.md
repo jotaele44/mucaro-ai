@@ -14,7 +14,7 @@ rename/delete/search, desktop package self-testing, CLI `--version`, early `ask 
 validation, CLI source/index management, CLI conversation management, CLI
 run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
 executable product-gap auditing, an opt-in local semantic embedding store,
-approval-gated local tool runtime, local HTML/DOCX/EML document ingestion, bounded text-like EML attachment extraction, metadata-only image/audio/video ingestion,
+approval-gated local tool runtime, local HTML/DOCX/EML document ingestion, bounded text-like EML attachment extraction, Outlook MSG text probing, metadata-only image/audio/video ingestion,
 explicit local memory, CLI-exposed retrieval evaluation, and CLI-exposed
 packaging readiness with a governed source-artifact policy. The current
 retrieval-quality baseline adds expected-binding recall, context precision,
@@ -132,7 +132,7 @@ Observed success markers:
 - `mucaro certify retrieval-quality` now turns the default and large retrieval
   fixtures plus the mixed-format retrieval fixture into an exact-head
   `retrieval_quality` release receipt. The mixed-format fixture covers TXT,
-  Markdown, HTML, DOCX, EML, CSV, JSON, PDF, metadata-only media,
+  Markdown, HTML, DOCX, EML, MSG text probing, CSV, JSON, PDF, metadata-only media,
   traceability, and multi-format questions with strict per-category binding
   recall. The profile records per-fixture thresholds, query/category counts,
   category threshold failures, and full eval reports, and `mucaro release
@@ -178,6 +178,10 @@ Observed success markers:
   attachment markers, and records skipped attachments as source-manifest
   metadata and parser warnings rather than silently treating them as ingested
   evidence.
+- MSG files now have a bounded local text-probe ingestion path. The parser
+  records `outlook_msg_text_probe_v1`, extracted text segment counts, byte
+  counts, source hashes, and parser warnings while keeping full Outlook
+  structured-property extraction marked as a future parser upgrade.
 - `mucaro release state` classifies bounded release progress across
   `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`, `FRESH_CLONE_CERTIFIED`,
   `SOURCE_ARTIFACT_PACKAGING`, `GITHUB_GOVERNANCE_OPEN`,

@@ -26,7 +26,8 @@
 | Chroma integration | Persistent embedding/vector store for larger corpora | Planned in `docs/RETRIEVAL_UPGRADE_PLAN.md`; queued after larger eval corpus |
 | LlamaIndex ingestion | Richer document ingestion and node parsing | Queued |
 | Text-like EML attachment extraction | Bounded extraction for TXT, Markdown, HTML, CSV, and JSON email attachments with explicit source-lineage markers | Complete candidate |
-| Unstructured parser expansion | Better PDFs, richer DOCX/HTML extraction, Outlook MSG, binary email attachment parsing, and model-backed media understanding beyond metadata | Queued |
+| Outlook MSG text probe | Bounded local text-segment extraction for MSG files with explicit heuristic parser metadata | Complete candidate |
+| Unstructured parser expansion | Better PDFs, richer DOCX/HTML extraction, full Outlook MSG property extraction, binary email attachment parsing, and model-backed media understanding beyond metadata | Queued |
 | GraphRAG entity layer | People/org/place/event graph extraction | Queued |
 | MCP adapter | External protocol adapter beneath the Skill Fabric; not a separate authority model | Queued |
 | PostGIS/GIS service adapter | Spatial source lineage and map exports behind explicit service capability | Queued |

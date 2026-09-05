@@ -78,7 +78,7 @@ Global flags:
 - `--version` prints the installed package version for fresh-clone and support
   receipts.
 
-Supported ingest inputs are TXT, MD, HTML, HTM, DOCX, EML, CSV, JSON, PDF, PNG,
+Supported ingest inputs are TXT, MD, HTML, HTM, DOCX, EML, MSG, CSV, JSON, PDF, PNG,
 JPEG, GIF, WEBP, WAV, MP3, M4A, MP4, MOV, and WEBM. HTML files are parsed as
 local documents with visible text, title metadata, and link counts. DOCX files
 are parsed as local OpenXML documents with paragraph/table text and core
@@ -86,9 +86,12 @@ properties. EML files are parsed as local RFC 822/MIME messages with selected
 headers, body text, and attachment metadata. Text-like EML attachments are
 extracted only for bounded allowlisted types: TXT, MD, HTML, CSV, and JSON.
 Other attachments remain listed with skip reasons instead of being silently
-ingested. Media files are metadata-only in this release: they preserve source
-lineage, byte counts, dimensions or container facts where available, and parser
-warnings, but do not perform semantic image/audio/video understanding.
+ingested. MSG files are parsed with a bounded local binary text probe that can
+recover cited text segments from Outlook message files when present, while full
+structured Outlook property extraction remains a future parser upgrade. Media
+files are metadata-only in this release: they preserve source lineage, byte
+counts, dimensions or container facts where available, and parser warnings, but
+do not perform semantic image/audio/video understanding.
 
 ## Output Contracts
 
@@ -362,7 +365,7 @@ retrieval evidence instead of an ad hoc score. The certification profile runs
 the default fixture with strict category binding recall and the larger fixture
 with calibrated multi-binding category recall. It also runs a mixed-format
 fixture with strict category binding recall across TXT, Markdown, HTML, DOCX,
-EML, CSV, JSON, PDF, metadata-only media, traceability, and multi-format
+EML, MSG text probing, CSV, JSON, PDF, metadata-only media, traceability, and multi-format
 queries. It writes a
 `retrieval_quality` receipt under `data/exports/release_receipts`, records the
 profile, exact `HEAD`, thresholds, fixture counts, category threshold failures,
