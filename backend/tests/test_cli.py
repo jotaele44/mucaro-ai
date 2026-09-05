@@ -1011,6 +1011,10 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
             return True, {"enabled": True, "allowed_actions": "all"}, ""
         if args == ["api", "repos/jotaele44/mucaro-ai/actions/permissions/workflow"]:
             return True, {"default_workflow_permissions": "read"}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/branches/main/protection"]:
+            return False, None, "HTTP 403: Upgrade to GitHub Pro or make this repository public"
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/runners"]:
+            return True, {"total_count": 0, "runners": []}, ""
         if args == ["api", "repos/jotaele44/mucaro-ai/actions/workflows"]:
             return True, {
                 "workflows": [
@@ -1047,12 +1051,19 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert checks["latest_ci"]["status"] == "FAIL"
     assert checks["startup_probe"]["status"] == "FAIL"
     assert checks["startup_layer_isolated"]["status"] == "FAIL"
+    assert checks["branch_protection_api"]["status"] == "WARN"
+    assert checks["self_hosted_runner_inventory"]["status"] == "PASS"
     assert checks["actions_billing"]["status"] == "WARN"
+    assert payload["branch_protection"]["available"] is False
+    assert payload["runner_inventory"]["self_hosted_total_count"] == 0
 
     assert main(["certify", "github-actions", "--format", "text"], cfg=cfg) == 2
     text_output = capsys.readouterr().out
     assert "GITHUB_ACTIONS_DIAGNOSTIC_FAIL" in text_output
+    assert "WARN branch_protection_api HTTP 403: Upgrade to GitHub Pro" in text_output
+    assert "PASS self_hosted_runner_inventory self_hosted_total_count=0" in text_output
     assert "FAIL startup_layer_isolated" in text_output
+    assert "next_action=Upgrade GitHub plan or make the repository public" in text_output
     assert "next_action=Run `gh auth refresh -h github.com -s user`" in text_output
 
 

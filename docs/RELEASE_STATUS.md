@@ -97,6 +97,11 @@ Observed success markers:
   report `startup_failure` with `0` jobs for commit
   `9685077049b761b6d200d1493cbbb53376537a4e`; GitHub governance remains open at
   the Actions startup/account/repository-runner layer.
+- `mucaro certify github-actions` now reports private branch-protection API
+  availability and self-hosted runner inventory as explicit read-only
+  diagnostics. The current private repo branch-protection API reports a plan
+  gate requiring GitHub Pro or public visibility, while hosted CI startup still
+  fails before job creation.
 - Local release certification for `v0.1.23` reports `CERTIFY_RELEASE_OK` on
   commit `f48828b8dd5648554b65dba1ca86a07db099f7d3`, including `122 passed`,
   retrieval eval, JSON validation, desktop package self-test, frontend audit,

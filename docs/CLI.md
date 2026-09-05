@@ -273,11 +273,15 @@ policy checks; it does not replace the required `github_latest_ci` pass.
 
 Use `mucaro certify github-actions` when the GitHub governance gate fails and
 the operator needs a narrower hosted-runner diagnostic receipt. The command
-checks repository Actions permissions, workflow token permissions, workflow
+checks repository Actions permissions, workflow token permissions, private
+branch-protection API availability, self-hosted runner inventory, workflow
 registration, the latest named release workflow, the optional startup probe
 workflow, job counts, and account billing endpoint access. It is read-only and
 returns `GITHUB_ACTIONS_DIAGNOSTIC_FAIL` when hosted startup is isolated outside
-the project build/test stack.
+the project build/test stack. If private branch protection is plan-gated, the
+diagnostic reports a `branch_protection_api` warning separately from hosted CI
+startup so governance work can distinguish repository policy from build
+failures.
 
 Use `mucaro audit product` to classify the broader governed assistant objective
 as requirement rows with `PASS`, `OPEN`, or `BLOCKED` status. The audit includes

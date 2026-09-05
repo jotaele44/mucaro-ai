@@ -1117,6 +1117,23 @@ def _command_output(cfg: Settings, args: list[str]) -> tuple[bool, str]:
     return proc.returncode == 0, proc.stdout.strip()
 
 
+def _format_gh_error(output: str) -> str:
+    if not output:
+        return "gh command failed"
+    try:
+        payload, _end = json.JSONDecoder().raw_decode(output)
+    except json.JSONDecodeError:
+        return output
+    if not isinstance(payload, dict):
+        return output
+    message = payload.get("message")
+    status = payload.get("status")
+    if not message:
+        return output
+    prefix = f"HTTP {status}: " if status else ""
+    return f"{prefix}{message}"
+
+
 def _redact_remote_url(remote_url: str) -> str:
     if "://" not in remote_url:
         return remote_url
@@ -1152,7 +1169,7 @@ def _github_repo_from_origin(remote_url: str | None) -> str | None:
 def _gh_json(cfg: Settings, args: list[str]) -> tuple[bool, Any, str]:
     ok, output = _command_output(cfg, ["gh", *args])
     if not ok:
-        return False, None, output
+        return False, None, _format_gh_error(output)
     try:
         return True, json.loads(output), output
     except json.JSONDecodeError as exc:
@@ -1449,6 +1466,38 @@ def build_github_actions_diagnostic_status(
     else:
         checks.append(_certification_gate("workflow_token_permissions", "WARN", token_error or "workflow token permission lookup failed"))
 
+    branch_protection: dict[str, Any] = {"available": False}
+    if not branch_ok:
+        branch_protection["error"] = "branch unavailable"
+        checks.append(_certification_gate("branch_protection_api", "WARN", "branch unavailable"))
+    else:
+        protection_ok, protection_payload, protection_error = _gh_json(cfg, ["api", f"repos/{repo}/branches/{branch}/protection"])
+        branch_protection["available"] = protection_ok
+        if protection_ok and isinstance(protection_payload, dict):
+            branch_protection["required_status_checks"] = protection_payload.get("required_status_checks")
+            checks.append(_certification_gate("branch_protection_api", "PASS", "branch protection endpoint readable"))
+        else:
+            branch_protection["error"] = protection_error
+            checks.append(_certification_gate("branch_protection_api", "WARN", protection_error or "branch protection endpoint unavailable"))
+            if protection_error and ("Upgrade to GitHub Pro" in protection_error or "make this repository public" in protection_error):
+                next_actions.append("Upgrade GitHub plan or make the repository public before enforcing private-repo branch protection.")
+
+    runners_ok, runners_payload, runners_error = _gh_json(cfg, ["api", f"repos/{repo}/actions/runners"])
+    runner_inventory: dict[str, Any] = {"available": runners_ok}
+    if runners_ok and isinstance(runners_payload, dict):
+        total_count = runners_payload.get("total_count")
+        runner_inventory["self_hosted_total_count"] = total_count
+        checks.append(
+            _certification_gate(
+                "self_hosted_runner_inventory",
+                "PASS",
+                f"self_hosted_total_count={total_count}; ubuntu-latest uses GitHub-hosted runner capacity",
+            )
+        )
+    else:
+        runner_inventory["error"] = runners_error
+        checks.append(_certification_gate("self_hosted_runner_inventory", "WARN", runners_error or "runner inventory lookup failed"))
+
     workflows_ok, workflows_payload, workflows_error = _gh_json(cfg, ["api", f"repos/{repo}/actions/workflows"])
     workflows: dict[str, Any] = {}
     if workflows_ok and isinstance(workflows_payload, dict):
@@ -1543,6 +1592,8 @@ def build_github_actions_diagnostic_status(
         "branch": branch if branch_ok else None,
         "head_sha": head_sha if head_ok else None,
         "checks": checks,
+        "branch_protection": branch_protection,
+        "runner_inventory": runner_inventory,
         "workflows": workflows,
         "runs": {
             "ci": _run_summary(ci_latest, ci_jobs_count),
