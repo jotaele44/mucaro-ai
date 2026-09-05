@@ -290,6 +290,8 @@ mucaro = "backend.app.cli:main"
         "scripts/certify_release.py",
         "scripts/certify_fresh_clone.py",
         "scripts/package_desktop.py",
+        "scripts/certify_source_artifact.py",
+        "scripts/certify_python_distribution.py",
     ]:
         (root / path).write_text("# fixture\n", encoding="utf-8")
     (root / "frontend" / "package.json").write_text(
@@ -647,6 +649,7 @@ def test_cli_release_state_reports_github_governance_open(tmp_path: Path, capsys
     assert states["FRESH_CLONE_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["SOURCE_ARTIFACT_PACKAGING"]["status"] == "PASS"
     assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["PYTHON_DIST_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["GITHUB_GOVERNANCE_OPEN"]["status"] == "OPEN"
     assert "github_hosted_runner_startup=FAIL" in states["GITHUB_GOVERNANCE_OPEN"]["evidence"]
     assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
@@ -689,6 +692,14 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     )
     write_release_receipt(
         tmp_path,
+        receipt_type="python_dist",
+        status="PYTHON_DIST_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_python_distribution.py"],
+        payload={"checks": []},
+    )
+    write_release_receipt(
+        tmp_path,
         receipt_type="fresh_clone",
         status="FRESH_CLONE_CERT_OK",
         head_sha="e" * 40,
@@ -719,9 +730,11 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     assert states["LOCAL_RELEASE_CERTIFIED"]["status"] == "PASS"
     assert states["FRESH_CLONE_CERTIFIED"]["status"] == "PASS"
     assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "PASS"
+    assert states["PYTHON_DIST_CERTIFIED"]["status"] == "PASS"
     assert payload["receipts"]["local_release"]["head_sha"] == head_sha
     assert payload["receipts"]["fresh_clone"]["head_sha"] == head_sha
     assert payload["receipts"]["source_artifact"]["head_sha"] == head_sha
+    assert payload["receipts"]["python_dist"]["head_sha"] == head_sha
 
 
 def test_cli_release_state_requires_source_artifact_receipt_for_governed_ready(tmp_path: Path, capsys, monkeypatch):

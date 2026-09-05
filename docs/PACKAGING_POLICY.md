@@ -14,6 +14,7 @@ Build it from a clean Git worktree:
 PYTHONPATH=.:backend python3 scripts/mucaro.py package build --format text
 PYTHONPATH=.:backend python3 scripts/mucaro.py package verify data/exports/packages/MANIFEST.json --require-current-head --format text
 python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json
+python3 scripts/certify_python_distribution.py
 ```
 
 The command writes generated files under `data/exports/packages`, which is
@@ -64,6 +65,14 @@ installed `mucaro` entry point, and runs the desktop package self-test. A
 passing run writes a `SOURCE_ARTIFACT_CERT_OK` receipt whose `head_sha` is taken
 from the verified manifest.
 
+`scripts/certify_python_distribution.py` validates the standard Python
+distribution layer. It builds both wheel and sdist artifacts under
+`data/exports/python_dist`, records SHA-256 and member counts for each
+distribution artifact, installs the built wheel into a separate clean virtual
+environment, verifies the installed `mucaro` entry point, and imports installed
+package modules. A passing run writes a `PYTHON_DIST_CERT_OK` receipt for the
+current Git `HEAD`.
+
 ## Release Gates
 
 Before a governed release tag, the operator must have:
@@ -79,6 +88,11 @@ Before a governed release tag, the operator must have:
 
 ## Deferred Distribution Layers
 
+`PYTHON_DIST_CERT_OK` is a production-packaging readiness signal for the Python
+wheel/sdist layer. It is not a hosted governance substitute and does not by
+itself authorize a governed release tag while hosted GitHub Actions remains
+open.
+
 The current policy does not claim a signed installer, notarized macOS app,
-Windows installer, Linux package, PyPI package, or auto-update channel.
-Those are future packaging layers and must be certified separately.
+Windows installer, Linux package, PyPI publication, or auto-update channel.
+Those are future distribution layers and must be certified separately.

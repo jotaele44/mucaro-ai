@@ -1705,9 +1705,11 @@ def build_release_state_report(
     local_release_receipt = load_release_receipt(cfg.project_root, receipt_type="local_release", head_sha=head_sha)
     fresh_clone_receipt = load_release_receipt(cfg.project_root, receipt_type="fresh_clone", head_sha=head_sha)
     source_artifact_receipt = load_release_receipt(cfg.project_root, receipt_type="source_artifact", head_sha=head_sha)
+    python_dist_receipt = load_release_receipt(cfg.project_root, receipt_type="python_dist", head_sha=head_sha)
     local_release_status, local_release_evidence = _receipt_state(local_release_receipt, "CERTIFY_RELEASE_OK")
     fresh_clone_status, fresh_clone_evidence = _receipt_state(fresh_clone_receipt, "FRESH_CLONE_CERT_OK")
     source_artifact_status, source_artifact_evidence = _receipt_state(source_artifact_receipt, "SOURCE_ARTIFACT_CERT_OK")
+    python_dist_status, python_dist_evidence = _receipt_state(python_dist_receipt, "PYTHON_DIST_CERT_OK")
     canonical_local_pass = (
         git_repository is not None
         and git_repository.get("status") == "PASS"
@@ -1771,6 +1773,12 @@ def build_release_state_report(
             "Run python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json.",
         ),
         _release_state(
+            "PYTHON_DIST_CERTIFIED",
+            python_dist_status,
+            python_dist_evidence,
+            "Run python3 scripts/certify_python_distribution.py.",
+        ),
+        _release_state(
             "GITHUB_GOVERNANCE_OPEN",
             "OPEN" if github_open else "UNVERIFIED" if not include_github else "PASS",
             (
@@ -1798,6 +1806,7 @@ def build_release_state_report(
         "python3 scripts/certify_release.py",
         f"python3 scripts/certify_fresh_clone.py --ref {certification.get('git', {}).get('head_sha') or 'main'}",
         "python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json",
+        "python3 scripts/certify_python_distribution.py",
     ]
     if not include_github:
         next_commands.insert(0, "mucaro release state --include-github --format text")
@@ -1821,6 +1830,7 @@ def build_release_state_report(
             "local_release": local_release_receipt,
             "fresh_clone": fresh_clone_receipt,
             "source_artifact": source_artifact_receipt,
+            "python_dist": python_dist_receipt,
         },
         "product_audit_status": audit.get("status"),
         "package_status": package.get("status"),

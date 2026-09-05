@@ -191,6 +191,7 @@ mucaro package status --format text
 mucaro package build --format text
 mucaro package verify data/exports/packages/MANIFEST.json --require-current-head --format text
 python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json
+python3 scripts/certify_python_distribution.py
 mucaro tools list --format text
 mucaro tools request source_library.status --reason "readiness check" --format json
 mucaro tools approve TOOL_CALL_ID --format json
@@ -233,9 +234,10 @@ automation should fail on warnings.
 Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,
-`SOURCE_ARTIFACT_CERTIFIED`, `GITHUB_GOVERNANCE_OPEN`,
-`GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`. The command reuses existing
-audit, package, Git, artifact, and optional GitHub governance receipts. It does
+`SOURCE_ARTIFACT_CERTIFIED`, `PYTHON_DIST_CERTIFIED`,
+`GITHUB_GOVERNANCE_OPEN`, `GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`.
+The command reuses existing audit, package, Git,
+artifact, Python distribution, and optional GitHub governance receipts. It does
 not run heavy certification scripts, so those states remain `UNVERIFIED` until
 the operator runs the reported commands and creates matching exact-HEAD receipts
 under `data/exports/release_receipts`. Add `--include-github` when authenticated
@@ -324,6 +326,15 @@ virtual environment from the extracted source, installs `.[dev]`, installs
 frontend dependencies, runs `scripts/release_check.py`, checks the installed
 `mucaro` entry point, runs the desktop package self-test, and writes a
 `source_artifact` release receipt for the exact manifest `head_sha`.
+
+Use `python3 scripts/certify_python_distribution.py` to build and certify
+standard Python distribution artifacts. The script creates a clean build
+environment, builds both sdist and wheel artifacts under
+`data/exports/python_dist`, installs the built wheel into a separate clean
+virtual environment, verifies `mucaro --version`, verifies `mucaro --help`,
+imports the installed package modules, records SHA-256 and member counts for
+the wheel and sdist, and writes a `python_dist` release receipt for the exact
+current Git `HEAD`.
 
 ## Retrieval Strategies
 

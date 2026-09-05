@@ -6,6 +6,7 @@ import sys
 import pytest
 
 import scripts.certify_fresh_clone as certify_fresh_clone
+import scripts.certify_python_distribution as certify_python_distribution
 import scripts.certify_release as certify_release
 import scripts.certify_source_artifact as certify_source_artifact
 import scripts.launch_app as launch_app
@@ -157,6 +158,21 @@ def test_source_artifact_rejects_unexpected_archive_root(tmp_path):
 
     with pytest.raises(ValueError, match="unexpected archive root"):
         certify_source_artifact.extract_source_archive(manifest, tmp_path / "extract")
+
+
+def test_python_distribution_summarizes_wheel_artifact(tmp_path):
+    wheel = tmp_path / "mucaro_ai-0.1.23-py3-none-any.whl"
+    with certify_python_distribution.zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("backend/app/__init__.py", "")
+        archive.writestr("mucaro_ai-0.1.23.dist-info/METADATA", "Name: mucaro-ai\n")
+
+    summary = certify_python_distribution.dist_summary(wheel)
+
+    assert summary["path"] == str(wheel)
+    assert summary["size_bytes"] == wheel.stat().st_size
+    assert summary["member_count"] == 2
+    assert isinstance(summary["sha256"], str)
+    assert len(summary["sha256"]) == 64
 
 
 def test_launch_app_reports_missing_frontend_deps(tmp_path, monkeypatch):
