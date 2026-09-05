@@ -170,6 +170,10 @@ def build_parser() -> argparse.ArgumentParser:
     eval_retrieval.add_argument("--min-no-context-accuracy", type=float, default=1.00, help="Minimum no-context accuracy required for every retrieval strategy.")
     eval_retrieval.add_argument("--min-semantic-recall", type=float, default=0.80, help="Minimum recall@k required for semantic retrieval.")
     eval_retrieval.add_argument("--min-semantic-no-context", type=float, default=1.00, help="Minimum no-context accuracy required for semantic retrieval.")
+    eval_retrieval.add_argument("--min-hybrid-precision", type=float, default=0.20, help="Minimum context precision@k required for hybrid retrieval.")
+    eval_retrieval.add_argument("--min-semantic-precision", type=float, default=0.20, help="Minimum context precision@k required for semantic retrieval.")
+    eval_retrieval.add_argument("--min-expected-binding-recall", type=float, default=0.95, help="Minimum expected binding recall@k required for every retrieval strategy.")
+    eval_retrieval.add_argument("--min-multi-binding-full-hit", type=float, default=0.60, help="Minimum multi-binding full-hit rate required for every retrieval strategy.")
     eval_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     eval_retrieval.set_defaults(handler=run_eval_retrieval)
 
@@ -530,6 +534,10 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"min_no_context_accuracy={payload.get('min_no_context_accuracy')}")
         print(f"min_semantic_recall={payload.get('min_semantic_recall')}")
         print(f"min_semantic_no_context={payload.get('min_semantic_no_context')}")
+        print(f"min_hybrid_precision={payload.get('min_hybrid_precision')}")
+        print(f"min_semantic_precision={payload.get('min_semantic_precision')}")
+        print(f"min_expected_binding_recall={payload.get('min_expected_binding_recall')}")
+        print(f"min_multi_binding_full_hit={payload.get('min_multi_binding_full_hit')}")
         for line in format_retrieval_eval_text(payload)[:-1]:
             print(line)
     elif status in {"PACKAGE_READY", "PACKAGE_WARN", "PACKAGE_FAIL"}:
@@ -1014,6 +1022,10 @@ def run_eval_retrieval(args: argparse.Namespace, cfg: Settings) -> int:
         min_no_context_accuracy=args.min_no_context_accuracy,
         min_semantic_recall=args.min_semantic_recall,
         min_semantic_no_context=args.min_semantic_no_context,
+        min_hybrid_precision=args.min_hybrid_precision,
+        min_semantic_precision=args.min_semantic_precision,
+        min_expected_binding_recall=args.min_expected_binding_recall,
+        min_multi_binding_full_hit=args.min_multi_binding_full_hit,
     )
     emit_payload(report, args.format)
     return 0 if report["status"] == "RETRIEVAL_EVAL_OK" else 2

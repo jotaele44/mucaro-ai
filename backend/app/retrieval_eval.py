@@ -236,6 +236,12 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
     no_context_hits = 0
     expected_with_context = 0
     expected_no_context = 0
+    total_expected_bindings = 0
+    retrieved_for_positive = 0
+    relevant_retrieved = 0
+    full_binding_hits = 0
+    multi_binding_cases = 0
+    multi_binding_full_hits = 0
     try:
         for case in fixture["queries"]:
             expected = set(case["expected_chunk_ids"])
@@ -245,10 +251,20 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
                 else retrieve(case["query"], chunks, top_k=top_k, strategy=strategy)
             )
             retrieved_ids = [chunk["chunk_id"] for chunk in result["retrieved_chunks"]]
+            retrieved = set(retrieved_ids)
+            matched_expected = sorted(expected.intersection(retrieved))
             if expected:
                 expected_with_context += 1
+                total_expected_bindings += len(expected)
+                retrieved_for_positive += len(retrieved_ids)
+                relevant_retrieved += len(matched_expected)
                 hit = bool(expected.intersection(retrieved_ids))
                 top1_hit = bool(retrieved_ids and retrieved_ids[0] in expected)
+                full_binding_hit = expected.issubset(retrieved)
+                full_binding_hits += int(full_binding_hit)
+                if len(expected) > 1:
+                    multi_binding_cases += 1
+                    multi_binding_full_hits += int(full_binding_hit)
                 hits += int(hit)
                 top1_hits += int(top1_hit)
             else:
@@ -256,15 +272,18 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
                 no_context_hits += int(result["status"] == "ERROR_NO_RETRIEVAL_CONTEXT")
                 hit = result["status"] == "ERROR_NO_RETRIEVAL_CONTEXT"
                 top1_hit = False
+                full_binding_hit = False
             rows.append(
                 {
                     "case_type": "positive" if expected else "no_context",
                     "query": case["query"],
                     "expected_chunk_ids": sorted(expected),
                     "retrieved_chunk_ids": retrieved_ids,
+                    "matched_expected_chunk_ids": matched_expected,
                     "status": result["status"],
                     "hit": hit,
                     "top1_hit": top1_hit,
+                    "full_binding_hit": full_binding_hit,
                 }
             )
     finally:
@@ -274,8 +293,15 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
     return {
         "strategy": strategy,
         "recall_at_k": round(hits / expected_with_context, 4) if expected_with_context else 0.0,
+        "expected_binding_recall_at_k": round(relevant_retrieved / total_expected_bindings, 4) if total_expected_bindings else 0.0,
+        "context_precision_at_k": round(relevant_retrieved / retrieved_for_positive, 4) if retrieved_for_positive else 0.0,
         "top1_hit_rate": round(top1_hits / expected_with_context, 4) if expected_with_context else 0.0,
+        "full_binding_hit_rate": round(full_binding_hits / expected_with_context, 4) if expected_with_context else 0.0,
+        "multi_binding_full_hit_rate": round(multi_binding_full_hits / multi_binding_cases, 4) if multi_binding_cases else 1.0,
         "no_context_accuracy": round(no_context_hits / expected_no_context, 4) if expected_no_context else 1.0,
+        "positive_retrieved_chunks": retrieved_for_positive,
+        "relevant_retrieved_chunks": relevant_retrieved,
+        "expected_bindings": total_expected_bindings,
         "cases": rows,
     }
 
@@ -288,6 +314,10 @@ def build_retrieval_eval_report(
     min_no_context_accuracy: float = 1.00,
     min_semantic_recall: float = 0.80,
     min_semantic_no_context: float = 1.00,
+    min_hybrid_precision: float = 0.20,
+    min_semantic_precision: float = 0.20,
+    min_expected_binding_recall: float = 0.95,
+    min_multi_binding_full_hit: float = 0.60,
 ) -> dict[str, Any]:
     fixture = load_retrieval_eval_fixture(fixture_path)
     fixture_validation = validate_retrieval_eval_fixture(fixture)
@@ -303,6 +333,10 @@ def build_retrieval_eval_report(
             "min_no_context_accuracy": min_no_context_accuracy,
             "min_semantic_recall": min_semantic_recall,
             "min_semantic_no_context": min_semantic_no_context,
+            "min_hybrid_precision": min_hybrid_precision,
+            "min_semantic_precision": min_semantic_precision,
+            "min_expected_binding_recall": min_expected_binding_recall,
+            "min_multi_binding_full_hit": min_multi_binding_full_hit,
         }
     report: dict[str, Any] = {
         "fixture": str(fixture_path.relative_to(ROOT) if fixture_path.is_relative_to(ROOT) else fixture_path),
@@ -315,6 +349,10 @@ def build_retrieval_eval_report(
         "min_no_context_accuracy": min_no_context_accuracy,
         "min_semantic_recall": min_semantic_recall,
         "min_semantic_no_context": min_semantic_no_context,
+        "min_hybrid_precision": min_hybrid_precision,
+        "min_semantic_precision": min_semantic_precision,
+        "min_expected_binding_recall": min_expected_binding_recall,
+        "min_multi_binding_full_hit": min_multi_binding_full_hit,
         "fixture_validation": fixture_validation,
     }
     by_strategy = {item["strategy"]: item for item in report["strategies"]}
@@ -322,8 +360,12 @@ def build_retrieval_eval_report(
     semantic = by_strategy["semantic"]
     passed = (
         hybrid["recall_at_k"] >= min_hybrid_recall
+        and hybrid["context_precision_at_k"] >= min_hybrid_precision
         and all(strategy["no_context_accuracy"] >= min_no_context_accuracy for strategy in report["strategies"])
+        and all(strategy["expected_binding_recall_at_k"] >= min_expected_binding_recall for strategy in report["strategies"])
+        and all(strategy["multi_binding_full_hit_rate"] >= min_multi_binding_full_hit for strategy in report["strategies"])
         and semantic["recall_at_k"] >= min_semantic_recall
+        and semantic["context_precision_at_k"] >= min_semantic_precision
         and semantic["no_context_accuracy"] >= min_semantic_no_context
     )
     report["status"] = "RETRIEVAL_EVAL_OK" if passed else "RETRIEVAL_EVAL_FAILED"
@@ -347,7 +389,11 @@ def format_retrieval_eval_text(report: dict[str, Any]) -> list[str]:
     for strategy in report.get("strategies", []):
         lines.append(
             f"{strategy['strategy']} recall@{top_k}={strategy['recall_at_k']:.2f} "
-            f"top1={strategy['top1_hit_rate']:.2f} no_context={strategy['no_context_accuracy']:.2f}"
+            f"binding_recall={strategy['expected_binding_recall_at_k']:.2f} "
+            f"precision={strategy['context_precision_at_k']:.2f} top1={strategy['top1_hit_rate']:.2f} "
+            f"full_binding={strategy['full_binding_hit_rate']:.2f} "
+            f"multi_full={strategy['multi_binding_full_hit_rate']:.2f} "
+            f"no_context={strategy['no_context_accuracy']:.2f}"
         )
     lines.append(str(report.get("status")))
     return lines

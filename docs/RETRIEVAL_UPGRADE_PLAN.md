@@ -70,6 +70,9 @@ default `hybrid` strategy until eval evidence shows a material improvement.
 | Fixture contract | `RETRIEVAL_FIXTURE_OK` with no dangling expected IDs, source diversity, multi-binding cases, category coverage, and positive/no-context minimums |
 | Large-corpus eval | `RETRIEVAL_EVAL_OK` for `backend/tests/fixtures/retrieval_eval_large.json` during release certification |
 | No-context accuracy | Every evaluated strategy meets the configured `--min-no-context-accuracy` threshold |
+| Expected-binding recall | Every evaluated strategy meets the configured `--min-expected-binding-recall` threshold |
+| Context precision | Hybrid and semantic retrieval meet their configured precision thresholds so noisy top-k context is visible |
+| Multi-binding full hit | Every evaluated strategy meets the configured `--min-multi-binding-full-hit` threshold for multi-source questions |
 | Determinism check | Stable top-k order for ties or explicit tie-break metadata |
 | Empty corpus | Explicit error status, no exception |
 | Missing index/store | Explicit repair warning |

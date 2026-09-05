@@ -37,6 +37,10 @@ def main() -> int:
     parser.add_argument("--min-no-context-accuracy", type=float, default=1.00)
     parser.add_argument("--min-semantic-recall", type=float, default=0.80)
     parser.add_argument("--min-semantic-no-context", type=float, default=1.00)
+    parser.add_argument("--min-hybrid-precision", type=float, default=0.20)
+    parser.add_argument("--min-semantic-precision", type=float, default=0.20)
+    parser.add_argument("--min-expected-binding-recall", type=float, default=0.95)
+    parser.add_argument("--min-multi-binding-full-hit", type=float, default=0.60)
     parser.add_argument("--format", choices=["text", "json"], default="text")
     args = parser.parse_args()
 
@@ -47,6 +51,10 @@ def main() -> int:
         min_no_context_accuracy=args.min_no_context_accuracy,
         min_semantic_recall=args.min_semantic_recall,
         min_semantic_no_context=args.min_semantic_no_context,
+        min_hybrid_precision=args.min_hybrid_precision,
+        min_semantic_precision=args.min_semantic_precision,
+        min_expected_binding_recall=args.min_expected_binding_recall,
+        min_multi_binding_full_hit=args.min_multi_binding_full_hit,
     )
     if args.format == "json":
         print(json.dumps(report, indent=2, ensure_ascii=False))

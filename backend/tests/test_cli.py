@@ -180,6 +180,13 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
         "persistent",
         "semantic",
     }
+    hybrid = next(strategy for strategy in payload["strategies"] if strategy["strategy"] == "hybrid")
+    assert hybrid["expected_binding_recall_at_k"] == 1.0
+    assert hybrid["context_precision_at_k"] == 0.2857
+    assert hybrid["full_binding_hit_rate"] == 1.0
+    assert hybrid["multi_binding_full_hit_rate"] == 1.0
+    assert hybrid["positive_retrieved_chunks"] == 98
+    assert hybrid["relevant_retrieved_chunks"] == 28
 
     assert main(["eval", "retrieval", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
@@ -191,6 +198,11 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert "query_categories=20" in text_output
     assert "fixture_validation=RETRIEVAL_FIXTURE_OK" in text_output
     assert "min_no_context_accuracy=1.0" in text_output
+    assert "min_hybrid_precision=0.2" in text_output
+    assert "min_expected_binding_recall=0.95" in text_output
+    assert "binding_recall=1.00" in text_output
+    assert "precision=0.29" in text_output
+    assert "multi_full=1.00" in text_output
     assert "hybrid recall@5=" in text_output
     assert "semantic recall@5=" in text_output
     assert "RETRIEVAL_EVAL_OK" in text_output
@@ -227,6 +239,58 @@ def test_cli_eval_retrieval_fails_when_thresholds_are_not_met(tmp_path: Path, ca
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "RETRIEVAL_EVAL_FAILED"
     assert payload["min_hybrid_recall"] == 1.1
+
+
+def test_cli_eval_retrieval_fails_when_precision_threshold_is_not_met(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert (
+        main(
+            [
+                "eval",
+                "retrieval",
+                "--fixture",
+                "backend/tests/fixtures/retrieval_eval_large.json",
+                "--min-hybrid-precision",
+                "0.9",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    payload = json.loads(capsys.readouterr().out)
+    hybrid = next(strategy for strategy in payload["strategies"] if strategy["strategy"] == "hybrid")
+    assert payload["status"] == "RETRIEVAL_EVAL_FAILED"
+    assert payload["min_hybrid_precision"] == 0.9
+    assert hybrid["context_precision_at_k"] == 0.236
+
+
+def test_cli_eval_retrieval_fails_when_binding_threshold_is_not_met(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert (
+        main(
+            [
+                "eval",
+                "retrieval",
+                "--fixture",
+                "backend/tests/fixtures/retrieval_eval_large.json",
+                "--min-expected-binding-recall",
+                "1.0",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    payload = json.loads(capsys.readouterr().out)
+    bm25 = next(strategy for strategy in payload["strategies"] if strategy["strategy"] == "bm25")
+    assert payload["status"] == "RETRIEVAL_EVAL_FAILED"
+    assert payload["min_expected_binding_recall"] == 1.0
+    assert bm25["expected_binding_recall_at_k"] == 0.9667
 
 
 def test_cli_eval_retrieval_fails_on_invalid_fixture(tmp_path: Path, capsys):
