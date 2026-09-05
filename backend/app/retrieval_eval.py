@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -14,10 +15,150 @@ from .vector_index import build_persistent_index
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FIXTURE = ROOT / "backend" / "tests" / "fixtures" / "retrieval_eval.json"
 DEFAULT_STRATEGIES = ["lexical", "vector", "bm25", "hybrid", "persistent", "semantic"]
+MIN_FIXTURE_CHUNKS = 12
+MIN_FIXTURE_QUERIES = 12
 
 
-def load_retrieval_eval_fixture(path: Path = DEFAULT_FIXTURE) -> dict[str, Any]:
+def load_retrieval_eval_fixture(path: Path = DEFAULT_FIXTURE) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _eval_check(name: str, status: str, detail: str) -> dict[str, str]:
+    return {"name": name, "status": status, "detail": detail}
+
+
+def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
+    checks: list[dict[str, str]] = []
+    if not isinstance(fixture, dict):
+        return {
+            "status": "RETRIEVAL_FIXTURE_INVALID",
+            "checks": [
+                _eval_check(
+                    "fixture_shape",
+                    "FAIL",
+                    f"fixture_type={type(fixture).__name__} chunks_type=missing queries_type=missing",
+                )
+            ],
+            "counts": {
+                "chunks": 0,
+                "queries": 0,
+                "positive_queries": 0,
+                "no_context_queries": 0,
+                "expected_bindings": 0,
+            },
+        }
+    chunks = fixture.get("chunks")
+    queries = fixture.get("queries")
+    chunk_rows = chunks if isinstance(chunks, list) else []
+    query_rows = queries if isinstance(queries, list) else []
+
+    checks.append(
+        _eval_check(
+            "fixture_shape",
+            "PASS" if isinstance(chunks, list) and isinstance(queries, list) else "FAIL",
+            f"chunks_type={type(chunks).__name__} queries_type={type(queries).__name__}",
+        )
+    )
+    checks.append(
+        _eval_check(
+            "fixture_size",
+            "PASS" if len(chunk_rows) >= MIN_FIXTURE_CHUNKS and len(query_rows) >= MIN_FIXTURE_QUERIES else "FAIL",
+            f"chunks={len(chunk_rows)} min_chunks={MIN_FIXTURE_CHUNKS} queries={len(query_rows)} min_queries={MIN_FIXTURE_QUERIES}",
+        )
+    )
+
+    chunk_ids: list[str] = []
+    malformed_chunks = 0
+    for index, chunk in enumerate(chunk_rows):
+        if not isinstance(chunk, dict):
+            malformed_chunks += 1
+            continue
+        chunk_id = chunk.get("chunk_id")
+        source_id = chunk.get("source_id")
+        text = chunk.get("text")
+        if not isinstance(chunk_id, str) or not chunk_id.strip():
+            malformed_chunks += 1
+            continue
+        chunk_ids.append(chunk_id)
+        if not isinstance(source_id, str) or not source_id.strip() or not isinstance(text, str) or not text.strip():
+            malformed_chunks += 1
+        if "chunk_index" not in chunk:
+            malformed_chunks += 1
+    chunk_id_counts = Counter(chunk_ids)
+    duplicate_chunk_ids = sorted(chunk_id for chunk_id, count in chunk_id_counts.items() if count > 1)
+    known_chunk_ids = set(chunk_ids)
+    checks.append(
+        _eval_check(
+            "chunk_contract",
+            "PASS" if not malformed_chunks and not duplicate_chunk_ids else "FAIL",
+            f"malformed={malformed_chunks} duplicates={','.join(duplicate_chunk_ids) or 'none'}",
+        )
+    )
+
+    malformed_queries = 0
+    duplicate_queries: set[str] = set()
+    seen_queries: set[str] = set()
+    dangling_expected: set[str] = set()
+    positive_queries = 0
+    no_context_queries = 0
+    expected_bindings = 0
+    for row in query_rows:
+        if not isinstance(row, dict):
+            malformed_queries += 1
+            continue
+        query = row.get("query")
+        expected = row.get("expected_chunk_ids")
+        if not isinstance(query, str) or not query.strip() or not isinstance(expected, list):
+            malformed_queries += 1
+            continue
+        if query in seen_queries:
+            duplicate_queries.add(query)
+        seen_queries.add(query)
+        if expected:
+            positive_queries += 1
+        else:
+            no_context_queries += 1
+        for chunk_id in expected:
+            if not isinstance(chunk_id, str) or not chunk_id.strip():
+                malformed_queries += 1
+                continue
+            expected_bindings += 1
+            if chunk_id not in known_chunk_ids:
+                dangling_expected.add(chunk_id)
+    checks.append(
+        _eval_check(
+            "query_contract",
+            "PASS" if not malformed_queries and not duplicate_queries else "FAIL",
+            f"malformed={malformed_queries} duplicate_queries={len(duplicate_queries)}",
+        )
+    )
+    checks.append(
+        _eval_check(
+            "expected_chunk_bindings",
+            "PASS" if not dangling_expected else "FAIL",
+            f"dangling={','.join(sorted(dangling_expected)) or 'none'} expected_bindings={expected_bindings}",
+        )
+    )
+    checks.append(
+        _eval_check(
+            "negative_cases",
+            "PASS" if positive_queries > 0 and no_context_queries > 0 else "FAIL",
+            f"positive={positive_queries} no_context={no_context_queries}",
+        )
+    )
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": "RETRIEVAL_FIXTURE_INVALID" if failed else "RETRIEVAL_FIXTURE_OK",
+        "checks": checks,
+        "counts": {
+            "chunks": len(chunk_rows),
+            "queries": len(query_rows),
+            "positive_queries": positive_queries,
+            "no_context_queries": no_context_queries,
+            "expected_bindings": expected_bindings,
+        },
+    }
 
 
 def make_eval_settings(root: Path) -> Settings:
@@ -74,6 +215,7 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
                 top1_hit = False
             rows.append(
                 {
+                    "case_type": "positive" if expected else "no_context",
                     "query": case["query"],
                     "expected_chunk_ids": sorted(expected),
                     "retrieved_chunk_ids": retrieved_ids,
@@ -104,6 +246,19 @@ def build_retrieval_eval_report(
     min_semantic_no_context: float = 1.00,
 ) -> dict[str, Any]:
     fixture = load_retrieval_eval_fixture(fixture_path)
+    fixture_validation = validate_retrieval_eval_fixture(fixture)
+    if fixture_validation["status"] != "RETRIEVAL_FIXTURE_OK":
+        return {
+            "status": "RETRIEVAL_EVAL_INVALID",
+            "fixture": str(fixture_path.relative_to(ROOT) if fixture_path.is_relative_to(ROOT) else fixture_path),
+            "top_k": top_k,
+            "strategies": [],
+            "fixture_validation": fixture_validation,
+            "counts": fixture_validation["counts"] | {"strategies": 0},
+            "min_hybrid_recall": min_hybrid_recall,
+            "min_semantic_recall": min_semantic_recall,
+            "min_semantic_no_context": min_semantic_no_context,
+        }
     report: dict[str, Any] = {
         "fixture": str(fixture_path.relative_to(ROOT) if fixture_path.is_relative_to(ROOT) else fixture_path),
         "top_k": top_k,
@@ -114,6 +269,7 @@ def build_retrieval_eval_report(
         "min_hybrid_recall": min_hybrid_recall,
         "min_semantic_recall": min_semantic_recall,
         "min_semantic_no_context": min_semantic_no_context,
+        "fixture_validation": fixture_validation,
     }
     by_strategy = {item["strategy"]: item for item in report["strategies"]}
     hybrid = by_strategy["hybrid"]
@@ -127,6 +283,9 @@ def build_retrieval_eval_report(
     report["counts"] = {
         "chunks": len(fixture.get("chunks", [])),
         "queries": len(fixture.get("queries", [])),
+        "positive_queries": fixture_validation["counts"]["positive_queries"],
+        "no_context_queries": fixture_validation["counts"]["no_context_queries"],
+        "expected_bindings": fixture_validation["counts"]["expected_bindings"],
         "strategies": len(report["strategies"]),
     }
     return report

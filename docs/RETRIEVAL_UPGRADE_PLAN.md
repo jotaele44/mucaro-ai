@@ -14,11 +14,12 @@ contracts.
 | `bm25_v1` | Candidate | Local BM25 ranking without external dependencies |
 | `hybrid_tfidf_v1` | Certified | Default answer retrieval strategy |
 | `persistent_tfidf_v1` | Certified | Local persisted TF-IDF index rebuilt during ingestion |
-| `local_semantic_hash_store_v1` | Candidate | Local persisted hash-embedding store rebuilt during ingestion |
+| `local_semantic_hash_store_v1` | Candidate | Local persisted hash-embedding store rebuilt during ingestion, constrained by matched-term evidence |
 
 The current persistent index is stored under `data/indexes/tfidf_index.json`.
 The local semantic store is stored under `data/indexes/semantic_store.json`.
-Both stores fail closed when missing or stale.
+Both stores fail closed when missing or stale. The local semantic hash store also
+fails closed when hash similarity exists without matched query terms.
 
 ## Invariants
 
@@ -40,7 +41,14 @@ The first semantic-store cycle adds `strategy="semantic"` behind the existing
 `retrieve()` boundary without changing the default `hybrid` answer path. The
 store uses deterministic local hash embeddings, preserves the answer-trace
 schema, rebuilds during ingestion/reindex/delete, and fails closed when the
-store is missing or stale.
+store is missing or stale. Because the current store is local and deterministic,
+not a hosted language embedding model, it requires matched terms before returning
+cited context.
+
+The committed retrieval fixture now has its own validation gate: chunk IDs must
+be unique, expected chunk bindings must point at existing chunks, positive and
+no-context cases must both be present, and benchmark counts are reported beside
+retrieval scores.
 
 Future model-backed embeddings or Chroma-style stores should use this boundary
 instead of changing the answer service contract. They should not replace the
@@ -51,6 +59,7 @@ default `hybrid` strategy until eval evidence shows a material improvement.
 | Gate | Required Result |
 |---|---|
 | Fixture eval | `RETRIEVAL_EVAL_OK` with the candidate strategy included |
+| Fixture contract | `RETRIEVAL_FIXTURE_OK` with no dangling expected IDs and at least one no-context case |
 | Determinism check | Stable top-k order for ties or explicit tie-break metadata |
 | Empty corpus | Explicit error status, no exception |
 | Missing index/store | Explicit repair warning |
@@ -68,7 +77,8 @@ default `hybrid` strategy until eval evidence shows a material improvement.
 3. Add the provider strategy only after tests cover missing and stale store
    states.
 4. Extend `scripts/evaluate_retrieval.py` to include the new strategy when any
-   optional dependency is installed.
+   optional dependency is installed, and keep fixture validation mandatory for
+   all candidate strategies.
 5. Keep `hybrid` as default until larger-corpus evals prove the new strategy is
    better under recall@k, top-1 hit rate, and no-context accuracy.
 
@@ -85,5 +95,6 @@ default `hybrid` strategy until eval evidence shows a material improvement.
 
 Current state: `persistent_tfidf_v1` is certified as the first local persistence
 upgrade. `local_semantic_hash_store_v1` is the current semantic-store candidate
-for certification. Chroma or model-backed embeddings remain future quality
-upgrades behind the same boundary.
+for certification with matched-term false-positive protection and fixture-shape
+validation. Chroma or model-backed embeddings remain future quality upgrades
+behind the same boundary.

@@ -153,7 +153,15 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert main(["eval", "retrieval", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "RETRIEVAL_EVAL_OK"
-    assert payload["counts"] == {"chunks": 10, "queries": 10, "strategies": 6}
+    assert payload["counts"] == {
+        "chunks": 16,
+        "queries": 19,
+        "positive_queries": 15,
+        "no_context_queries": 4,
+        "expected_bindings": 15,
+        "strategies": 6,
+    }
+    assert payload["fixture_validation"]["status"] == "RETRIEVAL_FIXTURE_OK"
     assert {strategy["strategy"] for strategy in payload["strategies"]} == {
         "lexical",
         "vector",
@@ -166,6 +174,9 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert main(["eval", "retrieval", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "fixture=backend/tests/fixtures/retrieval_eval.json" in text_output
+    assert "positive_queries=15" in text_output
+    assert "no_context_queries=4" in text_output
+    assert "fixture_validation=RETRIEVAL_FIXTURE_OK" in text_output
     assert "hybrid recall@5=" in text_output
     assert "semantic recall@5=" in text_output
     assert "RETRIEVAL_EVAL_OK" in text_output
@@ -178,6 +189,41 @@ def test_cli_eval_retrieval_fails_when_thresholds_are_not_met(tmp_path: Path, ca
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "RETRIEVAL_EVAL_FAILED"
     assert payload["min_hybrid_recall"] == 1.1
+
+
+def test_cli_eval_retrieval_fails_on_invalid_fixture(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    fixture = tmp_path / "invalid_retrieval_eval.json"
+    fixture.write_text(
+        json.dumps(
+            {
+                "chunks": [{"chunk_id": "known", "source_id": "source", "chunk_index": 0, "text": "known text"}],
+                "queries": [{"query": "unknown binding", "expected_chunk_ids": ["missing"]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["eval", "retrieval", "--fixture", str(fixture), "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RETRIEVAL_EVAL_INVALID"
+    checks = {check["name"]: check for check in payload["fixture_validation"]["checks"]}
+    assert checks["fixture_size"]["status"] == "FAIL"
+    assert checks["expected_chunk_bindings"]["status"] == "FAIL"
+    assert checks["negative_cases"]["status"] == "FAIL"
+
+
+def test_cli_eval_retrieval_fails_on_non_object_fixture(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    fixture = tmp_path / "array_retrieval_eval.json"
+    fixture.write_text("[]\n", encoding="utf-8")
+
+    assert main(["eval", "retrieval", "--fixture", str(fixture), "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RETRIEVAL_EVAL_INVALID"
+    checks = {check["name"]: check for check in payload["fixture_validation"]["checks"]}
+    assert checks["fixture_shape"]["status"] == "FAIL"
+    assert checks["fixture_shape"]["detail"] == "fixture_type=list chunks_type=missing queries_type=missing"
 
 
 def write_package_fixture(root: Path, *, frontend_version: str = "0.1.23", lock_version: str | None = None) -> None:

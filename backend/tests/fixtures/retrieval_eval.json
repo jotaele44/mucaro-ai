@@ -55,6 +55,42 @@
       "text": "The local operator auth boundary is optional. When MUCARO_AI_OPERATOR_TOKEN is set, mutating API routes require a bearer or X-Mucaro-Token header."
     },
     {
+      "chunk_id": "eval_package_status",
+      "source_id": "eval_source_packaging",
+      "chunk_index": 0,
+      "text": "Package status checks required package inputs, Python and frontend metadata, frontend lockfile consistency, version consistency, CLI entrypoint, launcher entrypoint, and distribution blockers."
+    },
+    {
+      "chunk_id": "eval_retrieval_fixture",
+      "source_id": "eval_source_retrieval_eval",
+      "chunk_index": 0,
+      "text": "Retrieval evaluation fixtures must preserve unique chunk IDs, valid expected chunk bindings, positive queries, no-context queries, and transparent benchmark counts."
+    },
+    {
+      "chunk_id": "eval_memory_controls",
+      "source_id": "eval_source_memory",
+      "chunk_index": 0,
+      "text": "Explicit memory controls let operators remember local notes, list memory items, disable a memory item without deleting it, re-enable it, export it, or delete it."
+    },
+    {
+      "chunk_id": "eval_tool_audit",
+      "source_id": "eval_source_tools",
+      "chunk_index": 0,
+      "text": "Approved local tool execution records a pending request, requires explicit approval before running, preserves denial events, and stores audit entries for tool calls."
+    },
+    {
+      "chunk_id": "eval_media_metadata",
+      "source_id": "eval_source_media",
+      "chunk_index": 0,
+      "text": "Image, audio, and video ingestion is metadata-only in the current baseline; it records file hashes and media metadata but does not perform semantic media understanding."
+    },
+    {
+      "chunk_id": "eval_governance_ci",
+      "source_id": "eval_source_governance",
+      "chunk_index": 0,
+      "text": "Governed release certification separates local release success from hosted GitHub Actions proof; startup_failure before jobs blocks tag readiness even when local gates pass."
+    },
+    {
       "chunk_id": "eval_distractor_runtime",
       "source_id": "eval_source_distractor",
       "chunk_index": 0,
@@ -71,6 +107,15 @@
     {"query": "How does persistent retrieval know an index is stale?", "expected_chunk_ids": ["eval_persistent_index"]},
     {"query": "How are follow-up chat questions given prior context?", "expected_chunk_ids": ["eval_chat_history"]},
     {"query": "What protects local mutating API routes when configured?", "expected_chunk_ids": ["eval_operator_auth"]},
-    {"query": "What is the moon made of?", "expected_chunk_ids": []}
+    {"query": "Which package readiness command checks the frontend lockfile?", "expected_chunk_ids": ["eval_package_status"]},
+    {"query": "Which retrieval fixture safeguards prevent misleading benchmark scores?", "expected_chunk_ids": ["eval_retrieval_fixture"]},
+    {"query": "How can a memory item be turned off without deletion?", "expected_chunk_ids": ["eval_memory_controls"]},
+    {"query": "What has to happen before a local tool call runs?", "expected_chunk_ids": ["eval_tool_audit"]},
+    {"query": "What does media ingestion understand about images and audio?", "expected_chunk_ids": ["eval_media_metadata"]},
+    {"query": "Why can local release pass while tag readiness is blocked?", "expected_chunk_ids": ["eval_governance_ci"]},
+    {"query": "What is the moon made of?", "expected_chunk_ids": []},
+    {"query": "Who won the alpine ski race?", "expected_chunk_ids": []},
+    {"query": "What flavor is the wedding cake?", "expected_chunk_ids": []},
+    {"query": "How tall is Mount Everest?", "expected_chunk_ids": []}
   ]
 }

@@ -158,6 +158,9 @@ def query_semantic_store(query: str, store: dict[str, Any], *, top_k: int) -> li
         tokens = entry.get("tokens", [])
         if not isinstance(chunk, dict) or not isinstance(embedding, list):
             continue
+        matched_terms = sorted(q_tokens.intersection(set(tokens))) if isinstance(tokens, list) else []
+        if not matched_terms:
+            continue
         score = cosine_similarity(
             {str(index): value for index, value in enumerate(query_embedding) if value},
             {str(index): float(value) for index, value in enumerate(embedding) if value},
@@ -168,7 +171,7 @@ def query_semantic_store(query: str, store: dict[str, Any], *, top_k: int) -> li
         item["score"] = round(score, 6)
         item["semantic_score"] = round(score, 6)
         item["retrieval_strategy"] = STORE_VERSION
-        item["matched_terms"] = sorted(q_tokens.intersection(set(tokens)))[:20] if isinstance(tokens, list) else []
+        item["matched_terms"] = matched_terms[:20]
         scored.append(item)
     return sorted(
         scored,

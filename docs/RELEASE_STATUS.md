@@ -8,9 +8,9 @@ hardening, parser evidence, retrieval evaluation gates, explicit live-model
 routing, frontend evidence display, and an explicit persistent local TF-IDF
 retrieval strategy backed by `data/indexes/tfidf_index.json`. Post-baseline
 operator upgrades add source deletion/reindexing, retrieval strategy selection
-in the UI, expanded retrieval eval coverage, optional local operator auth,
-workspace profiles, structured run history, conversation rename/delete/search,
-desktop package self-testing, CLI `--version`, early `ask --top-k`
+in the UI, expanded retrieval eval coverage with fixture validation, optional
+local operator auth, workspace profiles, structured run history, conversation
+rename/delete/search, desktop package self-testing, CLI `--version`, early `ask --top-k`
 validation, CLI source/index management, CLI conversation management, CLI
 run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
 executable product-gap auditing, an opt-in local semantic embedding store,
@@ -88,7 +88,9 @@ Observed success markers:
   GitHub-governed baseline remains open and untagged.
 - `mucaro eval retrieval` exposes the retrieval-quality fixture through the
   supported CLI boundary while `scripts/evaluate_retrieval.py` remains a
-  compatibility wrapper for release automation.
+  compatibility wrapper for release automation. The fixture gate validates
+  benchmark shape, unique chunk IDs, expected chunk bindings, and positive plus
+  no-context coverage before scoring strategies.
 - `mucaro package status` exposes package metadata, version consistency,
   launcher entrypoint, desktop package manifest, optional generated outputs, and
   current distribution blockers through the supported CLI boundary while
@@ -103,7 +105,9 @@ Observed success markers:
   `startup_failure` with `0` jobs and no logs, so the active hosted blocker is
   at the GitHub Actions startup/account/repository-runner layer, not in the
   Python, Node, checkout, or release-certification steps.
-- Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, BM25, hybrid, persistent, and semantic strategies across the expanded corpus
+- Retrieval eval gate: `RETRIEVAL_EVAL_OK` with `RETRIEVAL_FIXTURE_OK` for
+  lexical, vector, BM25, hybrid, persistent, and semantic strategies across 16
+  chunks, 19 queries, 15 positive queries, and 4 no-context queries.
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
 - `CITATION_OK`

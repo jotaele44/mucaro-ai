@@ -238,10 +238,12 @@ automation should fail while any product gap remains open.
 
 Use `mucaro eval retrieval` to run the committed retrieval-quality fixture from
 the supported CLI surface. The command reports the fixture path, chunk/query
-counts, evaluated strategy count, recall thresholds, per-strategy `recall@k`,
-top-1 hit rate, and no-context accuracy. It returns
+counts, positive/no-context query counts, expected binding counts, fixture
+validation checks, evaluated strategy count, recall thresholds, per-strategy
+`recall@k`, top-1 hit rate, and no-context accuracy. It returns
+`RETRIEVAL_EVAL_INVALID` for malformed benchmark fixtures and
 `RETRIEVAL_EVAL_FAILED` when configured thresholds are not met, so release
-automation can fail on measurable retrieval regressions.
+automation can fail on invalid or regressed retrieval evidence.
 
 Use `mucaro package status` to inspect packaging readiness without writing
 artifacts. The command checks required package inputs, Python/frontend package
@@ -253,7 +255,7 @@ inputs, `PACKAGE_WARN` for incomplete distribution readiness, and
 
 ## Retrieval Strategies
 
-`mucaro ask` defaults to `--strategy hybrid`, which recomputes deterministic lexical and TF-IDF scores from the current chunk file. Use `--strategy bm25` for local BM25 ranking, `--strategy persistent` to query the local persisted TF-IDF index, or `--strategy semantic` to query the local embedding store built during ingestion. Persistent and semantic retrieval fail closed when their stores are missing or stale; run `mucaro sources reindex` after ingesting sources to rebuild them.
+`mucaro ask` defaults to `--strategy hybrid`, which recomputes deterministic lexical and TF-IDF scores from the current chunk file. Use `--strategy bm25` for local BM25 ranking, `--strategy persistent` to query the local persisted TF-IDF index, or `--strategy semantic` to query the local embedding store built during ingestion. The local semantic hash store requires matched terms before returning a cited chunk, reducing false-positive context from hash similarity alone. Persistent and semantic retrieval fail closed when their stores are missing or stale; run `mucaro sources reindex` after ingesting sources to rebuild them.
 
 Use `mucaro index status` to check whether the persistent index and semantic
 store are usable. Use `mucaro sources reindex` to rebuild them from current

@@ -465,7 +465,19 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         if isinstance(counts, dict):
             print(f"chunks={counts.get('chunks')}")
             print(f"queries={counts.get('queries')}")
+            if "positive_queries" in counts:
+                print(f"positive_queries={counts.get('positive_queries')}")
+            if "no_context_queries" in counts:
+                print(f"no_context_queries={counts.get('no_context_queries')}")
+            if "expected_bindings" in counts:
+                print(f"expected_bindings={counts.get('expected_bindings')}")
             print(f"strategies={counts.get('strategies')}")
+        fixture_validation = payload.get("fixture_validation", {})
+        if isinstance(fixture_validation, dict):
+            print(f"fixture_validation={fixture_validation.get('status')}")
+            for check in fixture_validation.get("checks", []):
+                detail = str(check.get("detail")).replace("\n", "\\n")
+                print(f"{check.get('status')} {check.get('name')} {detail}")
         print(f"min_hybrid_recall={payload.get('min_hybrid_recall')}")
         print(f"min_semantic_recall={payload.get('min_semantic_recall')}")
         print(f"min_semantic_no_context={payload.get('min_semantic_no_context')}")
