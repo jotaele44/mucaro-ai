@@ -101,6 +101,12 @@ operator UX, and regression tests for approval and audit behavior.
 
 The desktop package flow is validated by `scripts/package_desktop.py --self-test`. It verifies launcher, bootstrap, frontend lockfile, and package metadata inputs without writing generated artifacts during certification.
 
+`mucaro package status` exposes a faster read-only packaging receipt over the
+same package inputs plus Python/frontend version consistency, CLI entrypoint,
+launcher entrypoint, optional generated outputs, and current distribution
+blockers. The script and CLI share packaging logic through
+`backend.app.packaging`.
+
 ## Conversation layer
 
 Conversations are local SQLite-backed chat sessions. The `/conversations` API creates and lists sessions; `PATCH /conversations/{conversation_id}` renames sessions; `DELETE /conversations/{conversation_id}` removes a session record; `/conversations/{conversation_id}/ask` routes through the same cited RAG service as `/ask`, passes recent turns as bounded conversation context, and appends the user turn plus assistant answer to the selected session.

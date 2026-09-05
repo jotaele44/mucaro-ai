@@ -180,6 +180,105 @@ def test_cli_eval_retrieval_fails_when_thresholds_are_not_met(tmp_path: Path, ca
     assert payload["min_hybrid_recall"] == 1.1
 
 
+def write_package_fixture(root: Path, *, frontend_version: str = "0.1.23", lock_version: str | None = None) -> None:
+    (root / "scripts").mkdir(parents=True)
+    (root / "frontend").mkdir(parents=True)
+    (root / "pyproject.toml").write_text(
+        """
+[project]
+name = "mucaro-ai"
+version = "0.1.23"
+
+[project.scripts]
+mucaro = "backend.app.cli:main"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    (root / "README.md").write_text("# Mucaro AI\n", encoding="utf-8")
+    for path in [
+        "scripts/mucaro.py",
+        "scripts/launch_app.py",
+        "scripts/bootstrap_macos.sh",
+        "scripts/bootstrap_windows.ps1",
+        "scripts/certify_release.py",
+        "scripts/certify_fresh_clone.py",
+        "scripts/package_desktop.py",
+    ]:
+        (root / path).write_text("# fixture\n", encoding="utf-8")
+    (root / "frontend" / "package.json").write_text(
+        json.dumps({"name": "mucaro-ai-frontend", "version": frontend_version}),
+        encoding="utf-8",
+    )
+    (root / "frontend" / "package-lock.json").write_text(
+        json.dumps(
+            {
+                "name": "mucaro-ai-frontend",
+                "version": lock_version or frontend_version,
+                "packages": {
+                    "": {
+                        "name": "mucaro-ai-frontend",
+                        "version": lock_version or frontend_version,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_cli_package_status_reports_packaging_readiness(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+
+    assert main(["package", "status", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "PACKAGE_WARN"
+    assert payload["python_package"]["name"] == "mucaro-ai"
+    assert payload["python_package"]["entrypoint"] == "backend.app.cli:main"
+    assert payload["frontend_package"]["version"] == "0.1.23"
+    assert checks["required_package_inputs"]["status"] == "PASS"
+    assert checks["version_consistency"]["status"] == "PASS"
+    assert checks["frontend_lockfile"]["status"] == "PASS"
+    assert checks["generated_outputs"]["status"] == "WARN"
+    assert checks["distribution_policy"]["status"] == "WARN"
+
+    assert main(["package", "status", "--strict", "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "PACKAGE_WARN" in text_output
+    assert "PASS cli_entrypoint backend.app.cli:main" in text_output
+    assert "WARN distribution_policy" in text_output
+
+
+def test_cli_package_status_fails_on_version_mismatch(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path, frontend_version="0.1.99")
+
+    assert main(["package", "status", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "PACKAGE_FAIL"
+    assert checks["version_consistency"]["status"] == "FAIL"
+    assert checks["version_consistency"]["detail"] == "pyproject=0.1.23 frontend=0.1.99"
+
+
+def test_cli_package_status_fails_on_stale_frontend_lockfile(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path, lock_version="0.1.22")
+
+    assert main(["package", "status", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "PACKAGE_FAIL"
+    assert checks["frontend_lockfile"]["status"] == "FAIL"
+    assert checks["frontend_lockfile"]["detail"] == (
+        "package=mucaro-ai-frontend:0.1.22 "
+        "root=mucaro-ai-frontend:0.1.22 "
+        "expected=mucaro-ai-frontend:0.1.23"
+    )
+
+
 def test_cli_certify_status_reports_release_readiness(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 

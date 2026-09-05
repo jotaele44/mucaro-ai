@@ -55,6 +55,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro memory delete MEMORY_ID` | Delete one memory item | 0 | 2 |
 | `mucaro memory export` | Export all explicit memory items | 0 | 2 |
 | `mucaro security status` | Inspect local or production security readiness | 0 | 2 |
+| `mucaro package status` | Inspect packaging and distribution readiness | 0 | 2 on failures, or with `--strict` warnings/failures |
 | `mucaro tools list` | List locally allowlisted tools | 0 | 2 |
 | `mucaro tools request TOOL_NAME` | Create a pending tool-call request | 0 | 2 |
 | `mucaro tools approve TOOL_CALL_ID` | Approve a pending tool call | 0 | 2 |
@@ -241,6 +242,14 @@ counts, evaluated strategy count, recall thresholds, per-strategy `recall@k`,
 top-1 hit rate, and no-context accuracy. It returns
 `RETRIEVAL_EVAL_FAILED` when configured thresholds are not met, so release
 automation can fail on measurable retrieval regressions.
+
+Use `mucaro package status` to inspect packaging readiness without writing
+artifacts. The command checks required package inputs, Python/frontend package
+metadata, version consistency, the installed CLI entrypoint, desktop launcher
+entrypoint, desktop package manifest readiness, optional generated outputs, and
+known distribution blockers. It reports `PACKAGE_FAIL` for broken required
+inputs, `PACKAGE_WARN` for incomplete distribution readiness, and
+`PACKAGE_READY` only when no packaging warnings remain.
 
 ## Retrieval Strategies
 

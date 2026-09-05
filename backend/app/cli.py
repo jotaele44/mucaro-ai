@@ -40,6 +40,7 @@ from .memory import (
     remember_memory_item,
     set_memory_enabled,
 )
+from .packaging import build_package_status
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -368,6 +369,14 @@ def build_parser() -> argparse.ArgumentParser:
     index_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     index_status.set_defaults(handler=run_index_status)
 
+    package_cmd = subcommands.add_parser("package", help="Inspect packaging and distribution readiness.")
+    package_subcommands = package_cmd.add_subparsers(dest="package_command", required=True)
+
+    package_status = package_subcommands.add_parser("status", help="Show packaging readiness without writing artifacts.")
+    package_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    package_status.add_argument("--strict", action="store_true", help="Exit nonzero when warnings or failures are present.")
+    package_status.set_defaults(handler=run_package_status)
+
     permissions = subcommands.add_parser("permissions", help="Manage user-directory access grants.")
     permissions_subcommands = permissions.add_subparsers(dest="permission_command", required=True)
 
@@ -462,6 +471,20 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"min_semantic_no_context={payload.get('min_semantic_no_context')}")
         for line in format_retrieval_eval_text(payload)[:-1]:
             print(line)
+    elif status in {"PACKAGE_READY", "PACKAGE_WARN", "PACKAGE_FAIL"}:
+        print(f"project_root={payload.get('project_root')}")
+        python_package = payload.get("python_package", {})
+        frontend_package = payload.get("frontend_package", {})
+        if isinstance(python_package, dict):
+            print(f"python_package={python_package.get('name')}:{python_package.get('version')}")
+            print(f"cli_entrypoint={python_package.get('entrypoint')}")
+        if isinstance(frontend_package, dict):
+            print(f"frontend_package={frontend_package.get('name')}:{frontend_package.get('version')}")
+        for check in payload.get("checks", []):
+            detail = str(check.get("detail")).replace("\n", "\\n")
+            print(f"{check.get('status')} {check.get('name')} {detail}")
+        for command in payload.get("next_commands", []):
+            print(f"command={command}")
     elif status in {"DOCTOR_OK", "DOCTOR_WARN", "DOCTOR_FAIL"}:
         summary = payload.get("summary", {})
         if isinstance(summary, dict):
@@ -862,6 +885,16 @@ def run_eval_retrieval(args: argparse.Namespace, cfg: Settings) -> int:
     )
     emit_payload(report, args.format)
     return 0 if report["status"] == "RETRIEVAL_EVAL_OK" else 2
+
+
+def run_package_status(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_package_status(cfg.project_root)
+    emit_payload(report, args.format)
+    if report["status"] == "PACKAGE_FAIL":
+        return 2
+    if args.strict and report["status"] != "PACKAGE_READY":
+        return 2
+    return 0
 
 
 def _git_output(cfg: Settings, args: list[str]) -> tuple[bool, str]:

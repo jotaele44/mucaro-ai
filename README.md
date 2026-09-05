@@ -236,6 +236,10 @@ top-1 hit rate, no-context accuracy, fixture counts, and threshold settings;
 release automation still calls `scripts/evaluate_retrieval.py`, which delegates
 to the same evaluator module.
 
+Use `mucaro package status --format text` to inspect package metadata, version
+consistency, launcher entrypoints, desktop package manifest readiness, optional
+generated outputs, and distribution blockers without writing artifacts.
+
 The browser app includes the same permission workflow in the Directory Access panel.
 
 The CLI can also inspect and maintain the local source library: `mucaro sources
