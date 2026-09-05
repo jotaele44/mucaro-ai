@@ -3,18 +3,21 @@
 This document records the current hosted-CI blocker for the `v0.1.23`
 governance candidate.
 
-## Current State
+## Diagnostic Scope
 
 - Repository: `jotaele44/mucaro-ai`
 - Branch: `main`
-- Current HEAD: `8baef57c3188990c29bf7cb83ad3003aa1828d18`
 - Local release gate: `CERTIFY_RELEASE_OK`
 - Exact-SHA fresh-clone gate: `FRESH_CLONE_CERT_OK`
 - GitHub governance gate: `CERTIFICATION_FAIL`
 - Blocking gate: `github_latest_ci`
 
-The latest named `CI` run for the current HEAD completed with
-`startup_failure` before GitHub created jobs or logs:
+Use `git rev-parse HEAD` before each release attempt; documentation commits move
+the live HEAD, so the exact release candidate SHA must be re-bound at the time
+of certification.
+
+The named `CI` workflow has repeatedly completed with `startup_failure` before
+GitHub created jobs or logs. Diagnostic examples:
 
 ```text
 workflow=CI
@@ -26,13 +29,34 @@ conclusion=startup_failure
 jobs=0
 ```
 
-The manual-only `CI Startup Probe` workflow also failed before jobs or logs:
+```text
+workflow=CI
+run=33972734825
+event=workflow_dispatch
+head_sha=5d5711a26e668d468523fb47774cdcdbf8b3a052
+status=completed
+conclusion=startup_failure
+jobs=0
+```
+
+The manual-only `CI Startup Probe` workflow also failed before jobs or logs.
+Diagnostic examples:
 
 ```text
 workflow=CI Startup Probe
 run=33972500645
 event=workflow_dispatch
 head_sha=b70c5a859a879e651304091b57505b74c49f6953
+status=completed
+conclusion=startup_failure
+jobs=0
+```
+
+```text
+workflow=CI Startup Probe
+run=33972734765
+event=workflow_dispatch
+head_sha=5d5711a26e668d468523fb47774cdcdbf8b3a052
 status=completed
 conclusion=startup_failure
 jobs=0

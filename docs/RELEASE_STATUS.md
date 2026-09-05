@@ -81,8 +81,8 @@ Observed success markers:
   `f48828b8dd5648554b65dba1ca86a07db099f7d3`, including clean clone install,
   CLI help, launcher self-test, and desktop smoke test.
 - `mucaro certify status --include-github` now fails closed when the latest
-  hosted CI run for the current HEAD completes unsuccessfully. The current
-  GitHub-hosted `CI` run for commit
+  hosted CI run for the current HEAD completes unsuccessfully. A GitHub-hosted
+  `CI` run for commit
   `f48828b8dd5648554b65dba1ca86a07db099f7d3` reports `startup_failure`, so the
   GitHub-governed baseline remains open and untagged.
 - A manual-only `CI Startup Probe` workflow was added to isolate hosted runner
