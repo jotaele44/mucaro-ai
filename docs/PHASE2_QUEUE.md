@@ -25,7 +25,7 @@
 | Cross-repo orchestration | Invoke contract-bound domain capabilities while preserving repo autonomy | Blocked on federation execution environment |
 | Chroma integration | Persistent embedding/vector store for larger corpora | Planned in `docs/RETRIEVAL_UPGRADE_PLAN.md`; queued after larger eval corpus |
 | LlamaIndex ingestion | Richer document ingestion and node parsing | Queued |
-| Unstructured parser expansion | Better PDFs, richer DOCX/HTML extraction, emails, and model-backed media understanding beyond metadata | Queued |
+| Unstructured parser expansion | Better PDFs, richer DOCX/HTML extraction, Outlook MSG, email attachment extraction, and model-backed media understanding beyond metadata | Queued |
 | GraphRAG entity layer | People/org/place/event graph extraction | Queued |
 | MCP adapter | External protocol adapter beneath the Skill Fabric; not a separate authority model | Queued |
 | PostGIS/GIS service adapter | Spatial source lineage and map exports behind explicit service capability | Queued |

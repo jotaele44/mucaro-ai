@@ -18,3 +18,9 @@ DOCX inputs also follow the same chain. The parser reads the local OpenXML
 package, extracts visible paragraph and table text from `word/document.xml`, and
 preserves paragraph count, table count, text length, parser ID, parser warnings,
 and available core document properties in the source manifest.
+
+EML inputs also follow the same chain. The parser reads local RFC 822/MIME
+messages, extracts selected headers and body text for chunking, preserves body
+part counts, attachment counts, attachment names/content types, parser ID, and
+parser warnings in the source manifest, and records skipped attachments
+explicitly instead of folding them into the message body.

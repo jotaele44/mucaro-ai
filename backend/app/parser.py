@@ -3,6 +3,9 @@ from __future__ import annotations
 import csv
 import json
 import zipfile
+from email import policy
+from email.message import Message
+from email.parser import BytesParser
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
@@ -133,6 +136,7 @@ def detect_mime(path: Path) -> str:
         ".html": "text/html",
         ".htm": "text/html",
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".eml": "message/rfc822",
         ".csv": "text/csv",
         ".json": "application/json",
         ".pdf": "application/pdf",
@@ -179,6 +183,8 @@ def parse_file(path: Path) -> dict[str, Any]:
             return _parse_html(path)
         if suffix == ".docx":
             return _parse_docx(path)
+        if suffix == ".eml":
+            return _parse_eml(path)
         if suffix == ".pdf":
             return _parse_pdf(path)
         if suffix in MULTIMODAL_SUFFIXES:
@@ -342,6 +348,100 @@ def _parse_docx(path: Path) -> dict[str, Any]:
                 core_properties=_docx_core_metadata(archive),
             ),
         }
+
+
+def _email_headers(message: Message) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    for source, target in [
+        ("subject", "subject"),
+        ("from", "from"),
+        ("to", "to"),
+        ("cc", "cc"),
+        ("date", "date"),
+        ("message-id", "message_id"),
+    ]:
+        value = message.get(source)
+        if value:
+            headers[target] = str(value)
+    return headers
+
+
+def _email_payload_text(part: Message) -> str:
+    payload = part.get_payload(decode=True)
+    if payload is None:
+        raw_payload = part.get_payload()
+        return raw_payload if isinstance(raw_payload, str) else ""
+    charset = part.get_content_charset() or "utf-8"
+    return payload.decode(charset, errors="replace")
+
+
+def _email_html_text(raw_html: str) -> str:
+    parser = _HTMLTextExtractor()
+    parser.feed(raw_html)
+    parser.close()
+    return parser.text
+
+
+def _parse_eml(path: Path) -> dict[str, Any]:
+    message = BytesParser(policy=policy.default).parsebytes(path.read_bytes())
+    text_parts: list[str] = []
+    html_parts: list[str] = []
+    attachments: list[dict[str, str]] = []
+    body_part_count = 0
+    parts = list(message.walk()) if message.is_multipart() else [message]
+    for part in parts:
+        if part.is_multipart():
+            continue
+        content_disposition = (part.get_content_disposition() or "").lower()
+        content_type = part.get_content_type()
+        filename = part.get_filename()
+        if content_disposition == "attachment" or filename:
+            attachments.append(
+                {
+                    "filename": str(filename or ""),
+                    "content_type": content_type,
+                }
+            )
+            continue
+        if content_type == "text/plain":
+            body_part_count += 1
+            text = _email_payload_text(part).strip()
+            if text:
+                text_parts.append(text)
+        elif content_type == "text/html":
+            body_part_count += 1
+            text = _email_html_text(_email_payload_text(part)).strip()
+            if text:
+                html_parts.append(text)
+
+    warnings: list[str] = []
+    if attachments:
+        warnings.append(f"EMAIL_ATTACHMENTS_SKIPPED:{len(attachments)}")
+    if text_parts:
+        body_text = "\n\n".join(text_parts)
+    elif html_parts:
+        body_text = "\n\n".join(html_parts)
+        warnings.append("EMAIL_HTML_BODY_USED")
+    else:
+        body_text = ""
+        warnings.append("EMAIL_NO_BODY_TEXT")
+    headers = _email_headers(message)
+    header_lines = [f"{key}: {value}" for key, value in headers.items()]
+    text = "\n".join(header_lines + ([""] if header_lines and body_text else []) + ([body_text] if body_text else [])).strip()
+    return {
+        "text": text,
+        **_base_result(
+            path,
+            parser="email_rfc822_v1",
+            mime_type="message/rfc822",
+            warnings=warnings,
+            headers=headers,
+            body_part_count=body_part_count,
+            attachment_count=len(attachments),
+            attachments=attachments,
+            text_length=len(text),
+        ),
+    }
 
 
 def _parse_pdf(path: Path) -> dict[str, Any]:

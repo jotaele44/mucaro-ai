@@ -171,6 +171,97 @@ def test_ingest_docx_manifest_includes_parser_evidence(tmp_path: Path):
     assert result["chunks_added"] == 1
 
 
+def test_eml_parser_extracts_plain_body_headers_and_attachment_metadata(tmp_path: Path):
+    path = tmp_path / "brief.eml"
+    path.write_text(
+        "\n".join(
+            [
+                "From: sender@example.test",
+                "To: reviewer@example.test",
+                "Subject: Mucaro Email Brief",
+                "Date: Sat, 05 Sep 2026 18:00:00 -0400",
+                "Message-ID: <brief@example.test>",
+                "MIME-Version: 1.0",
+                'Content-Type: multipart/mixed; boundary="outer"',
+                "",
+                "--outer",
+                "Content-Type: text/plain; charset=utf-8",
+                "",
+                "Email source lineage requires cited chunks.",
+                "--outer",
+                "Content-Type: application/pdf",
+                'Content-Disposition: attachment; filename="evidence.pdf"',
+                "",
+                "placeholder",
+                "--outer--",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = parse_file(path)
+
+    assert result["parser"] == "email_rfc822_v1"
+    assert result["mime_type"] == "message/rfc822"
+    assert result["headers"]["subject"] == "Mucaro Email Brief"
+    assert result["headers"]["message_id"] == "<brief@example.test>"
+    assert result["body_part_count"] == 1
+    assert result["attachment_count"] == 1
+    assert result["attachments"] == [{"filename": "evidence.pdf", "content_type": "application/pdf"}]
+    assert "EMAIL_ATTACHMENTS_SKIPPED:1" in result["warnings"]
+    assert result["parse_status"] == "PARTIAL"
+    assert "Email source lineage requires cited chunks." in result["text"]
+    assert "placeholder" not in result["text"]
+    assert result["text_length"] == len(result["text"])
+
+
+def test_eml_parser_uses_html_body_when_plain_text_is_missing(tmp_path: Path):
+    path = tmp_path / "html-only.eml"
+    path.write_text(
+        "\n".join(
+            [
+                "From: sender@example.test",
+                "To: reviewer@example.test",
+                "Subject: HTML Email Brief",
+                "MIME-Version: 1.0",
+                "Content-Type: text/html; charset=utf-8",
+                "",
+                "<html><body><h1>HTML Mail</h1><p>Cited &amp; decoded body.</p></body></html>",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = parse_file(path)
+
+    assert result["parser"] == "email_rfc822_v1"
+    assert result["body_part_count"] == 1
+    assert result["attachment_count"] == 0
+    assert "EMAIL_HTML_BODY_USED" in result["warnings"]
+    assert "HTML Mail" in result["text"]
+    assert "Cited & decoded body." in result["text"]
+
+
+def test_ingest_eml_manifest_includes_parser_evidence(tmp_path: Path):
+    cfg = make_settings(tmp_path / "proj")
+    src = tmp_path / "brief.eml"
+    src.write_text(
+        "From: sender@example.test\nTo: reviewer@example.test\nSubject: Brief\n\nCited email source.",
+        encoding="utf-8",
+    )
+
+    result = ingest_file(src, cfg)
+    source = result["source"]
+
+    assert source["mime_type"] == "message/rfc822"
+    assert source["parser"] == "email_rfc822_v1"
+    assert source["parser_metadata"]["headers"]["subject"] == "Brief"
+    assert source["parser_metadata"]["body_part_count"] == 1
+    assert source["parser_metadata"]["attachment_count"] == 0
+    assert source["lineage_status"] == "VALID"
+    assert result["chunks_added"] == 1
+
+
 def test_invalid_json_raises_parse_error(tmp_path: Path):
     path = tmp_path / "bad.json"
     path.write_text('{"broken": ', encoding="utf-8")

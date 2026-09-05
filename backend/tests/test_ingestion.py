@@ -90,15 +90,17 @@ def test_ingest_folder_accepts_media_and_html_files(tmp_path: Path):
     (folder / "note.md").write_text("Source lineage remains text grounded.", encoding="utf-8")
     (folder / "brief.html").write_text("<html><body><p>HTML source lineage remains grounded.</p></body></html>", encoding="utf-8")
     write_minimal_docx(folder / "brief.docx")
+    (folder / "brief.eml").write_text("From: sender@example.test\nSubject: EML Brief\n\nEmail folder ingest source.", encoding="utf-8")
     (folder / "sample.png").write_bytes(minimal_png())
 
     result = ingest_folder(folder, cfg)
 
     assert result["status"] == "INGEST_FOLDER_OK"
-    assert result["files_ingested"] == 4
+    assert result["files_ingested"] == 5
     assert {item["source"]["parser"] for item in result["results"]} == {
         "text_utf8",
         "html_text_v1",
         "docx_text_v1",
+        "email_rfc822_v1",
         "image_metadata_v1",
     }
