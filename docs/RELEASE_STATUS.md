@@ -25,9 +25,10 @@ repairs fresh-clone certification for exact commit SHAs.
 The current development candidate adds optional read-only GitHub governance
 checks to `mucaro certify status --include-github`, covering branch protection,
 latest hosted CI on the current branch for a named workflow, and remote tag
-binding without mutating GitHub repository settings. The CI workflow also supports manual
-`workflow_dispatch` runs so a release operator can recover when a push-triggered
-run fails before logs or jobs are available.
+binding without mutating GitHub repository settings. The CI workflow also
+supports explicit manual `workflow_dispatch` runs with bounded runtime so a
+release operator can recover when a push-triggered run fails before logs or jobs
+are available.
 
 Observed success markers:
 
