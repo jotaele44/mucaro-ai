@@ -6,6 +6,7 @@ import sys
 import pytest
 
 import scripts.certify_fresh_clone as certify_fresh_clone
+import scripts.certify_release as certify_release
 import scripts.launch_app as launch_app
 
 
@@ -31,6 +32,32 @@ def test_package_desktop_self_test():
     )
     assert proc.returncode == 0
     assert "DESKTOP_PACKAGE_READY" in proc.stdout
+
+
+def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
+    calls = []
+
+    def fake_tracked_files():
+        return []
+
+    def fake_gate(name, status="PASS", detail="ok"):
+        return certify_release.Gate(name, status, detail)
+
+    def fake_gate_command(name, cmd, *, cwd=certify_release.ROOT):
+        calls.append((name, cmd, cwd))
+        return fake_gate(name)
+
+    monkeypatch.setattr(certify_release, "tracked_files", fake_tracked_files)
+    monkeypatch.setattr(certify_release, "gate_worktree_clean", lambda: fake_gate("worktree_clean"))
+    monkeypatch.setattr(certify_release, "gate_no_prior_names", lambda files: fake_gate("prior_name_residue"))
+    monkeypatch.setattr(certify_release, "gate_no_secret_patterns", lambda files: fake_gate("secret_pattern_scan"))
+    monkeypatch.setattr(certify_release, "gate_no_large_files", lambda files: fake_gate("large_file_scan"))
+    monkeypatch.setattr(certify_release, "gate_no_generated_tracked", lambda files: fake_gate("generated_artifact_scan"))
+    monkeypatch.setattr(certify_release, "gate_command", fake_gate_command)
+
+    assert certify_release.main() == 0
+    assert "CERTIFY_RELEASE_OK" in capsys.readouterr().out
+    assert ("package_artifact", [sys.executable, "scripts/mucaro.py", "package", "build", "--format", "text"], certify_release.ROOT) in calls
 
 
 def test_fresh_clone_uses_shallow_branch_clone_for_named_refs(tmp_path, monkeypatch):

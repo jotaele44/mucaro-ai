@@ -315,7 +315,9 @@ RELEASE_CHECK_OK
 
 ## Certification gate
 
-Use the certification gate before pushing release candidates. It combines source-boundary scans, tests, JSON validation, frontend audit, and frontend build:
+Use the certification gate before pushing release candidates. It combines
+source-boundary scans, tests, retrieval evaluation, JSON validation, desktop
+package self-test, source artifact build, frontend audit, and frontend build:
 
 ```bash
 npm ci --registry=https://registry.npmjs.org/ --prefix frontend

@@ -120,6 +120,7 @@ def main() -> int:
         gate_command("retrieval_eval", [sys.executable, "scripts/evaluate_retrieval.py"]),
         gate_command("json_validation", [sys.executable, "scripts/validate_json.py"]),
         gate_command("desktop_package_self_test", [sys.executable, "scripts/package_desktop.py", "--self-test"]),
+        gate_command("package_artifact", [sys.executable, "scripts/mucaro.py", "package", "build", "--format", "text"]),
         gate_command("npm_audit", ["npm", "audit", "--audit-level=moderate"], cwd=ROOT / "frontend"),
         gate_command("frontend_build", ["npm", "run", "build"], cwd=ROOT / "frontend"),
     ]

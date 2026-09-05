@@ -122,6 +122,7 @@ Excluded by design:
 | Generated artifact scan | PASS: no committed env, venv, node modules, dist, SQLite, exports, pycache, Finder metadata, or generated ingestion artifacts |
 | Backend tests | PASS: 32 tests passed |
 | JSON schema validation | PASS: `JSON_OK checked=7` |
+| Source package artifact | PASS: `PACKAGE_ARTIFACT_READY` |
 | Frontend security audit | PASS: `npm audit --audit-level=moderate` found 0 vulnerabilities |
 | Frontend build | PASS: `npm run build` succeeded |
 | Release certification | PASS: `CERTIFY_RELEASE_OK` |

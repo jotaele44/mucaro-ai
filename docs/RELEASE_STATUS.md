@@ -119,7 +119,7 @@ Observed success markers:
 - `npm audit` reported 0 vulnerabilities after Vite/package-lock repair
 - `npm run build` succeeded
 - `RELEASE_CHECK_OK`
-- `CERTIFY_RELEASE_OK` after dependency install, source-boundary scans, tests, JSON validation, frontend audit, and frontend build
+- `CERTIFY_RELEASE_OK` after dependency install, source-boundary scans, tests, retrieval evaluation, JSON validation, desktop package self-test, source artifact build, frontend audit, and frontend build
 - `FRESH_CLONE_CERT_OK` after temporary clone install, release check, CLI help, launcher self-test, and desktop smoke test
 - GitHub issues #1, #2, and #3 closed with evidence comments
 - GitHub Actions CI passed on the retrieval and CLI hardening commits
