@@ -70,7 +70,7 @@ Candidate target:
   `DESKTOP_PACKAGE_READY`, `npm audit` 0 vulnerabilities, frontend build passed,
   `PRODUCT_AUDIT_OK` at `100.0%`, clean `worktree_clean`, and
   `CERTIFY_RELEASE_OK`.
-- Required external receipt: hosted CI and fresh-clone certification must pass on the final pushed commit before tagging.
+- Required external receipt: hosted CI and fresh-clone certification must pass on the final pushed commit before tagging. Current release candidates must also build `PACKAGE_ARTIFACT_READY` from the same clean source state before a governed tag.
 
 ## Scope
 
@@ -81,6 +81,7 @@ Included:
 
 - Backend source, schemas, tests, scripts, docs, sample inputs, frontend source,
   package lockfile, and CLI packaging metadata.
+- Packaging surface: read-only package readiness status plus governed tracked-source ZIP and JSON manifest generation under `data/exports/packages`.
 - CLI surface: `mucaro ask`, `mucaro ingest`, `mucaro plan`, `mucaro validate`,
   and `mucaro serve`.
 - Retrieval surface: `lexical_v2`, `vector_tfidf_v1`, `bm25_v1`,

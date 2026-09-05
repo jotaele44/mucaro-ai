@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
 import tomllib
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +24,7 @@ REQUIRED_PACKAGE_INPUTS = [
     "scripts/certify_release.py",
     "scripts/certify_fresh_clone.py",
     "scripts/package_desktop.py",
+    "docs/PACKAGING_POLICY.md",
     "frontend/package.json",
     "frontend/package-lock.json",
 ]
@@ -57,6 +61,36 @@ def _relative(path: Path, root: Path) -> str:
         return str(path.relative_to(root))
     except ValueError:
         return str(path)
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _git_output(root: Path, args: list[str]) -> tuple[bool, str]:
+    proc = subprocess.run(
+        ["git", *args],
+        cwd=root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    return proc.returncode == 0, proc.stdout.strip()
+
+
+def _tracked_source_files(root: Path) -> tuple[list[str], str | None]:
+    ok, output = _git_output(root, ["ls-files", "-z"])
+    if not ok:
+        return [], output or "git ls-files failed"
+    files = sorted(path for path in output.split("\0") if path)
+    if not files:
+        return [], "no tracked files"
+    return files, None
 
 
 def build_desktop_package_manifest(root: Path = ROOT) -> dict[str, Any]:
@@ -208,11 +242,25 @@ def build_package_status(root: Path = ROOT) -> dict[str, Any]:
         )
     )
 
+    policy_path = root / "docs" / "PACKAGING_POLICY.md"
+    checks.append(
+        _check(
+            "release_artifact_policy",
+            "PASS" if policy_path.exists() else "FAIL",
+            _relative(policy_path, root),
+        )
+    )
+    checks.append(
+        _check(
+            "distribution_policy",
+            "PASS",
+            "source ZIP plus JSON manifest under data/exports/packages; signed installer deferred",
+        )
+    )
     blockers = [
         "Hosted GitHub Actions startup is unresolved; governed release tags still require hosted CI success.",
-        "Distribution artifact format is not finalized beyond editable install plus desktop launcher smoke path.",
     ]
-    checks.append(_check("distribution_policy", "WARN", "; ".join(blockers)))
+    checks.append(_check("hosted_release_gate", "WARN", blockers[0]))
 
     failed = [check for check in checks if check["status"] == "FAIL"]
     warned = [check for check in checks if check["status"] == "WARN"]
@@ -227,7 +275,134 @@ def build_package_status(root: Path = ROOT) -> dict[str, Any]:
         "blockers": blockers,
         "next_commands": [
             "python3 scripts/package_desktop.py --self-test",
+            "PYTHONPATH=.:backend python3 scripts/mucaro.py package build --format text",
             "python3 scripts/certify_release.py",
             'python3 scripts/certify_fresh_clone.py --ref "$(git rev-parse HEAD)"',
         ],
+    }
+
+
+def build_release_artifacts(
+    root: Path = ROOT,
+    *,
+    output_dir: Path | None = None,
+    allow_dirty: bool = False,
+) -> dict[str, Any]:
+    output_dir = output_dir or root / "data" / "exports" / "packages"
+    checks: list[dict[str, str]] = []
+    package_status = build_package_status(root)
+    failed_package_checks = [check for check in package_status["checks"] if check["status"] == "FAIL"]
+    checks.append(
+        _check(
+            "package_status",
+            "PASS" if not failed_package_checks else "FAIL",
+            package_status["status"],
+        )
+    )
+
+    ok, head_sha = _git_output(root, ["rev-parse", "HEAD"])
+    checks.append(_check("git_head", "PASS" if ok else "FAIL", head_sha or "missing"))
+
+    ok, status_output = _git_output(root, ["status", "--short"])
+    clean = ok and not status_output
+    checks.append(
+        _check(
+            "worktree_clean",
+            "PASS" if clean or allow_dirty else "FAIL",
+            "clean" if clean else status_output or "git status failed",
+        )
+    )
+
+    tracked_files, tracked_error = _tracked_source_files(root)
+    checks.append(
+        _check(
+            "tracked_source_files",
+            "PASS" if tracked_files else "FAIL",
+            f"count={len(tracked_files)}" if tracked_files else str(tracked_error),
+        )
+    )
+
+    pyproject_path = root / "pyproject.toml"
+    try:
+        pyproject = _load_toml(pyproject_path)
+        project = pyproject.get("project", {})
+        version = _string_value(project, "version")
+        name = _string_value(project, "name")
+    except (OSError, tomllib.TOMLDecodeError):
+        version = None
+        name = None
+    checks.append(
+        _check(
+            "artifact_identity",
+            "PASS" if name == PYTHON_PACKAGE_NAME and version else "FAIL",
+            f"name={name} version={version}",
+        )
+    )
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    if failed:
+        return {
+            "status": "PACKAGE_ARTIFACT_BLOCKED",
+            "project_root": str(root),
+            "output_dir": str(output_dir),
+            "checks": checks,
+            "artifact": None,
+            "manifest": None,
+        }
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    assert version is not None
+    assert head_sha is not None
+    archive_path = output_dir / f"{PYTHON_PACKAGE_NAME}-{version}-{head_sha[:12]}-source.zip"
+    manifest_path = output_dir / f"{PYTHON_PACKAGE_NAME}-{version}-{head_sha[:12]}-artifact-manifest.json"
+    archive_root = f"{PYTHON_PACKAGE_NAME}-{version}"
+    members = []
+    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for relative_path in tracked_files:
+            source_path = root / relative_path
+            if not source_path.is_file():
+                continue
+            data = source_path.read_bytes()
+            info = zipfile.ZipInfo(f"{archive_root}/{relative_path}", date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = (source_path.stat().st_mode & 0o777) << 16
+            archive.writestr(info, data)
+            members.append(
+                {
+                    "path": relative_path,
+                    "size_bytes": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                }
+            )
+    manifest = {
+        "status": "PACKAGE_ARTIFACT_READY",
+        "artifact_format": "source_zip_with_json_manifest_v1",
+        "project_root": str(root),
+        "package_name": PYTHON_PACKAGE_NAME,
+        "version": version,
+        "head_sha": head_sha,
+        "dirty_allowed": allow_dirty,
+        "archive_path": str(archive_path),
+        "archive_sha256": _sha256_file(archive_path),
+        "archive_size_bytes": archive_path.stat().st_size,
+        "member_count": len(members),
+        "members": members,
+        "policy": "docs/PACKAGING_POLICY.md",
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+    return {
+        "status": "PACKAGE_ARTIFACT_READY",
+        "project_root": str(root),
+        "output_dir": str(output_dir),
+        "checks": checks,
+        "artifact": {
+            "path": str(archive_path),
+            "sha256": manifest["archive_sha256"],
+            "size_bytes": manifest["archive_size_bytes"],
+        },
+        "manifest": {
+            "path": str(manifest_path),
+            "sha256": _sha256_file(manifest_path),
+            "member_count": len(members),
+        },
     }

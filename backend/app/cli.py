@@ -40,7 +40,7 @@ from .memory import (
     remember_memory_item,
     set_memory_enabled,
 )
-from .packaging import build_package_status
+from .packaging import build_package_status, build_release_artifacts
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -377,6 +377,12 @@ def build_parser() -> argparse.ArgumentParser:
     package_status.add_argument("--strict", action="store_true", help="Exit nonzero when warnings or failures are present.")
     package_status.set_defaults(handler=run_package_status)
 
+    package_build = package_subcommands.add_parser("build", help="Build the governed source-release artifact bundle.")
+    package_build.add_argument("--output-dir", type=Path, default=None, help="Directory for generated package artifacts.")
+    package_build.add_argument("--allow-dirty", action="store_true", help="Allow artifact creation from a dirty worktree.")
+    package_build.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    package_build.set_defaults(handler=run_package_build)
+
     permissions = subcommands.add_parser("permissions", help="Manage user-directory access grants.")
     permissions_subcommands = permissions.add_subparsers(dest="permission_command", required=True)
 
@@ -497,6 +503,22 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"{check.get('status')} {check.get('name')} {detail}")
         for command in payload.get("next_commands", []):
             print(f"command={command}")
+    elif status in {"PACKAGE_ARTIFACT_READY", "PACKAGE_ARTIFACT_BLOCKED"}:
+        print(f"project_root={payload.get('project_root')}")
+        print(f"output_dir={payload.get('output_dir')}")
+        for check in payload.get("checks", []):
+            detail = str(check.get("detail")).replace("\n", "\\n")
+            print(f"{check.get('status')} {check.get('name')} {detail}")
+        artifact = payload.get("artifact")
+        if isinstance(artifact, dict):
+            print(f"artifact_path={artifact.get('path')}")
+            print(f"artifact_sha256={artifact.get('sha256')}")
+            print(f"artifact_size_bytes={artifact.get('size_bytes')}")
+        manifest = payload.get("manifest")
+        if isinstance(manifest, dict):
+            print(f"manifest_path={manifest.get('path')}")
+            print(f"manifest_sha256={manifest.get('sha256')}")
+            print(f"manifest_member_count={manifest.get('member_count')}")
     elif status in {"DOCTOR_OK", "DOCTOR_WARN", "DOCTOR_FAIL"}:
         summary = payload.get("summary", {})
         if isinstance(summary, dict):
@@ -907,6 +929,12 @@ def run_package_status(args: argparse.Namespace, cfg: Settings) -> int:
     if args.strict and report["status"] != "PACKAGE_READY":
         return 2
     return 0
+
+
+def run_package_build(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_release_artifacts(cfg.project_root, output_dir=args.output_dir, allow_dirty=args.allow_dirty)
+    emit_payload(report, args.format)
+    return 0 if report["status"] == "PACKAGE_ARTIFACT_READY" else 2
 
 
 def _git_output(cfg: Settings, args: list[str]) -> tuple[bool, str]:

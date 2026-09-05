@@ -56,6 +56,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro memory export` | Export all explicit memory items | 0 | 2 |
 | `mucaro security status` | Inspect local or production security readiness | 0 | 2 |
 | `mucaro package status` | Inspect packaging and distribution readiness | 0 | 2 on failures, or with `--strict` warnings/failures |
+| `mucaro package build` | Build the governed source ZIP and artifact manifest | 0 | 2 |
 | `mucaro tools list` | List locally allowlisted tools | 0 | 2 |
 | `mucaro tools request TOOL_NAME` | Create a pending tool-call request | 0 | 2 |
 | `mucaro tools approve TOOL_CALL_ID` | Approve a pending tool call | 0 | 2 |
@@ -252,6 +253,12 @@ entrypoint, desktop package manifest readiness, optional generated outputs, and
 known distribution blockers. It reports `PACKAGE_FAIL` for broken required
 inputs, `PACKAGE_WARN` for incomplete distribution readiness, and
 `PACKAGE_READY` only when no packaging warnings remain.
+
+Use `mucaro package build` to create the current governed release artifact: a
+tracked-source ZIP plus JSON manifest under `data/exports/packages`. The command
+refuses dirty worktrees by default, records the exact Git `HEAD`, and includes
+SHA-256 receipts for the archive and every tracked source member. Use
+`--allow-dirty` only for diagnostics, not governed release tags.
 
 ## Retrieval Strategies
 

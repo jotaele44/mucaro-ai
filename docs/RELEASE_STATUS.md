@@ -16,7 +16,7 @@ run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
 executable product-gap auditing, an opt-in local semantic embedding store,
 approval-gated local tool runtime, metadata-only image/audio/video ingestion,
 explicit local memory, CLI-exposed retrieval evaluation, and CLI-exposed
-packaging readiness.
+packaging readiness with a governed source-artifact policy.
 The production-security baseline added profile checks, fail-closed startup
 validation, and public-bind safeguards. The current certification target adds
 CLI certification-readiness status so operators can inspect product audit,
@@ -95,10 +95,15 @@ Observed success markers:
   launcher entrypoint, desktop package manifest, optional generated outputs, and
   current distribution blockers through the supported CLI boundary while
   `scripts/package_desktop.py` remains the desktop-package manifest entrypoint.
+- `mucaro package build` creates the current governed release artifact: a
+  tracked-source ZIP plus JSON manifest under `data/exports/packages`, with
+  exact Git `HEAD`, archive SHA-256, member count, and per-member SHA-256
+  receipts.
 - `mucaro package status` currently reports `PACKAGE_WARN`: required package
   inputs, Python/frontend version consistency, CLI entrypoint, launcher
-  entrypoint, desktop package manifest, and generated outputs pass; hosted
-  GitHub Actions startup and final distribution artifact policy remain open.
+  entrypoint, desktop package manifest, generated outputs, release artifact
+  policy, and distribution policy pass; hosted GitHub Actions startup remains
+  open.
 - A manual-only `CI Startup Probe` workflow was added to isolate hosted runner
   startup from the Mucaro build/test stack. Run `33972500645` for commit
   `b70c5a859a879e651304091b57505b74c49f6953` also reports

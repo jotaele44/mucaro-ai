@@ -107,6 +107,11 @@ launcher entrypoint, optional generated outputs, and current distribution
 blockers. The script and CLI share packaging logic through
 `backend.app.packaging`.
 
+`mucaro package build` creates the current governed release artifact: a
+tracked-source ZIP plus JSON manifest under `data/exports/packages`. The builder
+refuses dirty worktrees unless explicitly overridden, records the exact Git
+`HEAD`, and hashes both the archive and each tracked source member.
+
 ## Conversation layer
 
 Conversations are local SQLite-backed chat sessions. The `/conversations` API creates and lists sessions; `PATCH /conversations/{conversation_id}` renames sessions; `DELETE /conversations/{conversation_id}` removes a session record; `/conversations/{conversation_id}/ask` routes through the same cited RAG service as `/ask`, passes recent turns as bounded conversation context, and appends the user turn plus assistant answer to the selected session.

@@ -241,6 +241,11 @@ Use `mucaro package status --format text` to inspect package metadata, version
 consistency, launcher entrypoints, desktop package manifest readiness, optional
 generated outputs, and distribution blockers without writing artifacts.
 
+Use `mucaro package build --format text` to create the governed source-release
+ZIP and JSON manifest under `data/exports/packages`. The command packages only
+tracked source files, refuses dirty worktrees by default, and records SHA-256
+receipts for the archive and every member.
+
 The browser app includes the same permission workflow in the Directory Access panel.
 
 The CLI can also inspect and maintain the local source library: `mucaro sources

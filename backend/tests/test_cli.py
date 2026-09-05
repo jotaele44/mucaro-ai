@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 import backend.app.cli as cli
@@ -229,6 +230,7 @@ def test_cli_eval_retrieval_fails_on_non_object_fixture(tmp_path: Path, capsys):
 def write_package_fixture(root: Path, *, frontend_version: str = "0.1.23", lock_version: str | None = None) -> None:
     (root / "scripts").mkdir(parents=True)
     (root / "frontend").mkdir(parents=True)
+    (root / "docs").mkdir(parents=True)
     (root / "pyproject.toml").write_text(
         """
 [project]
@@ -242,6 +244,7 @@ mucaro = "backend.app.cli:main"
         encoding="utf-8",
     )
     (root / "README.md").write_text("# Mucaro AI\n", encoding="utf-8")
+    (root / "docs" / "PACKAGING_POLICY.md").write_text("# Packaging Policy\n", encoding="utf-8")
     for path in [
         "scripts/mucaro.py",
         "scripts/launch_app.py",
@@ -288,13 +291,15 @@ def test_cli_package_status_reports_packaging_readiness(tmp_path: Path, capsys):
     assert checks["version_consistency"]["status"] == "PASS"
     assert checks["frontend_lockfile"]["status"] == "PASS"
     assert checks["generated_outputs"]["status"] == "WARN"
-    assert checks["distribution_policy"]["status"] == "WARN"
+    assert checks["release_artifact_policy"]["status"] == "PASS"
+    assert checks["distribution_policy"]["status"] == "PASS"
+    assert checks["hosted_release_gate"]["status"] == "WARN"
 
     assert main(["package", "status", "--strict", "--format", "text"], cfg=cfg) == 2
     text_output = capsys.readouterr().out
     assert "PACKAGE_WARN" in text_output
     assert "PASS cli_entrypoint backend.app.cli:main" in text_output
-    assert "WARN distribution_policy" in text_output
+    assert "WARN hosted_release_gate" in text_output
 
 
 def test_cli_package_status_fails_on_version_mismatch(tmp_path: Path, capsys):
@@ -323,6 +328,62 @@ def test_cli_package_status_fails_on_stale_frontend_lockfile(tmp_path: Path, cap
         "root=mucaro-ai-frontend:0.1.22 "
         "expected=mucaro-ai-frontend:0.1.23"
     )
+
+
+def commit_fixture_repo(root: Path) -> None:
+    subprocess.run(["git", "init"], cwd=root, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    subprocess.run(["git", "add", "."], cwd=root, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=mucaro@example.test",
+            "-c",
+            "user.name=Mucaro Test",
+            "commit",
+            "-m",
+            "fixture",
+        ],
+        cwd=root,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+
+def test_cli_package_build_writes_source_artifact_manifest(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    commit_fixture_repo(tmp_path)
+    output_dir = tmp_path / "artifacts"
+
+    assert main(["package", "build", "--output-dir", str(output_dir), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "PACKAGE_ARTIFACT_READY"
+    artifact = Path(payload["artifact"]["path"])
+    manifest = Path(payload["manifest"]["path"])
+    assert artifact.exists()
+    assert manifest.exists()
+    manifest_payload = json.loads(manifest.read_text(encoding="utf-8"))
+    assert manifest_payload["artifact_format"] == "source_zip_with_json_manifest_v1"
+    assert manifest_payload["head_sha"]
+    assert manifest_payload["member_count"] >= 1
+    assert {member["path"] for member in manifest_payload["members"]} >= {"pyproject.toml", "README.md"}
+
+
+def test_cli_package_build_blocks_dirty_worktree(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    commit_fixture_repo(tmp_path)
+    (tmp_path / "README.md").write_text("# Dirty Mucaro AI\n", encoding="utf-8")
+
+    assert main(["package", "build", "--output-dir", str(tmp_path / "artifacts"), "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "PACKAGE_ARTIFACT_BLOCKED"
+    assert checks["worktree_clean"]["status"] == "FAIL"
 
 
 def test_cli_certify_status_reports_release_readiness(tmp_path: Path, capsys):
