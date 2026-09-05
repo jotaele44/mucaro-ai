@@ -49,6 +49,7 @@ from .permissions import (
 )
 from .product_audit import build_product_audit
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
+from .retrieval_eval import DEFAULT_FIXTURE, build_retrieval_eval_report, format_retrieval_eval_text
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
 from .services import answer_question
 from .tools import (
@@ -156,6 +157,18 @@ def build_parser() -> argparse.ArgumentParser:
     audit_product.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     audit_product.add_argument("--strict", action="store_true", help="Exit nonzero while product gaps remain open.")
     audit_product.set_defaults(handler=run_audit_product)
+
+    eval_cmd = subcommands.add_parser("eval", help="Run measurable local quality evaluations.")
+    eval_subcommands = eval_cmd.add_subparsers(dest="eval_command", required=True)
+
+    eval_retrieval = eval_subcommands.add_parser("retrieval", help="Evaluate local retrieval strategies against a fixture.")
+    eval_retrieval.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE, help="Retrieval evaluation fixture path.")
+    eval_retrieval.add_argument("--top-k", type=parse_top_k, default=5, help=f"Maximum retrieved chunks to score ({MIN_TOP_K}-{MAX_TOP_K}).")
+    eval_retrieval.add_argument("--min-hybrid-recall", type=float, default=0.80, help="Minimum recall@k required for hybrid retrieval.")
+    eval_retrieval.add_argument("--min-semantic-recall", type=float, default=0.80, help="Minimum recall@k required for semantic retrieval.")
+    eval_retrieval.add_argument("--min-semantic-no-context", type=float, default=1.00, help="Minimum no-context accuracy required for semantic retrieval.")
+    eval_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    eval_retrieval.set_defaults(handler=run_eval_retrieval)
 
     certify = subcommands.add_parser("certify", help="Inspect release certification readiness.")
     certify_subcommands = certify.add_subparsers(dest="certify_command", required=True)
@@ -437,6 +450,18 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"{check.get('status')} {check.get('name')} {detail}")
         for action in payload.get("next_actions", []):
             print(f"next_action={action}")
+    elif status in {"RETRIEVAL_EVAL_OK", "RETRIEVAL_EVAL_FAILED"}:
+        print(f"fixture={payload.get('fixture')}")
+        counts = payload.get("counts", {})
+        if isinstance(counts, dict):
+            print(f"chunks={counts.get('chunks')}")
+            print(f"queries={counts.get('queries')}")
+            print(f"strategies={counts.get('strategies')}")
+        print(f"min_hybrid_recall={payload.get('min_hybrid_recall')}")
+        print(f"min_semantic_recall={payload.get('min_semantic_recall')}")
+        print(f"min_semantic_no_context={payload.get('min_semantic_no_context')}")
+        for line in format_retrieval_eval_text(payload)[:-1]:
+            print(line)
     elif status in {"DOCTOR_OK", "DOCTOR_WARN", "DOCTOR_FAIL"}:
         summary = payload.get("summary", {})
         if isinstance(summary, dict):
@@ -824,6 +849,19 @@ def run_audit_product(args: argparse.Namespace, cfg: Settings) -> int:
     if args.strict and report["status"] != "PRODUCT_AUDIT_OK":
         return 2
     return 0
+
+
+def run_eval_retrieval(args: argparse.Namespace, cfg: Settings) -> int:
+    del cfg
+    report = build_retrieval_eval_report(
+        fixture_path=args.fixture,
+        top_k=args.top_k,
+        min_hybrid_recall=args.min_hybrid_recall,
+        min_semantic_recall=args.min_semantic_recall,
+        min_semantic_no_context=args.min_semantic_no_context,
+    )
+    emit_payload(report, args.format)
+    return 0 if report["status"] == "RETRIEVAL_EVAL_OK" else 2
 
 
 def _git_output(cfg: Settings, args: list[str]) -> tuple[bool, str]:

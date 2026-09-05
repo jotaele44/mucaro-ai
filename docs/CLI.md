@@ -235,6 +235,13 @@ Use `mucaro audit product` to classify the broader assistant objective as
 requirement rows with `PASS`, `OPEN`, or `BLOCKED` status. Add `--strict` when
 automation should fail while any product gap remains open.
 
+Use `mucaro eval retrieval` to run the committed retrieval-quality fixture from
+the supported CLI surface. The command reports the fixture path, chunk/query
+counts, evaluated strategy count, recall thresholds, per-strategy `recall@k`,
+top-1 hit rate, and no-context accuracy. It returns
+`RETRIEVAL_EVAL_FAILED` when configured thresholds are not met, so release
+automation can fail on measurable retrieval regressions.
+
 ## Retrieval Strategies
 
 `mucaro ask` defaults to `--strategy hybrid`, which recomputes deterministic lexical and TF-IDF scores from the current chunk file. Use `--strategy bm25` for local BM25 ranking, `--strategy persistent` to query the local persisted TF-IDF index, or `--strategy semantic` to query the local embedding store built during ingestion. Persistent and semantic retrieval fail closed when their stores are missing or stale; run `mucaro sources reindex` after ingesting sources to rebuild them.

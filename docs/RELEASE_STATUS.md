@@ -15,7 +15,7 @@ validation, CLI source/index management, CLI conversation management, CLI
 run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
 executable product-gap auditing, an opt-in local semantic embedding store,
 approval-gated local tool runtime, metadata-only image/audio/video ingestion,
-and explicit local memory.
+explicit local memory, and CLI-exposed retrieval evaluation.
 The production-security baseline added profile checks, fail-closed startup
 validation, and public-bind safeguards. The current certification target adds
 CLI certification-readiness status so operators can inspect product audit,
@@ -85,6 +85,9 @@ Observed success markers:
   `CI` run for commit
   `f48828b8dd5648554b65dba1ca86a07db099f7d3` reports `startup_failure`, so the
   GitHub-governed baseline remains open and untagged.
+- `mucaro eval retrieval` exposes the retrieval-quality fixture through the
+  supported CLI boundary while `scripts/evaluate_retrieval.py` remains a
+  compatibility wrapper for release automation.
 - A manual-only `CI Startup Probe` workflow was added to isolate hosted runner
   startup from the Mucaro build/test stack. Run `33972500645` for commit
   `b70c5a859a879e651304091b57505b74c49f6953` also reports

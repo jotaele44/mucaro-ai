@@ -230,6 +230,12 @@ the same operator CLI boundary as release certification.
 Use `mucaro audit product` to track what is complete versus still open against
 the full ChatGPT/Claude-like local assistant target.
 
+Use `mucaro eval retrieval --format text` to run the committed retrieval
+quality fixture from the supported CLI. It reports per-strategy recall,
+top-1 hit rate, no-context accuracy, fixture counts, and threshold settings;
+release automation still calls `scripts/evaluate_retrieval.py`, which delegates
+to the same evaluator module.
+
 The browser app includes the same permission workflow in the Directory Access panel.
 
 The CLI can also inspect and maintain the local source library: `mucaro sources

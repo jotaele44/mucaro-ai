@@ -147,6 +147,39 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert "PASS production_security" in strict_output
 
 
+def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["eval", "retrieval", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RETRIEVAL_EVAL_OK"
+    assert payload["counts"] == {"chunks": 10, "queries": 10, "strategies": 6}
+    assert {strategy["strategy"] for strategy in payload["strategies"]} == {
+        "lexical",
+        "vector",
+        "bm25",
+        "hybrid",
+        "persistent",
+        "semantic",
+    }
+
+    assert main(["eval", "retrieval", "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "fixture=backend/tests/fixtures/retrieval_eval.json" in text_output
+    assert "hybrid recall@5=" in text_output
+    assert "semantic recall@5=" in text_output
+    assert "RETRIEVAL_EVAL_OK" in text_output
+
+
+def test_cli_eval_retrieval_fails_when_thresholds_are_not_met(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["eval", "retrieval", "--min-hybrid-recall", "1.1", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RETRIEVAL_EVAL_FAILED"
+    assert payload["min_hybrid_recall"] == 1.1
+
+
 def test_cli_certify_status_reports_release_readiness(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
