@@ -93,7 +93,9 @@ default `hybrid` strategy until eval evidence shows a material improvement.
    optional dependency is installed, and keep fixture validation mandatory for
    all candidate strategies.
 5. Keep `hybrid` as default until larger-corpus evals prove the new strategy is
-   better under recall@k, top-1 hit rate, and no-context accuracy.
+   better under recall@k, expected-binding recall, context precision,
+   full-binding hit rate, multi-binding full-hit rate, top-1 hit rate, and
+   no-context accuracy.
 
 ## Non-Goals
 

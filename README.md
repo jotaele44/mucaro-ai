@@ -251,10 +251,11 @@ coverage can pass while the GitHub-governed release row remains open.
 
 Use `mucaro eval retrieval --format text` to run the committed retrieval
 quality fixture from the supported CLI. It reports per-strategy recall,
-top-1 hit rate, no-context accuracy, fixture counts, positive/no-context query
-counts, fixture validation checks, and threshold settings; release automation
-still calls `scripts/evaluate_retrieval.py`, which delegates to the same
-evaluator module.
+expected-binding recall, context precision, full-binding hit rate,
+multi-binding full-hit rate, top-1 hit rate, no-context accuracy, fixture
+counts, positive/no-context query counts, fixture validation checks, and
+threshold settings; release automation still calls
+`scripts/evaluate_retrieval.py`, which delegates to the same evaluator module.
 
 Use `mucaro package status --format text` to inspect package metadata, version
 consistency, launcher entrypoints, desktop package manifest readiness, optional

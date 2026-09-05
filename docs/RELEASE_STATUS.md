@@ -16,7 +16,10 @@ run-history inspection, opt-in local BM25 retrieval, CLI readiness diagnostics,
 executable product-gap auditing, an opt-in local semantic embedding store,
 approval-gated local tool runtime, metadata-only image/audio/video ingestion,
 explicit local memory, CLI-exposed retrieval evaluation, and CLI-exposed
-packaging readiness with a governed source-artifact policy.
+packaging readiness with a governed source-artifact policy. The current
+retrieval-quality baseline adds expected-binding recall, context precision,
+full-binding hit rate, and multi-binding full-hit rate gates so high recall
+cannot hide noisy or partial top-k context.
 The production-security baseline added profile checks, fail-closed startup
 validation, and public-bind safeguards. The current certification target adds
 CLI certification-readiness status so operators can inspect product audit,
@@ -74,6 +77,26 @@ Observed success markers:
   `37c4fc5fde0e0fcfa63edd7a3100dd9bb82a3846`.
 - `v0.1.23` is the current development candidate for optional GitHub governance
   checks in the CLI certification-readiness receipt.
+- `v0.1.23-retrieval-precision-gates` is certified on commit
+  `9685077049b761b6d200d1493cbbb53376537a4e` for retrieval precision and
+  expected-binding quality gates across the script and CLI surfaces.
+- Local release certification for commit
+  `9685077049b761b6d200d1493cbbb53376537a4e` reports
+  `CERTIFY_RELEASE_OK`, including `149 passed`, default retrieval eval, large
+  retrieval eval, JSON validation, desktop package self-test, package artifact
+  build/verify, npm audit, and frontend build.
+- Exact-SHA fresh-clone certification reports `FRESH_CLONE_CERT_OK` for commit
+  `9685077049b761b6d200d1493cbbb53376537a4e`, including clean clone install,
+  CLI help, launcher self-test, and desktop smoke test.
+- Python distribution certification reports `PYTHON_DIST_CERT_OK` for commit
+  `9685077049b761b6d200d1493cbbb53376537a4e`, including wheel/sdist build,
+  wheel install, CLI version/help, and import checks.
+- Source artifact certification reports `SOURCE_ARTIFACT_CERT_OK` for manifest
+  `data/exports/packages/mucaro-ai-0.1.23-9685077049b7-artifact-manifest.json`.
+- Hosted `CI` run `33987538734` and `CI Startup Probe` run `33987538749` both
+  report `startup_failure` with `0` jobs for commit
+  `9685077049b761b6d200d1493cbbb53376537a4e`; GitHub governance remains open at
+  the Actions startup/account/repository-runner layer.
 - Local release certification for `v0.1.23` reports `CERTIFY_RELEASE_OK` on
   commit `f48828b8dd5648554b65dba1ca86a07db099f7d3`, including `122 passed`,
   retrieval eval, JSON validation, desktop package self-test, frontend audit,
