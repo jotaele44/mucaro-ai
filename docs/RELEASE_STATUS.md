@@ -115,6 +115,10 @@ Observed success markers:
   `GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`. It keeps heavy local and
   fresh-clone certification states `UNVERIFIED` unless matching exact-HEAD
   receipts exist under `data/exports/release_receipts`.
+- `mucaro release receipts` and `mucaro release receipt RECEIPT_ID` expose the
+  local release/fresh-clone certification receipt ledger through the supported
+  CLI boundary, including schema validity, bound head SHA, status, and computed
+  receipt file SHA-256.
 - Local release certification for audit commit
   `2848d6f54880a716d5fa61467e5d8a6b5bb5f301` reports
   `CERTIFY_RELEASE_OK`, including `133 passed`, retrieval eval, JSON

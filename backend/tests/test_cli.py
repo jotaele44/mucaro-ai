@@ -606,6 +606,58 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     assert payload["receipts"]["fresh_clone"]["head_sha"] == head_sha
 
 
+def test_cli_release_receipts_lists_and_shows_exact_head_receipts(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "f" * 40
+    stale_sha = "1" * 40
+
+    current_receipt = write_release_receipt(
+        tmp_path,
+        receipt_type="local_release",
+        status="CERTIFY_RELEASE_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_release.py"],
+        payload={"gates": []},
+    )
+    write_release_receipt(
+        tmp_path,
+        receipt_type="fresh_clone",
+        status="FRESH_CLONE_CERT_OK",
+        head_sha=stale_sha,
+        command=["python3", "scripts/certify_fresh_clone.py", "--ref", stale_sha],
+        payload={"checks": ["stale"]},
+    )
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    assert main(["release", "receipts", "--current-head", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RELEASE_RECEIPTS_OK"
+    assert payload["current_head"] == head_sha
+    assert payload["count"] == 1
+    assert payload["receipts"][0]["receipt_id"] == current_receipt.stem
+    assert payload["receipts"][0]["valid"] is True
+    assert payload["receipts"][0]["file_sha256"]
+
+    assert main(["release", "receipt", current_receipt.stem, "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RELEASE_RECEIPT_OK"
+    assert payload["summary"]["receipt_id"] == current_receipt.stem
+    assert payload["summary"]["valid"] is True
+    assert payload["receipt"]["head_sha"] == head_sha
+
+    assert main(["release", "receipt", "missing-receipt", "--format", "text"], cfg=cfg) == 2
+    assert "ERROR_RELEASE_RECEIPT_NOT_FOUND" in capsys.readouterr().err
+
+    assert main(["release", "receipt", "../outside", "--format", "text"], cfg=cfg) == 2
+    assert "ERROR_RELEASE_RECEIPT_NOT_FOUND" in capsys.readouterr().err
+
+
 def test_github_governance_fails_when_latest_ci_is_for_different_head(tmp_path: Path, monkeypatch):
     cfg = make_settings(tmp_path)
     head_sha = "a" * 40

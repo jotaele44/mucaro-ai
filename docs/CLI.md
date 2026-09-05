@@ -32,6 +32,8 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 |---|---|---:|---:|
 | `mucaro doctor` | Check local assistant readiness | 0 | 2 with `--strict` warnings/failures |
 | `mucaro release state` | Classify bounded release-state progress | 0 | 2 with `--strict` until governed release is ready |
+| `mucaro release receipts` | List local release/fresh-clone certification receipts | 0 | 2 |
+| `mucaro release receipt RECEIPT_ID` | Show one local certification receipt | 0 | 2 |
 | `mucaro certify status` | Inspect release readiness before running full certification gates | 0 | 2 on failures, or with `--strict` warnings/failures |
 | `mucaro audit product` | Audit product gaps against the full assistant objective | 0 | 2 with `--strict` while gaps remain |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
@@ -143,6 +145,9 @@ retrieval payloads where practical:
 | `DOCTOR_FAIL` | readiness check found unsupported or invalid local setup |
 | `RELEASE_STATE_OPEN` | release-state classifier found open or unverified release states |
 | `RELEASE_STATE_READY` | release-state classifier found the governed release state ready |
+| `RELEASE_RECEIPTS_OK` | release receipt listing completed |
+| `RELEASE_RECEIPT_OK` | release receipt inspection completed |
+| `ERROR_RELEASE_RECEIPT_NOT_FOUND` | requested release receipt does not exist |
 | `CERTIFICATION_WARN` | release readiness has warnings such as local-mode auth disabled, missing tag, missing upstream, unavailable Git metadata, or unenforced GitHub governance |
 | `CERTIFICATION_FAIL` | release readiness has a hard blocker such as product audit failure, JSON validation failure, or dirty worktree |
 | `PRODUCT_AUDIT_OPEN` | product audit found remaining ChatGPT/Claude-comparability gaps |
@@ -158,6 +163,8 @@ mucaro ingest data/input --format text
 mucaro --version
 mucaro doctor
 mucaro release state --include-github --format text
+mucaro release receipts --current-head --format text
+mucaro release receipt local_release-HEADPREFIX --format json
 mucaro certify status --format text
 mucaro certify status --include-github --format text
 mucaro audit product --format text
@@ -225,6 +232,13 @@ receipts. It does not run heavy certification scripts, so those states remain
 `UNVERIFIED` until the operator runs the reported commands and creates matching
 exact-HEAD receipts under `data/exports/release_receipts`. Add `--include-github`
 when authenticated `gh` evidence is available.
+
+Use `mucaro release receipts` to list local release and fresh-clone
+certification receipts. Add `--current-head` to filter the list to receipts
+whose `head_sha` matches the current Git `HEAD`. Each row includes receipt
+validity, receipt type, certification status, bound head SHA, and receipt file
+SHA-256. Use `mucaro release receipt RECEIPT_ID` to inspect the full JSON
+receipt by file stem or filename.
 
 Use `mucaro certify status` before tagging or pushing release candidates. It is
 a read-only readiness receipt over product audit, doctor, JSON validation, Git

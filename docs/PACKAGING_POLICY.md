@@ -37,6 +37,9 @@ Release and fresh-clone certification scripts also write exact-HEAD JSON
 receipts under `data/exports/release_receipts`. The `mucaro release state`
 command uses only receipts whose `head_sha` matches the current Git `HEAD`;
 older receipts remain history, not current certification proof.
+Use `mucaro release receipts --current-head --format text` to audit matching
+receipts and `mucaro release receipt RECEIPT_ID --format json` to inspect a
+specific receipt with its computed file SHA-256.
 
 ## Release Gates
 

@@ -49,7 +49,7 @@ from .permissions import (
     revoke_directory,
 )
 from .product_audit import build_product_audit
-from .release_receipts import load_release_receipt
+from .release_receipts import find_release_receipt, list_release_receipts, load_release_receipt
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .retrieval_eval import DEFAULT_FIXTURE, build_retrieval_eval_report, format_retrieval_eval_text
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
@@ -402,6 +402,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     release_state.set_defaults(handler=run_release_state)
 
+    release_receipts = release_subcommands.add_parser("receipts", help="List local release certification receipts.")
+    release_receipts.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_receipts.add_argument("--current-head", action="store_true", help="Only show receipts for the current Git HEAD.")
+    release_receipts.set_defaults(handler=run_release_receipts)
+
+    release_receipt = release_subcommands.add_parser("receipt", help="Show one local release certification receipt.")
+    release_receipt.add_argument("receipt_id", help="Receipt file stem or JSON filename under data/exports/release_receipts.")
+    release_receipt.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_receipt.set_defaults(handler=run_release_receipt_show)
+
     permissions = subcommands.add_parser("permissions", help="Manage user-directory access grants.")
     permissions_subcommands = permissions.add_subparsers(dest="permission_command", required=True)
 
@@ -552,6 +562,35 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"{state.get('status')} {state.get('state')} {detail}")
         for command in payload.get("next_commands", []):
             print(f"command={command}")
+    elif status in {"RELEASE_RECEIPTS_OK", "RELEASE_RECEIPT_OK"}:
+        if payload.get("receipt_id"):
+            print(f"receipt_id={payload.get('receipt_id')}")
+        if payload.get("head_sha"):
+            print(f"head_sha={payload.get('head_sha')}")
+        if payload.get("current_head"):
+            print(f"current_head={payload.get('current_head')}")
+        if "count" in payload:
+            print(f"count={payload.get('count')}")
+        rows = payload.get("receipts", [])
+        if isinstance(rows, list):
+            for row in rows:
+                if isinstance(row, dict):
+                    print(
+                        f"{'PASS' if row.get('valid') else 'FAIL'} {row.get('receipt_id')} "
+                        f"{row.get('receipt_type')} {row.get('status')} {row.get('head_sha')} {row.get('file_sha256')}"
+                    )
+        summary = payload.get("summary")
+        if isinstance(summary, dict):
+            print(
+                f"{'PASS' if summary.get('valid') else 'FAIL'} {summary.get('receipt_id')} "
+                f"{summary.get('receipt_type')} {summary.get('status')} {summary.get('head_sha')} {summary.get('file_sha256')}"
+            )
+            if summary.get("validation_error"):
+                print(f"validation_error={summary.get('validation_error')}")
+        receipt = payload.get("receipt")
+        if isinstance(receipt, dict):
+            print(f"created_utc={receipt.get('created_utc')}")
+            print(f"command={' '.join(str(part) for part in receipt.get('command', []))}")
     elif status in {"DOCTOR_OK", "DOCTOR_WARN", "DOCTOR_FAIL"}:
         summary = payload.get("summary", {})
         if isinstance(summary, dict):
@@ -979,6 +1018,38 @@ def run_release_state(args: argparse.Namespace, cfg: Settings) -> int:
     emit_payload(report, args.format)
     if args.strict and report["status"] != "RELEASE_STATE_READY":
         return 2
+    return 0
+
+
+def run_release_receipts(args: argparse.Namespace, cfg: Settings) -> int:
+    receipts = list_release_receipts(cfg.project_root)
+    current_head = None
+    if args.current_head:
+        head_ok, head_sha = _git_output(cfg, ["rev-parse", "HEAD"])
+        current_head = head_sha if head_ok else None
+        receipts = [row for row in receipts if row.get("head_sha") == current_head]
+    payload = {
+        "status": "RELEASE_RECEIPTS_OK",
+        "project_root": str(cfg.project_root),
+        "current_head": current_head,
+        "count": len(receipts),
+        "receipts": receipts,
+    }
+    emit_payload(payload, args.format)
+    return 0
+
+
+def run_release_receipt_show(args: argparse.Namespace, cfg: Settings) -> int:
+    payload = find_release_receipt(cfg.project_root, args.receipt_id)
+    if payload is None:
+        raise MucaroCLIError("ERROR_RELEASE_RECEIPT_NOT_FOUND", args.receipt_id)
+    payload = {
+        "status": "RELEASE_RECEIPT_OK",
+        "project_root": str(cfg.project_root),
+        "receipt_id": args.receipt_id,
+        **payload,
+    }
+    emit_payload(payload, args.format)
     return 0
 
 

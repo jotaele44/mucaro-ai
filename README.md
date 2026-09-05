@@ -137,6 +137,7 @@ See `docs/CLI.md` for exit codes, retrieval strategies, structured error payload
 python scripts/mucaro.py ingest data/input
 python scripts/mucaro.py doctor
 python scripts/mucaro.py release state --include-github --format text
+python scripts/mucaro.py release receipts --current-head --format text
 python scripts/mucaro.py certify status --format text
 python scripts/mucaro.py certify status --include-github --format text
 python scripts/mucaro.py audit product --format text
@@ -168,6 +169,7 @@ After `python -m pip install -e ".[dev]"`, the installed console command is avai
 mucaro --version
 mucaro doctor
 mucaro release state --include-github --format text
+mucaro release receipts --current-head --format text
 mucaro certify status --format text
 mucaro certify status --include-github --format text
 mucaro audit product --format text
@@ -236,6 +238,10 @@ artifact packaging, GitHub governance open, governed release ready, and
 production ready. The command is read-only and reports `UNVERIFIED` for states
 that require a matching exact-HEAD receipt from a separate heavy certification
 script.
+
+Use `mucaro release receipts --current-head --format text` and `mucaro release
+receipt RECEIPT_ID --format json` to inspect local release and fresh-clone
+certification receipts, including schema validity and receipt file SHA-256.
 
 Use `mucaro audit product` to track what is complete versus still open against
 the governed local-first assistant target. The audit includes both assistant
