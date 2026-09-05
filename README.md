@@ -216,7 +216,9 @@ release or fresh-clone certification scripts. The command combines product
 audit, doctor, JSON validation, Git metadata, worktree cleanliness, tag-at-HEAD,
 and upstream checks into a structured operator receipt. Add `--include-github`
 to include read-only GitHub governance checks for branch protection, latest CI
-on the current branch, and remote tag binding when `gh` is authenticated.
+on the current branch, and remote tag binding when `gh` is authenticated. The
+default hosted workflow is `CI`; use `--github-workflow NAME` if the release
+workflow is renamed.
 
 Use `mucaro audit product` to track what is complete versus still open against
 the full ChatGPT/Claude-like local assistant target.

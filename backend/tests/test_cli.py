@@ -198,7 +198,7 @@ def test_cli_certify_status_includes_github_governance(tmp_path: Path, capsys, m
             return True, f"{'b' * 40}\trefs/tags/{tag_name}\n{head_sha}\trefs/tags/{tag_name}^{{}}"
         if args[:3] == ["gh", "api", "repos/jotaele44/mucaro-ai/branches/main"]:
             return True, json.dumps({"protected": False, "protection": {"required_status_checks": {"contexts": []}}})
-        if args[:4] == ["gh", "run", "list", "--repo"]:
+        if args[:7] == ["gh", "run", "list", "--repo", "jotaele44/mucaro-ai", "--workflow", "CI"]:
             return True, json.dumps(
                 [
                     {
@@ -223,6 +223,7 @@ def test_cli_certify_status_includes_github_governance(tmp_path: Path, capsys, m
     gates = {gate["name"]: gate for gate in payload["gates"]}
     assert payload["github"]["enabled"] is True
     assert payload["github"]["repo"] == "jotaele44/mucaro-ai"
+    assert payload["github"]["workflow"] == "CI"
     assert payload["github"]["branch_protected"] is False
     assert payload["github"]["latest_ci"]["head_sha"] == head_sha
     assert gates["github_repo"]["status"] == "PASS"
@@ -234,6 +235,7 @@ def test_cli_certify_status_includes_github_governance(tmp_path: Path, capsys, m
     text_output = capsys.readouterr().out
     assert "github_repo=jotaele44/mucaro-ai" in text_output
     assert "github_branch_protected=False" in text_output
+    assert "github_workflow=CI" in text_output
     assert f"PASS github_latest_ci success {head_sha}" in text_output
 
 
@@ -263,6 +265,7 @@ def test_github_governance_fails_when_latest_ci_is_for_different_head(tmp_path: 
         branch="main",
         head_sha=head_sha,
         tags_at_head=["v0.1.23-governance-status"],
+        workflow_name="CI",
     )
     by_name = {gate["name"]: gate for gate in gates}
     assert by_name["github_branch_protection"]["status"] == "PASS"

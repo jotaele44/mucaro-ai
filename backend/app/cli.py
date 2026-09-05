@@ -171,6 +171,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Include read-only GitHub branch, CI, and remote tag governance checks when gh is available.",
     )
+    certify_status.add_argument(
+        "--github-workflow",
+        default="CI",
+        help="GitHub Actions workflow name to use for hosted CI evidence with --include-github.",
+    )
     certify_status.set_defaults(handler=run_certify_status)
 
     sources = subcommands.add_parser("sources", help="Inspect and manage ingested sources.")
@@ -400,6 +405,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         if isinstance(github, dict) and github.get("enabled"):
             print(f"github_repo={github.get('repo')}")
             print(f"github_branch_protected={github.get('branch_protected')}")
+            print(f"github_workflow={github.get('workflow')}")
             latest_ci = github.get("latest_ci")
             if isinstance(latest_ci, dict):
                 print(f"github_latest_ci={latest_ci.get('status')}:{latest_ci.get('conclusion')}:{latest_ci.get('head_sha')}")
@@ -888,11 +894,13 @@ def build_github_governance_status(
     branch: str | None,
     head_sha: str | None,
     tags_at_head: list[str],
+    workflow_name: str = "CI",
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     github: dict[str, Any] = {
         "enabled": True,
         "repo": repo,
         "branch": branch,
+        "workflow": workflow_name,
         "branch_protected": None,
         "required_status_checks": None,
         "latest_ci": None,
@@ -939,6 +947,8 @@ def build_github_governance_status(
             "list",
             "--repo",
             repo,
+            "--workflow",
+            workflow_name,
             "--branch",
             branch,
             "--limit",
@@ -993,7 +1003,12 @@ def build_github_governance_status(
     return github, gates
 
 
-def build_certification_status(cfg: Settings, *, include_github: bool = False) -> dict[str, Any]:
+def build_certification_status(
+    cfg: Settings,
+    *,
+    include_github: bool = False,
+    github_workflow: str = "CI",
+) -> dict[str, Any]:
     audit = build_product_audit(cfg)
     doctor = build_doctor_report(cfg)
     validation = validate_project_json(cfg)
@@ -1054,6 +1069,7 @@ def build_certification_status(cfg: Settings, *, include_github: bool = False) -
             branch=branch if branch_ok else None,
             head_sha=head_sha if head_ok else None,
             tags_at_head=tags_at_head,
+            workflow_name=github_workflow,
         )
         gates.extend(github_gates)
 
@@ -1088,7 +1104,11 @@ def build_certification_status(cfg: Settings, *, include_github: bool = False) -
 
 
 def run_certify_status(args: argparse.Namespace, cfg: Settings) -> int:
-    report = build_certification_status(cfg, include_github=args.include_github)
+    report = build_certification_status(
+        cfg,
+        include_github=args.include_github,
+        github_workflow=args.github_workflow,
+    )
     emit_payload(report, args.format)
     if report["status"] == "CERTIFICATION_FAIL":
         return 2
