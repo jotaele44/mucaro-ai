@@ -73,6 +73,18 @@ Observed success markers:
   `37c4fc5fde0e0fcfa63edd7a3100dd9bb82a3846`.
 - `v0.1.23` is the current development candidate for optional GitHub governance
   checks in the CLI certification-readiness receipt.
+- Local release certification for `v0.1.23` reports `CERTIFY_RELEASE_OK` on
+  commit `f48828b8dd5648554b65dba1ca86a07db099f7d3`, including `122 passed`,
+  retrieval eval, JSON validation, desktop package self-test, frontend audit,
+  and frontend build.
+- Exact-SHA fresh-clone certification reports `FRESH_CLONE_CERT_OK` for commit
+  `f48828b8dd5648554b65dba1ca86a07db099f7d3`, including clean clone install,
+  CLI help, launcher self-test, and desktop smoke test.
+- `mucaro certify status --include-github` now fails closed when the latest
+  hosted CI run for the current HEAD completes unsuccessfully. The current
+  GitHub-hosted `CI` run for commit
+  `f48828b8dd5648554b65dba1ca86a07db099f7d3` reports `startup_failure`, so the
+  GitHub-governed baseline remains open and untagged.
 - Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, BM25, hybrid, persistent, and semantic strategies across the expanded corpus
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
@@ -114,3 +126,8 @@ Known environment-dependent item:
   is metadata-only and source-lineage oriented.
 - Multi-tenant SaaS isolation remains out of scope; current production security
   covers a single-operator local-first deployment profile.
+- GitHub-hosted `CI` startup is currently unresolved for the `v0.1.23`
+  governance candidate. Local release certification and exact-SHA fresh-clone
+  certification pass, but the GitHub-governed baseline must not be tagged until
+  the hosted `CI` gate succeeds for the current HEAD or the release scope is
+  explicitly narrowed.
