@@ -1,0 +1,11 @@
+name: CI Startup Probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  startup-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm runner startup
+        run: echo "CI_STARTUP_PROBE_OK"
