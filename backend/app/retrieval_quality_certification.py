@@ -11,6 +11,7 @@ from .retrieval_eval import DEFAULT_FIXTURE, ROOT, build_retrieval_eval_report
 
 
 LARGE_FIXTURE = ROOT / "backend" / "tests" / "fixtures" / "retrieval_eval_large.json"
+MIXED_FORMAT_FIXTURE = ROOT / "backend" / "tests" / "fixtures" / "retrieval_eval_mixed_formats.json"
 RETRIEVAL_QUALITY_PROFILE = "v0.1.23-local-release"
 RETRIEVAL_QUALITY_RECEIPT_TYPE = "retrieval_quality"
 RETRIEVAL_QUALITY_OK = "RETRIEVAL_QUALITY_CERT_OK"
@@ -55,6 +56,22 @@ RETRIEVAL_QUALITY_CASES = [
             "min_multi_binding_full_hit": 0.60,
             "min_category_recall": 1.00,
             "min_category_binding_recall": 0.80,
+        },
+    ),
+    RetrievalQualityCase(
+        name="mixed_format_fixture_strict_binding",
+        fixture_path=MIXED_FORMAT_FIXTURE,
+        thresholds={
+            "min_hybrid_recall": 0.80,
+            "min_no_context_accuracy": 1.00,
+            "min_semantic_recall": 0.80,
+            "min_semantic_no_context": 1.00,
+            "min_hybrid_precision": 0.20,
+            "min_semantic_precision": 0.20,
+            "min_expected_binding_recall": 0.95,
+            "min_multi_binding_full_hit": 0.60,
+            "min_category_recall": 1.00,
+            "min_category_binding_recall": 1.00,
         },
     ),
 ]

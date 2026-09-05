@@ -262,6 +262,63 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert "RETRIEVAL_EVAL_OK" in text_output
 
 
+def test_cli_eval_retrieval_reports_mixed_format_quality_metrics(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    fixture = "backend/tests/fixtures/retrieval_eval_mixed_formats.json"
+
+    assert main(["eval", "retrieval", "--fixture", fixture, "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RETRIEVAL_EVAL_OK"
+    assert payload["counts"] == {
+        "chunks": 25,
+        "queries": 34,
+        "positive_queries": 28,
+        "no_context_queries": 6,
+        "expected_bindings": 31,
+        "source_ids": 25,
+        "multi_binding_queries": 3,
+        "query_categories": 12,
+        "strategies": 6,
+    }
+    assert payload["fixture_validation"]["status"] == "RETRIEVAL_FIXTURE_OK"
+    hybrid = next(strategy for strategy in payload["strategies"] if strategy["strategy"] == "hybrid")
+    assert hybrid["expected_binding_recall_at_k"] == 1.0
+    assert hybrid["context_precision_at_k"] == 0.2385
+    assert hybrid["full_binding_hit_rate"] == 1.0
+    assert hybrid["multi_binding_full_hit_rate"] == 1.0
+    assert hybrid["no_context_accuracy"] == 1.0
+    assert hybrid["positive_retrieved_chunks"] == 130
+    assert hybrid["relevant_retrieved_chunks"] == 31
+    categories = {category["category"]: category for category in hybrid["category_metrics"]}
+    assert set(categories) == {
+        "csv",
+        "docx",
+        "eml",
+        "html",
+        "json",
+        "markdown",
+        "media",
+        "multi_format",
+        "no_context",
+        "pdf",
+        "traceability",
+        "txt",
+    }
+    assert categories["multi_format"]["multi_binding_full_hit_rate"] == 1.0
+    assert categories["no_context"]["no_context_accuracy"] == 1.0
+
+    assert main(["eval", "retrieval", "--fixture", fixture, "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "fixture=backend/tests/fixtures/retrieval_eval_mixed_formats.json" in text_output
+    assert "positive_queries=28" in text_output
+    assert "expected_bindings=31" in text_output
+    assert "query_categories=12" in text_output
+    assert "hybrid category=csv queries=2 positives=2 recall@5=1.00" in text_output
+    assert "hybrid category=html queries=3 positives=3 recall@5=1.00" in text_output
+    assert "hybrid category=media queries=3 positives=3 recall@5=1.00" in text_output
+    assert "RETRIEVAL_EVAL_OK" in text_output
+
+
 def test_cli_eval_retrieval_fails_when_category_thresholds_are_not_met(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
@@ -445,6 +502,7 @@ def test_cli_certify_retrieval_quality_writes_exact_head_receipt(tmp_path: Path,
     assert [case["name"] for case in payload["cases"]] == [
         "default_fixture_strict_category_binding",
         "large_fixture_calibrated_multi_binding",
+        "mixed_format_fixture_strict_binding",
     ]
     assert payload["failed_cases"] == []
 
@@ -460,7 +518,9 @@ def test_cli_certify_retrieval_quality_writes_exact_head_receipt(tmp_path: Path,
     assert "RETRIEVAL_QUALITY_CERT_OK" in text_output
     assert "default_fixture_strict_category_binding" in text_output
     assert "large_fixture_calibrated_multi_binding" in text_output
+    assert "mixed_format_fixture_strict_binding" in text_output
     assert "min_category_binding_recall=0.8" in text_output
+    assert "min_category_binding_recall=1.0" in text_output
 
 
 def write_package_fixture(root: Path, *, frontend_version: str = "0.1.23", lock_version: str | None = None) -> None:
