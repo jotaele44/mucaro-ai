@@ -1316,7 +1316,15 @@ def test_github_governance_fails_when_latest_ci_is_for_different_head(tmp_path: 
         if args[:2] == ["api", "repos/jotaele44/mucaro-ai/branches/main"]:
             return True, {"protected": True, "protection": {"required_status_checks": {"contexts": ["validate"]}}}, ""
         if args[:2] == ["run", "list"]:
-            return True, [{"status": "completed", "conclusion": "success", "headSha": stale_sha}], ""
+            return True, [
+                {
+                    "databaseId": 7,
+                    "status": "completed",
+                    "conclusion": "success",
+                    "headSha": stale_sha,
+                    "url": "https://github.com/jotaele44/mucaro-ai/actions/runs/7",
+                }
+            ], ""
         return False, None, f"unexpected command: {args}"
 
     def fake_find_remote_tag_commit(_cfg: Settings, tag_name: str, expected_head: str | None):
@@ -1339,6 +1347,7 @@ def test_github_governance_fails_when_latest_ci_is_for_different_head(tmp_path: 
     assert by_name["github_branch_protection"]["status"] == "PASS"
     assert by_name["github_latest_ci"]["status"] == "FAIL"
     assert f"does not match HEAD {head_sha}" in by_name["github_latest_ci"]["detail"]
+    assert "run_id=7" in by_name["github_latest_ci"]["detail"]
 
 
 def test_github_governance_fails_when_current_head_ci_fails(tmp_path: Path, monkeypatch):
@@ -1349,7 +1358,15 @@ def test_github_governance_fails_when_current_head_ci_fails(tmp_path: Path, monk
         if args[:2] == ["api", "repos/jotaele44/mucaro-ai/branches/main"]:
             return True, {"protected": True, "protection": {"required_status_checks": {"contexts": ["validate"]}}}, ""
         if args[:2] == ["run", "list"]:
-            return True, [{"databaseId": 9, "status": "completed", "conclusion": "startup_failure", "headSha": head_sha}], ""
+            return True, [
+                {
+                    "databaseId": 9,
+                    "status": "completed",
+                    "conclusion": "startup_failure",
+                    "headSha": head_sha,
+                    "url": "https://github.com/jotaele44/mucaro-ai/actions/runs/9",
+                }
+            ], ""
         if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/9/jobs"]:
             return True, {"total_count": 0, "jobs": []}, ""
         return False, None, f"unexpected command: {args}"
@@ -1367,6 +1384,7 @@ def test_github_governance_fails_when_current_head_ci_fails(tmp_path: Path, monk
     by_name = {gate["name"]: gate for gate in gates}
     assert by_name["github_latest_ci"]["status"] == "FAIL"
     assert f"completed startup_failure {head_sha}" in by_name["github_latest_ci"]["detail"]
+    assert "run_id=9" in by_name["github_latest_ci"]["detail"]
     assert by_name["github_hosted_runner_startup"]["status"] == "FAIL"
     assert github["latest_ci"]["jobs_count"] == 0
     assert github["latest_ci"]["startup_layer"] == "before_jobs"
@@ -1407,9 +1425,25 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
                 ]
             }, ""
         if args[:2] == ["run", "list"] and "CI Startup Probe" in args:
-            return True, [{"databaseId": 22, "status": "completed", "conclusion": "startup_failure", "headSha": head_sha}], ""
+            return True, [
+                {
+                    "databaseId": 22,
+                    "status": "completed",
+                    "conclusion": "startup_failure",
+                    "headSha": head_sha,
+                    "url": "https://github.com/jotaele44/mucaro-ai/actions/runs/22",
+                }
+            ], ""
         if args[:2] == ["run", "list"] and "CI" in args:
-            return True, [{"databaseId": 11, "status": "completed", "conclusion": "startup_failure", "headSha": head_sha}], ""
+            return True, [
+                {
+                    "databaseId": 11,
+                    "status": "completed",
+                    "conclusion": "startup_failure",
+                    "headSha": head_sha,
+                    "url": "https://github.com/jotaele44/mucaro-ai/actions/runs/11",
+                }
+            ], ""
         if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/11/jobs"]:
             return True, {"total_count": 0, "jobs": []}, ""
         if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/22/jobs"]:
@@ -1425,7 +1459,9 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     payload = json.loads(capsys.readouterr().out)
     checks = {check["name"]: check for check in payload["checks"]}
     assert payload["status"] == "GITHUB_ACTIONS_DIAGNOSTIC_FAIL"
+    assert payload["runs"]["ci"]["database_id"] == 11
     assert payload["runs"]["ci"]["jobs_count"] == 0
+    assert payload["runs"]["startup_probe"]["database_id"] == 22
     assert payload["runs"]["startup_probe"]["jobs_count"] == 0
     assert payload["startup_blocker"]["status"] == "FAIL"
     assert payload["startup_blocker"]["isolated_before_jobs"] is True
@@ -1446,6 +1482,10 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert "private_branch_protection_plan_gate" in text_output
     assert "WARN branch_protection_api HTTP 403: Upgrade to GitHub Pro" in text_output
     assert "PASS self_hosted_runner_inventory self_hosted_total_count=0" in text_output
+    assert "FAIL latest_ci completed startup_failure" in text_output
+    assert "run_id=11" in text_output
+    assert "run=ci id=11 status=completed conclusion=startup_failure" in text_output
+    assert "run=startup_probe id=22 status=completed conclusion=startup_failure" in text_output
     assert "FAIL startup_layer_isolated" in text_output
     assert "next_action=Upgrade GitHub plan or make the repository public" in text_output
     assert "next_action=Run `gh auth refresh -h github.com -s user`" in text_output

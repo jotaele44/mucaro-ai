@@ -576,6 +576,16 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         for check in payload.get("checks", []):
             detail = str(check.get("detail")).replace("\n", "\\n")
             print(f"{check.get('status')} {check.get('name')} {detail}")
+        runs = payload.get("runs", {})
+        if isinstance(runs, dict):
+            for run_name in ["ci", "startup_probe"]:
+                run = runs.get(run_name)
+                if isinstance(run, dict):
+                    print(
+                        f"run={run_name} id={run.get('database_id')} status={run.get('status')} "
+                        f"conclusion={run.get('conclusion')} head_sha={run.get('head_sha')} "
+                        f"jobs={run.get('jobs_count')} url={run.get('url')}"
+                    )
         for action in payload.get("next_actions", []):
             print(f"next_action={action}")
     elif status in {"RETRIEVAL_EVAL_OK", "RETRIEVAL_EVAL_FAILED"}:
@@ -1755,13 +1765,21 @@ def build_github_governance_status(
             ci_matches_head = not head_sha or latest.get("headSha") == head_sha
             ci_passed = latest.get("status") == "completed" and latest.get("conclusion") == "success"
             if ci_matches_head and ci_passed:
-                gates.append(_certification_gate("github_latest_ci", "PASS", f"success {latest.get('headSha')}"))
+                run_evidence = _run_evidence(latest)
+                detail = f"success {latest.get('headSha')}"
+                if run_evidence:
+                    detail = f"{detail} {run_evidence}"
+                gates.append(_certification_gate("github_latest_ci", "PASS", detail))
             elif ci_matches_head and latest.get("status") == "completed":
+                run_evidence = _run_evidence(latest)
+                detail = f"{latest.get('status')} {latest.get('conclusion') or 'unknown'} {latest.get('headSha')}"
+                if run_evidence:
+                    detail = f"{detail} {run_evidence}"
                 gates.append(
                     _certification_gate(
                         "github_latest_ci",
                         "FAIL",
-                        f"{latest.get('status')} {latest.get('conclusion') or 'unknown'} {latest.get('headSha')}",
+                        detail,
                     )
                 )
                 if jobs_error:
@@ -1780,19 +1798,27 @@ def build_github_governance_status(
                         branch_protection_error=protection_error_for_blocker,
                     )
             elif ci_matches_head:
+                run_evidence = _run_evidence(latest)
+                detail = f"{latest.get('status')} {latest.get('conclusion') or 'pending'} {latest.get('headSha')}"
+                if run_evidence:
+                    detail = f"{detail} {run_evidence}"
                 gates.append(
                     _certification_gate(
                         "github_latest_ci",
                         "WARN",
-                        f"{latest.get('status')} {latest.get('conclusion') or 'pending'} {latest.get('headSha')}",
+                        detail,
                     )
                 )
             else:
+                run_evidence = _run_evidence(latest)
+                detail = f"latest {latest.get('headSha')} does not match HEAD {head_sha}"
+                if run_evidence:
+                    detail = f"{detail} {run_evidence}"
                 gates.append(
                     _certification_gate(
                         "github_latest_ci",
                         "FAIL",
-                        f"latest {latest.get('headSha')} does not match HEAD {head_sha}",
+                        detail,
                     )
                 )
 
@@ -1860,6 +1886,15 @@ def _run_summary(latest: dict[str, Any] | None, jobs_count: int | None = None) -
     }
 
 
+def _run_evidence(latest: dict[str, Any]) -> str:
+    parts = []
+    if latest.get("databaseId"):
+        parts.append(f"run_id={latest.get('databaseId')}")
+    if latest.get("url"):
+        parts.append(f"url={latest.get('url')}")
+    return " ".join(parts)
+
+
 def _classify_latest_run(
     *,
     name: str,
@@ -1874,13 +1909,15 @@ def _classify_latest_run(
     status = latest.get("status")
     conclusion = latest.get("conclusion")
     jobs_detail = f" jobs={jobs_count}" if jobs_count is not None else ""
+    run_evidence = _run_evidence(latest)
+    evidence_detail = f" {run_evidence}" if run_evidence else ""
     if head_sha and run_head != head_sha:
-        return _certification_gate(name, "FAIL", f"latest {run_head} does not match HEAD {head_sha}{jobs_detail}")
+        return _certification_gate(name, "FAIL", f"latest {run_head} does not match HEAD {head_sha}{jobs_detail}{evidence_detail}")
     if status == "completed" and conclusion == "success":
-        return _certification_gate(name, "PASS", f"success {run_head}{jobs_detail}")
+        return _certification_gate(name, "PASS", f"success {run_head}{jobs_detail}{evidence_detail}")
     if status == "completed":
-        return _certification_gate(name, "FAIL", f"{status} {conclusion or 'unknown'} {run_head}{jobs_detail}")
-    return _certification_gate(name, "WARN", f"{status} {conclusion or 'pending'} {run_head}{jobs_detail}")
+        return _certification_gate(name, "FAIL", f"{status} {conclusion or 'unknown'} {run_head}{jobs_detail}{evidence_detail}")
+    return _certification_gate(name, "WARN", f"{status} {conclusion or 'pending'} {run_head}{jobs_detail}{evidence_detail}")
 
 
 def build_github_actions_diagnostic_status(
