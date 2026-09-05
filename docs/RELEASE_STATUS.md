@@ -108,7 +108,10 @@ Observed success markers:
   Actions diagnostics, startup-blocker causes, hosted run evidence, and exact
   commands/actions into one current-head handoff payload. Add `--save` to
   persist the JSON handoff artifact under `data/exports/governance_reports` with
-  path, SHA-256, and byte-size metadata in the CLI response.
+  path, SHA-256, and byte-size metadata in the CLI response. Use
+  `mucaro release governance-report --verify PATH` to validate a saved handoff
+  artifact, add `--expected-sha256 SHA256` to prove byte identity, and add
+  `--require-current-head` when the artifact must bind to the current checkout.
 - Local release certification for `v0.1.23` reports `CERTIFY_RELEASE_OK` on
   commit `f48828b8dd5648554b65dba1ca86a07db099f7d3`, including `122 passed`,
   retrieval eval, JSON validation, desktop package self-test, frontend audit,

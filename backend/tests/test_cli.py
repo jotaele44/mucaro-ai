@@ -912,6 +912,133 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert saved["report"]["startup_blocker"]["status"] == "FAIL"
 
 
+def test_cli_release_governance_report_verifies_saved_artifact(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    head_sha = "9" * 40
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "branch", "--show-current"]:
+            return True, "main"
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        if args == ["git", "tag", "--points-at", "HEAD"]:
+            return True, "v0.1.23-governance-report-export"
+        if args == ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]:
+            return True, "origin/main"
+        if args == ["git", "remote", "get-url", "origin"]:
+            return True, "https://github.com/jotaele44/mucaro-ai.git"
+        if args[:3] == ["git", "ls-remote", "origin"]:
+            return True, f"{head_sha}\trefs/tags/v0.1.23-governance-report-export^{{}}"
+        return False, f"unexpected command: {args}"
+
+    def fake_gh_json(_cfg: Settings, args: list[str]):
+        if args == ["api", "repos/jotaele44/mucaro-ai/branches/main"]:
+            return True, {"protected": False, "protection": {"required_status_checks": {"contexts": []}}}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/branches/main/protection"]:
+            return False, None, "HTTP 403: Upgrade to GitHub Pro or make this repository public"
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/permissions"]:
+            return True, {"enabled": True, "allowed_actions": "all"}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/permissions/workflow"]:
+            return True, {"default_workflow_permissions": "read"}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/runners"]:
+            return True, {"total_count": 0, "runners": []}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/workflows"]:
+            return True, {"workflows": []}, ""
+        if args[:2] == ["run", "list"]:
+            return True, [], ""
+        if args == ["api", "users/jotaele44/settings/billing/actions"]:
+            return False, None, "HTTP 404: Not Found"
+        return False, None, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+    monkeypatch.setattr(cli, "_gh_json", fake_gh_json)
+
+    output_path = tmp_path / "data" / "exports" / "governance_reports" / "handoff.json"
+    assert main(["release", "governance-report", "--save", "--output", str(output_path), "--format", "json"], cfg=cfg) == 0
+    saved_payload = json.loads(capsys.readouterr().out)
+    expected_sha256 = saved_payload["export"]["sha256"]
+
+    assert (
+        main(
+            [
+                "release",
+                "governance-report",
+                "--verify",
+                str(output_path),
+                "--require-current-head",
+                "--expected-sha256",
+                expected_sha256,
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "GOVERNANCE_REPORT_VERIFIED"
+    assert payload["artifact"]["sha256"] == expected_sha256
+    assert payload["head_sha"] == head_sha
+    assert checks["schema_version"]["status"] == "PASS"
+    assert checks["report_head_sha"]["status"] == "PASS"
+    assert checks["current_head_binding"]["status"] == "PASS"
+    assert checks["expected_sha256"]["status"] == "PASS"
+
+    assert (
+        main(
+            [
+                "release",
+                "governance-report",
+                "--verify",
+                str(output_path),
+                "--expected-sha256",
+                "0" * 64,
+                "--format",
+                "text",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    text_output = capsys.readouterr().out
+    assert "GOVERNANCE_REPORT_VERIFY_FAILED" in text_output
+    assert "FAIL expected_sha256" in text_output
+
+
+def test_cli_release_governance_report_verify_fails_current_head_mismatch(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    artifact = {
+        "schema_version": "mucaro_governance_report_v1",
+        "created_utc": "2026-09-05T20:00:00Z",
+        "report": {
+            "status": "GOVERNANCE_REPORT_OPEN",
+            "current_state": "GITHUB_GOVERNANCE_OPEN",
+            "head_sha": "1" * 40,
+            "current_head_receipts_summary": {},
+            "startup_blocker": {},
+        },
+    }
+    output_path = tmp_path / "governance-report.json"
+    output_path.write_text(json.dumps(artifact), encoding="utf-8")
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, "2" * 40
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    assert main(["release", "governance-report", "--verify", str(output_path), "--require-current-head", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "GOVERNANCE_REPORT_VERIFY_FAILED"
+    assert checks["current_head_binding"]["status"] == "FAIL"
+
+
 def test_cli_release_state_requires_source_artifact_receipt_for_governed_ready(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     head_sha = "a" * 40

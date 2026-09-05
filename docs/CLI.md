@@ -146,6 +146,8 @@ retrieval payloads where practical:
 | `DOCTOR_FAIL` | readiness check found unsupported or invalid local setup |
 | `RELEASE_STATE_OPEN` | release-state classifier found open or unverified release states |
 | `RELEASE_STATE_READY` | release-state classifier found the governed release state ready |
+| `GOVERNANCE_REPORT_VERIFIED` | saved governance report artifact passed schema, hash, report, and requested head-binding checks |
+| `GOVERNANCE_REPORT_VERIFY_FAILED` | saved governance report artifact is missing, malformed, hash-mismatched, stale for current `HEAD`, or otherwise invalid |
 | `RELEASE_RECEIPTS_OK` | release receipt listing completed |
 | `RELEASE_RECEIPT_OK` | release receipt inspection completed |
 | `ERROR_RELEASE_RECEIPT_NOT_FOUND` | requested release receipt does not exist |
@@ -166,6 +168,8 @@ mucaro ingest data/input --format text
 mucaro --version
 mucaro doctor
 mucaro release state --include-github --format text
+mucaro release governance-report --save --format text
+mucaro release governance-report --verify data/exports/governance_reports/governance-report-HEADPREFIX.json --require-current-head --format text
 mucaro release receipts --current-head --format text
 mucaro release receipt local_release-HEADPREFIX --format json
 mucaro certify status --format text
@@ -253,8 +257,13 @@ run evidence, and exact next actions. Add `--save` to write the JSON artifact
 under `data/exports/governance_reports`, or pass `--output PATH` to choose the
 artifact path. The saved artifact records a schema version, creation time, and
 the report payload; the CLI response includes the artifact path, SHA-256, and
-size. Use `--strict` when automation should fail until
-`GOVERNANCE_REPORT_READY`.
+size. Use `--verify PATH` to validate a saved artifact without rebuilding live
+GitHub evidence. Verification checks file existence, JSON object shape, schema
+version, timestamp, embedded report status, report `head_sha`, receipt summary,
+startup-blocker payload, and optional file SHA-256 via `--expected-sha256`.
+Add `--require-current-head` when the artifact must bind to the current Git
+`HEAD`; omit it when inspecting older archived handoff evidence. Use `--strict`
+when automation should fail until `GOVERNANCE_REPORT_READY`.
 
 Use `mucaro release receipts` to list local release and fresh-clone
 certification receipts. Add `--current-head` to filter the list to receipts

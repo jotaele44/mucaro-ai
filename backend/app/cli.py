@@ -427,6 +427,16 @@ def build_parser() -> argparse.ArgumentParser:
     release_governance.add_argument("--strict", action="store_true", help="Exit nonzero until governed release state is ready.")
     release_governance.add_argument("--save", action="store_true", help="Write a JSON governance report artifact under data/exports/governance_reports.")
     release_governance.add_argument("--output", type=Path, help="Optional JSON artifact path. Implies --save.")
+    release_governance.add_argument("--verify", type=Path, help="Verify a saved governance report artifact instead of building a new report.")
+    release_governance.add_argument(
+        "--require-current-head",
+        action="store_true",
+        help="With --verify, require the saved report head_sha to match current Git HEAD.",
+    )
+    release_governance.add_argument(
+        "--expected-sha256",
+        help="With --verify, require the artifact file SHA-256 to match this value.",
+    )
     release_governance.add_argument(
         "--github-workflow",
         default="CI",
@@ -659,6 +669,21 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"command={command}")
         for action in payload.get("next_actions", []):
             print(f"next_action={action}")
+    elif status in {"GOVERNANCE_REPORT_VERIFIED", "GOVERNANCE_REPORT_VERIFY_FAILED"}:
+        print(f"project_root={payload.get('project_root')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        if payload.get("current_head"):
+            print(f"current_head={payload.get('current_head')}")
+        artifact = payload.get("artifact")
+        if isinstance(artifact, dict):
+            print(f"artifact_path={artifact.get('path')}")
+            print(f"artifact_sha256={artifact.get('sha256')}")
+            print(f"artifact_size_bytes={artifact.get('size_bytes')}")
+            print(f"artifact_schema_version={artifact.get('schema_version')}")
+            print(f"artifact_created_utc={artifact.get('created_utc')}")
+        for check in payload.get("checks", []):
+            detail = str(check.get("detail")).replace("\n", "\\n")
+            print(f"{check.get('status')} {check.get('name')} {detail}")
     elif status in {"RELEASE_RECEIPTS_OK", "RELEASE_RECEIPT_OK"}:
         if payload.get("receipt_id"):
             print(f"receipt_id={payload.get('receipt_id')}")
@@ -1223,7 +1248,165 @@ def write_release_governance_report(
     }
 
 
+def _parse_utc_timestamp(value: Any) -> tuple[bool, str]:
+    if not isinstance(value, str) or not value:
+        return False, "missing created_utc"
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return False, f"invalid created_utc={value}"
+    if parsed.tzinfo is None:
+        return False, "created_utc missing timezone"
+    return True, value
+
+
+def _is_hex_sha(value: Any, *, length: int = 40) -> bool:
+    return isinstance(value, str) and len(value) == length and all(char in "0123456789abcdef" for char in value)
+
+
+def verify_release_governance_report(
+    cfg: Settings,
+    artifact_path: Path,
+    *,
+    require_current_head: bool = False,
+    expected_sha256: str | None = None,
+) -> dict[str, Any]:
+    path = artifact_path if artifact_path.is_absolute() else cfg.project_root / artifact_path
+    checks: list[dict[str, str]] = []
+    artifact: dict[str, Any] | None = None
+    artifact_sha256: str | None = None
+    artifact_size_bytes: int | None = None
+
+    if path.exists() and path.is_file():
+        checks.append(_certification_gate("artifact_exists", "PASS", str(path)))
+        artifact_sha256 = _sha256_file(path)
+        artifact_size_bytes = path.stat().st_size
+        checks.append(_certification_gate("artifact_sha256", "PASS", artifact_sha256))
+        if expected_sha256:
+            expected = expected_sha256.strip().lower()
+            checks.append(
+                _certification_gate(
+                    "expected_sha256",
+                    "PASS" if artifact_sha256 == expected else "FAIL",
+                    f"expected={expected} actual={artifact_sha256}",
+                )
+            )
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            checks.append(_certification_gate("artifact_json", "FAIL", str(exc)))
+            loaded = None
+        if isinstance(loaded, dict):
+            artifact = loaded
+            checks.append(_certification_gate("artifact_json", "PASS", "valid JSON object"))
+        elif loaded is not None:
+            checks.append(_certification_gate("artifact_json", "FAIL", "top-level JSON value is not an object"))
+    else:
+        checks.append(_certification_gate("artifact_exists", "FAIL", str(path)))
+
+    report: dict[str, Any] | None = None
+    if artifact is not None:
+        schema_version = artifact.get("schema_version")
+        checks.append(
+            _certification_gate(
+                "schema_version",
+                "PASS" if schema_version == GOVERNANCE_REPORT_SCHEMA_VERSION else "FAIL",
+                str(schema_version),
+            )
+        )
+        created_ok, created_detail = _parse_utc_timestamp(artifact.get("created_utc"))
+        checks.append(_certification_gate("created_utc", "PASS" if created_ok else "FAIL", created_detail))
+        raw_report = artifact.get("report")
+        if isinstance(raw_report, dict):
+            report = raw_report
+            checks.append(_certification_gate("report_payload", "PASS", "report object present"))
+        else:
+            checks.append(_certification_gate("report_payload", "FAIL", "report object missing"))
+
+    head_sha: str | None = None
+    if report is not None:
+        raw_head_sha = report.get("head_sha")
+        if _is_hex_sha(raw_head_sha):
+            head_sha = str(raw_head_sha)
+            checks.append(_certification_gate("report_head_sha", "PASS", head_sha))
+        else:
+            checks.append(_certification_gate("report_head_sha", "FAIL", str(raw_head_sha)))
+
+        status = report.get("status")
+        checks.append(
+            _certification_gate(
+                "report_status",
+                "PASS" if status in {"GOVERNANCE_REPORT_READY", "GOVERNANCE_REPORT_OPEN"} else "FAIL",
+                str(status),
+            )
+        )
+        current_state = report.get("current_state")
+        checks.append(
+            _certification_gate(
+                "current_state",
+                "PASS" if isinstance(current_state, str) and bool(current_state) else "FAIL",
+                str(current_state),
+            )
+        )
+        receipt_summary = report.get("current_head_receipts_summary")
+        checks.append(
+            _certification_gate(
+                "receipt_summary",
+                "PASS" if isinstance(receipt_summary, dict) else "FAIL",
+                "present" if isinstance(receipt_summary, dict) else "missing",
+            )
+        )
+        startup_blocker = report.get("startup_blocker")
+        checks.append(
+            _certification_gate(
+                "startup_blocker",
+                "PASS" if isinstance(startup_blocker, dict) else "FAIL",
+                "present" if isinstance(startup_blocker, dict) else "missing",
+            )
+        )
+
+    current_head: str | None = None
+    if require_current_head:
+        head_ok, current_head_output = _git_output(cfg, ["rev-parse", "HEAD"])
+        current_head = current_head_output if head_ok else None
+        checks.append(
+            _certification_gate(
+                "current_head_binding",
+                "PASS" if head_ok and head_sha == current_head_output else "FAIL",
+                f"report_head={head_sha} current_head={current_head_output if head_ok else current_head_output or 'unavailable'}",
+            )
+        )
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": "GOVERNANCE_REPORT_VERIFIED" if not failed else "GOVERNANCE_REPORT_VERIFY_FAILED",
+        "project_root": str(cfg.project_root),
+        "artifact": {
+            "path": str(path),
+            "sha256": artifact_sha256,
+            "size_bytes": artifact_size_bytes,
+            "schema_version": artifact.get("schema_version") if artifact else None,
+            "created_utc": artifact.get("created_utc") if artifact else None,
+        },
+        "head_sha": head_sha,
+        "current_head": current_head,
+        "checks": checks,
+    }
+
+
 def run_release_governance_report(args: argparse.Namespace, cfg: Settings) -> int:
+    if args.verify:
+        report = verify_release_governance_report(
+            cfg,
+            args.verify,
+            require_current_head=args.require_current_head,
+            expected_sha256=args.expected_sha256,
+        )
+        emit_payload(report, args.format)
+        return 0 if report["status"] == "GOVERNANCE_REPORT_VERIFIED" else 2
+    if args.require_current_head or args.expected_sha256:
+        raise MucaroCLIError("ERROR_GOVERNANCE_REPORT_VERIFY_OPTION", "--require-current-head and --expected-sha256 require --verify")
     report = build_release_governance_report(
         cfg,
         github_workflow=args.github_workflow,
