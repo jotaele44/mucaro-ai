@@ -215,8 +215,8 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Governed releases require current-head hosted CI, protected branch policy, and tag binding.",
             "OPEN",
             "mucaro certify status --include-github and mucaro certify github-actions",
-            "Hosted GitHub Actions startup currently fails before jobs; branch protection is not enforced; no governed tag is bound to the current HEAD.",
-            "Repair hosted Actions startup, enable branch protection after CI is healthy, then tag only after current-head GitHub governance passes.",
+            "Hosted GitHub Actions startup currently fails before jobs and branch protection is not enforced; tag binding is verified by the release-state and GitHub governance commands.",
+            "Repair hosted Actions startup, enable branch protection after CI is healthy, then require current-head GitHub governance before promoting a governed release.",
         ),
     ]
 

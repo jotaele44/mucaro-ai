@@ -130,8 +130,9 @@ Observed success markers:
 - `mucaro audit product` now uses the governed-release objective. The current
   scope reports `16 PASS`, `1 OPEN`, `0 BLOCKED`, and `94.1%` readiness:
   assistant capabilities and source-artifact packaging pass, while
-  `github_release_governance` remains open because hosted CI startup, branch
-  protection, and governed tag binding are not yet proven.
+  `github_release_governance` remains open because hosted CI startup and branch
+  protection are not yet proven. Tag binding is verified separately by the
+  release-state and GitHub governance commands.
 - `mucaro release state` classifies bounded release progress across
   `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`, `FRESH_CLONE_CERTIFIED`,
   `SOURCE_ARTIFACT_PACKAGING`, `GITHUB_GOVERNANCE_OPEN`,
