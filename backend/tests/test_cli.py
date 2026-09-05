@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import backend.app.cli as cli
 from backend.app.cli import main
 from backend.app.config import Settings
 
@@ -72,7 +73,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.22\n"
+    assert output == "mucaro 0.1.23\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -152,10 +153,11 @@ def test_cli_certify_status_reports_release_readiness(tmp_path: Path, capsys):
     assert main(["certify", "status", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "CERTIFICATION_WARN"
-    assert payload["version"] == "0.1.22"
+    assert payload["version"] == "0.1.23"
     assert payload["project_root"] == str(tmp_path)
     assert payload["product_audit_status"] == "PRODUCT_AUDIT_OK"
     assert payload["json_status"] == "JSON_OK"
+    assert payload["github"] == {"enabled": False}
     assert payload["git"]["head_sha"] is None
     gates = {gate["name"]: gate for gate in payload["gates"]}
     assert gates["product_audit"]["status"] == "PASS"
@@ -172,6 +174,100 @@ def test_cli_certify_status_reports_release_readiness(tmp_path: Path, capsys):
     assert "CERTIFICATION_WARN" in strict_output
     assert "WARN git_repository git metadata unavailable" in strict_output
     assert "command=python3 scripts/certify_release.py" in strict_output
+
+
+def test_cli_certify_status_includes_github_governance(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "a" * 40
+    tag_name = "v0.1.23-governance-status"
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "branch", "--show-current"]:
+            return True, "main"
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        if args == ["git", "tag", "--points-at", "HEAD"]:
+            return True, tag_name
+        if args == ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]:
+            return True, "origin/main"
+        if args == ["git", "remote", "get-url", "origin"]:
+            return True, "https://github.com/jotaele44/mucaro-ai.git"
+        if args[:3] == ["git", "ls-remote", "origin"]:
+            return True, f"{'b' * 40}\trefs/tags/{tag_name}\n{head_sha}\trefs/tags/{tag_name}^{{}}"
+        if args[:3] == ["gh", "api", "repos/jotaele44/mucaro-ai/branches/main"]:
+            return True, json.dumps({"protected": False, "protection": {"required_status_checks": {"contexts": []}}})
+        if args[:4] == ["gh", "run", "list", "--repo"]:
+            return True, json.dumps(
+                [
+                    {
+                        "databaseId": 1,
+                        "status": "completed",
+                        "conclusion": "success",
+                        "headSha": head_sha,
+                        "url": "https://github.com/jotaele44/mucaro-ai/actions/runs/1",
+                        "name": "CI",
+                        "event": "push",
+                        "createdAt": "2026-09-02T00:00:00Z",
+                        "updatedAt": "2026-09-02T00:00:30Z",
+                    }
+                ]
+            )
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    assert main(["certify", "status", "--include-github", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    gates = {gate["name"]: gate for gate in payload["gates"]}
+    assert payload["github"]["enabled"] is True
+    assert payload["github"]["repo"] == "jotaele44/mucaro-ai"
+    assert payload["github"]["branch_protected"] is False
+    assert payload["github"]["latest_ci"]["head_sha"] == head_sha
+    assert gates["github_repo"]["status"] == "PASS"
+    assert gates["github_branch_protection"]["status"] == "WARN"
+    assert gates["github_latest_ci"]["status"] == "PASS"
+    assert gates["github_tag_binding"]["status"] == "PASS"
+
+    assert main(["certify", "status", "--include-github", "--strict", "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "github_repo=jotaele44/mucaro-ai" in text_output
+    assert "github_branch_protected=False" in text_output
+    assert f"PASS github_latest_ci success {head_sha}" in text_output
+
+
+def test_github_governance_fails_when_latest_ci_is_for_different_head(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "a" * 40
+    stale_sha = "c" * 40
+
+    def fake_gh_json(_cfg: Settings, args: list[str]):
+        if args[:2] == ["api", "repos/jotaele44/mucaro-ai/branches/main"]:
+            return True, {"protected": True, "protection": {"required_status_checks": {"contexts": ["validate"]}}}, ""
+        if args[:2] == ["run", "list"]:
+            return True, [{"status": "completed", "conclusion": "success", "headSha": stale_sha}], ""
+        return False, None, f"unexpected command: {args}"
+
+    def fake_find_remote_tag_commit(_cfg: Settings, tag_name: str, expected_head: str | None):
+        assert tag_name == "v0.1.23-governance-status"
+        assert expected_head == head_sha
+        return True, f"{tag_name} -> {head_sha}"
+
+    monkeypatch.setattr(cli, "_gh_json", fake_gh_json)
+    monkeypatch.setattr(cli, "_find_remote_tag_commit", fake_find_remote_tag_commit)
+
+    _github, gates = cli.build_github_governance_status(
+        cfg,
+        repo="jotaele44/mucaro-ai",
+        branch="main",
+        head_sha=head_sha,
+        tags_at_head=["v0.1.23-governance-status"],
+    )
+    by_name = {gate["name"]: gate for gate in gates}
+    assert by_name["github_branch_protection"]["status"] == "PASS"
+    assert by_name["github_latest_ci"]["status"] == "FAIL"
+    assert f"does not match HEAD {head_sha}" in by_name["github_latest_ci"]["detail"]
 
 
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):

@@ -137,6 +137,7 @@ See `docs/CLI.md` for exit codes, retrieval strategies, structured error payload
 python scripts/mucaro.py ingest data/input
 python scripts/mucaro.py doctor
 python scripts/mucaro.py certify status --format text
+python scripts/mucaro.py certify status --include-github --format text
 python scripts/mucaro.py audit product --format text
 python scripts/mucaro.py permissions grant ~/Documents/mucaro-sources --yes
 python scripts/mucaro.py ingest ~/Documents/mucaro-sources
@@ -166,6 +167,7 @@ After `python -m pip install -e ".[dev]"`, the installed console command is avai
 mucaro --version
 mucaro doctor
 mucaro certify status --format text
+mucaro certify status --include-github --format text
 mucaro audit product --format text
 mucaro ingest data/input
 mucaro permissions grant ~/Documents/mucaro-sources --yes
@@ -212,7 +214,9 @@ posture, and answer runs.
 Use `mucaro certify status` to inspect release readiness before running heavier
 release or fresh-clone certification scripts. The command combines product
 audit, doctor, JSON validation, Git metadata, worktree cleanliness, tag-at-HEAD,
-and upstream checks into a structured operator receipt.
+and upstream checks into a structured operator receipt. Add `--include-github`
+to include read-only GitHub governance checks for branch protection, latest CI
+on the current branch, and remote tag binding when `gh` is authenticated.
 
 Use `mucaro audit product` to track what is complete versus still open against
 the full ChatGPT/Claude-like local assistant target.

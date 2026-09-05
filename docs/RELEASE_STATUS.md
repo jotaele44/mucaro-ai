@@ -1,6 +1,6 @@
 # Release Status
 
-Current package version: `0.1.22`.
+Current package version: `0.1.23`.
 
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, fresh-clone validation, API upload
@@ -22,6 +22,10 @@ CLI certification-readiness status so operators can inspect product audit,
 doctor, JSON validation, Git metadata, worktree cleanliness, tag-at-HEAD, and
 upstream state before running heavier release or fresh-clone gates. It also
 repairs fresh-clone certification for exact commit SHAs.
+The current development candidate adds optional read-only GitHub governance
+checks to `mucaro certify status --include-github`, covering branch protection,
+latest hosted CI on the current branch, and remote tag binding without mutating
+GitHub repository settings.
 
 Observed success markers:
 
@@ -64,6 +68,8 @@ Observed success markers:
   `37c4fc5fde0e0fcfa63edd7a3100dd9bb82a3846`.
 - Exact-SHA fresh-clone certification reports `FRESH_CLONE_CERT_OK` for commit
   `37c4fc5fde0e0fcfa63edd7a3100dd9bb82a3846`.
+- `v0.1.23` is the current development candidate for optional GitHub governance
+  checks in the CLI certification-readiness receipt.
 - Retrieval eval gate: `RETRIEVAL_EVAL_OK` for lexical, vector, BM25, hybrid, persistent, and semantic strategies across the expanded corpus
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
@@ -87,6 +93,8 @@ Observed success markers:
   checks and full product-audit closure
 - `v0.1.22-cli-certification-status` is the current certification target for
   CLI certification-readiness status and exact-SHA fresh-clone certification
+- `v0.1.23` is the current development candidate for read-only GitHub
+  governance visibility in `mucaro certify status --include-github`
 
 Local expected marker after first setup:
 

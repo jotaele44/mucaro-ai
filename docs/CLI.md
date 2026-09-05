@@ -138,7 +138,7 @@ retrieval payloads where practical:
 | `ERROR_TOOL_CALL_ALREADY_EXECUTED` | tool call execution was attempted more than once |
 | `DOCTOR_WARN` | readiness check found missing or incomplete local setup |
 | `DOCTOR_FAIL` | readiness check found unsupported or invalid local setup |
-| `CERTIFICATION_WARN` | release readiness has warnings such as local-mode auth disabled, missing tag, missing upstream, or unavailable Git metadata |
+| `CERTIFICATION_WARN` | release readiness has warnings such as local-mode auth disabled, missing tag, missing upstream, unavailable Git metadata, or unenforced GitHub governance |
 | `CERTIFICATION_FAIL` | release readiness has a hard blocker such as product audit failure, JSON validation failure, or dirty worktree |
 | `PRODUCT_AUDIT_OPEN` | product audit found remaining ChatGPT/Claude-comparability gaps |
 | `PRODUCT_AUDIT_BLOCKED` | product audit found a blocked requirement |
@@ -153,6 +153,7 @@ mucaro ingest data/input --format text
 mucaro --version
 mucaro doctor
 mucaro certify status --format text
+mucaro certify status --include-github --format text
 mucaro audit product --format text
 mucaro permissions grant ~/Documents/mucaro-sources --yes --format json
 mucaro permissions list --format text
@@ -214,7 +215,10 @@ a read-only readiness receipt over product audit, doctor, JSON validation, Git
 HEAD, worktree cleanliness, tag-at-HEAD, and upstream configuration. Add
 `--strict` when automation should fail on warnings, then run the reported
 `scripts/certify_release.py` and `scripts/certify_fresh_clone.py` commands for
-the heavier gates.
+the heavier gates. Add `--include-github` when network access and authenticated
+`gh` are available to include branch protection, latest hosted CI, and remote
+tag-binding checks. GitHub governance checks are read-only and never mutate
+repository settings.
 
 Use `mucaro audit product` to classify the broader assistant objective as
 requirement rows with `PASS`, `OPEN`, or `BLOCKED` status. Add `--strict` when

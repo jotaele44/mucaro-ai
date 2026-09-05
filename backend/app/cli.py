@@ -10,6 +10,7 @@ import sys
 import tomllib
 from pathlib import Path
 from typing import Any, Sequence
+from urllib.parse import urlparse
 
 from .config import Settings, settings
 from .conversations import (
@@ -91,7 +92,7 @@ def package_version() -> str:
     try:
         return importlib.metadata.version("mucaro-ai")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.21-dev"
+        return "0.1.23-dev"
 
 
 def parse_json_object(value: str) -> dict[str, Any]:
@@ -165,6 +166,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     certify_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     certify_status.add_argument("--strict", action="store_true", help="Exit nonzero when warnings or failures are present.")
+    certify_status.add_argument(
+        "--include-github",
+        action="store_true",
+        help="Include read-only GitHub branch, CI, and remote tag governance checks when gh is available.",
+    )
     certify_status.set_defaults(handler=run_certify_status)
 
     sources = subcommands.add_parser("sources", help="Inspect and manage ingested sources.")
@@ -390,6 +396,13 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"tags_at_head={','.join(git.get('tags_at_head', []))}")
             print(f"worktree_clean={git.get('worktree_clean')}")
             print(f"upstream={git.get('upstream')}")
+        github = payload.get("github", {})
+        if isinstance(github, dict) and github.get("enabled"):
+            print(f"github_repo={github.get('repo')}")
+            print(f"github_branch_protected={github.get('branch_protected')}")
+            latest_ci = github.get("latest_ci")
+            if isinstance(latest_ci, dict):
+                print(f"github_latest_ci={latest_ci.get('status')}:{latest_ci.get('conclusion')}:{latest_ci.get('head_sha')}")
         for gate in payload.get("gates", []):
             detail = str(gate.get("detail")).replace("\n", "\\n")
             print(f"{gate.get('status')} {gate.get('name')} {detail}")
@@ -785,9 +798,13 @@ def run_audit_product(args: argparse.Namespace, cfg: Settings) -> int:
 
 
 def _git_output(cfg: Settings, args: list[str]) -> tuple[bool, str]:
+    return _command_output(cfg, ["git", *args])
+
+
+def _command_output(cfg: Settings, args: list[str]) -> tuple[bool, str]:
     try:
         proc = subprocess.run(
-            ["git", *args],
+            args,
             cwd=cfg.project_root,
             text=True,
             stdout=subprocess.PIPE,
@@ -812,7 +829,171 @@ def _certification_gate(name: str, status: str, detail: str) -> dict[str, str]:
     return {"name": name, "status": status, "detail": detail}
 
 
-def build_certification_status(cfg: Settings) -> dict[str, Any]:
+def _github_repo_from_origin(remote_url: str | None) -> str | None:
+    if not remote_url:
+        return None
+    value = remote_url.strip()
+    if value.startswith("git@github.com:"):
+        path = value.split(":", 1)[1]
+    else:
+        parsed = urlparse(value)
+        if parsed.hostname != "github.com":
+            return None
+        path = parsed.path.lstrip("/")
+    if path.endswith(".git"):
+        path = path[:-4]
+    parts = [part for part in path.split("/") if part]
+    if len(parts) != 2:
+        return None
+    return f"{parts[0]}/{parts[1]}"
+
+
+def _gh_json(cfg: Settings, args: list[str]) -> tuple[bool, Any, str]:
+    ok, output = _command_output(cfg, ["gh", *args])
+    if not ok:
+        return False, None, output
+    try:
+        return True, json.loads(output), output
+    except json.JSONDecodeError as exc:
+        return False, None, f"invalid gh JSON: {exc}"
+
+
+def _find_remote_tag_commit(cfg: Settings, tag_name: str, head_sha: str | None) -> tuple[bool, str]:
+    ok, output = _git_output(cfg, ["ls-remote", "origin", f"refs/tags/{tag_name}", f"refs/tags/{tag_name}^{{}}"])
+    if not ok:
+        return False, output or "remote tag lookup failed"
+    dereferenced = None
+    direct = None
+    for line in output.splitlines():
+        parts = line.split()
+        if len(parts) != 2:
+            continue
+        sha, ref = parts
+        if ref.endswith("^{}"):
+            dereferenced = sha
+        else:
+            direct = sha
+    resolved = dereferenced or direct
+    if not resolved:
+        return False, "remote tag not found"
+    if head_sha and resolved != head_sha:
+        return False, f"{tag_name} -> {resolved}, expected {head_sha}"
+    return True, f"{tag_name} -> {resolved}"
+
+
+def build_github_governance_status(
+    cfg: Settings,
+    *,
+    repo: str | None,
+    branch: str | None,
+    head_sha: str | None,
+    tags_at_head: list[str],
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    github: dict[str, Any] = {
+        "enabled": True,
+        "repo": repo,
+        "branch": branch,
+        "branch_protected": None,
+        "required_status_checks": None,
+        "latest_ci": None,
+        "remote_tag_bindings": [],
+        "errors": [],
+    }
+    gates: list[dict[str, str]] = []
+
+    if not repo:
+        gates.append(_certification_gate("github_repo", "WARN", "origin is not a github.com repository"))
+        return github, gates
+    gates.append(_certification_gate("github_repo", "PASS", repo))
+
+    if not branch:
+        gates.append(_certification_gate("github_branch", "WARN", "branch unavailable"))
+        return github, gates
+
+    branch_ok, branch_payload, branch_error = _gh_json(cfg, ["api", f"repos/{repo}/branches/{branch}"])
+    if not branch_ok or not isinstance(branch_payload, dict):
+        github["errors"].append(branch_error)
+        gates.append(_certification_gate("github_branch_protection", "WARN", branch_error or "branch lookup failed"))
+    else:
+        protected = bool(branch_payload.get("protected"))
+        github["branch_protected"] = protected
+        protection = branch_payload.get("protection", {})
+        required_checks = False
+        if isinstance(protection, dict):
+            required = protection.get("required_status_checks", {})
+            if isinstance(required, dict):
+                contexts = required.get("contexts") or []
+                checks = required.get("checks") or []
+                enforcement = required.get("enforcement_level")
+                required_checks = bool(contexts or checks or enforcement == "non_admins")
+        github["required_status_checks"] = required_checks
+        detail = "protected" if protected else "unprotected"
+        if protected and required_checks:
+            detail = "protected with required status checks"
+        gates.append(_certification_gate("github_branch_protection", "PASS" if protected else "WARN", detail))
+
+    ci_ok, ci_payload, ci_error = _gh_json(
+        cfg,
+        [
+            "run",
+            "list",
+            "--repo",
+            repo,
+            "--branch",
+            branch,
+            "--limit",
+            "1",
+            "--json",
+            "databaseId,status,conclusion,headSha,url,name,event,createdAt,updatedAt",
+        ],
+    )
+    if not ci_ok or not isinstance(ci_payload, list) or not ci_payload:
+        github["errors"].append(ci_error)
+        gates.append(_certification_gate("github_latest_ci", "WARN", ci_error or "latest CI lookup failed"))
+    else:
+        latest = ci_payload[0]
+        if isinstance(latest, dict):
+            latest_ci = {
+                "database_id": latest.get("databaseId"),
+                "status": latest.get("status"),
+                "conclusion": latest.get("conclusion"),
+                "head_sha": latest.get("headSha"),
+                "url": latest.get("url"),
+            }
+            github["latest_ci"] = latest_ci
+            ci_matches_head = not head_sha or latest.get("headSha") == head_sha
+            ci_passed = latest.get("status") == "completed" and latest.get("conclusion") == "success"
+            if ci_matches_head and ci_passed:
+                gates.append(_certification_gate("github_latest_ci", "PASS", f"success {latest.get('headSha')}"))
+            elif ci_matches_head:
+                gates.append(
+                    _certification_gate(
+                        "github_latest_ci",
+                        "WARN",
+                        f"{latest.get('status')} {latest.get('conclusion') or 'pending'} {latest.get('headSha')}",
+                    )
+                )
+            else:
+                gates.append(
+                    _certification_gate(
+                        "github_latest_ci",
+                        "FAIL",
+                        f"latest {latest.get('headSha')} does not match HEAD {head_sha}",
+                    )
+                )
+
+    if not tags_at_head:
+        gates.append(_certification_gate("github_tag_binding", "WARN", "no local tag at HEAD"))
+    else:
+        for tag_name in tags_at_head:
+            tag_ok, tag_detail = _find_remote_tag_commit(cfg, tag_name, head_sha)
+            github["remote_tag_bindings"].append({"tag": tag_name, "status": "PASS" if tag_ok else "FAIL", "detail": tag_detail})
+            gates.append(_certification_gate("github_tag_binding", "PASS" if tag_ok else "FAIL", tag_detail))
+
+    return github, gates
+
+
+def build_certification_status(cfg: Settings, *, include_github: bool = False) -> dict[str, Any]:
     audit = build_product_audit(cfg)
     doctor = build_doctor_report(cfg)
     validation = validate_project_json(cfg)
@@ -826,6 +1007,7 @@ def build_certification_status(cfg: Settings) -> dict[str, Any]:
 
     tags_at_head = [line for line in tags_output.splitlines() if line.strip()] if tags_ok else []
     worktree_clean = status_ok and not worktree_status
+    repo = _github_repo_from_origin(remote_url if remote_ok else None)
 
     gates = [
         _certification_gate(
@@ -864,6 +1046,16 @@ def build_certification_status(cfg: Settings) -> dict[str, Any]:
             upstream if upstream_ok else "no upstream configured",
         ),
     ]
+    github: dict[str, Any] = {"enabled": False}
+    if include_github:
+        github, github_gates = build_github_governance_status(
+            cfg,
+            repo=repo,
+            branch=branch if branch_ok else None,
+            head_sha=head_sha if head_ok else None,
+            tags_at_head=tags_at_head,
+        )
+        gates.extend(github_gates)
 
     failed = [gate for gate in gates if gate["status"] == "FAIL"]
     warned = [gate for gate in gates if gate["status"] == "WARN"]
@@ -887,6 +1079,7 @@ def build_certification_status(cfg: Settings) -> dict[str, Any]:
         "doctor_status": doctor.get("status"),
         "product_audit_status": audit.get("status"),
         "json_status": validation.get("status"),
+        "github": github,
         "next_commands": [
             "python3 scripts/certify_release.py",
             f"python3 scripts/certify_fresh_clone.py --ref {ref}",
@@ -895,7 +1088,7 @@ def build_certification_status(cfg: Settings) -> dict[str, Any]:
 
 
 def run_certify_status(args: argparse.Namespace, cfg: Settings) -> int:
-    report = build_certification_status(cfg)
+    report = build_certification_status(cfg, include_github=args.include_github)
     emit_payload(report, args.format)
     if report["status"] == "CERTIFICATION_FAIL":
         return 2
