@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.metadata
-import importlib.util
 import json
 import os
 import subprocess
@@ -61,6 +60,7 @@ from .retrieval_quality_certification import (
     format_retrieval_quality_certification_text,
 )
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
+from .model_router import ModelProviderError, list_model_providers, model_provider_names, model_provider_status
 from .services import answer_question
 from .tools import (
     ToolRuntimeError,
@@ -142,7 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("query", nargs="+", help="Question to answer from ingested local sources.")
     ask.add_argument("--top-k", type=parse_top_k, default=5, help=f"Maximum retrieved chunks to use ({MIN_TOP_K}-{MAX_TOP_K}).")
     ask.add_argument("--strategy", choices=sorted(RETRIEVAL_STRATEGIES), default="hybrid", help="Retrieval strategy to use.")
-    ask.add_argument("--provider", choices=["mock", "anthropic"], help="Model provider override.")
+    ask.add_argument("--provider", choices=model_provider_names(), help="Model provider override.")
     ask.add_argument("--model", help="Model name override.")
     ask.add_argument("--allow-mock-fallback", action="store_true", help="Permit mock fallback when a live provider is unavailable.")
     ask.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
@@ -163,6 +163,18 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--format", choices=["json", "text"], default="text", help="Output format.")
     doctor.add_argument("--strict", action="store_true", help="Exit nonzero when warnings or failures are present.")
     doctor.set_defaults(handler=run_doctor)
+
+    models = subcommands.add_parser("models", help="Inspect model provider readiness.")
+    models_subcommands = models.add_subparsers(dest="models_command", required=True)
+
+    models_list = models_subcommands.add_parser("list", help="List configured model providers.")
+    models_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    models_list.set_defaults(handler=run_models_list)
+
+    models_status = models_subcommands.add_parser("status", help="Show readiness for one model provider.")
+    models_status.add_argument("provider", nargs="?", default=None, help="Provider name; defaults to the configured provider.")
+    models_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    models_status.set_defaults(handler=run_models_status)
 
     audit = subcommands.add_parser("audit", help="Audit product completion against the target objective.")
     audit_subcommands = audit.add_subparsers(dest="audit_command", required=True)
@@ -303,7 +315,7 @@ def build_parser() -> argparse.ArgumentParser:
     conversations_ask.add_argument("query", nargs="+", help="Question to answer from ingested local sources.")
     conversations_ask.add_argument("--top-k", type=parse_top_k, default=5, help=f"Maximum retrieved chunks to use ({MIN_TOP_K}-{MAX_TOP_K}).")
     conversations_ask.add_argument("--strategy", choices=sorted(RETRIEVAL_STRATEGIES), default="hybrid", help="Retrieval strategy to use.")
-    conversations_ask.add_argument("--provider", choices=["mock", "anthropic"], help="Model provider override.")
+    conversations_ask.add_argument("--provider", choices=model_provider_names(), help="Model provider override.")
     conversations_ask.add_argument("--model", help="Model name override.")
     conversations_ask.add_argument("--allow-mock-fallback", action="store_true", help="Permit mock fallback when a live provider is unavailable.")
     conversations_ask.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
@@ -818,10 +830,37 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"runs={summary.get('run_count', 0)}")
             print(f"memories={summary.get('memory_count', 0)}")
             print(f"enabled_memories={summary.get('enabled_memory_count', 0)}")
+            print(f"model_provider={summary.get('model_provider')}")
         for check in payload.get("checks", []):
             print(f"{check.get('status')} {check.get('name')} {check.get('detail')}")
         for recommendation in payload.get("recommendations", []):
             print(f"recommendation={recommendation}")
+    elif status in {"MODEL_PROVIDERS_OK", "MODEL_PROVIDER_STATUS"}:
+        providers = payload.get("providers")
+        if isinstance(providers, list):
+            print(f"providers={len(providers)}")
+            for provider in providers:
+                if isinstance(provider, dict):
+                    warnings = ",".join(str(warning) for warning in provider.get("warnings", []))
+                    print(
+                        f"{provider.get('status')} {provider.get('name')} "
+                        f"default_model={provider.get('default_model')} live={provider.get('live')} "
+                        f"warnings={warnings or 'none'}"
+                    )
+        provider = payload.get("provider")
+        if isinstance(provider, dict):
+            warnings = ",".join(str(warning) for warning in provider.get("warnings", []))
+            print(f"provider={provider.get('name')}")
+            print(f"status={provider.get('status')}")
+            print(f"default_model={provider.get('default_model')}")
+            print(f"live={provider.get('live')}")
+            print(f"requires_live_mode={provider.get('requires_live_mode')}")
+            print(f"live_mode_enabled={provider.get('live_mode_enabled')}")
+            print(f"api_key_env={provider.get('api_key_env')}")
+            print(f"api_key_configured={provider.get('api_key_configured')}")
+            print(f"optional_dependency={provider.get('optional_dependency')}")
+            print(f"dependency_available={provider.get('dependency_available')}")
+            print(f"warnings={warnings or 'none'}")
     elif status in {"PRODUCT_AUDIT_OK", "PRODUCT_AUDIT_OPEN", "PRODUCT_AUDIT_BLOCKED"}:
         counts = payload.get("counts", {})
         print(f"readiness_percent={payload.get('readiness_percent')}")
@@ -1126,25 +1165,39 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
         recommendations.append("Repair or remove the directory permission ledger under data/processed.")
 
     live_mode = os.getenv("MUCARO_AI_LIVE_MODE") == "1"
-    api_key_present = bool(os.getenv("ANTHROPIC_API_KEY"))
-    anthropic_sdk_present = importlib.util.find_spec("anthropic") is not None
-    if cfg.default_model_provider == "mock":
+    try:
+        configured_model_provider = model_provider_status(cfg.default_model_provider)
+    except ModelProviderError as exc:
+        configured_model_provider = {
+            "name": cfg.default_model_provider,
+            "status": exc.status,
+            "live_mode_enabled": live_mode,
+            "api_key_configured": None,
+            "dependency_available": None,
+            "warnings": [exc.detail],
+        }
+    provider_status = str(configured_model_provider.get("status"))
+    if provider_status == "MODEL_PROVIDER_READY":
         model_status = "PASS"
-        model_detail = "mock provider"
-    elif cfg.default_model_provider == "anthropic":
-        model_ready = live_mode and api_key_present and anthropic_sdk_present
-        model_status = "PASS" if model_ready else "WARN"
-        model_detail = (
-            f"live_mode={live_mode} api_key_present={api_key_present} sdk_present={anthropic_sdk_present}"
-        )
-        if not model_ready:
+    elif provider_status in {"MODEL_PROVIDER_DISABLED", "MODEL_PROVIDER_NOT_READY"}:
+        model_status = "WARN"
+    else:
+        model_status = "FAIL"
+    model_detail = (
+        f"{provider_status} provider={configured_model_provider.get('name')} "
+        f"live_mode={configured_model_provider.get('live_mode_enabled')} "
+        f"api_key_configured={configured_model_provider.get('api_key_configured')} "
+        f"dependency_available={configured_model_provider.get('dependency_available')}"
+    )
+    if provider_status in {"MODEL_PROVIDER_DISABLED", "MODEL_PROVIDER_NOT_READY"}:
+        if configured_model_provider.get("name") == "anthropic":
             recommendations.append(
                 "For live Anthropic mode, install `.[anthropic]`, set MUCARO_AI_LIVE_MODE=1, and set ANTHROPIC_API_KEY."
             )
-    else:
-        model_status = "FAIL"
-        model_detail = f"unsupported provider={cfg.default_model_provider}"
-        recommendations.append("Set MUCARO_AI_MODEL_PROVIDER to `mock` or `anthropic`.")
+        else:
+            recommendations.append("Inspect `mucaro models list` and select a ready provider.")
+    elif model_status == "FAIL":
+        recommendations.append("Set MUCARO_AI_MODEL_PROVIDER to a supported provider from `mucaro models list`.")
     checks.append(_doctor_check("model_provider", model_status, model_detail))
 
     checks.append(
@@ -1195,6 +1248,7 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
             "tool_count": len(tools),
             "model_provider": cfg.default_model_provider,
             "live_mode": live_mode,
+            "model_provider_status": provider_status,
             "auth_required": bool(cfg.operator_token),
             "deployment_profile": cfg.deployment_profile,
             "security_status": security.get("status"),
@@ -1202,6 +1256,19 @@ def build_doctor_report(cfg: Settings) -> dict[str, Any]:
         "checks": checks,
         "recommendations": sorted(set(recommendations)),
     }
+
+
+def run_models_list(args: argparse.Namespace, cfg: Settings) -> int:
+    del cfg
+    emit_payload({"status": "MODEL_PROVIDERS_OK", "providers": list_model_providers()}, args.format)
+    return 0
+
+
+def run_models_status(args: argparse.Namespace, cfg: Settings) -> int:
+    provider = args.provider or cfg.default_model_provider
+    result = {"status": "MODEL_PROVIDER_STATUS", "provider": model_provider_status(provider)}
+    emit_payload(result, args.format)
+    return 0
 
 
 def run_doctor(args: argparse.Namespace, cfg: Settings) -> int:
@@ -3027,6 +3094,9 @@ def main(argv: Sequence[str] | None = None, cfg: Settings = settings) -> int:
     except MucaroCLIError as exc:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
         return exc.exit_code
+    except ModelProviderError as exc:
+        emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
+        return 2
     except DirectoryPermissionError as exc:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
         return 2

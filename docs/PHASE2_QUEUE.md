@@ -13,7 +13,7 @@
 | Skill mount runtime | Mount → authorize → activate → execute lifecycle with local execution ledger | Candidate in Intelligence Plane foundation |
 | Execution contract | Runtime/execution identity and status schema | Candidate in Intelligence Plane foundation |
 | Model runtime contract | Provider/model/mode/capability schema independent of provider implementation | Candidate in Intelligence Plane foundation |
-| Provider-neutral model runtime | Replace narrow provider branching with adapter registry while preserving fail-closed live-mode behavior | Next |
+| Provider-neutral model runtime | Replace narrow provider branching with adapter registry while preserving fail-closed live-mode behavior | Complete candidate |
 | Local worker runtime adapter | Isolate general skills from the app process | Next |
 | Container runtime adapter | Reproducible heavy GIS/OCR/media execution with pinned runtime identity | Queued |
 | Execution router | Choose IN_PROCESS / LOCAL_WORKER / CONTAINER / SERVICE / FEDERATION_WORKER by policy, never by skill fiat | Queued |

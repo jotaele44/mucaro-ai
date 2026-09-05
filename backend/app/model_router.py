@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib.util
 import os
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -9,6 +11,99 @@ class ModelProviderError(RuntimeError):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+
+
+@dataclass(frozen=True)
+class ModelProviderSpec:
+    name: str
+    default_model: str
+    live: bool
+    requires_live_mode: bool
+    api_key_env: str | None
+    optional_dependency: str | None
+    description: str
+
+
+MODEL_PROVIDER_SPECS: dict[str, ModelProviderSpec] = {
+    "mock": ModelProviderSpec(
+        name="mock",
+        default_model="mock-cited-synthesizer-v1",
+        live=False,
+        requires_live_mode=False,
+        api_key_env=None,
+        optional_dependency=None,
+        description="Deterministic local cited-answer synthesizer for offline use and tests.",
+    ),
+    "anthropic": ModelProviderSpec(
+        name="anthropic",
+        default_model="claude-3-5-sonnet-latest",
+        live=True,
+        requires_live_mode=True,
+        api_key_env="ANTHROPIC_API_KEY",
+        optional_dependency="anthropic",
+        description="Live Anthropic Messages API adapter, disabled unless live mode and credentials are explicit.",
+    ),
+}
+
+
+def normalize_model_provider(model_provider: str | None) -> str:
+    provider = (model_provider or "mock").strip().lower()
+    if not provider:
+        return "mock"
+    return provider
+
+
+def get_model_provider_spec(model_provider: str | None) -> ModelProviderSpec:
+    provider = normalize_model_provider(model_provider)
+    try:
+        return MODEL_PROVIDER_SPECS[provider]
+    except KeyError as exc:
+        raise ModelProviderError("ERROR_UNSUPPORTED_MODEL_PROVIDER", provider) from exc
+
+
+def list_model_providers() -> list[dict[str, Any]]:
+    return [_provider_status(spec) for spec in MODEL_PROVIDER_SPECS.values()]
+
+
+def model_provider_names() -> tuple[str, ...]:
+    return tuple(MODEL_PROVIDER_SPECS)
+
+
+def model_provider_status(model_provider: str | None = None) -> dict[str, Any]:
+    return _provider_status(get_model_provider_spec(model_provider))
+
+
+def _provider_status(spec: ModelProviderSpec) -> dict[str, Any]:
+    live_mode_enabled = os.getenv("MUCARO_AI_LIVE_MODE") == "1"
+    api_key_configured = bool(os.getenv(spec.api_key_env)) if spec.api_key_env else None
+    dependency_available = (
+        importlib.util.find_spec(spec.optional_dependency) is not None if spec.optional_dependency else None
+    )
+    warnings: list[str] = []
+    status = "MODEL_PROVIDER_READY"
+    if spec.requires_live_mode and not live_mode_enabled:
+        status = "MODEL_PROVIDER_DISABLED"
+        warnings.append("LIVE_MODE_DISABLED")
+    elif spec.api_key_env and not api_key_configured:
+        status = "MODEL_PROVIDER_NOT_READY"
+        warnings.append(f"API_KEY_MISSING:{spec.api_key_env}")
+    elif spec.optional_dependency and not dependency_available:
+        status = "MODEL_PROVIDER_NOT_READY"
+        warnings.append(f"OPTIONAL_DEPENDENCY_MISSING:{spec.optional_dependency}")
+    return {
+        "name": spec.name,
+        "default_model": spec.default_model,
+        "live": spec.live,
+        "requires_live_mode": spec.requires_live_mode,
+        "api_key_env": spec.api_key_env,
+        "optional_dependency": spec.optional_dependency,
+        "description": spec.description,
+        "live_mode_enabled": live_mode_enabled,
+        "api_key_configured": api_key_configured,
+        "dependency_available": dependency_available,
+        "status": status,
+        "warnings": warnings,
+    }
 
 
 def generate_answer(
@@ -21,18 +116,16 @@ def generate_answer(
     conversation_context: list[dict[str, Any]] | None = None,
     memory_context: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    provider = model_provider or "mock"
-    if provider == "mock":
+    spec = get_model_provider_spec(model_provider)
+    if spec.name == "mock":
         return _mock_answer(
             query,
             retrieved_chunks,
-            model_name=model_name or "mock-cited-synthesizer-v1",
+            model_name=model_name or spec.default_model,
             conversation_context=conversation_context or [],
             memory_context=memory_context or [],
         )
-    if provider != "anthropic":
-        raise ModelProviderError("ERROR_UNSUPPORTED_MODEL_PROVIDER", provider)
-    if os.getenv("MUCARO_AI_LIVE_MODE") != "1":
+    if spec.name == "anthropic" and os.getenv("MUCARO_AI_LIVE_MODE") != "1":
         return _fallback_or_error(
             query,
             retrieved_chunks,
@@ -42,7 +135,7 @@ def generate_answer(
             conversation_context=conversation_context or [],
             memory_context=memory_context or [],
         )
-    if not os.getenv("ANTHROPIC_API_KEY"):
+    if spec.name == "anthropic" and spec.api_key_env and not os.getenv(spec.api_key_env):
         return _fallback_or_error(
             query,
             retrieved_chunks,
@@ -182,7 +275,7 @@ def _anthropic_answer(
         f"Question: {query}\n\nContext:\n{context}"
     )
     response = client.messages.create(
-        model=model_name or os.getenv("MUCARO_AI_MODEL", "claude-3-5-sonnet-latest"),
+        model=model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model),
         max_tokens=900,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -190,7 +283,7 @@ def _anthropic_answer(
     cited = [c["chunk_id"] for c in retrieved_chunks if c["chunk_id"] in text]
     return {
         "model_provider": "anthropic",
-        "model_name": model_name or os.getenv("MUCARO_AI_MODEL", "claude-3-5-sonnet-latest"),
+        "model_name": model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model),
         "answer": text,
         "cited_chunk_ids": cited,
     }

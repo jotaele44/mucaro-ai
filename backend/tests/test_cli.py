@@ -67,7 +67,68 @@ def test_cli_help_lists_serve(capsys):
         assert exc.code == 0
     output = capsys.readouterr().out
     assert "certify" in output
+    assert "models" in output
     assert "serve" in output
+
+
+def test_cli_models_list_reports_provider_registry(tmp_path: Path, capsys, monkeypatch):
+    monkeypatch.delenv("MUCARO_AI_LIVE_MODE", raising=False)
+    cfg = make_settings(tmp_path)
+
+    assert main(["models", "list", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "MODEL_PROVIDERS_OK"
+    providers = {provider["name"]: provider for provider in payload["providers"]}
+    assert set(providers) == {"mock", "anthropic"}
+    assert providers["mock"]["status"] == "MODEL_PROVIDER_READY"
+    assert providers["anthropic"]["status"] == "MODEL_PROVIDER_DISABLED"
+
+    assert main(["models", "list", "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "providers=2" in text_output
+    assert "MODEL_PROVIDER_READY mock" in text_output
+    assert "MODEL_PROVIDER_DISABLED anthropic" in text_output
+
+
+def test_cli_models_status_defaults_to_configured_provider(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["models", "status", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "MODEL_PROVIDER_STATUS"
+    assert payload["provider"]["name"] == "mock"
+    assert payload["provider"]["status"] == "MODEL_PROVIDER_READY"
+
+
+def test_cli_models_status_reports_live_provider_gates(tmp_path: Path, capsys, monkeypatch):
+    monkeypatch.delenv("MUCARO_AI_LIVE_MODE", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    cfg = make_settings(tmp_path)
+
+    assert main(["models", "status", "anthropic", "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+
+    assert "provider=anthropic" in text_output
+    assert "status=MODEL_PROVIDER_DISABLED" in text_output
+    assert "warnings=LIVE_MODE_DISABLED" in text_output
+
+    monkeypatch.setenv("MUCARO_AI_LIVE_MODE", "1")
+    assert main(["models", "status", "anthropic", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["provider"]["status"] == "MODEL_PROVIDER_NOT_READY"
+    assert payload["provider"]["warnings"] == ["API_KEY_MISSING:ANTHROPIC_API_KEY"]
+
+
+def test_cli_models_status_rejects_unknown_provider(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["models", "status", "other", "--format", "text"], cfg=cfg) == 2
+    captured = capsys.readouterr()
+
+    assert "ERROR_UNSUPPORTED_MODEL_PROVIDER other" in captured.err
 
 
 def test_cli_version(capsys):

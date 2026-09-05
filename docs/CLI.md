@@ -196,6 +196,9 @@ mucaro conversations list --format text
 mucaro conversations ask CONVERSATION_ID "How does source lineage work?" --strategy persistent --format json
 mucaro runs summary --format text
 mucaro runs show RUN_ID --format json
+mucaro models list --format text
+mucaro models status --format json
+mucaro models status anthropic --format text
 mucaro memory remember "Prefer concise technical answers" --kind preference --format json
 mucaro memory list --format text
 mucaro memory disable MEMORY_ID --format json
@@ -244,6 +247,13 @@ source/chunk counts, persistent index status, semantic-store status, directory
 grants, model-provider readiness, API auth posture, conversations, runs,
 explicit memory, production-security posture, and the local tool runtime. Add `--strict` when
 automation should fail on warnings.
+
+Use `mucaro models list` to inspect the provider registry without making live
+model calls. Use `mucaro models status PROVIDER` to diagnose a single provider's
+live-mode gate, credential environment variable, optional dependency, default
+model, readiness status, and warnings. The mock provider is always local and
+ready; live providers remain disabled or not ready until their explicit gates
+are satisfied.
 
 Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,

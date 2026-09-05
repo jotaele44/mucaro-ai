@@ -163,9 +163,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "model_layer",
             "Assistant can call a live frontier model when explicitly enabled.",
             _status_from_files(cfg, [("backend", "app", "model_router.py")]),
-            "Anthropic adapter behind explicit live-mode environment gates",
-            "Only mock and Anthropic are currently supported.",
-            "Add provider-neutral routing and clearer model readiness UX.",
+            "Provider registry with mock and Anthropic readiness diagnostics behind explicit live-mode gates",
+            "Only mock and Anthropic adapters are currently implemented.",
+            "Add new providers through the registry without weakening fail-closed live-mode behavior.",
         ),
         ProductRequirement(
             "tool_use_and_actions",
@@ -311,8 +311,8 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
                 "production_security",
             ),
             "Memory, tools, live-mode routing, multimodal metadata, and security posture are explicitly bounded.",
-            "Broader write tools, provider-neutral routing, and semantic multimodal understanding remain future scoped work.",
-            "Add new model/tool capabilities only with opt-in controls, audit events, and fail-closed security rules.",
+            "Broader write tools, additional model providers, and semantic multimodal understanding remain future scoped work.",
+            "Add new model/tool capabilities through the registry with opt-in controls, audit events, and fail-closed security rules.",
         ),
         ProductRoadmapStage(
             "release_packaging_certification",
