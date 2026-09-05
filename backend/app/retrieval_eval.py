@@ -15,8 +15,13 @@ from .vector_index import build_persistent_index
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FIXTURE = ROOT / "backend" / "tests" / "fixtures" / "retrieval_eval.json"
 DEFAULT_STRATEGIES = ["lexical", "vector", "bm25", "hybrid", "persistent", "semantic"]
-MIN_FIXTURE_CHUNKS = 12
-MIN_FIXTURE_QUERIES = 12
+MIN_FIXTURE_CHUNKS = 24
+MIN_FIXTURE_QUERIES = 30
+MIN_POSITIVE_QUERIES = 24
+MIN_NO_CONTEXT_QUERIES = 6
+MIN_SOURCE_IDS = 20
+MIN_MULTI_BINDING_QUERIES = 2
+MIN_QUERY_CATEGORIES = 8
 
 
 def load_retrieval_eval_fixture(path: Path = DEFAULT_FIXTURE) -> Any:
@@ -45,6 +50,9 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
                 "positive_queries": 0,
                 "no_context_queries": 0,
                 "expected_bindings": 0,
+                "source_ids": 0,
+                "multi_binding_queries": 0,
+                "query_categories": 0,
             },
         }
     chunks = fixture.get("chunks")
@@ -87,6 +95,7 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
     chunk_id_counts = Counter(chunk_ids)
     duplicate_chunk_ids = sorted(chunk_id for chunk_id, count in chunk_id_counts.items() if count > 1)
     known_chunk_ids = set(chunk_ids)
+    source_ids = {chunk.get("source_id") for chunk in chunk_rows if isinstance(chunk, dict) and isinstance(chunk.get("source_id"), str)}
     checks.append(
         _eval_check(
             "chunk_contract",
@@ -94,13 +103,22 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
             f"malformed={malformed_chunks} duplicates={','.join(duplicate_chunk_ids) or 'none'}",
         )
     )
+    checks.append(
+        _eval_check(
+            "source_diversity",
+            "PASS" if len(source_ids) >= MIN_SOURCE_IDS else "FAIL",
+            f"source_ids={len(source_ids)} min_source_ids={MIN_SOURCE_IDS}",
+        )
+    )
 
     malformed_queries = 0
     duplicate_queries: set[str] = set()
     seen_queries: set[str] = set()
     dangling_expected: set[str] = set()
+    query_categories: set[str] = set()
     positive_queries = 0
     no_context_queries = 0
+    multi_binding_queries = 0
     expected_bindings = 0
     for row in query_rows:
         if not isinstance(row, dict):
@@ -116,8 +134,13 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
         seen_queries.add(query)
         if expected:
             positive_queries += 1
+            if len(expected) > 1:
+                multi_binding_queries += 1
         else:
             no_context_queries += 1
+        category = row.get("category")
+        if isinstance(category, str) and category.strip():
+            query_categories.add(category)
         for chunk_id in expected:
             if not isinstance(chunk_id, str) or not chunk_id.strip():
                 malformed_queries += 1
@@ -142,8 +165,25 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
     checks.append(
         _eval_check(
             "negative_cases",
-            "PASS" if positive_queries > 0 and no_context_queries > 0 else "FAIL",
-            f"positive={positive_queries} no_context={no_context_queries}",
+            "PASS" if positive_queries >= MIN_POSITIVE_QUERIES and no_context_queries >= MIN_NO_CONTEXT_QUERIES else "FAIL",
+            (
+                f"positive={positive_queries} min_positive={MIN_POSITIVE_QUERIES} "
+                f"no_context={no_context_queries} min_no_context={MIN_NO_CONTEXT_QUERIES}"
+            ),
+        )
+    )
+    checks.append(
+        _eval_check(
+            "multi_binding_cases",
+            "PASS" if multi_binding_queries >= MIN_MULTI_BINDING_QUERIES else "FAIL",
+            f"multi_binding={multi_binding_queries} min_multi_binding={MIN_MULTI_BINDING_QUERIES}",
+        )
+    )
+    checks.append(
+        _eval_check(
+            "query_category_coverage",
+            "PASS" if len(query_categories) >= MIN_QUERY_CATEGORIES else "FAIL",
+            f"categories={len(query_categories)} min_categories={MIN_QUERY_CATEGORIES}",
         )
     )
 
@@ -157,6 +197,9 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
             "positive_queries": positive_queries,
             "no_context_queries": no_context_queries,
             "expected_bindings": expected_bindings,
+            "source_ids": len(source_ids),
+            "multi_binding_queries": multi_binding_queries,
+            "query_categories": len(query_categories),
         },
     }
 
@@ -286,6 +329,9 @@ def build_retrieval_eval_report(
         "positive_queries": fixture_validation["counts"]["positive_queries"],
         "no_context_queries": fixture_validation["counts"]["no_context_queries"],
         "expected_bindings": fixture_validation["counts"]["expected_bindings"],
+        "source_ids": fixture_validation["counts"]["source_ids"],
+        "multi_binding_queries": fixture_validation["counts"]["multi_binding_queries"],
+        "query_categories": fixture_validation["counts"]["query_categories"],
         "strategies": len(report["strategies"]),
     }
     return report

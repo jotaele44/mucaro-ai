@@ -160,11 +160,14 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "RETRIEVAL_EVAL_OK"
     assert payload["counts"] == {
-        "chunks": 16,
-        "queries": 19,
-        "positive_queries": 15,
-        "no_context_queries": 4,
-        "expected_bindings": 15,
+        "chunks": 25,
+        "queries": 31,
+        "positive_queries": 25,
+        "no_context_queries": 6,
+        "expected_bindings": 28,
+        "source_ids": 25,
+        "multi_binding_queries": 3,
+        "query_categories": 20,
         "strategies": 6,
     }
     assert payload["fixture_validation"]["status"] == "RETRIEVAL_FIXTURE_OK"
@@ -180,8 +183,11 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert main(["eval", "retrieval", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "fixture=backend/tests/fixtures/retrieval_eval.json" in text_output
-    assert "positive_queries=15" in text_output
-    assert "no_context_queries=4" in text_output
+    assert "positive_queries=25" in text_output
+    assert "no_context_queries=6" in text_output
+    assert "source_ids=25" in text_output
+    assert "multi_binding_queries=3" in text_output
+    assert "query_categories=20" in text_output
     assert "fixture_validation=RETRIEVAL_FIXTURE_OK" in text_output
     assert "hybrid recall@5=" in text_output
     assert "semantic recall@5=" in text_output

@@ -506,6 +506,12 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 print(f"no_context_queries={counts.get('no_context_queries')}")
             if "expected_bindings" in counts:
                 print(f"expected_bindings={counts.get('expected_bindings')}")
+            if "source_ids" in counts:
+                print(f"source_ids={counts.get('source_ids')}")
+            if "multi_binding_queries" in counts:
+                print(f"multi_binding_queries={counts.get('multi_binding_queries')}")
+            if "query_categories" in counts:
+                print(f"query_categories={counts.get('query_categories')}")
             print(f"strategies={counts.get('strategies')}")
         fixture_validation = payload.get("fixture_validation", {})
         if isinstance(fixture_validation, dict):

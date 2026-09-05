@@ -91,6 +91,60 @@
       "text": "Governed release certification separates local release success from hosted GitHub Actions proof; startup_failure before jobs blocks tag readiness even when local gates pass."
     },
     {
+      "chunk_id": "eval_package_artifact",
+      "source_id": "eval_source_artifact",
+      "chunk_index": 0,
+      "text": "Package build writes a tracked-source ZIP and artifact manifest with exact HEAD, archive SHA-256, member count, and per-member SHA-256 receipts."
+    },
+    {
+      "chunk_id": "eval_release_receipts",
+      "source_id": "eval_source_release_receipts",
+      "chunk_index": 0,
+      "text": "Release receipts list local release and fresh-clone certification evidence by receipt type, status, bound head SHA, schema validity, and receipt file SHA-256."
+    },
+    {
+      "chunk_id": "eval_github_startup",
+      "source_id": "eval_source_github_startup",
+      "chunk_index": 0,
+      "text": "Hosted runner startup diagnostics classify startup_failure with zero jobs as before_jobs and direct operators to Actions billing, spending limit, runner availability, and account policy."
+    },
+    {
+      "chunk_id": "eval_security_public_bind",
+      "source_id": "eval_source_public_bind",
+      "chunk_index": 0,
+      "text": "Public bind protection rejects non-loopback hosts unless MUCARO_AI_ALLOW_PUBLIC_BIND is set and production mode requires operator token and CORS origins."
+    },
+    {
+      "chunk_id": "eval_provider_fail_closed",
+      "source_id": "eval_source_provider_fail_closed",
+      "chunk_index": 0,
+      "text": "Live provider calls fail closed with structured errors unless live mode, provider dependencies, and API credentials are explicitly configured."
+    },
+    {
+      "chunk_id": "eval_source_deletion",
+      "source_id": "eval_source_deletion",
+      "chunk_index": 0,
+      "text": "Source deletion removes the selected source, cascades its chunks, rebuilds the persistent index, and refreshes the semantic store from remaining chunks."
+    },
+    {
+      "chunk_id": "eval_schema_validation",
+      "source_id": "eval_source_schema_validation",
+      "chunk_index": 0,
+      "text": "Schema validation checks committed JSON artifacts against their schemas and reports JSON_OK with checked counts before release certification."
+    },
+    {
+      "chunk_id": "eval_conversation_trace",
+      "source_id": "eval_source_conversation_trace",
+      "chunk_index": 0,
+      "text": "Run history preserves answer traces after conversation deletion, including retrieval strategy, citation status, and latest run identifiers."
+    },
+    {
+      "chunk_id": "eval_cli_exit_codes",
+      "source_id": "eval_source_cli_exit_codes",
+      "chunk_index": 0,
+      "text": "CLI automation uses exit code 0 for success, exit code 2 for operational failures, and exit code 3 when an answer runs but citation validation is not OK."
+    },
+    {
       "chunk_id": "eval_distractor_runtime",
       "source_id": "eval_source_distractor",
       "chunk_index": 0,
@@ -98,24 +152,36 @@
     }
   ],
   "queries": [
-    {"query": "What prevents execution before approval?", "expected_chunk_ids": ["eval_approval_lock"]},
-    {"query": "How are answer citations traced back to files?", "expected_chunk_ids": ["eval_source_lineage"]},
-    {"query": "How does the launcher prove the server stopped?", "expected_chunk_ids": ["eval_desktop_launcher"]},
-    {"query": "Which parser evidence is kept for CSV files?", "expected_chunk_ids": ["eval_csv_parser"]},
-    {"query": "When should Anthropic live calls run?", "expected_chunk_ids": ["eval_mock_model"]},
-    {"query": "What must happen before ingesting an external folder?", "expected_chunk_ids": ["eval_directory_permission"]},
-    {"query": "How does persistent retrieval know an index is stale?", "expected_chunk_ids": ["eval_persistent_index"]},
-    {"query": "How are follow-up chat questions given prior context?", "expected_chunk_ids": ["eval_chat_history"]},
-    {"query": "What protects local mutating API routes when configured?", "expected_chunk_ids": ["eval_operator_auth"]},
-    {"query": "Which package readiness command checks the frontend lockfile?", "expected_chunk_ids": ["eval_package_status"]},
-    {"query": "Which retrieval fixture safeguards prevent misleading benchmark scores?", "expected_chunk_ids": ["eval_retrieval_fixture"]},
-    {"query": "How can a memory item be turned off without deletion?", "expected_chunk_ids": ["eval_memory_controls"]},
-    {"query": "What has to happen before a local tool call runs?", "expected_chunk_ids": ["eval_tool_audit"]},
-    {"query": "What does media ingestion understand about images and audio?", "expected_chunk_ids": ["eval_media_metadata"]},
-    {"query": "Why can local release pass while tag readiness is blocked?", "expected_chunk_ids": ["eval_governance_ci"]},
-    {"query": "What is the moon made of?", "expected_chunk_ids": []},
-    {"query": "Who won the alpine ski race?", "expected_chunk_ids": []},
-    {"query": "What flavor is the wedding cake?", "expected_chunk_ids": []},
-    {"query": "How tall is Mount Everest?", "expected_chunk_ids": []}
+    {"query": "What prevents execution before approval?", "expected_chunk_ids": ["eval_approval_lock"], "category": "execution_gate"},
+    {"query": "How are answer citations traced back to files?", "expected_chunk_ids": ["eval_source_lineage"], "category": "citation_traceability"},
+    {"query": "How does the launcher prove the server stopped?", "expected_chunk_ids": ["eval_desktop_launcher"], "category": "launcher_certification"},
+    {"query": "Which parser evidence is kept for CSV files?", "expected_chunk_ids": ["eval_csv_parser"], "category": "source_ingestion"},
+    {"query": "When should Anthropic live calls run?", "expected_chunk_ids": ["eval_mock_model"], "category": "model_routing"},
+    {"query": "What must happen before ingesting an external folder?", "expected_chunk_ids": ["eval_directory_permission"], "category": "permission_boundary"},
+    {"query": "How does persistent retrieval know an index is stale?", "expected_chunk_ids": ["eval_persistent_index"], "category": "retrieval_index"},
+    {"query": "How are follow-up chat questions given prior context?", "expected_chunk_ids": ["eval_chat_history"], "category": "conversation_context"},
+    {"query": "What protects local mutating API routes when configured?", "expected_chunk_ids": ["eval_operator_auth"], "category": "security_profile"},
+    {"query": "Which package readiness command checks the frontend lockfile?", "expected_chunk_ids": ["eval_package_status"], "category": "packaging"},
+    {"query": "Which retrieval fixture safeguards prevent misleading benchmark scores?", "expected_chunk_ids": ["eval_retrieval_fixture"], "category": "retrieval_eval_contract"},
+    {"query": "How can a memory item be turned off without deletion?", "expected_chunk_ids": ["eval_memory_controls"], "category": "memory_controls"},
+    {"query": "What has to happen before a local tool call runs?", "expected_chunk_ids": ["eval_tool_audit"], "category": "tool_runtime"},
+    {"query": "What does media ingestion understand about images and audio?", "expected_chunk_ids": ["eval_media_metadata"], "category": "media_metadata"},
+    {"query": "Why can local release pass while tag readiness is blocked?", "expected_chunk_ids": ["eval_governance_ci"], "category": "github_governance"},
+    {"query": "Which package artifact receipts are written by package build?", "expected_chunk_ids": ["eval_package_artifact", "eval_package_status"], "category": "packaging"},
+    {"query": "How are exact-head certification receipts inspected?", "expected_chunk_ids": ["eval_release_receipts"], "category": "release_receipts"},
+    {"query": "What does startup_failure with zero jobs mean?", "expected_chunk_ids": ["eval_github_startup"], "category": "github_governance"},
+    {"query": "What rejects public bind hosts in production posture?", "expected_chunk_ids": ["eval_security_public_bind"], "category": "security_profile"},
+    {"query": "How do live provider calls fail when credentials are missing?", "expected_chunk_ids": ["eval_provider_fail_closed"], "category": "model_routing"},
+    {"query": "What happens to indexes after source deletion?", "expected_chunk_ids": ["eval_source_deletion"], "category": "source_management"},
+    {"query": "Which validation reports JSON_OK before release certification?", "expected_chunk_ids": ["eval_schema_validation"], "category": "schema_validation"},
+    {"query": "What answer trace survives conversation deletion?", "expected_chunk_ids": ["eval_conversation_trace", "eval_chat_history"], "category": "conversation_context"},
+    {"query": "Which CLI exit code means citation validation was not OK?", "expected_chunk_ids": ["eval_cli_exit_codes"], "category": "cli_contract"},
+    {"query": "How do release receipts bind local release and fresh-clone evidence?", "expected_chunk_ids": ["eval_release_receipts", "eval_governance_ci"], "category": "release_receipts"},
+    {"query": "What is the moon made of?", "expected_chunk_ids": [], "category": "no_context"},
+    {"query": "Who won the alpine ski race?", "expected_chunk_ids": [], "category": "no_context"},
+    {"query": "What flavor is the wedding cake?", "expected_chunk_ids": [], "category": "no_context"},
+    {"query": "How tall is Mount Everest?", "expected_chunk_ids": [], "category": "no_context"},
+    {"query": "What is the capital of France?", "expected_chunk_ids": [], "category": "no_context"},
+    {"query": "Which restaurant is open downtown tonight?", "expected_chunk_ids": [], "category": "no_context"}
   ]
 }

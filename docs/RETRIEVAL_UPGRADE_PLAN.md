@@ -46,9 +46,11 @@ not a hosted language embedding model, it requires matched terms before returnin
 cited context.
 
 The committed retrieval fixture now has its own validation gate: chunk IDs must
-be unique, expected chunk bindings must point at existing chunks, positive and
-no-context cases must both be present, and benchmark counts are reported beside
-retrieval scores.
+be unique, expected chunk bindings must point at existing chunks, source
+coverage must span a minimum number of source IDs, positive and no-context cases
+must both meet minimum floors, multi-binding cases must be present, query
+categories must cover multiple product surfaces, and benchmark counts are
+reported beside retrieval scores.
 
 Future model-backed embeddings or Chroma-style stores should use this boundary
 instead of changing the answer service contract. They should not replace the
@@ -59,7 +61,7 @@ default `hybrid` strategy until eval evidence shows a material improvement.
 | Gate | Required Result |
 |---|---|
 | Fixture eval | `RETRIEVAL_EVAL_OK` with the candidate strategy included |
-| Fixture contract | `RETRIEVAL_FIXTURE_OK` with no dangling expected IDs and at least one no-context case |
+| Fixture contract | `RETRIEVAL_FIXTURE_OK` with no dangling expected IDs, source diversity, multi-binding cases, category coverage, and positive/no-context minimums |
 | Determinism check | Stable top-k order for ties or explicit tie-break metadata |
 | Empty corpus | Explicit error status, no exception |
 | Missing index/store | Explicit repair warning |

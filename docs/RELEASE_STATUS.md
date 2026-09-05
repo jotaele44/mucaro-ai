@@ -139,8 +139,9 @@ Observed success markers:
   at the GitHub Actions startup/account/repository-runner layer, not in the
   Python, Node, checkout, or release-certification steps.
 - Retrieval eval gate: `RETRIEVAL_EVAL_OK` with `RETRIEVAL_FIXTURE_OK` for
-  lexical, vector, BM25, hybrid, persistent, and semantic strategies across 16
-  chunks, 19 queries, 15 positive queries, and 4 no-context queries.
+  lexical, vector, BM25, hybrid, persistent, and semantic strategies across 25
+  chunks, 31 queries, 25 positive queries, 6 no-context queries, 28 expected
+  bindings, 25 source IDs, 3 multi-binding queries, and 20 query categories.
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
 - `INGEST_FOLDER_OK`
 - `CITATION_OK`
