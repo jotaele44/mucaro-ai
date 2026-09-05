@@ -154,6 +154,34 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert "OPEN github_release_governance" in strict_output
 
 
+def test_cli_product_roadmap_groups_audit_gaps(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["audit", "roadmap", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "PRODUCT_ROADMAP_OPEN"
+    assert payload["audit_status"] == "PRODUCT_AUDIT_OPEN"
+    assert payload["audit_counts"] == {"pass": 16, "open": 1, "blocked": 0, "total": 17}
+    assert payload["next_recommended_stage"] == "hosted_release_governance"
+    assert payload["next_recommended_vector"] == "github_release_governance"
+
+    stages = {stage["stage_id"]: stage for stage in payload["stages"]}
+    assert stages["canonical_operator_surface"]["status"] == "PASS"
+    assert stages["permissioned_source_grounding"]["status"] == "PASS"
+    assert stages["controlled_assistant_behavior"]["status"] == "PASS"
+    assert stages["release_packaging_certification"]["status"] == "PASS"
+    assert stages["hosted_release_governance"]["status"] == "OPEN"
+    assert stages["hosted_release_governance"]["open_requirements"] == ["github_release_governance"]
+
+    assert main(["audit", "roadmap", "--strict", "--format", "text"], cfg=cfg) == 2
+    strict_output = capsys.readouterr().out
+    assert "PRODUCT_ROADMAP_OPEN" in strict_output
+    assert "audit_total=17" in strict_output
+    assert "next_recommended_stage=hosted_release_governance" in strict_output
+    assert "OPEN hosted_release_governance" in strict_output
+    assert "open_requirements=github_release_governance" in strict_output
+
+
 def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 

@@ -39,6 +39,16 @@ class ProductRequirement:
         }
 
 
+@dataclass(frozen=True)
+class ProductRoadmapStage:
+    stage_id: str
+    title: str
+    requirement_ids: tuple[str, ...]
+    evidence: str
+    gap: str
+    next_step: str
+
+
 def _has(cfg: Settings, *parts: str) -> bool:
     return (cfg.project_root.joinpath(*parts)).exists() or (CODE_ROOT.joinpath(*parts)).exists()
 
@@ -242,4 +252,132 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
         "counts": counts,
         "requirements": rows,
         "next_recommended_vector": next_recommended_vector,
+    }
+
+
+def _stage_status(rows: list[dict[str, str]]) -> str:
+    statuses = {row.get("status") for row in rows}
+    if "BLOCKED" in statuses:
+        return "BLOCKED"
+    if "OPEN" in statuses:
+        return "OPEN"
+    return "PASS"
+
+
+def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
+    audit = build_product_audit(cfg)
+    requirements = {
+        str(row.get("requirement_id")): row
+        for row in audit.get("requirements", [])
+        if isinstance(row, dict) and row.get("requirement_id")
+    }
+    stages = [
+        ProductRoadmapStage(
+            "canonical_operator_surface",
+            "Canonical operator surface",
+            (
+                "local_desktop_app",
+                "installable_cli",
+                "readiness_diagnostics",
+                "durable_conversations",
+                "run_history_audit",
+            ),
+            "Desktop launcher, CLI, doctor, conversations, and run audit are exposed through supported app surfaces.",
+            "",
+            "Keep CLI, API, and desktop behavior routed through shared backend services.",
+        ),
+        ProductRoadmapStage(
+            "permissioned_source_grounding",
+            "Permissioned source grounding",
+            (
+                "permission_gated_user_directory",
+                "document_ingestion",
+                "source_lineage_citations",
+                "local_retrieval_strategies",
+                "semantic_vector_store",
+            ),
+            "Directory grants, parsers, source lineage, deterministic strategies, and semantic-store scaffolding are present.",
+            "DOCX, HTML, email, higher-quality embeddings, and semantic media understanding remain upgrade vectors.",
+            "Expand parser and embedding adapters behind explicit permission, provenance, and evaluation gates.",
+        ),
+        ProductRoadmapStage(
+            "controlled_assistant_behavior",
+            "Controlled assistant behavior",
+            (
+                "personalization_memory",
+                "tool_use_and_actions",
+                "live_model_adapter",
+                "multimodal_interface",
+                "production_security",
+            ),
+            "Memory, tools, live-mode routing, multimodal metadata, and security posture are explicitly bounded.",
+            "Broader write tools, provider-neutral routing, and semantic multimodal understanding remain future scoped work.",
+            "Add new model/tool capabilities only with opt-in controls, audit events, and fail-closed security rules.",
+        ),
+        ProductRoadmapStage(
+            "release_packaging_certification",
+            "Release packaging certification",
+            ("source_artifact_packaging",),
+            "Source-artifact packaging is part of the product audit and release-state receipt path.",
+            "",
+            "Keep source artifacts, distribution checks, and receipts exact-head bound before release tags.",
+        ),
+        ProductRoadmapStage(
+            "hosted_release_governance",
+            "Hosted release governance",
+            ("github_release_governance",),
+            "GitHub governance remains separate from local certification so hosted failures do not masquerade as product test failures.",
+            "Hosted GitHub Actions startup and private branch-protection enforcement are not yet proven.",
+            "Repair hosted Actions startup, enforce branch protection when available, and rerun current-head governance certification.",
+        ),
+    ]
+
+    stage_rows: list[dict[str, Any]] = []
+    for stage in stages:
+        rows = [requirements[requirement_id] for requirement_id in stage.requirement_ids if requirement_id in requirements]
+        counts = {
+            "pass": sum(1 for row in rows if row.get("status") == "PASS"),
+            "open": sum(1 for row in rows if row.get("status") == "OPEN"),
+            "blocked": sum(1 for row in rows if row.get("status") == "BLOCKED"),
+            "total": len(rows),
+        }
+        status = _stage_status(rows)
+        open_requirements = [
+            str(row.get("requirement_id"))
+            for row in rows
+            if row.get("status") in {"OPEN", "BLOCKED"}
+        ]
+        stage_rows.append(
+            {
+                "stage_id": stage.stage_id,
+                "title": stage.title,
+                "status": status,
+                "counts": counts,
+                "requirements": [str(row.get("requirement_id")) for row in rows],
+                "open_requirements": open_requirements,
+                "evidence": stage.evidence,
+                "gap": stage.gap,
+                "next_step": stage.next_step,
+            }
+        )
+
+    stage_statuses = {row["status"] for row in stage_rows}
+    status = "PRODUCT_ROADMAP_OK"
+    if "BLOCKED" in stage_statuses:
+        status = "PRODUCT_ROADMAP_BLOCKED"
+    elif "OPEN" in stage_statuses:
+        status = "PRODUCT_ROADMAP_OPEN"
+    next_recommended_stage = next(
+        (row["stage_id"] for row in stage_rows if row["status"] in {"BLOCKED", "OPEN"}),
+        "complete",
+    )
+    return {
+        "status": status,
+        "objective": audit.get("objective"),
+        "audit_status": audit.get("status"),
+        "audit_counts": audit.get("counts"),
+        "readiness_percent": audit.get("readiness_percent"),
+        "next_recommended_vector": audit.get("next_recommended_vector"),
+        "next_recommended_stage": next_recommended_stage,
+        "stages": stage_rows,
     }

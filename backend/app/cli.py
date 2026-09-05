@@ -50,7 +50,7 @@ from .permissions import (
     load_directory_grants,
     revoke_directory,
 )
-from .product_audit import build_product_audit
+from .product_audit import build_product_audit, build_product_roadmap
 from .release_receipts import find_release_receipt, list_release_receipts, load_release_receipt, summarize_release_receipts
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .retrieval_eval import DEFAULT_FIXTURE, build_retrieval_eval_report, format_retrieval_eval_text
@@ -171,6 +171,11 @@ def build_parser() -> argparse.ArgumentParser:
     audit_product.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     audit_product.add_argument("--strict", action="store_true", help="Exit nonzero while product gaps remain open.")
     audit_product.set_defaults(handler=run_audit_product)
+
+    audit_roadmap = audit_subcommands.add_parser("roadmap", help="Group product audit gaps into development stages.")
+    audit_roadmap.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    audit_roadmap.add_argument("--strict", action="store_true", help="Exit nonzero while roadmap stages remain open.")
+    audit_roadmap.set_defaults(handler=run_audit_roadmap)
 
     eval_cmd = subcommands.add_parser("eval", help="Run measurable local quality evaluations.")
     eval_subcommands = eval_cmd.add_subparsers(dest="eval_command", required=True)
@@ -828,6 +833,31 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"next_recommended_vector={payload.get('next_recommended_vector')}")
         for requirement in payload.get("requirements", []):
             print(f"{requirement.get('status')} {requirement.get('requirement_id')} {requirement.get('gap')}")
+    elif status in {"PRODUCT_ROADMAP_OK", "PRODUCT_ROADMAP_OPEN", "PRODUCT_ROADMAP_BLOCKED"}:
+        audit_counts = payload.get("audit_counts", {})
+        print(f"readiness_percent={payload.get('readiness_percent')}")
+        if isinstance(audit_counts, dict):
+            print(f"audit_pass={audit_counts.get('pass', 0)}")
+            print(f"audit_open={audit_counts.get('open', 0)}")
+            print(f"audit_blocked={audit_counts.get('blocked', 0)}")
+            print(f"audit_total={audit_counts.get('total', 0)}")
+        print(f"next_recommended_stage={payload.get('next_recommended_stage')}")
+        print(f"next_recommended_vector={payload.get('next_recommended_vector')}")
+        for stage in payload.get("stages", []):
+            counts = stage.get("counts", {})
+            if not isinstance(counts, dict):
+                counts = {}
+            open_requirements = ",".join(str(item) for item in stage.get("open_requirements", []))
+            print(
+                f"{stage.get('status')} {stage.get('stage_id')} "
+                f"pass={counts.get('pass', 0)} open={counts.get('open', 0)} "
+                f"blocked={counts.get('blocked', 0)} total={counts.get('total', 0)}"
+            )
+            if open_requirements:
+                print(f"open_requirements={open_requirements}")
+            if stage.get("gap"):
+                print(f"gap={stage.get('gap')}")
+            print(f"next_step={stage.get('next_step')}")
     elif "answer" in payload and "conversation" in payload:
         answer = payload.get("answer", {})
         conversation = payload.get("conversation", {})
@@ -1186,6 +1216,14 @@ def run_audit_product(args: argparse.Namespace, cfg: Settings) -> int:
     report = build_product_audit(cfg)
     emit_payload(report, args.format)
     if args.strict and report["status"] != "PRODUCT_AUDIT_OK":
+        return 2
+    return 0
+
+
+def run_audit_roadmap(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_product_roadmap(cfg)
+    emit_payload(report, args.format)
+    if args.strict and report["status"] != "PRODUCT_ROADMAP_OK":
         return 2
     return 0
 

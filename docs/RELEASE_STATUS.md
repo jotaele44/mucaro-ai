@@ -153,6 +153,11 @@ Observed success markers:
   `github_release_governance` remains open because hosted CI startup and branch
   protection are not yet proven. Tag binding is verified separately by the
   release-state and GitHub governance commands.
+- `mucaro audit roadmap` groups the same product-audit rows into development
+  stages without changing the denominator. It reports the canonical operator
+  surface, permissioned source grounding, controlled assistant behavior, release
+  packaging certification, and hosted release governance as stage-level gates,
+  with `hosted_release_governance` as the current open stage.
 - `mucaro release state` classifies bounded release progress across
   `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`, `FRESH_CLONE_CERTIFIED`,
   `SOURCE_ARTIFACT_PACKAGING`, `GITHUB_GOVERNANCE_OPEN`,

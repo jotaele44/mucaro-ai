@@ -36,6 +36,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro release receipt RECEIPT_ID` | Show one local certification receipt | 0 | 2 |
 | `mucaro certify status` | Inspect release readiness before running full certification gates | 0 | 2 on failures, or with `--strict` warnings/failures |
 | `mucaro audit product` | Audit product gaps against the full assistant objective | 0 | 2 with `--strict` while gaps remain |
+| `mucaro audit roadmap` | Group product-audit rows into development stages | 0 | 2 with `--strict` while stages remain open |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources, persistent index status, and semantic-store status | 0 | 2 |
@@ -322,6 +323,14 @@ assistant capability rows plus release-governance rows, so an otherwise working
 local build still reports `PRODUCT_AUDIT_OPEN` while hosted CI, branch
 protection, or governed tag binding remains unresolved. Add `--strict` when
 automation should fail while any product gap remains open.
+
+Use `mucaro audit roadmap` to group those same product-audit rows into
+development stages. The roadmap preserves the audit denominator and adds
+stage-level status for the canonical operator surface, permissioned source
+grounding, controlled assistant behavior, release packaging certification, and
+hosted release governance. Text output includes the next recommended stage,
+next recommended vector, per-stage counts, open requirement IDs, gaps, and next
+steps so a development cycle can continue from the supported CLI boundary.
 
 Use `mucaro eval retrieval` to run the committed retrieval-quality fixture from
 the supported CLI surface. The command reports the fixture path, chunk/query
