@@ -132,8 +132,12 @@ without opening the JSON export.
 `mucaro eval answer-trace` validates the committed answer-trace fixture. The
 fixture includes positive cases plus negative cases for uncited answers,
 invented citations, missing source bindings, empty snippets, and invalid
-retrieval ranks. `mucaro certify answer-trace-quality` writes the same result
-as an exact-head `answer_trace_quality` release receipt.
+retrieval ranks. It also includes generated local-corpus cases that create an
+isolated temp source library, ingest Markdown/TXT sources, ask through the
+normal mock cited-answer path, and verify the produced citation records,
+snippets, required source bindings, and export paths. `mucaro certify
+answer-trace-quality` writes the same result as an exact-head
+`answer_trace_quality` release receipt.
 
 ## Expected Failure States
 

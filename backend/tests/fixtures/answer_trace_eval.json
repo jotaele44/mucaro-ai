@@ -1,5 +1,53 @@
 {
   "schema_version": "mucaro_answer_trace_eval_v1",
+  "generated_cases": [
+    {
+      "case_id": "generated_markdown_source_trace",
+      "expected_status": "CITATION_OK",
+      "expected_flags": [],
+      "query": "What does source lineage require?",
+      "retrieval_strategy": "persistent",
+      "top_k": 3,
+      "min_cited_chunks": 1,
+      "required_source_files": ["lineage.md"],
+      "required_snippet_terms": ["Source lineage", "cited chunk IDs", "source IDs"],
+      "files": [
+        {
+          "path": "lineage.md",
+          "text": "Source lineage requires cited chunk IDs and source IDs so an answer can be audited."
+        },
+        {
+          "path": "unrelated.txt",
+          "text": "Packaging receipts and launcher smoke tests are separate release checks."
+        }
+      ]
+    },
+    {
+      "case_id": "generated_multi_source_trace",
+      "expected_status": "CITATION_OK",
+      "expected_flags": [],
+      "query": "Which evidence binds release certification to a pushed commit and records citation order retrieval rank source ID snippets?",
+      "retrieval_strategy": "persistent",
+      "top_k": 3,
+      "min_cited_chunks": 2,
+      "required_source_files": ["release.md", "traceability.txt"],
+      "required_snippet_terms": ["pushed commit", "citation order"],
+      "files": [
+        {
+          "path": "release.md",
+          "text": "Fresh-clone release receipts bind certification evidence to a pushed commit."
+        },
+        {
+          "path": "traceability.txt",
+          "text": "Cited answer traceability records citation order, retrieval rank, source ID, and snippets."
+        },
+        {
+          "path": "decoy.txt",
+          "text": "A local weather note mentions a commit but does not describe release certification."
+        }
+      ]
+    }
+  ],
   "cases": [
     {
       "case_id": "valid_single_citation_trace",

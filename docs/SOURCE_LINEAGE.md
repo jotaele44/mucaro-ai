@@ -34,7 +34,8 @@ source/rank details under each cited chunk, and citation CSV exports include
 one row per cited chunk with run ID, citation order, retrieval rank, source ID,
 chunk index, score, retrieval strategy, source format, and text snippet.
 `mucaro eval answer-trace` and `mucaro certify answer-trace-quality` validate
-this trace contract with positive and negative cases before release.
+this trace contract with positive, negative, and generated local-corpus cases
+before release.
 
 HTML and HTM inputs follow the same chain. The parser extracts visible document
 text for chunking while preserving file SHA-256, byte count, title metadata,

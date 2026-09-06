@@ -3,11 +3,15 @@ from __future__ import annotations
 import copy
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
 from .citations import validate_citations
+from .config import Settings
+from .ingestion import ingest_file
 from .release_receipts import write_release_receipt
+from .services import answer_question
 from .utils import read_json
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -109,6 +113,141 @@ def _evaluate_case(case: dict[str, Any]) -> dict[str, Any]:
     flags_match = expected_flag_set.issubset(observed_flag_set)
     case_status = "PASS" if status_matches and flags_match else "FAIL"
     return {
+        "case_type": "static",
+        "case_id": case_id,
+        "status": case_status,
+        "observed_status": observed_status,
+        "observed_flags": observed_flags,
+        "expected_status": expected_status,
+        "expected_flags": expected_flags,
+    }
+
+
+def _temp_settings(root: Path) -> Settings:
+    return Settings(
+        project_root=root,
+        data_dir=root / "data",
+        input_dir=root / "data" / "input",
+        processed_dir=root / "data" / "processed",
+        export_dir=root / "data" / "exports",
+        index_dir=root / "data" / "indexes",
+        sqlite_path=root / "data" / "processed" / "answer_trace_eval.sqlite3",
+        default_model_provider="mock",
+        default_model_name="mock",
+    )
+
+
+def _write_generated_source(input_dir: Path, file_spec: dict[str, Any]) -> Path:
+    relative_path = Path(str(file_spec.get("path") or "source.txt"))
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise ValueError(f"generated source path must be relative and contained: {relative_path}")
+    path = input_dir / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(file_spec.get("text") or ""), encoding="utf-8")
+    return path
+
+
+def _generated_requirement_flags(
+    result: dict[str, Any],
+    case: dict[str, Any],
+    source_ids_by_path: dict[str, str],
+) -> list[str]:
+    flags: list[str] = []
+    cited_chunks = result.get("cited_chunks", [])
+    cited_source_ids = {
+        str(record.get("source_id"))
+        for record in cited_chunks
+        if isinstance(record, dict) and record.get("source_id")
+    }
+    min_cited_chunks = int(case.get("min_cited_chunks", 1))
+    if not isinstance(cited_chunks, list) or len(cited_chunks) < min_cited_chunks:
+        flags.append("ERROR_GENERATED_MIN_CITED_CHUNKS_NOT_MET")
+    for source_path in case.get("required_source_files", []):
+        source_id = source_ids_by_path.get(str(source_path))
+        if source_id is None:
+            flags.append("ERROR_REQUIRED_SOURCE_NOT_INGESTED")
+        elif source_id not in cited_source_ids:
+            flags.append("ERROR_REQUIRED_SOURCE_NOT_CITED")
+    snippets = " ".join(
+        str(record.get("text_snippet") or "")
+        for record in cited_chunks
+        if isinstance(record, dict)
+    ).lower()
+    for term in case.get("required_snippet_terms", []):
+        if str(term).lower() not in snippets:
+            flags.append("ERROR_REQUIRED_SNIPPET_TERM_MISSING")
+    for source_path in case.get("forbidden_source_files", []):
+        source_id = source_ids_by_path.get(str(source_path))
+        if source_id is not None and source_id in cited_source_ids:
+            flags.append("ERROR_FORBIDDEN_SOURCE_CITED")
+    if case.get("require_export_paths", True):
+        export_paths = result.get("export_paths")
+        if not isinstance(export_paths, dict) or not all(Path(str(path)).exists() for path in export_paths.values()):
+            flags.append("ERROR_TRACE_EXPORT_MISSING")
+    return sorted(set(flags))
+
+
+def _evaluate_generated_case(case: dict[str, Any]) -> dict[str, Any]:
+    case_id = str(case.get("case_id") or "unnamed_generated_case")
+    expected_status = str(case.get("expected_status") or "CITATION_OK")
+    expected_flags = sorted(str(flag) for flag in case.get("expected_flags", []))
+    files = case.get("files", [])
+    if not isinstance(files, list) or not files:
+        return {
+            "case_type": "generated",
+            "case_id": case_id,
+            "status": "FAIL",
+            "observed_status": "GENERATED_CASE_INVALID",
+            "observed_flags": ["ERROR_GENERATED_FILES_MISSING"],
+            "expected_status": expected_status,
+            "expected_flags": expected_flags,
+        }
+
+    with tempfile.TemporaryDirectory(prefix="mucaro-answer-trace-eval-") as temp_dir:
+        cfg = _temp_settings(Path(temp_dir))
+        cfg.ensure_dirs()
+        source_ids_by_path: dict[str, str] = {}
+        try:
+            for file_spec in files:
+                if not isinstance(file_spec, dict):
+                    raise ValueError("generated source file spec must be an object")
+                path = _write_generated_source(cfg.input_dir, file_spec)
+                ingest_result = ingest_file(path, cfg)
+                source_ids_by_path[str(file_spec.get("path"))] = str(ingest_result["source"]["source_id"])
+            result = answer_question(
+                str(case.get("query") or ""),
+                top_k=int(case.get("top_k", 5)),
+                retrieval_strategy=str(case.get("retrieval_strategy") or "persistent"),
+                model_provider="mock",
+                cfg=cfg,
+                persist=True,
+            )
+        except Exception as exc:
+            return {
+                "case_type": "generated",
+                "case_id": case_id,
+                "status": "FAIL",
+                "observed_status": "GENERATED_CASE_ERROR",
+                "observed_flags": [f"ERROR_GENERATED_CASE_EXCEPTION:{type(exc).__name__}"],
+                "expected_status": expected_status,
+                "expected_flags": expected_flags,
+            }
+
+        if str(result.get("status", "")).startswith("ERROR_"):
+            observed_status = str(result.get("status"))
+            observed_flags = [observed_status]
+        else:
+            validated = validate_answer_trace_quality(result)
+            flags = set(str(flag) for flag in validated.get("validation_flags", []))
+            flags.update(_generated_requirement_flags(validated, case, source_ids_by_path))
+            observed_flags = sorted(flags)
+            observed_status = "CITATION_OK" if not any(flag.startswith("ERROR_") for flag in observed_flags) else "CITATION_ERROR"
+
+    expected_flag_set = set(expected_flags)
+    observed_flag_set = set(observed_flags)
+    case_status = "PASS" if observed_status == expected_status and expected_flag_set.issubset(observed_flag_set) else "FAIL"
+    return {
+        "case_type": "generated",
         "case_id": case_id,
         "status": case_status,
         "observed_status": observed_status,
@@ -126,6 +265,7 @@ def build_answer_trace_eval_report(
 ) -> dict[str, Any]:
     fixture = read_json(fixture_path, {})
     cases = fixture.get("cases") if isinstance(fixture, dict) else None
+    generated_cases = fixture.get("generated_cases", []) if isinstance(fixture, dict) else []
     if not isinstance(cases, list) or not cases:
         return {
             "status": ANSWER_TRACE_EVAL_FAILED,
@@ -137,8 +277,19 @@ def build_answer_trace_eval_report(
             "cases": [],
         }
 
-    case_results = [_evaluate_case(case) for case in cases if isinstance(case, dict)]
+    static_case_results = [_evaluate_case(case) for case in cases if isinstance(case, dict)]
+    generated_case_results = (
+        [_evaluate_generated_case(case) for case in generated_cases if isinstance(case, dict)]
+        if isinstance(generated_cases, list)
+        else []
+    )
+    case_results = [*static_case_results, *generated_case_results]
     expected_errors = sum(1 for case in cases if isinstance(case, dict) and case.get("expected_status") == "CITATION_ERROR")
+    expected_errors += sum(
+        1
+        for case in generated_cases
+        if isinstance(generated_cases, list) and isinstance(case, dict) and case.get("expected_status") == "CITATION_ERROR"
+    )
     passed = sum(1 for case in case_results if case.get("status") == "PASS")
     failed_cases = [case for case in case_results if case.get("status") != "PASS"]
     case_count = len(case_results)
@@ -162,6 +313,8 @@ def build_answer_trace_eval_report(
         "case_pass_rate": round(case_pass_rate, 6),
         "counts": {
             "cases": case_count,
+            "static_cases": len(static_case_results),
+            "generated_cases": len(generated_case_results),
             "passed": passed,
             "failed": len(failed_cases),
             "expected_errors": expected_errors,
@@ -227,6 +380,8 @@ def format_answer_trace_eval_text(report: dict[str, Any]) -> list[str]:
     lines = [
         f"fixture={report.get('fixture')}",
         f"cases={counts.get('cases')}",
+        f"static_cases={counts.get('static_cases')}",
+        f"generated_cases={counts.get('generated_cases')}",
         f"passed={counts.get('passed')}",
         f"failed={counts.get('failed')}",
         f"expected_errors={counts.get('expected_errors')}",

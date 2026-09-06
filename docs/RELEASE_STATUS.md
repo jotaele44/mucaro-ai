@@ -28,7 +28,10 @@ bounded text snippet across JSON, Markdown, CSV, persisted runs, and CLI text
 output. The follow-on answer-trace quality gate exposes this contract through
 `mucaro eval answer-trace`, `mucaro certify answer-trace-quality`, and an
 exact-head `answer_trace_quality` release receipt with positive and negative
-fixture cases.
+fixture cases. It now also runs generated local-corpus cases that ingest
+Markdown/TXT sources in an isolated temp project, ask through the normal service
+path, and verify the produced citation records, source bindings, snippets, and
+export paths.
 The production-security baseline added profile checks, fail-closed startup
 validation, and public-bind safeguards. The current certification target adds
 CLI certification-readiness status so operators can inspect product audit,

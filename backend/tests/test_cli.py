@@ -675,8 +675,10 @@ def test_cli_eval_answer_trace_reports_traceability_metrics(tmp_path: Path, caps
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "ANSWER_TRACE_EVAL_OK"
     assert payload["counts"] == {
-        "cases": 7,
-        "passed": 7,
+        "cases": 9,
+        "static_cases": 7,
+        "generated_cases": 2,
+        "passed": 9,
         "failed": 0,
         "expected_errors": 5,
     }
@@ -687,7 +689,10 @@ def test_cli_eval_answer_trace_reports_traceability_metrics(tmp_path: Path, caps
     text_output = capsys.readouterr().out
     assert "ANSWER_TRACE_EVAL_OK" in text_output
     assert "valid_single_citation_trace" in text_output
+    assert "generated_markdown_source_trace" in text_output
+    assert "generated_multi_source_trace" in text_output
     assert "invented_citation_fails" in text_output
+    assert "generated_cases=2" in text_output
     assert "expected_errors=5" in text_output
 
 
@@ -753,6 +758,7 @@ def test_cli_certify_answer_trace_quality_writes_exact_head_receipt(tmp_path: Pa
     text_output = capsys.readouterr().out
     assert "ANSWER_TRACE_QUALITY_CERT_OK" in text_output
     assert "valid_multi_citation_trace_preserves_order_and_rank" in text_output
+    assert "generated_multi_source_trace" in text_output
     assert "case_pass_rate=1.0" in text_output
 
 
