@@ -1221,6 +1221,14 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     )
     write_release_receipt(
         tmp_path,
+        receipt_type="operator_workflow",
+        status="OPERATOR_WORKFLOW_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_operator_workflow.py"],
+        payload={"checks": []},
+    )
+    write_release_receipt(
+        tmp_path,
         receipt_type="fresh_clone",
         status="FRESH_CLONE_CERT_OK",
         head_sha="e" * 40,
@@ -1254,12 +1262,14 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     assert states["PYTHON_DIST_CERTIFIED"]["status"] == "PASS"
     assert states["ANSWER_TRACE_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "PASS"
+    assert states["OPERATOR_WORKFLOW_CERTIFIED"]["status"] == "PASS"
     assert payload["receipts"]["local_release"]["head_sha"] == head_sha
     assert payload["receipts"]["fresh_clone"]["head_sha"] == head_sha
     assert payload["receipts"]["source_artifact"]["head_sha"] == head_sha
     assert payload["receipts"]["python_dist"]["head_sha"] == head_sha
     assert payload["receipts"]["answer_trace_quality"]["head_sha"] == head_sha
     assert payload["receipts"]["retrieval_quality"]["head_sha"] == head_sha
+    assert payload["receipts"]["operator_workflow"]["head_sha"] == head_sha
 
 
 def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path: Path, capsys, monkeypatch):
@@ -1275,6 +1285,7 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
         ("python_dist", "PYTHON_DIST_CERT_OK"),
         ("answer_trace_quality", "ANSWER_TRACE_QUALITY_CERT_OK"),
         ("retrieval_quality", "RETRIEVAL_QUALITY_CERT_OK"),
+        ("operator_workflow", "OPERATOR_WORKFLOW_CERT_OK"),
     ]:
         write_release_receipt(
             tmp_path,
@@ -1369,8 +1380,8 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert payload["current_state"] == "GITHUB_GOVERNANCE_OPEN"
     assert payload["head_sha"] == head_sha
     assert payload["tags_at_head"] == [tag_name]
-    assert payload["current_head_receipts_summary"]["total"] == 6
-    assert payload["current_head_receipts_summary"]["valid"] == 6
+    assert payload["current_head_receipts_summary"]["total"] == 7
+    assert payload["current_head_receipts_summary"]["valid"] == 7
     assert payload["startup_blocker"]["status"] == "FAIL"
     assert payload["github_actions"]["check_suites"]["total_count"] == 2
     assert payload["github_actions"]["check_suites"]["suites"][0]["latest_check_runs_count"] == 0
@@ -1393,8 +1404,8 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert "startup_blocker_causes=" in text_output
     assert "github_support_classification=HOSTED_STARTUP_BEFORE_JOBS" in text_output
     assert "github_support_check_suite_counts=github_actions=2 zero_check_run_startup_failures=2 queued_external=0" in text_output
-    assert "receipt_count=6" in text_output
-    assert "receipt_valid=6" in text_output
+    assert "receipt_count=7" in text_output
+    assert "receipt_valid=7" in text_output
     assert "next_action=Upgrade GitHub plan or make the repository public" in text_output
 
     output_path = tmp_path / "data" / "exports" / "governance_reports" / "handoff.json"
@@ -1631,6 +1642,24 @@ def test_cli_release_state_requires_exact_head_quality_receipts_for_governed_rea
         payload={"checks": []},
     )
 
+    assert main(["release", "state", "--include-github", "--strict", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    states = {row["state"]: row for row in payload["states"]}
+    assert payload["status"] == "RELEASE_STATE_OPEN"
+    assert payload["current_state"] == "OPERATOR_WORKFLOW_CERTIFICATION_OPEN"
+    assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "PASS"
+    assert states["OPERATOR_WORKFLOW_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
+
+    write_release_receipt(
+        tmp_path,
+        receipt_type="operator_workflow",
+        status="OPERATOR_WORKFLOW_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_operator_workflow.py"],
+        payload={"checks": []},
+    )
+
     assert main(["release", "state", "--include-github", "--strict", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     states = {row["state"]: row for row in payload["states"]}
@@ -1639,6 +1668,7 @@ def test_cli_release_state_requires_exact_head_quality_receipts_for_governed_rea
     assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "PASS"
     assert states["ANSWER_TRACE_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "PASS"
+    assert states["OPERATOR_WORKFLOW_CERTIFIED"]["status"] == "PASS"
     assert states["GOVERNED_RELEASE_READY"]["status"] == "PASS"
 
 

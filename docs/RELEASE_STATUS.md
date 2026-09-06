@@ -198,10 +198,13 @@ Observed success markers:
   structured-property extraction marked as a future parser upgrade.
 - `mucaro release state` classifies bounded release progress across
   `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`, `FRESH_CLONE_CERTIFIED`,
-  `SOURCE_ARTIFACT_PACKAGING`, `GITHUB_GOVERNANCE_OPEN`,
-  `GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`. It keeps heavy local and
-  fresh-clone certification states `UNVERIFIED` unless matching exact-HEAD
-  receipts exist under `data/exports/release_receipts`.
+  `SOURCE_ARTIFACT_PACKAGING`, `SOURCE_ARTIFACT_CERTIFIED`,
+  `PYTHON_DIST_CERTIFIED`, `ANSWER_TRACE_QUALITY_CERTIFIED`,
+  `RETRIEVAL_QUALITY_CERTIFIED`, `OPERATOR_WORKFLOW_CERTIFIED`,
+  `GITHUB_GOVERNANCE_OPEN`, `GOVERNED_RELEASE_READY`, and
+  `PRODUCTION_READY`. It keeps heavy local and fresh-clone certification states
+  `UNVERIFIED` unless matching exact-HEAD receipts exist under
+  `data/exports/release_receipts`.
 - `mucaro release receipts` and `mucaro release receipt RECEIPT_ID` expose the
   local release/fresh-clone certification receipt ledger through the supported
   CLI boundary, including schema validity, bound head SHA, status, and computed

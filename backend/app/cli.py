@@ -2679,6 +2679,7 @@ def build_release_state_report(
     fresh_clone_receipt = load_release_receipt(cfg.project_root, receipt_type="fresh_clone", head_sha=head_sha)
     source_artifact_receipt = load_release_receipt(cfg.project_root, receipt_type="source_artifact", head_sha=head_sha)
     python_dist_receipt = load_release_receipt(cfg.project_root, receipt_type="python_dist", head_sha=head_sha)
+    operator_workflow_receipt = load_release_receipt(cfg.project_root, receipt_type="operator_workflow", head_sha=head_sha)
     answer_trace_quality_receipt = load_release_receipt(
         cfg.project_root,
         receipt_type="answer_trace_quality",
@@ -2693,6 +2694,10 @@ def build_release_state_report(
     fresh_clone_status, fresh_clone_evidence = _receipt_state(fresh_clone_receipt, "FRESH_CLONE_CERT_OK")
     source_artifact_status, source_artifact_evidence = _receipt_state(source_artifact_receipt, "SOURCE_ARTIFACT_CERT_OK")
     python_dist_status, python_dist_evidence = _receipt_state(python_dist_receipt, "PYTHON_DIST_CERT_OK")
+    operator_workflow_status, operator_workflow_evidence = _receipt_state(
+        operator_workflow_receipt,
+        "OPERATOR_WORKFLOW_CERT_OK",
+    )
     answer_trace_quality_status, answer_trace_quality_evidence = _receipt_state(
         answer_trace_quality_receipt,
         "ANSWER_TRACE_QUALITY_CERT_OK",
@@ -2720,12 +2725,15 @@ def build_release_state_report(
     answer_trace_quality_open = include_github and not answer_trace_quality_certified
     retrieval_quality_certified = retrieval_quality_status == "PASS"
     retrieval_quality_open = include_github and not retrieval_quality_certified
+    operator_workflow_certified = operator_workflow_status == "PASS"
+    operator_workflow_open = include_github and not operator_workflow_certified
     governed_ready = (
         include_github
         and certification.get("status") == "CERTIFICATION_READY"
         and source_artifact_certified
         and answer_trace_quality_certified
         and retrieval_quality_certified
+        and operator_workflow_certified
     )
 
     highest_local_state = "CANONICAL_LOCAL" if canonical_local_pass else "PROTOTYPE"
@@ -2739,6 +2747,8 @@ def build_release_state_report(
         current_state = "ANSWER_TRACE_QUALITY_CERTIFICATION_OPEN"
     elif retrieval_quality_open:
         current_state = "RETRIEVAL_QUALITY_CERTIFICATION_OPEN"
+    elif operator_workflow_open:
+        current_state = "OPERATOR_WORKFLOW_CERTIFICATION_OPEN"
     else:
         current_state = highest_local_state
 
@@ -2796,6 +2806,12 @@ def build_release_state_report(
             "Run python3 scripts/certify_retrieval_quality.py.",
         ),
         _release_state(
+            "OPERATOR_WORKFLOW_CERTIFIED",
+            operator_workflow_status,
+            operator_workflow_evidence,
+            "Run python3 scripts/certify_operator_workflow.py.",
+        ),
+        _release_state(
             "GITHUB_GOVERNANCE_OPEN",
             "OPEN" if github_open else "UNVERIFIED" if not include_github else "PASS",
             (
@@ -2826,6 +2842,7 @@ def build_release_state_report(
         "python3 scripts/certify_python_distribution.py",
         "python3 scripts/certify_answer_trace_quality.py",
         "python3 scripts/certify_retrieval_quality.py",
+        "python3 scripts/certify_operator_workflow.py",
     ]
     if not include_github:
         next_commands.insert(0, "mucaro release state --include-github --format text")
@@ -2850,6 +2867,7 @@ def build_release_state_report(
             "fresh_clone": fresh_clone_receipt,
             "source_artifact": source_artifact_receipt,
             "python_dist": python_dist_receipt,
+            "operator_workflow": operator_workflow_receipt,
             "answer_trace_quality": answer_trace_quality_receipt,
             "retrieval_quality": retrieval_quality_receipt,
         },

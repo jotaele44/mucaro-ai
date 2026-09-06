@@ -298,11 +298,12 @@ Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,
 `SOURCE_ARTIFACT_CERTIFIED`, `PYTHON_DIST_CERTIFIED`,
-`RETRIEVAL_QUALITY_CERTIFIED`, `GITHUB_GOVERNANCE_OPEN`,
-`GOVERNED_RELEASE_READY`, and `PRODUCTION_READY`.
+`RETRIEVAL_QUALITY_CERTIFIED`, `OPERATOR_WORKFLOW_CERTIFIED`,
+`GITHUB_GOVERNANCE_OPEN`, `GOVERNED_RELEASE_READY`, and
+`PRODUCTION_READY`.
 The command reuses existing audit, package, Git,
-artifact, Python distribution, retrieval-quality, and optional GitHub
-governance receipts. It does not run heavy certification scripts, so those
+artifact, Python distribution, retrieval-quality, operator-workflow, and
+optional GitHub governance receipts. It does not run heavy certification scripts, so those
 states remain `UNVERIFIED` until the operator runs the reported commands and
 creates matching exact-HEAD receipts under `data/exports/release_receipts`. Add
 `--include-github` when authenticated `gh` evidence is available. The GitHub
