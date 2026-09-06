@@ -377,7 +377,8 @@ python scripts/extract_reference_patterns.py
 
 ## Phase 2 roadmap
 
-See `docs/PHASE2_QUEUE.md`.
+See `docs/DEVELOPMENT_GOAL.md` for the release-grade goal statement and
+`docs/PHASE2_QUEUE.md` for the active development queue.
 
 
 ## NPM registry repair

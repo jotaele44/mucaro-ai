@@ -2,6 +2,7 @@
 
 | Item | Purpose | Status |
 |---|---|---|
+| Release-grade development goal | Scope the finish line across CLI, retrieval quality, source ingestion, answer traceability, memory, tools, packaging, fresh clone, and hosted governance | Current anchor in `docs/DEVELOPMENT_GOAL.md` |
 | Local hybrid retrieval | Deterministic lexical plus TF-IDF vector scoring | Complete in V1 |
 | Retrieval eval harness | recall@k, top-1, and no-context gate for retrieval changes | Complete in V1 |
 | Persistent local TF-IDF index | Local stored vector index with explicit `persistent` strategy | Complete in V1.4 |

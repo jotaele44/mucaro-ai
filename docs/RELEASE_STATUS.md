@@ -287,3 +287,31 @@ Known environment-dependent item:
   the hosted startup blocker, including Actions permissions, workflow
   registration, latest `CI` and probe runs, job counts, and billing endpoint
   access status.
+- Commit `17d9198c25f03b361b52db0a05e17adecc478e7f` adds generated
+  local-corpus answer-trace evaluation cases. The evaluator now writes isolated
+  Markdown/TXT fixture sources into a temp project, ingests them through the
+  normal source-lineage path, asks through mock retrieval, and verifies cited
+  source bindings, snippet terms, citation records, and export paths.
+- The generated answer-trace baseline is tagged as
+  `v0.1.23-generated-answer-trace-eval`. Current-head local receipts verify
+  for `answer_trace_quality`, `local_release`, `retrieval_quality`,
+  `python_dist`, `source_artifact`, and `fresh_clone`.
+- Local release certification for commit
+  `17d9198c25f03b361b52db0a05e17adecc478e7f` reports
+  `CERTIFY_RELEASE_OK`, including `181 passed`, answer-trace quality,
+  retrieval quality, default and large retrieval eval gates, JSON validation,
+  desktop package self-test, source artifact build/verify, npm audit, and
+  frontend build.
+- Exact-SHA fresh-clone certification reports `FRESH_CLONE_CERT_OK` for commit
+  `17d9198c25f03b361b52db0a05e17adecc478e7f`, including clean clone install,
+  CLI help, launcher self-test, and desktop smoke test.
+- Hosted `CI` run `34002438261` and `CI Startup Probe` run `34002438271` both
+  report `startup_failure` with `0` jobs for commit
+  `17d9198c25f03b361b52db0a05e17adecc478e7f`; GitHub governance remains open at
+  the hosted startup/account/repository-runner layer.
+- `mucaro release governance-report --save` produced
+  `data/exports/governance_reports/governance-report-17d9198c25f0.json` with
+  SHA-256
+  `094bd7f44e1073596f37506f9f951423ee623750b42209d639ea35017c24eb99`.
+  Verification with `--expected-sha256` and `--require-current-head` reports
+  `GOVERNANCE_REPORT_VERIFIED`.
