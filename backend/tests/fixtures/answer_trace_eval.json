@@ -1,0 +1,147 @@
+{
+  "schema_version": "mucaro_answer_trace_eval_v1",
+  "cases": [
+    {
+      "case_id": "valid_single_citation_trace",
+      "expected_status": "CITATION_OK",
+      "expected_flags": [],
+      "trace": {
+        "retrieved_chunk_ids": ["chunk_a"],
+        "cited_chunk_ids": ["chunk_a"],
+        "cited_chunks": [
+          {
+            "citation_order": 1,
+            "retrieval_rank": 1,
+            "chunk_id": "chunk_a",
+            "source_id": "src_a",
+            "chunk_index": 0,
+            "score": 0.91,
+            "retrieval_strategy": "hybrid_tfidf_v1",
+            "matched_terms": ["source", "lineage"],
+            "source_format": "md",
+            "text_snippet": "Source lineage requires cited chunk IDs."
+          }
+        ],
+        "validation_flags": []
+      }
+    },
+    {
+      "case_id": "valid_multi_citation_trace_preserves_order_and_rank",
+      "expected_status": "CITATION_OK",
+      "expected_flags": [],
+      "trace": {
+        "retrieved_chunk_ids": ["chunk_a", "chunk_b"],
+        "cited_chunk_ids": ["chunk_b", "chunk_a"],
+        "cited_chunks": [
+          {
+            "citation_order": 1,
+            "retrieval_rank": 2,
+            "chunk_id": "chunk_b",
+            "source_id": "src_b",
+            "chunk_index": 3,
+            "score": 0.72,
+            "retrieval_strategy": "persistent_tfidf_v1",
+            "matched_terms": ["governance"],
+            "source_format": "txt",
+            "text_snippet": "Governance evidence requires exact current-head receipts."
+          },
+          {
+            "citation_order": 2,
+            "retrieval_rank": 1,
+            "chunk_id": "chunk_a",
+            "source_id": "src_a",
+            "chunk_index": 0,
+            "score": 0.89,
+            "retrieval_strategy": "persistent_tfidf_v1",
+            "matched_terms": ["receipt"],
+            "source_format": "md",
+            "text_snippet": "Fresh-clone receipts bind release evidence to a pushed commit."
+          }
+        ],
+        "validation_flags": []
+      }
+    },
+    {
+      "case_id": "uncited_answer_fails",
+      "expected_status": "CITATION_ERROR",
+      "expected_flags": ["ERROR_UNCITED_ANSWER"],
+      "trace": {
+        "retrieved_chunk_ids": ["chunk_a"],
+        "cited_chunk_ids": [],
+        "cited_chunks": [],
+        "validation_flags": []
+      }
+    },
+    {
+      "case_id": "invented_citation_fails",
+      "expected_status": "CITATION_ERROR",
+      "expected_flags": ["ERROR_CITATION_TRACE_MISSING", "ERROR_CITED_CHUNK_NOT_RETRIEVED"],
+      "trace": {
+        "retrieved_chunk_ids": ["chunk_a"],
+        "cited_chunk_ids": ["chunk_z"],
+        "cited_chunks": [],
+        "validation_flags": []
+      }
+    },
+    {
+      "case_id": "missing_source_binding_fails",
+      "expected_status": "CITATION_ERROR",
+      "expected_flags": ["ERROR_CITATION_SOURCE_ID_MISSING"],
+      "trace": {
+        "retrieved_chunk_ids": ["chunk_a"],
+        "cited_chunk_ids": ["chunk_a"],
+        "cited_chunks": [
+          {
+            "citation_order": 1,
+            "retrieval_rank": 1,
+            "chunk_id": "chunk_a",
+            "source_id": "",
+            "chunk_index": 0,
+            "text_snippet": "A cited chunk without source identity is not auditable."
+          }
+        ],
+        "validation_flags": []
+      }
+    },
+    {
+      "case_id": "empty_snippet_fails",
+      "expected_status": "CITATION_ERROR",
+      "expected_flags": ["ERROR_CITATION_SNIPPET_MISSING"],
+      "trace": {
+        "retrieved_chunk_ids": ["chunk_a"],
+        "cited_chunk_ids": ["chunk_a"],
+        "cited_chunks": [
+          {
+            "citation_order": 1,
+            "retrieval_rank": 1,
+            "chunk_id": "chunk_a",
+            "source_id": "src_a",
+            "chunk_index": 0,
+            "text_snippet": ""
+          }
+        ],
+        "validation_flags": []
+      }
+    },
+    {
+      "case_id": "bad_retrieval_rank_fails",
+      "expected_status": "CITATION_ERROR",
+      "expected_flags": ["ERROR_CITATION_RETRIEVAL_RANK_INVALID"],
+      "trace": {
+        "retrieved_chunk_ids": ["chunk_a"],
+        "cited_chunk_ids": ["chunk_a"],
+        "cited_chunks": [
+          {
+            "citation_order": 1,
+            "retrieval_rank": 3,
+            "chunk_id": "chunk_a",
+            "source_id": "src_a",
+            "chunk_index": 0,
+            "text_snippet": "The retrieval rank must point inside the retrieved result set."
+          }
+        ],
+        "validation_flags": []
+      }
+    }
+  ]
+}

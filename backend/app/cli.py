@@ -14,6 +14,16 @@ from typing import Any, Sequence
 from urllib.parse import urlparse
 
 from .config import Settings, settings
+from .answer_trace_eval import (
+    ANSWER_TRACE_EVAL_OK,
+    ANSWER_TRACE_QUALITY_OK,
+    ANSWER_TRACE_QUALITY_PROFILE,
+    DEFAULT_ANSWER_TRACE_FIXTURE,
+    build_answer_trace_eval_report,
+    build_answer_trace_quality_certification,
+    format_answer_trace_eval_text,
+    format_answer_trace_quality_certification_text,
+)
 from .conversations import (
     append_answer_turn,
     build_conversation_context,
@@ -214,6 +224,25 @@ def build_parser() -> argparse.ArgumentParser:
     eval_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     eval_retrieval.set_defaults(handler=run_eval_retrieval)
 
+    eval_answer_trace = eval_subcommands.add_parser(
+        "answer-trace",
+        help="Evaluate cited-answer traceability against a fixture.",
+    )
+    eval_answer_trace.add_argument(
+        "--fixture",
+        type=Path,
+        default=DEFAULT_ANSWER_TRACE_FIXTURE,
+        help="Answer-trace evaluation fixture path.",
+    )
+    eval_answer_trace.add_argument("--min-case-pass-rate", type=float, default=1.0, help="Minimum fixture case pass rate.")
+    eval_answer_trace.add_argument(
+        "--allow-no-negative-cases",
+        action="store_true",
+        help="Do not require at least one negative citation case in the fixture.",
+    )
+    eval_answer_trace.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    eval_answer_trace.set_defaults(handler=run_eval_answer_trace)
+
     certify = subcommands.add_parser("certify", help="Inspect release certification readiness.")
     certify_subcommands = certify.add_subparsers(dest="certify_command", required=True)
 
@@ -266,6 +295,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     certify_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     certify_retrieval.set_defaults(handler=run_certify_retrieval_quality)
+
+    certify_answer_trace = certify_subcommands.add_parser(
+        "answer-trace-quality",
+        help="Certify cited-answer traceability against the release fixture profile.",
+    )
+    certify_answer_trace.add_argument(
+        "--profile",
+        default=ANSWER_TRACE_QUALITY_PROFILE,
+        help="Named answer-trace profile to record in the release receipt.",
+    )
+    certify_answer_trace.add_argument(
+        "--fixture",
+        type=Path,
+        default=DEFAULT_ANSWER_TRACE_FIXTURE,
+        help="Answer-trace evaluation fixture path.",
+    )
+    certify_answer_trace.add_argument("--min-case-pass-rate", type=float, default=1.0, help="Minimum fixture case pass rate.")
+    certify_answer_trace.add_argument(
+        "--allow-no-negative-cases",
+        action="store_true",
+        help="Do not require at least one negative citation case in the fixture.",
+    )
+    certify_answer_trace.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    certify_answer_trace.set_defaults(handler=run_certify_answer_trace_quality)
 
     sources = subcommands.add_parser("sources", help="Inspect and manage ingested sources.")
     sources_subcommands = sources.add_subparsers(dest="sources_command", required=True)
@@ -675,6 +728,12 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(line)
     elif status in {"RETRIEVAL_QUALITY_CERT_OK", "RETRIEVAL_QUALITY_CERT_FAILED"}:
         for line in format_retrieval_quality_certification_text(payload)[:-1]:
+            print(line)
+    elif status in {"ANSWER_TRACE_EVAL_OK", "ANSWER_TRACE_EVAL_FAILED"}:
+        for line in format_answer_trace_eval_text(payload)[:-1]:
+            print(line)
+    elif status in {"ANSWER_TRACE_QUALITY_CERT_OK", "ANSWER_TRACE_QUALITY_CERT_FAILED"}:
+        for line in format_answer_trace_quality_certification_text(payload)[:-1]:
             print(line)
     elif status in {"PACKAGE_READY", "PACKAGE_WARN", "PACKAGE_FAIL"}:
         print(f"project_root={payload.get('project_root')}")
@@ -2599,6 +2658,11 @@ def build_release_state_report(
     fresh_clone_receipt = load_release_receipt(cfg.project_root, receipt_type="fresh_clone", head_sha=head_sha)
     source_artifact_receipt = load_release_receipt(cfg.project_root, receipt_type="source_artifact", head_sha=head_sha)
     python_dist_receipt = load_release_receipt(cfg.project_root, receipt_type="python_dist", head_sha=head_sha)
+    answer_trace_quality_receipt = load_release_receipt(
+        cfg.project_root,
+        receipt_type="answer_trace_quality",
+        head_sha=head_sha,
+    )
     retrieval_quality_receipt = load_release_receipt(
         cfg.project_root,
         receipt_type="retrieval_quality",
@@ -2608,6 +2672,10 @@ def build_release_state_report(
     fresh_clone_status, fresh_clone_evidence = _receipt_state(fresh_clone_receipt, "FRESH_CLONE_CERT_OK")
     source_artifact_status, source_artifact_evidence = _receipt_state(source_artifact_receipt, "SOURCE_ARTIFACT_CERT_OK")
     python_dist_status, python_dist_evidence = _receipt_state(python_dist_receipt, "PYTHON_DIST_CERT_OK")
+    answer_trace_quality_status, answer_trace_quality_evidence = _receipt_state(
+        answer_trace_quality_receipt,
+        "ANSWER_TRACE_QUALITY_CERT_OK",
+    )
     retrieval_quality_status, retrieval_quality_evidence = _receipt_state(
         retrieval_quality_receipt,
         "RETRIEVAL_QUALITY_CERT_OK",
@@ -2627,12 +2695,15 @@ def build_release_state_report(
     github_gate_blockers = [gate for gate in gate_rows if gate.get("name") in github_gate_names and gate.get("status") != "PASS"]
     github_open = include_github and (github_requirement_open or bool(github_gate_blockers))
     source_artifact_open = include_github and not source_artifact_certified
+    answer_trace_quality_certified = answer_trace_quality_status == "PASS"
+    answer_trace_quality_open = include_github and not answer_trace_quality_certified
     retrieval_quality_certified = retrieval_quality_status == "PASS"
     retrieval_quality_open = include_github and not retrieval_quality_certified
     governed_ready = (
         include_github
         and certification.get("status") == "CERTIFICATION_READY"
         and source_artifact_certified
+        and answer_trace_quality_certified
         and retrieval_quality_certified
     )
 
@@ -2643,6 +2714,8 @@ def build_release_state_report(
         current_state = "GITHUB_GOVERNANCE_OPEN"
     elif source_artifact_open:
         current_state = "SOURCE_ARTIFACT_CERTIFICATION_OPEN"
+    elif answer_trace_quality_open:
+        current_state = "ANSWER_TRACE_QUALITY_CERTIFICATION_OPEN"
     elif retrieval_quality_open:
         current_state = "RETRIEVAL_QUALITY_CERTIFICATION_OPEN"
     else:
@@ -2690,6 +2763,12 @@ def build_release_state_report(
             "Run python3 scripts/certify_python_distribution.py.",
         ),
         _release_state(
+            "ANSWER_TRACE_QUALITY_CERTIFIED",
+            answer_trace_quality_status,
+            answer_trace_quality_evidence,
+            "Run python3 scripts/certify_answer_trace_quality.py.",
+        ),
+        _release_state(
             "RETRIEVAL_QUALITY_CERTIFIED",
             retrieval_quality_status,
             retrieval_quality_evidence,
@@ -2724,6 +2803,7 @@ def build_release_state_report(
         f"python3 scripts/certify_fresh_clone.py --ref {certification.get('git', {}).get('head_sha') or 'main'}",
         "python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json",
         "python3 scripts/certify_python_distribution.py",
+        "python3 scripts/certify_answer_trace_quality.py",
         "python3 scripts/certify_retrieval_quality.py",
     ]
     if not include_github:
@@ -2749,6 +2829,7 @@ def build_release_state_report(
             "fresh_clone": fresh_clone_receipt,
             "source_artifact": source_artifact_receipt,
             "python_dist": python_dist_receipt,
+            "answer_trace_quality": answer_trace_quality_receipt,
             "retrieval_quality": retrieval_quality_receipt,
         },
         "product_audit_status": audit.get("status"),
@@ -2801,6 +2882,38 @@ def run_certify_retrieval_quality(args: argparse.Namespace, cfg: Settings) -> in
     )
     emit_payload(report, args.format)
     return 0 if report["status"] == RETRIEVAL_QUALITY_OK else 2
+
+
+def run_eval_answer_trace(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_answer_trace_eval_report(
+        fixture_path=args.fixture,
+        min_case_pass_rate=args.min_case_pass_rate,
+        require_negative_cases=not args.allow_no_negative_cases,
+    )
+    emit_payload(report, args.format)
+    return 0 if report["status"] == ANSWER_TRACE_EVAL_OK else 2
+
+
+def run_certify_answer_trace_quality(args: argparse.Namespace, cfg: Settings) -> int:
+    command = ["mucaro", "certify", "answer-trace-quality"]
+    if args.profile != ANSWER_TRACE_QUALITY_PROFILE:
+        command.extend(["--profile", args.profile])
+    if args.fixture != DEFAULT_ANSWER_TRACE_FIXTURE:
+        command.extend(["--fixture", str(args.fixture)])
+    if args.min_case_pass_rate != 1.0:
+        command.extend(["--min-case-pass-rate", str(args.min_case_pass_rate)])
+    if args.allow_no_negative_cases:
+        command.append("--allow-no-negative-cases")
+    report = build_answer_trace_quality_certification(
+        cfg.project_root,
+        profile=args.profile,
+        fixture_path=args.fixture,
+        min_case_pass_rate=args.min_case_pass_rate,
+        require_negative_cases=not args.allow_no_negative_cases,
+        command=command,
+    )
+    emit_payload(report, args.format)
+    return 0 if report["status"] == ANSWER_TRACE_QUALITY_OK else 2
 
 
 def run_sources_list(args: argparse.Namespace, cfg: Settings) -> int:

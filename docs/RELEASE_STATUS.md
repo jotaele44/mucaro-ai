@@ -25,7 +25,10 @@ The current cited-answer traceability candidate expands answer traces with
 per-citation records that bind citation order to retrieval rank, source ID,
 chunk index, retrieval strategy, score, matched terms, source format, and a
 bounded text snippet across JSON, Markdown, CSV, persisted runs, and CLI text
-output.
+output. The follow-on answer-trace quality gate exposes this contract through
+`mucaro eval answer-trace`, `mucaro certify answer-trace-quality`, and an
+exact-head `answer_trace_quality` release receipt with positive and negative
+fixture cases.
 The production-security baseline added profile checks, fail-closed startup
 validation, and public-bind safeguards. The current certification target adds
 CLI certification-readiness status so operators can inspect product audit,

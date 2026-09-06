@@ -668,6 +668,94 @@ def test_cli_certify_retrieval_quality_writes_exact_head_receipt(tmp_path: Path,
     assert "min_distractor_free_rate=1.0" in text_output
 
 
+def test_cli_eval_answer_trace_reports_traceability_metrics(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["eval", "answer-trace", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ANSWER_TRACE_EVAL_OK"
+    assert payload["counts"] == {
+        "cases": 7,
+        "passed": 7,
+        "failed": 0,
+        "expected_errors": 5,
+    }
+    assert payload["case_pass_rate"] == 1.0
+    assert payload["failures"] == []
+
+    assert main(["eval", "answer-trace", "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "ANSWER_TRACE_EVAL_OK" in text_output
+    assert "valid_single_citation_trace" in text_output
+    assert "invented_citation_fails" in text_output
+    assert "expected_errors=5" in text_output
+
+
+def test_cli_eval_answer_trace_requires_negative_cases(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    fixture = tmp_path / "answer_trace_eval_positive_only.json"
+    fixture.write_text(
+        json.dumps(
+            {
+                "cases": [
+                    {
+                        "case_id": "only_positive",
+                        "expected_status": "CITATION_OK",
+                        "trace": {
+                            "retrieved_chunk_ids": ["chunk_a"],
+                            "cited_chunk_ids": ["chunk_a"],
+                            "cited_chunks": [
+                                {
+                                    "citation_order": 1,
+                                    "retrieval_rank": 1,
+                                    "chunk_id": "chunk_a",
+                                    "source_id": "src_a",
+                                    "chunk_index": 0,
+                                    "text_snippet": "Source lineage requires citations.",
+                                }
+                            ],
+                            "validation_flags": [],
+                        },
+                    }
+                ]
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert main(["eval", "answer-trace", "--fixture", str(fixture), "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ANSWER_TRACE_EVAL_FAILED"
+    assert payload["counts"]["expected_errors"] == 0
+    assert payload["failures"][0]["case_id"] == "fixture"
+
+
+def test_cli_certify_answer_trace_quality_writes_exact_head_receipt(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["certify", "answer-trace-quality", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ANSWER_TRACE_QUALITY_CERT_OK"
+    assert payload["profile"] == "v0.1.23-local-release"
+    assert payload["head_sha"] == "UNKNOWN_HEAD"
+    assert payload["receipt"] == "data/exports/release_receipts/answer_trace_quality-UNKNOWN_HEAD.json"
+    assert payload["report"]["status"] == "ANSWER_TRACE_EVAL_OK"
+
+    receipt_path = tmp_path / payload["receipt"]
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["receipt_type"] == "answer_trace_quality"
+    assert receipt["status"] == "ANSWER_TRACE_QUALITY_CERT_OK"
+    assert receipt["head_sha"] == "UNKNOWN_HEAD"
+    assert receipt["payload"]["profile"] == "v0.1.23-local-release"
+
+    assert main(["certify", "answer-trace-quality", "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "ANSWER_TRACE_QUALITY_CERT_OK" in text_output
+    assert "valid_multi_citation_trace_preserves_order_and_rank" in text_output
+    assert "case_pass_rate=1.0" in text_output
+
+
 def write_package_fixture(root: Path, *, frontend_version: str = "0.1.23", lock_version: str | None = None) -> None:
     (root / "scripts").mkdir(parents=True)
     (root / "frontend").mkdir(parents=True)
@@ -1059,6 +1147,7 @@ def test_cli_release_state_reports_github_governance_open(tmp_path: Path, capsys
     assert states["SOURCE_ARTIFACT_PACKAGING"]["status"] == "PASS"
     assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["PYTHON_DIST_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["ANSWER_TRACE_QUALITY_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["GITHUB_GOVERNANCE_OPEN"]["status"] == "OPEN"
     assert "github_hosted_runner_startup=FAIL" in states["GITHUB_GOVERNANCE_OPEN"]["evidence"]
     assert "github_branch_protection_api=WARN:HTTP 403: Upgrade to GitHub Pro" in states["GITHUB_GOVERNANCE_OPEN"]["evidence"]
@@ -1110,6 +1199,14 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     )
     write_release_receipt(
         tmp_path,
+        receipt_type="answer_trace_quality",
+        status="ANSWER_TRACE_QUALITY_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_answer_trace_quality.py"],
+        payload={"checks": []},
+    )
+    write_release_receipt(
+        tmp_path,
         receipt_type="retrieval_quality",
         status="RETRIEVAL_QUALITY_CERT_OK",
         head_sha=head_sha,
@@ -1149,11 +1246,13 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     assert states["FRESH_CLONE_CERTIFIED"]["status"] == "PASS"
     assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "PASS"
     assert states["PYTHON_DIST_CERTIFIED"]["status"] == "PASS"
+    assert states["ANSWER_TRACE_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert payload["receipts"]["local_release"]["head_sha"] == head_sha
     assert payload["receipts"]["fresh_clone"]["head_sha"] == head_sha
     assert payload["receipts"]["source_artifact"]["head_sha"] == head_sha
     assert payload["receipts"]["python_dist"]["head_sha"] == head_sha
+    assert payload["receipts"]["answer_trace_quality"]["head_sha"] == head_sha
     assert payload["receipts"]["retrieval_quality"]["head_sha"] == head_sha
 
 
@@ -1168,6 +1267,7 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
         ("fresh_clone", "FRESH_CLONE_CERT_OK"),
         ("source_artifact", "SOURCE_ARTIFACT_CERT_OK"),
         ("python_dist", "PYTHON_DIST_CERT_OK"),
+        ("answer_trace_quality", "ANSWER_TRACE_QUALITY_CERT_OK"),
         ("retrieval_quality", "RETRIEVAL_QUALITY_CERT_OK"),
     ]:
         write_release_receipt(
@@ -1263,8 +1363,8 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert payload["current_state"] == "GITHUB_GOVERNANCE_OPEN"
     assert payload["head_sha"] == head_sha
     assert payload["tags_at_head"] == [tag_name]
-    assert payload["current_head_receipts_summary"]["total"] == 5
-    assert payload["current_head_receipts_summary"]["valid"] == 5
+    assert payload["current_head_receipts_summary"]["total"] == 6
+    assert payload["current_head_receipts_summary"]["valid"] == 6
     assert payload["startup_blocker"]["status"] == "FAIL"
     assert payload["github_actions"]["check_suites"]["total_count"] == 2
     assert payload["github_actions"]["check_suites"]["suites"][0]["latest_check_runs_count"] == 0
@@ -1287,8 +1387,8 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert "startup_blocker_causes=" in text_output
     assert "github_support_classification=HOSTED_STARTUP_BEFORE_JOBS" in text_output
     assert "github_support_check_suite_counts=github_actions=2 zero_check_run_startup_failures=2 queued_external=0" in text_output
-    assert "receipt_count=5" in text_output
-    assert "receipt_valid=5" in text_output
+    assert "receipt_count=6" in text_output
+    assert "receipt_valid=6" in text_output
     assert "next_action=Upgrade GitHub plan or make the repository public" in text_output
 
     output_path = tmp_path / "data" / "exports" / "governance_reports" / "handoff.json"
@@ -1491,8 +1591,28 @@ def test_cli_release_state_requires_exact_head_quality_receipts_for_governed_rea
     payload = json.loads(capsys.readouterr().out)
     states = {row["state"]: row for row in payload["states"]}
     assert payload["status"] == "RELEASE_STATE_OPEN"
+    assert payload["current_state"] == "ANSWER_TRACE_QUALITY_CERTIFICATION_OPEN"
+    assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "PASS"
+    assert states["ANSWER_TRACE_QUALITY_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
+
+    write_release_receipt(
+        tmp_path,
+        receipt_type="answer_trace_quality",
+        status="ANSWER_TRACE_QUALITY_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_answer_trace_quality.py"],
+        payload={"checks": []},
+    )
+
+    assert main(["release", "state", "--include-github", "--strict", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    states = {row["state"]: row for row in payload["states"]}
+    assert payload["status"] == "RELEASE_STATE_OPEN"
     assert payload["current_state"] == "RETRIEVAL_QUALITY_CERTIFICATION_OPEN"
     assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "PASS"
+    assert states["ANSWER_TRACE_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
 
@@ -1511,6 +1631,7 @@ def test_cli_release_state_requires_exact_head_quality_receipts_for_governed_rea
     assert payload["status"] == "RELEASE_STATE_READY"
     assert payload["current_state"] == "GOVERNED_RELEASE_READY"
     assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "PASS"
+    assert states["ANSWER_TRACE_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["GOVERNED_RELEASE_READY"]["status"] == "PASS"
 

@@ -37,6 +37,10 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro certify status` | Inspect release readiness before running full certification gates | 0 | 2 on failures, or with `--strict` warnings/failures |
 | `mucaro audit product` | Audit product gaps against the full assistant objective | 0 | 2 with `--strict` while gaps remain |
 | `mucaro audit roadmap` | Group product-audit rows into development stages | 0 | 2 with `--strict` while stages remain open |
+| `mucaro eval retrieval` | Evaluate local retrieval quality against fixture suites | 0 | 2 |
+| `mucaro eval answer-trace` | Evaluate cited-answer trace records against positive and negative fixtures | 0 | 2 |
+| `mucaro certify retrieval-quality` | Write an exact-head retrieval-quality release receipt | 0 | 2 |
+| `mucaro certify answer-trace-quality` | Write an exact-head cited-answer traceability release receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources, persistent index status, and semantic-store status | 0 | 2 |
@@ -125,6 +129,12 @@ snippet. Text output prints compact `citation=N chunk_id=... source_id=...
 rank=...` lines before the answer so operator logs can prove source binding
 without opening the JSON export.
 
+`mucaro eval answer-trace` validates the committed answer-trace fixture. The
+fixture includes positive cases plus negative cases for uncited answers,
+invented citations, missing source bindings, empty snippets, and invalid
+retrieval ranks. `mucaro certify answer-trace-quality` writes the same result
+as an exact-head `answer_trace_quality` release receipt.
+
 ## Expected Failure States
 
 | State | Meaning |
@@ -180,6 +190,8 @@ without opening the JSON export.
 | `CITATION_ERROR` | answer trace failed citation validation |
 | `ERROR_CITATION_TRACE_MISSING` | answer cited chunk IDs but did not include expandable citation trace records |
 | `ERROR_CITED_CHUNK_NOT_TRACED` | one or more cited chunk IDs were retrieved but missing from `cited_chunks` |
+| `ANSWER_TRACE_EVAL_FAILED` | answer-trace fixture validation failed, thresholds failed, or no negative cases were present |
+| `ANSWER_TRACE_QUALITY_CERT_FAILED` | exact-head cited-answer traceability certification failed |
 
 ## Examples
 
@@ -195,6 +207,10 @@ mucaro release receipt local_release-HEADPREFIX --format json
 mucaro certify status --format text
 mucaro certify status --include-github --format text
 mucaro audit product --format text
+mucaro eval retrieval --format text
+mucaro eval answer-trace --format text
+mucaro certify retrieval-quality --format text
+mucaro certify answer-trace-quality --format text
 mucaro permissions grant ~/Documents/mucaro-sources --yes --format json
 mucaro permissions list --format text
 mucaro ingest ~/Documents/mucaro-sources --format json

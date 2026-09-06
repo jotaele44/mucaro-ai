@@ -185,6 +185,7 @@ def main() -> int:
         gate_no_large_files(files),
         gate_no_generated_tracked(files),
         gate_command("python_tests", [sys.executable, "-m", "pytest", "backend/tests", "-q"]),
+        gate_command("answer_trace_quality", [sys.executable, "scripts/certify_answer_trace_quality.py"]),
         gate_command("retrieval_eval", [sys.executable, "scripts/evaluate_retrieval.py"]),
         gate_command("retrieval_quality", [sys.executable, "scripts/certify_retrieval_quality.py"]),
         gate_command(
