@@ -39,6 +39,9 @@ def test_cli_ingest_and_ask(tmp_path: Path, capsys):
     ask_output = capsys.readouterr().out
     assert "CITATION_OK" in ask_output
     assert "chunk_id=" in ask_output
+    assert "citation=1" in ask_output
+    assert "source_id=" in ask_output
+    assert "rank=1" in ask_output
 
 
 def test_cli_plan(tmp_path: Path, capsys):

@@ -16,10 +16,37 @@ def export_answer_trace(answer_trace: dict[str, Any], cfg: Settings = settings) 
     write_json(json_path, answer_trace)
     md_path.write_text(_to_markdown(answer_trace), encoding="utf-8")
     with csv_path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["run_id", "chunk_id", "source_id"])
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "run_id",
+                "citation_order",
+                "retrieval_rank",
+                "chunk_id",
+                "source_id",
+                "chunk_index",
+                "score",
+                "retrieval_strategy",
+                "source_format",
+                "text_snippet",
+            ],
+        )
         writer.writeheader()
-        for chunk_id, source_id in zip(answer_trace.get("cited_chunk_ids", []), answer_trace.get("source_ids", [])):
-            writer.writerow({"run_id": run_id, "chunk_id": chunk_id, "source_id": source_id})
+        for record in answer_trace.get("cited_chunks", []):
+            writer.writerow(
+                {
+                    "run_id": run_id,
+                    "citation_order": record.get("citation_order"),
+                    "retrieval_rank": record.get("retrieval_rank"),
+                    "chunk_id": record.get("chunk_id"),
+                    "source_id": record.get("source_id"),
+                    "chunk_index": record.get("chunk_index"),
+                    "score": record.get("score"),
+                    "retrieval_strategy": record.get("retrieval_strategy"),
+                    "source_format": record.get("source_format"),
+                    "text_snippet": record.get("text_snippet"),
+                }
+            )
     return {"json": str(json_path), "markdown": str(md_path), "csv": str(csv_path)}
 
 
@@ -38,6 +65,16 @@ def _to_markdown(answer_trace: dict[str, Any]) -> str:
         "",
         "## Cited chunks",
     ]
-    for chunk_id in answer_trace.get("cited_chunk_ids", []):
-        lines.append(f"- `{chunk_id}`")
+    for record in answer_trace.get("cited_chunks", []):
+        chunk_id = record.get("chunk_id")
+        source_id = record.get("source_id")
+        rank = record.get("retrieval_rank")
+        score = record.get("score")
+        snippet = record.get("text_snippet")
+        detail = f"source_id={source_id} retrieval_rank={rank}"
+        if score is not None:
+            detail = f"{detail} score={score}"
+        lines.append(f"- `{chunk_id}` ({detail})")
+        if snippet:
+            lines.append(f"  - {snippet}")
     return "\n".join(lines) + "\n"

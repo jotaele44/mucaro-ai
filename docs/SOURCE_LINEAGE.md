@@ -7,6 +7,32 @@ file → source_id → chunk_id → retrieval_result → answer_trace → export
 ```
 
 If a generated answer does not cite retrieved chunk IDs, it receives `ERROR_UNCITED_ANSWER`.
+If it cites a chunk that was not retrieved, it receives `ERROR_CITED_CHUNK_NOT_RETRIEVED`.
+If cited chunk IDs cannot be expanded into trace records, it receives
+`ERROR_CITATION_TRACE_MISSING` or `ERROR_CITED_CHUNK_NOT_TRACED`.
+
+Answer traces include a `cited_chunks` array that binds each citation to the
+retrieved evidence used at answer time:
+
+```json
+{
+  "citation_order": 1,
+  "retrieval_rank": 1,
+  "chunk_id": "chunk_a",
+  "source_id": "src_a",
+  "chunk_index": 0,
+  "score": 0.547248,
+  "retrieval_strategy": "hybrid_tfidf_v1",
+  "matched_terms": ["lineage", "source"],
+  "source_format": "md",
+  "text_snippet": "Source lineage requires cited chunk IDs."
+}
+```
+
+JSON exports preserve the full answer trace, Markdown exports include
+source/rank details under each cited chunk, and citation CSV exports include
+one row per cited chunk with run ID, citation order, retrieval rank, source ID,
+chunk index, score, retrieval strategy, source format, and text snippet.
 
 HTML and HTM inputs follow the same chain. The parser extracts visible document
 text for chunking while preserving file SHA-256, byte count, title metadata,

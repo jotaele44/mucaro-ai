@@ -21,6 +21,11 @@ retrieval-quality baseline adds expected-binding recall, context precision,
 full-binding hit rate, multi-binding full-hit rate, source-format coverage
 counts, and explicit distractor top-1 avoidance gates so high recall cannot hide
 noisy, partial, or wrong-leading top-k context.
+The current cited-answer traceability candidate expands answer traces with
+per-citation records that bind citation order to retrieval rank, source ID,
+chunk index, retrieval strategy, score, matched terms, source format, and a
+bounded text snippet across JSON, Markdown, CSV, persisted runs, and CLI text
+output.
 The production-security baseline added profile checks, fail-closed startup
 validation, and public-bind safeguards. The current certification target adds
 CLI certification-readiness status so operators can inspect product audit,

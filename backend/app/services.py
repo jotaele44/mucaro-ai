@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .citations import score_confidence, validate_citations
+from .citations import build_citation_records, score_confidence, validate_citations
 from .config import Settings, settings
 from .db import init_db, upsert_payload
 from .exports import export_answer_trace
@@ -66,7 +66,8 @@ def answer_question(
         }
     retrieved_ids = [chunk["chunk_id"] for chunk in retrieved]
     cited_ids = model.get("cited_chunk_ids", [])
-    source_ids = [chunk["source_id"] for chunk in retrieved if chunk["chunk_id"] in cited_ids]
+    cited_chunks = build_citation_records(retrieved, cited_ids)
+    source_ids = [record["source_id"] for record in cited_chunks]
     answer_trace = {
         "run_id": stable_id("run", normalized_query, utc_now(), length=12),
         "query": normalized_query,
@@ -83,6 +84,7 @@ def answer_question(
         "retrieval_strategy": retrieved[0].get("retrieval_strategy", "unknown") if retrieved else "none",
         "retrieved_chunk_ids": retrieved_ids,
         "cited_chunk_ids": cited_ids,
+        "cited_chunks": cited_chunks,
         "source_ids": source_ids,
         "answer": model["answer"],
         "confidence": score_confidence(cited_ids, source_ids, bool(retrieved)),

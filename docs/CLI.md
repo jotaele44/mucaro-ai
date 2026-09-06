@@ -117,6 +117,14 @@ retrieval payloads where practical:
 }
 ```
 
+Successful cited answers include `cited_chunk_ids` plus `cited_chunks` trace
+records. Each cited chunk record binds the citation order to the retrieved
+chunk ID, source ID, chunk index, retrieval rank, retrieval strategy, score,
+matched terms when available, source format when available, and a bounded text
+snippet. Text output prints compact `citation=N chunk_id=... source_id=...
+rank=...` lines before the answer so operator logs can prove source binding
+without opening the JSON export.
+
 ## Expected Failure States
 
 | State | Meaning |
@@ -170,6 +178,8 @@ retrieval payloads where practical:
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
+| `ERROR_CITATION_TRACE_MISSING` | answer cited chunk IDs but did not include expandable citation trace records |
+| `ERROR_CITED_CHUNK_NOT_TRACED` | one or more cited chunk IDs were retrieved but missing from `cited_chunks` |
 
 ## Examples
 

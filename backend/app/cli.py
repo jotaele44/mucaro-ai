@@ -913,12 +913,30 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"answer_status={answer.get('citation_status') or answer.get('status')}")
             if answer.get("run_id"):
                 print(f"run_id={answer.get('run_id')}")
+            for citation in answer.get("cited_chunks", []):
+                if isinstance(citation, dict):
+                    print(
+                        "citation="
+                        f"{citation.get('citation_order')} "
+                        f"chunk_id={citation.get('chunk_id')} "
+                        f"source_id={citation.get('source_id')} "
+                        f"rank={citation.get('retrieval_rank')}"
+                    )
             if answer.get("answer"):
                 print(answer.get("answer"))
     elif "run_id" in payload:
         print(f"run_id={payload.get('run_id')}")
         print(f"citation_status={payload.get('citation_status')}")
         print(f"retrieval_strategy={payload.get('retrieval_strategy')}")
+        for citation in payload.get("cited_chunks", []):
+            if isinstance(citation, dict):
+                print(
+                    "citation="
+                    f"{citation.get('citation_order')} "
+                    f"chunk_id={citation.get('chunk_id')} "
+                    f"source_id={citation.get('source_id')} "
+                    f"rank={citation.get('retrieval_rank')}"
+                )
         if payload.get("answer"):
             print(payload.get("answer"))
     elif "answer" in payload:
