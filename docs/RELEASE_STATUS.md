@@ -315,3 +315,9 @@ Known environment-dependent item:
   `094bd7f44e1073596f37506f9f951423ee623750b42209d639ea35017c24eb99`.
   Verification with `--expected-sha256` and `--require-current-head` reports
   `GOVERNANCE_REPORT_VERIFIED`.
+- `mucaro certify operator-workflow` now certifies the local operator workflow
+  boundary in an isolated temp project. It proves external directory permission
+  gating, source ingestion and index rebuilds, mock cited answer generation with
+  active memory, trace exports, run-history persistence, memory
+  disable/export/delete controls, and approval-gated local tool execution with
+  audit events.

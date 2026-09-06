@@ -71,6 +71,12 @@ from .retrieval_quality_certification import (
 )
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
 from .model_router import ModelProviderError, list_model_providers, model_provider_names, model_provider_status
+from .operator_workflow_certification import (
+    OPERATOR_WORKFLOW_OK,
+    OPERATOR_WORKFLOW_PROFILE,
+    build_operator_workflow_certification,
+    format_operator_workflow_certification_text,
+)
 from .services import answer_question
 from .tools import (
     ToolRuntimeError,
@@ -319,6 +325,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     certify_answer_trace.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     certify_answer_trace.set_defaults(handler=run_certify_answer_trace_quality)
+
+    certify_operator_workflow = certify_subcommands.add_parser(
+        "operator-workflow",
+        help="Certify the local CLI operator workflow boundary.",
+    )
+    certify_operator_workflow.add_argument(
+        "--profile",
+        default=OPERATOR_WORKFLOW_PROFILE,
+        help="Named operator-workflow profile to record in the release receipt.",
+    )
+    certify_operator_workflow.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    certify_operator_workflow.set_defaults(handler=run_certify_operator_workflow)
 
     sources = subcommands.add_parser("sources", help="Inspect and manage ingested sources.")
     sources_subcommands = sources.add_subparsers(dest="sources_command", required=True)
@@ -850,6 +868,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         for check in payload.get("checks", []):
             detail = str(check.get("detail")).replace("\n", "\\n")
             print(f"{check.get('status')} {check.get('name')} {detail}")
+    elif status in {"OPERATOR_WORKFLOW_CERT_OK", "OPERATOR_WORKFLOW_CERT_FAILED"}:
+        for line in format_operator_workflow_certification_text(payload):
+            print(line)
     elif status in {"RELEASE_RECEIPTS_OK", "RELEASE_RECEIPT_OK"}:
         if payload.get("receipt_id"):
             print(f"receipt_id={payload.get('receipt_id')}")
@@ -2914,6 +2935,19 @@ def run_certify_answer_trace_quality(args: argparse.Namespace, cfg: Settings) ->
     )
     emit_payload(report, args.format)
     return 0 if report["status"] == ANSWER_TRACE_QUALITY_OK else 2
+
+
+def run_certify_operator_workflow(args: argparse.Namespace, cfg: Settings) -> int:
+    command = ["mucaro", "certify", "operator-workflow"]
+    if args.profile != OPERATOR_WORKFLOW_PROFILE:
+        command.extend(["--profile", args.profile])
+    report = build_operator_workflow_certification(
+        cfg.project_root,
+        profile=args.profile,
+        command=command,
+    )
+    emit_payload(report, args.format)
+    return 0 if report["status"] == OPERATOR_WORKFLOW_OK else 2
 
 
 def run_sources_list(args: argparse.Namespace, cfg: Settings) -> int:

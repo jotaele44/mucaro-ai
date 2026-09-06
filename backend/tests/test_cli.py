@@ -2144,6 +2144,39 @@ def test_cli_memory_controls_and_export(tmp_path: Path, capsys):
     assert deleted["remaining_memories"] == 0
 
 
+def test_cli_certify_operator_workflow_exercises_local_boundary(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["certify", "operator-workflow", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "OPERATOR_WORKFLOW_CERT_OK"
+    assert payload["summary"]["failed"] == 0
+    assert payload["summary"]["source_count"] == 2
+    assert payload["summary"]["run_count"] == 1
+    assert payload["summary"]["tool_audit_event_count"] == 3
+    assert payload["summary"]["trace_export_count"] == 3
+    assert payload["receipt"] == "data/exports/release_receipts/operator_workflow-UNKNOWN_HEAD.json"
+    by_name = {check["name"]: check for check in payload["checks"]}
+    assert by_name["permission_required_before_grant"]["status"] == "PASS"
+    assert by_name["source_ingestion_and_indexes"]["status"] == "PASS"
+    assert by_name["ask_trace_memory_and_exports"]["status"] == "PASS"
+    assert by_name["tool_denied_before_approval"]["status"] == "PASS"
+    assert by_name["tool_approval_execution_audit"]["status"] == "PASS"
+
+    receipt = tmp_path / payload["receipt"]
+    assert receipt.exists()
+    saved_receipt = json.loads(receipt.read_text(encoding="utf-8"))
+    assert saved_receipt["receipt_type"] == "operator_workflow"
+    assert saved_receipt["status"] == "OPERATOR_WORKFLOW_CERT_OK"
+
+    assert main(["certify", "operator-workflow", "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "OPERATOR_WORKFLOW_CERT_OK" in text_output
+    assert "PASS permission_required_before_grant" in text_output
+    assert "PASS tool_approval_execution_audit" in text_output
+
+
 def test_cli_security_status_and_serve_public_bind_guard(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path, operator_token="x" * 32)
 

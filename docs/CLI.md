@@ -41,6 +41,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro eval answer-trace` | Evaluate cited-answer trace records against positive and negative fixtures | 0 | 2 |
 | `mucaro certify retrieval-quality` | Write an exact-head retrieval-quality release receipt | 0 | 2 |
 | `mucaro certify answer-trace-quality` | Write an exact-head cited-answer traceability release receipt | 0 | 2 |
+| `mucaro certify operator-workflow` | Write an exact-head local operator-workflow release receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources, persistent index status, and semantic-store status | 0 | 2 |
@@ -139,6 +140,13 @@ snippets, required source bindings, and export paths. `mucaro certify
 answer-trace-quality` writes the same result as an exact-head
 `answer_trace_quality` release receipt.
 
+`mucaro certify operator-workflow` runs an isolated end-to-end local operator
+workflow. It proves external-source permission is required before ingestion, a
+granted directory can be ingested, retrieval indexes are rebuilt, mock `ask`
+produces cited trace exports while using active memory, run history persists,
+memory can be disabled/exported/deleted, and local tools cannot execute until
+approved and audited.
+
 ## Expected Failure States
 
 | State | Meaning |
@@ -215,6 +223,7 @@ mucaro eval retrieval --format text
 mucaro eval answer-trace --format text
 mucaro certify retrieval-quality --format text
 mucaro certify answer-trace-quality --format text
+mucaro certify operator-workflow --format text
 mucaro permissions grant ~/Documents/mucaro-sources --yes --format json
 mucaro permissions list --format text
 mucaro ingest ~/Documents/mucaro-sources --format json

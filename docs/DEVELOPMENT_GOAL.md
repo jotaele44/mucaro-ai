@@ -36,6 +36,7 @@ packaging, and hosted governance.
 | Answer traceability | Citation order, retrieval rank, source ID, chunk ID, source format, score, matched terms, snippets, and export paths |
 | Memory controls | Explicit opt-in, inspect, export, disable, delete, and local-only persistence behavior |
 | Tool execution | Deny-by-default request, approve or deny, execute only after approval, and append-only local audit events |
+| Operator workflow | Isolated proof that permission grants, ingestion, retrieval, answer traces, memory controls, run history, and approved tools work together |
 | Fresh clone | Exact-ref clone, install, CLI help, release check, launcher self-test, and desktop smoke certification |
 | Packaging | Source artifact manifest, archive SHA-256, member hashes, distribution policy, and package status gate |
 | Hosted governance | Current-head hosted CI, startup probe, branch-protection visibility, tag binding, and clear external blocker classification |
