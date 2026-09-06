@@ -203,6 +203,7 @@ def build_parser() -> argparse.ArgumentParser:
     eval_retrieval.add_argument("--min-semantic-precision", type=float, default=0.20, help="Minimum context precision@k required for semantic retrieval.")
     eval_retrieval.add_argument("--min-expected-binding-recall", type=float, default=0.95, help="Minimum expected binding recall@k required for every retrieval strategy.")
     eval_retrieval.add_argument("--min-multi-binding-full-hit", type=float, default=0.60, help="Minimum multi-binding full-hit rate required for every retrieval strategy.")
+    eval_retrieval.add_argument("--min-distractor-free-rate", type=float, default=1.00, help="Minimum distractor-free query rate required for every retrieval strategy.")
     eval_retrieval.add_argument("--min-category-recall", type=float, default=0.0, help="Optional minimum recall@k required for every positive-query category.")
     eval_retrieval.add_argument(
         "--min-category-binding-recall",
@@ -640,8 +641,14 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 print(f"no_context_queries={counts.get('no_context_queries')}")
             if "expected_bindings" in counts:
                 print(f"expected_bindings={counts.get('expected_bindings')}")
+            if "distractor_bindings" in counts:
+                print(f"distractor_bindings={counts.get('distractor_bindings')}")
+            if "distractor_queries" in counts:
+                print(f"distractor_queries={counts.get('distractor_queries')}")
             if "source_ids" in counts:
                 print(f"source_ids={counts.get('source_ids')}")
+            if "source_formats" in counts:
+                print(f"source_formats={counts.get('source_formats')}")
             if "multi_binding_queries" in counts:
                 print(f"multi_binding_queries={counts.get('multi_binding_queries')}")
             if "query_categories" in counts:
@@ -661,6 +668,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"min_semantic_precision={payload.get('min_semantic_precision')}")
         print(f"min_expected_binding_recall={payload.get('min_expected_binding_recall')}")
         print(f"min_multi_binding_full_hit={payload.get('min_multi_binding_full_hit')}")
+        print(f"min_distractor_free_rate={payload.get('min_distractor_free_rate')}")
         print(f"min_category_recall={payload.get('min_category_recall')}")
         print(f"min_category_binding_recall={payload.get('min_category_binding_recall')}")
         for line in format_retrieval_eval_text(payload)[:-1]:
@@ -1308,6 +1316,7 @@ def run_eval_retrieval(args: argparse.Namespace, cfg: Settings) -> int:
         min_semantic_precision=args.min_semantic_precision,
         min_expected_binding_recall=args.min_expected_binding_recall,
         min_multi_binding_full_hit=args.min_multi_binding_full_hit,
+        min_distractor_free_rate=args.min_distractor_free_rate,
         min_category_recall=args.min_category_recall,
         min_category_binding_recall=args.min_category_binding_recall,
     )

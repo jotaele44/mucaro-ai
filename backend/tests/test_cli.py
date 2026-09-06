@@ -255,7 +255,10 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
         "positive_queries": 25,
         "no_context_queries": 6,
         "expected_bindings": 28,
+        "distractor_bindings": 0,
+        "distractor_queries": 0,
         "source_ids": 25,
+        "source_formats": 0,
         "multi_binding_queries": 3,
         "query_categories": 20,
         "strategies": 6,
@@ -264,6 +267,7 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert payload["min_category_recall"] == 0.0
     assert payload["min_category_binding_recall"] == 0.0
     assert payload["category_threshold_failures"] == []
+    assert payload["distractor_threshold_failures"] == []
     assert {strategy["strategy"] for strategy in payload["strategies"]} == {
         "lexical",
         "vector",
@@ -292,8 +296,13 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
         "top1_hit_rate": 1.0,
         "full_binding_hit_rate": 1.0,
         "multi_binding_full_hit_rate": 1.0,
+        "distractor_free_rate": 1.0,
+        "distractor_hit_rate": 0.0,
         "no_context_accuracy": 1.0,
         "expected_bindings": 3,
+        "distractor_bindings": 0,
+        "distractor_hits": 0,
+        "distractor_top1_hits": 0,
         "positive_retrieved_chunks": 6,
         "relevant_retrieved_chunks": 3,
     }
@@ -306,12 +315,15 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert "positive_queries=25" in text_output
     assert "no_context_queries=6" in text_output
     assert "source_ids=25" in text_output
+    assert "source_formats=0" in text_output
+    assert "distractor_bindings=0" in text_output
     assert "multi_binding_queries=3" in text_output
     assert "query_categories=20" in text_output
     assert "fixture_validation=RETRIEVAL_FIXTURE_OK" in text_output
     assert "min_no_context_accuracy=1.0" in text_output
     assert "min_hybrid_precision=0.2" in text_output
     assert "min_expected_binding_recall=0.95" in text_output
+    assert "min_distractor_free_rate=1.0" in text_output
     assert "min_category_recall=0.0" in text_output
     assert "min_category_binding_recall=0.0" in text_output
     assert "binding_recall=1.00" in text_output
@@ -331,12 +343,15 @@ def test_cli_eval_retrieval_reports_mixed_format_quality_metrics(tmp_path: Path,
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "RETRIEVAL_EVAL_OK"
     assert payload["counts"] == {
-        "chunks": 26,
+        "chunks": 29,
         "queries": 36,
         "positive_queries": 30,
         "no_context_queries": 6,
         "expected_bindings": 34,
-        "source_ids": 26,
+        "distractor_bindings": 3,
+        "distractor_queries": 3,
+        "source_ids": 29,
+        "source_formats": 13,
         "multi_binding_queries": 4,
         "query_categories": 13,
         "strategies": 6,
@@ -344,11 +359,15 @@ def test_cli_eval_retrieval_reports_mixed_format_quality_metrics(tmp_path: Path,
     assert payload["fixture_validation"]["status"] == "RETRIEVAL_FIXTURE_OK"
     hybrid = next(strategy for strategy in payload["strategies"] if strategy["strategy"] == "hybrid")
     assert hybrid["expected_binding_recall_at_k"] == 1.0
-    assert hybrid["context_precision_at_k"] == 0.2411
+    assert hybrid["context_precision_at_k"] == 0.2378
     assert hybrid["full_binding_hit_rate"] == 1.0
     assert hybrid["multi_binding_full_hit_rate"] == 1.0
+    assert hybrid["distractor_free_rate"] == 1.0
+    assert hybrid["distractor_hit_rate"] == 1.0
+    assert hybrid["distractor_hits"] == 3
+    assert hybrid["distractor_top1_hits"] == 0
     assert hybrid["no_context_accuracy"] == 1.0
-    assert hybrid["positive_retrieved_chunks"] == 141
+    assert hybrid["positive_retrieved_chunks"] == 143
     assert hybrid["relevant_retrieved_chunks"] == 34
     categories = {category["category"]: category for category in hybrid["category_metrics"]}
     assert set(categories) == {
@@ -368,12 +387,18 @@ def test_cli_eval_retrieval_reports_mixed_format_quality_metrics(tmp_path: Path,
     }
     assert categories["multi_format"]["multi_binding_full_hit_rate"] == 1.0
     assert categories["no_context"]["no_context_accuracy"] == 1.0
+    assert categories["txt"]["distractor_bindings"] == 1
+    assert categories["txt"]["distractor_top1_hits"] == 0
 
     assert main(["eval", "retrieval", "--fixture", fixture, "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "fixture=backend/tests/fixtures/retrieval_eval_mixed_formats.json" in text_output
+    assert "chunks=29" in text_output
     assert "positive_queries=30" in text_output
     assert "expected_bindings=34" in text_output
+    assert "distractor_bindings=3" in text_output
+    assert "distractor_queries=3" in text_output
+    assert "source_formats=13" in text_output
     assert "query_categories=13" in text_output
     assert "hybrid category=csv queries=2 positives=2 recall@5=1.00" in text_output
     assert "hybrid category=html queries=3 positives=3 recall@5=1.00" in text_output
@@ -517,6 +542,60 @@ def test_cli_eval_retrieval_fails_when_binding_threshold_is_not_met(tmp_path: Pa
     assert bm25["expected_binding_recall_at_k"] == 0.9667
 
 
+def test_cli_eval_retrieval_fails_when_distractor_threshold_is_not_met(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    fixture = tmp_path / "distractor_retrieval_eval.json"
+    chunks = [
+        {"chunk_id": f"known_{idx}", "source_id": f"source_{idx:02d}", "chunk_index": 0, "text": f"known source text {idx}"}
+        for idx in range(25)
+    ]
+    chunks[0] = {
+        "chunk_id": "expected_execution",
+        "source_id": "zzz_expected_execution",
+        "chunk_index": 0,
+        "text": "Execution approval requires operator lock evidence before local action.",
+    }
+    chunks[1] = {
+        "chunk_id": "decoy_execution",
+        "source_id": "aaa_decoy_execution",
+        "chunk_index": 0,
+        "text": "Execution approval appears in unrelated procurement notes before local action.",
+    }
+    queries = [
+        {
+            "query": "Execution approval before local action",
+            "expected_chunk_ids": ["expected_execution"],
+            "distractor_chunk_ids": ["decoy_execution"],
+            "category": "decoy",
+        },
+        *[
+            {"query": f"known source text {idx}", "expected_chunk_ids": [f"known_{idx}"], "category": f"cat_{idx}"}
+            for idx in range(2, 23)
+        ],
+        *[
+            {"query": "known source text 21 and 22", "expected_chunk_ids": ["known_21", "known_22"], "category": "multi_a"},
+            {"query": "known source text 23 and 24", "expected_chunk_ids": ["known_23", "known_24"], "category": "multi_b"},
+        ],
+        *[
+            {"query": f"outside topic {idx}", "expected_chunk_ids": [], "category": "no_context"}
+            for idx in range(6)
+        ],
+    ]
+    fixture.write_text(json.dumps({"chunks": chunks, "queries": queries}), encoding="utf-8")
+
+    assert main(["eval", "retrieval", "--fixture", str(fixture), "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "RETRIEVAL_EVAL_FAILED"
+    assert payload["min_distractor_free_rate"] == 1.0
+    assert any(failure["strategy"] == "hybrid" for failure in payload["distractor_threshold_failures"])
+
+    assert main(["eval", "retrieval", "--fixture", str(fixture), "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "distractor_threshold_failure strategy=hybrid" in text_output
+    assert "RETRIEVAL_EVAL_FAILED" in text_output
+
+
 def test_cli_eval_retrieval_fails_on_invalid_fixture(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
     fixture = tmp_path / "invalid_retrieval_eval.json"
@@ -583,6 +662,7 @@ def test_cli_certify_retrieval_quality_writes_exact_head_receipt(tmp_path: Path,
     assert "mixed_format_fixture_strict_binding" in text_output
     assert "min_category_binding_recall=0.8" in text_output
     assert "min_category_binding_recall=1.0" in text_output
+    assert "min_distractor_free_rate=1.0" in text_output
 
 
 def write_package_fixture(root: Path, *, frontend_version: str = "0.1.23", lock_version: str | None = None) -> None:

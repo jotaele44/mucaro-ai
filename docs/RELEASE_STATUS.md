@@ -18,8 +18,9 @@ approval-gated local tool runtime, local HTML/DOCX/EML document ingestion, bound
 explicit local memory, CLI-exposed retrieval evaluation, and CLI-exposed
 packaging readiness with a governed source-artifact policy. The current
 retrieval-quality baseline adds expected-binding recall, context precision,
-full-binding hit rate, and multi-binding full-hit rate gates so high recall
-cannot hide noisy or partial top-k context.
+full-binding hit rate, multi-binding full-hit rate, source-format coverage
+counts, and explicit distractor top-1 avoidance gates so high recall cannot hide
+noisy, partial, or wrong-leading top-k context.
 The production-security baseline added profile checks, fail-closed startup
 validation, and public-bind safeguards. The current certification target adds
 CLI certification-readiness status so operators can inspect product audit,
@@ -127,16 +128,18 @@ Observed success markers:
 - `mucaro eval retrieval` exposes the retrieval-quality fixture through the
   supported CLI boundary while `scripts/evaluate_retrieval.py` remains a
   compatibility wrapper for release automation. The fixture gate validates
-  benchmark shape, unique chunk IDs, expected chunk bindings, and positive plus
+  benchmark shape, unique chunk IDs, expected chunk bindings, explicit
+  distractor chunk bindings, source-format metadata, and positive plus
   no-context coverage before scoring strategies.
 - `mucaro certify retrieval-quality` now turns the default and large retrieval
   fixtures plus the mixed-format retrieval fixture into an exact-head
   `retrieval_quality` release receipt. The mixed-format fixture covers TXT,
   Markdown, HTML, DOCX, EML, MSG text probing, CSV, JSON, PDF, metadata-only media,
   traceability, and multi-format questions with strict per-category binding
-  recall. The profile records per-fixture thresholds, query/category counts,
-  category threshold failures, and full eval reports, and `mucaro release
-  state` reports `RETRIEVAL_QUALITY_CERTIFIED` from that receipt.
+  recall plus explicit decoy chunks for distractor top-1 avoidance. The profile
+  records per-fixture thresholds, query/category/source-format/distractor counts,
+  category and distractor threshold failures, and full eval reports, and
+  `mucaro release state` reports `RETRIEVAL_QUALITY_CERTIFIED` from that receipt.
 - `mucaro package status` exposes package metadata, version consistency,
   launcher entrypoint, desktop package manifest, optional generated outputs, and
   current distribution blockers through the supported CLI boundary while

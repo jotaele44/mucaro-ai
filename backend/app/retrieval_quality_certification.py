@@ -38,6 +38,7 @@ RETRIEVAL_QUALITY_CASES = [
             "min_semantic_precision": 0.20,
             "min_expected_binding_recall": 0.95,
             "min_multi_binding_full_hit": 0.60,
+            "min_distractor_free_rate": 1.00,
             "min_category_recall": 1.00,
             "min_category_binding_recall": 1.00,
         },
@@ -54,6 +55,7 @@ RETRIEVAL_QUALITY_CASES = [
             "min_semantic_precision": 0.20,
             "min_expected_binding_recall": 0.95,
             "min_multi_binding_full_hit": 0.60,
+            "min_distractor_free_rate": 1.00,
             "min_category_recall": 1.00,
             "min_category_binding_recall": 0.80,
         },
@@ -70,6 +72,7 @@ RETRIEVAL_QUALITY_CASES = [
             "min_semantic_precision": 0.20,
             "min_expected_binding_recall": 0.95,
             "min_multi_binding_full_hit": 0.60,
+            "min_distractor_free_rate": 1.00,
             "min_category_recall": 1.00,
             "min_category_binding_recall": 1.00,
         },
@@ -114,6 +117,7 @@ def build_retrieval_quality_certification(
             "status": report["status"],
             "counts": report.get("counts"),
             "category_threshold_failures": report.get("category_threshold_failures", []),
+            "distractor_threshold_failures": report.get("distractor_threshold_failures", []),
             "report": report,
         }
         case_reports.append(case_report)
@@ -124,6 +128,7 @@ def build_retrieval_quality_certification(
                     "fixture": _fixture_label(case.fixture_path),
                     "status": report["status"],
                     "category_threshold_failures": report.get("category_threshold_failures", []),
+                    "distractor_threshold_failures": report.get("distractor_threshold_failures", []),
                 }
             )
 
@@ -176,6 +181,9 @@ def format_retrieval_quality_certification_text(report: dict[str, Any]) -> list[
         lines.append(
             f"{case.get('status')} {case.get('name')} fixture={case.get('fixture')} "
             f"queries={counts.get('queries')} source_ids={counts.get('source_ids')} "
+            f"source_formats={counts.get('source_formats')} "
+            f"distractor_queries={counts.get('distractor_queries')} "
+            f"distractor_bindings={counts.get('distractor_bindings')} "
             f"query_categories={counts.get('query_categories')}"
         )
         thresholds = case.get("thresholds") if isinstance(case.get("thresholds"), dict) else {}
@@ -184,7 +192,8 @@ def format_retrieval_quality_certification_text(report: dict[str, Any]) -> list[
             f"min_category_recall={thresholds.get('min_category_recall')} "
             f"min_category_binding_recall={thresholds.get('min_category_binding_recall')} "
             f"min_expected_binding_recall={thresholds.get('min_expected_binding_recall')} "
-            f"min_multi_binding_full_hit={thresholds.get('min_multi_binding_full_hit')}"
+            f"min_multi_binding_full_hit={thresholds.get('min_multi_binding_full_hit')} "
+            f"min_distractor_free_rate={thresholds.get('min_distractor_free_rate')}"
         )
         for failure in case.get("category_threshold_failures", []):
             if isinstance(failure, dict):
@@ -193,6 +202,14 @@ def format_retrieval_quality_certification_text(report: dict[str, Any]) -> list[
                     f"strategy={failure.get('strategy')} category={failure.get('category')} "
                     f"recall={failure.get('recall_at_k')} "
                     f"binding_recall={failure.get('expected_binding_recall_at_k')}"
+                )
+        for failure in case.get("distractor_threshold_failures", []):
+            if isinstance(failure, dict):
+                lines.append(
+                    f"distractor_threshold_failure case={case.get('name')} "
+                    f"strategy={failure.get('strategy')} "
+                    f"distractor_free={failure.get('distractor_free_rate')} "
+                    f"distractor_hits={failure.get('distractor_hits')}"
                 )
     if report.get("receipt_error"):
         lines.append(f"receipt_error={report.get('receipt_error')}")

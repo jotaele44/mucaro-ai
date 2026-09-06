@@ -52,8 +52,9 @@ The committed retrieval fixture now has its own validation gate: chunk IDs must
 be unique, expected chunk bindings must point at existing chunks, source
 coverage must span a minimum number of source IDs, positive and no-context cases
 must both meet minimum floors, multi-binding cases must be present, query
-categories must cover multiple product surfaces, and benchmark counts are
-reported beside retrieval scores.
+categories must cover multiple product surfaces, explicit distractor bindings
+must point at existing non-expected chunks, and benchmark counts are reported
+beside retrieval scores.
 
 Release certification also runs `backend/tests/fixtures/retrieval_eval_large.json`
 as a larger deterministic corpus. That larger fixture exercises the same local
@@ -66,7 +67,12 @@ Release certification also runs
 corpus for the current ingestion surface. That fixture covers TXT, Markdown,
 HTML, DOCX, EML, MSG text probing, CSV, JSON, PDF, metadata-only media,
 traceability, and multi-format source questions so parser upgrades have
-retrieval evidence beyond unit-level extraction checks.
+retrieval evidence beyond unit-level extraction checks. It also includes
+explicit decoy chunks that share surface vocabulary with target queries but are
+not acceptable source bindings. The eval records both top-k distractor hits and
+whether a distractor wins top-1; certification currently requires a perfect
+top-1 distractor-free rate while keeping lower-ranked distractor hits visible as
+context-noise evidence.
 
 `mucaro certify retrieval-quality` promotes those fixture checks into an
 exact-head release receipt. The current `v0.1.23-local-release` profile runs the
@@ -94,6 +100,7 @@ default `hybrid` strategy until eval evidence shows a material improvement.
 | Category expected-binding recall | Optional `--min-category-binding-recall` can fail any positive-query category that misses required expected chunks |
 | Context precision | Hybrid and semantic retrieval meet their configured precision thresholds so noisy top-k context is visible |
 | Multi-binding full hit | Every evaluated strategy meets the configured `--min-multi-binding-full-hit` threshold for multi-source questions |
+| Distractor top-1 avoidance | Every evaluated strategy meets `--min-distractor-free-rate`, meaning explicit distractor chunks must not outrank expected bindings |
 | Determinism check | Stable top-k order for ties or explicit tie-break metadata |
 | Empty corpus | Explicit error status, no exception |
 | Missing index/store | Explicit repair warning |

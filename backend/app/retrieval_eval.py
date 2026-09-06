@@ -51,7 +51,10 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
                 "positive_queries": 0,
                 "no_context_queries": 0,
                 "expected_bindings": 0,
+                "distractor_bindings": 0,
+                "distractor_queries": 0,
                 "source_ids": 0,
+                "source_formats": 0,
                 "multi_binding_queries": 0,
                 "query_categories": 0,
             },
@@ -78,6 +81,7 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
 
     chunk_ids: list[str] = []
     malformed_chunks = 0
+    malformed_source_formats = 0
     for index, chunk in enumerate(chunk_rows):
         if not isinstance(chunk, dict):
             malformed_chunks += 1
@@ -89,6 +93,9 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
             malformed_chunks += 1
             continue
         chunk_ids.append(chunk_id)
+        source_format = chunk.get("source_format")
+        if source_format is not None and (not isinstance(source_format, str) or not source_format.strip()):
+            malformed_source_formats += 1
         if not isinstance(source_id, str) or not source_id.strip() or not isinstance(text, str) or not text.strip():
             malformed_chunks += 1
         if "chunk_index" not in chunk:
@@ -97,6 +104,11 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
     duplicate_chunk_ids = sorted(chunk_id for chunk_id, count in chunk_id_counts.items() if count > 1)
     known_chunk_ids = set(chunk_ids)
     source_ids = {chunk.get("source_id") for chunk in chunk_rows if isinstance(chunk, dict) and isinstance(chunk.get("source_id"), str)}
+    source_formats = {
+        chunk.get("source_format")
+        for chunk in chunk_rows
+        if isinstance(chunk, dict) and isinstance(chunk.get("source_format"), str) and chunk.get("source_format").strip()
+    }
     checks.append(
         _eval_check(
             "chunk_contract",
@@ -111,16 +123,27 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
             f"source_ids={len(source_ids)} min_source_ids={MIN_SOURCE_IDS}",
         )
     )
+    checks.append(
+        _eval_check(
+            "source_format_contract",
+            "PASS" if malformed_source_formats == 0 else "FAIL",
+            f"source_formats={len(source_formats)} malformed={malformed_source_formats}",
+        )
+    )
 
     malformed_queries = 0
     duplicate_queries: set[str] = set()
     seen_queries: set[str] = set()
     dangling_expected: set[str] = set()
+    dangling_distractors: set[str] = set()
+    overlapping_expected_and_distractors: set[str] = set()
     query_categories: set[str] = set()
     positive_queries = 0
     no_context_queries = 0
     multi_binding_queries = 0
     expected_bindings = 0
+    distractor_bindings = 0
+    distractor_queries = 0
     for row in query_rows:
         if not isinstance(row, dict):
             malformed_queries += 1
@@ -130,6 +153,10 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
         if not isinstance(query, str) or not query.strip() or not isinstance(expected, list):
             malformed_queries += 1
             continue
+        distractors = row.get("distractor_chunk_ids", [])
+        if not isinstance(distractors, list):
+            malformed_queries += 1
+            distractors = []
         if query in seen_queries:
             duplicate_queries.add(query)
         seen_queries.add(query)
@@ -142,13 +169,26 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
         category = row.get("category")
         if isinstance(category, str) and category.strip():
             query_categories.add(category)
+        expected_set = set()
         for chunk_id in expected:
             if not isinstance(chunk_id, str) or not chunk_id.strip():
                 malformed_queries += 1
                 continue
+            expected_set.add(chunk_id)
             expected_bindings += 1
             if chunk_id not in known_chunk_ids:
                 dangling_expected.add(chunk_id)
+        if distractors:
+            distractor_queries += 1
+        for chunk_id in distractors:
+            if not isinstance(chunk_id, str) or not chunk_id.strip():
+                malformed_queries += 1
+                continue
+            distractor_bindings += 1
+            if chunk_id not in known_chunk_ids:
+                dangling_distractors.add(chunk_id)
+            if chunk_id in expected_set:
+                overlapping_expected_and_distractors.add(chunk_id)
     checks.append(
         _eval_check(
             "query_contract",
@@ -161,6 +201,17 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
             "expected_chunk_bindings",
             "PASS" if not dangling_expected else "FAIL",
             f"dangling={','.join(sorted(dangling_expected)) or 'none'} expected_bindings={expected_bindings}",
+        )
+    )
+    checks.append(
+        _eval_check(
+            "distractor_chunk_bindings",
+            "PASS" if not dangling_distractors and not overlapping_expected_and_distractors else "FAIL",
+            (
+                f"dangling={','.join(sorted(dangling_distractors)) or 'none'} "
+                f"overlap={','.join(sorted(overlapping_expected_and_distractors)) or 'none'} "
+                f"distractor_bindings={distractor_bindings}"
+            ),
         )
     )
     checks.append(
@@ -198,7 +249,10 @@ def validate_retrieval_eval_fixture(fixture: Any) -> dict[str, Any]:
             "positive_queries": positive_queries,
             "no_context_queries": no_context_queries,
             "expected_bindings": expected_bindings,
+            "distractor_bindings": distractor_bindings,
+            "distractor_queries": distractor_queries,
             "source_ids": len(source_ids),
+            "source_formats": len(source_formats),
             "multi_binding_queries": multi_binding_queries,
             "query_categories": len(query_categories),
         },
@@ -231,6 +285,10 @@ def _empty_category_bucket(category: str) -> dict[str, Any]:
         "full_binding_hits": 0,
         "multi_binding_cases": 0,
         "multi_binding_full_hits": 0,
+        "distractor_queries": 0,
+        "distractor_top1_hits": 0,
+        "total_distractor_bindings": 0,
+        "distractor_hits": 0,
         "total_expected_bindings": 0,
         "retrieved_for_positive": 0,
         "relevant_retrieved": 0,
@@ -246,6 +304,7 @@ def _finalize_category_bucket(bucket: dict[str, Any]) -> dict[str, Any]:
     positive_queries = bucket["positive_queries"]
     no_context_queries = bucket["no_context_queries"]
     multi_binding_cases = bucket["multi_binding_cases"]
+    distractor_queries = bucket["distractor_queries"]
     return {
         "category": bucket["category"],
         "queries": bucket["queries"],
@@ -267,8 +326,21 @@ def _finalize_category_bucket(bucket: dict[str, Any]) -> dict[str, Any]:
         "multi_binding_full_hit_rate": (
             round(bucket["multi_binding_full_hits"] / multi_binding_cases, 4) if multi_binding_cases else 1.0
         ),
+        "distractor_free_rate": (
+            round(1 - (bucket["distractor_top1_hits"] / distractor_queries), 4)
+            if distractor_queries
+            else 1.0
+        ),
+        "distractor_hit_rate": (
+            round(bucket["distractor_hits"] / bucket["total_distractor_bindings"], 4)
+            if bucket["total_distractor_bindings"]
+            else 0.0
+        ),
         "no_context_accuracy": round(bucket["no_context_hits"] / no_context_queries, 4) if no_context_queries else 1.0,
         "expected_bindings": bucket["total_expected_bindings"],
+        "distractor_bindings": bucket["total_distractor_bindings"],
+        "distractor_hits": bucket["distractor_hits"],
+        "distractor_top1_hits": bucket["distractor_top1_hits"],
         "positive_retrieved_chunks": bucket["retrieved_for_positive"],
         "relevant_retrieved_chunks": bucket["relevant_retrieved"],
     }
@@ -298,10 +370,15 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
     full_binding_hits = 0
     multi_binding_cases = 0
     multi_binding_full_hits = 0
+    distractor_queries = 0
+    distractor_top1_hits = 0
+    total_distractor_bindings = 0
+    distractor_hits = 0
     category_buckets: dict[str, dict[str, Any]] = {}
     try:
         for case in fixture["queries"]:
             expected = set(case["expected_chunk_ids"])
+            distractors = set(case.get("distractor_chunk_ids", []))
             category = _category_from_case(case)
             category_bucket = category_buckets.setdefault(category, _empty_category_bucket(category))
             category_bucket["queries"] += 1
@@ -313,6 +390,17 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
             retrieved_ids = [chunk["chunk_id"] for chunk in result["retrieved_chunks"]]
             retrieved = set(retrieved_ids)
             matched_expected = sorted(expected.intersection(retrieved))
+            matched_distractors = sorted(distractors.intersection(retrieved))
+            distractor_top1_hit = bool(retrieved_ids and retrieved_ids[0] in distractors)
+            if distractors:
+                distractor_queries += 1
+                total_distractor_bindings += len(distractors)
+                distractor_hits += len(matched_distractors)
+                distractor_top1_hits += int(distractor_top1_hit)
+                category_bucket["distractor_queries"] += 1
+                category_bucket["total_distractor_bindings"] += len(distractors)
+                category_bucket["distractor_hits"] += len(matched_distractors)
+                category_bucket["distractor_top1_hits"] += int(distractor_top1_hit)
             if expected:
                 expected_with_context += 1
                 total_expected_bindings += len(expected)
@@ -350,8 +438,11 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
                     "category": category,
                     "query": case["query"],
                     "expected_chunk_ids": sorted(expected),
+                    "distractor_chunk_ids": sorted(distractors),
                     "retrieved_chunk_ids": retrieved_ids,
                     "matched_expected_chunk_ids": matched_expected,
+                    "matched_distractor_chunk_ids": matched_distractors,
+                    "distractor_top1_hit": distractor_top1_hit,
                     "status": result["status"],
                     "hit": hit,
                     "top1_hit": top1_hit,
@@ -370,10 +461,16 @@ def evaluate_retrieval_strategy(strategy: str, fixture: dict[str, Any], *, top_k
         "top1_hit_rate": round(top1_hits / expected_with_context, 4) if expected_with_context else 0.0,
         "full_binding_hit_rate": round(full_binding_hits / expected_with_context, 4) if expected_with_context else 0.0,
         "multi_binding_full_hit_rate": round(multi_binding_full_hits / multi_binding_cases, 4) if multi_binding_cases else 1.0,
+        "distractor_free_rate": round(1 - (distractor_top1_hits / distractor_queries), 4) if distractor_queries else 1.0,
+        "distractor_hit_rate": round(distractor_hits / total_distractor_bindings, 4) if total_distractor_bindings else 0.0,
         "no_context_accuracy": round(no_context_hits / expected_no_context, 4) if expected_no_context else 1.0,
         "positive_retrieved_chunks": retrieved_for_positive,
         "relevant_retrieved_chunks": relevant_retrieved,
         "expected_bindings": total_expected_bindings,
+        "distractor_queries": distractor_queries,
+        "distractor_bindings": total_distractor_bindings,
+        "distractor_hits": distractor_hits,
+        "distractor_top1_hits": distractor_top1_hits,
         "category_metrics": [
             _finalize_category_bucket(category_buckets[category])
             for category in sorted(category_buckets)
@@ -394,6 +491,7 @@ def build_retrieval_eval_report(
     min_semantic_precision: float = 0.20,
     min_expected_binding_recall: float = 0.95,
     min_multi_binding_full_hit: float = 0.60,
+    min_distractor_free_rate: float = 1.00,
     min_category_recall: float = 0.0,
     min_category_binding_recall: float = 0.0,
 ) -> dict[str, Any]:
@@ -415,9 +513,11 @@ def build_retrieval_eval_report(
             "min_semantic_precision": min_semantic_precision,
             "min_expected_binding_recall": min_expected_binding_recall,
             "min_multi_binding_full_hit": min_multi_binding_full_hit,
+            "min_distractor_free_rate": min_distractor_free_rate,
             "min_category_recall": min_category_recall,
             "min_category_binding_recall": min_category_binding_recall,
             "category_threshold_failures": [],
+            "distractor_threshold_failures": [],
         }
     report: dict[str, Any] = {
         "fixture": str(fixture_path.relative_to(ROOT) if fixture_path.is_relative_to(ROOT) else fixture_path),
@@ -434,6 +534,7 @@ def build_retrieval_eval_report(
         "min_semantic_precision": min_semantic_precision,
         "min_expected_binding_recall": min_expected_binding_recall,
         "min_multi_binding_full_hit": min_multi_binding_full_hit,
+        "min_distractor_free_rate": min_distractor_free_rate,
         "min_category_recall": min_category_recall,
         "min_category_binding_recall": min_category_binding_recall,
         "fixture_validation": fixture_validation,
@@ -456,6 +557,16 @@ def build_retrieval_eval_report(
             or category["expected_binding_recall_at_k"] < min_category_binding_recall
         )
     ]
+    distractor_threshold_failures = [
+        {
+            "strategy": strategy["strategy"],
+            "distractor_free_rate": strategy["distractor_free_rate"],
+            "distractor_hit_rate": strategy["distractor_hit_rate"],
+            "distractor_hits": strategy["distractor_hits"],
+        }
+        for strategy in report["strategies"]
+        if strategy["distractor_queries"] > 0 and strategy["distractor_free_rate"] < min_distractor_free_rate
+    ]
     passed = (
         hybrid["recall_at_k"] >= min_hybrid_recall
         and hybrid["context_precision_at_k"] >= min_hybrid_precision
@@ -466,16 +577,21 @@ def build_retrieval_eval_report(
         and semantic["context_precision_at_k"] >= min_semantic_precision
         and semantic["no_context_accuracy"] >= min_semantic_no_context
         and not category_threshold_failures
+        and not distractor_threshold_failures
     )
     report["status"] = "RETRIEVAL_EVAL_OK" if passed else "RETRIEVAL_EVAL_FAILED"
     report["category_threshold_failures"] = category_threshold_failures
+    report["distractor_threshold_failures"] = distractor_threshold_failures
     report["counts"] = {
         "chunks": len(fixture.get("chunks", [])),
         "queries": len(fixture.get("queries", [])),
         "positive_queries": fixture_validation["counts"]["positive_queries"],
         "no_context_queries": fixture_validation["counts"]["no_context_queries"],
         "expected_bindings": fixture_validation["counts"]["expected_bindings"],
+        "distractor_bindings": fixture_validation["counts"]["distractor_bindings"],
+        "distractor_queries": fixture_validation["counts"]["distractor_queries"],
         "source_ids": fixture_validation["counts"]["source_ids"],
+        "source_formats": fixture_validation["counts"]["source_formats"],
         "multi_binding_queries": fixture_validation["counts"]["multi_binding_queries"],
         "query_categories": fixture_validation["counts"]["query_categories"],
         "strategies": len(report["strategies"]),
@@ -493,6 +609,7 @@ def format_retrieval_eval_text(report: dict[str, Any]) -> list[str]:
             f"precision={strategy['context_precision_at_k']:.2f} top1={strategy['top1_hit_rate']:.2f} "
             f"full_binding={strategy['full_binding_hit_rate']:.2f} "
             f"multi_full={strategy['multi_binding_full_hit_rate']:.2f} "
+            f"distractor_free={strategy['distractor_free_rate']:.2f} "
             f"no_context={strategy['no_context_accuracy']:.2f}"
         )
         weakest_categories = sorted(
@@ -511,6 +628,7 @@ def format_retrieval_eval_text(report: dict[str, Any]) -> list[str]:
                 f"recall@{top_k}={category['recall_at_k']:.2f} "
                 f"binding_recall={category['expected_binding_recall_at_k']:.2f} "
                 f"precision={category['context_precision_at_k']:.2f} "
+                f"distractor_free={category['distractor_free_rate']:.2f} "
                 f"no_context={category['no_context_accuracy']:.2f}"
             )
     for failure in report.get("category_threshold_failures", []):
@@ -519,6 +637,13 @@ def format_retrieval_eval_text(report: dict[str, Any]) -> list[str]:
                 f"category_threshold_failure strategy={failure.get('strategy')} "
                 f"category={failure.get('category')} recall={failure.get('recall_at_k')} "
                 f"binding_recall={failure.get('expected_binding_recall_at_k')}"
+            )
+    for failure in report.get("distractor_threshold_failures", []):
+        if isinstance(failure, dict):
+            lines.append(
+                f"distractor_threshold_failure strategy={failure.get('strategy')} "
+                f"distractor_free={failure.get('distractor_free_rate')} "
+                f"distractor_hits={failure.get('distractor_hits')}"
             )
     lines.append(str(report.get("status")))
     return lines

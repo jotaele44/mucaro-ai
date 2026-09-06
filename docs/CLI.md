@@ -353,19 +353,23 @@ steps so a development cycle can continue from the supported CLI boundary.
 
 Use `mucaro eval retrieval` to run the committed retrieval-quality fixture from
 the supported CLI surface. The command reports the fixture path, chunk/query
-counts, positive/no-context query counts, expected binding counts, fixture
-validation checks, evaluated strategy count, recall thresholds, per-strategy
-`recall@k`, expected-binding recall, context precision, top-1 hit rate,
-full-binding hit rate, multi-binding full-hit rate, no-context accuracy, and
+counts, positive/no-context query counts, expected binding counts, explicit
+distractor binding counts, source-format counts, fixture validation checks,
+evaluated strategy count, recall thresholds, per-strategy `recall@k`,
+expected-binding recall, context precision, top-1 hit rate, full-binding hit
+rate, multi-binding full-hit rate, distractor-free rate, no-context accuracy, and
 per-category quality slices for each strategy. The category slices preserve the
 fixture's query categories so broad aggregate scores cannot hide a weak
 retrieval area. The `--min-no-context-accuracy`, `--min-expected-binding-recall`, and
 `--min-multi-binding-full-hit` thresholds apply across evaluated strategies so
 unrelated context, partial multi-source retrieval, and missing expected
-bindings fail the gate instead of passing as weak context. Hybrid and semantic
-retrieval also have dedicated precision thresholds. Use `--min-category-recall`
-and `--min-category-binding-recall` to promote per-category positive-query
-metrics into hard gates once the category expectations are release-ready. It returns
+bindings fail the gate instead of passing as weak context. Use
+`--min-distractor-free-rate` to fail cases where an explicitly marked
+wrong-but-related distractor chunk outranks the expected binding at top-1.
+Hybrid and semantic retrieval also have dedicated precision thresholds. Use
+`--min-category-recall` and `--min-category-binding-recall` to promote
+per-category positive-query metrics into hard gates once the category
+expectations are release-ready. It returns
 `RETRIEVAL_EVAL_INVALID` for malformed benchmark fixtures and
 `RETRIEVAL_EVAL_FAILED` when configured thresholds are not met, so release
 automation can fail on invalid or regressed retrieval evidence.
@@ -376,7 +380,7 @@ the default fixture with strict category binding recall and the larger fixture
 with calibrated multi-binding category recall. It also runs a mixed-format
 fixture with strict category binding recall across TXT, Markdown, HTML, DOCX,
 EML, MSG text probing, CSV, JSON, PDF, metadata-only media, traceability, and multi-format
-queries. It writes a
+queries, including explicit decoy chunks for distractor top-1 avoidance. It writes a
 `retrieval_quality` receipt under `data/exports/release_receipts`, records the
 profile, exact `HEAD`, thresholds, fixture counts, category threshold failures,
 and full eval reports, and returns `RETRIEVAL_QUALITY_CERT_OK` only when every

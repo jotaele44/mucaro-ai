@@ -41,6 +41,7 @@ def main() -> int:
     parser.add_argument("--min-semantic-precision", type=float, default=0.20)
     parser.add_argument("--min-expected-binding-recall", type=float, default=0.95)
     parser.add_argument("--min-multi-binding-full-hit", type=float, default=0.60)
+    parser.add_argument("--min-distractor-free-rate", type=float, default=1.00)
     parser.add_argument("--min-category-recall", type=float, default=0.0)
     parser.add_argument("--min-category-binding-recall", type=float, default=0.0)
     parser.add_argument("--format", choices=["text", "json"], default="text")
@@ -57,6 +58,7 @@ def main() -> int:
         min_semantic_precision=args.min_semantic_precision,
         min_expected_binding_recall=args.min_expected_binding_recall,
         min_multi_binding_full_hit=args.min_multi_binding_full_hit,
+        min_distractor_free_rate=args.min_distractor_free_rate,
         min_category_recall=args.min_category_recall,
         min_category_binding_recall=args.min_category_binding_recall,
     )
