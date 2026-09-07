@@ -2,39 +2,36 @@
 
 Current package version: `0.1.23`.
 
-## Current Exact-Head Status
+## Authoritative Exact-Head Status
 
-Current `HEAD`, `origin/main`, and tag
-`v0.1.23-hosted-governance-remediation` are all bound to commit
-`937bb709bbca08faf32b5565773da01b5fbb7f68`.
-
-The current local release lane is certified and the hosted governance lane is
-open:
+Do not treat hard-coded commits in this tracked document as current proof.
+Editing and committing release documentation changes Git `HEAD`, which makes
+previous exact-head receipts historical. Use the CLI to bind the current source
+state to receipts and handoff artifacts:
 
 - `mucaro release receipts --current-head --format text` reports `7` receipts,
-  `7` valid, `0` invalid.
+  `7` valid, `0` invalid when the local release lane is fully refreshed.
 - `mucaro package distribution-manifest --verify
-  data/exports/distribution_manifests/distribution-manifest-937bb709bbca.json
-  --require-current-head --expected-sha256
-  bf010ae2171e95232d7eaabbb144d6ea20e29f5fe453f937d69026ae45d17ec5` reports
-  `DISTRIBUTION_MANIFEST_VERIFIED`.
+  data/exports/distribution_manifests/distribution-manifest-HEADPREFIX.json
+  --require-current-head --expected-sha256 SHA256` proves the local
+  distribution handoff bytes for the current checkout.
 - `mucaro release governance-report --verify
-  data/exports/governance_reports/governance-report-937bb709bbca.json
-  --require-current-head --expected-sha256
-  6b021e261cf5643ff9ff4463d181edbff1bb201851affa3b37bd203b993410d7` reports
-  `GOVERNANCE_REPORT_VERIFIED`.
+  data/exports/governance_reports/governance-report-HEADPREFIX.json
+  --require-current-head --expected-sha256 SHA256` proves the governance
+  handoff report for the current checkout.
 - `mucaro release support-bundle --verify
-  data/exports/support_bundles/support-bundle-937bb709bbca.json
-  --require-current-head` reports `SUPPORT_BUNDLE_VERIFIED`.
-- `mucaro audit completion --include-github --format text` reports
-  `COMPLETION_AUDIT_OPEN` with `9 PASS`, `1 OPEN`, `0 BLOCKED`, `0 FAIL`, and
-  `0 UNVERIFIED`.
+  data/exports/support_bundles/support-bundle-HEADPREFIX.json
+  --require-current-head --expected-sha256 SHA256` proves the support bundle
+  for the current checkout.
+- `mucaro audit completion --include-github --format text` is the active-goal
+  completion matrix and must remain `OPEN` while hosted governance is not
+  proven.
 
-Hosted `CI` run `34079668051` and `CI Startup Probe` run `34079668086` both
-completed with `startup_failure` before GitHub created jobs for the current
-commit. The support classification remains `HOSTED_STARTUP_BEFORE_JOBS`; local
-certification must not be upgraded to hosted or production readiness until run
-admission, billing visibility, and branch protection are independently proven.
+When hosted `CI` and `CI Startup Probe` complete with `startup_failure` before
+GitHub creates jobs, the support classification is
+`HOSTED_STARTUP_BEFORE_JOBS`. Local certification must not be upgraded to
+hosted or production readiness until run admission, billing visibility, and
+branch protection are independently proven.
 
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, fresh-clone validation, API upload
@@ -224,14 +221,12 @@ Observed success markers:
   diagnostic status, support classification, startup blocker, blockers,
   reproduction commands, and next actions without claiming the hosted blocker is
   resolved.
-- At commit `937bb709bbca08faf32b5565773da01b5fbb7f68`,
-  `mucaro audit completion --include-github` reports `COMPLETION_AUDIT_OPEN`
-  with `9 PASS`, `1 OPEN`, `0 BLOCKED`, `0 FAIL`, and `0 UNVERIFIED`; the only
-  open active-goal row is hosted governance.
-- At commit `937bb709bbca08faf32b5565773da01b5fbb7f68`,
-  `mucaro release hosted-governance` reports `HOSTED_GOVERNANCE_OPEN` with
-  `support_bundle_status=PASS`, `ci_jobs_count=0`, `startup_probe_jobs_count=0`,
-  and support classification `HOSTED_STARTUP_BEFORE_JOBS`.
+- `mucaro audit completion --include-github` reports `COMPLETION_AUDIT_OPEN`
+  with the hosted-governance row open until GitHub runner admission, billing
+  visibility, and branch protection are proven for the current head.
+- `mucaro release hosted-governance` reports `HOSTED_GOVERNANCE_OPEN` with
+  support-bundle readiness separated from CI job admission and branch
+  protection readiness.
 - `mucaro package status` currently reports `PACKAGE_WARN`: required package
   inputs, Python/frontend version consistency, CLI entrypoint, launcher
   entrypoint, desktop package manifest, generated outputs, release artifact
