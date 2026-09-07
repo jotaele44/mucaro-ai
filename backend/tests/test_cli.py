@@ -1721,6 +1721,126 @@ def test_cli_release_governance_report_verify_fails_current_head_mismatch(tmp_pa
     assert checks["current_head_binding"]["status"] == "FAIL"
 
 
+def write_dashboard_governance_report_fixture(root: Path, head_sha: str) -> Path:
+    path = root / "data" / "exports" / "governance_reports" / f"governance-report-{head_sha[:12]}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    artifact = {
+        "schema_version": "mucaro_governance_report_v1",
+        "created_utc": "2026-09-07T00:00:00Z",
+        "report": {
+            "status": "GOVERNANCE_REPORT_OPEN",
+            "current_state": "GITHUB_GOVERNANCE_OPEN",
+            "head_sha": head_sha,
+            "current_head_receipts_summary": {"total": 7, "valid": 7, "invalid": 0},
+            "startup_blocker": {"status": "FAIL"},
+        },
+    }
+    path.write_text(json.dumps(artifact), encoding="utf-8")
+    return path
+
+
+def test_cli_release_dashboard_summarizes_current_handoff_artifacts(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    commit_fixture_repo(tmp_path)
+    head_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(["git", "tag", "v0.1.23-dashboard"], cwd=tmp_path, check=True)
+    write_distribution_manifest_fixture_receipts(tmp_path, head_sha)
+    assert main(["package", "distribution-manifest", "--save", "--format", "json"], cfg=cfg) == 0
+    capsys.readouterr()
+    write_dashboard_governance_report_fixture(tmp_path, head_sha)
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "branch", "--show-current"]:
+            return True, "main"
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        if args == ["git", "tag", "--points-at", "HEAD"]:
+            return True, "v0.1.23-dashboard"
+        if args == ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]:
+            return True, "origin/main"
+        if args == ["git", "remote", "get-url", "origin"]:
+            return True, "https://github.com/jotaele44/mucaro-ai.git"
+        if args == ["git", "ls-remote", "origin", "refs/heads/main"]:
+            return True, f"{head_sha}\trefs/heads/main"
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    assert main(["release", "dashboard", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "RELEASE_DASHBOARD_OPEN"
+    assert payload["head_sha"] == head_sha
+    assert payload["distribution_manifest_status"] == "DISTRIBUTION_MANIFEST_VERIFIED"
+    assert payload["governance_report_status"] == "GOVERNANCE_REPORT_VERIFIED"
+    assert payload["remote_branch_status"] == "PASS"
+    assert payload["current_head_receipts_summary"]["total"] == 7
+    assert checks["current_head_receipts"]["status"] == "PASS"
+    assert checks["distribution_manifest"]["status"] == "PASS"
+    assert checks["governance_report"]["status"] == "PASS"
+    assert checks["release_state"]["status"] == "OPEN"
+
+    assert main(["release", "dashboard", "--strict", "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "RELEASE_DASHBOARD_OPEN" in text_output
+    assert "distribution_manifest_status=DISTRIBUTION_MANIFEST_VERIFIED" in text_output
+    assert "governance_report_status=GOVERNANCE_REPORT_VERIFIED" in text_output
+    assert "OPEN release_state" in text_output
+
+
+def test_cli_release_dashboard_fails_without_distribution_manifest(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    commit_fixture_repo(tmp_path)
+    head_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    ).stdout.strip()
+    write_distribution_manifest_fixture_receipts(tmp_path, head_sha)
+    write_dashboard_governance_report_fixture(tmp_path, head_sha)
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "branch", "--show-current"]:
+            return True, "main"
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        if args == ["git", "tag", "--points-at", "HEAD"]:
+            return False, "no tags"
+        if args == ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]:
+            return True, "origin/main"
+        if args == ["git", "remote", "get-url", "origin"]:
+            return True, "https://github.com/jotaele44/mucaro-ai.git"
+        if args == ["git", "ls-remote", "origin", "refs/heads/main"]:
+            return True, f"{head_sha}\trefs/heads/main"
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    assert main(["release", "dashboard", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "RELEASE_DASHBOARD_FAIL"
+    assert payload["distribution_manifest_status"] == "DISTRIBUTION_MANIFEST_MISSING"
+    assert checks["distribution_manifest"]["status"] == "FAIL"
+    assert checks["current_head_receipts"]["status"] == "PASS"
+
+
 def test_cli_release_state_requires_exact_head_quality_receipts_for_governed_ready(
     tmp_path: Path,
     capsys,

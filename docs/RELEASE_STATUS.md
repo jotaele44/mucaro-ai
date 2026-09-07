@@ -165,6 +165,11 @@ Observed success markers:
   and operator-workflow receipts exist. The manifest records receipt file
   hashes, source artifact hashes, Python distribution artifact hashes, and keeps
   hosted governance explicitly open.
+- `mucaro release dashboard` summarizes current release state, exact-head
+  receipts, verified handoff artifacts, remote branch binding, tag binding, and
+  blockers in one read-only operator view. With `--include-github`, it also
+  reports live GitHub Actions diagnostics without converting hosted failures
+  into local certification claims.
 - `mucaro package status` currently reports `PACKAGE_WARN`: required package
   inputs, Python/frontend version consistency, CLI entrypoint, launcher
   entrypoint, desktop package manifest, generated outputs, release artifact

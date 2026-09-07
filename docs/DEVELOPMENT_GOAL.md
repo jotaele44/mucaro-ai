@@ -80,11 +80,13 @@ governance lane as open.
 1. Keep the CLI as the primary operator boundary for release-grade behavior.
 2. Expand retrieval and answer-trace evidence before introducing heavier vector
    stores or model-backed embeddings.
-3. Treat all future execution adapters as subordinate to Skill Fabric identity,
+3. Use the release dashboard as the operator's current-state summary instead of
+   inferring readiness from individual receipts or artifacts.
+4. Treat all future execution adapters as subordinate to Skill Fabric identity,
    permission, audit, and certification boundaries.
-4. Preserve local-first default behavior and fail closed whenever live provider,
+5. Preserve local-first default behavior and fail closed whenever live provider,
    hosted runner, optional dependency, or index state is missing.
-5. Keep release claims scoped: local certification can pass while hosted
+6. Keep release claims scoped: local certification can pass while hosted
    governance remains open.
 
 ## Readiness Rule

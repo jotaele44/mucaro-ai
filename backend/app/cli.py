@@ -52,6 +52,7 @@ from .memory import (
     set_memory_enabled,
 )
 from .packaging import (
+    DISTRIBUTION_MANIFEST_DIR,
     build_distribution_manifest,
     build_package_status,
     build_release_artifacts,
@@ -572,6 +573,29 @@ def build_parser() -> argparse.ArgumentParser:
     )
     release_state.set_defaults(handler=run_release_state)
 
+    release_dashboard = release_subcommands.add_parser(
+        "dashboard",
+        help="Summarize current release readiness, handoff artifacts, receipts, and blockers.",
+    )
+    release_dashboard.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_dashboard.add_argument("--strict", action="store_true", help="Exit nonzero until the release dashboard is ready.")
+    release_dashboard.add_argument(
+        "--include-github",
+        action="store_true",
+        help="Include live GitHub governance diagnostics in the dashboard.",
+    )
+    release_dashboard.add_argument(
+        "--github-workflow",
+        default="CI",
+        help="Primary GitHub Actions workflow name to inspect with --include-github.",
+    )
+    release_dashboard.add_argument(
+        "--probe-workflow",
+        default="CI Startup Probe",
+        help="Manual-only startup probe workflow name to inspect with --include-github.",
+    )
+    release_dashboard.set_defaults(handler=run_release_dashboard)
+
     release_governance = release_subcommands.add_parser(
         "governance-report",
         help="Build a current-head governance handoff report.",
@@ -931,6 +955,28 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         for check in payload.get("checks", []):
             detail = str(check.get("detail")).replace("\n", "\\n")
             print(f"{check.get('status')} {check.get('name')} {detail}")
+    elif status in {"RELEASE_DASHBOARD_READY", "RELEASE_DASHBOARD_OPEN", "RELEASE_DASHBOARD_FAIL"}:
+        print(f"current_state={payload.get('current_state')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        print(f"tag_at_head={','.join(payload.get('tags_at_head', []))}")
+        print(f"release_state_status={payload.get('release_state_status')}")
+        print(f"distribution_manifest_status={payload.get('distribution_manifest_status')}")
+        print(f"governance_report_status={payload.get('governance_report_status')}")
+        print(f"github_actions_status={payload.get('github_actions_status')}")
+        print(f"remote_branch_status={payload.get('remote_branch_status')}")
+        print(f"hosted_governance_status={payload.get('hosted_governance_status')}")
+        receipt_summary = payload.get("current_head_receipts_summary", {})
+        if isinstance(receipt_summary, dict):
+            print(f"receipt_count={receipt_summary.get('total')}")
+            print(f"receipt_valid={receipt_summary.get('valid')}")
+            print(f"receipt_invalid={receipt_summary.get('invalid')}")
+        for check in payload.get("checks", []):
+            detail = str(check.get("detail")).replace("\n", "\\n")
+            print(f"{check.get('status')} {check.get('name')} {detail}")
+        for blocker in payload.get("blockers", []):
+            print(f"blocker={blocker}")
+        for command in payload.get("next_commands", []):
+            print(f"command={command}")
     elif status in {"OPERATOR_WORKFLOW_CERT_OK", "OPERATOR_WORKFLOW_CERT_FAILED"}:
         for line in format_operator_workflow_certification_text(payload):
             print(line)
@@ -1774,6 +1820,234 @@ def verify_release_governance_report(
         "current_head": current_head,
         "checks": checks,
     }
+
+
+def _release_state_row(release_state: dict[str, Any], state_name: str) -> dict[str, Any]:
+    states = release_state.get("states", [])
+    if not isinstance(states, list):
+        return {}
+    return next((state for state in states if isinstance(state, dict) and state.get("state") == state_name), {})
+
+
+def _expected_handoff_path(root: Path, directory: Path, prefix: str, head_sha: str | None) -> Path:
+    head_prefix = str(head_sha or "unknown")[:12]
+    return root / directory / f"{prefix}-{head_prefix}.json"
+
+
+def _remote_branch_check(cfg: Settings, branch: str | None, head_sha: str | None) -> dict[str, Any]:
+    if not branch:
+        return _certification_gate("remote_branch_binding", "WARN", "branch unavailable")
+    if not head_sha:
+        return _certification_gate("remote_branch_binding", "WARN", "head SHA unavailable")
+    ok, output = _git_output(cfg, ["ls-remote", "origin", f"refs/heads/{branch}"])
+    if not ok:
+        return _certification_gate("remote_branch_binding", "WARN", output or "remote branch lookup failed")
+    remote_sha = None
+    for line in output.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[1] == f"refs/heads/{branch}":
+            remote_sha = parts[0]
+            break
+    if not remote_sha:
+        return _certification_gate("remote_branch_binding", "FAIL", f"origin/{branch} not found")
+    return _certification_gate(
+        "remote_branch_binding",
+        "PASS" if remote_sha == head_sha else "FAIL",
+        f"origin/{branch}={remote_sha} head={head_sha}",
+    )
+
+
+def build_release_dashboard_report(
+    cfg: Settings,
+    *,
+    include_github: bool = False,
+    github_workflow: str = "CI",
+    probe_workflow: str = "CI Startup Probe",
+) -> dict[str, Any]:
+    release_state = build_release_state_report(
+        cfg,
+        include_github=include_github,
+        github_workflow=github_workflow,
+    )
+    git_payload = release_state.get("git", {}) if isinstance(release_state.get("git"), dict) else {}
+    head_sha = git_payload.get("head_sha") if isinstance(git_payload.get("head_sha"), str) else None
+    branch = git_payload.get("branch") if isinstance(git_payload.get("branch"), str) else None
+    receipts = list_release_receipts(cfg.project_root)
+    current_head_receipts = [row for row in receipts if row.get("head_sha") == head_sha]
+    receipt_summary = summarize_release_receipts(current_head_receipts)
+    receipt_payloads = release_state.get("receipts", {})
+    expected_receipt_types = sorted(receipt_payloads) if isinstance(receipt_payloads, dict) else []
+    missing_receipts = [
+        receipt_type
+        for receipt_type in expected_receipt_types
+        if not isinstance(receipt_payloads.get(receipt_type), dict)
+    ]
+
+    distribution_path = _expected_handoff_path(
+        cfg.project_root,
+        DISTRIBUTION_MANIFEST_DIR,
+        "distribution-manifest",
+        head_sha,
+    )
+    if distribution_path.exists():
+        distribution_manifest = verify_distribution_manifest(
+            distribution_path,
+            root=cfg.project_root,
+            require_current_head=True,
+        )
+    else:
+        distribution_manifest = {
+            "status": "DISTRIBUTION_MANIFEST_MISSING",
+            "manifest_path": str(distribution_path),
+            "checks": [_certification_gate("manifest_exists", "FAIL", str(distribution_path))],
+        }
+
+    governance_path = _expected_handoff_path(
+        cfg.project_root,
+        GOVERNANCE_REPORT_DIR,
+        "governance-report",
+        head_sha,
+    )
+    if governance_path.exists():
+        governance_report = verify_release_governance_report(
+            cfg,
+            governance_path,
+            require_current_head=True,
+        )
+    else:
+        governance_report = {
+            "status": "GOVERNANCE_REPORT_MISSING",
+            "artifact": {"path": str(governance_path), "sha256": None, "size_bytes": None},
+            "checks": [_certification_gate("artifact_exists", "FAIL", str(governance_path))],
+        }
+
+    github_actions: dict[str, Any] = {"status": "UNREQUESTED"}
+    if include_github:
+        github_actions = build_github_actions_diagnostic_status(
+            cfg,
+            workflow_name=github_workflow,
+            probe_workflow_name=probe_workflow,
+        )
+
+    remote_branch = _remote_branch_check(cfg, branch, head_sha)
+    governed_state = _release_state_row(release_state, "GOVERNED_RELEASE_READY")
+    github_state = _release_state_row(release_state, "GITHUB_GOVERNANCE_OPEN")
+    receipt_expected_count = len(expected_receipt_types)
+    receipts_complete = (
+        receipt_summary.get("total") == receipt_expected_count
+        and receipt_summary.get("valid") == receipt_expected_count
+        and not missing_receipts
+    )
+
+    checks = [
+        _certification_gate("current_head", "PASS" if head_sha else "FAIL", str(head_sha)),
+        _certification_gate(
+            "worktree_clean",
+            "PASS" if git_payload.get("worktree_clean") is True else "FAIL",
+            str(git_payload.get("worktree_clean")),
+        ),
+        _certification_gate(
+            "upstream",
+            "PASS" if git_payload.get("upstream") else "WARN",
+            str(git_payload.get("upstream") or "missing"),
+        ),
+        remote_branch,
+        _certification_gate(
+            "tag_at_head",
+            "PASS" if git_payload.get("tags_at_head") else "WARN",
+            ",".join(git_payload.get("tags_at_head", [])) or "none",
+        ),
+        _certification_gate(
+            "current_head_receipts",
+            "PASS" if receipts_complete else "FAIL",
+            f"expected={receipt_expected_count} total={receipt_summary.get('total')} "
+            f"valid={receipt_summary.get('valid')} missing={','.join(missing_receipts) or 'none'}",
+        ),
+        _certification_gate(
+            "distribution_manifest",
+            "PASS" if distribution_manifest.get("status") == "DISTRIBUTION_MANIFEST_VERIFIED" else "FAIL",
+            str(distribution_manifest.get("status")),
+        ),
+        _certification_gate(
+            "governance_report",
+            "PASS" if governance_report.get("status") == "GOVERNANCE_REPORT_VERIFIED" else "FAIL",
+            str(governance_report.get("status")),
+        ),
+        _certification_gate(
+            "release_state",
+            "PASS" if release_state.get("status") == "RELEASE_STATE_READY" else "OPEN",
+            str(release_state.get("current_state")),
+        ),
+    ]
+    if include_github:
+        checks.append(
+            _certification_gate(
+                "github_actions",
+                "PASS" if github_actions.get("status") == "GITHUB_ACTIONS_DIAGNOSTIC_OK" else "OPEN",
+                str(github_actions.get("status")),
+            )
+        )
+
+    hard_failed = [check for check in checks if check.get("status") == "FAIL"]
+    open_checks = [check for check in checks if check.get("status") in {"OPEN", "WARN"}]
+    dashboard_ready = (
+        not hard_failed
+        and not open_checks
+        and release_state.get("status") == "RELEASE_STATE_READY"
+        and governed_state.get("status") == "PASS"
+    )
+    blockers = [f"{check['name']}={check['status']}:{check['detail']}" for check in hard_failed + open_checks]
+    if github_state.get("status") == "OPEN" and github_state.get("evidence"):
+        blockers.append(f"github_governance={github_state.get('evidence')}")
+    if include_github:
+        for action in github_actions.get("next_actions", []):
+            blockers.append(str(action))
+
+    status = "RELEASE_DASHBOARD_READY" if dashboard_ready else "RELEASE_DASHBOARD_FAIL" if hard_failed else "RELEASE_DASHBOARD_OPEN"
+    return {
+        "status": status,
+        "version": package_version(),
+        "project_root": str(cfg.project_root),
+        "current_state": release_state.get("current_state"),
+        "head_sha": head_sha,
+        "tags_at_head": git_payload.get("tags_at_head", []),
+        "release_state_status": release_state.get("status"),
+        "distribution_manifest_status": distribution_manifest.get("status"),
+        "distribution_manifest": distribution_manifest,
+        "governance_report_status": governance_report.get("status"),
+        "governance_report": governance_report,
+        "github_actions_status": github_actions.get("status"),
+        "github_actions": github_actions,
+        "remote_branch_status": remote_branch.get("status"),
+        "hosted_governance_status": (
+            "OPEN"
+            if github_state.get("status") == "OPEN"
+            else "PASS"
+            if release_state.get("status") == "RELEASE_STATE_READY"
+            else "UNVERIFIED"
+        ),
+        "current_head_receipts_summary": receipt_summary,
+        "current_head_receipts": current_head_receipts,
+        "checks": checks,
+        "blockers": sorted(set(blockers)),
+        "release_states": release_state.get("states", []),
+        "next_commands": sorted(set(str(command) for command in release_state.get("next_commands", []))),
+    }
+
+
+def run_release_dashboard(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_release_dashboard_report(
+        cfg,
+        include_github=args.include_github,
+        github_workflow=args.github_workflow,
+        probe_workflow=args.probe_workflow,
+    )
+    emit_payload(report, args.format)
+    if report["status"] == "RELEASE_DASHBOARD_FAIL":
+        return 2
+    if args.strict and report["status"] != "RELEASE_DASHBOARD_READY":
+        return 2
+    return 0
 
 
 def run_release_governance_report(args: argparse.Namespace, cfg: Settings) -> int:

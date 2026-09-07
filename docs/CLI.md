@@ -32,6 +32,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 |---|---|---:|---:|
 | `mucaro doctor` | Check local assistant readiness | 0 | 2 with `--strict` warnings/failures |
 | `mucaro release state` | Classify bounded release-state progress | 0 | 2 with `--strict` until governed release is ready |
+| `mucaro release dashboard` | Summarize release state, receipts, handoff artifacts, remote binding, and blockers | 0 | 2 on local evidence failure, or with `--strict` until ready |
 | `mucaro release receipts` | List local release/fresh-clone certification receipts | 0 | 2 |
 | `mucaro release receipt RECEIPT_ID` | Show one local certification receipt | 0 | 2 |
 | `mucaro certify status` | Inspect release readiness before running full certification gates | 0 | 2 on failures, or with `--strict` warnings/failures |
@@ -213,6 +214,7 @@ mucaro ingest data/input --format text
 mucaro --version
 mucaro doctor
 mucaro release state --include-github --format text
+mucaro release dashboard --include-github --format text
 mucaro release governance-report --save --format text
 mucaro release governance-report --verify data/exports/governance_reports/governance-report-HEADPREFIX.json --require-current-head --format text
 mucaro release receipts --current-head --format text
@@ -312,6 +314,14 @@ governance row reports all non-passing GitHub release gates, including
 hosted-runner startup classification when current-head CI fails before jobs are
 created. When source-artifact evidence is present but retrieval-quality evidence
 is not, the current state is `RETRIEVAL_QUALITY_CERTIFICATION_OPEN`.
+
+Use `mucaro release dashboard` for a single read-only operator summary of the
+current release lane. It verifies the saved distribution handoff manifest and
+governance report for the current Git `HEAD`, summarizes exact-head receipts,
+checks worktree, upstream, tag, and `origin/BRANCH` binding, and reports the
+current blockers. Add `--include-github` to include live GitHub Actions
+diagnostics; omit it for a local/offline dashboard over saved artifacts. Use
+`--strict` when automation should fail until `RELEASE_DASHBOARD_READY`.
 
 Use `mucaro release governance-report` to build a single current-head handoff
 payload for governed release work. The report combines release-state
