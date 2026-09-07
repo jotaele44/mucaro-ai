@@ -34,7 +34,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro release state` | Classify bounded release-state progress | 0 | 2 with `--strict` until governed release is ready |
 | `mucaro release dashboard` | Summarize release state, receipts, handoff artifacts, remote binding, and blockers | 0 | 2 on local evidence failure, or with `--strict` until ready |
 | `mucaro release hosted-governance` | Print hosted GitHub governance blocker evidence and exact operator remediation commands | 0 | 2 with `--strict` until hosted governance is ready |
-| `mucaro release next-actions` | Print prioritized release actions, current run handles, handoff artifact paths, and verification commands | 0 | 2 with `--strict` while actions remain open |
+| `mucaro release next-actions` | Print or save prioritized release actions, current run handles, handoff artifact paths, and verification commands | 0 | 2 with `--strict` while actions remain open, or on failed artifact verification |
 | `mucaro release support-bundle` | Build or verify a support-ready release evidence bundle | 0 | 2 |
 | `mucaro release receipts` | List local release/fresh-clone certification receipts | 0 | 2 |
 | `mucaro release receipt RECEIPT_ID` | Show one local certification receipt | 0 | 2 |
@@ -196,6 +196,8 @@ approved and audited.
 | `HOSTED_GOVERNANCE_READY` | hosted governance diagnostic, dashboard, and remediation steps are all passing |
 | `RELEASE_NEXT_ACTIONS_OPEN` | one or more release or hosted-governance actions remain open; output includes prioritized operator commands and verification commands |
 | `RELEASE_NEXT_ACTIONS_READY` | no release next actions remain open |
+| `RELEASE_NEXT_ACTIONS_VERIFIED` | saved release next-actions runbook passed schema, hash, payload, and requested head-binding checks |
+| `RELEASE_NEXT_ACTIONS_VERIFY_FAILED` | saved release next-actions runbook is missing, malformed, hash-mismatched, stale for current `HEAD`, or otherwise invalid |
 | `COMPLETION_AUDIT_OPEN` | completion audit found at least one active-goal requirement open or unverified |
 | `COMPLETION_AUDIT_READY` | completion audit found every active-goal requirement proven by current evidence |
 | `COMPLETION_AUDIT_BLOCKED` | completion audit found a requirement blocked by an explicit external or policy blocker |
@@ -229,6 +231,8 @@ mucaro release state --include-github --format text
 mucaro release dashboard --include-github --format text
 mucaro release hosted-governance --format text
 mucaro release next-actions --format text
+mucaro release next-actions --save --format text
+mucaro release next-actions --verify data/exports/release_next_actions/next-actions-HEADPREFIX.json --require-current-head --format text
 mucaro release support-bundle --save --format text
 mucaro release support-bundle --verify data/exports/support_bundles/support-bundle-HEADPREFIX.json --require-current-head --format text
 mucaro release governance-report --save --format text
@@ -339,6 +343,18 @@ checks worktree, upstream, tag, and `origin/BRANCH` binding, and reports the
 current blockers. Add `--include-github` to include live GitHub Actions
 diagnostics; omit it for a local/offline dashboard over saved artifacts. Use
 `--strict` when automation should fail until `RELEASE_DASHBOARD_READY`.
+
+Use `mucaro release next-actions` when the operator needs the shortest
+current-head runbook instead of the full dashboard. It composes the
+hosted-governance report, prioritizes non-passing steps, prints current run
+IDs, handoff artifact paths, and verification commands, and promotes local
+release evidence refresh above hosted remediation when the release dashboard is
+failing. Add `--save` to write the runbook under
+`data/exports/release_next_actions`, pass `--output PATH` to choose the saved
+artifact path, or use `--verify PATH` to validate a saved runbook without
+rerunning live GitHub diagnostics. Add `--expected-sha256 SHA256` to pin the
+runbook bytes and `--require-current-head` when the runbook must bind to the
+current checkout.
 
 Use `mucaro release support-bundle --save` when hosted governance is open and
 the operator needs a single support-ready evidence artifact. The command runs

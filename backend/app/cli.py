@@ -111,6 +111,8 @@ GOVERNANCE_REPORT_SCHEMA_VERSION = "mucaro_governance_report_v1"
 GOVERNANCE_REPORT_DIR = Path("data") / "exports" / "governance_reports"
 SUPPORT_BUNDLE_SCHEMA_VERSION = "mucaro_release_support_bundle_v1"
 SUPPORT_BUNDLE_DIR = Path("data") / "exports" / "support_bundles"
+NEXT_ACTIONS_SCHEMA_VERSION = "mucaro_release_next_actions_v1"
+NEXT_ACTIONS_DIR = Path("data") / "exports" / "release_next_actions"
 
 
 def parse_port(value: str) -> int:
@@ -646,6 +648,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     release_next_actions.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     release_next_actions.add_argument("--strict", action="store_true", help="Exit nonzero until no release actions remain open.")
+    release_next_actions.add_argument("--save", action="store_true", help="Write the runbook under data/exports/release_next_actions.")
+    release_next_actions.add_argument("--output", type=Path, help="Optional JSON artifact path. Implies --save.")
+    release_next_actions.add_argument("--verify", type=Path, help="Verify a saved runbook instead of building a new one.")
+    release_next_actions.add_argument(
+        "--require-current-head",
+        action="store_true",
+        help="With --verify, require the runbook head_sha to match current Git HEAD.",
+    )
+    release_next_actions.add_argument(
+        "--expected-sha256",
+        help="With --verify, require the runbook artifact SHA-256 to match this value.",
+    )
     release_next_actions.add_argument(
         "--github-workflow",
         default="CI",
@@ -944,6 +958,11 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         if isinstance(artifacts, dict):
             for artifact_id in ["distribution_manifest", "governance_report", "support_bundle"]:
                 print(f"artifact_{artifact_id}={artifacts.get(artifact_id)}")
+        export = payload.get("export")
+        if isinstance(export, dict):
+            print(f"export_path={export.get('path')}")
+            print(f"export_sha256={export.get('sha256')}")
+            print(f"export_size_bytes={export.get('size_bytes')}")
         for command in payload.get("verification_commands", []):
             print(f"verify_command={command}")
         for action in payload.get("actions", []):
@@ -954,6 +973,22 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                     f"action={action.get('action_id')} owner={action.get('owner')} "
                     f"evidence={evidence} command={action.get('command')}"
                 )
+    elif status in {"RELEASE_NEXT_ACTIONS_VERIFIED", "RELEASE_NEXT_ACTIONS_VERIFY_FAILED"}:
+        print(f"project_root={payload.get('project_root')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        if payload.get("current_head"):
+            print(f"current_head={payload.get('current_head')}")
+        print(f"runbook_status={payload.get('runbook_status')}")
+        artifact = payload.get("artifact")
+        if isinstance(artifact, dict):
+            print(f"artifact_path={artifact.get('path')}")
+            print(f"artifact_sha256={artifact.get('sha256')}")
+            print(f"artifact_size_bytes={artifact.get('size_bytes')}")
+            print(f"artifact_schema_version={artifact.get('schema_version')}")
+            print(f"artifact_created_utc={artifact.get('created_utc')}")
+        for check in payload.get("checks", []):
+            detail = str(check.get("detail")).replace("\n", "\\n")
+            print(f"{check.get('status')} {check.get('name')} {detail}")
     elif status in {"RETRIEVAL_EVAL_OK", "RETRIEVAL_EVAL_FAILED"}:
         print(f"fixture={payload.get('fixture')}")
         counts = payload.get("counts", {})
@@ -2652,12 +2687,178 @@ def build_release_next_actions_report(
     }
 
 
+def write_release_next_actions_report(
+    cfg: Settings,
+    report: dict[str, Any],
+    *,
+    output_path: Path | None = None,
+) -> dict[str, Any]:
+    head_sha = str(report.get("head_sha") or "unknown")
+    path = output_path or cfg.project_root / NEXT_ACTIONS_DIR / f"next-actions-{head_sha[:12]}.json"
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    artifact = {
+        "schema_version": NEXT_ACTIONS_SCHEMA_VERSION,
+        "created_utc": _utc_now(),
+        "runbook": report,
+    }
+    path.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return {
+        "path": str(path),
+        "sha256": _sha256_file(path),
+        "size_bytes": path.stat().st_size,
+        "schema_version": NEXT_ACTIONS_SCHEMA_VERSION,
+    }
+
+
+def verify_release_next_actions_report(
+    cfg: Settings,
+    artifact_path: Path,
+    *,
+    require_current_head: bool = False,
+    expected_sha256: str | None = None,
+) -> dict[str, Any]:
+    path = artifact_path if artifact_path.is_absolute() else cfg.project_root / artifact_path
+    checks: list[dict[str, str]] = []
+    artifact: dict[str, Any] | None = None
+    artifact_sha256: str | None = None
+    artifact_size_bytes: int | None = None
+
+    if path.exists() and path.is_file():
+        checks.append(_certification_gate("artifact_exists", "PASS", str(path)))
+        artifact_sha256 = _sha256_file(path)
+        artifact_size_bytes = path.stat().st_size
+        checks.append(_certification_gate("artifact_sha256", "PASS", artifact_sha256))
+        if expected_sha256:
+            expected = expected_sha256.strip().lower()
+            checks.append(
+                _certification_gate(
+                    "expected_sha256",
+                    "PASS" if artifact_sha256 == expected else "FAIL",
+                    f"expected={expected} actual={artifact_sha256}",
+                )
+            )
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            loaded = None
+            checks.append(_certification_gate("artifact_json", "FAIL", str(exc)))
+        if isinstance(loaded, dict):
+            artifact = loaded
+            checks.append(_certification_gate("artifact_json", "PASS", "valid JSON object"))
+        elif loaded is not None:
+            checks.append(_certification_gate("artifact_json", "FAIL", "top-level JSON value is not an object"))
+    else:
+        checks.append(_certification_gate("artifact_exists", "FAIL", str(path)))
+
+    runbook: dict[str, Any] | None = None
+    if artifact is not None:
+        schema_version = artifact.get("schema_version")
+        checks.append(
+            _certification_gate(
+                "schema_version",
+                "PASS" if schema_version == NEXT_ACTIONS_SCHEMA_VERSION else "FAIL",
+                str(schema_version),
+            )
+        )
+        created_ok, created_detail = _parse_utc_timestamp(artifact.get("created_utc"))
+        checks.append(_certification_gate("created_utc", "PASS" if created_ok else "FAIL", created_detail))
+        raw_runbook = artifact.get("runbook")
+        if isinstance(raw_runbook, dict):
+            runbook = raw_runbook
+            checks.append(_certification_gate("runbook_payload", "PASS", "runbook object present"))
+        else:
+            checks.append(_certification_gate("runbook_payload", "FAIL", "runbook object missing"))
+
+    head_sha: str | None = None
+    runbook_status: str | None = None
+    if runbook is not None:
+        raw_head_sha = runbook.get("head_sha")
+        if _is_hex_sha(raw_head_sha):
+            head_sha = str(raw_head_sha)
+            checks.append(_certification_gate("runbook_head_sha", "PASS", head_sha))
+        else:
+            checks.append(_certification_gate("runbook_head_sha", "FAIL", str(raw_head_sha)))
+        runbook_status = str(runbook.get("status") or "")
+        checks.append(
+            _certification_gate(
+                "runbook_status",
+                "PASS" if runbook_status in {"RELEASE_NEXT_ACTIONS_OPEN", "RELEASE_NEXT_ACTIONS_READY"} else "FAIL",
+                runbook_status,
+            )
+        )
+        checks.append(
+            _certification_gate(
+                "actions_payload",
+                "PASS" if isinstance(runbook.get("actions"), list) else "FAIL",
+                "present" if isinstance(runbook.get("actions"), list) else "missing",
+            )
+        )
+        checks.append(
+            _certification_gate(
+                "verification_commands",
+                "PASS" if isinstance(runbook.get("verification_commands"), list) else "FAIL",
+                "present" if isinstance(runbook.get("verification_commands"), list) else "missing",
+            )
+        )
+        checks.append(
+            _certification_gate(
+                "counts_payload",
+                "PASS" if isinstance(runbook.get("counts"), dict) else "FAIL",
+                "present" if isinstance(runbook.get("counts"), dict) else "missing",
+            )
+        )
+
+    current_head: str | None = None
+    if require_current_head:
+        head_ok, current_head_output = _git_output(cfg, ["rev-parse", "HEAD"])
+        current_head = current_head_output if head_ok else None
+        checks.append(
+            _certification_gate(
+                "current_head_binding",
+                "PASS" if head_ok and head_sha == current_head_output else "FAIL",
+                f"runbook_head={head_sha} current_head={current_head_output if head_ok else current_head_output or 'unavailable'}",
+            )
+        )
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": "RELEASE_NEXT_ACTIONS_VERIFIED" if not failed else "RELEASE_NEXT_ACTIONS_VERIFY_FAILED",
+        "project_root": str(cfg.project_root),
+        "artifact": {
+            "path": str(path),
+            "sha256": artifact_sha256,
+            "size_bytes": artifact_size_bytes,
+            "schema_version": artifact.get("schema_version") if artifact else None,
+            "created_utc": artifact.get("created_utc") if artifact else None,
+        },
+        "head_sha": head_sha,
+        "current_head": current_head,
+        "runbook_status": runbook_status,
+        "checks": checks,
+    }
+
+
 def run_release_next_actions(args: argparse.Namespace, cfg: Settings) -> int:
+    if args.verify:
+        report = verify_release_next_actions_report(
+            cfg,
+            args.verify,
+            require_current_head=args.require_current_head,
+            expected_sha256=args.expected_sha256,
+        )
+        emit_payload(report, args.format)
+        return 0 if report["status"] == "RELEASE_NEXT_ACTIONS_VERIFIED" else 2
+    if args.require_current_head or args.expected_sha256:
+        raise MucaroCLIError("ERROR_RELEASE_NEXT_ACTIONS_VERIFY_OPTION", "--require-current-head and --expected-sha256 require --verify")
     report = build_release_next_actions_report(
         cfg,
         github_workflow=args.github_workflow,
         probe_workflow=args.probe_workflow,
     )
+    if args.save or args.output:
+        report["export"] = write_release_next_actions_report(cfg, report, output_path=args.output)
     emit_payload(report, args.format)
     if report["status"] == "RELEASE_NEXT_ACTIONS_READY":
         return 0

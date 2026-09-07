@@ -2880,7 +2880,8 @@ def test_cli_release_next_actions_prioritizes_open_operator_runbook(tmp_path: Pa
 
     monkeypatch.setattr(cli, "build_release_hosted_governance_report", fake_hosted)
 
-    assert main(["release", "next-actions", "--format", "json"], cfg=cfg) == 0
+    output_path = tmp_path / "data" / "exports" / "release_next_actions" / "runbook.json"
+    assert main(["release", "next-actions", "--save", "--output", str(output_path), "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "RELEASE_NEXT_ACTIONS_OPEN"
     assert payload["counts"] == {"open": 2, "total": 2}
@@ -2888,7 +2889,43 @@ def test_cli_release_next_actions_prioritizes_open_operator_runbook(tmp_path: Pa
     assert payload["actions"][0]["priority"] == 10
     assert payload["actions"][1]["action_id"] == "ci_run_admission"
     assert payload["artifact_paths"]["support_bundle"] == str(support_path)
+    assert payload["export"]["path"] == str(output_path)
+    expected_sha = payload["export"]["sha256"]
+    saved = json.loads(output_path.read_text(encoding="utf-8"))
+    assert saved["schema_version"] == "mucaro_release_next_actions_v1"
+    assert saved["runbook"]["head_sha"] == head_sha
     assert any(command.startswith("mucaro release support-bundle --verify") for command in payload["verification_commands"])
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    assert (
+        main(
+            [
+                "release",
+                "next-actions",
+                "--verify",
+                str(output_path),
+                "--expected-sha256",
+                expected_sha,
+                "--require-current-head",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    verified = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in verified["checks"]}
+    assert verified["status"] == "RELEASE_NEXT_ACTIONS_VERIFIED"
+    assert verified["runbook_status"] == "RELEASE_NEXT_ACTIONS_OPEN"
+    assert checks["expected_sha256"]["status"] == "PASS"
+    assert checks["current_head_binding"]["status"] == "PASS"
 
     assert main(["release", "next-actions", "--strict", "--format", "text"], cfg=cfg) == 2
     text_output = capsys.readouterr().out
@@ -2897,6 +2934,35 @@ def test_cli_release_next_actions_prioritizes_open_operator_runbook(tmp_path: Pa
     assert "ci_run_id=11" in text_output
     assert "verify_command=mucaro release dashboard --include-github --format text" in text_output
     assert "OPEN priority=10 action=billing_visibility" in text_output
+
+
+def test_cli_release_next_actions_verify_fails_current_head_mismatch(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    artifact = {
+        "schema_version": "mucaro_release_next_actions_v1",
+        "created_utc": "2026-09-07T00:00:00Z",
+        "runbook": {
+            "status": "RELEASE_NEXT_ACTIONS_OPEN",
+            "head_sha": "1" * 40,
+            "actions": [],
+            "verification_commands": [],
+            "counts": {"open": 0, "total": 0},
+        },
+    }
+    output_path = tmp_path / "next-actions.json"
+    output_path.write_text(json.dumps(artifact), encoding="utf-8")
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, "2" * 40
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    assert main(["release", "next-actions", "--verify", str(output_path), "--require-current-head", "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "RELEASE_NEXT_ACTIONS_VERIFY_FAILED" in text_output
+    assert "FAIL current_head_binding" in text_output
 
 
 def test_cli_release_next_actions_promotes_dashboard_failure_first(tmp_path: Path, capsys, monkeypatch):
