@@ -34,7 +34,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro release state` | Classify bounded release-state progress | 0 | 2 with `--strict` until governed release is ready |
 | `mucaro release dashboard` | Summarize release state, receipts, handoff artifacts, remote binding, and blockers | 0 | 2 on local evidence failure, or with `--strict` until ready |
 | `mucaro release hosted-governance` | Print hosted GitHub governance blocker evidence and exact operator remediation commands | 0 | 2 with `--strict` until hosted governance is ready |
-| `mucaro release next-actions` | Print or save prioritized release actions, current run handles, handoff artifact paths, and verification commands | 0 | 2 with `--strict` while actions remain open, or on failed artifact verification |
+| `mucaro release next-actions` | Print or save prioritized release actions, current run handles, handoff artifact paths, support-copy lines, and verification commands | 0 | 2 with `--strict` while actions remain open, or on failed artifact verification |
 | `mucaro release support-bundle` | Build or verify a support-ready release evidence bundle | 0 | 2 |
 | `mucaro release receipts` | List local release/fresh-clone certification receipts | 0 | 2 |
 | `mucaro release receipt RECEIPT_ID` | Show one local certification receipt | 0 | 2 |
@@ -347,14 +347,19 @@ diagnostics; omit it for a local/offline dashboard over saved artifacts. Use
 Use `mucaro release next-actions` when the operator needs the shortest
 current-head runbook instead of the full dashboard. It composes the
 hosted-governance report, prioritizes non-passing steps, prints current run
-IDs, handoff artifact paths, and verification commands, and promotes local
-release evidence refresh above hosted remediation when the release dashboard is
-failing. Add `--save` to write the runbook under
+IDs and URLs, handoff artifact paths, support-copy lines, and verification
+commands, and promotes local release evidence refresh above hosted remediation
+when the release dashboard is failing. The saved runbook includes a structured
+`support_copy` payload with summary fields, run handles, artifact paths,
+verification commands, open actions, and line-oriented text suitable for a
+support ticket or issue handoff. Add `--save` to write the runbook under
 `data/exports/release_next_actions`, pass `--output PATH` to choose the saved
 artifact path, or use `--verify PATH` to validate a saved runbook without
 rerunning live GitHub diagnostics. Add `--expected-sha256 SHA256` to pin the
 runbook bytes and `--require-current-head` when the runbook must bind to the
-current checkout.
+current checkout. Verification requires the current runbook schema, including
+the support-copy payload, so older saved runbooks should be regenerated for the
+current `HEAD`.
 
 Use `mucaro release support-bundle --save` when hosted governance is open and
 the operator needs a single support-ready evidence artifact. The command runs

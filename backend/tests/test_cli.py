@@ -2849,7 +2849,9 @@ def test_cli_release_next_actions_prioritizes_open_operator_runbook(tmp_path: Pa
             "github_actions_status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
             "support_classification": "HOSTED_STARTUP_BEFORE_JOBS",
             "ci_run_id": 11,
+            "ci_run_url": "https://github.com/jotaele44/mucaro-ai/actions/runs/11",
             "startup_probe_run_id": 22,
+            "startup_probe_run_url": "https://github.com/jotaele44/mucaro-ai/actions/runs/22",
             "ci_jobs_count": 0,
             "startup_probe_jobs_count": 0,
             "support_bundle": {"path": str(support_path), "status": "PASS"},
@@ -2889,11 +2891,15 @@ def test_cli_release_next_actions_prioritizes_open_operator_runbook(tmp_path: Pa
     assert payload["actions"][0]["priority"] == 10
     assert payload["actions"][1]["action_id"] == "ci_run_admission"
     assert payload["artifact_paths"]["support_bundle"] == str(support_path)
+    assert payload["support_copy"]["run_handles"]["ci_run_url"] == "https://github.com/jotaele44/mucaro-ai/actions/runs/11"
+    assert payload["support_copy"]["run_handles"]["startup_probe_run_url"] == "https://github.com/jotaele44/mucaro-ai/actions/runs/22"
+    assert any(line.startswith("open_action=priority:10 action:billing_visibility") for line in payload["support_copy"]["copy_lines"])
     assert payload["export"]["path"] == str(output_path)
     expected_sha = payload["export"]["sha256"]
     saved = json.loads(output_path.read_text(encoding="utf-8"))
-    assert saved["schema_version"] == "mucaro_release_next_actions_v1"
+    assert saved["schema_version"] == "mucaro_release_next_actions_v2"
     assert saved["runbook"]["head_sha"] == head_sha
+    assert saved["runbook"]["support_copy"]["title"] == "Mucaro AI release governance handoff"
     assert any(command.startswith("mucaro release support-bundle --verify") for command in payload["verification_commands"])
 
     def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
@@ -2926,20 +2932,25 @@ def test_cli_release_next_actions_prioritizes_open_operator_runbook(tmp_path: Pa
     assert verified["runbook_status"] == "RELEASE_NEXT_ACTIONS_OPEN"
     assert checks["expected_sha256"]["status"] == "PASS"
     assert checks["current_head_binding"]["status"] == "PASS"
+    assert checks["support_copy_payload"]["status"] == "PASS"
+    assert checks["support_copy_lines"]["status"] == "PASS"
 
     assert main(["release", "next-actions", "--strict", "--format", "text"], cfg=cfg) == 2
     text_output = capsys.readouterr().out
     assert "RELEASE_NEXT_ACTIONS_OPEN" in text_output
     assert "release_dashboard_status=RELEASE_DASHBOARD_OPEN" in text_output
     assert "ci_run_id=11" in text_output
+    assert "ci_run_url=https://github.com/jotaele44/mucaro-ai/actions/runs/11" in text_output
     assert "verify_command=mucaro release dashboard --include-github --format text" in text_output
+    assert "support_copy_title=Mucaro AI release governance handoff" in text_output
+    assert "support_copy=open_action=priority:10 action:billing_visibility" in text_output
     assert "OPEN priority=10 action=billing_visibility" in text_output
 
 
 def test_cli_release_next_actions_verify_fails_current_head_mismatch(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     artifact = {
-        "schema_version": "mucaro_release_next_actions_v1",
+        "schema_version": "mucaro_release_next_actions_v2",
         "created_utc": "2026-09-07T00:00:00Z",
         "runbook": {
             "status": "RELEASE_NEXT_ACTIONS_OPEN",
@@ -2947,6 +2958,10 @@ def test_cli_release_next_actions_verify_fails_current_head_mismatch(tmp_path: P
             "actions": [],
             "verification_commands": [],
             "counts": {"open": 0, "total": 0},
+            "support_copy": {
+                "title": "Mucaro AI release governance handoff",
+                "copy_lines": ["Mucaro AI release governance handoff"],
+            },
         },
     }
     output_path = tmp_path / "next-actions.json"

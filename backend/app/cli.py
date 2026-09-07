@@ -111,7 +111,7 @@ GOVERNANCE_REPORT_SCHEMA_VERSION = "mucaro_governance_report_v1"
 GOVERNANCE_REPORT_DIR = Path("data") / "exports" / "governance_reports"
 SUPPORT_BUNDLE_SCHEMA_VERSION = "mucaro_release_support_bundle_v1"
 SUPPORT_BUNDLE_DIR = Path("data") / "exports" / "support_bundles"
-NEXT_ACTIONS_SCHEMA_VERSION = "mucaro_release_next_actions_v1"
+NEXT_ACTIONS_SCHEMA_VERSION = "mucaro_release_next_actions_v2"
 NEXT_ACTIONS_DIR = Path("data") / "exports" / "release_next_actions"
 
 
@@ -946,7 +946,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"hosted_governance_status={payload.get('hosted_governance_status')}")
         print(f"support_classification={payload.get('support_classification')}")
         print(f"ci_run_id={payload.get('ci_run_id')}")
+        print(f"ci_run_url={payload.get('ci_run_url')}")
         print(f"startup_probe_run_id={payload.get('startup_probe_run_id')}")
+        print(f"startup_probe_run_url={payload.get('startup_probe_run_url')}")
         counts = payload.get("counts", {})
         if isinstance(counts, dict):
             print(
@@ -965,6 +967,11 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"export_size_bytes={export.get('size_bytes')}")
         for command in payload.get("verification_commands", []):
             print(f"verify_command={command}")
+        support_copy = payload.get("support_copy")
+        if isinstance(support_copy, dict):
+            print(f"support_copy_title={support_copy.get('title')}")
+            for line in support_copy.get("copy_lines", []):
+                print(f"support_copy={line}")
         for action in payload.get("actions", []):
             if isinstance(action, dict):
                 evidence = str(action.get("evidence")).replace("\n", "\\n")
@@ -2516,7 +2523,9 @@ def build_release_hosted_governance_report(
         "github_actions_status": github_actions.get("status"),
         "support_classification": support_summary.get("classification"),
         "ci_run_id": support_summary.get("ci_run_id"),
+        "ci_run_url": support_summary.get("ci_run_url"),
         "startup_probe_run_id": support_summary.get("startup_probe_run_id"),
+        "startup_probe_run_url": support_summary.get("startup_probe_run_url"),
         "ci_jobs_count": support_summary.get("ci_jobs_count"),
         "startup_probe_jobs_count": support_summary.get("startup_probe_jobs_count"),
         "actions_enabled": support_summary.get("actions_enabled"),
@@ -2589,6 +2598,84 @@ def _release_next_action_from_step(step: dict[str, Any]) -> dict[str, Any]:
         "reason": _NEXT_ACTION_REASONS.get(step_id, "This hosted governance step is not yet passing."),
         "evidence": str(step.get("evidence") or ""),
         "command": str(step.get("command") or ""),
+    }
+
+
+def _support_copy_value(value: Any) -> str:
+    if isinstance(value, list):
+        return ",".join(str(item) for item in value)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _support_copy_line_value(value: Any) -> str:
+    return _support_copy_value(value).replace("\n", "\\n")
+
+
+def _build_release_next_actions_support_copy(runbook: dict[str, Any]) -> dict[str, Any]:
+    summary_keys = [
+        "head_sha",
+        "tag_at_head",
+        "release_dashboard_status",
+        "release_state_status",
+        "github_actions_status",
+        "hosted_governance_status",
+        "support_classification",
+    ]
+    run_handle_keys = [
+        "ci_run_id",
+        "ci_run_url",
+        "ci_jobs_count",
+        "startup_probe_run_id",
+        "startup_probe_run_url",
+        "startup_probe_jobs_count",
+    ]
+    summary = {key: runbook.get(key) for key in summary_keys}
+    run_handles = {key: runbook.get(key) for key in run_handle_keys}
+    artifact_paths = runbook.get("artifact_paths") if isinstance(runbook.get("artifact_paths"), dict) else {}
+    verification_commands = [
+        str(command)
+        for command in runbook.get("verification_commands", [])
+        if command
+    ]
+    open_actions = [
+        {
+            "priority": action.get("priority"),
+            "action_id": action.get("action_id"),
+            "status": action.get("status"),
+            "owner": action.get("owner"),
+            "command": action.get("command"),
+            "evidence": action.get("evidence"),
+        }
+        for action in runbook.get("actions", [])
+        if isinstance(action, dict)
+    ]
+
+    copy_lines = ["Mucaro AI release governance handoff"]
+    copy_lines.extend(f"{key}={_support_copy_value(summary[key])}" for key in summary_keys)
+    copy_lines.extend(f"{key}={_support_copy_value(run_handles[key])}" for key in run_handle_keys)
+    for artifact_id in ["distribution_manifest", "governance_report", "support_bundle"]:
+        copy_lines.append(f"artifact_{artifact_id}={_support_copy_value(artifact_paths.get(artifact_id))}")
+    copy_lines.extend(f"verify_command={command}" for command in verification_commands)
+    copy_lines.extend(
+        "open_action="
+        f"priority:{_support_copy_value(action.get('priority'))} "
+        f"action:{_support_copy_value(action.get('action_id'))} "
+        f"status:{_support_copy_value(action.get('status'))} "
+        f"owner:{_support_copy_value(action.get('owner'))} "
+        f"command:{_support_copy_value(action.get('command'))} "
+        f"evidence:{_support_copy_line_value(action.get('evidence'))}"
+        for action in open_actions
+    )
+    return {
+        "title": "Mucaro AI release governance handoff",
+        "summary": summary,
+        "run_handles": run_handles,
+        "artifact_paths": artifact_paths,
+        "verification_commands": verification_commands,
+        "open_actions": open_actions,
+        "copy_lines": copy_lines,
     }
 
 
@@ -2665,7 +2752,7 @@ def build_release_next_actions_report(
         if hosted.get("status") == "HOSTED_GOVERNANCE_READY" and not actions
         else "RELEASE_NEXT_ACTIONS_OPEN"
     )
-    return {
+    report = {
         "status": status,
         "version": package_version(),
         "project_root": str(cfg.project_root),
@@ -2677,7 +2764,9 @@ def build_release_next_actions_report(
         "github_actions_status": hosted.get("github_actions_status"),
         "support_classification": hosted.get("support_classification"),
         "ci_run_id": hosted.get("ci_run_id"),
+        "ci_run_url": hosted.get("ci_run_url"),
         "startup_probe_run_id": hosted.get("startup_probe_run_id"),
+        "startup_probe_run_url": hosted.get("startup_probe_run_url"),
         "ci_jobs_count": hosted.get("ci_jobs_count"),
         "startup_probe_jobs_count": hosted.get("startup_probe_jobs_count"),
         "artifact_paths": artifact_paths,
@@ -2685,6 +2774,8 @@ def build_release_next_actions_report(
         "actions": actions,
         "counts": counts,
     }
+    report["support_copy"] = _build_release_next_actions_support_copy(report)
+    return report
 
 
 def write_release_next_actions_report(
@@ -2807,6 +2898,22 @@ def verify_release_next_actions_report(
                 "counts_payload",
                 "PASS" if isinstance(runbook.get("counts"), dict) else "FAIL",
                 "present" if isinstance(runbook.get("counts"), dict) else "missing",
+            )
+        )
+        support_copy = runbook.get("support_copy")
+        checks.append(
+            _certification_gate(
+                "support_copy_payload",
+                "PASS" if isinstance(support_copy, dict) else "FAIL",
+                "present" if isinstance(support_copy, dict) else "missing",
+            )
+        )
+        support_copy_lines = support_copy.get("copy_lines") if isinstance(support_copy, dict) else None
+        checks.append(
+            _certification_gate(
+                "support_copy_lines",
+                "PASS" if isinstance(support_copy_lines, list) and support_copy_lines else "FAIL",
+                "present" if isinstance(support_copy_lines, list) and support_copy_lines else "missing",
             )
         )
 
