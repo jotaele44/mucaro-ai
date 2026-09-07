@@ -175,6 +175,11 @@ Observed success markers:
   startup failures, branch-protection plan gates, and billing-scope visibility.
   If the billing endpoint requires extra GitHub OAuth scope, the diagnostic
   preserves the required scope in both JSON and text output.
+- `mucaro release hosted-governance` is the operator-facing remediation view for
+  the hosted lane. It composes the GitHub diagnostic and current support-bundle
+  verification into explicit steps for Actions policy, workflow registration,
+  run admission, check-suite admission, billing visibility, branch protection,
+  and support-bundle readiness.
 - `mucaro audit completion --include-github` composes product-audit,
   release-state, release-dashboard, package, receipt, and hosted-governance
   evidence into one active-goal matrix. It reports PASS, OPEN, BLOCKED, FAIL,

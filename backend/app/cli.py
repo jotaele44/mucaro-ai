@@ -622,6 +622,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     release_dashboard.set_defaults(handler=run_release_dashboard)
 
+    release_hosted_governance = release_subcommands.add_parser(
+        "hosted-governance",
+        help="Summarize hosted-governance blockers and exact remediation commands.",
+    )
+    release_hosted_governance.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_hosted_governance.add_argument("--strict", action="store_true", help="Exit nonzero until hosted governance is ready.")
+    release_hosted_governance.add_argument(
+        "--github-workflow",
+        default="CI",
+        help="Primary GitHub Actions workflow name to inspect.",
+    )
+    release_hosted_governance.add_argument(
+        "--probe-workflow",
+        default="CI Startup Probe",
+        help="Manual-only startup probe workflow name to inspect.",
+    )
+    release_hosted_governance.set_defaults(handler=run_release_hosted_governance)
+
     release_support_bundle = release_subcommands.add_parser(
         "support-bundle",
         help="Build or verify a support-ready release evidence bundle.",
@@ -833,6 +851,56 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                     f"github_actions={counts.get('github_actions')} "
                     f"zero_check_run_startup_failures={counts.get('github_actions_zero_check_run_startup_failures')} "
                     f"queued_external={counts.get('queued_external')}"
+                )
+        for action in payload.get("next_actions", []):
+            print(f"next_action={action}")
+    elif status in {"HOSTED_GOVERNANCE_READY", "HOSTED_GOVERNANCE_OPEN"}:
+        print(f"project_root={payload.get('project_root')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        print(f"tag_at_head={','.join(payload.get('tag_at_head', []))}")
+        print(f"release_dashboard_status={payload.get('release_dashboard_status')}")
+        print(f"release_state_status={payload.get('release_state_status')}")
+        print(f"hosted_governance_status={payload.get('hosted_governance_status')}")
+        print(f"github_actions_status={payload.get('github_actions_status')}")
+        print(f"support_classification={payload.get('support_classification')}")
+        print(f"ci_run_id={payload.get('ci_run_id')}")
+        print(f"startup_probe_run_id={payload.get('startup_probe_run_id')}")
+        print(f"ci_jobs_count={payload.get('ci_jobs_count')}")
+        print(f"startup_probe_jobs_count={payload.get('startup_probe_jobs_count')}")
+        print(f"actions_enabled={payload.get('actions_enabled')}")
+        print(f"allowed_actions={payload.get('allowed_actions')}")
+        print(f"default_workflow_permissions={payload.get('default_workflow_permissions')}")
+        print(f"billing_available={payload.get('billing_available')}")
+        if payload.get("billing_required_scope"):
+            print(f"billing_required_scope={payload.get('billing_required_scope')}")
+        print(f"branch_protection_available={payload.get('branch_protection_available')}")
+        counts = payload.get("counts", {})
+        if isinstance(counts, dict):
+            print(
+                "counts="
+                f"pass:{counts.get('pass')} "
+                f"open:{counts.get('open')} "
+                f"blocked:{counts.get('blocked')} "
+                f"fail:{counts.get('fail')} "
+                f"unverified:{counts.get('unverified')} "
+                f"total:{counts.get('total')}"
+            )
+        startup_blocker = payload.get("startup_blocker", {})
+        if isinstance(startup_blocker, dict):
+            print(f"startup_blocker_status={startup_blocker.get('status')}")
+            causes = startup_blocker.get("suspected_causes", [])
+            if isinstance(causes, list):
+                print(f"startup_blocker_causes={','.join(str(cause) for cause in causes)}")
+        support_bundle = payload.get("support_bundle", {})
+        if isinstance(support_bundle, dict):
+            print(f"support_bundle_status={support_bundle.get('status')}")
+            print(f"support_bundle_path={support_bundle.get('path')}")
+        for step in payload.get("steps", []):
+            if isinstance(step, dict):
+                evidence = str(step.get("evidence")).replace("\n", "\\n")
+                print(
+                    f"{step.get('status')} {step.get('step_id')} "
+                    f"owner={step.get('owner')} evidence={evidence} command={step.get('command')}"
                 )
         for action in payload.get("next_actions", []):
             print(f"next_action={action}")
@@ -2187,6 +2255,213 @@ def run_release_dashboard(args: argparse.Namespace, cfg: Settings) -> int:
     if args.strict and report["status"] != "RELEASE_DASHBOARD_READY":
         return 2
     return 0
+
+
+def _hosted_step(
+    step_id: str,
+    status: str,
+    evidence: str,
+    command: str,
+    owner: str = "operator",
+) -> dict[str, str]:
+    return {
+        "step_id": step_id,
+        "status": status,
+        "owner": owner,
+        "evidence": evidence,
+        "command": command,
+    }
+
+
+def _check_status(checks: list[dict[str, Any]], name: str) -> str:
+    for check in checks:
+        if isinstance(check, dict) and check.get("name") == name:
+            return str(check.get("status") or "UNVERIFIED")
+    return "UNVERIFIED"
+
+
+def _check_detail(checks: list[dict[str, Any]], name: str) -> str:
+    for check in checks:
+        if isinstance(check, dict) and check.get("name") == name:
+            return str(check.get("detail") or "")
+    return ""
+
+
+def _open_if_not_pass(status: str) -> str:
+    return "PASS" if status == "PASS" else "OPEN" if status in {"WARN", "FAIL", "UNVERIFIED"} else status
+
+
+def build_release_hosted_governance_report(
+    cfg: Settings,
+    *,
+    github_workflow: str = "CI",
+    probe_workflow: str = "CI Startup Probe",
+) -> dict[str, Any]:
+    dashboard = build_release_dashboard_report(
+        cfg,
+        include_github=True,
+        github_workflow=github_workflow,
+        probe_workflow=probe_workflow,
+    )
+    github_actions = dashboard.get("github_actions", {})
+    if not isinstance(github_actions, dict):
+        github_actions = {}
+    checks = [check for check in github_actions.get("checks", []) if isinstance(check, dict)]
+    runs = github_actions.get("runs", {})
+    if not isinstance(runs, dict):
+        runs = {}
+    support_summary = github_actions.get("support_summary", {})
+    if not isinstance(support_summary, dict):
+        support_summary = {}
+    startup_blocker = github_actions.get("startup_blocker", {})
+    if not isinstance(startup_blocker, dict):
+        startup_blocker = {}
+    billing = github_actions.get("billing", {})
+    if not isinstance(billing, dict):
+        billing = {}
+    branch_protection = github_actions.get("branch_protection", {})
+    if not isinstance(branch_protection, dict):
+        branch_protection = {}
+
+    head_sha = str(dashboard.get("head_sha") or "")
+    support_bundle_path = cfg.project_root / SUPPORT_BUNDLE_DIR / f"support-bundle-{head_sha[:12]}.json" if head_sha else None
+    support_bundle_status = "UNVERIFIED"
+    support_bundle_evidence = "support bundle path unavailable"
+    if support_bundle_path is not None:
+        support_bundle_check = verify_release_support_bundle(cfg, support_bundle_path, require_current_head=True)
+        support_bundle_status = "PASS" if support_bundle_check.get("status") == "SUPPORT_BUNDLE_VERIFIED" else "OPEN"
+        support_bundle_evidence = f"{support_bundle_check.get('status')} {support_bundle_path}"
+
+    actions_enabled_status = _check_status(checks, "actions_enabled")
+    workflow_token_status = _check_status(checks, "workflow_token_permissions")
+    ci_status = _check_status(checks, "latest_ci")
+    probe_status = _check_status(checks, "startup_probe")
+    check_suite_status = _check_status(checks, "github_actions_check_suites_before_runs")
+    billing_status = _check_status(checks, "actions_billing")
+    branch_protection_status = _check_status(checks, "branch_protection_api")
+
+    required_scope = billing.get("required_scope")
+    billing_command = (
+        f"gh auth refresh -h github.com -s {required_scope}"
+        if required_scope
+        else "Inspect GitHub Actions billing/minutes in account settings."
+    )
+
+    steps = [
+        _hosted_step(
+            "actions_repository_policy",
+            _open_if_not_pass(actions_enabled_status),
+            _check_detail(checks, "actions_enabled"),
+            "Open GitHub repository Settings -> Actions -> General and confirm Actions is enabled for this repository.",
+        ),
+        _hosted_step(
+            "workflow_token_policy",
+            _open_if_not_pass(workflow_token_status),
+            _check_detail(checks, "workflow_token_permissions"),
+            "Open GitHub repository Settings -> Actions -> General and confirm workflow token permissions are acceptable.",
+        ),
+        _hosted_step(
+            "ci_workflow_registration",
+            _open_if_not_pass(_check_status(checks, f"workflow_registered:{github_workflow}")),
+            _check_detail(checks, f"workflow_registered:{github_workflow}"),
+            f"gh workflow view {github_workflow!r}",
+        ),
+        _hosted_step(
+            "startup_probe_registration",
+            _open_if_not_pass(_check_status(checks, f"workflow_registered:{probe_workflow}")),
+            _check_detail(checks, f"workflow_registered:{probe_workflow}"),
+            f"gh workflow view {probe_workflow!r}",
+        ),
+        _hosted_step(
+            "ci_run_admission",
+            _open_if_not_pass(ci_status),
+            _check_detail(checks, "latest_ci"),
+            f"gh run view {support_summary.get('ci_run_id') or '<ci_run_id>'} --json databaseId,name,status,conclusion,headSha,jobs,url",
+        ),
+        _hosted_step(
+            "startup_probe_admission",
+            _open_if_not_pass(probe_status),
+            _check_detail(checks, "startup_probe"),
+            f"gh run view {support_summary.get('startup_probe_run_id') or '<startup_probe_run_id>'} --json databaseId,name,status,conclusion,headSha,jobs,url",
+        ),
+        _hosted_step(
+            "check_suite_admission",
+            _open_if_not_pass(check_suite_status),
+            _check_detail(checks, "github_actions_check_suites_before_runs"),
+            f"gh api repos/{github_actions.get('repo') or '<owner/repo>'}/commits/{head_sha or '<head_sha>'}/check-suites",
+        ),
+        _hosted_step(
+            "billing_visibility",
+            _open_if_not_pass(billing_status),
+            str(billing.get("error") or _check_detail(checks, "actions_billing")),
+            billing_command,
+        ),
+        _hosted_step(
+            "branch_protection",
+            _open_if_not_pass(branch_protection_status),
+            str(branch_protection.get("error") or _check_detail(checks, "branch_protection_api")),
+            "Upgrade GitHub plan or make the repository public before enforcing private-repo branch protection.",
+        ),
+        _hosted_step(
+            "support_bundle",
+            support_bundle_status,
+            support_bundle_evidence,
+            "mucaro release support-bundle --save --format text",
+        ),
+    ]
+    counts = {
+        "pass": sum(1 for step in steps if step["status"] == "PASS"),
+        "open": sum(1 for step in steps if step["status"] == "OPEN"),
+        "blocked": sum(1 for step in steps if step["status"] == "BLOCKED"),
+        "fail": sum(1 for step in steps if step["status"] == "FAIL"),
+        "unverified": sum(1 for step in steps if step["status"] == "UNVERIFIED"),
+        "total": len(steps),
+    }
+    hosted_ready = dashboard.get("hosted_governance_status") == "PASS" and github_actions.get("status") == "GITHUB_ACTIONS_DIAGNOSTIC_OK"
+    status = "HOSTED_GOVERNANCE_READY" if hosted_ready and counts["pass"] == counts["total"] else "HOSTED_GOVERNANCE_OPEN"
+    return {
+        "status": status,
+        "version": package_version(),
+        "project_root": str(cfg.project_root),
+        "head_sha": head_sha,
+        "tag_at_head": dashboard.get("tags_at_head", []),
+        "release_dashboard_status": dashboard.get("status"),
+        "release_state_status": dashboard.get("release_state_status"),
+        "hosted_governance_status": dashboard.get("hosted_governance_status"),
+        "github_actions_status": github_actions.get("status"),
+        "support_classification": support_summary.get("classification"),
+        "ci_run_id": support_summary.get("ci_run_id"),
+        "startup_probe_run_id": support_summary.get("startup_probe_run_id"),
+        "ci_jobs_count": support_summary.get("ci_jobs_count"),
+        "startup_probe_jobs_count": support_summary.get("startup_probe_jobs_count"),
+        "actions_enabled": support_summary.get("actions_enabled"),
+        "allowed_actions": support_summary.get("allowed_actions"),
+        "default_workflow_permissions": support_summary.get("default_workflow_permissions"),
+        "billing_available": billing.get("available"),
+        "billing_required_scope": billing.get("required_scope"),
+        "branch_protection_available": branch_protection.get("available"),
+        "startup_blocker": startup_blocker,
+        "counts": counts,
+        "steps": steps,
+        "support_bundle": {
+            "path": str(support_bundle_path) if support_bundle_path is not None else None,
+            "status": support_bundle_status,
+            "evidence": support_bundle_evidence,
+        },
+        "next_actions": sorted(set(str(action) for action in [*github_actions.get("next_actions", []), *(step["command"] for step in steps if step["status"] != "PASS")])),
+    }
+
+
+def run_release_hosted_governance(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_release_hosted_governance_report(
+        cfg,
+        github_workflow=args.github_workflow,
+        probe_workflow=args.probe_workflow,
+    )
+    emit_payload(report, args.format)
+    if report["status"] == "HOSTED_GOVERNANCE_READY":
+        return 0
+    return 2 if args.strict else 0
 
 
 def _audit_status(*statuses: str | None) -> str:

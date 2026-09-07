@@ -33,6 +33,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro doctor` | Check local assistant readiness | 0 | 2 with `--strict` warnings/failures |
 | `mucaro release state` | Classify bounded release-state progress | 0 | 2 with `--strict` until governed release is ready |
 | `mucaro release dashboard` | Summarize release state, receipts, handoff artifacts, remote binding, and blockers | 0 | 2 on local evidence failure, or with `--strict` until ready |
+| `mucaro release hosted-governance` | Print hosted GitHub governance blocker evidence and exact operator remediation commands | 0 | 2 with `--strict` until hosted governance is ready |
 | `mucaro release support-bundle` | Build or verify a support-ready release evidence bundle | 0 | 2 |
 | `mucaro release receipts` | List local release/fresh-clone certification receipts | 0 | 2 |
 | `mucaro release receipt RECEIPT_ID` | Show one local certification receipt | 0 | 2 |
@@ -190,6 +191,8 @@ approved and audited.
 | `DOCTOR_FAIL` | readiness check found unsupported or invalid local setup |
 | `RELEASE_STATE_OPEN` | release-state classifier found open or unverified release states |
 | `RELEASE_STATE_READY` | release-state classifier found the governed release state ready |
+| `HOSTED_GOVERNANCE_OPEN` | hosted governance is not ready; output includes run IDs, job counts, Actions policy, billing scope, branch-protection state, and support-bundle status |
+| `HOSTED_GOVERNANCE_READY` | hosted governance diagnostic, dashboard, and remediation steps are all passing |
 | `COMPLETION_AUDIT_OPEN` | completion audit found at least one active-goal requirement open or unverified |
 | `COMPLETION_AUDIT_READY` | completion audit found every active-goal requirement proven by current evidence |
 | `COMPLETION_AUDIT_BLOCKED` | completion audit found a requirement blocked by an explicit external or policy blocker |
@@ -221,6 +224,7 @@ mucaro --version
 mucaro doctor
 mucaro release state --include-github --format text
 mucaro release dashboard --include-github --format text
+mucaro release hosted-governance --format text
 mucaro release support-bundle --save --format text
 mucaro release support-bundle --verify data/exports/support_bundles/support-bundle-HEADPREFIX.json --require-current-head --format text
 mucaro release governance-report --save --format text

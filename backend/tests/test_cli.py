@@ -2646,6 +2646,185 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert "next_action=Run `gh auth refresh -h github.com -s user`" in text_output
 
 
+def test_cli_release_hosted_governance_summarizes_operator_remediation(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "d" * 40
+    support_path = tmp_path / "data" / "exports" / "support_bundles" / f"support-bundle-{head_sha[:12]}.json"
+
+    def fake_dashboard(
+        _cfg: Settings,
+        *,
+        include_github: bool = False,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        assert include_github is True
+        assert github_workflow == "CI"
+        assert probe_workflow == "CI Startup Probe"
+        return {
+            "status": "RELEASE_DASHBOARD_OPEN",
+            "head_sha": head_sha,
+            "tags_at_head": ["v0.1.23-hosted-governance"],
+            "release_state_status": "RELEASE_STATE_OPEN",
+            "hosted_governance_status": "OPEN",
+            "github_actions": {
+                "status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+                "repo": "jotaele44/mucaro-ai",
+                "checks": [
+                    {"name": "actions_enabled", "status": "PASS", "detail": "enabled=True allowed_actions=all"},
+                    {"name": "workflow_token_permissions", "status": "PASS", "detail": "default_workflow_permissions=read"},
+                    {"name": "workflow_registered:CI", "status": "PASS", "detail": ".github/workflows/ci.yml active"},
+                    {
+                        "name": "workflow_registered:CI Startup Probe",
+                        "status": "PASS",
+                        "detail": ".github/workflows/ci-startup-probe.yml active",
+                    },
+                    {"name": "latest_ci", "status": "FAIL", "detail": f"completed startup_failure {head_sha} jobs=0 run_id=11"},
+                    {"name": "startup_probe", "status": "FAIL", "detail": f"completed startup_failure {head_sha} jobs=0 run_id=22"},
+                    {
+                        "name": "github_actions_check_suites_before_runs",
+                        "status": "FAIL",
+                        "detail": "GitHub Actions check suites completed startup_failure with latest_check_runs_count=0",
+                    },
+                    {
+                        "name": "actions_billing",
+                        "status": "WARN",
+                        "detail": 'HTTP 404: Not Found; This API operation needs the "user" scope.',
+                    },
+                    {
+                        "name": "branch_protection_api",
+                        "status": "WARN",
+                        "detail": "HTTP 403: Upgrade to GitHub Pro or make this repository public",
+                    },
+                ],
+                "billing": {
+                    "available": False,
+                    "required_scope": "user",
+                    "error": 'HTTP 404: Not Found; This API operation needs the "user" scope.',
+                },
+                "branch_protection": {
+                    "available": False,
+                    "error": "HTTP 403: Upgrade to GitHub Pro or make this repository public",
+                },
+                "startup_blocker": {
+                    "status": "FAIL",
+                    "isolated_before_jobs": True,
+                    "suspected_causes": ["actions_billing_visibility_unverified"],
+                },
+                "support_summary": {
+                    "classification": "HOSTED_STARTUP_BEFORE_JOBS",
+                    "ci_run_id": 11,
+                    "startup_probe_run_id": 22,
+                    "ci_jobs_count": 0,
+                    "startup_probe_jobs_count": 0,
+                    "actions_enabled": True,
+                    "allowed_actions": "all",
+                    "default_workflow_permissions": "read",
+                },
+                "next_actions": ["Run `gh auth refresh -h github.com -s user` and inspect GitHub Actions billing/minutes."],
+            },
+        }
+
+    def fake_support_verify(_cfg: Settings, artifact_path: Path, *, require_current_head: bool = False, expected_sha256: str | None = None):
+        assert artifact_path == support_path
+        assert require_current_head is True
+        assert expected_sha256 is None
+        return {"status": "SUPPORT_BUNDLE_VERIFIED"}
+
+    monkeypatch.setattr(cli, "build_release_dashboard_report", fake_dashboard)
+    monkeypatch.setattr(cli, "verify_release_support_bundle", fake_support_verify)
+
+    assert main(["release", "hosted-governance", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    steps = {step["step_id"]: step for step in payload["steps"]}
+    assert payload["status"] == "HOSTED_GOVERNANCE_OPEN"
+    assert payload["support_classification"] == "HOSTED_STARTUP_BEFORE_JOBS"
+    assert payload["ci_run_id"] == 11
+    assert payload["startup_probe_run_id"] == 22
+    assert payload["billing_required_scope"] == "user"
+    assert payload["support_bundle"]["status"] == "PASS"
+    assert steps["actions_repository_policy"]["status"] == "PASS"
+    assert steps["ci_run_admission"]["status"] == "OPEN"
+    assert steps["startup_probe_admission"]["status"] == "OPEN"
+    assert steps["billing_visibility"]["command"] == "gh auth refresh -h github.com -s user"
+
+    assert main(["release", "hosted-governance", "--strict", "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "HOSTED_GOVERNANCE_OPEN" in text_output
+    assert "ci_run_id=11" in text_output
+    assert "startup_probe_jobs_count=0" in text_output
+    assert "billing_required_scope=user" in text_output
+    assert f"support_bundle_path={support_path}" in text_output
+    assert "OPEN ci_run_admission" in text_output
+    assert "command=gh auth refresh -h github.com -s user" in text_output
+
+
+def test_cli_release_hosted_governance_ready_when_dashboard_and_steps_pass(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "e" * 40
+
+    def fake_dashboard(
+        _cfg: Settings,
+        *,
+        include_github: bool = False,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        del include_github, github_workflow, probe_workflow
+        return {
+            "status": "RELEASE_DASHBOARD_READY",
+            "head_sha": head_sha,
+            "tags_at_head": ["v0.1.23-hosted-ready"],
+            "release_state_status": "RELEASE_STATE_READY",
+            "hosted_governance_status": "PASS",
+            "github_actions": {
+                "status": "GITHUB_ACTIONS_DIAGNOSTIC_OK",
+                "repo": "jotaele44/mucaro-ai",
+                "checks": [
+                    {"name": "actions_enabled", "status": "PASS", "detail": "enabled=True allowed_actions=all"},
+                    {"name": "workflow_token_permissions", "status": "PASS", "detail": "default_workflow_permissions=read"},
+                    {"name": "workflow_registered:CI", "status": "PASS", "detail": ".github/workflows/ci.yml active"},
+                    {
+                        "name": "workflow_registered:CI Startup Probe",
+                        "status": "PASS",
+                        "detail": ".github/workflows/ci-startup-probe.yml active",
+                    },
+                    {"name": "latest_ci", "status": "PASS", "detail": f"success {head_sha} jobs=1 run_id=11"},
+                    {"name": "startup_probe", "status": "PASS", "detail": f"success {head_sha} jobs=1 run_id=22"},
+                    {"name": "github_actions_check_suites_before_runs", "status": "PASS", "detail": "none"},
+                    {"name": "actions_billing", "status": "PASS", "detail": "billing endpoint readable"},
+                    {"name": "branch_protection_api", "status": "PASS", "detail": "branch protection endpoint readable"},
+                ],
+                "billing": {"available": True},
+                "branch_protection": {"available": True},
+                "startup_blocker": {"status": "PASS", "isolated_before_jobs": False, "suspected_causes": []},
+                "support_summary": {
+                    "classification": "HOSTED_GOVERNANCE_REVIEW",
+                    "ci_run_id": 11,
+                    "startup_probe_run_id": 22,
+                    "ci_jobs_count": 1,
+                    "startup_probe_jobs_count": 1,
+                    "actions_enabled": True,
+                    "allowed_actions": "all",
+                    "default_workflow_permissions": "read",
+                },
+                "next_actions": [],
+            },
+        }
+
+    def fake_support_verify(_cfg: Settings, artifact_path: Path, *, require_current_head: bool = False, expected_sha256: str | None = None):
+        del artifact_path, require_current_head, expected_sha256
+        return {"status": "SUPPORT_BUNDLE_VERIFIED"}
+
+    monkeypatch.setattr(cli, "build_release_dashboard_report", fake_dashboard)
+    monkeypatch.setattr(cli, "verify_release_support_bundle", fake_support_verify)
+
+    assert main(["release", "hosted-governance", "--strict", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "HOSTED_GOVERNANCE_READY"
+    assert payload["counts"] == {"pass": 10, "open": 0, "blocked": 0, "fail": 0, "unverified": 0, "total": 10}
+
+
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
