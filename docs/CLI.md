@@ -352,7 +352,11 @@ commands, and promotes local release evidence refresh above hosted remediation
 when the release dashboard is failing. The saved runbook includes a structured
 `support_copy` payload with summary fields, run handles, artifact paths,
 verification commands, open actions, and line-oriented text suitable for a
-support ticket or issue handoff. Add `--save` to write the runbook under
+support ticket or issue handoff. When GitHub reports current-head push runs
+that failed before workflow jobs were created but the named workflow handles are
+stale, the runbook reports `current_head_push_startup` as a separate action and
+includes `current_head_startup_run_ids` in the support-copy payload. Add
+`--save` to write the runbook under
 `data/exports/release_next_actions`, pass `--output PATH` to choose the saved
 artifact path, or use `--verify PATH` to validate a saved runbook without
 rerunning live GitHub diagnostics. Add `--expected-sha256 SHA256` to pin the

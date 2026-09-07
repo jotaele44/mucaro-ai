@@ -2539,9 +2539,38 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
                     "url": "https://github.com/jotaele44/mucaro-ai/actions/runs/11",
                 }
             ], ""
+        if args[:2] == ["run", "list"]:
+            return True, [
+                {
+                    "databaseId": 31,
+                    "status": "completed",
+                    "conclusion": "startup_failure",
+                    "headSha": head_sha,
+                    "url": "https://github.com/jotaele44/mucaro-ai/actions/runs/31",
+                    "name": "",
+                    "event": "push",
+                    "createdAt": "2026-09-07T00:00:00Z",
+                    "updatedAt": "2026-09-07T00:00:01Z",
+                },
+                {
+                    "databaseId": 32,
+                    "status": "completed",
+                    "conclusion": "startup_failure",
+                    "headSha": head_sha,
+                    "url": "https://github.com/jotaele44/mucaro-ai/actions/runs/32",
+                    "name": "",
+                    "event": "push",
+                    "createdAt": "2026-09-07T00:00:00Z",
+                    "updatedAt": "2026-09-07T00:00:01Z",
+                },
+            ], ""
         if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/11/jobs"]:
             return True, {"total_count": 0, "jobs": []}, ""
         if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/22/jobs"]:
+            return True, {"total_count": 0, "jobs": []}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/31/jobs"]:
+            return True, {"total_count": 0, "jobs": []}, ""
+        if args == ["api", "repos/jotaele44/mucaro-ai/actions/runs/32/jobs"]:
             return True, {"total_count": 0, "jobs": []}, ""
         if args == ["api", f"repos/jotaele44/mucaro-ai/commits/{head_sha}/check-suites"]:
             return True, {
@@ -2575,6 +2604,8 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert payload["runs"]["ci"]["jobs_count"] == 0
     assert payload["runs"]["startup_probe"]["database_id"] == 22
     assert payload["runs"]["startup_probe"]["jobs_count"] == 0
+    assert [run["database_id"] for run in payload["current_head_startup_runs"]] == [31, 32]
+    assert payload["support_summary"]["current_head_startup_run_ids"] == [31, 32]
     assert payload["check_suites"]["total_count"] == 1
     assert payload["check_suites"]["suites"][0]["id"] == 44
     assert payload["check_suites"]["suites"][0]["latest_check_runs_count"] == 0
@@ -2608,6 +2639,7 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert "private_branch_protection_plan_gate" in payload["startup_blocker"]["suspected_causes"]
     assert checks["latest_ci"]["status"] == "FAIL"
     assert checks["startup_probe"]["status"] == "FAIL"
+    assert checks["current_head_push_startup"]["status"] == "FAIL"
     assert checks["startup_layer_isolated"]["status"] == "FAIL"
     assert checks["check_suites_lookup"]["status"] == "PASS"
     assert checks["github_actions_check_suites_before_runs"]["status"] == "FAIL"
@@ -2628,11 +2660,13 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert "run_id=11" in text_output
     assert "run=ci id=11 status=completed conclusion=startup_failure" in text_output
     assert "run=startup_probe id=22 status=completed conclusion=startup_failure" in text_output
+    assert "current_head_startup_run id=31 name= event=push status=completed conclusion=startup_failure" in text_output
     assert "check_suites_total=1" in text_output
     assert "check_suite id=44 app=github-actions status=completed conclusion=startup_failure check_runs=0" in text_output
     assert "support_classification=HOSTED_STARTUP_BEFORE_JOBS" in text_output
     assert "support_ci_run_id=11" in text_output
     assert "support_startup_probe_run_id=22" in text_output
+    assert "support_current_head_startup_run_ids=31,32" in text_output
     assert "actions_permissions_available=True" in text_output
     assert "actions_enabled=True" in text_output
     assert "allowed_actions=all" in text_output
@@ -2642,6 +2676,7 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert "support_check_suite_counts=github_actions=1 zero_check_run_startup_failures=1 queued_external=0" in text_output
     assert "FAIL startup_layer_isolated" in text_output
     assert "FAIL github_actions_check_suites_before_runs" in text_output
+    assert "FAIL current_head_push_startup" in text_output
     assert "next_action=Upgrade GitHub plan or make the repository public" in text_output
     assert "next_action=Run `gh auth refresh -h github.com -s user`" in text_output
 
@@ -2822,7 +2857,7 @@ def test_cli_release_hosted_governance_ready_when_dashboard_and_steps_pass(tmp_p
     assert main(["release", "hosted-governance", "--strict", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "HOSTED_GOVERNANCE_READY"
-    assert payload["counts"] == {"pass": 10, "open": 0, "blocked": 0, "fail": 0, "unverified": 0, "total": 10}
+    assert payload["counts"] == {"pass": 11, "open": 0, "blocked": 0, "fail": 0, "unverified": 0, "total": 11}
 
 
 def test_cli_release_next_actions_prioritizes_open_operator_runbook(tmp_path: Path, capsys, monkeypatch):

@@ -837,6 +837,16 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                         f"conclusion={run.get('conclusion')} head_sha={run.get('head_sha')} "
                         f"jobs={run.get('jobs_count')} url={run.get('url')}"
                     )
+        current_head_startup_runs = payload.get("current_head_startup_runs", [])
+        if isinstance(current_head_startup_runs, list):
+            for run in current_head_startup_runs:
+                if isinstance(run, dict):
+                    print(
+                        f"current_head_startup_run id={run.get('database_id')} "
+                        f"name={run.get('name')} event={run.get('event')} "
+                        f"status={run.get('status')} conclusion={run.get('conclusion')} "
+                        f"jobs={run.get('jobs_count')} url={run.get('url')}"
+                    )
         check_suites = payload.get("check_suites", {})
         if isinstance(check_suites, dict):
             print(f"check_suites_total={check_suites.get('total_count')}")
@@ -871,6 +881,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"support_classification={support_summary.get('classification')}")
             print(f"support_ci_run_id={support_summary.get('ci_run_id')}")
             print(f"support_startup_probe_run_id={support_summary.get('startup_probe_run_id')}")
+            current_head_run_ids = support_summary.get("current_head_startup_run_ids", [])
+            if isinstance(current_head_run_ids, list):
+                print(f"support_current_head_startup_run_ids={','.join(str(run_id) for run_id in current_head_run_ids)}")
             print(f"support_actions_enabled={support_summary.get('actions_enabled')}")
             print(f"support_allowed_actions={support_summary.get('allowed_actions')}")
             print(f"support_default_workflow_permissions={support_summary.get('default_workflow_permissions')}")
@@ -896,7 +909,12 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"github_actions_status={payload.get('github_actions_status')}")
         print(f"support_classification={payload.get('support_classification')}")
         print(f"ci_run_id={payload.get('ci_run_id')}")
+        print(f"ci_run_url={payload.get('ci_run_url')}")
         print(f"startup_probe_run_id={payload.get('startup_probe_run_id')}")
+        print(f"startup_probe_run_url={payload.get('startup_probe_run_url')}")
+        current_head_run_ids = payload.get("current_head_startup_run_ids", [])
+        if isinstance(current_head_run_ids, list):
+            print(f"current_head_startup_run_ids={','.join(str(run_id) for run_id in current_head_run_ids)}")
         print(f"ci_jobs_count={payload.get('ci_jobs_count')}")
         print(f"startup_probe_jobs_count={payload.get('startup_probe_jobs_count')}")
         print(f"actions_enabled={payload.get('actions_enabled')}")
@@ -949,6 +967,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"ci_run_url={payload.get('ci_run_url')}")
         print(f"startup_probe_run_id={payload.get('startup_probe_run_id')}")
         print(f"startup_probe_run_url={payload.get('startup_probe_run_url')}")
+        current_head_run_ids = payload.get("current_head_startup_run_ids", [])
+        if isinstance(current_head_run_ids, list):
+            print(f"current_head_startup_run_ids={','.join(str(run_id) for run_id in current_head_run_ids)}")
         counts = payload.get("counts", {})
         if isinstance(counts, dict):
             print(
@@ -2431,6 +2452,9 @@ def build_release_hosted_governance_report(
     check_suite_status = _check_status(checks, "github_actions_check_suites_before_runs")
     billing_status = _check_status(checks, "actions_billing")
     branch_protection_status = _check_status(checks, "branch_protection_api")
+    current_head_startup_run_ids = support_summary.get("current_head_startup_run_ids", [])
+    if not isinstance(current_head_startup_run_ids, list):
+        current_head_startup_run_ids = []
 
     required_scope = billing.get("required_scope")
     billing_command = (
@@ -2469,6 +2493,16 @@ def build_release_hosted_governance_report(
             _open_if_not_pass(ci_status),
             _check_detail(checks, "latest_ci"),
             f"gh run view {support_summary.get('ci_run_id') or '<ci_run_id>'} --json databaseId,name,status,conclusion,headSha,jobs,url",
+        ),
+        _hosted_step(
+            "current_head_push_startup",
+            "OPEN" if current_head_startup_run_ids else "PASS",
+            f"run_ids={','.join(str(run_id) for run_id in current_head_startup_run_ids)}"
+            if current_head_startup_run_ids
+            else "no current-head push startup failures detected outside named workflow handles",
+            f"gh run view {current_head_startup_run_ids[0]} --json databaseId,name,status,conclusion,headSha,jobs,url"
+            if current_head_startup_run_ids
+            else "gh run list --limit 10 --json databaseId,name,status,conclusion,headSha,url,event,createdAt",
         ),
         _hosted_step(
             "startup_probe_admission",
@@ -2526,6 +2560,8 @@ def build_release_hosted_governance_report(
         "ci_run_url": support_summary.get("ci_run_url"),
         "startup_probe_run_id": support_summary.get("startup_probe_run_id"),
         "startup_probe_run_url": support_summary.get("startup_probe_run_url"),
+        "current_head_startup_runs": support_summary.get("current_head_startup_runs", []),
+        "current_head_startup_run_ids": support_summary.get("current_head_startup_run_ids", []),
         "ci_jobs_count": support_summary.get("ci_jobs_count"),
         "startup_probe_jobs_count": support_summary.get("startup_probe_jobs_count"),
         "actions_enabled": support_summary.get("actions_enabled"),
@@ -2565,6 +2601,7 @@ _NEXT_ACTION_PRIORITIES = {
     "workflow_token_policy": 30,
     "branch_protection": 40,
     "ci_run_admission": 50,
+    "current_head_push_startup": 55,
     "startup_probe_admission": 60,
     "check_suite_admission": 70,
     "ci_workflow_registration": 80,
@@ -2580,6 +2617,7 @@ _NEXT_ACTION_REASONS = {
     "ci_workflow_registration": "The primary CI workflow must be registered before run admission can be proven.",
     "startup_probe_registration": "The startup probe must be registered to isolate hosted runner startup from project code.",
     "ci_run_admission": "The current-head CI run must create jobs and finish successfully before hosted governance can pass.",
+    "current_head_push_startup": "Current-head push runs failed before jobs and must be adjudicated before hosted governance can pass.",
     "startup_probe_admission": "The startup probe must create jobs so startup failures are not mistaken for project test failures.",
     "check_suite_admission": "GitHub check suites must expose check runs for current-head workflow evidence.",
     "billing_visibility": "Billing visibility is needed to adjudicate hosted startup failures before jobs.",
@@ -2630,6 +2668,7 @@ def _build_release_next_actions_support_copy(runbook: dict[str, Any]) -> dict[st
         "startup_probe_run_id",
         "startup_probe_run_url",
         "startup_probe_jobs_count",
+        "current_head_startup_run_ids",
     ]
     summary = {key: runbook.get(key) for key in summary_keys}
     run_handles = {key: runbook.get(key) for key in run_handle_keys}
@@ -2767,6 +2806,8 @@ def build_release_next_actions_report(
         "ci_run_url": hosted.get("ci_run_url"),
         "startup_probe_run_id": hosted.get("startup_probe_run_id"),
         "startup_probe_run_url": hosted.get("startup_probe_run_url"),
+        "current_head_startup_runs": hosted.get("current_head_startup_runs", []),
+        "current_head_startup_run_ids": hosted.get("current_head_startup_run_ids", []),
         "ci_jobs_count": hosted.get("ci_jobs_count"),
         "startup_probe_jobs_count": hosted.get("startup_probe_jobs_count"),
         "artifact_paths": artifact_paths,
@@ -4022,6 +4063,61 @@ def _latest_workflow_run(
     return latest, None
 
 
+def _current_head_startup_failure_runs(
+    cfg: Settings,
+    *,
+    repo: str,
+    branch: str | None,
+    head_sha: str | None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    if not head_sha:
+        return [], "head SHA unavailable"
+    args = [
+        "run",
+        "list",
+        "--repo",
+        repo,
+        "--limit",
+        "10",
+        "--json",
+        "databaseId,status,conclusion,headSha,url,name,event,createdAt,updatedAt",
+    ]
+    if branch:
+        args.extend(["--branch", branch])
+    ok, payload, error = _gh_json(cfg, args)
+    if not ok or not isinstance(payload, list):
+        return [], error or "current-head run lookup failed"
+
+    runs: list[dict[str, Any]] = []
+    for row in payload:
+        if not isinstance(row, dict):
+            continue
+        if row.get("headSha") != head_sha:
+            continue
+        if row.get("event") != "push":
+            continue
+        if row.get("status") != "completed" or row.get("conclusion") != "startup_failure":
+            continue
+        jobs_count, jobs_error = _workflow_run_jobs_count(cfg, repo=repo, run_id=row.get("databaseId"))
+        runs.append(
+            {
+                "database_id": row.get("databaseId"),
+                "name": row.get("name"),
+                "event": row.get("event"),
+                "status": row.get("status"),
+                "conclusion": row.get("conclusion"),
+                "head_sha": row.get("headSha"),
+                "url": row.get("url"),
+                "created_at": row.get("createdAt"),
+                "updated_at": row.get("updatedAt"),
+                "jobs_count": jobs_count,
+                "jobs_error": jobs_error,
+                "startup_layer": "before_jobs" if _run_failed_before_jobs(row, jobs_count) else None,
+            }
+        )
+    return runs, None
+
+
 def _workflow_run_jobs_count(cfg: Settings, *, repo: str, run_id: Any) -> tuple[int | None, str | None]:
     if not run_id:
         return None, "run id unavailable"
@@ -4166,21 +4262,32 @@ def _github_actions_support_summary(
     workflow_permissions: dict[str, Any],
     billing: dict[str, Any],
     next_actions: list[str],
+    current_head_startup_runs: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     ci_run = runs.get("ci") if isinstance(runs.get("ci"), dict) else {}
     startup_probe_run = runs.get("startup_probe") if isinstance(runs.get("startup_probe"), dict) else {}
+    current_head_startup_runs = current_head_startup_runs or []
+    current_head_startup_run_ids = [
+        row.get("database_id")
+        for row in current_head_startup_runs
+        if row.get("database_id")
+    ]
     return {
         "status": status,
         "repo": repo,
         "branch": branch,
         "head_sha": head_sha,
-        "classification": "HOSTED_STARTUP_BEFORE_JOBS" if startup_blocker.get("isolated_before_jobs") else "HOSTED_GOVERNANCE_REVIEW",
+        "classification": "HOSTED_STARTUP_BEFORE_JOBS"
+        if startup_blocker.get("isolated_before_jobs") or current_head_startup_run_ids
+        else "HOSTED_GOVERNANCE_REVIEW",
         "ci_run_id": ci_run.get("database_id"),
         "ci_run_url": ci_run.get("url"),
         "ci_jobs_count": ci_run.get("jobs_count"),
         "startup_probe_run_id": startup_probe_run.get("database_id"),
         "startup_probe_run_url": startup_probe_run.get("url"),
         "startup_probe_jobs_count": startup_probe_run.get("jobs_count"),
+        "current_head_startup_runs": current_head_startup_runs,
+        "current_head_startup_run_ids": current_head_startup_run_ids,
         "check_suite_counts": _github_actions_check_suite_counts(check_suites),
         "branch_protection_available": branch_protection.get("available"),
         "branch_protection_error": branch_protection.get("error"),
@@ -4349,6 +4456,29 @@ def build_github_actions_diagnostic_status(
         )
     )
 
+    current_head_startup_runs, current_head_startup_error = _current_head_startup_failure_runs(
+        cfg,
+        repo=repo,
+        branch=branch if branch_ok else None,
+        head_sha=head_sha if head_ok else None,
+    )
+    before_job_run_ids = [
+        run.get("database_id")
+        for run in current_head_startup_runs
+        if run.get("startup_layer") == "before_jobs" and run.get("database_id")
+    ]
+    if before_job_run_ids:
+        checks.append(
+            _certification_gate(
+                "current_head_push_startup",
+                "FAIL",
+                f"current HEAD push startup_failure before jobs run_ids={','.join(str(run_id) for run_id in before_job_run_ids)}",
+            )
+        )
+        next_actions.append(f"Inspect current-head push startup run {before_job_run_ids[0]}.")
+    elif current_head_startup_error:
+        checks.append(_certification_gate("current_head_push_startup", "WARN", current_head_startup_error))
+
     check_suites, check_suites_error = _commit_check_suites(cfg, repo=repo, head_sha=head_sha if head_ok else None)
     if check_suites_error:
         checks.append(_certification_gate("check_suites_lookup", "WARN", check_suites_error))
@@ -4439,6 +4569,7 @@ def build_github_actions_diagnostic_status(
         workflow_permissions=workflow_permissions,
         billing=billing,
         next_actions=next_actions,
+        current_head_startup_runs=current_head_startup_runs,
     )
     return {
         "status": status,
@@ -4454,6 +4585,7 @@ def build_github_actions_diagnostic_status(
         "startup_blocker": startup_blocker,
         "workflows": workflows,
         "runs": runs,
+        "current_head_startup_runs": current_head_startup_runs,
         "billing": billing,
         "support_summary": support_summary,
         "next_actions": next_actions,
