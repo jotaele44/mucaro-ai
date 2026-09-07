@@ -35,6 +35,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro release dashboard` | Summarize release state, receipts, handoff artifacts, remote binding, and blockers | 0 | 2 on local evidence failure, or with `--strict` until ready |
 | `mucaro release hosted-governance` | Print hosted GitHub governance blocker evidence and exact operator remediation commands | 0 | 2 with `--strict` until hosted governance is ready |
 | `mucaro release next-actions` | Print or save prioritized release actions, current run handles, handoff artifact paths, support-copy lines, and verification commands | 0 | 2 with `--strict` while actions remain open, or on failed artifact verification |
+| `mucaro release handoff` | Save and verify the current-head distribution manifest, governance report, support bundle, and next-actions runbook in order | 0 | 2 on local artifact failure, or with `--strict` while hosted governance remains open |
 | `mucaro release support-bundle` | Build or verify a support-ready release evidence bundle | 0 | 2 |
 | `mucaro release receipts` | List local release/fresh-clone certification receipts | 0 | 2 |
 | `mucaro release receipt RECEIPT_ID` | Show one local certification receipt | 0 | 2 |
@@ -231,6 +232,7 @@ mucaro release state --include-github --format text
 mucaro release dashboard --include-github --format text
 mucaro release hosted-governance --format text
 mucaro release next-actions --format text
+mucaro release handoff --format text
 mucaro release next-actions --save --format text
 mucaro release next-actions --verify data/exports/release_next_actions/next-actions-HEADPREFIX.json --require-current-head --format text
 mucaro release support-bundle --save --format text
@@ -364,6 +366,15 @@ runbook bytes and `--require-current-head` when the runbook must bind to the
 current checkout. Verification requires the current runbook schema, including
 the support-copy payload, so older saved runbooks should be regenerated for the
 current `HEAD`.
+
+Use `mucaro release handoff --format text` after current-head local
+certification receipts exist and the operator needs a single restartable release
+handoff path. The command saves and verifies the distribution manifest, ensures
+the current-head governance report, saves and verifies the support bundle, saves
+and verifies the next-actions runbook, and prints the exact verification
+commands for all four artifacts. The command returns `RELEASE_HANDOFF_OPEN` when
+the local handoff artifacts verify but hosted governance is still open; add
+`--strict` when that open hosted state should produce exit code 2.
 
 Use `mucaro release support-bundle --save` when hosted governance is open and
 the operator needs a single support-ready evidence artifact. The command runs

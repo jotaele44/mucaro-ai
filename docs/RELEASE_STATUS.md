@@ -211,6 +211,11 @@ Observed success markers:
   verification into explicit steps for Actions policy, workflow registration,
   run admission, check-suite admission, billing visibility, branch protection,
   and support-bundle readiness.
+- `mucaro release handoff --format text` is the restartable one-command path for
+  the current-head handoff artifact set. It saves and verifies the distribution
+  manifest, ensures the governance report, saves and verifies the support
+  bundle, saves and verifies the next-actions runbook, and prints the exact
+  verification commands.
 - `mucaro audit completion --include-github` composes product-audit,
   release-state, release-dashboard, package, receipt, and hosted-governance
   evidence into one active-goal matrix. It reports PASS, OPEN, BLOCKED, FAIL,

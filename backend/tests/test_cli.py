@@ -1946,6 +1946,8 @@ def test_cli_release_support_bundle_saves_and_verifies_support_artifact(tmp_path
     def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
         if args == ["git", "rev-parse", "HEAD"]:
             return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
         return False, f"unexpected command: {args}"
 
     monkeypatch.setattr(cli, "build_release_dashboard_report", fake_dashboard)
@@ -2045,6 +2047,8 @@ def test_cli_release_support_bundle_save_creates_missing_governance_report(tmp_p
     def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
         if args == ["git", "rev-parse", "HEAD"]:
             return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
         return False, f"unexpected command: {args}"
 
     monkeypatch.setattr(cli, "build_release_governance_report", fake_governance_report)
@@ -3233,6 +3237,222 @@ def test_cli_release_next_actions_ready_when_hosted_governance_ready(tmp_path: P
     assert payload["status"] == "RELEASE_NEXT_ACTIONS_READY"
     assert payload["actions"] == []
     assert payload["counts"] == {"open": 0, "total": 0}
+
+
+def test_cli_release_handoff_saves_and_verifies_ordered_artifact_set(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "b" * 40
+    calls: list[str] = []
+
+    distribution_path = tmp_path / "data" / "exports" / "distribution_manifests" / f"distribution-manifest-{head_sha[:12]}.json"
+    governance_path = tmp_path / "data" / "exports" / "governance_reports" / f"governance-report-{head_sha[:12]}.json"
+    support_path = tmp_path / "data" / "exports" / "support_bundles" / f"support-bundle-{head_sha[:12]}.json"
+    next_actions_path = tmp_path / "data" / "exports" / "release_next_actions" / f"next-actions-{head_sha[:12]}.json"
+    receipts = [
+        {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
+        for index in range(7)
+    ]
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        return False, f"unexpected command: {args}"
+
+    def fake_distribution(root: Path, *, output_path: Path | None = None, save: bool = False):
+        assert root == tmp_path
+        assert output_path is None
+        assert save is True
+        calls.append("distribution")
+        return {
+            "status": "DISTRIBUTION_MANIFEST_READY",
+            "head_sha": head_sha,
+            "export": {"path": str(distribution_path), "sha256": "d" * 64, "size_bytes": 10},
+        }
+
+    def fake_distribution_verify(
+        artifact_path: Path,
+        *,
+        root: Path,
+        expected_sha256: str | None = None,
+        require_current_head: bool = False,
+    ):
+        assert artifact_path == distribution_path
+        assert root == tmp_path
+        assert expected_sha256 == "d" * 64
+        assert require_current_head is True
+        calls.append("distribution_verify")
+        return {
+            "status": "DISTRIBUTION_MANIFEST_VERIFIED",
+            "artifact": {"path": str(distribution_path), "sha256": "d" * 64, "size_bytes": 10},
+        }
+
+    def fake_support(
+        _cfg: Settings,
+        *,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+        output_path: Path | None = None,
+        save: bool = False,
+    ):
+        assert github_workflow == "CI"
+        assert probe_workflow == "CI Startup Probe"
+        assert output_path is None
+        assert save is True
+        calls.append("support")
+        return {
+            "status": "SUPPORT_BUNDLE_READY",
+            "head_sha": head_sha,
+            "case_status": "HOSTED_GOVERNANCE_OPEN",
+            "governance_report": {"path": str(governance_path)},
+            "export": {"path": str(support_path), "sha256": "s" * 64, "size_bytes": 11},
+        }
+
+    def fake_support_verify(
+        _cfg: Settings,
+        artifact_path: Path,
+        *,
+        require_current_head: bool = False,
+        expected_sha256: str | None = None,
+    ):
+        assert artifact_path == support_path
+        assert require_current_head is True
+        assert expected_sha256 == "s" * 64
+        calls.append("support_verify")
+        return {
+            "status": "SUPPORT_BUNDLE_VERIFIED",
+            "artifact": {"path": str(support_path), "sha256": "s" * 64, "size_bytes": 11},
+        }
+
+    def fake_governance_verify(
+        _cfg: Settings,
+        artifact_path: Path,
+        *,
+        require_current_head: bool = False,
+        expected_sha256: str | None = None,
+    ):
+        assert artifact_path == governance_path
+        assert require_current_head is True
+        assert expected_sha256 is None
+        calls.append("governance_verify")
+        return {
+            "status": "GOVERNANCE_REPORT_VERIFIED",
+            "artifact": {"path": str(governance_path), "sha256": "g" * 64, "size_bytes": 12},
+        }
+
+    def fake_next_actions(
+        _cfg: Settings,
+        *,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        assert github_workflow == "CI"
+        assert probe_workflow == "CI Startup Probe"
+        calls.append("next_actions")
+        return {
+            "status": "RELEASE_NEXT_ACTIONS_OPEN",
+            "head_sha": head_sha,
+            "tag_at_head": ["v0.1.23-handoff"],
+            "hosted_governance_status": "OPEN",
+            "release_dashboard_status": "RELEASE_DASHBOARD_OPEN",
+            "release_state_status": "RELEASE_STATE_OPEN",
+            "github_actions_status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+        }
+
+    def fake_write_next_actions(_cfg: Settings, report: dict[str, object], *, output_path: Path | None = None):
+        assert report["head_sha"] == head_sha
+        assert output_path is None
+        calls.append("next_actions_write")
+        return {"path": str(next_actions_path), "sha256": "n" * 64, "size_bytes": 13}
+
+    def fake_next_actions_verify(
+        _cfg: Settings,
+        artifact_path: Path,
+        *,
+        require_current_head: bool = False,
+        expected_sha256: str | None = None,
+    ):
+        assert artifact_path == next_actions_path
+        assert require_current_head is True
+        assert expected_sha256 == "n" * 64
+        calls.append("next_actions_verify")
+        return {
+            "status": "RELEASE_NEXT_ACTIONS_VERIFIED",
+            "artifact": {"path": str(next_actions_path), "sha256": "n" * 64, "size_bytes": 13},
+        }
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+    monkeypatch.setattr(cli, "list_release_receipts", lambda _root: receipts)
+    monkeypatch.setattr(cli, "build_distribution_manifest", fake_distribution)
+    monkeypatch.setattr(cli, "verify_distribution_manifest", fake_distribution_verify)
+    monkeypatch.setattr(cli, "build_release_support_bundle", fake_support)
+    monkeypatch.setattr(cli, "verify_release_support_bundle", fake_support_verify)
+    monkeypatch.setattr(cli, "verify_release_governance_report", fake_governance_verify)
+    monkeypatch.setattr(cli, "build_release_next_actions_report", fake_next_actions)
+    monkeypatch.setattr(cli, "write_release_next_actions_report", fake_write_next_actions)
+    monkeypatch.setattr(cli, "verify_release_next_actions_report", fake_next_actions_verify)
+
+    assert main(["release", "handoff", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+
+    assert payload["status"] == "RELEASE_HANDOFF_OPEN"
+    assert payload["head_sha"] == head_sha
+    assert payload["counts"] == {"pass": 7, "open": 1, "fail": 0, "total": 8}
+    assert payload["artifacts"]["distribution_manifest"]["path"] == str(distribution_path)
+    assert payload["artifacts"]["governance_report"]["path"] == str(governance_path)
+    assert payload["artifacts"]["support_bundle"]["path"] == str(support_path)
+    assert payload["artifacts"]["next_actions"]["path"] == str(next_actions_path)
+    assert checks["worktree_clean"]["status"] == "PASS"
+    assert checks["hosted_governance"]["status"] == "OPEN"
+    assert calls == [
+        "distribution",
+        "distribution_verify",
+        "support",
+        "support_verify",
+        "governance_verify",
+        "next_actions",
+        "next_actions_write",
+        "next_actions_verify",
+    ]
+
+    assert main(["release", "handoff", "--strict", "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "RELEASE_HANDOFF_OPEN" in text_output
+    assert f"artifact_distribution_manifest={distribution_path}" in text_output
+    assert "OPEN hosted_governance OPEN" in text_output
+
+
+def test_cli_release_handoff_fails_before_writing_when_worktree_is_dirty(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "c" * 40
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, " M backend/app/cli.py"
+        return False, f"unexpected command: {args}"
+
+    def unexpected_artifact_write(*_args, **_kwargs):
+        raise AssertionError("release handoff should not write artifacts from a dirty worktree")
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+    monkeypatch.setattr(cli, "list_release_receipts", lambda _root: [])
+    monkeypatch.setattr(cli, "build_distribution_manifest", unexpected_artifact_write)
+    monkeypatch.setattr(cli, "build_release_support_bundle", unexpected_artifact_write)
+    monkeypatch.setattr(cli, "write_release_next_actions_report", unexpected_artifact_write)
+
+    assert main(["release", "handoff", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+
+    assert payload["status"] == "RELEASE_HANDOFF_FAILED"
+    assert payload["counts"] == {"pass": 1, "open": 0, "fail": 1, "total": 2}
+    assert checks["current_head"]["status"] == "PASS"
+    assert checks["worktree_clean"]["status"] == "FAIL"
+    assert payload["artifacts"] == {}
 
 
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):

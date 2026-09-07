@@ -683,6 +683,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     release_next_actions.set_defaults(handler=run_release_next_actions)
 
+    release_handoff = release_subcommands.add_parser(
+        "handoff",
+        help="Save and verify the current-head release handoff artifact set.",
+    )
+    release_handoff.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_handoff.add_argument("--strict", action="store_true", help="Exit nonzero until the handoff is fully ready.")
+    release_handoff.add_argument(
+        "--github-workflow",
+        default="CI",
+        help="Primary GitHub Actions workflow name to inspect.",
+    )
+    release_handoff.add_argument(
+        "--probe-workflow",
+        default="CI Startup Probe",
+        help="Manual-only startup probe workflow name to inspect.",
+    )
+    release_handoff.set_defaults(handler=run_release_handoff)
+
     release_support_bundle = release_subcommands.add_parser(
         "support-bundle",
         help="Build or verify a support-ready release evidence bundle.",
@@ -1028,6 +1046,40 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         for check in payload.get("checks", []):
             detail = str(check.get("detail")).replace("\n", "\\n")
             print(f"{check.get('status')} {check.get('name')} {detail}")
+    elif status in {"RELEASE_HANDOFF_READY", "RELEASE_HANDOFF_OPEN", "RELEASE_HANDOFF_FAILED"}:
+        print(f"project_root={payload.get('project_root')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        print(f"tag_at_head={','.join(payload.get('tag_at_head', []))}")
+        print(f"hosted_governance_status={payload.get('hosted_governance_status')}")
+        print(f"release_dashboard_status={payload.get('release_dashboard_status')}")
+        print(f"release_state_status={payload.get('release_state_status')}")
+        print(f"github_actions_status={payload.get('github_actions_status')}")
+        counts = payload.get("counts", {})
+        if isinstance(counts, dict):
+            print(
+                "counts="
+                f"pass:{counts.get('pass')} "
+                f"open:{counts.get('open')} "
+                f"fail:{counts.get('fail')} "
+                f"total:{counts.get('total')}"
+            )
+        receipts = payload.get("current_head_receipts_summary", {})
+        if isinstance(receipts, dict):
+            print(f"receipt_count={receipts.get('total')}")
+            print(f"receipt_valid={receipts.get('valid')}")
+            print(f"receipt_invalid={receipts.get('invalid')}")
+        artifacts = payload.get("artifacts", {})
+        if isinstance(artifacts, dict):
+            for artifact_id in ["distribution_manifest", "governance_report", "support_bundle", "next_actions"]:
+                artifact = artifacts.get(artifact_id)
+                if isinstance(artifact, dict):
+                    print(f"artifact_{artifact_id}={artifact.get('path')}")
+                    print(f"artifact_{artifact_id}_sha256={artifact.get('sha256')}")
+        for check in payload.get("checks", []):
+            detail = str(check.get("detail")).replace("\n", "\\n")
+            print(f"{check.get('status')} {check.get('name')} {detail}")
+        for command in payload.get("verification_commands", []):
+            print(f"verify_command={command}")
     elif status in {"RETRIEVAL_EVAL_OK", "RETRIEVAL_EVAL_FAILED"}:
         print(f"fixture={payload.get('fixture')}")
         counts = payload.get("counts", {})
@@ -3085,6 +3137,217 @@ def run_release_next_actions(args: argparse.Namespace, cfg: Settings) -> int:
     if report["status"] == "RELEASE_NEXT_ACTIONS_READY":
         return 0
     return 2 if args.strict else 0
+
+
+def _artifact_export(payload: dict[str, Any]) -> dict[str, Any]:
+    export = payload.get("export")
+    if isinstance(export, dict):
+        return {
+            "path": export.get("path"),
+            "sha256": export.get("sha256"),
+            "size_bytes": export.get("size_bytes"),
+            "schema_version": export.get("schema_version"),
+        }
+    artifact = payload.get("artifact")
+    if isinstance(artifact, dict):
+        return {
+            "path": artifact.get("path"),
+            "sha256": artifact.get("sha256"),
+            "size_bytes": artifact.get("size_bytes"),
+            "schema_version": artifact.get("schema_version"),
+        }
+    return {"path": None, "sha256": None, "size_bytes": None, "schema_version": None}
+
+
+def build_release_handoff_report(
+    cfg: Settings,
+    *,
+    github_workflow: str = "CI",
+    probe_workflow: str = "CI Startup Probe",
+) -> dict[str, Any]:
+    head_ok, head_sha = _git_output(cfg, ["rev-parse", "HEAD"])
+    head_sha = head_sha if head_ok and _is_hex_sha(head_sha) else ""
+    dirty_ok, dirty_output = _git_output(cfg, ["status", "--short"])
+    worktree_clean = dirty_ok and not dirty_output.strip()
+    receipts = list_release_receipts(cfg.project_root)
+    current_head_receipts = [row for row in receipts if row.get("head_sha") == head_sha]
+    receipt_summary = summarize_release_receipts(current_head_receipts)
+    preflight_checks = [
+        _certification_gate("current_head", "PASS" if head_sha else "FAIL", head_sha or "unavailable"),
+        _certification_gate(
+            "worktree_clean",
+            "PASS" if worktree_clean else "FAIL",
+            "clean" if worktree_clean else dirty_output or "unavailable",
+        ),
+    ]
+    if any(check.get("status") == "FAIL" for check in preflight_checks):
+        return {
+            "status": "RELEASE_HANDOFF_FAILED",
+            "version": package_version(),
+            "project_root": str(cfg.project_root),
+            "head_sha": head_sha or None,
+            "tag_at_head": [],
+            "hosted_governance_status": "UNVERIFIED",
+            "release_dashboard_status": "UNVERIFIED",
+            "release_state_status": "UNVERIFIED",
+            "github_actions_status": "UNVERIFIED",
+            "current_head_receipts_summary": receipt_summary,
+            "artifacts": {},
+            "artifact_verification": {},
+            "checks": preflight_checks,
+            "counts": {
+                "pass": sum(1 for check in preflight_checks if check.get("status") == "PASS"),
+                "open": 0,
+                "fail": sum(1 for check in preflight_checks if check.get("status") == "FAIL"),
+                "total": len(preflight_checks),
+            },
+            "verification_commands": [
+                "git status --short",
+                "mucaro release receipts --current-head --format text",
+            ],
+        }
+
+    distribution = build_distribution_manifest(cfg.project_root, save=True)
+    distribution_export = _artifact_export(distribution)
+    distribution_verify = verify_distribution_manifest(
+        Path(str(distribution_export["path"])),
+        root=cfg.project_root,
+        expected_sha256=str(distribution_export["sha256"]),
+        require_current_head=True,
+    )
+
+    support_bundle = build_release_support_bundle(
+        cfg,
+        github_workflow=github_workflow,
+        probe_workflow=probe_workflow,
+        save=True,
+    )
+    support_export = _artifact_export(support_bundle)
+    support_verify = verify_release_support_bundle(
+        cfg,
+        Path(str(support_export["path"])),
+        expected_sha256=str(support_export["sha256"]),
+        require_current_head=True,
+    )
+
+    governance_report = support_bundle.get("governance_report")
+    governance_path = (
+        Path(str(governance_report.get("path")))
+        if isinstance(governance_report, dict) and governance_report.get("path")
+        else cfg.project_root / GOVERNANCE_REPORT_DIR / f"governance-report-{head_sha[:12]}.json"
+    )
+    governance_verify = verify_release_governance_report(cfg, governance_path, require_current_head=True)
+    governance_export = _artifact_export(governance_verify)
+
+    next_actions = build_release_next_actions_report(
+        cfg,
+        github_workflow=github_workflow,
+        probe_workflow=probe_workflow,
+    )
+    next_actions_export = write_release_next_actions_report(cfg, next_actions)
+    next_actions_verify = verify_release_next_actions_report(
+        cfg,
+        Path(str(next_actions_export["path"])),
+        expected_sha256=str(next_actions_export["sha256"]),
+        require_current_head=True,
+    )
+
+    checks = [
+        *preflight_checks,
+        _certification_gate(
+            "current_head_receipts",
+            "PASS" if receipt_summary.get("total") == 7 and receipt_summary.get("valid") == 7 else "FAIL",
+            f"total={receipt_summary.get('total')} valid={receipt_summary.get('valid')} invalid={receipt_summary.get('invalid')}",
+        ),
+        _certification_gate(
+            "distribution_manifest",
+            "PASS" if distribution_verify.get("status") == "DISTRIBUTION_MANIFEST_VERIFIED" else "FAIL",
+            str(distribution_verify.get("status")),
+        ),
+        _certification_gate(
+            "governance_report",
+            "PASS" if governance_verify.get("status") == "GOVERNANCE_REPORT_VERIFIED" else "FAIL",
+            str(governance_verify.get("status")),
+        ),
+        _certification_gate(
+            "support_bundle",
+            "PASS" if support_verify.get("status") == "SUPPORT_BUNDLE_VERIFIED" else "FAIL",
+            str(support_verify.get("status")),
+        ),
+        _certification_gate(
+            "next_actions",
+            "PASS" if next_actions_verify.get("status") == "RELEASE_NEXT_ACTIONS_VERIFIED" else "FAIL",
+            str(next_actions_verify.get("status")),
+        ),
+    ]
+    hosted_status = str(next_actions.get("hosted_governance_status") or support_bundle.get("case_status") or "UNVERIFIED")
+    if hosted_status != "PASS":
+        checks.append(_certification_gate("hosted_governance", "OPEN", hosted_status))
+
+    failed = [check for check in checks if check.get("status") == "FAIL"]
+    open_checks = [check for check in checks if check.get("status") in {"OPEN", "WARN", "UNVERIFIED"}]
+    status = "RELEASE_HANDOFF_FAILED" if failed else "RELEASE_HANDOFF_OPEN" if open_checks else "RELEASE_HANDOFF_READY"
+    artifacts = {
+        "distribution_manifest": distribution_export,
+        "governance_report": governance_export,
+        "support_bundle": support_export,
+        "next_actions": next_actions_export,
+    }
+    verification_commands = [
+        "mucaro release receipts --current-head --format text",
+        "mucaro release dashboard --include-github --format text",
+        "mucaro release hosted-governance --format text",
+        "mucaro audit completion --include-github --format text",
+        f"mucaro package distribution-manifest --verify {artifacts['distribution_manifest']['path']} "
+        f"--expected-sha256 {artifacts['distribution_manifest']['sha256']} --require-current-head --format text",
+        f"mucaro release governance-report --verify {artifacts['governance_report']['path']} "
+        "--require-current-head --format text",
+        f"mucaro release support-bundle --verify {artifacts['support_bundle']['path']} "
+        f"--expected-sha256 {artifacts['support_bundle']['sha256']} --require-current-head --format text",
+        f"mucaro release next-actions --verify {artifacts['next_actions']['path']} "
+        f"--expected-sha256 {artifacts['next_actions']['sha256']} --require-current-head --format text",
+    ]
+    return {
+        "status": status,
+        "version": package_version(),
+        "project_root": str(cfg.project_root),
+        "head_sha": head_sha or None,
+        "tag_at_head": next_actions.get("tag_at_head", []),
+        "hosted_governance_status": next_actions.get("hosted_governance_status"),
+        "release_dashboard_status": next_actions.get("release_dashboard_status"),
+        "release_state_status": next_actions.get("release_state_status"),
+        "github_actions_status": next_actions.get("github_actions_status"),
+        "current_head_receipts_summary": receipt_summary,
+        "artifacts": artifacts,
+        "artifact_verification": {
+            "distribution_manifest": distribution_verify,
+            "governance_report": governance_verify,
+            "support_bundle": support_verify,
+            "next_actions": next_actions_verify,
+        },
+        "checks": checks,
+        "counts": {
+            "pass": sum(1 for check in checks if check.get("status") == "PASS"),
+            "open": sum(1 for check in checks if check.get("status") in {"OPEN", "WARN", "UNVERIFIED"}),
+            "fail": len(failed),
+            "total": len(checks),
+        },
+        "verification_commands": verification_commands,
+    }
+
+
+def run_release_handoff(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_release_handoff_report(
+        cfg,
+        github_workflow=args.github_workflow,
+        probe_workflow=args.probe_workflow,
+    )
+    emit_payload(report, args.format)
+    if report["status"] == "RELEASE_HANDOFF_FAILED":
+        return 2
+    if args.strict and report["status"] != "RELEASE_HANDOFF_READY":
+        return 2
+    return 0
 
 
 def _audit_status(*statuses: str | None) -> str:
