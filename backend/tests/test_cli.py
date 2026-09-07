@@ -1841,6 +1841,120 @@ def test_cli_release_dashboard_fails_without_distribution_manifest(tmp_path: Pat
     assert checks["current_head_receipts"]["status"] == "PASS"
 
 
+def test_cli_release_support_bundle_saves_and_verifies_support_artifact(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "8" * 40
+
+    def fake_dashboard(
+        _cfg: Settings,
+        *,
+        include_github: bool = False,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        assert include_github is True
+        assert github_workflow == "CI"
+        assert probe_workflow == "CI Startup Probe"
+        return {
+            "status": "RELEASE_DASHBOARD_OPEN",
+            "head_sha": head_sha,
+            "hosted_governance_status": "OPEN",
+            "github_actions_status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+            "github_actions": {
+                "status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+                "startup_blocker": {"status": "FAIL", "suspected_causes": ["hosted_runner_availability"]},
+                "support_summary": {
+                    "classification": "HOSTED_STARTUP_BEFORE_JOBS",
+                    "ci_run_id": 123,
+                    "startup_probe_run_id": 456,
+                },
+                "next_actions": ["Inspect Actions runners."],
+            },
+            "blockers": ["github_actions=OPEN:GITHUB_ACTIONS_DIAGNOSTIC_FAIL"],
+        }
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "build_release_dashboard_report", fake_dashboard)
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    output_path = tmp_path / "data" / "exports" / "support_bundles" / "support.json"
+    assert main(["release", "support-bundle", "--save", "--output", str(output_path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "SUPPORT_BUNDLE_READY"
+    assert payload["case_status"] == "HOSTED_GOVERNANCE_OPEN"
+    assert payload["support_classification"] == "HOSTED_STARTUP_BEFORE_JOBS"
+    assert payload["export"]["path"] == str(output_path)
+    expected_sha = payload["export"]["sha256"]
+    saved = json.loads(output_path.read_text(encoding="utf-8"))
+    assert saved["schema_version"] == "mucaro_release_support_bundle_v1"
+    assert saved["bundle"]["head_sha"] == head_sha
+
+    assert (
+        main(
+            [
+                "release",
+                "support-bundle",
+                "--verify",
+                str(output_path),
+                "--expected-sha256",
+                expected_sha,
+                "--require-current-head",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    verify_payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in verify_payload["checks"]}
+    assert verify_payload["status"] == "SUPPORT_BUNDLE_VERIFIED"
+    assert verify_payload["head_sha"] == head_sha
+    assert verify_payload["case_status"] == "HOSTED_GOVERNANCE_OPEN"
+    assert checks["expected_sha256"]["status"] == "PASS"
+    assert checks["current_head_binding"]["status"] == "PASS"
+
+    assert main(["release", "support-bundle", "--verify", str(output_path), "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "SUPPORT_BUNDLE_VERIFIED" in text_output
+    assert "case_status=HOSTED_GOVERNANCE_OPEN" in text_output
+    assert "support_classification=HOSTED_STARTUP_BEFORE_JOBS" in text_output
+
+
+def test_cli_release_support_bundle_verify_fails_current_head_mismatch(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    artifact = {
+        "schema_version": "mucaro_release_support_bundle_v1",
+        "created_utc": "2026-09-07T00:00:00Z",
+        "bundle": {
+            "status": "SUPPORT_BUNDLE_READY",
+            "head_sha": "1" * 40,
+            "case_status": "HOSTED_GOVERNANCE_OPEN",
+            "dashboard_status": "RELEASE_DASHBOARD_OPEN",
+            "dashboard": {},
+        },
+    }
+    output_path = tmp_path / "support-bundle.json"
+    output_path.write_text(json.dumps(artifact), encoding="utf-8")
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, "2" * 40
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    assert main(["release", "support-bundle", "--verify", str(output_path), "--require-current-head", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "SUPPORT_BUNDLE_VERIFY_FAILED"
+    assert checks["current_head_binding"]["status"] == "FAIL"
+
+
 def test_cli_release_state_requires_exact_head_quality_receipts_for_governed_ready(
     tmp_path: Path,
     capsys,

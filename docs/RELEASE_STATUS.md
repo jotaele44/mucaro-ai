@@ -170,6 +170,11 @@ Observed success markers:
   blockers in one read-only operator view. With `--include-github`, it also
   reports live GitHub Actions diagnostics without converting hosted failures
   into local certification claims.
+- `mucaro release support-bundle --save` creates a support-ready JSON artifact
+  for hosted governance escalation. It captures the release dashboard, GitHub
+  diagnostic status, support classification, startup blocker, blockers,
+  reproduction commands, and next actions without claiming the hosted blocker is
+  resolved.
 - `mucaro package status` currently reports `PACKAGE_WARN`: required package
   inputs, Python/frontend version consistency, CLI entrypoint, launcher
   entrypoint, desktop package manifest, generated outputs, release artifact

@@ -108,6 +108,8 @@ class MucaroCLIError(RuntimeError):
 
 GOVERNANCE_REPORT_SCHEMA_VERSION = "mucaro_governance_report_v1"
 GOVERNANCE_REPORT_DIR = Path("data") / "exports" / "governance_reports"
+SUPPORT_BUNDLE_SCHEMA_VERSION = "mucaro_release_support_bundle_v1"
+SUPPORT_BUNDLE_DIR = Path("data") / "exports" / "support_bundles"
 
 
 def parse_port(value: str) -> int:
@@ -596,6 +598,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     release_dashboard.set_defaults(handler=run_release_dashboard)
 
+    release_support_bundle = release_subcommands.add_parser(
+        "support-bundle",
+        help="Build or verify a support-ready release evidence bundle.",
+    )
+    release_support_bundle.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_support_bundle.add_argument("--save", action="store_true", help="Write the support bundle under data/exports/support_bundles.")
+    release_support_bundle.add_argument("--output", type=Path, help="Optional JSON artifact path. Implies --save.")
+    release_support_bundle.add_argument("--verify", type=Path, help="Verify a saved support bundle instead of building one.")
+    release_support_bundle.add_argument(
+        "--require-current-head",
+        action="store_true",
+        help="With --verify, require the bundle head_sha to match current Git HEAD.",
+    )
+    release_support_bundle.add_argument(
+        "--expected-sha256",
+        help="With --verify, require the support bundle file SHA-256 to match this value.",
+    )
+    release_support_bundle.add_argument(
+        "--github-workflow",
+        default="CI",
+        help="Primary GitHub Actions workflow name to inspect.",
+    )
+    release_support_bundle.add_argument(
+        "--probe-workflow",
+        default="CI Startup Probe",
+        help="Manual-only startup probe workflow name to inspect.",
+    )
+    release_support_bundle.set_defaults(handler=run_release_support_bundle)
+
     release_governance = release_subcommands.add_parser(
         "governance-report",
         help="Build a current-head governance handoff report.",
@@ -977,6 +1008,33 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"blocker={blocker}")
         for command in payload.get("next_commands", []):
             print(f"command={command}")
+    elif status in {"SUPPORT_BUNDLE_READY", "SUPPORT_BUNDLE_FAILED", "SUPPORT_BUNDLE_VERIFIED", "SUPPORT_BUNDLE_VERIFY_FAILED"}:
+        print(f"project_root={payload.get('project_root')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        print(f"case_status={payload.get('case_status')}")
+        print(f"dashboard_status={payload.get('dashboard_status')}")
+        print(f"support_classification={payload.get('support_classification')}")
+        print(f"github_actions_status={payload.get('github_actions_status')}")
+        if payload.get("artifact_path"):
+            print(f"artifact_path={payload.get('artifact_path')}")
+        export = payload.get("export")
+        if isinstance(export, dict):
+            print(f"export_path={export.get('path')}")
+            print(f"export_sha256={export.get('sha256')}")
+            print(f"export_size_bytes={export.get('size_bytes')}")
+        artifact = payload.get("artifact")
+        if isinstance(artifact, dict):
+            print(f"artifact_sha256={artifact.get('sha256')}")
+            print(f"artifact_size_bytes={artifact.get('size_bytes')}")
+            print(f"artifact_schema_version={artifact.get('schema_version')}")
+            print(f"artifact_created_utc={artifact.get('created_utc')}")
+        for check in payload.get("checks", []):
+            detail = str(check.get("detail")).replace("\n", "\\n")
+            print(f"{check.get('status')} {check.get('name')} {detail}")
+        for blocker in payload.get("blockers", []):
+            print(f"blocker={blocker}")
+        for action in payload.get("next_actions", []):
+            print(f"next_action={action}")
     elif status in {"OPERATOR_WORKFLOW_CERT_OK", "OPERATOR_WORKFLOW_CERT_FAILED"}:
         for line in format_operator_workflow_certification_text(payload):
             print(line)
@@ -2048,6 +2106,255 @@ def run_release_dashboard(args: argparse.Namespace, cfg: Settings) -> int:
     if args.strict and report["status"] != "RELEASE_DASHBOARD_READY":
         return 2
     return 0
+
+
+def build_release_support_bundle(
+    cfg: Settings,
+    *,
+    github_workflow: str = "CI",
+    probe_workflow: str = "CI Startup Probe",
+    output_path: Path | None = None,
+    save: bool = False,
+) -> dict[str, Any]:
+    dashboard = build_release_dashboard_report(
+        cfg,
+        include_github=True,
+        github_workflow=github_workflow,
+        probe_workflow=probe_workflow,
+    )
+    github_actions = dashboard.get("github_actions", {})
+    if not isinstance(github_actions, dict):
+        github_actions = {}
+    support_summary = github_actions.get("support_summary", {})
+    if not isinstance(support_summary, dict):
+        support_summary = {}
+    startup_blocker = github_actions.get("startup_blocker", {})
+    if not isinstance(startup_blocker, dict):
+        startup_blocker = {}
+
+    checks = [
+        _certification_gate(
+            "dashboard_not_failed",
+            "PASS" if dashboard.get("status") != "RELEASE_DASHBOARD_FAIL" else "FAIL",
+            str(dashboard.get("status")),
+        ),
+        _certification_gate(
+            "github_diagnostic_present",
+            "PASS" if github_actions.get("status") else "FAIL",
+            str(github_actions.get("status")),
+        ),
+        _certification_gate(
+            "support_classification",
+            "PASS" if support_summary.get("classification") else "WARN",
+            str(support_summary.get("classification") or "missing"),
+        ),
+    ]
+    failed = [check for check in checks if check.get("status") == "FAIL"]
+    case_status = (
+        "HOSTED_GOVERNANCE_OPEN"
+        if dashboard.get("hosted_governance_status") == "OPEN"
+        else "GOVERNED_RELEASE_READY"
+        if dashboard.get("status") == "RELEASE_DASHBOARD_READY"
+        else "LOCAL_EVIDENCE_INCOMPLETE"
+    )
+    next_actions = sorted(
+        set(
+            str(action)
+            for action in [
+                *github_actions.get("next_actions", []),
+                *dashboard.get("blockers", []),
+            ]
+        )
+    )
+    report = {
+        "status": "SUPPORT_BUNDLE_FAILED" if failed else "SUPPORT_BUNDLE_READY",
+        "version": package_version(),
+        "project_root": str(cfg.project_root),
+        "head_sha": dashboard.get("head_sha"),
+        "case_status": case_status,
+        "dashboard_status": dashboard.get("status"),
+        "support_classification": support_summary.get("classification"),
+        "github_actions_status": github_actions.get("status"),
+        "startup_blocker": startup_blocker,
+        "support_summary": support_summary,
+        "dashboard": dashboard,
+        "checks": checks,
+        "blockers": dashboard.get("blockers", []),
+        "next_actions": next_actions,
+        "reproduction_commands": [
+            "mucaro release dashboard --include-github --format text",
+            "mucaro certify github-actions --format text",
+            "mucaro release governance-report --save --format text",
+            "mucaro package distribution-manifest --save --format text",
+        ],
+    }
+    if save or output_path is not None:
+        head_sha = str(report.get("head_sha") or "unknown")
+        path = output_path or cfg.project_root / SUPPORT_BUNDLE_DIR / f"support-bundle-{head_sha[:12]}.json"
+        if not path.is_absolute():
+            path = cfg.project_root / path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        artifact = {
+            "schema_version": SUPPORT_BUNDLE_SCHEMA_VERSION,
+            "created_utc": _utc_now(),
+            "bundle": report,
+        }
+        path.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        report["export"] = {
+            "path": str(path),
+            "sha256": _sha256_file(path),
+            "size_bytes": path.stat().st_size,
+            "schema_version": SUPPORT_BUNDLE_SCHEMA_VERSION,
+        }
+    return report
+
+
+def verify_release_support_bundle(
+    cfg: Settings,
+    artifact_path: Path,
+    *,
+    require_current_head: bool = False,
+    expected_sha256: str | None = None,
+) -> dict[str, Any]:
+    path = artifact_path if artifact_path.is_absolute() else cfg.project_root / artifact_path
+    checks: list[dict[str, str]] = []
+    artifact: dict[str, Any] | None = None
+    artifact_sha256: str | None = None
+    artifact_size_bytes: int | None = None
+
+    if path.exists() and path.is_file():
+        checks.append(_certification_gate("artifact_exists", "PASS", str(path)))
+        artifact_sha256 = _sha256_file(path)
+        artifact_size_bytes = path.stat().st_size
+        checks.append(_certification_gate("artifact_sha256", "PASS", artifact_sha256))
+        if expected_sha256:
+            expected = expected_sha256.strip().lower()
+            checks.append(
+                _certification_gate(
+                    "expected_sha256",
+                    "PASS" if artifact_sha256 == expected else "FAIL",
+                    f"expected={expected} actual={artifact_sha256}",
+                )
+            )
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            loaded = None
+            checks.append(_certification_gate("artifact_json", "FAIL", str(exc)))
+        if isinstance(loaded, dict):
+            artifact = loaded
+            checks.append(_certification_gate("artifact_json", "PASS", "valid JSON object"))
+        elif loaded is not None:
+            checks.append(_certification_gate("artifact_json", "FAIL", "top-level JSON value is not an object"))
+    else:
+        checks.append(_certification_gate("artifact_exists", "FAIL", str(path)))
+
+    bundle: dict[str, Any] | None = None
+    if artifact is not None:
+        schema_version = artifact.get("schema_version")
+        checks.append(
+            _certification_gate(
+                "schema_version",
+                "PASS" if schema_version == SUPPORT_BUNDLE_SCHEMA_VERSION else "FAIL",
+                str(schema_version),
+            )
+        )
+        created_ok, created_detail = _parse_utc_timestamp(artifact.get("created_utc"))
+        checks.append(_certification_gate("created_utc", "PASS" if created_ok else "FAIL", created_detail))
+        raw_bundle = artifact.get("bundle")
+        if isinstance(raw_bundle, dict):
+            bundle = raw_bundle
+            checks.append(_certification_gate("bundle_payload", "PASS", "bundle object present"))
+        else:
+            checks.append(_certification_gate("bundle_payload", "FAIL", "bundle object missing"))
+
+    head_sha: str | None = None
+    case_status = None
+    dashboard_status = None
+    support_classification = None
+    github_actions_status = None
+    if bundle is not None:
+        raw_head_sha = bundle.get("head_sha")
+        if _is_hex_sha(raw_head_sha):
+            head_sha = str(raw_head_sha)
+            checks.append(_certification_gate("bundle_head_sha", "PASS", head_sha))
+        else:
+            checks.append(_certification_gate("bundle_head_sha", "FAIL", str(raw_head_sha)))
+        case_status = bundle.get("case_status")
+        checks.append(
+            _certification_gate(
+                "case_status",
+                "PASS" if isinstance(case_status, str) and bool(case_status) else "FAIL",
+                str(case_status),
+            )
+        )
+        dashboard = bundle.get("dashboard")
+        dashboard_status = bundle.get("dashboard_status")
+        checks.append(
+            _certification_gate(
+                "dashboard_payload",
+                "PASS" if isinstance(dashboard, dict) and dashboard_status else "FAIL",
+                str(dashboard_status),
+            )
+        )
+        support_classification = bundle.get("support_classification")
+        github_actions_status = bundle.get("github_actions_status")
+
+    current_head: str | None = None
+    if require_current_head:
+        head_ok, current_head_output = _git_output(cfg, ["rev-parse", "HEAD"])
+        current_head = current_head_output if head_ok else None
+        checks.append(
+            _certification_gate(
+                "current_head_binding",
+                "PASS" if head_ok and head_sha == current_head_output else "FAIL",
+                f"bundle_head={head_sha} current_head={current_head_output if head_ok else current_head_output or 'unavailable'}",
+            )
+        )
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": "SUPPORT_BUNDLE_VERIFIED" if not failed else "SUPPORT_BUNDLE_VERIFY_FAILED",
+        "project_root": str(cfg.project_root),
+        "artifact_path": str(path),
+        "artifact": {
+            "path": str(path),
+            "sha256": artifact_sha256,
+            "size_bytes": artifact_size_bytes,
+            "schema_version": artifact.get("schema_version") if artifact else None,
+            "created_utc": artifact.get("created_utc") if artifact else None,
+        },
+        "head_sha": head_sha,
+        "current_head": current_head,
+        "case_status": case_status,
+        "dashboard_status": dashboard_status,
+        "support_classification": support_classification,
+        "github_actions_status": github_actions_status,
+        "checks": checks,
+    }
+
+
+def run_release_support_bundle(args: argparse.Namespace, cfg: Settings) -> int:
+    if args.verify:
+        report = verify_release_support_bundle(
+            cfg,
+            args.verify,
+            require_current_head=args.require_current_head,
+            expected_sha256=args.expected_sha256,
+        )
+        emit_payload(report, args.format)
+        return 0 if report["status"] == "SUPPORT_BUNDLE_VERIFIED" else 2
+    if args.require_current_head or args.expected_sha256:
+        raise MucaroCLIError("ERROR_SUPPORT_BUNDLE_VERIFY_OPTION", "--require-current-head and --expected-sha256 require --verify")
+    report = build_release_support_bundle(
+        cfg,
+        github_workflow=args.github_workflow,
+        probe_workflow=args.probe_workflow,
+        output_path=args.output,
+        save=args.save or args.output is not None,
+    )
+    emit_payload(report, args.format)
+    return 0 if report["status"] == "SUPPORT_BUNDLE_READY" else 2
 
 
 def run_release_governance_report(args: argparse.Namespace, cfg: Settings) -> int:

@@ -33,6 +33,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro doctor` | Check local assistant readiness | 0 | 2 with `--strict` warnings/failures |
 | `mucaro release state` | Classify bounded release-state progress | 0 | 2 with `--strict` until governed release is ready |
 | `mucaro release dashboard` | Summarize release state, receipts, handoff artifacts, remote binding, and blockers | 0 | 2 on local evidence failure, or with `--strict` until ready |
+| `mucaro release support-bundle` | Build or verify a support-ready release evidence bundle | 0 | 2 |
 | `mucaro release receipts` | List local release/fresh-clone certification receipts | 0 | 2 |
 | `mucaro release receipt RECEIPT_ID` | Show one local certification receipt | 0 | 2 |
 | `mucaro certify status` | Inspect release readiness before running full certification gates | 0 | 2 on failures, or with `--strict` warnings/failures |
@@ -215,6 +216,8 @@ mucaro --version
 mucaro doctor
 mucaro release state --include-github --format text
 mucaro release dashboard --include-github --format text
+mucaro release support-bundle --save --format text
+mucaro release support-bundle --verify data/exports/support_bundles/support-bundle-HEADPREFIX.json --require-current-head --format text
 mucaro release governance-report --save --format text
 mucaro release governance-report --verify data/exports/governance_reports/governance-report-HEADPREFIX.json --require-current-head --format text
 mucaro release receipts --current-head --format text
@@ -322,6 +325,16 @@ checks worktree, upstream, tag, and `origin/BRANCH` binding, and reports the
 current blockers. Add `--include-github` to include live GitHub Actions
 diagnostics; omit it for a local/offline dashboard over saved artifacts. Use
 `--strict` when automation should fail until `RELEASE_DASHBOARD_READY`.
+
+Use `mucaro release support-bundle --save` when hosted governance is open and
+the operator needs a single support-ready evidence artifact. The command runs
+the release dashboard with live GitHub diagnostics, records the support
+classification, startup blocker, dashboard payload, blockers, reproduction
+commands, and next actions, then writes a JSON bundle under
+`data/exports/support_bundles`. Use `--verify PATH` to validate a saved support
+bundle without rerunning live GitHub diagnostics. Add `--expected-sha256 SHA256`
+to pin the bundle bytes and `--require-current-head` when the bundle must bind
+to the current checkout.
 
 Use `mucaro release governance-report` to build a single current-head handoff
 payload for governed release work. The report combines release-state

@@ -82,11 +82,13 @@ governance lane as open.
    stores or model-backed embeddings.
 3. Use the release dashboard as the operator's current-state summary instead of
    inferring readiness from individual receipts or artifacts.
-4. Treat all future execution adapters as subordinate to Skill Fabric identity,
+4. Use support bundles to escalate hosted governance blockers without
+   weakening local certification boundaries.
+5. Treat all future execution adapters as subordinate to Skill Fabric identity,
    permission, audit, and certification boundaries.
-5. Preserve local-first default behavior and fail closed whenever live provider,
+6. Preserve local-first default behavior and fail closed whenever live provider,
    hosted runner, optional dependency, or index state is missing.
-6. Keep release claims scoped: local certification can pass while hosted
+7. Keep release claims scoped: local certification can pass while hosted
    governance remains open.
 
 ## Readiness Rule
