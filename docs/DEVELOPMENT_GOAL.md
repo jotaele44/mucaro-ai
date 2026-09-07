@@ -43,33 +43,44 @@ packaging, and hosted governance.
 
 ## Current Baseline
 
-As of commit `17d9198c25f03b361b52db0a05e17adecc478e7f`, the local baseline is
-certified for the generated answer-trace evaluation cycle:
+As of commit `937bb709bbca08faf32b5565773da01b5fbb7f68`, the canonical
+`main` branch and tag `v0.1.23-hosted-governance-remediation` are aligned with
+`origin/main`. The exact-head local release baseline is certified by seven
+valid release receipts:
 
 - `ANSWER_TRACE_QUALITY_CERT_OK`
 - `CERTIFY_RELEASE_OK`
 - `RETRIEVAL_QUALITY_CERT_OK`
+- `OPERATOR_WORKFLOW_CERT_OK`
 - `PYTHON_DIST_CERT_OK`
 - `SOURCE_ARTIFACT_CERT_OK`
 - `FRESH_CLONE_CERT_OK`
-- `181 passed` backend tests
-- tag `v0.1.23-generated-answer-trace-eval`
 
-The saved governance handoff artifact is:
+The current local release receipt records `193 passed` backend tests, plus
+secret scanning, generated-artifact scanning, frontend build, frontend audit,
+JSON validation, package artifact build and verify, and desktop launcher checks.
+
+The saved current-head handoff artifacts are:
 
 ```text
-data/exports/governance_reports/governance-report-17d9198c25f0.json
-sha256=094bd7f44e1073596f37506f9f951423ee623750b42209d639ea35017c24eb99
+data/exports/distribution_manifests/distribution-manifest-937bb709bbca.json
+sha256=bf010ae2171e95232d7eaabbb144d6ea20e29f5fe453f937d69026ae45d17ec5
+
+data/exports/governance_reports/governance-report-937bb709bbca.json
+sha256=6b021e261cf5643ff9ff4463d181edbff1bb201851affa3b37bd203b993410d7
+
+data/exports/support_bundles/support-bundle-937bb709bbca.json
+sha256=f53af014232d74868d5f8c3d948315642771545e83a4184ba4c38f737211970a
 ```
 
-That artifact verifies against the current checkout and records the hosted
-governance lane as open.
+Those artifacts verify against the current checkout and record the hosted
+governance lane as open rather than resolved.
 
 ## Open Finish-Line Gaps
 
 | Gap | State | Next proof |
 |---|---|---|
-| Hosted GitHub Actions | OPEN | Hosted `CI` and `CI Startup Probe` currently fail before jobs at current head; inspect Actions settings, billing/minutes, runner availability, and repository/account policy |
+| Hosted GitHub Actions | OPEN | Hosted `CI` run `34079668051` and `CI Startup Probe` run `34079668086` both failed before jobs at commit `937bb709bbca08faf32b5565773da01b5fbb7f68`; inspect Actions settings, billing/minutes, runner availability, and repository/account policy |
 | Private branch protection | OPEN | GitHub API currently reports a plan gate for private-repo branch protection; prove protection after plan/visibility changes or keep the release scope local |
 | Larger real-corpus retrieval | OPEN | Add non-fixture corpus snapshots with frozen manifests, source counts, source-format coverage, and repeatable eval thresholds |
 | Production packaging | OPEN | Verify the local distribution handoff manifest, then convert certified local artifacts into the chosen publish/install channel |

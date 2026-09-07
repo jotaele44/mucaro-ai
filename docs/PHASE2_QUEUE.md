@@ -20,6 +20,8 @@
 | Execution router | Choose IN_PROCESS / LOCAL_WORKER / CONTAINER / SERVICE / FEDERATION_WORKER by policy, never by skill fiat | Queued |
 | Capability policy engine | Bind filesystem/network/database/subprocess/model permissions to explicit policy | Next |
 | Artifact identity/provenance | Input/output handles, SHA-256 identity, staged commit, execution receipts | Next |
+| Exact-head release handoff | Distribution manifest, governance report, and support bundle verify against the canonical head while preserving hosted governance as OPEN | Current baseline at `937bb709bbca` |
+| Hosted governance remediation | Resolve GitHub Actions startup-before-jobs, billing visibility, and private branch-protection plan gate | Open external lane |
 | Agent/workflow DAG runtime | Durable multi-step plans with explicit state, restart/resume, and receipts | Queued |
 | Federation membership discovery | Consume canonical membership and repo capability descriptors once federation environment is available | Blocked on federation execution environment |
 | FEDERATION LOCKSTEP client | Compatibility/impact gate for skill activation and federation-visible contracts | Blocked on federation execution environment |

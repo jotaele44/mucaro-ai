@@ -2,6 +2,40 @@
 
 Current package version: `0.1.23`.
 
+## Current Exact-Head Status
+
+Current `HEAD`, `origin/main`, and tag
+`v0.1.23-hosted-governance-remediation` are all bound to commit
+`937bb709bbca08faf32b5565773da01b5fbb7f68`.
+
+The current local release lane is certified and the hosted governance lane is
+open:
+
+- `mucaro release receipts --current-head --format text` reports `7` receipts,
+  `7` valid, `0` invalid.
+- `mucaro package distribution-manifest --verify
+  data/exports/distribution_manifests/distribution-manifest-937bb709bbca.json
+  --require-current-head --expected-sha256
+  bf010ae2171e95232d7eaabbb144d6ea20e29f5fe453f937d69026ae45d17ec5` reports
+  `DISTRIBUTION_MANIFEST_VERIFIED`.
+- `mucaro release governance-report --verify
+  data/exports/governance_reports/governance-report-937bb709bbca.json
+  --require-current-head --expected-sha256
+  6b021e261cf5643ff9ff4463d181edbff1bb201851affa3b37bd203b993410d7` reports
+  `GOVERNANCE_REPORT_VERIFIED`.
+- `mucaro release support-bundle --verify
+  data/exports/support_bundles/support-bundle-937bb709bbca.json
+  --require-current-head` reports `SUPPORT_BUNDLE_VERIFIED`.
+- `mucaro audit completion --include-github --format text` reports
+  `COMPLETION_AUDIT_OPEN` with `9 PASS`, `1 OPEN`, `0 BLOCKED`, `0 FAIL`, and
+  `0 UNVERIFIED`.
+
+Hosted `CI` run `34079668051` and `CI Startup Probe` run `34079668086` both
+completed with `startup_failure` before GitHub created jobs for the current
+commit. The support classification remains `HOSTED_STARTUP_BEFORE_JOBS`; local
+certification must not be upgraded to hosted or production readiness until run
+admission, billing visibility, and branch protection are independently proven.
+
 Current package includes CLI hardening, local hybrid retrieval, desktop launcher
 smoke certification, hosted CI release gates, fresh-clone validation, API upload
 hardening, parser evidence, retrieval evaluation gates, explicit live-model
@@ -190,6 +224,14 @@ Observed success markers:
   diagnostic status, support classification, startup blocker, blockers,
   reproduction commands, and next actions without claiming the hosted blocker is
   resolved.
+- At commit `937bb709bbca08faf32b5565773da01b5fbb7f68`,
+  `mucaro audit completion --include-github` reports `COMPLETION_AUDIT_OPEN`
+  with `9 PASS`, `1 OPEN`, `0 BLOCKED`, `0 FAIL`, and `0 UNVERIFIED`; the only
+  open active-goal row is hosted governance.
+- At commit `937bb709bbca08faf32b5565773da01b5fbb7f68`,
+  `mucaro release hosted-governance` reports `HOSTED_GOVERNANCE_OPEN` with
+  `support_bundle_status=PASS`, `ci_jobs_count=0`, `startup_probe_jobs_count=0`,
+  and support classification `HOSTED_STARTUP_BEFORE_JOBS`.
 - `mucaro package status` currently reports `PACKAGE_WARN`: required package
   inputs, Python/frontend version consistency, CLI entrypoint, launcher
   entrypoint, desktop package manifest, generated outputs, release artifact
@@ -321,15 +363,15 @@ Known environment-dependent item:
   the hosted startup blocker, including Actions permissions, workflow
   registration, latest `CI` and probe runs, job counts, and billing endpoint
   access status.
-- Commit `17d9198c25f03b361b52db0a05e17adecc478e7f` adds generated
+- Historical marker: commit `17d9198c25f03b361b52db0a05e17adecc478e7f` added generated
   local-corpus answer-trace evaluation cases. The evaluator now writes isolated
   Markdown/TXT fixture sources into a temp project, ingests them through the
   normal source-lineage path, asks through mock retrieval, and verifies cited
   source bindings, snippet terms, citation records, and export paths.
 - The generated answer-trace baseline is tagged as
-  `v0.1.23-generated-answer-trace-eval`. Current-head local receipts verify
-  for `answer_trace_quality`, `local_release`, `retrieval_quality`,
-  `python_dist`, `source_artifact`, and `fresh_clone`.
+  `v0.1.23-generated-answer-trace-eval`. Those receipts remain historical
+  evidence for that exact commit, not current-head proof for later release
+  candidates.
 - Local release certification for commit
   `17d9198c25f03b361b52db0a05e17adecc478e7f` reports
   `CERTIFY_RELEASE_OK`, including `181 passed`, answer-trace quality,
@@ -347,8 +389,8 @@ Known environment-dependent item:
   `data/exports/governance_reports/governance-report-17d9198c25f0.json` with
   SHA-256
   `094bd7f44e1073596f37506f9f951423ee623750b42209d639ea35017c24eb99`.
-  Verification with `--expected-sha256` and `--require-current-head` reports
-  `GOVERNANCE_REPORT_VERIFIED`.
+  That artifact belongs to the historical `17d9198c25f0` checkout; do not use
+  `--require-current-head` against later heads.
 - `mucaro certify operator-workflow` now certifies the local operator workflow
   boundary in an isolated temp project. It proves external directory permission
   gating, source ingestion and index rebuilds, mock cited answer generation with
