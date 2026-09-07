@@ -1,9 +1,11 @@
+import hashlib
 import json
 import subprocess
 import zipfile
 from pathlib import Path
 
 import backend.app.cli as cli
+import backend.app.packaging as packaging
 from backend.app.cli import main
 from backend.app.config import Settings
 from backend.app.release_receipts import write_release_receipt
@@ -889,6 +891,85 @@ def commit_fixture_repo(root: Path) -> None:
     )
 
 
+def write_distribution_manifest_fixture_receipts(root: Path, head_sha: str) -> dict[str, Path]:
+    artifacts_dir = root / "data" / "exports" / "distribution_fixture"
+    artifacts_dir.mkdir(parents=True)
+    artifacts = {
+        "source_archive": artifacts_dir / "mucaro-ai-source.zip",
+        "source_manifest": artifacts_dir / "mucaro-ai-artifact-manifest.json",
+        "python_dist_manifest": artifacts_dir / "mucaro-ai-python-dist-manifest.json",
+        "wheel": artifacts_dir / "mucaro_ai-0.1.23-py3-none-any.whl",
+        "sdist": artifacts_dir / "mucaro_ai-0.1.23.tar.gz",
+    }
+    for name, path in artifacts.items():
+        path.write_text(f"{name}\n", encoding="utf-8")
+
+    write_release_receipt(
+        root,
+        receipt_type="local_release",
+        status="CERTIFY_RELEASE_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_release.py"],
+        payload={"checks": []},
+    )
+    write_release_receipt(
+        root,
+        receipt_type="fresh_clone",
+        status="FRESH_CLONE_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_fresh_clone.py", "--ref", head_sha],
+        payload={"checks": []},
+    )
+    write_release_receipt(
+        root,
+        receipt_type="source_artifact",
+        status="SOURCE_ARTIFACT_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_source_artifact.py", str(artifacts["source_manifest"])],
+        payload={
+            "archive_path": str(artifacts["source_archive"]),
+            "manifest_path": str(artifacts["source_manifest"]),
+        },
+    )
+    write_release_receipt(
+        root,
+        receipt_type="python_dist",
+        status="PYTHON_DIST_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_python_distribution.py"],
+        payload={
+            "manifest": {"path": str(artifacts["python_dist_manifest"])},
+            "wheel": {"path": str(artifacts["wheel"])},
+            "sdist": {"path": str(artifacts["sdist"])},
+        },
+    )
+    write_release_receipt(
+        root,
+        receipt_type="answer_trace_quality",
+        status="ANSWER_TRACE_QUALITY_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_answer_trace_quality.py"],
+        payload={"checks": []},
+    )
+    write_release_receipt(
+        root,
+        receipt_type="retrieval_quality",
+        status="RETRIEVAL_QUALITY_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_retrieval_quality.py"],
+        payload={"checks": []},
+    )
+    write_release_receipt(
+        root,
+        receipt_type="operator_workflow",
+        status="OPERATOR_WORKFLOW_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_operator_workflow.py"],
+        payload={"checks": []},
+    )
+    return artifacts
+
+
 def test_cli_package_build_writes_source_artifact_manifest(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
     write_package_fixture(tmp_path)
@@ -916,6 +997,98 @@ def test_cli_package_build_writes_source_artifact_manifest(tmp_path: Path, capsy
     assert verify_payload["manifest"]["head_sha"] == manifest_payload["head_sha"]
     assert verify_checks["current_head_binding"]["status"] == "PASS"
     assert verify_checks["archive_member_hashes"]["status"] == "PASS"
+
+
+def test_cli_package_distribution_manifest_builds_and_verifies_current_head_handoff(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    commit_fixture_repo(tmp_path)
+    head_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    ).stdout.strip()
+    artifacts = write_distribution_manifest_fixture_receipts(tmp_path, head_sha)
+
+    assert main(["package", "distribution-manifest", "--save", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "DISTRIBUTION_MANIFEST_READY"
+    assert payload["scope"] == "local_distribution_handoff"
+    assert payload["head_sha"] == head_sha
+    assert payload["hosted_governance_status"] == "OPEN"
+    assert payload["failed_checks"] == []
+    assert payload["artifacts"]["wheel"]["sha256"] == hashlib.sha256(artifacts["wheel"].read_bytes()).hexdigest()
+    assert set(payload["receipts"]) == {receipt_type for receipt_type, _ in packaging.REQUIRED_DISTRIBUTION_RECEIPTS}
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert checks["receipt:operator_workflow"]["status"] == "PASS"
+    assert checks["artifact:python_dist_manifest"]["status"] == "PASS"
+
+    manifest_path = Path(payload["export"]["path"])
+    expected_sha = payload["export"]["sha256"]
+    assert manifest_path.exists()
+
+    assert (
+        main(
+            [
+                "package",
+                "distribution-manifest",
+                "--verify",
+                str(manifest_path),
+                "--expected-sha256",
+                expected_sha,
+                "--require-current-head",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    verify_payload = json.loads(capsys.readouterr().out)
+    verify_checks = {check["name"]: check for check in verify_payload["checks"]}
+    assert verify_payload["status"] == "DISTRIBUTION_MANIFEST_VERIFIED"
+    assert verify_payload["head_sha"] == head_sha
+    assert verify_payload["hosted_governance_status"] == "OPEN"
+    assert verify_checks["manifest_json"]["status"] == "PASS"
+    assert verify_checks["current_head_binding"]["status"] == "PASS"
+    assert verify_checks["receipt:local_release"]["status"] == "PASS"
+    assert verify_checks["artifact:wheel"]["status"] == "PASS"
+
+    assert main(["package", "distribution-manifest", "--verify", str(manifest_path), "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "DISTRIBUTION_MANIFEST_VERIFIED" in text_output
+    assert "PASS artifact:wheel" in text_output
+    assert "PASS receipt:operator_workflow" in text_output
+
+
+def test_cli_package_distribution_manifest_fails_on_receipt_artifact_drift(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    commit_fixture_repo(tmp_path)
+    head_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    ).stdout.strip()
+    artifacts = write_distribution_manifest_fixture_receipts(tmp_path, head_sha)
+
+    assert main(["package", "distribution-manifest", "--save", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    manifest_path = Path(payload["export"]["path"])
+    artifacts["wheel"].write_text("changed\n", encoding="utf-8")
+
+    assert main(["package", "distribution-manifest", "--verify", str(manifest_path), "--format", "json"], cfg=cfg) == 2
+    verify_payload = json.loads(capsys.readouterr().out)
+    verify_checks = {check["name"]: check for check in verify_payload["checks"]}
+    assert verify_payload["status"] == "DISTRIBUTION_MANIFEST_VERIFY_FAILED"
+    assert verify_checks["artifact:wheel"]["status"] == "FAIL"
+    assert verify_checks["receipt:local_release"]["status"] == "PASS"
 
 
 def test_cli_package_verify_fails_on_archive_drift(tmp_path: Path, capsys):

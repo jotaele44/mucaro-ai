@@ -6,8 +6,11 @@ import subprocess
 import tomllib
 import zipfile
 from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
+
+from .release_receipts import load_release_receipt, receipt_path
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +37,17 @@ REQUIRED_PACKAGE_INPUTS = [
 
 OPTIONAL_GENERATED_OUTPUTS = [
     "frontend/dist/index.html",
+]
+DISTRIBUTION_MANIFEST_SCHEMA_VERSION = "mucaro_distribution_manifest_v1"
+DISTRIBUTION_MANIFEST_DIR = Path("data") / "exports" / "distribution_manifests"
+REQUIRED_DISTRIBUTION_RECEIPTS = [
+    ("local_release", "CERTIFY_RELEASE_OK"),
+    ("fresh_clone", "FRESH_CLONE_CERT_OK"),
+    ("source_artifact", "SOURCE_ARTIFACT_CERT_OK"),
+    ("python_dist", "PYTHON_DIST_CERT_OK"),
+    ("answer_trace_quality", "ANSWER_TRACE_QUALITY_CERT_OK"),
+    ("retrieval_quality", "RETRIEVAL_QUALITY_CERT_OK"),
+    ("operator_workflow", "OPERATOR_WORKFLOW_CERT_OK"),
 ]
 
 
@@ -76,6 +90,23 @@ def _sha256_file(path: Path) -> str:
 
 def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _file_summary(path_value: str | None, root: Path) -> dict[str, Any]:
+    if not path_value:
+        return {"path": None, "exists": False, "sha256": None, "size_bytes": None}
+    path = _resolve_package_path(root, Path(path_value))
+    exists = path.exists() and path.is_file()
+    return {
+        "path": str(path),
+        "exists": exists,
+        "sha256": _sha256_file(path) if exists else None,
+        "size_bytes": path.stat().st_size if exists else None,
+    }
 
 
 def _git_output(root: Path, args: list[str]) -> tuple[bool, str]:
@@ -596,4 +627,236 @@ def verify_release_artifact(
             "member_count": manifest_member_count,
             "sha256": _sha256_file(manifest_path),
         },
+    }
+
+
+def build_distribution_manifest(
+    root: Path = ROOT,
+    *,
+    output_path: Path | None = None,
+    save: bool = False,
+) -> dict[str, Any]:
+    checks: list[dict[str, str]] = []
+    ok, head_sha = _git_output(root, ["rev-parse", "HEAD"])
+    checks.append(_check("git_head", "PASS" if ok else "FAIL", head_sha or "missing"))
+
+    tag_ok, tags_output = _git_output(root, ["tag", "--points-at", "HEAD"])
+    tags_at_head = sorted(line for line in tags_output.splitlines() if line.strip()) if tag_ok else []
+    checks.append(_check("tags_at_head", "PASS" if tag_ok else "WARN", ",".join(tags_at_head) or "none"))
+
+    package = build_package_status(root)
+    failed_package_checks = [check for check in package.get("checks", []) if check.get("status") == "FAIL"]
+    checks.append(_check("package_status", "PASS" if not failed_package_checks else "FAIL", str(package.get("status"))))
+
+    receipts: dict[str, dict[str, Any]] = {}
+    for receipt_type, ok_status in REQUIRED_DISTRIBUTION_RECEIPTS:
+        receipt = load_release_receipt(root, receipt_type=receipt_type, head_sha=head_sha if ok else None)
+        receipt_file = receipt_path(root, receipt_type, head_sha if ok else "UNKNOWN_HEAD")
+        receipts[receipt_type] = {
+            "required_status": ok_status,
+            "path": str(receipt_file),
+            "exists": receipt_file.exists(),
+            "file_sha256": _sha256_file(receipt_file) if receipt_file.exists() else None,
+            "status": receipt.get("status") if receipt else None,
+            "created_utc": receipt.get("created_utc") if receipt else None,
+        }
+        receipt_passed = receipt is not None and receipt.get("status") == ok_status
+        checks.append(
+            _check(
+                f"receipt:{receipt_type}",
+                "PASS" if receipt_passed else "FAIL",
+                f"status={receipt.get('status') if receipt else 'missing'} required={ok_status}",
+            )
+        )
+
+    source_receipt = load_release_receipt(root, receipt_type="source_artifact", head_sha=head_sha if ok else None)
+    source_payload = source_receipt.get("payload", {}) if isinstance(source_receipt, dict) else {}
+    python_receipt = load_release_receipt(root, receipt_type="python_dist", head_sha=head_sha if ok else None)
+    python_payload = python_receipt.get("payload", {}) if isinstance(python_receipt, dict) else {}
+    python_manifest = python_payload.get("manifest", {}) if isinstance(python_payload.get("manifest"), dict) else {}
+    artifacts = {
+        "source_archive": _file_summary(
+            str(source_payload.get("archive_path")) if source_payload.get("archive_path") else None,
+            root,
+        ),
+        "source_manifest": _file_summary(
+            str(source_payload.get("manifest_path")) if source_payload.get("manifest_path") else None,
+            root,
+        ),
+        "python_dist_manifest": _file_summary(
+            str(python_manifest.get("path")) if python_manifest.get("path") else None,
+            root,
+        ),
+        "wheel": _file_summary(
+            str(python_payload.get("wheel", {}).get("path"))
+            if isinstance(python_payload.get("wheel"), dict) and python_payload.get("wheel", {}).get("path")
+            else None,
+            root,
+        ),
+        "sdist": _file_summary(
+            str(python_payload.get("sdist", {}).get("path"))
+            if isinstance(python_payload.get("sdist"), dict) and python_payload.get("sdist", {}).get("path")
+            else None,
+            root,
+        ),
+    }
+    for name, artifact in artifacts.items():
+        checks.append(_check(f"artifact:{name}", "PASS" if artifact["exists"] else "FAIL", str(artifact["path"])))
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    manifest = {
+        "schema_version": DISTRIBUTION_MANIFEST_SCHEMA_VERSION,
+        "status": "DISTRIBUTION_MANIFEST_READY" if not failed else "DISTRIBUTION_MANIFEST_FAILED",
+        "created_utc": _utc_now(),
+        "project_root": str(root),
+        "package_name": PYTHON_PACKAGE_NAME,
+        "version": _load_toml(root / "pyproject.toml").get("project", {}).get("version"),
+        "head_sha": head_sha if ok else None,
+        "tags_at_head": tags_at_head,
+        "scope": "local_distribution_handoff",
+        "hosted_governance_required": True,
+        "hosted_governance_status": "OPEN",
+        "package_status": package.get("status"),
+        "checks": checks,
+        "failed_checks": [check["name"] for check in failed],
+        "receipts": receipts,
+        "artifacts": artifacts,
+        "blockers": package.get("blockers", []),
+        "next_commands": [
+            "python3 scripts/certify_release.py",
+            f"python3 scripts/certify_fresh_clone.py --ref {head_sha if ok else 'HEAD'}",
+            "python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json",
+            "python3 scripts/certify_python_distribution.py",
+            "python3 -m backend.app.cli package distribution-manifest --save --format text",
+            "python3 -m backend.app.cli release state --include-github --format text",
+        ],
+    }
+    if save or output_path is not None:
+        destination = output_path or root / DISTRIBUTION_MANIFEST_DIR / f"distribution-manifest-{str(head_sha)[:12]}.json"
+        destination = _resolve_package_path(root, destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        manifest["export"] = {
+            "path": str(destination),
+            "sha256": _sha256_file(destination),
+            "size_bytes": destination.stat().st_size,
+            "schema_version": DISTRIBUTION_MANIFEST_SCHEMA_VERSION,
+        }
+    return manifest
+
+
+def verify_distribution_manifest(
+    manifest_path: Path,
+    *,
+    root: Path = ROOT,
+    expected_sha256: str | None = None,
+    require_current_head: bool = False,
+) -> dict[str, Any]:
+    path = _resolve_package_path(root, manifest_path)
+    checks: list[dict[str, str]] = []
+    checks.append(_check("manifest_exists", "PASS" if path.exists() else "FAIL", str(path)))
+    if not path.exists():
+        return {
+            "status": "DISTRIBUTION_MANIFEST_VERIFY_FAILED",
+            "project_root": str(root),
+            "manifest_path": str(path),
+            "checks": checks,
+        }
+
+    actual_sha = _sha256_file(path)
+    checks.append(_check("manifest_sha256", "PASS", actual_sha))
+    if expected_sha256:
+        checks.append(
+            _check(
+                "expected_sha256",
+                "PASS" if actual_sha == expected_sha256 else "FAIL",
+                f"expected={expected_sha256} actual={actual_sha}",
+            )
+        )
+    try:
+        payload = _load_json(path)
+        error = None
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        payload = None
+        error = str(exc)
+    checks.append(_check("manifest_json", "PASS" if isinstance(payload, dict) and error is None else "FAIL", error or "valid JSON object"))
+    if not isinstance(payload, dict) or error is not None:
+        return {
+            "status": "DISTRIBUTION_MANIFEST_VERIFY_FAILED",
+            "project_root": str(root),
+            "manifest_path": str(path),
+            "artifact": {"sha256": actual_sha, "size_bytes": path.stat().st_size},
+            "checks": checks,
+        }
+
+    checks.append(
+        _check(
+            "schema_version",
+            "PASS" if payload.get("schema_version") == DISTRIBUTION_MANIFEST_SCHEMA_VERSION else "FAIL",
+            str(payload.get("schema_version")),
+        )
+    )
+    if require_current_head:
+        head_ok, current_head = _git_output(root, ["rev-parse", "HEAD"])
+        checks.append(
+            _check(
+                "current_head_binding",
+                "PASS" if head_ok and payload.get("head_sha") == current_head else "FAIL",
+                f"manifest={payload.get('head_sha')} current={current_head if head_ok else 'unavailable'}",
+            )
+        )
+
+    artifacts = payload.get("artifacts", {})
+    if isinstance(artifacts, dict):
+        for name, artifact in artifacts.items():
+            if not isinstance(artifact, dict):
+                checks.append(_check(f"artifact:{name}", "FAIL", "artifact summary is not an object"))
+                continue
+            artifact_path = artifact.get("path")
+            artifact_summary = _file_summary(str(artifact_path) if artifact_path else None, root)
+            expected_artifact_sha = artifact.get("sha256")
+            artifact_ok = (
+                artifact_summary["exists"]
+                and isinstance(expected_artifact_sha, str)
+                and artifact_summary["sha256"] == expected_artifact_sha
+            )
+            checks.append(
+                _check(
+                    f"artifact:{name}",
+                    "PASS" if artifact_ok else "FAIL",
+                    f"expected={expected_artifact_sha} actual={artifact_summary['sha256']}",
+                )
+            )
+    else:
+        checks.append(_check("artifacts", "FAIL", "artifacts is not an object"))
+
+    receipts = payload.get("receipts", {})
+    if isinstance(receipts, dict):
+        for receipt_type, receipt in receipts.items():
+            if not isinstance(receipt, dict):
+                checks.append(_check(f"receipt:{receipt_type}", "FAIL", "receipt summary is not an object"))
+                continue
+            receipt_file = Path(str(receipt.get("path") or ""))
+            receipt_file = _resolve_package_path(root, receipt_file)
+            expected_receipt_sha = receipt.get("file_sha256")
+            actual_receipt_sha = _sha256_file(receipt_file) if receipt_file.exists() else None
+            checks.append(
+                _check(
+                    f"receipt:{receipt_type}",
+                    "PASS" if receipt_file.exists() and actual_receipt_sha == expected_receipt_sha else "FAIL",
+                    f"expected={expected_receipt_sha} actual={actual_receipt_sha}",
+                )
+            )
+    else:
+        checks.append(_check("receipts", "FAIL", "receipts is not an object"))
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": "DISTRIBUTION_MANIFEST_VERIFY_FAILED" if failed else "DISTRIBUTION_MANIFEST_VERIFIED",
+        "project_root": str(root),
+        "manifest_path": str(path),
+        "head_sha": payload.get("head_sha"),
+        "hosted_governance_status": payload.get("hosted_governance_status"),
+        "artifact": {"sha256": actual_sha, "size_bytes": path.stat().st_size},
+        "checks": checks,
     }

@@ -51,7 +51,13 @@ from .memory import (
     remember_memory_item,
     set_memory_enabled,
 )
-from .packaging import build_package_status, build_release_artifacts, verify_release_artifact
+from .packaging import (
+    build_distribution_manifest,
+    build_package_status,
+    build_release_artifacts,
+    verify_distribution_manifest,
+    verify_release_artifact,
+)
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -521,6 +527,33 @@ def build_parser() -> argparse.ArgumentParser:
     package_verify.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     package_verify.set_defaults(handler=run_package_verify)
 
+    package_distribution_manifest = package_subcommands.add_parser(
+        "distribution-manifest",
+        help="Build or verify an operator-facing local distribution handoff manifest.",
+    )
+    package_distribution_manifest.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    package_distribution_manifest.add_argument(
+        "--save",
+        action="store_true",
+        help="Write the distribution manifest under data/exports/distribution_manifests.",
+    )
+    package_distribution_manifest.add_argument("--output", type=Path, help="Optional JSON manifest path. Implies --save.")
+    package_distribution_manifest.add_argument(
+        "--verify",
+        type=Path,
+        help="Verify a saved distribution manifest instead of building a new one.",
+    )
+    package_distribution_manifest.add_argument(
+        "--require-current-head",
+        action="store_true",
+        help="With --verify, require manifest head_sha to match current Git HEAD.",
+    )
+    package_distribution_manifest.add_argument(
+        "--expected-sha256",
+        help="With --verify, require the manifest file SHA-256 to match this value.",
+    )
+    package_distribution_manifest.set_defaults(handler=run_package_distribution_manifest)
+
     release = subcommands.add_parser("release", help="Inspect bounded release-state progress.")
     release_subcommands = release.add_subparsers(dest="release_command", required=True)
 
@@ -788,6 +821,36 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             if manifest.get("sha256"):
                 print(f"manifest_sha256={manifest.get('sha256')}")
             print(f"manifest_member_count={manifest.get('member_count')}")
+    elif status in {
+        "DISTRIBUTION_MANIFEST_READY",
+        "DISTRIBUTION_MANIFEST_FAILED",
+        "DISTRIBUTION_MANIFEST_VERIFIED",
+        "DISTRIBUTION_MANIFEST_VERIFY_FAILED",
+    }:
+        print(f"project_root={payload.get('project_root')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        print(f"hosted_governance_status={payload.get('hosted_governance_status')}")
+        if payload.get("manifest_path"):
+            print(f"manifest_path={payload.get('manifest_path')}")
+        export = payload.get("export")
+        if isinstance(export, dict):
+            print(f"export_path={export.get('path')}")
+            print(f"export_sha256={export.get('sha256')}")
+            print(f"export_size_bytes={export.get('size_bytes')}")
+        artifact = payload.get("artifact")
+        if isinstance(artifact, dict):
+            print(f"manifest_sha256={artifact.get('sha256')}")
+            print(f"manifest_size_bytes={artifact.get('size_bytes')}")
+        for check in payload.get("checks", []):
+            detail = str(check.get("detail")).replace("\n", "\\n")
+            print(f"{check.get('status')} {check.get('name')} {detail}")
+        artifacts = payload.get("artifacts", {})
+        if isinstance(artifacts, dict):
+            for name, summary in sorted(artifacts.items()):
+                if isinstance(summary, dict):
+                    print(f"artifact:{name}={summary.get('path')} sha256={summary.get('sha256')}")
+        for command in payload.get("next_commands", []):
+            print(f"command={command}")
     elif status in {"RELEASE_STATE_READY", "RELEASE_STATE_OPEN"}:
         print(f"current_state={payload.get('current_state')}")
         print(f"highest_local_state={payload.get('highest_local_state')}")
@@ -1442,6 +1505,26 @@ def run_package_verify(args: argparse.Namespace, cfg: Settings) -> int:
     report = verify_release_artifact(args.manifest, root=cfg.project_root, require_current_head=args.require_current_head)
     emit_payload(report, args.format)
     return 0 if report["status"] == "PACKAGE_ARTIFACT_VERIFIED" else 2
+
+
+def run_package_distribution_manifest(args: argparse.Namespace, cfg: Settings) -> int:
+    if args.verify is not None:
+        report = verify_distribution_manifest(
+            args.verify,
+            root=cfg.project_root,
+            expected_sha256=args.expected_sha256,
+            require_current_head=args.require_current_head,
+        )
+        emit_payload(report, args.format)
+        return 0 if report["status"] == "DISTRIBUTION_MANIFEST_VERIFIED" else 2
+
+    report = build_distribution_manifest(
+        cfg.project_root,
+        output_path=args.output,
+        save=args.save or args.output is not None,
+    )
+    emit_payload(report, args.format)
+    return 0 if report["status"] == "DISTRIBUTION_MANIFEST_READY" else 2
 
 
 def run_release_state(args: argparse.Namespace, cfg: Settings) -> int:

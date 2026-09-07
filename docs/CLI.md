@@ -67,6 +67,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro package status` | Inspect packaging and distribution readiness | 0 | 2 on failures, or with `--strict` warnings/failures |
 | `mucaro package build` | Build the governed source ZIP and artifact manifest | 0 | 2 |
 | `mucaro package verify MANIFEST` | Verify a governed source ZIP against its artifact manifest | 0 | 2 |
+| `mucaro package distribution-manifest` | Build or verify the local distribution handoff manifest | 0 | 2 |
 | `mucaro tools list` | List locally allowlisted tools | 0 | 2 |
 | `mucaro tools request TOOL_NAME` | Create a pending tool-call request | 0 | 2 |
 | `mucaro tools approve TOOL_CALL_ID` | Approve a pending tool call | 0 | 2 |
@@ -447,6 +448,19 @@ path existence, archive SHA-256, archive size, ZIP path safety, duplicate
 archive members, exact archive member set, and per-member size/hash bindings.
 Add `--require-current-head` when the manifest must bind to the current checkout
 before a release or distribution decision.
+
+Use `mucaro package distribution-manifest --save` after exact-head release,
+fresh-clone, source-artifact, Python-distribution, answer-trace-quality,
+retrieval-quality, and operator-workflow receipts exist. The command writes a
+local distribution handoff manifest under
+`data/exports/distribution_manifests`, records the current Git `HEAD`,
+summarizes all required receipt file hashes, summarizes source and Python
+distribution artifact hashes, and keeps hosted governance explicitly marked
+`OPEN`.
+
+Use `mucaro package distribution-manifest --verify MANIFEST` to verify a saved
+handoff manifest. Add `--expected-sha256 SHA256` to pin the manifest file bytes
+and `--require-current-head` when the manifest must bind to the current checkout.
 
 Use `python3 scripts/certify_source_artifact.py MANIFEST` after building and
 verifying an artifact when the release decision needs installability evidence

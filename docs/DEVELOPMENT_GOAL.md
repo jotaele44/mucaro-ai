@@ -38,7 +38,7 @@ packaging, and hosted governance.
 | Tool execution | Deny-by-default request, approve or deny, execute only after approval, and append-only local audit events |
 | Operator workflow | Isolated proof that permission grants, ingestion, retrieval, answer traces, memory controls, run history, and approved tools work together |
 | Fresh clone | Exact-ref clone, install, CLI help, release check, launcher self-test, and desktop smoke certification |
-| Packaging | Source artifact manifest, archive SHA-256, member hashes, distribution policy, and package status gate |
+| Packaging | Source artifact manifest, archive SHA-256, member hashes, Python wheel/sdist receipts, local distribution handoff manifest, and package status gate |
 | Hosted governance | Current-head hosted CI, startup probe, branch-protection visibility, tag binding, and clear external blocker classification |
 
 ## Current Baseline
@@ -72,7 +72,7 @@ governance lane as open.
 | Hosted GitHub Actions | OPEN | Hosted `CI` and `CI Startup Probe` currently fail before jobs at current head; inspect Actions settings, billing/minutes, runner availability, and repository/account policy |
 | Private branch protection | OPEN | GitHub API currently reports a plan gate for private-repo branch protection; prove protection after plan/visibility changes or keep the release scope local |
 | Larger real-corpus retrieval | OPEN | Add non-fixture corpus snapshots with frozen manifests, source counts, source-format coverage, and repeatable eval thresholds |
-| Production packaging | OPEN | Convert local package artifacts into the chosen distribution path and certify install behavior from the produced artifact |
+| Production packaging | OPEN | Verify the local distribution handoff manifest, then convert certified local artifacts into the chosen publish/install channel |
 | Sustained workflow validation | OPEN | Run end-to-end operator workflows across ingest, ask, trace review, memory, tools, receipts, and recovery paths |
 
 ## Development Vector

@@ -3,6 +3,9 @@
 Mucaro AI uses a staged packaging policy. The current release artifact is a
 tracked-source ZIP with a JSON manifest. Desktop installers and signed bundles
 remain future distribution layers built from the same certified source state.
+The distribution handoff manifest is the current operator-facing bridge between
+local release artifacts, exact-head receipts, and the still-open hosted
+governance lane.
 
 ## Current Artifact
 
@@ -15,6 +18,7 @@ PYTHONPATH=.:backend python3 scripts/mucaro.py package build --format text
 PYTHONPATH=.:backend python3 scripts/mucaro.py package verify data/exports/packages/MANIFEST.json --require-current-head --format text
 python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json
 python3 scripts/certify_python_distribution.py
+PYTHONPATH=.:backend python3 scripts/mucaro.py package distribution-manifest --save --format text
 ```
 
 The command writes generated files under `data/exports/packages`, which is
@@ -75,6 +79,21 @@ environment, verifies the installed `mucaro` entry point, and imports installed
 package modules. A passing run writes a `PYTHON_DIST_CERT_OK` receipt for the
 current Git `HEAD`.
 
+`mucaro package distribution-manifest --save` validates that the exact current
+Git `HEAD` has all required local release receipts: `local_release`,
+`fresh_clone`, `source_artifact`, `python_dist`, `answer_trace_quality`,
+`retrieval_quality`, and `operator_workflow`. It then writes a JSON handoff
+manifest under `data/exports/distribution_manifests` with the receipt paths and
+file SHA-256 values plus the source archive, source manifest, Python
+distribution manifest, wheel, and sdist paths and SHA-256 values.
+
+`mucaro package distribution-manifest --verify MANIFEST` reloads that handoff
+manifest, verifies its schema, optionally verifies its own expected SHA-256,
+optionally requires its `head_sha` to match the current checkout, and recomputes
+all referenced receipt and artifact hashes. This command does not publish,
+upload, sign, notarize, or mark hosted governance as passing; it preserves the
+local distribution handoff boundary.
+
 ## Release Gates
 
 Before a governed release tag, the operator must have:
@@ -85,6 +104,7 @@ Before a governed release tag, the operator must have:
 - `PACKAGE_ARTIFACT_READY` for the same source state
 - `PACKAGE_ARTIFACT_VERIFIED` for the generated artifact manifest
 - `SOURCE_ARTIFACT_CERT_OK` for the generated artifact manifest
+- `DISTRIBUTION_MANIFEST_VERIFIED` for the local handoff manifest
 - hosted GitHub Actions success for the exact pushed SHA
 - branch protection and tag binding reviewed for the release scope
 

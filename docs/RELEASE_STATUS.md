@@ -159,6 +159,12 @@ Observed success markers:
   tracked-source ZIP plus JSON manifest under `data/exports/packages`, with
   exact Git `HEAD`, archive SHA-256, member count, and per-member SHA-256
   receipts.
+- `mucaro package distribution-manifest --save` creates a local distribution
+  handoff manifest after the exact-head local release, fresh-clone,
+  source-artifact, Python-distribution, answer-trace-quality, retrieval-quality,
+  and operator-workflow receipts exist. The manifest records receipt file
+  hashes, source artifact hashes, Python distribution artifact hashes, and keeps
+  hosted governance explicitly open.
 - `mucaro package status` currently reports `PACKAGE_WARN`: required package
   inputs, Python/frontend version consistency, CLI entrypoint, launcher
   entrypoint, desktop package manifest, generated outputs, release artifact
