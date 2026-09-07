@@ -170,6 +170,11 @@ Observed success markers:
   blockers in one read-only operator view. With `--include-github`, it also
   reports live GitHub Actions diagnostics without converting hosted failures
   into local certification claims.
+- `mucaro certify github-actions` records repository Actions permission,
+  workflow token permission, workflow registration, run/job counts, check-suite
+  startup failures, branch-protection plan gates, and billing-scope visibility.
+  If the billing endpoint requires extra GitHub OAuth scope, the diagnostic
+  preserves the required scope in both JSON and text output.
 - `mucaro audit completion --include-github` composes product-audit,
   release-state, release-dashboard, package, receipt, and hosted-governance
   evidence into one active-goal matrix. It reports PASS, OPEN, BLOCKED, FAIL,

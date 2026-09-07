@@ -1541,7 +1541,7 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
                 ],
             }, ""
         if args == ["api", "users/jotaele44/settings/billing/actions"]:
-            return False, None, "HTTP 404: Not Found"
+            return False, None, 'HTTP 404: Not Found; This API operation needs the "user" scope.'
         return False, None, f"unexpected command: {args}"
 
     monkeypatch.setattr(cli, "_command_output", fake_command_output)
@@ -1559,6 +1559,10 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert payload["github_actions"]["check_suites"]["total_count"] == 2
     assert payload["github_actions"]["check_suites"]["suites"][0]["latest_check_runs_count"] == 0
     assert payload["github_support_summary"]["classification"] == "HOSTED_STARTUP_BEFORE_JOBS"
+    assert payload["github_support_summary"]["actions_enabled"] is True
+    assert payload["github_support_summary"]["allowed_actions"] == "all"
+    assert payload["github_support_summary"]["default_workflow_permissions"] == "read"
+    assert payload["github_support_summary"]["billing_required_scope"] == "user"
     assert payload["github_support_summary"]["check_suite_counts"] == {
         "total": 2,
         "github_actions": 2,
@@ -1630,7 +1634,7 @@ def test_cli_release_governance_report_verifies_saved_artifact(tmp_path: Path, c
         if args[:2] == ["run", "list"]:
             return True, [], ""
         if args == ["api", "users/jotaele44/settings/billing/actions"]:
-            return False, None, "HTTP 404: Not Found"
+            return False, None, 'HTTP 404: Not Found; This API operation needs the "user" scope.'
         if args == ["api", f"repos/jotaele44/mucaro-ai/commits/{head_sha}/check-suites"]:
             return True, {"total_count": 0, "check_suites": []}, ""
         return False, None, f"unexpected command: {args}"
@@ -2557,7 +2561,7 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
                 ],
             }, ""
         if args == ["api", "users/jotaele44/settings/billing/actions"]:
-            return False, None, "HTTP 404: requires user scope"
+            return False, None, 'HTTP 404: Not Found; This API operation needs the "user" scope.'
         return False, None, f"unexpected command: {args}"
 
     monkeypatch.setattr(cli, "_command_output", fake_command_output)
@@ -2577,6 +2581,22 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert payload["support_summary"]["classification"] == "HOSTED_STARTUP_BEFORE_JOBS"
     assert payload["support_summary"]["ci_run_id"] == 11
     assert payload["support_summary"]["startup_probe_run_id"] == 22
+    assert payload["actions_permissions"] == {
+        "available": True,
+        "enabled": True,
+        "allowed_actions": "all",
+        "sha_pinning_required": None,
+    }
+    assert payload["workflow_permissions"] == {
+        "available": True,
+        "default_workflow_permissions": "read",
+        "can_approve_pull_request_reviews": None,
+    }
+    assert payload["billing"]["required_scope"] == "user"
+    assert payload["support_summary"]["actions_enabled"] is True
+    assert payload["support_summary"]["allowed_actions"] == "all"
+    assert payload["support_summary"]["default_workflow_permissions"] == "read"
+    assert payload["support_summary"]["billing_required_scope"] == "user"
     assert payload["support_summary"]["check_suite_counts"] == {
         "total": 1,
         "github_actions": 1,
@@ -2613,6 +2633,12 @@ def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsy
     assert "support_classification=HOSTED_STARTUP_BEFORE_JOBS" in text_output
     assert "support_ci_run_id=11" in text_output
     assert "support_startup_probe_run_id=22" in text_output
+    assert "actions_permissions_available=True" in text_output
+    assert "actions_enabled=True" in text_output
+    assert "allowed_actions=all" in text_output
+    assert "default_workflow_permissions=read" in text_output
+    assert "billing_required_scope=user" in text_output
+    assert "support_billing_required_scope=user" in text_output
     assert "support_check_suite_counts=github_actions=1 zero_check_run_startup_failures=1 queued_external=0" in text_output
     assert "FAIL startup_layer_isolated" in text_output
     assert "FAIL github_actions_check_suites_before_runs" in text_output

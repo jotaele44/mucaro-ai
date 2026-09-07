@@ -5,6 +5,7 @@ import hashlib
 import importlib.metadata
 import json
 import os
+import re
 import subprocess
 import sys
 import tomllib
@@ -796,11 +797,35 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                         f"status={suite.get('status')} conclusion={suite.get('conclusion')} "
                         f"check_runs={suite.get('latest_check_runs_count')} url={suite.get('url')}"
                     )
+        actions_permissions = payload.get("actions_permissions", {})
+        if isinstance(actions_permissions, dict):
+            print(f"actions_permissions_available={actions_permissions.get('available')}")
+            print(f"actions_enabled={actions_permissions.get('enabled')}")
+            print(f"allowed_actions={actions_permissions.get('allowed_actions')}")
+            print(f"sha_pinning_required={actions_permissions.get('sha_pinning_required')}")
+        workflow_permissions = payload.get("workflow_permissions", {})
+        if isinstance(workflow_permissions, dict):
+            print(f"workflow_permissions_available={workflow_permissions.get('available')}")
+            print(f"default_workflow_permissions={workflow_permissions.get('default_workflow_permissions')}")
+            print(f"can_approve_pull_request_reviews={workflow_permissions.get('can_approve_pull_request_reviews')}")
+        billing = payload.get("billing", {})
+        if isinstance(billing, dict):
+            print(f"billing_available={billing.get('available')}")
+            if billing.get("required_scope"):
+                print(f"billing_required_scope={billing.get('required_scope')}")
+            if billing.get("error"):
+                billing_error = str(billing.get("error")).replace("\n", "\\n")
+                print(f"billing_error={billing_error}")
         support_summary = payload.get("support_summary", {})
         if isinstance(support_summary, dict):
             print(f"support_classification={support_summary.get('classification')}")
             print(f"support_ci_run_id={support_summary.get('ci_run_id')}")
             print(f"support_startup_probe_run_id={support_summary.get('startup_probe_run_id')}")
+            print(f"support_actions_enabled={support_summary.get('actions_enabled')}")
+            print(f"support_allowed_actions={support_summary.get('allowed_actions')}")
+            print(f"support_default_workflow_permissions={support_summary.get('default_workflow_permissions')}")
+            if support_summary.get("billing_required_scope"):
+                print(f"support_billing_required_scope={support_summary.get('billing_required_scope')}")
             counts = support_summary.get("check_suite_counts", {})
             if isinstance(counts, dict):
                 print(
@@ -2877,7 +2902,27 @@ def _format_gh_error(output: str) -> str:
     if not message:
         return output
     prefix = f"HTTP {status}: " if status else ""
-    return f"{prefix}{message}"
+    details = []
+    for line in output[_end:].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("gh: "):
+            line = line[4:].strip()
+        duplicate_status = f"{message} (HTTP {status})" if status else message
+        if line in {message, duplicate_status}:
+            continue
+        if line and line not in details:
+            details.append(line)
+    suffix = f"; {'; '.join(details)}" if details else ""
+    return f"{prefix}{message}{suffix}"
+
+
+def _gh_error_required_scope(error: str | None) -> str | None:
+    if not error:
+        return None
+    match = re.search(r'needs the "([^"]+)" scope', error)
+    return match.group(1) if match else None
 
 
 def _redact_remote_url(remote_url: str) -> str:
@@ -3334,6 +3379,8 @@ def _github_actions_support_summary(
     check_suites: dict[str, Any],
     startup_blocker: dict[str, Any],
     branch_protection: dict[str, Any],
+    actions_permissions: dict[str, Any],
+    workflow_permissions: dict[str, Any],
     billing: dict[str, Any],
     next_actions: list[str],
 ) -> dict[str, Any]:
@@ -3354,8 +3401,14 @@ def _github_actions_support_summary(
         "check_suite_counts": _github_actions_check_suite_counts(check_suites),
         "branch_protection_available": branch_protection.get("available"),
         "branch_protection_error": branch_protection.get("error"),
+        "actions_permissions_available": actions_permissions.get("available"),
+        "actions_enabled": actions_permissions.get("enabled"),
+        "allowed_actions": actions_permissions.get("allowed_actions"),
+        "workflow_permissions_available": workflow_permissions.get("available"),
+        "default_workflow_permissions": workflow_permissions.get("default_workflow_permissions"),
         "billing_available": billing.get("available"),
         "billing_error": billing.get("error"),
+        "billing_required_scope": billing.get("required_scope"),
         "suspected_causes": startup_blocker.get("suspected_causes", []),
         "next_actions": next_actions,
     }
@@ -3388,20 +3441,37 @@ def build_github_actions_diagnostic_status(
     checks.append(_certification_gate("github_repo", "PASS", repo))
 
     actions_ok, actions_payload, actions_error = _gh_json(cfg, ["api", f"repos/{repo}/actions/permissions"])
+    actions_permissions: dict[str, Any] = {"available": actions_ok}
     if actions_ok and isinstance(actions_payload, dict):
         enabled = actions_payload.get("enabled") is True
         allowed_actions = actions_payload.get("allowed_actions")
+        actions_permissions.update(
+            {
+                "enabled": enabled,
+                "allowed_actions": allowed_actions,
+                "sha_pinning_required": actions_payload.get("sha_pinning_required"),
+            }
+        )
         checks.append(_certification_gate("actions_enabled", "PASS" if enabled else "FAIL", f"enabled={enabled} allowed_actions={allowed_actions}"))
         if not enabled:
             next_actions.append("Enable GitHub Actions in repository Settings -> Actions -> General.")
     else:
+        actions_permissions["error"] = actions_error
         checks.append(_certification_gate("actions_enabled", "WARN", actions_error or "actions permission lookup failed"))
 
     token_ok, token_payload, token_error = _gh_json(cfg, ["api", f"repos/{repo}/actions/permissions/workflow"])
+    workflow_permissions: dict[str, Any] = {"available": token_ok}
     if token_ok and isinstance(token_payload, dict):
         default_permissions = token_payload.get("default_workflow_permissions")
+        workflow_permissions.update(
+            {
+                "default_workflow_permissions": default_permissions,
+                "can_approve_pull_request_reviews": token_payload.get("can_approve_pull_request_reviews"),
+            }
+        )
         checks.append(_certification_gate("workflow_token_permissions", "PASS", f"default_workflow_permissions={default_permissions}"))
     else:
+        workflow_permissions["error"] = token_error
         checks.append(_certification_gate("workflow_token_permissions", "WARN", token_error or "workflow token permission lookup failed"))
 
     branch_protection: dict[str, Any] = {"available": False}
@@ -3523,9 +3593,18 @@ def build_github_actions_diagnostic_status(
         billing.update(billing_payload)
         checks.append(_certification_gate("actions_billing", "PASS", "billing endpoint readable"))
     else:
+        required_scope = _gh_error_required_scope(billing_error)
         billing["error"] = billing_error
-        checks.append(_certification_gate("actions_billing", "WARN", billing_error or "billing endpoint unavailable"))
-        next_actions.append("Run `gh auth refresh -h github.com -s user` and inspect GitHub Actions billing/minutes.")
+        if required_scope:
+            billing["required_scope"] = required_scope
+        billing_detail = billing_error or "billing endpoint unavailable"
+        if required_scope and f'needs the "{required_scope}" scope' not in billing_detail and f"requires {required_scope} scope" not in billing_detail:
+            billing_detail = f"{billing_detail}; requires {required_scope} scope"
+        checks.append(_certification_gate("actions_billing", "WARN", billing_detail))
+        if required_scope:
+            next_actions.append(f"Run `gh auth refresh -h github.com -s {required_scope}` and inspect GitHub Actions billing/minutes.")
+        else:
+            next_actions.append("Inspect GitHub Actions billing/minutes from account settings.")
 
     startup_blocker = _github_startup_blocker(
         ci_latest=ci_latest,
@@ -3573,6 +3652,8 @@ def build_github_actions_diagnostic_status(
         check_suites=check_suites,
         startup_blocker=startup_blocker,
         branch_protection=branch_protection,
+        actions_permissions=actions_permissions,
+        workflow_permissions=workflow_permissions,
         billing=billing,
         next_actions=next_actions,
     )
@@ -3582,6 +3663,8 @@ def build_github_actions_diagnostic_status(
         "branch": branch if branch_ok else None,
         "head_sha": head_sha if head_ok else None,
         "checks": checks,
+        "actions_permissions": actions_permissions,
+        "workflow_permissions": workflow_permissions,
         "branch_protection": branch_protection,
         "runner_inventory": runner_inventory,
         "check_suites": check_suites,
