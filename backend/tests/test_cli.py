@@ -3828,6 +3828,27 @@ def test_cli_release_handoff_refresh_timeout_stops_before_handoff_artifacts(tmp_
     assert calls == ["refresh:local_release"]
 
 
+def test_release_handoff_refresh_log_preserves_repeated_attempts(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    head_sha = "b" * 40
+    refresh = {
+        "requested": True,
+        "status": "CERTIFICATION_REFRESH_FAILED",
+        "requested_steps": ["fresh_clone"],
+        "timeout_seconds": 1,
+        "steps": [],
+    }
+
+    first = cli.write_release_handoff_refresh_log(cfg, refresh, head_sha)
+    second = cli.write_release_handoff_refresh_log(cfg, refresh, head_sha)
+
+    assert first["path"] != second["path"]
+    assert Path(first["path"]).exists()
+    assert Path(second["path"]).exists()
+    assert Path(first["path"]).name.startswith(f"refresh-{head_sha[:12]}-")
+    assert Path(second["path"]).name.startswith(f"refresh-{head_sha[:12]}-")
+
+
 def test_cli_release_handoff_refresh_failure_stops_before_handoff_artifacts(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     head_sha = "e" * 40

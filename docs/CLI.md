@@ -384,8 +384,9 @@ steps are `local_release`, `python_dist`, `source_artifact`, and `fresh_clone`,
 and selected steps always run in that release order. Add
 `--refresh-timeout-seconds N` to cap each certifier run, where `0` disables the
 timeout. Each refresh attempt writes a JSON log under
-`data/exports/release_refresh_logs`; if that refresh fails or times out, the
-command stops before writing the handoff artifact set.
+`data/exports/release_refresh_logs` with the current head prefix and a UTC
+attempt stamp; if that refresh fails or times out, the command stops before
+writing the handoff artifact set.
 
 Use `mucaro release support-bundle --save` when hosted governance is open and
 the operator needs a single support-ready evidence artifact. The command runs

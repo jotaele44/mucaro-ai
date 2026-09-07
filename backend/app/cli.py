@@ -3249,13 +3249,20 @@ def write_release_handoff_refresh_log(
     refresh: dict[str, Any],
     head_sha: str,
 ) -> dict[str, Any]:
+    created = datetime.now(UTC)
+    created_utc = created.isoformat().replace("+00:00", "Z")
     payload = {
         "schema_version": RELEASE_REFRESH_LOG_SCHEMA_VERSION,
-        "created_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "created_utc": created_utc,
         "head_sha": head_sha,
         "refresh": refresh,
     }
-    path = cfg.project_root / RELEASE_REFRESH_LOG_DIR / f"refresh-{head_sha[:12]}.json"
+    stamp = created.strftime("%Y%m%dT%H%M%S%fZ")
+    path = cfg.project_root / RELEASE_REFRESH_LOG_DIR / f"refresh-{head_sha[:12]}-{stamp}.json"
+    counter = 1
+    while path.exists():
+        path = cfg.project_root / RELEASE_REFRESH_LOG_DIR / f"refresh-{head_sha[:12]}-{stamp}-{counter}.json"
+        counter += 1
     path.parent.mkdir(parents=True, exist_ok=True)
     encoded = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
     path.write_bytes(encoded)

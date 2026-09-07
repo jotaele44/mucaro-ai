@@ -221,8 +221,8 @@ Observed success markers:
   fails. Repeated `--refresh-step` values select a canonical subset in release
   order and imply certification refresh. `--refresh-timeout-seconds N` applies
   a per-certifier timeout. Every refresh attempt writes a JSON log under
-  `data/exports/release_refresh_logs` so failed or timed-out pre-handoff runs
-  remain auditable.
+  `data/exports/release_refresh_logs` using the current head prefix and a UTC
+  attempt stamp, so failed or timed-out pre-handoff runs remain auditable.
 - `mucaro audit completion --include-github` composes product-audit,
   release-state, release-dashboard, package, receipt, and hosted-governance
   evidence into one active-goal matrix. It reports PASS, OPEN, BLOCKED, FAIL,
