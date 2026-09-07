@@ -41,6 +41,7 @@ RETRIEVAL_QUALITY_CASES = [
             "min_distractor_free_rate": 1.00,
             "min_category_recall": 1.00,
             "min_category_binding_recall": 1.00,
+            "min_source_formats": 0,
         },
     ),
     RetrievalQualityCase(
@@ -58,6 +59,7 @@ RETRIEVAL_QUALITY_CASES = [
             "min_distractor_free_rate": 1.00,
             "min_category_recall": 1.00,
             "min_category_binding_recall": 0.80,
+            "min_source_formats": 0,
         },
     ),
     RetrievalQualityCase(
@@ -75,6 +77,7 @@ RETRIEVAL_QUALITY_CASES = [
             "min_distractor_free_rate": 1.00,
             "min_category_recall": 1.00,
             "min_category_binding_recall": 1.00,
+            "min_source_formats": 13,
         },
     ),
 ]
@@ -118,6 +121,7 @@ def build_retrieval_quality_certification(
             "counts": report.get("counts"),
             "category_threshold_failures": report.get("category_threshold_failures", []),
             "distractor_threshold_failures": report.get("distractor_threshold_failures", []),
+            "source_format_threshold_failures": report.get("source_format_threshold_failures", []),
             "report": report,
         }
         case_reports.append(case_report)
@@ -129,6 +133,7 @@ def build_retrieval_quality_certification(
                     "status": report["status"],
                     "category_threshold_failures": report.get("category_threshold_failures", []),
                     "distractor_threshold_failures": report.get("distractor_threshold_failures", []),
+                    "source_format_threshold_failures": report.get("source_format_threshold_failures", []),
                 }
             )
 
@@ -193,7 +198,8 @@ def format_retrieval_quality_certification_text(report: dict[str, Any]) -> list[
             f"min_category_binding_recall={thresholds.get('min_category_binding_recall')} "
             f"min_expected_binding_recall={thresholds.get('min_expected_binding_recall')} "
             f"min_multi_binding_full_hit={thresholds.get('min_multi_binding_full_hit')} "
-            f"min_distractor_free_rate={thresholds.get('min_distractor_free_rate')}"
+            f"min_distractor_free_rate={thresholds.get('min_distractor_free_rate')} "
+            f"min_source_formats={thresholds.get('min_source_formats')}"
         )
         for failure in case.get("category_threshold_failures", []):
             if isinstance(failure, dict):
@@ -210,6 +216,13 @@ def format_retrieval_quality_certification_text(report: dict[str, Any]) -> list[
                     f"strategy={failure.get('strategy')} "
                     f"distractor_free={failure.get('distractor_free_rate')} "
                     f"distractor_hits={failure.get('distractor_hits')}"
+                )
+        for failure in case.get("source_format_threshold_failures", []):
+            if isinstance(failure, dict):
+                lines.append(
+                    f"source_format_threshold_failure case={case.get('name')} "
+                    f"source_formats={failure.get('source_formats')} "
+                    f"min_source_formats={failure.get('min_source_formats')}"
                 )
     if report.get("receipt_error"):
         lines.append(f"receipt_error={report.get('receipt_error')}")

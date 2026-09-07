@@ -29,6 +29,16 @@ def parse_top_k(value: str) -> int:
     return top_k
 
 
+def parse_non_negative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("NON_NEGATIVE_INTEGER_REQUIRED") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("NON_NEGATIVE_INTEGER_REQUIRED")
+    return parsed
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Evaluate deterministic retrieval strategies against the committed fixture.")
     parser.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE)
@@ -44,6 +54,7 @@ def main() -> int:
     parser.add_argument("--min-distractor-free-rate", type=float, default=1.00)
     parser.add_argument("--min-category-recall", type=float, default=0.0)
     parser.add_argument("--min-category-binding-recall", type=float, default=0.0)
+    parser.add_argument("--min-source-formats", type=parse_non_negative_int, default=0)
     parser.add_argument("--format", choices=["text", "json"], default="text")
     args = parser.parse_args()
 
@@ -61,6 +72,7 @@ def main() -> int:
         min_distractor_free_rate=args.min_distractor_free_rate,
         min_category_recall=args.min_category_recall,
         min_category_binding_recall=args.min_category_binding_recall,
+        min_source_formats=args.min_source_formats,
     )
     if args.format == "json":
         print(json.dumps(report, indent=2, ensure_ascii=False))

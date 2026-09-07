@@ -472,7 +472,9 @@ wrong-but-related distractor chunk outranks the expected binding at top-1.
 Hybrid and semantic retrieval also have dedicated precision thresholds. Use
 `--min-category-recall` and `--min-category-binding-recall` to promote
 per-category positive-query metrics into hard gates once the category
-expectations are release-ready. It returns
+expectations are release-ready. Use `--min-source-formats` to require a minimum
+number of distinct `source_format` values in the fixture, which is useful when
+mixed-format coverage itself is part of the release claim. It returns
 `RETRIEVAL_EVAL_INVALID` for malformed benchmark fixtures and
 `RETRIEVAL_EVAL_FAILED` when configured thresholds are not met, so release
 automation can fail on invalid or regressed retrieval evidence.
@@ -483,7 +485,10 @@ the default fixture with strict category binding recall and the larger fixture
 with calibrated multi-binding category recall. It also runs a mixed-format
 fixture with strict category binding recall across TXT, Markdown, HTML, DOCX,
 EML, MSG text probing, CSV, JSON, PDF, metadata-only media, traceability, and multi-format
-queries, including explicit decoy chunks for distractor top-1 avoidance. It writes a
+queries, including explicit decoy chunks for distractor top-1 avoidance. The
+mixed-format case also requires the full committed 13-format fixture spread via
+`min_source_formats=13`, so format coverage cannot silently narrow while scores
+stay green. It writes a
 `retrieval_quality` receipt under `data/exports/release_receipts`, records the
 profile, exact `HEAD`, thresholds, fixture counts, category threshold failures,
 and full eval reports, and returns `RETRIEVAL_QUALITY_CERT_OK` only when every

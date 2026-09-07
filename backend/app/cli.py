@@ -158,6 +158,16 @@ def parse_top_k(value: str) -> int:
     return top_k
 
 
+def parse_non_negative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("NON_NEGATIVE_INTEGER_REQUIRED") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("NON_NEGATIVE_INTEGER_REQUIRED")
+    return parsed
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mucaro",
@@ -256,6 +266,7 @@ def build_parser() -> argparse.ArgumentParser:
     eval_retrieval.add_argument("--min-multi-binding-full-hit", type=float, default=0.60, help="Minimum multi-binding full-hit rate required for every retrieval strategy.")
     eval_retrieval.add_argument("--min-distractor-free-rate", type=float, default=1.00, help="Minimum distractor-free query rate required for every retrieval strategy.")
     eval_retrieval.add_argument("--min-category-recall", type=float, default=0.0, help="Optional minimum recall@k required for every positive-query category.")
+    eval_retrieval.add_argument("--min-source-formats", type=parse_non_negative_int, default=0, help="Optional minimum distinct source_format values required by the fixture.")
     eval_retrieval.add_argument(
         "--min-category-binding-recall",
         type=float,
@@ -1059,6 +1070,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"min_distractor_free_rate={payload.get('min_distractor_free_rate')}")
         print(f"min_category_recall={payload.get('min_category_recall')}")
         print(f"min_category_binding_recall={payload.get('min_category_binding_recall')}")
+        print(f"min_source_formats={payload.get('min_source_formats')}")
         for line in format_retrieval_eval_text(payload)[:-1]:
             print(line)
     elif status in {"RETRIEVAL_QUALITY_CERT_OK", "RETRIEVAL_QUALITY_CERT_FAILED"}:
@@ -1846,6 +1858,7 @@ def run_eval_retrieval(args: argparse.Namespace, cfg: Settings) -> int:
         min_distractor_free_rate=args.min_distractor_free_rate,
         min_category_recall=args.min_category_recall,
         min_category_binding_recall=args.min_category_binding_recall,
+        min_source_formats=args.min_source_formats,
     )
     emit_payload(report, args.format)
     return 0 if report["status"] == "RETRIEVAL_EVAL_OK" else 2

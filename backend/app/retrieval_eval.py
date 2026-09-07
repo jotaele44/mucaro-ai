@@ -494,7 +494,10 @@ def build_retrieval_eval_report(
     min_distractor_free_rate: float = 1.00,
     min_category_recall: float = 0.0,
     min_category_binding_recall: float = 0.0,
+    min_source_formats: int = 0,
 ) -> dict[str, Any]:
+    if min_source_formats < 0:
+        raise ValueError("MIN_SOURCE_FORMATS_MUST_BE_NON_NEGATIVE")
     fixture = load_retrieval_eval_fixture(fixture_path)
     fixture_validation = validate_retrieval_eval_fixture(fixture)
     if fixture_validation["status"] != "RETRIEVAL_FIXTURE_OK":
@@ -516,8 +519,10 @@ def build_retrieval_eval_report(
             "min_distractor_free_rate": min_distractor_free_rate,
             "min_category_recall": min_category_recall,
             "min_category_binding_recall": min_category_binding_recall,
+            "min_source_formats": min_source_formats,
             "category_threshold_failures": [],
             "distractor_threshold_failures": [],
+            "source_format_threshold_failures": [],
         }
     report: dict[str, Any] = {
         "fixture": str(fixture_path.relative_to(ROOT) if fixture_path.is_relative_to(ROOT) else fixture_path),
@@ -537,6 +542,7 @@ def build_retrieval_eval_report(
         "min_distractor_free_rate": min_distractor_free_rate,
         "min_category_recall": min_category_recall,
         "min_category_binding_recall": min_category_binding_recall,
+        "min_source_formats": min_source_formats,
         "fixture_validation": fixture_validation,
     }
     by_strategy = {item["strategy"]: item for item in report["strategies"]}
@@ -567,6 +573,15 @@ def build_retrieval_eval_report(
         for strategy in report["strategies"]
         if strategy["distractor_queries"] > 0 and strategy["distractor_free_rate"] < min_distractor_free_rate
     ]
+    source_format_threshold_failures = []
+    source_format_count = fixture_validation["counts"]["source_formats"]
+    if source_format_count < min_source_formats:
+        source_format_threshold_failures.append(
+            {
+                "source_formats": source_format_count,
+                "min_source_formats": min_source_formats,
+            }
+        )
     passed = (
         hybrid["recall_at_k"] >= min_hybrid_recall
         and hybrid["context_precision_at_k"] >= min_hybrid_precision
@@ -578,10 +593,12 @@ def build_retrieval_eval_report(
         and semantic["no_context_accuracy"] >= min_semantic_no_context
         and not category_threshold_failures
         and not distractor_threshold_failures
+        and not source_format_threshold_failures
     )
     report["status"] = "RETRIEVAL_EVAL_OK" if passed else "RETRIEVAL_EVAL_FAILED"
     report["category_threshold_failures"] = category_threshold_failures
     report["distractor_threshold_failures"] = distractor_threshold_failures
+    report["source_format_threshold_failures"] = source_format_threshold_failures
     report["counts"] = {
         "chunks": len(fixture.get("chunks", [])),
         "queries": len(fixture.get("queries", [])),
@@ -644,6 +661,13 @@ def format_retrieval_eval_text(report: dict[str, Any]) -> list[str]:
                 f"distractor_threshold_failure strategy={failure.get('strategy')} "
                 f"distractor_free={failure.get('distractor_free_rate')} "
                 f"distractor_hits={failure.get('distractor_hits')}"
+            )
+    for failure in report.get("source_format_threshold_failures", []):
+        if isinstance(failure, dict):
+            lines.append(
+                f"source_format_threshold_failure "
+                f"source_formats={failure.get('source_formats')} "
+                f"min_source_formats={failure.get('min_source_formats')}"
             )
     lines.append(str(report.get("status")))
     return lines

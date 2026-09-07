@@ -4,11 +4,14 @@ import subprocess
 import zipfile
 from pathlib import Path
 
+import pytest
+
 import backend.app.cli as cli
 import backend.app.packaging as packaging
 from backend.app.cli import main
 from backend.app.config import Settings
 from backend.app.release_receipts import write_release_receipt
+from backend.app.retrieval_eval import build_retrieval_eval_report
 
 
 def make_settings(root: Path, *, operator_token: str | None = None) -> Settings:
@@ -269,6 +272,7 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
         "strategies": 6,
     }
     assert payload["fixture_validation"]["status"] == "RETRIEVAL_FIXTURE_OK"
+    assert payload["min_source_formats"] == 0
     assert payload["min_category_recall"] == 0.0
     assert payload["min_category_binding_recall"] == 0.0
     assert payload["category_threshold_failures"] == []
@@ -331,6 +335,7 @@ def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):
     assert "min_distractor_free_rate=1.0" in text_output
     assert "min_category_recall=0.0" in text_output
     assert "min_category_binding_recall=0.0" in text_output
+    assert "min_source_formats=0" in text_output
     assert "binding_recall=1.00" in text_output
     assert "precision=0.29" in text_output
     assert "multi_full=1.00" in text_output
@@ -362,6 +367,7 @@ def test_cli_eval_retrieval_reports_mixed_format_quality_metrics(tmp_path: Path,
         "strategies": 6,
     }
     assert payload["fixture_validation"]["status"] == "RETRIEVAL_FIXTURE_OK"
+    assert payload["min_source_formats"] == 0
     hybrid = next(strategy for strategy in payload["strategies"] if strategy["strategy"] == "hybrid")
     assert hybrid["expected_binding_recall_at_k"] == 1.0
     assert hybrid["context_precision_at_k"] == 0.2378
@@ -404,11 +410,65 @@ def test_cli_eval_retrieval_reports_mixed_format_quality_metrics(tmp_path: Path,
     assert "distractor_bindings=3" in text_output
     assert "distractor_queries=3" in text_output
     assert "source_formats=13" in text_output
+    assert "min_source_formats=0" in text_output
     assert "query_categories=13" in text_output
     assert "hybrid category=csv queries=2 positives=2 recall@5=1.00" in text_output
     assert "hybrid category=html queries=3 positives=3 recall@5=1.00" in text_output
     assert "hybrid category=media queries=3 positives=3 recall@5=1.00" in text_output
     assert "RETRIEVAL_EVAL_OK" in text_output
+
+
+def test_cli_eval_retrieval_fails_when_source_format_threshold_is_not_met(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert (
+        main(
+            [
+                "eval",
+                "retrieval",
+                "--fixture",
+                "backend/tests/fixtures/retrieval_eval_mixed_formats.json",
+                "--min-source-formats",
+                "14",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RETRIEVAL_EVAL_FAILED"
+    assert payload["min_source_formats"] == 14
+    assert payload["source_format_threshold_failures"] == [
+        {"source_formats": 13, "min_source_formats": 14}
+    ]
+
+    assert (
+        main(
+            [
+                "eval",
+                "retrieval",
+                "--fixture",
+                "backend/tests/fixtures/retrieval_eval_mixed_formats.json",
+                "--min-source-formats",
+                "14",
+                "--format",
+                "text",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    text_output = capsys.readouterr().out
+    assert "min_source_formats=14" in text_output
+    assert "source_format_threshold_failure source_formats=13 min_source_formats=14" in text_output
+    assert "RETRIEVAL_EVAL_FAILED" in text_output
+
+
+def test_retrieval_eval_rejects_negative_source_format_threshold():
+    with pytest.raises(ValueError, match="MIN_SOURCE_FORMATS_MUST_BE_NON_NEGATIVE"):
+        build_retrieval_eval_report(min_source_formats=-1)
 
 
 def test_cli_eval_retrieval_fails_when_category_thresholds_are_not_met(tmp_path: Path, capsys):
@@ -650,6 +710,11 @@ def test_cli_certify_retrieval_quality_writes_exact_head_receipt(tmp_path: Path,
         "large_fixture_calibrated_multi_binding",
         "mixed_format_fixture_strict_binding",
     ]
+    cases = {case["name"]: case for case in payload["cases"]}
+    assert cases["default_fixture_strict_category_binding"]["thresholds"]["min_source_formats"] == 0
+    assert cases["large_fixture_calibrated_multi_binding"]["thresholds"]["min_source_formats"] == 0
+    assert cases["mixed_format_fixture_strict_binding"]["thresholds"]["min_source_formats"] == 13
+    assert cases["mixed_format_fixture_strict_binding"]["counts"]["source_formats"] == 13
     assert payload["failed_cases"] == []
 
     receipt_path = tmp_path / payload["receipt"]
@@ -668,6 +733,7 @@ def test_cli_certify_retrieval_quality_writes_exact_head_receipt(tmp_path: Path,
     assert "min_category_binding_recall=0.8" in text_output
     assert "min_category_binding_recall=1.0" in text_output
     assert "min_distractor_free_rate=1.0" in text_output
+    assert "min_source_formats=13" in text_output
 
 
 def test_cli_eval_answer_trace_reports_traceability_metrics(tmp_path: Path, capsys):
