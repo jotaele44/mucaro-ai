@@ -1950,6 +1950,7 @@ def test_cli_release_support_bundle_saves_and_verifies_support_artifact(tmp_path
 
     monkeypatch.setattr(cli, "build_release_dashboard_report", fake_dashboard)
     monkeypatch.setattr(cli, "_command_output", fake_command_output)
+    write_dashboard_governance_report_fixture(tmp_path, head_sha)
 
     output_path = tmp_path / "data" / "exports" / "support_bundles" / "support.json"
     assert main(["release", "support-bundle", "--save", "--output", str(output_path), "--format", "json"], cfg=cfg) == 0
@@ -1993,6 +1994,75 @@ def test_cli_release_support_bundle_saves_and_verifies_support_artifact(tmp_path
     assert "SUPPORT_BUNDLE_VERIFIED" in text_output
     assert "case_status=HOSTED_GOVERNANCE_OPEN" in text_output
     assert "support_classification=HOSTED_STARTUP_BEFORE_JOBS" in text_output
+
+
+def test_cli_release_support_bundle_save_creates_missing_governance_report(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "9" * 40
+    governance_path = tmp_path / "data" / "exports" / "governance_reports" / f"governance-report-{head_sha[:12]}.json"
+
+    def fake_governance_report(
+        _cfg: Settings,
+        *,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        assert github_workflow == "CI"
+        assert probe_workflow == "CI Startup Probe"
+        return {
+            "status": "GOVERNANCE_REPORT_OPEN",
+            "current_state": "GITHUB_GOVERNANCE_OPEN",
+            "head_sha": head_sha,
+            "current_head_receipts_summary": {"total": 7, "valid": 7, "invalid": 0},
+            "startup_blocker": {"status": "FAIL"},
+        }
+
+    def fake_dashboard(
+        _cfg: Settings,
+        *,
+        include_github: bool = False,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        assert include_github is True
+        assert github_workflow == "CI"
+        assert probe_workflow == "CI Startup Probe"
+        assert governance_path.exists()
+        return {
+            "status": "RELEASE_DASHBOARD_OPEN",
+            "head_sha": head_sha,
+            "hosted_governance_status": "OPEN",
+            "github_actions_status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+            "github_actions": {
+                "status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+                "startup_blocker": {"status": "FAIL"},
+                "support_summary": {"classification": "HOSTED_STARTUP_BEFORE_JOBS"},
+                "next_actions": ["Inspect Actions runners."],
+            },
+            "blockers": ["github_actions=OPEN:GITHUB_ACTIONS_DIAGNOSTIC_FAIL"],
+        }
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "build_release_governance_report", fake_governance_report)
+    monkeypatch.setattr(cli, "build_release_dashboard_report", fake_dashboard)
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    output_path = tmp_path / "data" / "exports" / "support_bundles" / "support.json"
+    assert main(["release", "support-bundle", "--save", "--output", str(output_path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+    saved_governance = json.loads(governance_path.read_text(encoding="utf-8"))
+
+    assert payload["status"] == "SUPPORT_BUNDLE_READY"
+    assert payload["governance_report"]["status"] == "GOVERNANCE_REPORT_READY_FOR_SUPPORT"
+    assert payload["governance_report"]["created"] is True
+    assert checks["governance_report_ready"]["status"] == "PASS"
+    assert saved_governance["schema_version"] == "mucaro_governance_report_v1"
+    assert saved_governance["report"]["head_sha"] == head_sha
 
 
 def test_cli_release_support_bundle_verify_fails_current_head_mismatch(tmp_path: Path, capsys, monkeypatch):

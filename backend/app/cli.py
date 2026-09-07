@@ -2008,6 +2008,67 @@ def write_release_governance_report(
     }
 
 
+def ensure_release_governance_report_for_support_bundle(
+    cfg: Settings,
+    *,
+    github_workflow: str = "CI",
+    probe_workflow: str = "CI Startup Probe",
+) -> dict[str, Any]:
+    head_ok, head_sha = _git_output(cfg, ["rev-parse", "HEAD"])
+    if not head_ok or not _is_hex_sha(head_sha):
+        return {
+            "status": "GOVERNANCE_REPORT_ENSURE_FAILED",
+            "path": None,
+            "created": False,
+            "checks": [
+                _certification_gate(
+                    "current_head",
+                    "FAIL",
+                    head_sha if head_ok else head_sha or "unavailable",
+                )
+            ],
+        }
+
+    path = _expected_handoff_path(cfg.project_root, GOVERNANCE_REPORT_DIR, "governance-report", head_sha)
+    existing = verify_release_governance_report(cfg, path, require_current_head=True)
+    if existing.get("status") == "GOVERNANCE_REPORT_VERIFIED":
+        return {
+            "status": "GOVERNANCE_REPORT_READY_FOR_SUPPORT",
+            "path": str(path),
+            "created": False,
+            "verification": existing,
+            "checks": [_certification_gate("governance_report", "PASS", f"verified {path}")],
+        }
+
+    report = build_release_governance_report(
+        cfg,
+        github_workflow=github_workflow,
+        probe_workflow=probe_workflow,
+    )
+    export = write_release_governance_report(cfg, report)
+    verification = verify_release_governance_report(
+        cfg,
+        Path(str(export["path"])),
+        require_current_head=True,
+        expected_sha256=str(export["sha256"]),
+    )
+    verified = verification.get("status") == "GOVERNANCE_REPORT_VERIFIED"
+    return {
+        "status": "GOVERNANCE_REPORT_READY_FOR_SUPPORT" if verified else "GOVERNANCE_REPORT_ENSURE_FAILED",
+        "path": str(export["path"]),
+        "created": True,
+        "export": export,
+        "verification": verification,
+        "checks": [
+            _certification_gate(
+                "governance_report",
+                "PASS" if verified else "FAIL",
+                f"{verification.get('status')} {export['path']}",
+            )
+        ],
+    }
+
+
 def _parse_utc_timestamp(value: Any) -> tuple[bool, str]:
     if not isinstance(value, str) or not value:
         return False, "missing created_utc"
@@ -3395,6 +3456,14 @@ def build_release_support_bundle(
     output_path: Path | None = None,
     save: bool = False,
 ) -> dict[str, Any]:
+    governance_report = None
+    if save or output_path is not None:
+        governance_report = ensure_release_governance_report_for_support_bundle(
+            cfg,
+            github_workflow=github_workflow,
+            probe_workflow=probe_workflow,
+        )
+
     dashboard = build_release_dashboard_report(
         cfg,
         include_github=True,
@@ -3428,6 +3497,16 @@ def build_release_support_bundle(
             str(support_summary.get("classification") or "missing"),
         ),
     ]
+    if governance_report is not None:
+        checks.append(
+            _certification_gate(
+                "governance_report_ready",
+                "PASS"
+                if governance_report.get("status") == "GOVERNANCE_REPORT_READY_FOR_SUPPORT"
+                else "FAIL",
+                str(governance_report.get("status")),
+            )
+        )
     failed = [check for check in checks if check.get("status") == "FAIL"]
     case_status = (
         "HOSTED_GOVERNANCE_OPEN"
@@ -3456,6 +3535,7 @@ def build_release_support_bundle(
         "github_actions_status": github_actions.get("status"),
         "startup_blocker": startup_blocker,
         "support_summary": support_summary,
+        "governance_report": governance_report,
         "dashboard": dashboard,
         "checks": checks,
         "blockers": dashboard.get("blockers", []),

@@ -220,7 +220,9 @@ Observed success markers:
   for hosted governance escalation. It captures the release dashboard, GitHub
   diagnostic status, support classification, startup blocker, blockers,
   reproduction commands, and next actions without claiming the hosted blocker is
-  resolved.
+  resolved. When saving, it first verifies the matching current-head governance
+  report and creates it if needed, keeping the support artifact path
+  restartable instead of order-dependent.
 - `mucaro audit completion --include-github` reports `COMPLETION_AUDIT_OPEN`
   with the hosted-governance row open until GitHub runner admission, billing
   visibility, and branch protection are proven for the current head.

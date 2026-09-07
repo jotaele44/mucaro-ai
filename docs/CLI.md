@@ -370,10 +370,13 @@ the operator needs a single support-ready evidence artifact. The command runs
 the release dashboard with live GitHub diagnostics, records the support
 classification, startup blocker, dashboard payload, blockers, reproduction
 commands, and next actions, then writes a JSON bundle under
-`data/exports/support_bundles`. Use `--verify PATH` to validate a saved support
-bundle without rerunning live GitHub diagnostics. Add `--expected-sha256 SHA256`
-to pin the bundle bytes and `--require-current-head` when the bundle must bind
-to the current checkout.
+`data/exports/support_bundles`. Before saving the bundle, it verifies the
+matching current-head governance report under `data/exports/governance_reports`
+and creates it when it is missing or stale, so a support bundle can be generated
+directly without first running a separate governance-report save command. Use
+`--verify PATH` to validate a saved support bundle without rerunning live GitHub
+diagnostics. Add `--expected-sha256 SHA256` to pin the bundle bytes and
+`--require-current-head` when the bundle must bind to the current checkout.
 
 Use `mucaro release governance-report` to build a single current-head handoff
 payload for governed release work. The report combines release-state
