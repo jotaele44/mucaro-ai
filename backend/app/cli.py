@@ -640,6 +640,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     release_hosted_governance.set_defaults(handler=run_release_hosted_governance)
 
+    release_next_actions = release_subcommands.add_parser(
+        "next-actions",
+        help="Print the prioritized release runbook for the current head.",
+    )
+    release_next_actions.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_next_actions.add_argument("--strict", action="store_true", help="Exit nonzero until no release actions remain open.")
+    release_next_actions.add_argument(
+        "--github-workflow",
+        default="CI",
+        help="Primary GitHub Actions workflow name to inspect.",
+    )
+    release_next_actions.add_argument(
+        "--probe-workflow",
+        default="CI Startup Probe",
+        help="Manual-only startup probe workflow name to inspect.",
+    )
+    release_next_actions.set_defaults(handler=run_release_next_actions)
+
     release_support_bundle = release_subcommands.add_parser(
         "support-bundle",
         help="Build or verify a support-ready release evidence bundle.",
@@ -904,6 +922,38 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 )
         for action in payload.get("next_actions", []):
             print(f"next_action={action}")
+    elif status in {"RELEASE_NEXT_ACTIONS_READY", "RELEASE_NEXT_ACTIONS_OPEN"}:
+        print(f"project_root={payload.get('project_root')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        print(f"tag_at_head={','.join(payload.get('tag_at_head', []))}")
+        print(f"release_dashboard_status={payload.get('release_dashboard_status')}")
+        print(f"release_state_status={payload.get('release_state_status')}")
+        print(f"github_actions_status={payload.get('github_actions_status')}")
+        print(f"hosted_governance_status={payload.get('hosted_governance_status')}")
+        print(f"support_classification={payload.get('support_classification')}")
+        print(f"ci_run_id={payload.get('ci_run_id')}")
+        print(f"startup_probe_run_id={payload.get('startup_probe_run_id')}")
+        counts = payload.get("counts", {})
+        if isinstance(counts, dict):
+            print(
+                "counts="
+                f"open:{counts.get('open')} "
+                f"total:{counts.get('total')}"
+            )
+        artifacts = payload.get("artifact_paths", {})
+        if isinstance(artifacts, dict):
+            for artifact_id in ["distribution_manifest", "governance_report", "support_bundle"]:
+                print(f"artifact_{artifact_id}={artifacts.get(artifact_id)}")
+        for command in payload.get("verification_commands", []):
+            print(f"verify_command={command}")
+        for action in payload.get("actions", []):
+            if isinstance(action, dict):
+                evidence = str(action.get("evidence")).replace("\n", "\\n")
+                print(
+                    f"{action.get('status')} priority={action.get('priority')} "
+                    f"action={action.get('action_id')} owner={action.get('owner')} "
+                    f"evidence={evidence} command={action.get('command')}"
+                )
     elif status in {"RETRIEVAL_EVAL_OK", "RETRIEVAL_EVAL_FAILED"}:
         print(f"fixture={payload.get('fixture')}")
         counts = payload.get("counts", {})
@@ -2460,6 +2510,156 @@ def run_release_hosted_governance(args: argparse.Namespace, cfg: Settings) -> in
     )
     emit_payload(report, args.format)
     if report["status"] == "HOSTED_GOVERNANCE_READY":
+        return 0
+    return 2 if args.strict else 0
+
+
+_NEXT_ACTION_PRIORITIES = {
+    "local_release_evidence": 5,
+    "billing_visibility": 10,
+    "actions_repository_policy": 20,
+    "workflow_token_policy": 30,
+    "branch_protection": 40,
+    "ci_run_admission": 50,
+    "startup_probe_admission": 60,
+    "check_suite_admission": 70,
+    "ci_workflow_registration": 80,
+    "startup_probe_registration": 90,
+    "support_bundle": 100,
+}
+
+
+_NEXT_ACTION_REASONS = {
+    "local_release_evidence": "The release dashboard must be open or ready before hosted remediation can be treated as the only remaining lane.",
+    "actions_repository_policy": "Repository Actions policy must allow workflows before hosted CI can be trusted.",
+    "workflow_token_policy": "Workflow token permissions must be visible and acceptable for release governance.",
+    "ci_workflow_registration": "The primary CI workflow must be registered before run admission can be proven.",
+    "startup_probe_registration": "The startup probe must be registered to isolate hosted runner startup from project code.",
+    "ci_run_admission": "The current-head CI run must create jobs and finish successfully before hosted governance can pass.",
+    "startup_probe_admission": "The startup probe must create jobs so startup failures are not mistaken for project test failures.",
+    "check_suite_admission": "GitHub check suites must expose check runs for current-head workflow evidence.",
+    "billing_visibility": "Billing visibility is needed to adjudicate hosted startup failures before jobs.",
+    "branch_protection": "Branch-protection status must be visible before the governed release lane can be certified.",
+    "support_bundle": "A current support bundle preserves exact evidence for GitHub or account-policy escalation.",
+}
+
+
+def _release_next_action_from_step(step: dict[str, Any]) -> dict[str, Any]:
+    step_id = str(step.get("step_id") or "unknown_step")
+    return {
+        "action_id": step_id,
+        "priority": _NEXT_ACTION_PRIORITIES.get(step_id, 999),
+        "status": str(step.get("status") or "UNVERIFIED"),
+        "owner": str(step.get("owner") or "operator"),
+        "reason": _NEXT_ACTION_REASONS.get(step_id, "This hosted governance step is not yet passing."),
+        "evidence": str(step.get("evidence") or ""),
+        "command": str(step.get("command") or ""),
+    }
+
+
+def build_release_next_actions_report(
+    cfg: Settings,
+    *,
+    github_workflow: str = "CI",
+    probe_workflow: str = "CI Startup Probe",
+) -> dict[str, Any]:
+    hosted = build_release_hosted_governance_report(
+        cfg,
+        github_workflow=github_workflow,
+        probe_workflow=probe_workflow,
+    )
+    head_sha = str(hosted.get("head_sha") or "")
+    head_prefix = head_sha[:12]
+    artifact_paths = {
+        "distribution_manifest": str(cfg.project_root / DISTRIBUTION_MANIFEST_DIR / f"distribution-manifest-{head_prefix}.json")
+        if head_prefix
+        else None,
+        "governance_report": str(cfg.project_root / GOVERNANCE_REPORT_DIR / f"governance-report-{head_prefix}.json")
+        if head_prefix
+        else None,
+        "support_bundle": hosted.get("support_bundle", {}).get("path")
+        if isinstance(hosted.get("support_bundle"), dict)
+        else None,
+    }
+    verification_commands = [
+        "mucaro release receipts --current-head --format text",
+        "mucaro release dashboard --include-github --format text",
+        "mucaro release hosted-governance --format text",
+        "mucaro audit completion --include-github --format text",
+    ]
+    if artifact_paths["distribution_manifest"]:
+        verification_commands.append(
+            f"mucaro package distribution-manifest --verify {artifact_paths['distribution_manifest']} "
+            "--require-current-head --format text"
+        )
+    if artifact_paths["governance_report"]:
+        verification_commands.append(
+            f"mucaro release governance-report --verify {artifact_paths['governance_report']} "
+            "--require-current-head --format text"
+        )
+    if artifact_paths["support_bundle"]:
+        verification_commands.append(
+            f"mucaro release support-bundle --verify {artifact_paths['support_bundle']} "
+            "--require-current-head --format text"
+        )
+
+    actions = [
+        _release_next_action_from_step(step)
+        for step in hosted.get("steps", [])
+        if isinstance(step, dict) and step.get("status") != "PASS"
+    ]
+    if hosted.get("release_dashboard_status") == "RELEASE_DASHBOARD_FAIL":
+        actions.append(
+            {
+                "action_id": "local_release_evidence",
+                "priority": _NEXT_ACTION_PRIORITIES["local_release_evidence"],
+                "status": "OPEN",
+                "owner": "operator",
+                "reason": _NEXT_ACTION_REASONS["local_release_evidence"],
+                "evidence": "release_dashboard_status=RELEASE_DASHBOARD_FAIL",
+                "command": "mucaro release dashboard --include-github --format text",
+            }
+        )
+    actions.sort(key=lambda action: (int(action["priority"]), str(action["action_id"])))
+    counts = {
+        "open": len(actions),
+        "total": len(actions),
+    }
+    status = (
+        "RELEASE_NEXT_ACTIONS_READY"
+        if hosted.get("status") == "HOSTED_GOVERNANCE_READY" and not actions
+        else "RELEASE_NEXT_ACTIONS_OPEN"
+    )
+    return {
+        "status": status,
+        "version": package_version(),
+        "project_root": str(cfg.project_root),
+        "head_sha": head_sha,
+        "tag_at_head": hosted.get("tag_at_head", []),
+        "hosted_governance_status": hosted.get("hosted_governance_status"),
+        "release_dashboard_status": hosted.get("release_dashboard_status"),
+        "release_state_status": hosted.get("release_state_status"),
+        "github_actions_status": hosted.get("github_actions_status"),
+        "support_classification": hosted.get("support_classification"),
+        "ci_run_id": hosted.get("ci_run_id"),
+        "startup_probe_run_id": hosted.get("startup_probe_run_id"),
+        "ci_jobs_count": hosted.get("ci_jobs_count"),
+        "startup_probe_jobs_count": hosted.get("startup_probe_jobs_count"),
+        "artifact_paths": artifact_paths,
+        "verification_commands": verification_commands,
+        "actions": actions,
+        "counts": counts,
+    }
+
+
+def run_release_next_actions(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_release_next_actions_report(
+        cfg,
+        github_workflow=args.github_workflow,
+        probe_workflow=args.probe_workflow,
+    )
+    emit_payload(report, args.format)
+    if report["status"] == "RELEASE_NEXT_ACTIONS_READY":
         return 0
     return 2 if args.strict else 0
 

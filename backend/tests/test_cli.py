@@ -2825,6 +2825,164 @@ def test_cli_release_hosted_governance_ready_when_dashboard_and_steps_pass(tmp_p
     assert payload["counts"] == {"pass": 10, "open": 0, "blocked": 0, "fail": 0, "unverified": 0, "total": 10}
 
 
+def test_cli_release_next_actions_prioritizes_open_operator_runbook(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "f" * 40
+    support_path = tmp_path / "data" / "exports" / "support_bundles" / f"support-bundle-{head_sha[:12]}.json"
+
+    def fake_hosted(
+        _cfg: Settings,
+        *,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        assert github_workflow == "CI"
+        assert probe_workflow == "CI Startup Probe"
+        return {
+            "status": "HOSTED_GOVERNANCE_OPEN",
+            "project_root": str(tmp_path),
+            "head_sha": head_sha,
+            "tag_at_head": ["v0.1.23-runbook"],
+            "hosted_governance_status": "OPEN",
+            "release_dashboard_status": "RELEASE_DASHBOARD_OPEN",
+            "release_state_status": "RELEASE_STATE_OPEN",
+            "github_actions_status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+            "support_classification": "HOSTED_STARTUP_BEFORE_JOBS",
+            "ci_run_id": 11,
+            "startup_probe_run_id": 22,
+            "ci_jobs_count": 0,
+            "startup_probe_jobs_count": 0,
+            "support_bundle": {"path": str(support_path), "status": "PASS"},
+            "steps": [
+                {
+                    "step_id": "ci_run_admission",
+                    "status": "OPEN",
+                    "owner": "operator",
+                    "evidence": "completed startup_failure jobs=0",
+                    "command": "gh run view 11 --json databaseId,name,status,conclusion,headSha,jobs,url",
+                },
+                {
+                    "step_id": "billing_visibility",
+                    "status": "OPEN",
+                    "owner": "operator",
+                    "evidence": "needs user scope",
+                    "command": "gh auth refresh -h github.com -s user",
+                },
+                {
+                    "step_id": "support_bundle",
+                    "status": "PASS",
+                    "owner": "operator",
+                    "evidence": "SUPPORT_BUNDLE_VERIFIED",
+                    "command": "mucaro release support-bundle --save --format text",
+                },
+            ],
+        }
+
+    monkeypatch.setattr(cli, "build_release_hosted_governance_report", fake_hosted)
+
+    assert main(["release", "next-actions", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RELEASE_NEXT_ACTIONS_OPEN"
+    assert payload["counts"] == {"open": 2, "total": 2}
+    assert payload["actions"][0]["action_id"] == "billing_visibility"
+    assert payload["actions"][0]["priority"] == 10
+    assert payload["actions"][1]["action_id"] == "ci_run_admission"
+    assert payload["artifact_paths"]["support_bundle"] == str(support_path)
+    assert any(command.startswith("mucaro release support-bundle --verify") for command in payload["verification_commands"])
+
+    assert main(["release", "next-actions", "--strict", "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "RELEASE_NEXT_ACTIONS_OPEN" in text_output
+    assert "release_dashboard_status=RELEASE_DASHBOARD_OPEN" in text_output
+    assert "ci_run_id=11" in text_output
+    assert "verify_command=mucaro release dashboard --include-github --format text" in text_output
+    assert "OPEN priority=10 action=billing_visibility" in text_output
+
+
+def test_cli_release_next_actions_promotes_dashboard_failure_first(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "2" * 40
+
+    def fake_hosted(
+        _cfg: Settings,
+        *,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        del github_workflow, probe_workflow
+        return {
+            "status": "HOSTED_GOVERNANCE_OPEN",
+            "project_root": str(tmp_path),
+            "head_sha": head_sha,
+            "tag_at_head": [],
+            "hosted_governance_status": "OPEN",
+            "release_dashboard_status": "RELEASE_DASHBOARD_FAIL",
+            "release_state_status": "RELEASE_STATE_OPEN",
+            "github_actions_status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+            "support_classification": "HOSTED_STARTUP_BEFORE_JOBS",
+            "support_bundle": {"path": None, "status": "OPEN"},
+            "steps": [
+                {
+                    "step_id": "support_bundle",
+                    "status": "OPEN",
+                    "owner": "operator",
+                    "evidence": "SUPPORT_BUNDLE_MISSING",
+                    "command": "mucaro release support-bundle --save --format text",
+                },
+            ],
+        }
+
+    monkeypatch.setattr(cli, "build_release_hosted_governance_report", fake_hosted)
+
+    assert main(["release", "next-actions", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RELEASE_NEXT_ACTIONS_OPEN"
+    assert payload["actions"][0]["action_id"] == "local_release_evidence"
+    assert payload["actions"][0]["priority"] == 5
+    assert payload["actions"][1]["action_id"] == "support_bundle"
+
+
+def test_cli_release_next_actions_ready_when_hosted_governance_ready(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "1" * 40
+
+    def fake_hosted(
+        _cfg: Settings,
+        *,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        del github_workflow, probe_workflow
+        return {
+            "status": "HOSTED_GOVERNANCE_READY",
+            "project_root": str(tmp_path),
+            "head_sha": head_sha,
+            "tag_at_head": ["v0.1.23-ready"],
+            "hosted_governance_status": "PASS",
+            "support_classification": "HOSTED_GOVERNANCE_REVIEW",
+            "ci_run_id": 11,
+            "startup_probe_run_id": 22,
+            "support_bundle": {"path": None, "status": "PASS"},
+            "steps": [
+                {
+                    "step_id": "ci_run_admission",
+                    "status": "PASS",
+                    "owner": "operator",
+                    "evidence": "success jobs=1",
+                    "command": "gh run view 11",
+                },
+            ],
+        }
+
+    monkeypatch.setattr(cli, "build_release_hosted_governance_report", fake_hosted)
+
+    assert main(["release", "next-actions", "--strict", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "RELEASE_NEXT_ACTIONS_READY"
+    assert payload["actions"] == []
+    assert payload["counts"] == {"open": 0, "total": 0}
+
+
 def test_cli_index_status_reports_missing_index(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
