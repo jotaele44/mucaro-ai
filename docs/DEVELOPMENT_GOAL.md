@@ -82,13 +82,17 @@ governance lane as open.
    stores or model-backed embeddings.
 3. Use the release dashboard as the operator's current-state summary instead of
    inferring readiness from individual receipts or artifacts.
-4. Use support bundles to escalate hosted governance blockers without
+4. Use `mucaro audit completion --include-github` as the active-goal audit
+   before broad completion claims; it binds CLI, retrieval, answer trace,
+   memory, tool, fresh-clone, packaging, and hosted-governance requirements to
+   current evidence.
+5. Use support bundles to escalate hosted governance blockers without
    weakening local certification boundaries.
-5. Treat all future execution adapters as subordinate to Skill Fabric identity,
+6. Treat all future execution adapters as subordinate to Skill Fabric identity,
    permission, audit, and certification boundaries.
-6. Preserve local-first default behavior and fail closed whenever live provider,
+7. Preserve local-first default behavior and fail closed whenever live provider,
    hosted runner, optional dependency, or index state is missing.
-7. Keep release claims scoped: local certification can pass while hosted
+8. Keep release claims scoped: local certification can pass while hosted
    governance remains open.
 
 ## Readiness Rule

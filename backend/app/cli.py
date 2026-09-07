@@ -214,6 +214,29 @@ def build_parser() -> argparse.ArgumentParser:
     audit_roadmap.add_argument("--strict", action="store_true", help="Exit nonzero while roadmap stages remain open.")
     audit_roadmap.set_defaults(handler=run_audit_roadmap)
 
+    audit_completion = audit_subcommands.add_parser(
+        "completion",
+        help="Audit release-grade completion against the active Mucaro AI goal.",
+    )
+    audit_completion.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    audit_completion.add_argument("--strict", action="store_true", help="Exit nonzero until every completion requirement passes.")
+    audit_completion.add_argument(
+        "--include-github",
+        action="store_true",
+        help="Include live GitHub governance evidence in the completion audit.",
+    )
+    audit_completion.add_argument(
+        "--github-workflow",
+        default="CI",
+        help="Primary GitHub Actions workflow name to inspect with --include-github.",
+    )
+    audit_completion.add_argument(
+        "--probe-workflow",
+        default="CI Startup Probe",
+        help="Manual-only startup probe workflow name to inspect with --include-github.",
+    )
+    audit_completion.set_defaults(handler=run_audit_completion)
+
     eval_cmd = subcommands.add_parser("eval", help="Run measurable local quality evaluations.")
     eval_subcommands = eval_cmd.add_subparsers(dest="eval_command", required=True)
 
@@ -918,6 +941,39 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         for state in payload.get("states", []):
             detail = str(state.get("evidence")).replace("\n", "\\n")
             print(f"{state.get('status')} {state.get('state')} {detail}")
+        for command in payload.get("next_commands", []):
+            print(f"command={command}")
+    elif status in {"COMPLETION_AUDIT_READY", "COMPLETION_AUDIT_OPEN", "COMPLETION_AUDIT_BLOCKED", "COMPLETION_AUDIT_FAIL"}:
+        print(f"current_state={payload.get('current_state')}")
+        print(f"highest_local_state={payload.get('highest_local_state')}")
+        print(f"include_github={payload.get('include_github')}")
+        print(f"readiness_percent={payload.get('readiness_percent')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        print(f"release_state_status={payload.get('release_state_status')}")
+        print(f"release_dashboard_status={payload.get('release_dashboard_status')}")
+        print(f"hosted_governance_status={payload.get('hosted_governance_status')}")
+        counts = payload.get("counts", {})
+        if isinstance(counts, dict):
+            print(
+                "counts="
+                f"pass:{counts.get('pass')} "
+                f"open:{counts.get('open')} "
+                f"blocked:{counts.get('blocked')} "
+                f"fail:{counts.get('fail')} "
+                f"unverified:{counts.get('unverified')} "
+                f"total:{counts.get('total')}"
+            )
+        receipt_summary = payload.get("current_head_receipts_summary", {})
+        if isinstance(receipt_summary, dict):
+            print(f"receipt_count={receipt_summary.get('total')}")
+            print(f"receipt_valid={receipt_summary.get('valid')}")
+            print(f"receipt_invalid={receipt_summary.get('invalid')}")
+        for requirement in payload.get("requirements", []):
+            if isinstance(requirement, dict):
+                evidence = str(requirement.get("evidence")).replace("\n", "\\n")
+                print(f"{requirement.get('status')} {requirement.get('requirement_id')} {evidence}")
+        for blocker in payload.get("blockers", []):
+            print(f"blocker={blocker}")
         for command in payload.get("next_commands", []):
             print(f"command={command}")
     elif status in {"GOVERNANCE_REPORT_READY", "GOVERNANCE_REPORT_OPEN"}:
@@ -2104,6 +2160,367 @@ def run_release_dashboard(args: argparse.Namespace, cfg: Settings) -> int:
     if report["status"] == "RELEASE_DASHBOARD_FAIL":
         return 2
     if args.strict and report["status"] != "RELEASE_DASHBOARD_READY":
+        return 2
+    return 0
+
+
+def _audit_status(*statuses: str | None) -> str:
+    normalized = {str(status or "UNVERIFIED") for status in statuses}
+    if "FAIL" in normalized:
+        return "FAIL"
+    if "BLOCKED" in normalized:
+        return "BLOCKED"
+    if "OPEN" in normalized:
+        return "OPEN"
+    if "WARN" in normalized:
+        return "OPEN"
+    if "UNVERIFIED" in normalized:
+        return "UNVERIFIED"
+    return "PASS"
+
+
+def _audit_status_from_value(status: str | None, *, pass_values: set[str]) -> str:
+    normalized = str(status or "UNVERIFIED")
+    if normalized in pass_values:
+        return "PASS"
+    if normalized in {"PASS", "OPEN", "BLOCKED", "FAIL", "UNVERIFIED"}:
+        return normalized
+    if normalized == "WARN":
+        return "OPEN"
+    if "BLOCKED" in normalized:
+        return "BLOCKED"
+    if "FAIL" in normalized or "FAILED" in normalized or "ERROR" in normalized:
+        return "FAIL"
+    if "OPEN" in normalized or "MISSING" in normalized or "STALE" in normalized:
+        return "OPEN"
+    return "UNVERIFIED"
+
+
+def _release_state_status(release_state: dict[str, Any], state_name: str) -> str:
+    for state in release_state.get("states", []):
+        if isinstance(state, dict) and state.get("state") == state_name:
+            status = state.get("status")
+            return str(status) if status else "UNVERIFIED"
+    return "UNVERIFIED"
+
+
+def _release_state_evidence(release_state: dict[str, Any], state_name: str) -> str:
+    for state in release_state.get("states", []):
+        if isinstance(state, dict) and state.get("state") == state_name:
+            evidence = state.get("evidence")
+            return str(evidence) if evidence else "No evidence recorded."
+    return "Release state was not present in the release-state report."
+
+
+def _product_requirement_row(product_audit: dict[str, Any], requirement_id: str) -> dict[str, Any]:
+    for row in product_audit.get("requirements", []):
+        if isinstance(row, dict) and row.get("requirement_id") == requirement_id:
+            return row
+    return {"requirement_id": requirement_id, "status": "UNVERIFIED", "evidence": "Requirement was not present."}
+
+
+def _completion_requirement(
+    requirement_id: str,
+    requirement: str,
+    status: str,
+    evidence: str,
+    gap: str,
+    next_step: str,
+) -> dict[str, str]:
+    return {
+        "requirement_id": requirement_id,
+        "requirement": requirement,
+        "status": status,
+        "evidence": evidence,
+        "gap": gap,
+        "next_step": next_step,
+    }
+
+
+def build_completion_audit_report(
+    cfg: Settings,
+    *,
+    include_github: bool = False,
+    github_workflow: str = "CI",
+    probe_workflow: str = "CI Startup Probe",
+) -> dict[str, Any]:
+    product_audit = build_product_audit(cfg)
+    release_state = build_release_state_report(
+        cfg,
+        include_github=include_github,
+        github_workflow=github_workflow,
+    )
+    dashboard = build_release_dashboard_report(
+        cfg,
+        include_github=include_github,
+        github_workflow=github_workflow,
+        probe_workflow=probe_workflow,
+    )
+    git_payload = release_state.get("git", {}) if isinstance(release_state.get("git"), dict) else {}
+    receipt_summary = dashboard.get("current_head_receipts_summary", {})
+    if not isinstance(receipt_summary, dict):
+        receipt_summary = {}
+
+    installable_cli = _product_requirement_row(product_audit, "installable_cli")
+    readiness_diagnostics = _product_requirement_row(product_audit, "readiness_diagnostics")
+    permissioned_sources = _product_requirement_row(product_audit, "permission_gated_user_directory")
+    document_ingestion = _product_requirement_row(product_audit, "document_ingestion")
+    citations = _product_requirement_row(product_audit, "source_lineage_citations")
+    retrieval = _product_requirement_row(product_audit, "local_retrieval_strategies")
+    semantic_store = _product_requirement_row(product_audit, "semantic_vector_store")
+    memory = _product_requirement_row(product_audit, "personalization_memory")
+    tools = _product_requirement_row(product_audit, "tool_use_and_actions")
+    package = _product_requirement_row(product_audit, "source_artifact_packaging")
+
+    local_release_status = _release_state_status(release_state, "LOCAL_RELEASE_CERTIFIED")
+    fresh_clone_status = _release_state_status(release_state, "FRESH_CLONE_CERTIFIED")
+    source_artifact_packaging_status = _release_state_status(release_state, "SOURCE_ARTIFACT_PACKAGING")
+    source_artifact_status = _release_state_status(release_state, "SOURCE_ARTIFACT_CERTIFIED")
+    python_dist_status = _release_state_status(release_state, "PYTHON_DIST_CERTIFIED")
+    answer_trace_status = _release_state_status(release_state, "ANSWER_TRACE_QUALITY_CERTIFIED")
+    retrieval_quality_status = _release_state_status(release_state, "RETRIEVAL_QUALITY_CERTIFIED")
+    operator_workflow_status = _release_state_status(release_state, "OPERATOR_WORKFLOW_CERTIFIED")
+    github_governance_status = _release_state_status(release_state, "GITHUB_GOVERNANCE_OPEN")
+    governed_release_status = _release_state_status(release_state, "GOVERNED_RELEASE_READY")
+
+    remote_branch_status = str(dashboard.get("remote_branch_status") or "UNVERIFIED")
+    distribution_manifest_status = str(dashboard.get("distribution_manifest_status") or "UNVERIFIED")
+    governance_report_status = str(dashboard.get("governance_report_status") or "UNVERIFIED")
+    hosted_governance_status = str(dashboard.get("hosted_governance_status") or "UNVERIFIED")
+    remote_branch_audit_status = (
+        "PASS"
+        if remote_branch_status == "PASS"
+        else "UNVERIFIED"
+        if remote_branch_status == "UNVERIFIED"
+        else "OPEN"
+    )
+    distribution_manifest_audit_status = _audit_status_from_value(
+        distribution_manifest_status,
+        pass_values={"DISTRIBUTION_MANIFEST_VERIFIED"},
+    )
+    governance_report_audit_status = _audit_status_from_value(
+        governance_report_status,
+        pass_values={"GOVERNANCE_REPORT_VERIFIED"},
+    )
+    hosted_governance_audit_status = _audit_status_from_value(hosted_governance_status, pass_values={"PASS"})
+
+    current_head_receipts_status = (
+        "PASS"
+        if receipt_summary.get("total", 0) >= 7
+        and receipt_summary.get("valid") == receipt_summary.get("total")
+        and receipt_summary.get("invalid") == 0
+        else "OPEN"
+    )
+
+    requirements = [
+        _completion_requirement(
+            "canonical_repo_state",
+            "Development starts from the canonical mucaro-ai repository with clean Git state, upstream binding, and current-head release receipts.",
+            _audit_status(
+                _release_state_status(release_state, "CANONICAL_LOCAL"),
+                remote_branch_audit_status,
+                current_head_receipts_status,
+            ),
+            (
+                f"head_sha={git_payload.get('head_sha')} "
+                f"upstream={git_payload.get('upstream')} "
+                f"worktree_clean={git_payload.get('worktree_clean')} "
+                f"remote_branch_status={remote_branch_status} "
+                f"receipt_count={receipt_summary.get('total')}"
+            ),
+            "" if current_head_receipts_status == "PASS" else "Current HEAD does not yet have the full expected exact-head receipt set.",
+            "Rerun exact-head certification receipts after every commit and push the canonical branch.",
+        ),
+        _completion_requirement(
+            "hardened_cli_workflows",
+            "CLI workflows are installable, documented through supported commands, locally certified, and safe for automation.",
+            _audit_status(
+                str(installable_cli.get("status")),
+                str(readiness_diagnostics.get("status")),
+                local_release_status,
+            ),
+            (
+                f"installable_cli={installable_cli.get('status')} "
+                f"readiness_diagnostics={readiness_diagnostics.get('status')} "
+                f"local_release={_release_state_evidence(release_state, 'LOCAL_RELEASE_CERTIFIED')}"
+            ),
+            "" if local_release_status == "PASS" else "The current HEAD has not passed local release certification.",
+            "Run python3 scripts/certify_release.py on the exact current HEAD.",
+        ),
+        _completion_requirement(
+            "measurable_retrieval_quality",
+            "Retrieval quality is measured by exact-head evaluation receipts, not inferred from implementation presence.",
+            _audit_status(str(retrieval.get("status")), str(semantic_store.get("status")), retrieval_quality_status),
+            (
+                f"local_retrieval={retrieval.get('status')} "
+                f"semantic_store={semantic_store.get('status')} "
+                f"quality={_release_state_evidence(release_state, 'RETRIEVAL_QUALITY_CERTIFIED')}"
+            ),
+            "" if retrieval_quality_status == "PASS" else "Retrieval quality receipt is missing or stale for current HEAD.",
+            "Run python3 scripts/certify_retrieval_quality.py and expand fixtures before claiming larger-corpus quality.",
+        ),
+        _completion_requirement(
+            "permissioned_source_ingestion",
+            "Source ingestion is permission-gated and certified through the operator workflow path.",
+            _audit_status(
+                str(permissioned_sources.get("status")),
+                str(document_ingestion.get("status")),
+                operator_workflow_status,
+            ),
+            (
+                f"directory_permission={permissioned_sources.get('status')} "
+                f"document_ingestion={document_ingestion.get('status')} "
+                f"operator_workflow={_release_state_evidence(release_state, 'OPERATOR_WORKFLOW_CERTIFIED')}"
+            ),
+            str(document_ingestion.get("gap") or "") if operator_workflow_status == "PASS" else "Operator workflow certification is missing or stale for current HEAD.",
+            "Keep new parsers behind explicit grants and source-lineage manifests.",
+        ),
+        _completion_requirement(
+            "cited_answer_traceability",
+            "Generated answers preserve citations, chunk bindings, and answer traces with exact-head quality certification.",
+            _audit_status(str(citations.get("status")), answer_trace_status),
+            (
+                f"source_lineage_citations={citations.get('status')} "
+                f"quality={_release_state_evidence(release_state, 'ANSWER_TRACE_QUALITY_CERTIFIED')}"
+            ),
+            "" if answer_trace_status == "PASS" else "Answer-trace quality receipt is missing or stale for current HEAD.",
+            "Run python3 scripts/certify_answer_trace_quality.py after answer or citation changes.",
+        ),
+        _completion_requirement(
+            "explicit_memory_controls",
+            "Memory is explicit, user-controlled, locally auditable, and covered by operator workflow certification.",
+            _audit_status(str(memory.get("status")), operator_workflow_status),
+            (
+                f"personalization_memory={memory.get('status')} "
+                f"operator_workflow={_release_state_evidence(release_state, 'OPERATOR_WORKFLOW_CERTIFIED')}"
+            ),
+            "" if operator_workflow_status == "PASS" else "Operator workflow receipt is missing or stale for current HEAD.",
+            "Keep memory controls separate from cited source evidence and rerun operator certification after memory changes.",
+        ),
+        _completion_requirement(
+            "approved_tool_execution",
+            "Tool execution is allowlisted, approval-gated, audited, and covered by operator workflow certification.",
+            _audit_status(str(tools.get("status")), operator_workflow_status),
+            (
+                f"tool_use_and_actions={tools.get('status')} "
+                f"operator_workflow={_release_state_evidence(release_state, 'OPERATOR_WORKFLOW_CERTIFIED')}"
+            ),
+            "" if operator_workflow_status == "PASS" else "Tool approval/audit workflow receipt is missing or stale for current HEAD.",
+            "Add write/action tools only with explicit policy, approval, denial, and audit tests.",
+        ),
+        _completion_requirement(
+            "repeatable_fresh_clone_certification",
+            "A clean clone can reproduce the launcher and release gates from the current HEAD.",
+            fresh_clone_status,
+            _release_state_evidence(release_state, "FRESH_CLONE_CERTIFIED"),
+            "" if fresh_clone_status == "PASS" else "Fresh-clone certification is missing or stale for current HEAD.",
+            f"Run python3 scripts/certify_fresh_clone.py --ref {git_payload.get('head_sha') or 'main'}.",
+        ),
+        _completion_requirement(
+            "production_quality_packaging_path",
+            "Source artifact, Python distribution, distribution manifest, and governance handoff artifacts are reproducible and current-head verified.",
+            _audit_status(
+                str(package.get("status")),
+                source_artifact_packaging_status,
+                source_artifact_status,
+                python_dist_status,
+                distribution_manifest_audit_status,
+                governance_report_audit_status,
+            ),
+            (
+                f"package_requirement={package.get('status')} "
+                f"source_packaging={_release_state_evidence(release_state, 'SOURCE_ARTIFACT_PACKAGING')} "
+                f"source_artifact={_release_state_evidence(release_state, 'SOURCE_ARTIFACT_CERTIFIED')} "
+                f"python_dist={_release_state_evidence(release_state, 'PYTHON_DIST_CERTIFIED')} "
+                f"distribution_manifest={distribution_manifest_status} "
+                f"governance_report={governance_report_status}"
+            ),
+            "" if distribution_manifest_status == "DISTRIBUTION_MANIFEST_VERIFIED" else "Distribution manifest or governance artifact is not verified for current HEAD.",
+            "Rebuild and verify package artifacts, distribution manifest, and governance report after every release-support change.",
+        ),
+        _completion_requirement(
+            "hosted_governance",
+            "Hosted CI, tag binding, branch governance, and GitHub diagnostics prove the governed release boundary.",
+            _audit_status(
+                hosted_governance_audit_status if include_github else "UNVERIFIED",
+                github_governance_status,
+                governed_release_status,
+            ),
+            (
+                f"include_github={include_github} "
+                f"hosted_governance_status={hosted_governance_status} "
+                f"github_governance={_release_state_evidence(release_state, 'GITHUB_GOVERNANCE_OPEN')} "
+                f"governed_release={_release_state_evidence(release_state, 'GOVERNED_RELEASE_READY')}"
+            ),
+            "Hosted governance is not proven at current HEAD." if hosted_governance_status != "PASS" else "",
+            "Repair hosted Actions startup, enable branch protection when available, and rerun with --include-github.",
+        ),
+    ]
+
+    counts = {
+        "pass": sum(1 for row in requirements if row["status"] == "PASS"),
+        "open": sum(1 for row in requirements if row["status"] == "OPEN"),
+        "blocked": sum(1 for row in requirements if row["status"] == "BLOCKED"),
+        "fail": sum(1 for row in requirements if row["status"] == "FAIL"),
+        "unverified": sum(1 for row in requirements if row["status"] == "UNVERIFIED"),
+        "total": len(requirements),
+    }
+    status = (
+        "COMPLETION_AUDIT_FAIL"
+        if counts["fail"]
+        else "COMPLETION_AUDIT_BLOCKED"
+        if counts["blocked"]
+        else "COMPLETION_AUDIT_READY"
+        if counts["pass"] == counts["total"]
+        else "COMPLETION_AUDIT_OPEN"
+    )
+    blockers = [
+        f"{row['requirement_id']}={row['status']}:{row['gap'] or row['next_step']}"
+        for row in requirements
+        if row["status"] != "PASS"
+    ]
+    next_commands = sorted(
+        set(
+            str(command)
+            for command in [
+                *release_state.get("next_commands", []),
+                *dashboard.get("next_commands", []),
+                "mucaro audit completion --include-github --format text",
+            ]
+        )
+    )
+    return {
+        "status": status,
+        "objective": product_audit.get("objective"),
+        "version": package_version(),
+        "project_root": str(cfg.project_root),
+        "include_github": include_github,
+        "readiness_percent": round((counts["pass"] / counts["total"]) * 100, 1) if counts["total"] else 0.0,
+        "counts": counts,
+        "current_state": release_state.get("current_state"),
+        "highest_local_state": release_state.get("highest_local_state"),
+        "head_sha": git_payload.get("head_sha"),
+        "release_state_status": release_state.get("status"),
+        "release_dashboard_status": dashboard.get("status"),
+        "hosted_governance_status": hosted_governance_status,
+        "current_head_receipts_summary": receipt_summary,
+        "requirements": requirements,
+        "blockers": sorted(set(blockers)),
+        "next_commands": next_commands,
+    }
+
+
+def run_audit_completion(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_completion_audit_report(
+        cfg,
+        include_github=args.include_github,
+        github_workflow=args.github_workflow,
+        probe_workflow=args.probe_workflow,
+    )
+    emit_payload(report, args.format)
+    if report["status"] in {"COMPLETION_AUDIT_FAIL", "COMPLETION_AUDIT_BLOCKED"}:
+        return 2
+    if args.strict and report["status"] != "COMPLETION_AUDIT_READY":
         return 2
     return 0
 

@@ -37,6 +37,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro release receipts` | List local release/fresh-clone certification receipts | 0 | 2 |
 | `mucaro release receipt RECEIPT_ID` | Show one local certification receipt | 0 | 2 |
 | `mucaro certify status` | Inspect release readiness before running full certification gates | 0 | 2 on failures, or with `--strict` warnings/failures |
+| `mucaro audit completion` | Map the active release-grade goal to evidence-backed PASS/OPEN/BLOCKED/FAIL/UNVERIFIED rows | 0 | 2 on failure/blocker, or with `--strict` until ready |
 | `mucaro audit product` | Audit product gaps against the full assistant objective | 0 | 2 with `--strict` while gaps remain |
 | `mucaro audit roadmap` | Group product-audit rows into development stages | 0 | 2 with `--strict` while stages remain open |
 | `mucaro eval retrieval` | Evaluate local retrieval quality against fixture suites | 0 | 2 |
@@ -189,6 +190,10 @@ approved and audited.
 | `DOCTOR_FAIL` | readiness check found unsupported or invalid local setup |
 | `RELEASE_STATE_OPEN` | release-state classifier found open or unverified release states |
 | `RELEASE_STATE_READY` | release-state classifier found the governed release state ready |
+| `COMPLETION_AUDIT_OPEN` | completion audit found at least one active-goal requirement open or unverified |
+| `COMPLETION_AUDIT_READY` | completion audit found every active-goal requirement proven by current evidence |
+| `COMPLETION_AUDIT_BLOCKED` | completion audit found a requirement blocked by an explicit external or policy blocker |
+| `COMPLETION_AUDIT_FAIL` | completion audit found a hard failure such as invalid current-head release evidence |
 | `GOVERNANCE_REPORT_VERIFIED` | saved governance report artifact passed schema, hash, report, and requested head-binding checks |
 | `GOVERNANCE_REPORT_VERIFY_FAILED` | saved governance report artifact is missing, malformed, hash-mismatched, stale for current `HEAD`, or otherwise invalid |
 | `RELEASE_RECEIPTS_OK` | release receipt listing completed |
@@ -222,6 +227,7 @@ mucaro release governance-report --save --format text
 mucaro release governance-report --verify data/exports/governance_reports/governance-report-HEADPREFIX.json --require-current-head --format text
 mucaro release receipts --current-head --format text
 mucaro release receipt local_release-HEADPREFIX --format json
+mucaro audit completion --include-github --format text
 mucaro certify status --format text
 mucaro certify status --include-github --format text
 mucaro audit product --format text

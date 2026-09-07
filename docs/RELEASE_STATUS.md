@@ -170,6 +170,11 @@ Observed success markers:
   blockers in one read-only operator view. With `--include-github`, it also
   reports live GitHub Actions diagnostics without converting hosted failures
   into local certification claims.
+- `mucaro audit completion --include-github` composes product-audit,
+  release-state, release-dashboard, package, receipt, and hosted-governance
+  evidence into one active-goal matrix. It reports PASS, OPEN, BLOCKED, FAIL,
+  and UNVERIFIED rows so local readiness, release governance, and production
+  packaging progress cannot be conflated.
 - `mucaro release support-bundle --save` creates a support-ready JSON artifact
   for hosted governance escalation. It captures the release dashboard, GitHub
   diagnostic status, support classification, startup blocker, blockers,

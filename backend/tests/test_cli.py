@@ -2079,6 +2079,259 @@ def test_cli_release_state_requires_exact_head_quality_receipts_for_governed_rea
     assert states["GOVERNED_RELEASE_READY"]["status"] == "PASS"
 
 
+def test_cli_audit_completion_reports_hosted_governance_open(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "a" * 40
+
+    product_requirements = [
+        "installable_cli",
+        "readiness_diagnostics",
+        "permission_gated_user_directory",
+        "document_ingestion",
+        "source_lineage_citations",
+        "local_retrieval_strategies",
+        "semantic_vector_store",
+        "personalization_memory",
+        "tool_use_and_actions",
+        "source_artifact_packaging",
+    ]
+
+    def fake_product_audit(_cfg: Settings):
+        return {
+            "status": "PRODUCT_AUDIT_OPEN",
+            "objective": "test objective",
+            "requirements": [
+                {
+                    "requirement_id": requirement_id,
+                    "status": "PASS",
+                    "evidence": f"{requirement_id} evidence",
+                    "gap": "",
+                    "next_step": f"{requirement_id} next",
+                }
+                for requirement_id in product_requirements
+            ],
+        }
+
+    def fake_release_state(
+        _cfg: Settings,
+        *,
+        include_github: bool = False,
+        github_workflow: str = "CI",
+    ):
+        del github_workflow
+        assert include_github is True
+        return {
+            "status": "RELEASE_STATE_OPEN",
+            "current_state": "GITHUB_GOVERNANCE_OPEN",
+            "highest_local_state": "CANONICAL_LOCAL",
+            "git": {"head_sha": head_sha, "upstream": "origin/main", "worktree_clean": True},
+            "states": [
+                {"state": "CANONICAL_LOCAL", "status": "PASS", "evidence": "canonical local", "next_step": ""},
+                {"state": "LOCAL_RELEASE_CERTIFIED", "status": "PASS", "evidence": "local release", "next_step": ""},
+                {"state": "FRESH_CLONE_CERTIFIED", "status": "PASS", "evidence": "fresh clone", "next_step": ""},
+                {"state": "SOURCE_ARTIFACT_PACKAGING", "status": "PASS", "evidence": "package", "next_step": ""},
+                {"state": "SOURCE_ARTIFACT_CERTIFIED", "status": "PASS", "evidence": "source artifact", "next_step": ""},
+                {"state": "PYTHON_DIST_CERTIFIED", "status": "PASS", "evidence": "python dist", "next_step": ""},
+                {"state": "ANSWER_TRACE_QUALITY_CERTIFIED", "status": "PASS", "evidence": "answer trace", "next_step": ""},
+                {"state": "RETRIEVAL_QUALITY_CERTIFIED", "status": "PASS", "evidence": "retrieval", "next_step": ""},
+                {"state": "OPERATOR_WORKFLOW_CERTIFIED", "status": "PASS", "evidence": "operator", "next_step": ""},
+                {"state": "GITHUB_GOVERNANCE_OPEN", "status": "OPEN", "evidence": "startup failure", "next_step": ""},
+                {"state": "GOVERNED_RELEASE_READY", "status": "OPEN", "evidence": "not governed", "next_step": ""},
+            ],
+            "next_commands": ["mucaro certify github-actions --format text"],
+        }
+
+    def fake_dashboard(
+        _cfg: Settings,
+        *,
+        include_github: bool = False,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        del github_workflow, probe_workflow
+        assert include_github is True
+        return {
+            "status": "RELEASE_DASHBOARD_OPEN",
+            "remote_branch_status": "PASS",
+            "distribution_manifest_status": "DISTRIBUTION_MANIFEST_VERIFIED",
+            "governance_report_status": "GOVERNANCE_REPORT_VERIFIED",
+            "hosted_governance_status": "OPEN",
+            "current_head_receipts_summary": {"total": 7, "valid": 7, "invalid": 0},
+            "next_commands": ["mucaro release dashboard --include-github --format text"],
+        }
+
+    monkeypatch.setattr(cli, "build_product_audit", fake_product_audit)
+    monkeypatch.setattr(cli, "build_release_state_report", fake_release_state)
+    monkeypatch.setattr(cli, "build_release_dashboard_report", fake_dashboard)
+
+    assert main(["audit", "completion", "--include-github", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    requirements = {row["requirement_id"]: row for row in payload["requirements"]}
+    assert payload["status"] == "COMPLETION_AUDIT_OPEN"
+    assert payload["counts"] == {"pass": 9, "open": 1, "blocked": 0, "fail": 0, "unverified": 0, "total": 10}
+    assert requirements["hosted_governance"]["status"] == "OPEN"
+
+    assert main(["audit", "completion", "--include-github", "--strict", "--format", "text"], cfg=cfg) == 2
+    strict_output = capsys.readouterr().out
+    assert "counts=pass:9 open:1 blocked:0 fail:0 unverified:0 total:10" in strict_output
+    assert "OPEN hosted_governance" in strict_output
+
+
+def test_cli_audit_completion_is_ready_when_release_grade_gates_pass(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "b" * 40
+
+    def fake_product_audit(_cfg: Settings):
+        requirement_ids = [
+            "installable_cli",
+            "readiness_diagnostics",
+            "permission_gated_user_directory",
+            "document_ingestion",
+            "source_lineage_citations",
+            "local_retrieval_strategies",
+            "semantic_vector_store",
+            "personalization_memory",
+            "tool_use_and_actions",
+            "source_artifact_packaging",
+        ]
+        return {
+            "status": "PRODUCT_AUDIT_OK",
+            "objective": "test objective",
+            "requirements": [
+                {"requirement_id": requirement_id, "status": "PASS", "evidence": "ok", "gap": "", "next_step": ""}
+                for requirement_id in requirement_ids
+            ],
+        }
+
+    def fake_release_state(_cfg: Settings, *, include_github: bool = False, github_workflow: str = "CI"):
+        del include_github, github_workflow
+        return {
+            "status": "RELEASE_STATE_READY",
+            "current_state": "GOVERNED_RELEASE_READY",
+            "highest_local_state": "CANONICAL_LOCAL",
+            "git": {"head_sha": head_sha, "upstream": "origin/main", "worktree_clean": True},
+            "states": [
+                {"state": "CANONICAL_LOCAL", "status": "PASS", "evidence": "canonical local", "next_step": ""},
+                {"state": "LOCAL_RELEASE_CERTIFIED", "status": "PASS", "evidence": "local release", "next_step": ""},
+                {"state": "FRESH_CLONE_CERTIFIED", "status": "PASS", "evidence": "fresh clone", "next_step": ""},
+                {"state": "SOURCE_ARTIFACT_PACKAGING", "status": "PASS", "evidence": "package", "next_step": ""},
+                {"state": "SOURCE_ARTIFACT_CERTIFIED", "status": "PASS", "evidence": "source artifact", "next_step": ""},
+                {"state": "PYTHON_DIST_CERTIFIED", "status": "PASS", "evidence": "python dist", "next_step": ""},
+                {"state": "ANSWER_TRACE_QUALITY_CERTIFIED", "status": "PASS", "evidence": "answer trace", "next_step": ""},
+                {"state": "RETRIEVAL_QUALITY_CERTIFIED", "status": "PASS", "evidence": "retrieval", "next_step": ""},
+                {"state": "OPERATOR_WORKFLOW_CERTIFIED", "status": "PASS", "evidence": "operator", "next_step": ""},
+                {"state": "GITHUB_GOVERNANCE_OPEN", "status": "PASS", "evidence": "github governed", "next_step": ""},
+                {"state": "GOVERNED_RELEASE_READY", "status": "PASS", "evidence": "governed", "next_step": ""},
+            ],
+            "next_commands": [],
+        }
+
+    def fake_dashboard(
+        _cfg: Settings,
+        *,
+        include_github: bool = False,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        del include_github, github_workflow, probe_workflow
+        return {
+            "status": "RELEASE_DASHBOARD_READY",
+            "remote_branch_status": "PASS",
+            "distribution_manifest_status": "DISTRIBUTION_MANIFEST_VERIFIED",
+            "governance_report_status": "GOVERNANCE_REPORT_VERIFIED",
+            "hosted_governance_status": "PASS",
+            "current_head_receipts_summary": {"total": 7, "valid": 7, "invalid": 0},
+            "next_commands": [],
+        }
+
+    monkeypatch.setattr(cli, "build_product_audit", fake_product_audit)
+    monkeypatch.setattr(cli, "build_release_state_report", fake_release_state)
+    monkeypatch.setattr(cli, "build_release_dashboard_report", fake_dashboard)
+
+    assert main(["audit", "completion", "--include-github", "--strict", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "COMPLETION_AUDIT_READY"
+    assert payload["readiness_percent"] == 100.0
+    assert payload["counts"] == {"pass": 10, "open": 0, "blocked": 0, "fail": 0, "unverified": 0, "total": 10}
+
+
+def test_cli_audit_completion_fails_bad_artifact_status(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+
+    def fake_product_audit(_cfg: Settings):
+        requirement_ids = [
+            "installable_cli",
+            "readiness_diagnostics",
+            "permission_gated_user_directory",
+            "document_ingestion",
+            "source_lineage_citations",
+            "local_retrieval_strategies",
+            "semantic_vector_store",
+            "personalization_memory",
+            "tool_use_and_actions",
+            "source_artifact_packaging",
+        ]
+        return {
+            "status": "PRODUCT_AUDIT_OK",
+            "objective": "test objective",
+            "requirements": [
+                {"requirement_id": requirement_id, "status": "PASS", "evidence": "ok", "gap": "", "next_step": ""}
+                for requirement_id in requirement_ids
+            ],
+        }
+
+    def fake_release_state(_cfg: Settings, *, include_github: bool = False, github_workflow: str = "CI"):
+        del include_github, github_workflow
+        return {
+            "status": "RELEASE_STATE_READY",
+            "current_state": "GOVERNED_RELEASE_READY",
+            "highest_local_state": "CANONICAL_LOCAL",
+            "git": {"head_sha": "c" * 40, "upstream": "origin/main", "worktree_clean": True},
+            "states": [
+                {"state": "CANONICAL_LOCAL", "status": "PASS", "evidence": "canonical local", "next_step": ""},
+                {"state": "LOCAL_RELEASE_CERTIFIED", "status": "PASS", "evidence": "local release", "next_step": ""},
+                {"state": "FRESH_CLONE_CERTIFIED", "status": "PASS", "evidence": "fresh clone", "next_step": ""},
+                {"state": "SOURCE_ARTIFACT_PACKAGING", "status": "PASS", "evidence": "package", "next_step": ""},
+                {"state": "SOURCE_ARTIFACT_CERTIFIED", "status": "PASS", "evidence": "source artifact", "next_step": ""},
+                {"state": "PYTHON_DIST_CERTIFIED", "status": "PASS", "evidence": "python dist", "next_step": ""},
+                {"state": "ANSWER_TRACE_QUALITY_CERTIFIED", "status": "PASS", "evidence": "answer trace", "next_step": ""},
+                {"state": "RETRIEVAL_QUALITY_CERTIFIED", "status": "PASS", "evidence": "retrieval", "next_step": ""},
+                {"state": "OPERATOR_WORKFLOW_CERTIFIED", "status": "PASS", "evidence": "operator", "next_step": ""},
+                {"state": "GITHUB_GOVERNANCE_OPEN", "status": "PASS", "evidence": "github governed", "next_step": ""},
+                {"state": "GOVERNED_RELEASE_READY", "status": "PASS", "evidence": "governed", "next_step": ""},
+            ],
+            "next_commands": [],
+        }
+
+    def fake_dashboard(
+        _cfg: Settings,
+        *,
+        include_github: bool = False,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        del include_github, github_workflow, probe_workflow
+        return {
+            "status": "RELEASE_DASHBOARD_FAIL",
+            "remote_branch_status": "PASS",
+            "distribution_manifest_status": "DISTRIBUTION_MANIFEST_VERIFY_FAILED",
+            "governance_report_status": "GOVERNANCE_REPORT_VERIFIED",
+            "hosted_governance_status": "PASS",
+            "current_head_receipts_summary": {"total": 7, "valid": 7, "invalid": 0},
+            "next_commands": [],
+        }
+
+    monkeypatch.setattr(cli, "build_product_audit", fake_product_audit)
+    monkeypatch.setattr(cli, "build_release_state_report", fake_release_state)
+    monkeypatch.setattr(cli, "build_release_dashboard_report", fake_dashboard)
+
+    assert main(["audit", "completion", "--include-github", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    requirements = {row["requirement_id"]: row for row in payload["requirements"]}
+    assert payload["status"] == "COMPLETION_AUDIT_FAIL"
+    assert requirements["production_quality_packaging_path"]["status"] == "FAIL"
+
+
 def test_cli_release_receipts_lists_and_shows_exact_head_receipts(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     head_sha = "f" * 40
