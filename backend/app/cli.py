@@ -113,6 +113,9 @@ SUPPORT_BUNDLE_SCHEMA_VERSION = "mucaro_release_support_bundle_v1"
 SUPPORT_BUNDLE_DIR = Path("data") / "exports" / "support_bundles"
 NEXT_ACTIONS_SCHEMA_VERSION = "mucaro_release_next_actions_v2"
 NEXT_ACTIONS_DIR = Path("data") / "exports" / "release_next_actions"
+RELEASE_REFRESH_LOG_SCHEMA_VERSION = "mucaro_release_refresh_log_v1"
+RELEASE_REFRESH_LOG_DIR = Path("data") / "exports" / "release_refresh_logs"
+RELEASE_HANDOFF_REFRESH_STEPS = ("local_release", "python_dist", "source_artifact", "fresh_clone")
 
 
 def parse_port(value: str) -> int:
@@ -695,6 +698,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run current-head local release, Python distribution, source artifact, and fresh-clone certifiers before saving handoff artifacts.",
     )
     release_handoff.add_argument(
+        "--refresh-step",
+        action="append",
+        choices=RELEASE_HANDOFF_REFRESH_STEPS,
+        default=[],
+        help="Refresh one certifier step before handoff; repeat to select multiple steps. Implies --refresh-certification.",
+    )
+    release_handoff.add_argument(
+        "--refresh-timeout-seconds",
+        type=parse_non_negative_int,
+        default=0,
+        help="Per-certifier timeout in seconds for --refresh-certification; 0 disables the timeout.",
+    )
+    release_handoff.add_argument(
         "--github-workflow",
         default="CI",
         help="Primary GitHub Actions workflow name to inspect.",
@@ -1077,6 +1093,11 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         if isinstance(refresh, dict):
             print(f"certification_refresh_requested={refresh.get('requested')}")
             print(f"certification_refresh_status={refresh.get('status')}")
+            print(f"certification_refresh_timeout_seconds={refresh.get('timeout_seconds')}")
+            log = refresh.get("log")
+            if isinstance(log, dict):
+                print(f"certification_refresh_log={log.get('path')}")
+                print(f"certification_refresh_log_sha256={log.get('sha256')}")
             for step in refresh.get("steps", []):
                 if isinstance(step, dict):
                     detail = str(step.get("detail")).replace("\n", "\\n")
@@ -3175,15 +3196,36 @@ def _artifact_export(payload: dict[str, Any]) -> dict[str, Any]:
     return {"path": None, "sha256": None, "size_bytes": None, "schema_version": None}
 
 
-def _release_handoff_certification_command(step_id: str, command: list[str], cfg: Settings) -> dict[str, Any]:
-    proc = subprocess.run(
-        command,
-        cwd=cfg.project_root,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
-    )
+def _release_handoff_certification_command(
+    step_id: str,
+    command: list[str],
+    cfg: Settings,
+    *,
+    timeout_seconds: int = 0,
+) -> dict[str, Any]:
+    timeout = timeout_seconds if timeout_seconds > 0 else None
+    try:
+        proc = subprocess.run(
+            command,
+            cwd=cfg.project_root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        output = (exc.output or "").strip() if isinstance(exc.output, str) else ""
+        output_lines = output.splitlines()
+        return {
+            "step_id": step_id,
+            "status": "FAIL",
+            "returncode": None,
+            "command": " ".join(command),
+            "detail": f"TIMEOUT_AFTER_SECONDS:{timeout_seconds}",
+            "output_tail": output_lines[-20:],
+            "timed_out": True,
+        }
     output = proc.stdout.strip()
     output_lines = output.splitlines()
     return {
@@ -3193,10 +3235,45 @@ def _release_handoff_certification_command(step_id: str, command: list[str], cfg
         "command": " ".join(command),
         "detail": output_lines[-1] if output_lines else f"returncode={proc.returncode}",
         "output_tail": output_lines[-20:],
+        "timed_out": False,
     }
 
 
-def run_release_handoff_certification_refresh(cfg: Settings, head_sha: str) -> dict[str, Any]:
+def _selected_release_handoff_refresh_steps(refresh_steps: Sequence[str] | None = None) -> list[str]:
+    selected = set(refresh_steps or RELEASE_HANDOFF_REFRESH_STEPS)
+    return [step for step in RELEASE_HANDOFF_REFRESH_STEPS if step in selected]
+
+
+def write_release_handoff_refresh_log(
+    cfg: Settings,
+    refresh: dict[str, Any],
+    head_sha: str,
+) -> dict[str, Any]:
+    payload = {
+        "schema_version": RELEASE_REFRESH_LOG_SCHEMA_VERSION,
+        "created_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "head_sha": head_sha,
+        "refresh": refresh,
+    }
+    path = cfg.project_root / RELEASE_REFRESH_LOG_DIR / f"refresh-{head_sha[:12]}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    encoded = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
+    path.write_bytes(encoded)
+    return {
+        "path": str(path),
+        "sha256": hashlib.sha256(encoded).hexdigest(),
+        "size_bytes": len(encoded),
+        "schema_version": RELEASE_REFRESH_LOG_SCHEMA_VERSION,
+    }
+
+
+def run_release_handoff_certification_refresh(
+    cfg: Settings,
+    head_sha: str,
+    *,
+    refresh_steps: Sequence[str] | None = None,
+    timeout_seconds: int = 0,
+) -> dict[str, Any]:
     head_prefix = head_sha[:12]
     source_manifest = (
         cfg.project_root
@@ -3205,24 +3282,34 @@ def run_release_handoff_certification_refresh(cfg: Settings, head_sha: str) -> d
         / "packages"
         / f"mucaro-ai-{package_version()}-{head_prefix}-artifact-manifest.json"
     )
-    commands = [
-        ("local_release", [sys.executable, "scripts/certify_release.py"]),
-        ("python_dist", [sys.executable, "scripts/certify_python_distribution.py"]),
-        ("source_artifact", [sys.executable, "scripts/certify_source_artifact.py", str(source_manifest)]),
-        ("fresh_clone", [sys.executable, "scripts/certify_fresh_clone.py", "--ref", head_sha]),
-    ]
+    commands = {
+        "local_release": [sys.executable, "scripts/certify_release.py"],
+        "python_dist": [sys.executable, "scripts/certify_python_distribution.py"],
+        "source_artifact": [sys.executable, "scripts/certify_source_artifact.py", str(source_manifest)],
+        "fresh_clone": [sys.executable, "scripts/certify_fresh_clone.py", "--ref", head_sha],
+    }
+    requested_steps = _selected_release_handoff_refresh_steps(refresh_steps)
     steps = []
-    for step_id, command in commands:
-        step = _release_handoff_certification_command(step_id, command, cfg)
+    for step_id in requested_steps:
+        step = _release_handoff_certification_command(
+            step_id,
+            commands[step_id],
+            cfg,
+            timeout_seconds=timeout_seconds,
+        )
         steps.append(step)
         if step.get("status") != "PASS":
             break
     failed = [step for step in steps if step.get("status") != "PASS"]
-    return {
+    refresh = {
         "requested": True,
         "status": "CERTIFICATION_REFRESH_FAILED" if failed else "CERTIFICATION_REFRESH_OK",
+        "requested_steps": requested_steps,
+        "timeout_seconds": timeout_seconds,
         "steps": steps,
     }
+    refresh["log"] = write_release_handoff_refresh_log(cfg, refresh, head_sha)
+    return refresh
 
 
 def build_release_handoff_report(
@@ -3231,6 +3318,8 @@ def build_release_handoff_report(
     github_workflow: str = "CI",
     probe_workflow: str = "CI Startup Probe",
     refresh_certification: bool = False,
+    refresh_steps: Sequence[str] | None = None,
+    refresh_timeout_seconds: int = 0,
 ) -> dict[str, Any]:
     head_ok, head_sha = _git_output(cfg, ["rev-parse", "HEAD"])
     head_sha = head_sha if head_ok and _is_hex_sha(head_sha) else ""
@@ -3259,7 +3348,13 @@ def build_release_handoff_report(
             "release_state_status": "UNVERIFIED",
             "github_actions_status": "UNVERIFIED",
             "current_head_receipts_summary": receipt_summary,
-            "certification_refresh": {"requested": refresh_certification, "status": "SKIPPED", "steps": []},
+            "certification_refresh": {
+                "requested": refresh_certification,
+                "status": "SKIPPED",
+                "requested_steps": _selected_release_handoff_refresh_steps(refresh_steps) if refresh_certification else [],
+                "timeout_seconds": refresh_timeout_seconds,
+                "steps": [],
+            },
             "artifacts": {},
             "artifact_verification": {},
             "checks": preflight_checks,
@@ -3276,9 +3371,20 @@ def build_release_handoff_report(
         }
 
     certification_refresh = (
-        run_release_handoff_certification_refresh(cfg, head_sha)
+        run_release_handoff_certification_refresh(
+            cfg,
+            head_sha,
+            refresh_steps=refresh_steps,
+            timeout_seconds=refresh_timeout_seconds,
+        )
         if refresh_certification
-        else {"requested": False, "status": "SKIPPED", "steps": []}
+        else {
+            "requested": False,
+            "status": "SKIPPED",
+            "requested_steps": [],
+            "timeout_seconds": refresh_timeout_seconds,
+            "steps": [],
+        }
     )
     refresh_checks = [
         _certification_gate(
@@ -3459,7 +3565,9 @@ def run_release_handoff(args: argparse.Namespace, cfg: Settings) -> int:
         cfg,
         github_workflow=args.github_workflow,
         probe_workflow=args.probe_workflow,
-        refresh_certification=args.refresh_certification,
+        refresh_certification=args.refresh_certification or bool(args.refresh_step),
+        refresh_steps=args.refresh_step,
+        refresh_timeout_seconds=args.refresh_timeout_seconds,
     )
     emit_payload(report, args.format)
     if report["status"] == "RELEASE_HANDOFF_FAILED":

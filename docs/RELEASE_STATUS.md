@@ -218,7 +218,11 @@ Observed success markers:
   verification commands. With `--refresh-certification`, it reruns current-head
   local release, Python distribution, source artifact, and fresh-clone
   certifiers first, then stops before handoff artifact writes if any certifier
-  fails.
+  fails. Repeated `--refresh-step` values select a canonical subset in release
+  order and imply certification refresh. `--refresh-timeout-seconds N` applies
+  a per-certifier timeout. Every refresh attempt writes a JSON log under
+  `data/exports/release_refresh_logs` so failed or timed-out pre-handoff runs
+  remain auditable.
 - `mucaro audit completion --include-github` composes product-audit,
   release-state, release-dashboard, package, receipt, and hosted-governance
   evidence into one active-goal matrix. It reports PASS, OPEN, BLOCKED, FAIL,

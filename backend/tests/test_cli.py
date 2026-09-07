@@ -3589,7 +3589,26 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
 
     assert payload["status"] == "RELEASE_HANDOFF_OPEN"
     assert payload["certification_refresh"]["status"] == "CERTIFICATION_REFRESH_OK"
+    assert payload["certification_refresh"]["requested_steps"] == [
+        "local_release",
+        "python_dist",
+        "source_artifact",
+        "fresh_clone",
+    ]
+    assert payload["certification_refresh"]["timeout_seconds"] == 0
     assert [step["step_id"] for step in payload["certification_refresh"]["steps"]] == [
+        "local_release",
+        "python_dist",
+        "source_artifact",
+        "fresh_clone",
+    ]
+    refresh_log = payload["certification_refresh"]["log"]
+    refresh_log_payload = json.loads(Path(refresh_log["path"]).read_text(encoding="utf-8"))
+    assert refresh_log["schema_version"] == cli.RELEASE_REFRESH_LOG_SCHEMA_VERSION
+    assert refresh_log_payload["schema_version"] == cli.RELEASE_REFRESH_LOG_SCHEMA_VERSION
+    assert refresh_log_payload["head_sha"] == head_sha
+    assert refresh_log_payload["refresh"]["status"] == "CERTIFICATION_REFRESH_OK"
+    assert refresh_log_payload["refresh"]["requested_steps"] == [
         "local_release",
         "python_dist",
         "source_artifact",
@@ -3611,6 +3630,202 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
         "next_actions_write",
         "next_actions_verify",
     ]
+
+
+def test_cli_release_handoff_refresh_step_selects_canonical_subset(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "f" * 40
+    calls: list[str] = []
+    receipt_calls = {"count": 0}
+
+    distribution_path = tmp_path / "data" / "exports" / "distribution_manifests" / f"distribution-manifest-{head_sha[:12]}.json"
+    governance_path = tmp_path / "data" / "exports" / "governance_reports" / f"governance-report-{head_sha[:12]}.json"
+    support_path = tmp_path / "data" / "exports" / "support_bundles" / f"support-bundle-{head_sha[:12]}.json"
+    next_actions_path = tmp_path / "data" / "exports" / "release_next_actions" / f"next-actions-{head_sha[:12]}.json"
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        return False, f"unexpected command: {args}"
+
+    def fake_run(cmd: list[str], **kwargs):
+        assert kwargs["timeout"] == 9
+        command_text = " ".join(cmd)
+        if "certify_python_distribution.py" in command_text:
+            calls.append("refresh:python_dist")
+            return subprocess.CompletedProcess(cmd, 0, stdout="PYTHON_DIST_CERT_OK\n")
+        if "certify_fresh_clone.py" in command_text:
+            assert cmd[-1] == head_sha
+            calls.append("refresh:fresh_clone")
+            return subprocess.CompletedProcess(cmd, 0, stdout="FRESH_CLONE_CERT_OK\n")
+        raise AssertionError(f"unexpected subprocess command: {cmd}")
+
+    def fake_receipts(_root: Path):
+        receipt_calls["count"] += 1
+        if receipt_calls["count"] == 1:
+            return []
+        return [
+            {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
+            for index in range(7)
+        ]
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli, "list_release_receipts", fake_receipts)
+    monkeypatch.setattr(
+        cli,
+        "build_distribution_manifest",
+        lambda _root, *, output_path=None, save=False: {
+            "export": {"path": str(distribution_path), "sha256": "d" * 64, "size_bytes": 10}
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "verify_distribution_manifest",
+        lambda *_args, **_kwargs: {
+            "status": "DISTRIBUTION_MANIFEST_VERIFIED",
+            "artifact": {"path": str(distribution_path), "sha256": "d" * 64},
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "build_release_support_bundle",
+        lambda *_args, **_kwargs: {
+            "case_status": "HOSTED_GOVERNANCE_OPEN",
+            "governance_report": {"path": str(governance_path)},
+            "export": {"path": str(support_path), "sha256": "s" * 64, "size_bytes": 11},
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "verify_release_support_bundle",
+        lambda *_args, **_kwargs: {
+            "status": "SUPPORT_BUNDLE_VERIFIED",
+            "artifact": {"path": str(support_path), "sha256": "s" * 64},
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "verify_release_governance_report",
+        lambda *_args, **_kwargs: {
+            "status": "GOVERNANCE_REPORT_VERIFIED",
+            "artifact": {"path": str(governance_path), "sha256": "g" * 64},
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "build_release_next_actions_report",
+        lambda *_args, **_kwargs: {
+            "head_sha": head_sha,
+            "tag_at_head": ["v0.1.23-handoff-refresh"],
+            "hosted_governance_status": "OPEN",
+            "release_dashboard_status": "RELEASE_DASHBOARD_OPEN",
+            "release_state_status": "RELEASE_STATE_OPEN",
+            "github_actions_status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+        },
+    )
+    monkeypatch.setattr(
+        cli,
+        "write_release_next_actions_report",
+        lambda *_args, **_kwargs: {"path": str(next_actions_path), "sha256": "n" * 64, "size_bytes": 13},
+    )
+    monkeypatch.setattr(
+        cli,
+        "verify_release_next_actions_report",
+        lambda *_args, **_kwargs: {
+            "status": "RELEASE_NEXT_ACTIONS_VERIFIED",
+            "artifact": {"path": str(next_actions_path), "sha256": "n" * 64},
+        },
+    )
+
+    assert (
+        main(
+            [
+                "release",
+                "handoff",
+                "--refresh-step",
+                "fresh_clone",
+                "--refresh-step",
+                "python_dist",
+                "--refresh-timeout-seconds",
+                "9",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["certification_refresh"]["requested"] is True
+    assert payload["certification_refresh"]["status"] == "CERTIFICATION_REFRESH_OK"
+    assert payload["certification_refresh"]["requested_steps"] == ["python_dist", "fresh_clone"]
+    assert payload["certification_refresh"]["timeout_seconds"] == 9
+    assert [step["step_id"] for step in payload["certification_refresh"]["steps"]] == ["python_dist", "fresh_clone"]
+    assert calls == [
+        "refresh:python_dist",
+        "refresh:fresh_clone",
+    ]
+
+
+def test_cli_release_handoff_refresh_timeout_stops_before_handoff_artifacts(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "a" * 40
+    calls: list[str] = []
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        return False, f"unexpected command: {args}"
+
+    def fake_run(cmd: list[str], **kwargs):
+        assert kwargs["timeout"] == 1
+        calls.append("refresh:local_release")
+        raise subprocess.TimeoutExpired(cmd, 1, output="still running\n")
+
+    def unexpected_artifact_write(*_args, **_kwargs):
+        raise AssertionError("release handoff should not write artifacts after certification refresh timeout")
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli, "list_release_receipts", lambda _root: [])
+    monkeypatch.setattr(cli, "build_distribution_manifest", unexpected_artifact_write)
+    monkeypatch.setattr(cli, "build_release_support_bundle", unexpected_artifact_write)
+    monkeypatch.setattr(cli, "write_release_next_actions_report", unexpected_artifact_write)
+
+    assert (
+        main(
+            [
+                "release",
+                "handoff",
+                "--refresh-certification",
+                "--refresh-timeout-seconds",
+                "1",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    payload = json.loads(capsys.readouterr().out)
+    step = payload["certification_refresh"]["steps"][0]
+
+    assert payload["status"] == "RELEASE_HANDOFF_FAILED"
+    assert payload["certification_refresh"]["status"] == "CERTIFICATION_REFRESH_FAILED"
+    assert payload["certification_refresh"]["timeout_seconds"] == 1
+    assert step["step_id"] == "local_release"
+    assert step["timed_out"] is True
+    assert step["returncode"] is None
+    assert step["detail"] == "TIMEOUT_AFTER_SECONDS:1"
+    assert step["output_tail"] == ["still running"]
+    assert payload["artifacts"] == {}
+    assert calls == ["refresh:local_release"]
 
 
 def test_cli_release_handoff_refresh_failure_stops_before_handoff_artifacts(tmp_path: Path, capsys, monkeypatch):

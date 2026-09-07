@@ -377,8 +377,15 @@ the local handoff artifacts verify but hosted governance is still open; add
 `--strict` when that open hosted state should produce exit code 2. Add
 `--refresh-certification` when the command should first rerun current-head local
 release, Python distribution, source artifact, and fresh-clone certifiers before
-writing handoff artifacts. If that refresh fails, the command stops before
-writing the handoff artifact set.
+writing handoff artifacts. Use repeated `--refresh-step` values to run a
+canonical subset, for example `--refresh-step python_dist --refresh-step
+fresh_clone`; selecting a step implies `--refresh-certification`. The allowed
+steps are `local_release`, `python_dist`, `source_artifact`, and `fresh_clone`,
+and selected steps always run in that release order. Add
+`--refresh-timeout-seconds N` to cap each certifier run, where `0` disables the
+timeout. Each refresh attempt writes a JSON log under
+`data/exports/release_refresh_logs`; if that refresh fails or times out, the
+command stops before writing the handoff artifact set.
 
 Use `mucaro release support-bundle --save` when hosted governance is open and
 the operator needs a single support-ready evidence artifact. The command runs
