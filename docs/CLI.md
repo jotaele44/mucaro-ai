@@ -374,7 +374,11 @@ the current-head governance report, saves and verifies the support bundle, saves
 and verifies the next-actions runbook, and prints the exact verification
 commands for all four artifacts. The command returns `RELEASE_HANDOFF_OPEN` when
 the local handoff artifacts verify but hosted governance is still open; add
-`--strict` when that open hosted state should produce exit code 2.
+`--strict` when that open hosted state should produce exit code 2. Add
+`--refresh-certification` when the command should first rerun current-head local
+release, Python distribution, source artifact, and fresh-clone certifiers before
+writing handoff artifacts. If that refresh fails, the command stops before
+writing the handoff artifact set.
 
 Use `mucaro release support-bundle --save` when hosted governance is open and
 the operator needs a single support-ready evidence artifact. The command runs

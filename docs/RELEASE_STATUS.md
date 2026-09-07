@@ -215,7 +215,10 @@ Observed success markers:
   the current-head handoff artifact set. It saves and verifies the distribution
   manifest, ensures the governance report, saves and verifies the support
   bundle, saves and verifies the next-actions runbook, and prints the exact
-  verification commands.
+  verification commands. With `--refresh-certification`, it reruns current-head
+  local release, Python distribution, source artifact, and fresh-clone
+  certifiers first, then stops before handoff artifact writes if any certifier
+  fails.
 - `mucaro audit completion --include-github` composes product-audit,
   release-state, release-dashboard, package, receipt, and hosted-governance
   evidence into one active-goal matrix. It reports PASS, OPEN, BLOCKED, FAIL,

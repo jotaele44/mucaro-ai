@@ -3424,6 +3424,233 @@ def test_cli_release_handoff_saves_and_verifies_ordered_artifact_set(tmp_path: P
     assert "OPEN hosted_governance OPEN" in text_output
 
 
+def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "d" * 40
+    calls: list[str] = []
+    receipt_calls = {"count": 0}
+
+    distribution_path = tmp_path / "data" / "exports" / "distribution_manifests" / f"distribution-manifest-{head_sha[:12]}.json"
+    governance_path = tmp_path / "data" / "exports" / "governance_reports" / f"governance-report-{head_sha[:12]}.json"
+    support_path = tmp_path / "data" / "exports" / "support_bundles" / f"support-bundle-{head_sha[:12]}.json"
+    next_actions_path = tmp_path / "data" / "exports" / "release_next_actions" / f"next-actions-{head_sha[:12]}.json"
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        return False, f"unexpected command: {args}"
+
+    def fake_run(cmd: list[str], **_kwargs):
+        command_text = " ".join(cmd)
+        if "certify_release.py" in command_text:
+            calls.append("refresh:local_release")
+            return subprocess.CompletedProcess(cmd, 0, stdout="CERTIFY_RELEASE_OK\n")
+        if "certify_python_distribution.py" in command_text:
+            calls.append("refresh:python_dist")
+            return subprocess.CompletedProcess(cmd, 0, stdout="PYTHON_DIST_CERT_OK\n")
+        if "certify_source_artifact.py" in command_text:
+            assert cmd[-1].endswith(f"mucaro-ai-0.1.23-{head_sha[:12]}-artifact-manifest.json")
+            calls.append("refresh:source_artifact")
+            return subprocess.CompletedProcess(cmd, 0, stdout="SOURCE_ARTIFACT_CERT_OK\n")
+        if "certify_fresh_clone.py" in command_text:
+            assert cmd[-1] == head_sha
+            calls.append("refresh:fresh_clone")
+            return subprocess.CompletedProcess(cmd, 0, stdout="FRESH_CLONE_CERT_OK\n")
+        raise AssertionError(f"unexpected subprocess command: {cmd}")
+
+    def fake_receipts(_root: Path):
+        receipt_calls["count"] += 1
+        if receipt_calls["count"] == 1:
+            return []
+        return [
+            {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
+            for index in range(7)
+        ]
+
+    def fake_distribution(root: Path, *, output_path: Path | None = None, save: bool = False):
+        assert root == tmp_path
+        assert output_path is None
+        assert save is True
+        calls.append("distribution")
+        return {"export": {"path": str(distribution_path), "sha256": "d" * 64, "size_bytes": 10}}
+
+    def fake_distribution_verify(
+        artifact_path: Path,
+        *,
+        root: Path,
+        expected_sha256: str | None = None,
+        require_current_head: bool = False,
+    ):
+        assert artifact_path == distribution_path
+        assert root == tmp_path
+        assert expected_sha256 == "d" * 64
+        assert require_current_head is True
+        calls.append("distribution_verify")
+        return {"status": "DISTRIBUTION_MANIFEST_VERIFIED", "artifact": {"path": str(distribution_path), "sha256": "d" * 64}}
+
+    def fake_support(
+        _cfg: Settings,
+        *,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+        output_path: Path | None = None,
+        save: bool = False,
+    ):
+        assert github_workflow == "CI"
+        assert probe_workflow == "CI Startup Probe"
+        assert output_path is None
+        assert save is True
+        calls.append("support")
+        return {
+            "case_status": "HOSTED_GOVERNANCE_OPEN",
+            "governance_report": {"path": str(governance_path)},
+            "export": {"path": str(support_path), "sha256": "s" * 64, "size_bytes": 11},
+        }
+
+    def fake_support_verify(
+        _cfg: Settings,
+        artifact_path: Path,
+        *,
+        require_current_head: bool = False,
+        expected_sha256: str | None = None,
+    ):
+        assert artifact_path == support_path
+        assert require_current_head is True
+        assert expected_sha256 == "s" * 64
+        calls.append("support_verify")
+        return {"status": "SUPPORT_BUNDLE_VERIFIED", "artifact": {"path": str(support_path), "sha256": "s" * 64}}
+
+    def fake_governance_verify(
+        _cfg: Settings,
+        artifact_path: Path,
+        *,
+        require_current_head: bool = False,
+        expected_sha256: str | None = None,
+    ):
+        assert artifact_path == governance_path
+        assert require_current_head is True
+        assert expected_sha256 is None
+        calls.append("governance_verify")
+        return {"status": "GOVERNANCE_REPORT_VERIFIED", "artifact": {"path": str(governance_path), "sha256": "g" * 64}}
+
+    def fake_next_actions(
+        _cfg: Settings,
+        *,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        assert github_workflow == "CI"
+        assert probe_workflow == "CI Startup Probe"
+        calls.append("next_actions")
+        return {
+            "head_sha": head_sha,
+            "tag_at_head": ["v0.1.23-handoff-refresh"],
+            "hosted_governance_status": "OPEN",
+            "release_dashboard_status": "RELEASE_DASHBOARD_OPEN",
+            "release_state_status": "RELEASE_STATE_OPEN",
+            "github_actions_status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+        }
+
+    def fake_write_next_actions(_cfg: Settings, report: dict[str, object], *, output_path: Path | None = None):
+        assert report["head_sha"] == head_sha
+        assert output_path is None
+        calls.append("next_actions_write")
+        return {"path": str(next_actions_path), "sha256": "n" * 64, "size_bytes": 13}
+
+    def fake_next_actions_verify(
+        _cfg: Settings,
+        artifact_path: Path,
+        *,
+        require_current_head: bool = False,
+        expected_sha256: str | None = None,
+    ):
+        assert artifact_path == next_actions_path
+        assert require_current_head is True
+        assert expected_sha256 == "n" * 64
+        calls.append("next_actions_verify")
+        return {"status": "RELEASE_NEXT_ACTIONS_VERIFIED", "artifact": {"path": str(next_actions_path), "sha256": "n" * 64}}
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli, "list_release_receipts", fake_receipts)
+    monkeypatch.setattr(cli, "build_distribution_manifest", fake_distribution)
+    monkeypatch.setattr(cli, "verify_distribution_manifest", fake_distribution_verify)
+    monkeypatch.setattr(cli, "build_release_support_bundle", fake_support)
+    monkeypatch.setattr(cli, "verify_release_support_bundle", fake_support_verify)
+    monkeypatch.setattr(cli, "verify_release_governance_report", fake_governance_verify)
+    monkeypatch.setattr(cli, "build_release_next_actions_report", fake_next_actions)
+    monkeypatch.setattr(cli, "write_release_next_actions_report", fake_write_next_actions)
+    monkeypatch.setattr(cli, "verify_release_next_actions_report", fake_next_actions_verify)
+
+    assert main(["release", "handoff", "--refresh-certification", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "RELEASE_HANDOFF_OPEN"
+    assert payload["certification_refresh"]["status"] == "CERTIFICATION_REFRESH_OK"
+    assert [step["step_id"] for step in payload["certification_refresh"]["steps"]] == [
+        "local_release",
+        "python_dist",
+        "source_artifact",
+        "fresh_clone",
+    ]
+    assert payload["current_head_receipts_summary"]["total"] == 7
+    assert receipt_calls["count"] == 2
+    assert calls == [
+        "refresh:local_release",
+        "refresh:python_dist",
+        "refresh:source_artifact",
+        "refresh:fresh_clone",
+        "distribution",
+        "distribution_verify",
+        "support",
+        "support_verify",
+        "governance_verify",
+        "next_actions",
+        "next_actions_write",
+        "next_actions_verify",
+    ]
+
+
+def test_cli_release_handoff_refresh_failure_stops_before_handoff_artifacts(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "e" * 40
+    calls: list[str] = []
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        if args == ["git", "status", "--short"]:
+            return True, ""
+        return False, f"unexpected command: {args}"
+
+    def fake_run(cmd: list[str], **_kwargs):
+        calls.append("refresh")
+        return subprocess.CompletedProcess(cmd, 2, stdout="CERTIFY_RELEASE_FAILED\n")
+
+    def unexpected_artifact_write(*_args, **_kwargs):
+        raise AssertionError("release handoff should not write artifacts after certification refresh failure")
+
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli, "list_release_receipts", lambda _root: [])
+    monkeypatch.setattr(cli, "build_distribution_manifest", unexpected_artifact_write)
+    monkeypatch.setattr(cli, "build_release_support_bundle", unexpected_artifact_write)
+    monkeypatch.setattr(cli, "write_release_next_actions_report", unexpected_artifact_write)
+
+    assert main(["release", "handoff", "--refresh-certification", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in payload["checks"]}
+
+    assert payload["status"] == "RELEASE_HANDOFF_FAILED"
+    assert payload["certification_refresh"]["status"] == "CERTIFICATION_REFRESH_FAILED"
+    assert [step["step_id"] for step in payload["certification_refresh"]["steps"]] == ["local_release"]
+    assert payload["artifacts"] == {}
+    assert checks["certification_refresh:local_release"]["status"] == "FAIL"
+    assert calls == ["refresh"]
+
+
 def test_cli_release_handoff_fails_before_writing_when_worktree_is_dirty(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     head_sha = "c" * 40

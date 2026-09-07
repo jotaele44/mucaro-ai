@@ -690,6 +690,11 @@ def build_parser() -> argparse.ArgumentParser:
     release_handoff.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     release_handoff.add_argument("--strict", action="store_true", help="Exit nonzero until the handoff is fully ready.")
     release_handoff.add_argument(
+        "--refresh-certification",
+        action="store_true",
+        help="Run current-head local release, Python distribution, source artifact, and fresh-clone certifiers before saving handoff artifacts.",
+    )
+    release_handoff.add_argument(
         "--github-workflow",
         default="CI",
         help="Primary GitHub Actions workflow name to inspect.",
@@ -1068,6 +1073,17 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"receipt_count={receipts.get('total')}")
             print(f"receipt_valid={receipts.get('valid')}")
             print(f"receipt_invalid={receipts.get('invalid')}")
+        refresh = payload.get("certification_refresh")
+        if isinstance(refresh, dict):
+            print(f"certification_refresh_requested={refresh.get('requested')}")
+            print(f"certification_refresh_status={refresh.get('status')}")
+            for step in refresh.get("steps", []):
+                if isinstance(step, dict):
+                    detail = str(step.get("detail")).replace("\n", "\\n")
+                    print(
+                        f"certification_refresh_step={step.get('status')} "
+                        f"{step.get('step_id')} returncode={step.get('returncode')} detail={detail}"
+                    )
         artifacts = payload.get("artifacts", {})
         if isinstance(artifacts, dict):
             for artifact_id in ["distribution_manifest", "governance_report", "support_bundle", "next_actions"]:
@@ -3159,11 +3175,62 @@ def _artifact_export(payload: dict[str, Any]) -> dict[str, Any]:
     return {"path": None, "sha256": None, "size_bytes": None, "schema_version": None}
 
 
+def _release_handoff_certification_command(step_id: str, command: list[str], cfg: Settings) -> dict[str, Any]:
+    proc = subprocess.run(
+        command,
+        cwd=cfg.project_root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    output = proc.stdout.strip()
+    output_lines = output.splitlines()
+    return {
+        "step_id": step_id,
+        "status": "PASS" if proc.returncode == 0 else "FAIL",
+        "returncode": proc.returncode,
+        "command": " ".join(command),
+        "detail": output_lines[-1] if output_lines else f"returncode={proc.returncode}",
+        "output_tail": output_lines[-20:],
+    }
+
+
+def run_release_handoff_certification_refresh(cfg: Settings, head_sha: str) -> dict[str, Any]:
+    head_prefix = head_sha[:12]
+    source_manifest = (
+        cfg.project_root
+        / "data"
+        / "exports"
+        / "packages"
+        / f"mucaro-ai-{package_version()}-{head_prefix}-artifact-manifest.json"
+    )
+    commands = [
+        ("local_release", [sys.executable, "scripts/certify_release.py"]),
+        ("python_dist", [sys.executable, "scripts/certify_python_distribution.py"]),
+        ("source_artifact", [sys.executable, "scripts/certify_source_artifact.py", str(source_manifest)]),
+        ("fresh_clone", [sys.executable, "scripts/certify_fresh_clone.py", "--ref", head_sha]),
+    ]
+    steps = []
+    for step_id, command in commands:
+        step = _release_handoff_certification_command(step_id, command, cfg)
+        steps.append(step)
+        if step.get("status") != "PASS":
+            break
+    failed = [step for step in steps if step.get("status") != "PASS"]
+    return {
+        "requested": True,
+        "status": "CERTIFICATION_REFRESH_FAILED" if failed else "CERTIFICATION_REFRESH_OK",
+        "steps": steps,
+    }
+
+
 def build_release_handoff_report(
     cfg: Settings,
     *,
     github_workflow: str = "CI",
     probe_workflow: str = "CI Startup Probe",
+    refresh_certification: bool = False,
 ) -> dict[str, Any]:
     head_ok, head_sha = _git_output(cfg, ["rev-parse", "HEAD"])
     head_sha = head_sha if head_ok and _is_hex_sha(head_sha) else ""
@@ -3192,6 +3259,7 @@ def build_release_handoff_report(
             "release_state_status": "UNVERIFIED",
             "github_actions_status": "UNVERIFIED",
             "current_head_receipts_summary": receipt_summary,
+            "certification_refresh": {"requested": refresh_certification, "status": "SKIPPED", "steps": []},
             "artifacts": {},
             "artifact_verification": {},
             "checks": preflight_checks,
@@ -3206,6 +3274,54 @@ def build_release_handoff_report(
                 "mucaro release receipts --current-head --format text",
             ],
         }
+
+    certification_refresh = (
+        run_release_handoff_certification_refresh(cfg, head_sha)
+        if refresh_certification
+        else {"requested": False, "status": "SKIPPED", "steps": []}
+    )
+    refresh_checks = [
+        _certification_gate(
+            f"certification_refresh:{step.get('step_id')}",
+            str(step.get("status")),
+            str(step.get("detail") or ""),
+        )
+        for step in certification_refresh.get("steps", [])
+        if isinstance(step, dict)
+    ]
+    if any(check.get("status") == "FAIL" for check in refresh_checks):
+        checks = [*preflight_checks, *refresh_checks]
+        return {
+            "status": "RELEASE_HANDOFF_FAILED",
+            "version": package_version(),
+            "project_root": str(cfg.project_root),
+            "head_sha": head_sha or None,
+            "tag_at_head": [],
+            "hosted_governance_status": "UNVERIFIED",
+            "release_dashboard_status": "UNVERIFIED",
+            "release_state_status": "UNVERIFIED",
+            "github_actions_status": "UNVERIFIED",
+            "current_head_receipts_summary": receipt_summary,
+            "certification_refresh": certification_refresh,
+            "artifacts": {},
+            "artifact_verification": {},
+            "checks": checks,
+            "counts": {
+                "pass": sum(1 for check in checks if check.get("status") == "PASS"),
+                "open": 0,
+                "fail": sum(1 for check in checks if check.get("status") == "FAIL"),
+                "total": len(checks),
+            },
+            "verification_commands": [
+                "mucaro release handoff --refresh-certification --format text",
+                "mucaro release receipts --current-head --format text",
+            ],
+        }
+
+    if refresh_certification:
+        receipts = list_release_receipts(cfg.project_root)
+        current_head_receipts = [row for row in receipts if row.get("head_sha") == head_sha]
+        receipt_summary = summarize_release_receipts(current_head_receipts)
 
     distribution = build_distribution_manifest(cfg.project_root, save=True)
     distribution_export = _artifact_export(distribution)
@@ -3254,6 +3370,7 @@ def build_release_handoff_report(
 
     checks = [
         *preflight_checks,
+        *refresh_checks,
         _certification_gate(
             "current_head_receipts",
             "PASS" if receipt_summary.get("total") == 7 and receipt_summary.get("valid") == 7 else "FAIL",
@@ -3318,6 +3435,7 @@ def build_release_handoff_report(
         "release_state_status": next_actions.get("release_state_status"),
         "github_actions_status": next_actions.get("github_actions_status"),
         "current_head_receipts_summary": receipt_summary,
+        "certification_refresh": certification_refresh,
         "artifacts": artifacts,
         "artifact_verification": {
             "distribution_manifest": distribution_verify,
@@ -3341,6 +3459,7 @@ def run_release_handoff(args: argparse.Namespace, cfg: Settings) -> int:
         cfg,
         github_workflow=args.github_workflow,
         probe_workflow=args.probe_workflow,
+        refresh_certification=args.refresh_certification,
     )
     emit_payload(report, args.format)
     if report["status"] == "RELEASE_HANDOFF_FAILED":
