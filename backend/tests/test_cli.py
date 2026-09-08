@@ -202,23 +202,29 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert main(["audit", "product", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "PRODUCT_AUDIT_OPEN"
-    assert payload["readiness_percent"] == 94.1
-    assert payload["counts"] == {"pass": 16, "open": 1, "blocked": 0, "total": 17}
+    assert payload["readiness_percent"] == 72.7
+    assert payload["counts"] == {"pass": 16, "open": 6, "blocked": 0, "total": 22}
     by_id = {row["requirement_id"]: row for row in payload["requirements"]}
     assert by_id["permission_gated_user_directory"]["status"] == "PASS"
     assert by_id["source_lineage_citations"]["status"] == "PASS"
     assert by_id["semantic_vector_store"]["status"] == "PASS"
     assert by_id["tool_use_and_actions"]["status"] == "PASS"
+    assert by_id["advanced_gis_processing"]["status"] == "OPEN"
+    assert by_id["state_of_art_ocr_analysis"]["status"] == "OPEN"
+    assert by_id["governed_web_browsing"]["status"] == "OPEN"
+    assert by_id["coding_programming_expertise"]["status"] == "OPEN"
+    assert by_id["transparency_objectivity_governance"]["status"] == "OPEN"
     assert by_id["multimodal_interface"]["status"] == "PASS"
     assert by_id["personalization_memory"]["status"] == "PASS"
     assert by_id["production_security"]["status"] == "PASS"
     assert by_id["source_artifact_packaging"]["status"] == "PASS"
     assert by_id["github_release_governance"]["status"] == "OPEN"
-    assert payload["next_recommended_vector"] == "github_release_governance"
+    assert payload["next_recommended_vector"] == "advanced_gis_processing"
 
     assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out
     assert "PRODUCT_AUDIT_OPEN" in strict_output
+    assert "OPEN advanced_gis_processing" in strict_output
     assert "PASS source_artifact_packaging" in strict_output
     assert "OPEN github_release_governance" in strict_output
 
@@ -230,14 +236,22 @@ def test_cli_product_roadmap_groups_audit_gaps(tmp_path: Path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "PRODUCT_ROADMAP_OPEN"
     assert payload["audit_status"] == "PRODUCT_AUDIT_OPEN"
-    assert payload["audit_counts"] == {"pass": 16, "open": 1, "blocked": 0, "total": 17}
-    assert payload["next_recommended_stage"] == "hosted_release_governance"
-    assert payload["next_recommended_vector"] == "github_release_governance"
+    assert payload["audit_counts"] == {"pass": 16, "open": 6, "blocked": 0, "total": 22}
+    assert payload["next_recommended_stage"] == "advanced_capability_expansion"
+    assert payload["next_recommended_vector"] == "advanced_gis_processing"
 
     stages = {stage["stage_id"]: stage for stage in payload["stages"]}
     assert stages["canonical_operator_surface"]["status"] == "PASS"
     assert stages["permissioned_source_grounding"]["status"] == "PASS"
     assert stages["controlled_assistant_behavior"]["status"] == "PASS"
+    assert stages["advanced_capability_expansion"]["status"] == "OPEN"
+    assert stages["advanced_capability_expansion"]["open_requirements"] == [
+        "advanced_gis_processing",
+        "state_of_art_ocr_analysis",
+        "governed_web_browsing",
+        "coding_programming_expertise",
+        "transparency_objectivity_governance",
+    ]
     assert stages["release_packaging_certification"]["status"] == "PASS"
     assert stages["hosted_release_governance"]["status"] == "OPEN"
     assert stages["hosted_release_governance"]["open_requirements"] == ["github_release_governance"]
@@ -245,10 +259,11 @@ def test_cli_product_roadmap_groups_audit_gaps(tmp_path: Path, capsys):
     assert main(["audit", "roadmap", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out
     assert "PRODUCT_ROADMAP_OPEN" in strict_output
-    assert "audit_total=17" in strict_output
-    assert "next_recommended_stage=hosted_release_governance" in strict_output
+    assert "audit_total=22" in strict_output
+    assert "next_recommended_stage=advanced_capability_expansion" in strict_output
+    assert "OPEN advanced_capability_expansion" in strict_output
     assert "OPEN hosted_release_governance" in strict_output
-    assert "open_requirements=github_release_governance" in strict_output
+    assert "open_requirements=advanced_gis_processing,state_of_art_ocr_analysis,governed_web_browsing,coding_programming_expertise,transparency_objectivity_governance" in strict_output
 
 
 def test_cli_eval_retrieval_reports_quality_metrics(tmp_path: Path, capsys):

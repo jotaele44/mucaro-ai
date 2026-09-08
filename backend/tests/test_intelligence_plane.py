@@ -21,3 +21,8 @@ def test_intelligence_plane_capability_states_do_not_overclaim():
     assert capabilities["execution_router"]["state"] == "ABSENT"
     assert capabilities["cross_repo_orchestration"]["state"] == "ABSENT"
     assert capabilities["model_runtime"]["state"] == "PARTIAL"
+    assert capabilities["advanced_gis_processing"]["state"] == "ABSENT"
+    assert capabilities["state_of_art_ocr_analysis"]["state"] == "ABSENT"
+    assert capabilities["governed_web_browsing"]["state"] == "ABSENT"
+    assert capabilities["coding_programming_expertise"]["state"] == "ABSENT"
+    assert capabilities["transparency_objectivity_governance"]["state"] == "CANDIDATE"

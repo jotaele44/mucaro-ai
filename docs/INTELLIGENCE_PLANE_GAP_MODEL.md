@@ -24,6 +24,11 @@ Mucaro is being developed independently as an `INTELLIGENCE_PLANE_CANDIDATE`. Th
 | FEDERATION LOCKSTEP client | ABSENT | Activation and compatibility impact gates |
 | Cross-repo orchestration | ABSENT | Contract-bound orchestration without direct domain-data ownership |
 | Federation worker plane | ABSENT | Optional heavy execution target; domain repos remain autonomous |
+| Advanced GIS processing | ABSENT | Spatial engine/runtime with CRS, geometry, topology, map/export, and provenance gates |
+| State-of-the-art OCR analysis | ABSENT | OCR/layout/confidence pipeline with source-image traceability and regression fixtures |
+| Governed web browsing | ABSENT | Approved browsing tool family with URL policy, byte snapshots, parser traces, and citations |
+| Coding/programming expertise | ABSENT | Governed code read/patch/test/review capability with sandbox and diff receipts |
+| Transparency/objectivity governance | CANDIDATE | Cross-capability evidence taxonomy, uncertainty, contradiction, and falsification rules |
 
 ## Intersection
 
@@ -37,6 +42,8 @@ The intersection between current Mucaro and the target Intelligence Plane includ
 - explicit local memory controls
 - workspace/configuration surfaces
 - local security posture and release certification
+- early evidence-governance foundation through citations, receipts, support bundles,
+  and product audits
 
 ## Mucaro-only / implementation-specific capability
 
@@ -60,6 +67,12 @@ These remain implementation details unless promoted by a future federation contr
 - domain-repo adapters
 - federated execution provenance and artifact identity
 - provider-neutral model runtime beyond current mock/Anthropic adapters
+- advanced GIS processing and spatial evidence gates
+- OCR/layout/confidence analysis with source-image traceability
+- governed web browsing with URL policy and immutable fetch snapshots
+- coding-agent read/patch/test/review behavior inside explicit workspace safety boundaries
+- cross-capability transparency/objectivity contracts for uncertainty, contradictory
+  evidence, and falsification criteria
 
 ## Symmetric difference
 
@@ -76,7 +89,8 @@ The symmetric difference is therefore dominated by federation-specific control-p
 7. A failed candidate activation must not replace a known-good active mount.
 8. Execution receipts must identify the exact skill digest and runtime class.
 9. Cross-repo orchestration will consume explicit contracts rather than direct uncontrolled access to domain repositories.
-10. `FEDERATION_INTELLIGENCE_PLANE_CERTIFIED` remains unavailable until cross-repo and Lockstep certification is performed in the federation execution environment.
+10. Advanced GIS, OCR, browsing, and coding capabilities remain unavailable until their contracts, permission gates, provenance ledgers, and regression fixtures pass.
+11. `FEDERATION_INTELLIGENCE_PLANE_CERTIFIED` remains unavailable until cross-repo and Lockstep certification is performed in the federation execution environment.
 
 ## Current bounded claim
 

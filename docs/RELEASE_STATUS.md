@@ -257,17 +257,20 @@ Observed success markers:
   entrypoint, desktop package manifest, generated outputs, release artifact
   policy, and distribution policy pass; hosted GitHub Actions startup remains
   open.
-- `mucaro audit product` now uses the governed-release objective. The current
-  scope reports `16 PASS`, `1 OPEN`, `0 BLOCKED`, and `94.1%` readiness:
-  assistant capabilities and source-artifact packaging pass, while
-  `github_release_governance` remains open because hosted CI startup and branch
-  protection are not yet proven. Tag binding is verified separately by the
-  release-state and GitHub governance commands.
+- `mucaro audit product` now uses the expanded governed-release objective. The
+  current scope reports `16 PASS`, `6 OPEN`, `0 BLOCKED`, and `72.7%`
+  readiness: the existing local assistant capabilities and source-artifact
+  packaging pass, while advanced GIS processing, state-of-the-art OCR analysis,
+  governed web browsing, coding/programming expertise, cross-capability
+  transparency/objectivity governance, and hosted GitHub governance remain
+  open. Tag binding is verified separately by the release-state and GitHub
+  governance commands.
 - `mucaro audit roadmap` groups the same product-audit rows into development
   stages without changing the denominator. It reports the canonical operator
-  surface, permissioned source grounding, controlled assistant behavior, release
-  packaging certification, and hosted release governance as stage-level gates,
-  with `hosted_release_governance` as the current open stage.
+  surface, permissioned source grounding, controlled assistant behavior,
+  advanced capability expansion, release packaging certification, and hosted
+  release governance as stage-level gates, with
+  `advanced_capability_expansion` as the current open stage.
 - HTML and HTM files are now first-class local document-ingestion inputs. The
   parser extracts visible text, preserves title and link-count metadata in the
   source manifest, excludes script/style/template content from retrieval text,

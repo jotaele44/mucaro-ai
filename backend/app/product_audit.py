@@ -13,7 +13,10 @@ OBJECTIVE = (
     "measurable retrieval quality, permissioned source ingestion, cited answer "
     "traceability, explicit memory controls, approved tool execution, "
     "repeatable fresh-clone certification, and a clear path toward "
-    "production-quality packaging."
+    "production-quality packaging. Capabilities must include advanced GIS "
+    "processing, state-of-the-art OCR analysis, powerful web browsing "
+    "abilities, coding and programming expertise, all governed by maximum "
+    "transparency and objectivity."
 )
 
 
@@ -177,6 +180,51 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Add narrowly scoped write/action tools only with per-tool policies and stronger UX review.",
         ),
         ProductRequirement(
+            "advanced_gis_processing",
+            "capability_expansion",
+            "Assistant supports advanced GIS processing with spatial provenance and repeatable geometry checks.",
+            "OPEN",
+            "docs/PHASE2_QUEUE.md queues GIS/PostGIS service adapter work.",
+            "No implemented GIS processing engine, spatial CRS/geometry validation gate, map export path, or GIS eval corpus is present.",
+            "Define local GIS adapters, geometry invariants, CRS preservation rules, and receipt-backed spatial regression fixtures before implementation.",
+        ),
+        ProductRequirement(
+            "state_of_art_ocr_analysis",
+            "capability_expansion",
+            "Assistant supports state-of-the-art OCR analysis with confidence, layout, and source-image traceability.",
+            "OPEN",
+            "backend/app/multimodal.py currently supports scoped media metadata only.",
+            "No OCR engine adapter, image text extraction pipeline, confidence calibration, layout preservation, or OCR regression corpus is present.",
+            "Add an OCR capability contract covering image permissions, raw text preservation, confidence thresholds, layout evidence, and negative fixtures.",
+        ),
+        ProductRequirement(
+            "governed_web_browsing",
+            "capability_expansion",
+            "Assistant has powerful web browsing abilities governed by provenance, safety, and citation controls.",
+            "OPEN",
+            "backend/app/tools.py provides an approval-gated local tool runtime, but no browser/fetch capability contract.",
+            "No URL allow/deny policy, fetch snapshot ledger, robots/cache policy, page parsing trace, or web citation eval gate is implemented.",
+            "Introduce browsing as an approved tool family with URL policy, snapshot hashes, retrieval UTC, parser metadata, and cited answer tests.",
+        ),
+        ProductRequirement(
+            "coding_programming_expertise",
+            "capability_expansion",
+            "Assistant can perform coding and programming work with transparent patches, tests, and repository safety boundaries.",
+            "OPEN",
+            "The repository has CLI/test/release automation, but Mucaro itself does not yet expose a governed coding-agent capability.",
+            "No codebase indexing policy, patch proposal format, test-selection contract, sandbox policy, or code-review evidence gate is implemented.",
+            "Define a coding capability boundary for read/patch/test actions, diff receipts, failure preservation, and objective review output.",
+        ),
+        ProductRequirement(
+            "transparency_objectivity_governance",
+            "capability_expansion",
+            "All advanced capabilities preserve maximum transparency and objectivity through evidence, uncertainty, and contradiction handling.",
+            "OPEN",
+            "Existing cited retrieval, release receipts, support bundles, and audit commands provide a foundation.",
+            "The current audit does not yet require every GIS, OCR, browsing, and coding result to expose provenance, uncertainty, limitations, and falsification criteria.",
+            "Create a cross-capability evidence contract with source taxonomy, confidence, limitations, contradictory evidence, and reproducible verification hooks.",
+        ),
+        ProductRequirement(
             "multimodal_interface",
             "assistant_surface",
             "Assistant can work with images/audio/video and rich multimodal inputs.",
@@ -313,6 +361,20 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
             "Memory, tools, live-mode routing, multimodal metadata, and security posture are explicitly bounded.",
             "Broader write tools, additional model providers, and semantic multimodal understanding remain future scoped work.",
             "Add new model/tool capabilities through the registry with opt-in controls, audit events, and fail-closed security rules.",
+        ),
+        ProductRoadmapStage(
+            "advanced_capability_expansion",
+            "Advanced capability expansion",
+            (
+                "advanced_gis_processing",
+                "state_of_art_ocr_analysis",
+                "governed_web_browsing",
+                "coding_programming_expertise",
+                "transparency_objectivity_governance",
+            ),
+            "The expanded capability objective is now visible in product audit and roadmap output.",
+            "GIS, OCR, browsing, coding-agent behavior, and cross-capability objectivity contracts remain open by design.",
+            "Implement capability contracts first, then add adapters and eval fixtures behind permissioned, receipt-backed gates.",
         ),
         ProductRoadmapStage(
             "release_packaging_certification",

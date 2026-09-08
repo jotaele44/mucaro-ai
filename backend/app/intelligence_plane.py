@@ -54,6 +54,31 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
                 "contract": "mucaro-retrieval/local",
                 "notes": "Local cited retrieval with BM25, persistent TF-IDF, and semantic strategies.",
             },
+            "advanced_gis_processing": {
+                "state": "ABSENT",
+                "contract": None,
+                "notes": "GIS processing, spatial provenance, CRS preservation, and geometry regression gates are planned but not implemented.",
+            },
+            "state_of_art_ocr_analysis": {
+                "state": "ABSENT",
+                "contract": None,
+                "notes": "OCR extraction, layout analysis, confidence calibration, and OCR fixtures are planned but not implemented.",
+            },
+            "governed_web_browsing": {
+                "state": "ABSENT",
+                "contract": None,
+                "notes": "Web browsing requires approved-tool policy, URL controls, byte snapshots, parser traces, and web citation evals before availability.",
+            },
+            "coding_programming_expertise": {
+                "state": "ABSENT",
+                "contract": None,
+                "notes": "Governed code reading, patching, testing, and review output are planned as a future capability boundary.",
+            },
+            "transparency_objectivity_governance": {
+                "state": "CANDIDATE",
+                "contract": "mucaro-evidence-governance/0.x",
+                "notes": "Cited retrieval, release receipts, and audits provide a foundation; cross-capability uncertainty and contradiction rules remain open.",
+            },
             "cross_repo_orchestration": {
                 "state": "ABSENT",
                 "contract": None,

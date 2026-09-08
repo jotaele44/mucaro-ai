@@ -7,7 +7,9 @@ release-grade, local-first AI workbench with hardened CLI workflows,
 measurable retrieval quality, permissioned source ingestion, cited answer
 traceability, explicit memory controls, approved tool execution, repeatable
 fresh-clone certification, and a clear path toward production-quality
-packaging.
+packaging. Capabilities must include advanced GIS processing,
+state-of-the-art OCR analysis, powerful web browsing abilities, coding and
+programming expertise, all governed by maximum transparency and objectivity.
 
 The canonical source of truth is the `mucaro-ai` repository. The previous
 prototype lineage remains useful as historical evidence, but new development,
@@ -26,6 +28,12 @@ the repo repeatedly prove its behavior from a clean clone through ingestion,
 retrieval, answer generation, trace export, tool approval, memory inspection,
 packaging, and hosted governance.
 
+The expanded capability finish line is also not "add adapters." GIS, OCR,
+web browsing, and coding-agent behavior must each be permissioned, local-first
+where possible, receipt-backed, evaluated against positive and negative
+fixtures, and explicit about uncertainty, contradictions, source identity, and
+limits.
+
 ## Required Proof Boundaries
 
 | Boundary | Required proof |
@@ -36,6 +44,11 @@ packaging, and hosted governance.
 | Answer traceability | Citation order, retrieval rank, source ID, chunk ID, source format, score, matched terms, snippets, and export paths |
 | Memory controls | Explicit opt-in, inspect, export, disable, delete, and local-only persistence behavior |
 | Tool execution | Deny-by-default request, approve or deny, execute only after approval, and append-only local audit events |
+| Advanced GIS processing | CRS preservation, geometry type and validity, spatial operation receipts, topological assertions, map/export provenance, and spatial regression fixtures |
+| OCR analysis | Source-image hashes, OCR engine identity, layout/text preservation, confidence evidence, negative fixtures, and no silent text synthesis |
+| Web browsing | URL policy, retrieval UTC, byte snapshots, parser metadata, content hashes, citation binding, robots/cache posture, and failure-preserving fetch logs |
+| Coding expertise | Codebase read policy, patch proposal receipts, diff/test evidence, sandbox boundaries, review output, and no hidden workspace mutation |
+| Transparency/objectivity | FACT/INFERENCE/ASSUMPTION/UNKNOWN separation, limitations, contradiction handling, falsification criteria, and reproducible verification hooks |
 | Operator workflow | Isolated proof that permission grants, ingestion, retrieval, answer traces, memory controls, run history, and approved tools work together |
 | Fresh clone | Exact-ref clone, install, CLI help, release check, launcher self-test, and desktop smoke certification |
 | Packaging | Source artifact manifest, archive SHA-256, member hashes, Python wheel/sdist receipts, local distribution handoff manifest, and package status gate |
@@ -83,6 +96,11 @@ byte-pinned proof layer for a particular commit. Verify them with
 | Hosted GitHub Actions | OPEN | Hosted `CI` and `CI Startup Probe` have failed before jobs on current release-candidate heads; inspect Actions settings, billing/minutes, runner availability, and repository/account policy |
 | Private branch protection | OPEN | GitHub API currently reports a plan gate for private-repo branch protection; prove protection after plan/visibility changes or keep the release scope local |
 | Larger real-corpus retrieval | OPEN | Add non-fixture corpus snapshots with frozen manifests, source counts, source-format coverage, and repeatable eval thresholds |
+| Advanced GIS processing | OPEN | Define GIS capability contract, local engine/runtime adapter, CRS/geometry invariants, and spatial eval fixtures |
+| State-of-the-art OCR analysis | OPEN | Define OCR capability contract, local/optional model engine boundary, source-image trace schema, confidence thresholds, and OCR eval corpus |
+| Governed web browsing | OPEN | Add approved browser/fetch tool family with URL policy, byte snapshots, parser trace, and web citation regression gates |
+| Coding/programming expertise | OPEN | Define read/patch/test/review action boundary, sandbox policy, diff receipts, and code-quality eval fixtures |
+| Transparency/objectivity across capabilities | OPEN | Require provenance, uncertainty, limitations, contradictory evidence handling, and falsification criteria in every advanced capability output |
 | Production packaging | OPEN | Verify the local distribution handoff manifest, then convert certified local artifacts into the chosen publish/install channel |
 | Sustained workflow validation | OPEN | Run end-to-end operator workflows across ingest, ask, trace review, memory, tools, receipts, and recovery paths |
 
@@ -97,13 +115,16 @@ byte-pinned proof layer for a particular commit. Verify them with
    before broad completion claims; it binds CLI, retrieval, answer trace,
    memory, tool, fresh-clone, packaging, and hosted-governance requirements to
    current evidence.
-5. Use support bundles to escalate hosted governance blockers without
+5. Use `mucaro audit product` and `mucaro audit roadmap` to keep expanded GIS,
+   OCR, browsing, coding, and transparency/objectivity gaps visible until they
+   have implemented contracts and receipt-backed gates.
+6. Use support bundles to escalate hosted governance blockers without
    weakening local certification boundaries.
-6. Treat all future execution adapters as subordinate to Skill Fabric identity,
+7. Treat all future execution adapters as subordinate to Skill Fabric identity,
    permission, audit, and certification boundaries.
-7. Preserve local-first default behavior and fail closed whenever live provider,
+8. Preserve local-first default behavior and fail closed whenever live provider,
    hosted runner, optional dependency, or index state is missing.
-8. Keep release claims scoped: local certification can pass while hosted
+9. Keep release claims scoped: local certification can pass while hosted
    governance remains open.
 
 ## Readiness Rule
