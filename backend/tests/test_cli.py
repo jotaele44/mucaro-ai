@@ -2300,6 +2300,23 @@ def test_cli_audit_completion_reports_hosted_governance_open(tmp_path: Path, cap
             "distribution_manifest_status": "DISTRIBUTION_MANIFEST_VERIFIED",
             "governance_report_status": "GOVERNANCE_REPORT_VERIFIED",
             "hosted_governance_status": "OPEN",
+            "github_actions": {
+                "support_summary": {
+                    "classification": "HOSTED_STARTUP_BEFORE_JOBS",
+                    "current_head_startup_run_ids": [31, 32],
+                    "check_suite_counts": {
+                        "github_actions": 1,
+                        "github_actions_zero_check_run_startup_failures": 1,
+                        "queued_external": 0,
+                    },
+                },
+                "startup_blocker": {
+                    "suspected_causes": [
+                        "actions_billing_or_spending_limit",
+                        "hosted_runner_availability",
+                    ],
+                },
+            },
             "current_head_receipts_summary": {"total": 7, "valid": 7, "invalid": 0},
             "next_commands": ["mucaro release dashboard --include-github --format text"],
         }
@@ -2314,6 +2331,10 @@ def test_cli_audit_completion_reports_hosted_governance_open(tmp_path: Path, cap
     assert payload["status"] == "COMPLETION_AUDIT_OPEN"
     assert payload["counts"] == {"pass": 9, "open": 1, "blocked": 0, "fail": 0, "unverified": 0, "total": 10}
     assert requirements["hosted_governance"]["status"] == "OPEN"
+    assert "support_classification=HOSTED_STARTUP_BEFORE_JOBS" in requirements["hosted_governance"]["evidence"]
+    assert "current_head_startup_run_ids=31,32" in requirements["hosted_governance"]["evidence"]
+    assert "zero_check_run_startup_failures:1" in requirements["hosted_governance"]["evidence"]
+    assert "suspected_causes=actions_billing_or_spending_limit,hosted_runner_availability" in requirements["hosted_governance"]["evidence"]
 
     assert main(["audit", "completion", "--include-github", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out

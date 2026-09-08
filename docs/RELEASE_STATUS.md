@@ -227,7 +227,10 @@ Observed success markers:
   release-state, release-dashboard, package, receipt, and hosted-governance
   evidence into one active-goal matrix. It reports PASS, OPEN, BLOCKED, FAIL,
   and UNVERIFIED rows so local readiness, release governance, and production
-  packaging progress cannot be conflated.
+  packaging progress cannot be conflated. When GitHub Actions fails before
+  jobs, the hosted-governance row carries the support classification,
+  current-head startup run IDs, check-suite counts, and suspected causes from
+  the GitHub Actions diagnostic.
 - `mucaro release support-bundle --save` creates a support-ready JSON artifact
   for hosted governance escalation. It captures the release dashboard, GitHub
   diagnostic status, support classification, startup blocker, blockers,

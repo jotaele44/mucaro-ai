@@ -2814,6 +2814,12 @@ def _support_copy_line_value(value: Any) -> str:
     return _support_copy_value(value).replace("\n", "\\n")
 
 
+def _compact_id_list(values: Any) -> str:
+    if not isinstance(values, list):
+        return ""
+    return ",".join(str(value) for value in values if value is not None)
+
+
 def _build_release_next_actions_support_copy(runbook: dict[str, Any]) -> dict[str, Any]:
     summary_keys = [
         "head_sha",
@@ -3657,6 +3663,54 @@ def _completion_requirement(
     }
 
 
+def _completion_hosted_governance_evidence(
+    *,
+    include_github: bool,
+    hosted_governance_status: str,
+    dashboard: dict[str, Any],
+    release_state: dict[str, Any],
+) -> str:
+    github_actions = dashboard.get("github_actions")
+    if not isinstance(github_actions, dict):
+        github_actions = {}
+    support_summary = github_actions.get("support_summary")
+    if not isinstance(support_summary, dict):
+        support_summary = {}
+    startup_blocker = github_actions.get("startup_blocker")
+    if not isinstance(startup_blocker, dict):
+        startup_blocker = {}
+    check_suite_counts = support_summary.get("check_suite_counts")
+    if not isinstance(check_suite_counts, dict):
+        check_suite_counts = {}
+
+    current_head_run_ids = _compact_id_list(support_summary.get("current_head_startup_run_ids"))
+    suspected_causes = _compact_id_list(startup_blocker.get("suspected_causes"))
+    parts = [
+        f"include_github={include_github}",
+        f"hosted_governance_status={hosted_governance_status}",
+    ]
+    if support_summary.get("classification"):
+        parts.append(f"support_classification={support_summary.get('classification')}")
+    if current_head_run_ids:
+        parts.append(f"current_head_startup_run_ids={current_head_run_ids}")
+    if check_suite_counts:
+        parts.append(
+            "check_suite_counts="
+            f"github_actions:{check_suite_counts.get('github_actions')} "
+            f"zero_check_run_startup_failures:{check_suite_counts.get('github_actions_zero_check_run_startup_failures')} "
+            f"queued_external:{check_suite_counts.get('queued_external')}"
+        )
+    if suspected_causes:
+        parts.append(f"suspected_causes={suspected_causes}")
+    parts.extend(
+        [
+            f"github_governance={_release_state_evidence(release_state, 'GITHUB_GOVERNANCE_OPEN')}",
+            f"governed_release={_release_state_evidence(release_state, 'GOVERNED_RELEASE_READY')}",
+        ]
+    )
+    return " ".join(parts)
+
+
 def build_completion_audit_report(
     cfg: Settings,
     *,
@@ -3866,11 +3920,11 @@ def build_completion_audit_report(
                 github_governance_status,
                 governed_release_status,
             ),
-            (
-                f"include_github={include_github} "
-                f"hosted_governance_status={hosted_governance_status} "
-                f"github_governance={_release_state_evidence(release_state, 'GITHUB_GOVERNANCE_OPEN')} "
-                f"governed_release={_release_state_evidence(release_state, 'GOVERNED_RELEASE_READY')}"
+            _completion_hosted_governance_evidence(
+                include_github=include_github,
+                hosted_governance_status=hosted_governance_status,
+                dashboard=dashboard,
+                release_state=release_state,
             ),
             "Hosted governance is not proven at current HEAD." if hosted_governance_status != "PASS" else "",
             "Repair hosted Actions startup, enable branch protection when available, and rerun with --include-github.",

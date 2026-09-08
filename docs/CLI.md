@@ -287,6 +287,11 @@ mucaro validate --format text
 mucaro serve --host 127.0.0.1 --port 8000
 ```
 
+When `mucaro audit completion --include-github` reports hosted governance as
+OPEN, its hosted-governance row includes the support classification,
+current-head startup run IDs, check-suite counts, and suspected startup causes
+from the GitHub Actions diagnostic.
+
 ## Directory Permissions
 
 Project-local paths under the repository root are accessible by default. Direct
