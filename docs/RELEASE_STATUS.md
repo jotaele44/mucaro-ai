@@ -211,6 +211,12 @@ Observed success markers:
   verification into explicit steps for Actions policy, workflow registration,
   run admission, check-suite admission, billing visibility, branch protection,
   and support-bundle readiness.
+- `mucaro release incident-packet --save` creates a compact hosted-governance
+  escalation artifact under `data/exports/hosted_incident_packets`. It preserves
+  the hosted-governance report, completion-audit hosted row, current-head
+  startup run IDs, suspected startup causes, open remediation steps, diagnostic
+  commands, and support-ready copy lines. Verify saved packets with
+  `mucaro release incident-packet --verify PATH --require-current-head`.
 - `mucaro release handoff --format text` is the restartable one-command path for
   the current-head handoff artifact set. It saves and verifies the distribution
   manifest, ensures the governance report, saves and verifies the support

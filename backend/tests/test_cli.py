@@ -3021,6 +3021,149 @@ def test_cli_release_hosted_governance_ready_when_dashboard_and_steps_pass(tmp_p
     assert payload["counts"] == {"pass": 11, "open": 0, "blocked": 0, "fail": 0, "unverified": 0, "total": 11}
 
 
+def test_cli_release_incident_packet_saves_and_verifies_current_head(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "7" * 40
+    output_path = tmp_path / "data" / "exports" / "hosted_incident_packets" / "incident.json"
+
+    def fake_hosted(
+        _cfg: Settings,
+        *,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        assert github_workflow == "CI"
+        assert probe_workflow == "CI Startup Probe"
+        return {
+            "status": "HOSTED_GOVERNANCE_OPEN",
+            "project_root": str(tmp_path),
+            "head_sha": head_sha,
+            "tag_at_head": ["v0.1.23-hosted-blocker-evidence"],
+            "hosted_governance_status": "OPEN",
+            "github_actions_status": "GITHUB_ACTIONS_DIAGNOSTIC_FAIL",
+            "support_classification": "HOSTED_STARTUP_BEFORE_JOBS",
+            "current_head_startup_run_ids": [31],
+            "startup_blocker": {
+                "status": "FAIL",
+                "suspected_causes": [
+                    "actions_billing_or_spending_limit",
+                    "hosted_runner_availability",
+                ],
+            },
+            "support_bundle": {
+                "path": str(tmp_path / "data" / "exports" / "support_bundles" / f"support-bundle-{head_sha[:12]}.json"),
+                "status": "PASS",
+            },
+            "steps": [
+                {
+                    "step_id": "actions_repository_policy",
+                    "status": "PASS",
+                    "owner": "operator",
+                    "evidence": "enabled=True allowed_actions=all",
+                    "command": "Open GitHub repository Settings -> Actions -> General.",
+                },
+                {
+                    "step_id": "current_head_push_startup",
+                    "status": "OPEN",
+                    "owner": "operator",
+                    "evidence": "run_ids=31",
+                    "command": "gh run view 31 --json databaseId,name,status,conclusion,headSha,jobs,url",
+                },
+                {
+                    "step_id": "billing_visibility",
+                    "status": "OPEN",
+                    "owner": "operator",
+                    "evidence": "needs user scope",
+                    "command": "gh auth refresh -h github.com -s user",
+                },
+            ],
+            "next_actions": ["Inspect current-head push startup run 31."],
+        }
+
+    def fake_completion(
+        _cfg: Settings,
+        *,
+        include_github: bool = False,
+        github_workflow: str = "CI",
+        probe_workflow: str = "CI Startup Probe",
+    ):
+        assert include_github is True
+        assert github_workflow == "CI"
+        assert probe_workflow == "CI Startup Probe"
+        return {
+            "status": "COMPLETION_AUDIT_OPEN",
+            "current_state": "GITHUB_GOVERNANCE_OPEN",
+            "readiness_percent": 90.0,
+            "counts": {"pass": 9, "open": 1, "blocked": 0, "fail": 0, "unverified": 0, "total": 10},
+            "requirements": [
+                {
+                    "requirement_id": "hosted_governance",
+                    "status": "OPEN",
+                    "evidence": "support_classification=HOSTED_STARTUP_BEFORE_JOBS current_head_startup_run_ids=31",
+                    "gap": "Hosted governance is not proven at current HEAD.",
+                    "next_step": "Repair hosted Actions startup.",
+                }
+            ],
+        }
+
+    def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
+        if args == ["git", "rev-parse", "HEAD"]:
+            return True, head_sha
+        return False, f"unexpected command: {args}"
+
+    monkeypatch.setattr(cli, "build_release_hosted_governance_report", fake_hosted)
+    monkeypatch.setattr(cli, "build_completion_audit_report", fake_completion)
+    monkeypatch.setattr(cli, "_command_output", fake_command_output)
+
+    assert main(["release", "incident-packet", "--save", "--output", str(output_path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "HOSTED_INCIDENT_PACKET_READY"
+    assert payload["head_sha"] == head_sha
+    assert payload["case_status"] == "HOSTED_GOVERNANCE_OPEN"
+    assert payload["current_head_startup_run_ids"] == [31]
+    assert [step["step_id"] for step in payload["open_steps"]] == ["current_head_push_startup", "billing_visibility"]
+    assert "mucaro certify github-actions --format text" in payload["diagnostic_commands"]
+    assert any(line == "current_head_startup_run_ids=31" for line in payload["copy_lines"])
+    assert any(line.startswith("open_step=current_head_push_startup") for line in payload["copy_lines"])
+    assert payload["export"]["path"] == str(output_path)
+
+    saved = json.loads(output_path.read_text(encoding="utf-8"))
+    assert saved["schema_version"] == cli.HOSTED_INCIDENT_PACKET_SCHEMA_VERSION
+    assert saved["packet"]["completion_audit"]["hosted_governance"]["status"] == "OPEN"
+    expected_sha = payload["export"]["sha256"]
+
+    assert (
+        main(
+            [
+                "release",
+                "incident-packet",
+                "--verify",
+                str(output_path),
+                "--expected-sha256",
+                expected_sha,
+                "--require-current-head",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    verified = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in verified["checks"]}
+    assert verified["status"] == "HOSTED_INCIDENT_PACKET_VERIFIED"
+    assert verified["case_status"] == "HOSTED_GOVERNANCE_OPEN"
+    assert checks["expected_sha256"]["status"] == "PASS"
+    assert checks["current_head_binding"]["status"] == "PASS"
+    assert checks["copy_lines"]["status"] == "PASS"
+
+    assert main(["release", "incident-packet", "--verify", str(output_path), "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "HOSTED_INCIDENT_PACKET_VERIFIED" in text_output
+    assert "incident_copy=current_head_startup_run_ids=31" in text_output
+    assert "diagnostic_command=mucaro certify github-actions --format text" in text_output
+
+
 def test_cli_release_next_actions_prioritizes_open_operator_runbook(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     head_sha = "f" * 40

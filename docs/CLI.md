@@ -34,6 +34,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro release state` | Classify bounded release-state progress | 0 | 2 with `--strict` until governed release is ready |
 | `mucaro release dashboard` | Summarize release state, receipts, handoff artifacts, remote binding, and blockers | 0 | 2 on local evidence failure, or with `--strict` until ready |
 | `mucaro release hosted-governance` | Print hosted GitHub governance blocker evidence and exact operator remediation commands | 0 | 2 with `--strict` until hosted governance is ready |
+| `mucaro release incident-packet` | Build or verify a hosted-governance escalation packet with support-ready copy lines | 0 | 2 on packet build or verification failure |
 | `mucaro release next-actions` | Print or save prioritized release actions, current run handles, handoff artifact paths, support-copy lines, and verification commands | 0 | 2 with `--strict` while actions remain open, or on failed artifact verification |
 | `mucaro release handoff` | Save and verify the current-head distribution manifest, governance report, support bundle, and next-actions runbook in order | 0 | 2 on local artifact failure, or with `--strict` while hosted governance remains open |
 | `mucaro release support-bundle` | Build or verify a support-ready release evidence bundle | 0 | 2 |
@@ -195,6 +196,10 @@ approved and audited.
 | `RELEASE_STATE_READY` | release-state classifier found the governed release state ready |
 | `HOSTED_GOVERNANCE_OPEN` | hosted governance is not ready; output includes run IDs, job counts, Actions policy, billing scope, branch-protection state, and support-bundle status |
 | `HOSTED_GOVERNANCE_READY` | hosted governance diagnostic, dashboard, and remediation steps are all passing |
+| `HOSTED_INCIDENT_PACKET_READY` | hosted governance is open and an escalation packet was built for the current evidence |
+| `HOSTED_INCIDENT_PACKET_NOT_REQUIRED` | hosted governance is already ready, so an incident packet was not required |
+| `HOSTED_INCIDENT_PACKET_VERIFIED` | saved hosted-governance incident packet passed schema, hash, payload, copy-line, command, and optional current-head checks |
+| `HOSTED_INCIDENT_PACKET_VERIFY_FAILED` | saved hosted-governance incident packet is missing, malformed, hash-mismatched, stale for current `HEAD`, or otherwise invalid |
 | `RELEASE_NEXT_ACTIONS_OPEN` | one or more release or hosted-governance actions remain open; output includes prioritized operator commands and verification commands |
 | `RELEASE_NEXT_ACTIONS_READY` | no release next actions remain open |
 | `RELEASE_NEXT_ACTIONS_VERIFIED` | saved release next-actions runbook passed schema, hash, payload, and requested head-binding checks |
@@ -231,6 +236,8 @@ mucaro doctor
 mucaro release state --include-github --format text
 mucaro release dashboard --include-github --format text
 mucaro release hosted-governance --format text
+mucaro release incident-packet --save --format text
+mucaro release incident-packet --verify data/exports/hosted_incident_packets/incident-packet-HEADPREFIX.json --require-current-head --format text
 mucaro release next-actions --format text
 mucaro release handoff --format text
 mucaro release next-actions --save --format text
@@ -291,6 +298,16 @@ When `mucaro audit completion --include-github` reports hosted governance as
 OPEN, its hosted-governance row includes the support classification,
 current-head startup run IDs, check-suite counts, and suspected startup causes
 from the GitHub Actions diagnostic.
+
+Use `mucaro release incident-packet --save --format text` when hosted
+governance remains open after local release and handoff artifacts are verified.
+The command builds a compact escalation artifact under
+`data/exports/hosted_incident_packets` with the hosted-governance report,
+completion-audit hosted row, current-head startup run IDs, suspected startup
+causes, open remediation steps, diagnostic commands, and support-ready copy
+lines. Use `--verify PATH`, `--expected-sha256 SHA256`, and
+`--require-current-head` to validate a saved packet without rerunning live
+GitHub diagnostics.
 
 ## Directory Permissions
 

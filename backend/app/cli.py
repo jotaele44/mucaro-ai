@@ -113,6 +113,8 @@ SUPPORT_BUNDLE_SCHEMA_VERSION = "mucaro_release_support_bundle_v1"
 SUPPORT_BUNDLE_DIR = Path("data") / "exports" / "support_bundles"
 NEXT_ACTIONS_SCHEMA_VERSION = "mucaro_release_next_actions_v2"
 NEXT_ACTIONS_DIR = Path("data") / "exports" / "release_next_actions"
+HOSTED_INCIDENT_PACKET_SCHEMA_VERSION = "mucaro_hosted_incident_packet_v1"
+HOSTED_INCIDENT_PACKET_DIR = Path("data") / "exports" / "hosted_incident_packets"
 RELEASE_REFRESH_LOG_SCHEMA_VERSION = "mucaro_release_refresh_log_v1"
 RELEASE_REFRESH_LOG_DIR = Path("data") / "exports" / "release_refresh_logs"
 RELEASE_HANDOFF_REFRESH_STEPS = ("local_release", "python_dist", "source_artifact", "fresh_clone")
@@ -656,6 +658,36 @@ def build_parser() -> argparse.ArgumentParser:
     )
     release_hosted_governance.set_defaults(handler=run_release_hosted_governance)
 
+    release_incident_packet = release_subcommands.add_parser(
+        "incident-packet",
+        help="Build or verify a hosted-governance escalation packet.",
+    )
+    release_incident_packet.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_incident_packet.add_argument("--strict", action="store_true", help="Exit nonzero if the packet cannot be built or verified.")
+    release_incident_packet.add_argument("--save", action="store_true", help="Write the incident packet under data/exports/hosted_incident_packets.")
+    release_incident_packet.add_argument("--output", type=Path, help="Optional JSON artifact path. Implies --save.")
+    release_incident_packet.add_argument("--verify", type=Path, help="Verify a saved incident packet instead of building one.")
+    release_incident_packet.add_argument(
+        "--require-current-head",
+        action="store_true",
+        help="With --verify, require the packet head_sha to match current Git HEAD.",
+    )
+    release_incident_packet.add_argument(
+        "--expected-sha256",
+        help="With --verify, require the packet artifact SHA-256 to match this value.",
+    )
+    release_incident_packet.add_argument(
+        "--github-workflow",
+        default="CI",
+        help="Primary GitHub Actions workflow name to inspect.",
+    )
+    release_incident_packet.add_argument(
+        "--probe-workflow",
+        default="CI Startup Probe",
+        help="Manual-only startup probe workflow name to inspect.",
+    )
+    release_incident_packet.set_defaults(handler=run_release_incident_packet)
+
     release_next_actions = release_subcommands.add_parser(
         "next-actions",
         help="Print the prioritized release runbook for the current head.",
@@ -1004,6 +1036,43 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 )
         for action in payload.get("next_actions", []):
             print(f"next_action={action}")
+    elif status in {
+        "HOSTED_INCIDENT_PACKET_READY",
+        "HOSTED_INCIDENT_PACKET_FAILED",
+        "HOSTED_INCIDENT_PACKET_NOT_REQUIRED",
+        "HOSTED_INCIDENT_PACKET_VERIFIED",
+        "HOSTED_INCIDENT_PACKET_VERIFY_FAILED",
+    }:
+        print(f"project_root={payload.get('project_root')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        if payload.get("current_head"):
+            print(f"current_head={payload.get('current_head')}")
+        print(f"case_status={payload.get('case_status')}")
+        print(f"hosted_governance_status={payload.get('hosted_governance_status')}")
+        print(f"support_classification={payload.get('support_classification')}")
+        current_head_run_ids = payload.get("current_head_startup_run_ids", [])
+        if isinstance(current_head_run_ids, list):
+            print(f"current_head_startup_run_ids={','.join(str(run_id) for run_id in current_head_run_ids)}")
+        export = payload.get("export")
+        if isinstance(export, dict):
+            print(f"export_path={export.get('path')}")
+            print(f"export_sha256={export.get('sha256')}")
+            print(f"export_size_bytes={export.get('size_bytes')}")
+        artifact = payload.get("artifact")
+        if isinstance(artifact, dict):
+            print(f"artifact_path={artifact.get('path')}")
+            print(f"artifact_sha256={artifact.get('sha256')}")
+            print(f"artifact_size_bytes={artifact.get('size_bytes')}")
+            print(f"artifact_schema_version={artifact.get('schema_version')}")
+            print(f"artifact_created_utc={artifact.get('created_utc')}")
+        for line in payload.get("copy_lines", []):
+            print(f"incident_copy={line}")
+        for command in payload.get("diagnostic_commands", []):
+            print(f"diagnostic_command={command}")
+        for check in payload.get("checks", []):
+            if isinstance(check, dict):
+                detail = str(check.get("detail")).replace("\n", "\\n")
+                print(f"{check.get('status')} {check.get('name')} {detail}")
     elif status in {"RELEASE_NEXT_ACTIONS_READY", "RELEASE_NEXT_ACTIONS_OPEN"}:
         print(f"project_root={payload.get('project_root')}")
         print(f"head_sha={payload.get('head_sha')}")
@@ -2755,6 +2824,314 @@ def run_release_hosted_governance(args: argparse.Namespace, cfg: Settings) -> in
     if report["status"] == "HOSTED_GOVERNANCE_READY":
         return 0
     return 2 if args.strict else 0
+
+
+def _completion_requirement_by_id(audit: dict[str, Any], requirement_id: str) -> dict[str, Any]:
+    for row in audit.get("requirements", []):
+        if isinstance(row, dict) and row.get("requirement_id") == requirement_id:
+            return row
+    return {}
+
+
+def _incident_packet_copy_lines(packet: dict[str, Any]) -> list[str]:
+    lines = [
+        "Mucaro AI hosted governance incident packet",
+        f"head_sha={packet.get('head_sha')}",
+        f"tag_at_head={_support_copy_value(packet.get('tag_at_head'))}",
+        f"case_status={packet.get('case_status')}",
+        f"hosted_governance_status={packet.get('hosted_governance_status')}",
+        f"github_actions_status={packet.get('github_actions_status')}",
+        f"support_classification={packet.get('support_classification')}",
+        f"current_head_startup_run_ids={_support_copy_value(packet.get('current_head_startup_run_ids'))}",
+        f"startup_blocker_causes={_support_copy_value(packet.get('startup_blocker_causes'))}",
+        f"support_bundle_path={packet.get('support_bundle_path')}",
+    ]
+    for step in packet.get("open_steps", []):
+        if isinstance(step, dict):
+            lines.append(
+                "open_step="
+                f"{_support_copy_value(step.get('step_id'))} "
+                f"status:{_support_copy_value(step.get('status'))} "
+                f"evidence:{_support_copy_line_value(step.get('evidence'))} "
+                f"command:{_support_copy_value(step.get('command'))}"
+            )
+    lines.extend(f"diagnostic_command={command}" for command in packet.get("diagnostic_commands", []))
+    return lines
+
+
+def build_release_incident_packet(
+    cfg: Settings,
+    *,
+    github_workflow: str = "CI",
+    probe_workflow: str = "CI Startup Probe",
+    output_path: Path | None = None,
+    save: bool = False,
+) -> dict[str, Any]:
+    hosted = build_release_hosted_governance_report(
+        cfg,
+        github_workflow=github_workflow,
+        probe_workflow=probe_workflow,
+    )
+    completion = build_completion_audit_report(
+        cfg,
+        include_github=True,
+        github_workflow=github_workflow,
+        probe_workflow=probe_workflow,
+    )
+    support_bundle = hosted.get("support_bundle") if isinstance(hosted.get("support_bundle"), dict) else {}
+    startup_blocker = hosted.get("startup_blocker") if isinstance(hosted.get("startup_blocker"), dict) else {}
+    open_steps = [
+        step
+        for step in hosted.get("steps", [])
+        if isinstance(step, dict) and step.get("status") != "PASS"
+    ]
+    diagnostic_commands = sorted(
+        set(
+            str(command)
+            for command in [
+                *hosted.get("next_actions", []),
+                *(step.get("command") for step in open_steps if isinstance(step, dict)),
+                "mucaro release hosted-governance --format text",
+                "mucaro audit completion --include-github --format text",
+                "mucaro certify github-actions --format text",
+            ]
+            if command
+        )
+    )
+    hosted_requirement = _completion_requirement_by_id(completion, "hosted_governance")
+    incident_open = hosted.get("status") != "HOSTED_GOVERNANCE_READY"
+    checks = [
+        _certification_gate("hosted_report_present", "PASS" if hosted.get("status") else "FAIL", str(hosted.get("status"))),
+        _certification_gate("completion_audit_present", "PASS" if completion.get("status") else "FAIL", str(completion.get("status"))),
+        _certification_gate("head_sha", "PASS" if _is_hex_sha(hosted.get("head_sha")) else "FAIL", str(hosted.get("head_sha"))),
+        _certification_gate("open_steps", "PASS" if open_steps or not incident_open else "FAIL", f"count={len(open_steps)}"),
+        _certification_gate("diagnostic_commands", "PASS" if diagnostic_commands else "FAIL", f"count={len(diagnostic_commands)}"),
+    ]
+    failed = [check for check in checks if check.get("status") == "FAIL"]
+    packet = {
+        "status": "HOSTED_INCIDENT_PACKET_FAILED"
+        if failed
+        else "HOSTED_INCIDENT_PACKET_READY"
+        if incident_open
+        else "HOSTED_INCIDENT_PACKET_NOT_REQUIRED",
+        "version": package_version(),
+        "project_root": str(cfg.project_root),
+        "head_sha": hosted.get("head_sha"),
+        "tag_at_head": hosted.get("tag_at_head", []),
+        "case_status": hosted.get("status"),
+        "hosted_governance_status": hosted.get("hosted_governance_status"),
+        "github_actions_status": hosted.get("github_actions_status"),
+        "support_classification": hosted.get("support_classification"),
+        "current_head_startup_run_ids": hosted.get("current_head_startup_run_ids", []),
+        "startup_blocker_status": startup_blocker.get("status"),
+        "startup_blocker_causes": startup_blocker.get("suspected_causes", []),
+        "support_bundle_path": support_bundle.get("path"),
+        "support_bundle_status": support_bundle.get("status"),
+        "completion_audit_status": completion.get("status"),
+        "completion_hosted_governance": hosted_requirement,
+        "open_steps": open_steps,
+        "diagnostic_commands": diagnostic_commands,
+        "hosted_governance": hosted,
+        "completion_audit": {
+            "status": completion.get("status"),
+            "current_state": completion.get("current_state"),
+            "readiness_percent": completion.get("readiness_percent"),
+            "counts": completion.get("counts"),
+            "hosted_governance": hosted_requirement,
+        },
+        "checks": checks,
+    }
+    packet["copy_lines"] = _incident_packet_copy_lines(packet)
+    if save or output_path is not None:
+        packet["export"] = write_release_incident_packet(cfg, packet, output_path=output_path)
+    return packet
+
+
+def write_release_incident_packet(
+    cfg: Settings,
+    packet: dict[str, Any],
+    *,
+    output_path: Path | None = None,
+) -> dict[str, Any]:
+    head_sha = str(packet.get("head_sha") or "unknown")
+    path = output_path or cfg.project_root / HOSTED_INCIDENT_PACKET_DIR / f"incident-packet-{head_sha[:12]}.json"
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    artifact = {
+        "schema_version": HOSTED_INCIDENT_PACKET_SCHEMA_VERSION,
+        "created_utc": _utc_now(),
+        "packet": packet,
+    }
+    path.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return {
+        "path": str(path),
+        "sha256": _sha256_file(path),
+        "size_bytes": path.stat().st_size,
+        "schema_version": HOSTED_INCIDENT_PACKET_SCHEMA_VERSION,
+    }
+
+
+def verify_release_incident_packet(
+    cfg: Settings,
+    artifact_path: Path,
+    *,
+    require_current_head: bool = False,
+    expected_sha256: str | None = None,
+) -> dict[str, Any]:
+    path = artifact_path if artifact_path.is_absolute() else cfg.project_root / artifact_path
+    checks: list[dict[str, str]] = []
+    artifact: dict[str, Any] | None = None
+    artifact_sha256: str | None = None
+    artifact_size_bytes: int | None = None
+
+    if path.exists() and path.is_file():
+        checks.append(_certification_gate("artifact_exists", "PASS", str(path)))
+        artifact_sha256 = _sha256_file(path)
+        artifact_size_bytes = path.stat().st_size
+        checks.append(_certification_gate("artifact_sha256", "PASS", artifact_sha256))
+        if expected_sha256:
+            expected = expected_sha256.strip().lower()
+            checks.append(
+                _certification_gate(
+                    "expected_sha256",
+                    "PASS" if artifact_sha256 == expected else "FAIL",
+                    f"expected={expected} actual={artifact_sha256}",
+                )
+            )
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            loaded = None
+            checks.append(_certification_gate("artifact_json", "FAIL", str(exc)))
+        if isinstance(loaded, dict):
+            artifact = loaded
+            checks.append(_certification_gate("artifact_json", "PASS", "valid JSON object"))
+        elif loaded is not None:
+            checks.append(_certification_gate("artifact_json", "FAIL", "top-level JSON value is not an object"))
+    else:
+        checks.append(_certification_gate("artifact_exists", "FAIL", str(path)))
+
+    packet: dict[str, Any] | None = None
+    head_sha: str | None = None
+    case_status: str | None = None
+    hosted_governance_status: str | None = None
+    support_classification: str | None = None
+    current_head_startup_run_ids: list[Any] = []
+    if artifact is not None:
+        schema_version = artifact.get("schema_version")
+        checks.append(
+            _certification_gate(
+                "schema_version",
+                "PASS" if schema_version == HOSTED_INCIDENT_PACKET_SCHEMA_VERSION else "FAIL",
+                str(schema_version),
+            )
+        )
+        created_ok, created_detail = _parse_utc_timestamp(artifact.get("created_utc"))
+        checks.append(_certification_gate("created_utc", "PASS" if created_ok else "FAIL", created_detail))
+        raw_packet = artifact.get("packet")
+        if isinstance(raw_packet, dict):
+            packet = raw_packet
+            checks.append(_certification_gate("packet_payload", "PASS", "packet object present"))
+        else:
+            checks.append(_certification_gate("packet_payload", "FAIL", "packet object missing"))
+
+    if packet is not None:
+        raw_head_sha = packet.get("head_sha")
+        if _is_hex_sha(raw_head_sha):
+            head_sha = str(raw_head_sha)
+            checks.append(_certification_gate("packet_head_sha", "PASS", head_sha))
+        else:
+            checks.append(_certification_gate("packet_head_sha", "FAIL", str(raw_head_sha)))
+        packet_status = str(packet.get("status") or "")
+        checks.append(
+            _certification_gate(
+                "packet_status",
+                "PASS" if packet_status in {"HOSTED_INCIDENT_PACKET_READY", "HOSTED_INCIDENT_PACKET_NOT_REQUIRED"} else "FAIL",
+                packet_status,
+            )
+        )
+        copy_lines = packet.get("copy_lines")
+        checks.append(
+            _certification_gate(
+                "copy_lines",
+                "PASS" if isinstance(copy_lines, list) and copy_lines else "FAIL",
+                "present" if isinstance(copy_lines, list) and copy_lines else "missing",
+            )
+        )
+        diagnostic_commands = packet.get("diagnostic_commands")
+        checks.append(
+            _certification_gate(
+                "diagnostic_commands",
+                "PASS" if isinstance(diagnostic_commands, list) and diagnostic_commands else "FAIL",
+                "present" if isinstance(diagnostic_commands, list) and diagnostic_commands else "missing",
+            )
+        )
+        case_status = str(packet.get("case_status") or "")
+        hosted_governance_status = str(packet.get("hosted_governance_status") or "")
+        support_classification = str(packet.get("support_classification") or "")
+        startup_ids = packet.get("current_head_startup_run_ids", [])
+        current_head_startup_run_ids = startup_ids if isinstance(startup_ids, list) else []
+
+    current_head: str | None = None
+    if require_current_head:
+        head_ok, current_head_output = _git_output(cfg, ["rev-parse", "HEAD"])
+        current_head = current_head_output if head_ok else None
+        checks.append(
+            _certification_gate(
+                "current_head_binding",
+                "PASS" if head_ok and head_sha == current_head_output else "FAIL",
+                f"packet_head={head_sha} current_head={current_head_output if head_ok else current_head_output or 'unavailable'}",
+            )
+        )
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": "HOSTED_INCIDENT_PACKET_VERIFIED" if not failed else "HOSTED_INCIDENT_PACKET_VERIFY_FAILED",
+        "project_root": str(cfg.project_root),
+        "artifact_path": str(path),
+        "artifact": {
+            "path": str(path),
+            "sha256": artifact_sha256,
+            "size_bytes": artifact_size_bytes,
+            "schema_version": artifact.get("schema_version") if artifact else None,
+            "created_utc": artifact.get("created_utc") if artifact else None,
+        },
+        "head_sha": head_sha,
+        "current_head": current_head,
+        "case_status": case_status,
+        "hosted_governance_status": hosted_governance_status,
+        "support_classification": support_classification,
+        "current_head_startup_run_ids": current_head_startup_run_ids,
+        "copy_lines": packet.get("copy_lines", []) if packet else [],
+        "diagnostic_commands": packet.get("diagnostic_commands", []) if packet else [],
+        "checks": checks,
+    }
+
+
+def run_release_incident_packet(args: argparse.Namespace, cfg: Settings) -> int:
+    if args.verify:
+        report = verify_release_incident_packet(
+            cfg,
+            args.verify,
+            require_current_head=args.require_current_head,
+            expected_sha256=args.expected_sha256,
+        )
+        emit_payload(report, args.format)
+        return 0 if report["status"] == "HOSTED_INCIDENT_PACKET_VERIFIED" else 2
+    if args.require_current_head or args.expected_sha256:
+        raise MucaroCLIError("ERROR_HOSTED_INCIDENT_PACKET_VERIFY_OPTION", "--require-current-head and --expected-sha256 require --verify")
+    report = build_release_incident_packet(
+        cfg,
+        github_workflow=args.github_workflow,
+        probe_workflow=args.probe_workflow,
+        output_path=args.output,
+        save=args.save or args.output is not None,
+    )
+    emit_payload(report, args.format)
+    if report["status"] == "HOSTED_INCIDENT_PACKET_FAILED":
+        return 2
+    return 0
 
 
 _NEXT_ACTION_PRIORITIES = {
