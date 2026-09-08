@@ -3772,6 +3772,8 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
     assert refresh_log_payload["schema_version"] == cli.RELEASE_REFRESH_LOG_SCHEMA_VERSION
     assert refresh_log_payload["head_sha"] == head_sha
     assert refresh_log_payload["refresh"]["status"] == "CERTIFICATION_REFRESH_OK"
+    assert refresh_log_payload["refresh"]["total_elapsed_seconds"] >= 0
+    assert refresh_log_payload["refresh"]["slowest_steps"]
     assert refresh_log_payload["refresh"]["requested_steps"] == [
         "local_release",
         "python_dist",
@@ -3801,6 +3803,7 @@ def test_cli_release_handoff_refresh_step_selects_canonical_subset(tmp_path: Pat
     head_sha = "f" * 40
     calls: list[str] = []
     receipt_calls = {"count": 0}
+    monotonic_values = iter([0.0, 10.0, 12.5, 20.0, 24.25, 30.0])
 
     distribution_path = tmp_path / "data" / "exports" / "distribution_manifests" / f"distribution-manifest-{head_sha[:12]}.json"
     governance_path = tmp_path / "data" / "exports" / "governance_reports" / f"governance-report-{head_sha[:12]}.json"
@@ -3836,6 +3839,7 @@ def test_cli_release_handoff_refresh_step_selects_canonical_subset(tmp_path: Pat
         ]
 
     monkeypatch.setattr(cli, "_command_output", fake_command_output)
+    monkeypatch.setattr(cli.time, "monotonic", lambda: next(monotonic_values))
     monkeypatch.setattr(cli.subprocess, "run", fake_run)
     monkeypatch.setattr(cli, "list_release_receipts", fake_receipts)
     monkeypatch.setattr(
@@ -3928,7 +3932,10 @@ def test_cli_release_handoff_refresh_step_selects_canonical_subset(tmp_path: Pat
     assert payload["certification_refresh"]["status"] == "CERTIFICATION_REFRESH_OK"
     assert payload["certification_refresh"]["requested_steps"] == ["python_dist", "fresh_clone"]
     assert payload["certification_refresh"]["timeout_seconds"] == 9
+    assert payload["certification_refresh"]["total_elapsed_seconds"] == 30.0
     assert [step["step_id"] for step in payload["certification_refresh"]["steps"]] == ["python_dist", "fresh_clone"]
+    assert [step["elapsed_seconds"] for step in payload["certification_refresh"]["steps"]] == [2.5, 4.25]
+    assert [step["step_id"] for step in payload["certification_refresh"]["slowest_steps"]] == ["fresh_clone", "python_dist"]
     assert calls == [
         "refresh:python_dist",
         "refresh:fresh_clone",
@@ -3988,6 +3995,8 @@ def test_cli_release_handoff_refresh_timeout_stops_before_handoff_artifacts(tmp_
     assert step["returncode"] is None
     assert step["detail"] == "TIMEOUT_AFTER_SECONDS:1"
     assert step["output_tail"] == ["still running"]
+    assert step["elapsed_seconds"] >= 0
+    assert payload["certification_refresh"]["slowest_steps"][0]["step_id"] == "local_release"
     assert payload["artifacts"] == {}
     assert calls == ["refresh:local_release"]
 

@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -1163,16 +1164,26 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"certification_refresh_requested={refresh.get('requested')}")
             print(f"certification_refresh_status={refresh.get('status')}")
             print(f"certification_refresh_timeout_seconds={refresh.get('timeout_seconds')}")
+            print(f"certification_refresh_elapsed_seconds={refresh.get('total_elapsed_seconds')}")
             log = refresh.get("log")
             if isinstance(log, dict):
                 print(f"certification_refresh_log={log.get('path')}")
                 print(f"certification_refresh_log_sha256={log.get('sha256')}")
+            for slowest in refresh.get("slowest_steps", []):
+                if isinstance(slowest, dict):
+                    detail = str(slowest.get("detail")).replace("\n", "\\n")
+                    print(
+                        f"certification_refresh_slowest_step={slowest.get('step_id')} "
+                        f"status={slowest.get('status')} "
+                        f"elapsed_seconds={slowest.get('elapsed_seconds')} detail={detail}"
+                    )
             for step in refresh.get("steps", []):
                 if isinstance(step, dict):
                     detail = str(step.get("detail")).replace("\n", "\\n")
                     print(
                         f"certification_refresh_step={step.get('status')} "
-                        f"{step.get('step_id')} returncode={step.get('returncode')} detail={detail}"
+                        f"{step.get('step_id')} returncode={step.get('returncode')} "
+                        f"elapsed_seconds={step.get('elapsed_seconds')} detail={detail}"
                     )
         artifacts = payload.get("artifacts", {})
         if isinstance(artifacts, dict):
@@ -3587,6 +3598,8 @@ def _release_handoff_certification_command(
     timeout_seconds: int = 0,
 ) -> dict[str, Any]:
     timeout = timeout_seconds if timeout_seconds > 0 else None
+    started_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    started = time.monotonic()
     try:
         proc = subprocess.run(
             command,
@@ -3598,6 +3611,8 @@ def _release_handoff_certification_command(
             timeout=timeout,
         )
     except subprocess.TimeoutExpired as exc:
+        ended_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        elapsed_seconds = round(max(0.0, time.monotonic() - started), 3)
         output = (exc.output or "").strip() if isinstance(exc.output, str) else ""
         output_lines = output.splitlines()
         return {
@@ -3608,7 +3623,12 @@ def _release_handoff_certification_command(
             "detail": f"TIMEOUT_AFTER_SECONDS:{timeout_seconds}",
             "output_tail": output_lines[-20:],
             "timed_out": True,
+            "started_utc": started_utc,
+            "ended_utc": ended_utc,
+            "elapsed_seconds": elapsed_seconds,
         }
+    ended_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    elapsed_seconds = round(max(0.0, time.monotonic() - started), 3)
     output = proc.stdout.strip()
     output_lines = output.splitlines()
     return {
@@ -3619,12 +3639,33 @@ def _release_handoff_certification_command(
         "detail": output_lines[-1] if output_lines else f"returncode={proc.returncode}",
         "output_tail": output_lines[-20:],
         "timed_out": False,
+        "started_utc": started_utc,
+        "ended_utc": ended_utc,
+        "elapsed_seconds": elapsed_seconds,
     }
 
 
 def _selected_release_handoff_refresh_steps(refresh_steps: Sequence[str] | None = None) -> list[str]:
     selected = set(refresh_steps or RELEASE_HANDOFF_REFRESH_STEPS)
     return [step for step in RELEASE_HANDOFF_REFRESH_STEPS if step in selected]
+
+
+def _release_handoff_slowest_steps(steps: list[dict[str, Any]], *, limit: int = 3) -> list[dict[str, Any]]:
+    timed_steps = [
+        step
+        for step in steps
+        if isinstance(step.get("elapsed_seconds"), int | float)
+    ]
+    ordered = sorted(timed_steps, key=lambda step: float(step["elapsed_seconds"]), reverse=True)
+    return [
+        {
+            "step_id": step.get("step_id"),
+            "status": step.get("status"),
+            "elapsed_seconds": step.get("elapsed_seconds"),
+            "detail": step.get("detail"),
+        }
+        for step in ordered[:limit]
+    ]
 
 
 def write_release_handoff_refresh_log(
@@ -3664,6 +3705,8 @@ def run_release_handoff_certification_refresh(
     refresh_steps: Sequence[str] | None = None,
     timeout_seconds: int = 0,
 ) -> dict[str, Any]:
+    refresh_started_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    refresh_started = time.monotonic()
     head_prefix = head_sha[:12]
     source_manifest = (
         cfg.project_root
@@ -3691,11 +3734,17 @@ def run_release_handoff_certification_refresh(
         if step.get("status") != "PASS":
             break
     failed = [step for step in steps if step.get("status") != "PASS"]
+    refresh_ended_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    total_elapsed_seconds = round(max(0.0, time.monotonic() - refresh_started), 3)
     refresh = {
         "requested": True,
         "status": "CERTIFICATION_REFRESH_FAILED" if failed else "CERTIFICATION_REFRESH_OK",
         "requested_steps": requested_steps,
         "timeout_seconds": timeout_seconds,
+        "started_utc": refresh_started_utc,
+        "ended_utc": refresh_ended_utc,
+        "total_elapsed_seconds": total_elapsed_seconds,
+        "slowest_steps": _release_handoff_slowest_steps(steps),
         "steps": steps,
     }
     refresh["log"] = write_release_handoff_refresh_log(cfg, refresh, head_sha)

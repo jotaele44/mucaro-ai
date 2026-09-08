@@ -408,7 +408,9 @@ and selected steps always run in that release order. Add
 timeout. Each refresh attempt writes a JSON log under
 `data/exports/release_refresh_logs` with the current head prefix and a UTC
 attempt stamp; if that refresh fails or times out, the command stops before
-writing the handoff artifact set.
+writing the handoff artifact set. Refresh reports include per-step
+`elapsed_seconds`, total refresh elapsed time, and a `slowest_steps` summary so
+operators can identify expensive certifiers without parsing child-script logs.
 
 Use `mucaro release support-bundle --save` when hosted governance is open and
 the operator needs a single support-ready evidence artifact. The command runs
