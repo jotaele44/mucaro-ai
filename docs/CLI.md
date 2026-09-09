@@ -217,7 +217,7 @@ approved and audited.
 | `CERTIFICATION_FAIL` | release readiness has a hard blocker such as product audit failure, JSON validation failure, or dirty worktree |
 | `GITHUB_ACTIONS_DIAGNOSTIC_WARN` | hosted Actions diagnostic found incomplete read-only evidence but no hard failure |
 | `GITHUB_ACTIONS_DIAGNOSTIC_FAIL` | hosted Actions diagnostic found a hard failure, such as current-head CI startup failure before jobs |
-| `PRODUCT_AUDIT_OPEN` | product audit found remaining ChatGPT/Claude-comparability gaps |
+| `PRODUCT_AUDIT_OPEN` | product audit found remaining governed-product or advanced-capability gaps |
 | `PRODUCT_AUDIT_BLOCKED` | product audit found a blocked requirement |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |

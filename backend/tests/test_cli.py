@@ -2254,6 +2254,13 @@ def test_cli_audit_completion_reports_hosted_governance_open(tmp_path: Path, cap
         "tool_use_and_actions",
         "source_artifact_packaging",
     ]
+    advanced_requirements = [
+        "advanced_gis_processing",
+        "state_of_art_ocr_analysis",
+        "governed_web_browsing",
+        "coding_programming_expertise",
+        "transparency_objectivity_governance",
+    ]
 
     def fake_product_audit(_cfg: Settings):
         return {
@@ -2268,6 +2275,16 @@ def test_cli_audit_completion_reports_hosted_governance_open(tmp_path: Path, cap
                     "next_step": f"{requirement_id} next",
                 }
                 for requirement_id in product_requirements
+            ] + [
+                {
+                    "requirement_id": requirement_id,
+                    "requirement": f"{requirement_id} requirement",
+                    "status": "OPEN",
+                    "evidence": f"{requirement_id} evidence",
+                    "gap": f"{requirement_id} gap",
+                    "next_step": f"{requirement_id} next",
+                }
+                for requirement_id in advanced_requirements
             ],
         }
 
@@ -2344,7 +2361,9 @@ def test_cli_audit_completion_reports_hosted_governance_open(tmp_path: Path, cap
     payload = json.loads(capsys.readouterr().out)
     requirements = {row["requirement_id"]: row for row in payload["requirements"]}
     assert payload["status"] == "COMPLETION_AUDIT_OPEN"
-    assert payload["counts"] == {"pass": 9, "open": 1, "blocked": 0, "fail": 0, "unverified": 0, "total": 10}
+    assert payload["counts"] == {"pass": 9, "open": 6, "blocked": 0, "fail": 0, "unverified": 0, "total": 15}
+    assert requirements["advanced_gis_processing"]["status"] == "OPEN"
+    assert requirements["transparency_objectivity_governance"]["status"] == "OPEN"
     assert requirements["hosted_governance"]["status"] == "OPEN"
     assert "support_classification=HOSTED_STARTUP_BEFORE_JOBS" in requirements["hosted_governance"]["evidence"]
     assert "current_head_startup_run_ids=31,32" in requirements["hosted_governance"]["evidence"]
@@ -2353,7 +2372,8 @@ def test_cli_audit_completion_reports_hosted_governance_open(tmp_path: Path, cap
 
     assert main(["audit", "completion", "--include-github", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out
-    assert "counts=pass:9 open:1 blocked:0 fail:0 unverified:0 total:10" in strict_output
+    assert "counts=pass:9 open:6 blocked:0 fail:0 unverified:0 total:15" in strict_output
+    assert "OPEN advanced_gis_processing" in strict_output
     assert "OPEN hosted_governance" in strict_output
 
 
@@ -2373,6 +2393,11 @@ def test_cli_audit_completion_is_ready_when_release_grade_gates_pass(tmp_path: P
             "personalization_memory",
             "tool_use_and_actions",
             "source_artifact_packaging",
+            "advanced_gis_processing",
+            "state_of_art_ocr_analysis",
+            "governed_web_browsing",
+            "coding_programming_expertise",
+            "transparency_objectivity_governance",
         ]
         return {
             "status": "PRODUCT_AUDIT_OK",
@@ -2432,7 +2457,7 @@ def test_cli_audit_completion_is_ready_when_release_grade_gates_pass(tmp_path: P
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "COMPLETION_AUDIT_READY"
     assert payload["readiness_percent"] == 100.0
-    assert payload["counts"] == {"pass": 10, "open": 0, "blocked": 0, "fail": 0, "unverified": 0, "total": 10}
+    assert payload["counts"] == {"pass": 15, "open": 0, "blocked": 0, "fail": 0, "unverified": 0, "total": 15}
 
 
 def test_cli_audit_completion_fails_bad_artifact_status(tmp_path: Path, capsys, monkeypatch):
@@ -2450,6 +2475,11 @@ def test_cli_audit_completion_fails_bad_artifact_status(tmp_path: Path, capsys, 
             "personalization_memory",
             "tool_use_and_actions",
             "source_artifact_packaging",
+            "advanced_gis_processing",
+            "state_of_art_ocr_analysis",
+            "governed_web_browsing",
+            "coding_programming_expertise",
+            "transparency_objectivity_governance",
         ]
         return {
             "status": "PRODUCT_AUDIT_OK",

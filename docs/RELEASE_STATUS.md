@@ -234,11 +234,13 @@ Observed success markers:
 - `mucaro audit completion --include-github` composes product-audit,
   release-state, release-dashboard, package, receipt, and hosted-governance
   evidence into one active-goal matrix. It reports PASS, OPEN, BLOCKED, FAIL,
-  and UNVERIFIED rows so local readiness, release governance, and production
-  packaging progress cannot be conflated. When GitHub Actions fails before
-  jobs, the hosted-governance row carries the support classification,
-  current-head startup run IDs, check-suite counts, and suspected causes from
-  the GitHub Actions diagnostic.
+  and UNVERIFIED rows so local readiness, advanced capability readiness,
+  release governance, and production packaging progress cannot be conflated.
+  The completion denominator includes the expanded GIS, OCR, web browsing,
+  coding/programming, and transparency/objectivity rows from product audit.
+  When GitHub Actions fails before jobs, the hosted-governance row carries the
+  support classification, current-head startup run IDs, check-suite counts, and
+  suspected causes from the GitHub Actions diagnostic.
 - `mucaro release support-bundle --save` creates a support-ready JSON artifact
   for hosted governance escalation. It captures the release dashboard, GitHub
   diagnostic status, support classification, startup blocker, blockers,
@@ -247,8 +249,9 @@ Observed success markers:
   report and creates it if needed, keeping the support artifact path
   restartable instead of order-dependent.
 - `mucaro audit completion --include-github` reports `COMPLETION_AUDIT_OPEN`
-  with the hosted-governance row open until GitHub runner admission, billing
-  visibility, and branch protection are proven for the current head.
+  while any expanded capability row remains open, and keeps the
+  hosted-governance row open until GitHub runner admission, billing visibility,
+  and branch protection are proven for the current head.
 - `mucaro release hosted-governance` reports `HOSTED_GOVERNANCE_OPEN` with
   support-bundle readiness separated from CI job admission and branch
   protection readiness.

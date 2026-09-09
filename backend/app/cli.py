@@ -4089,6 +4089,18 @@ def _completion_requirement(
     }
 
 
+def _completion_requirement_from_product(row: dict[str, Any]) -> dict[str, str]:
+    requirement_id = str(row.get("requirement_id") or "unverified_product_requirement")
+    return _completion_requirement(
+        requirement_id,
+        str(row.get("requirement") or requirement_id),
+        str(row.get("status") or "UNVERIFIED"),
+        str(row.get("evidence") or ""),
+        str(row.get("gap") or ""),
+        str(row.get("next_step") or "Complete and verify this product-audit requirement."),
+    )
+
+
 def _completion_hosted_governance_evidence(
     *,
     include_github: bool,
@@ -4171,6 +4183,13 @@ def build_completion_audit_report(
     memory = _product_requirement_row(product_audit, "personalization_memory")
     tools = _product_requirement_row(product_audit, "tool_use_and_actions")
     package = _product_requirement_row(product_audit, "source_artifact_packaging")
+    advanced_capability_requirements = [
+        _product_requirement_row(product_audit, "advanced_gis_processing"),
+        _product_requirement_row(product_audit, "state_of_art_ocr_analysis"),
+        _product_requirement_row(product_audit, "governed_web_browsing"),
+        _product_requirement_row(product_audit, "coding_programming_expertise"),
+        _product_requirement_row(product_audit, "transparency_objectivity_governance"),
+    ]
 
     local_release_status = _release_state_status(release_state, "LOCAL_RELEASE_CERTIFIED")
     fresh_clone_status = _release_state_status(release_state, "FRESH_CLONE_CERTIFIED")
@@ -4308,6 +4327,10 @@ def build_completion_audit_report(
             "" if operator_workflow_status == "PASS" else "Tool approval/audit workflow receipt is missing or stale for current HEAD.",
             "Add write/action tools only with explicit policy, approval, denial, and audit tests.",
         ),
+        *[
+            _completion_requirement_from_product(row)
+            for row in advanced_capability_requirements
+        ],
         _completion_requirement(
             "repeatable_fresh_clone_certification",
             "A clean clone can reproduce the launcher and release gates from the current HEAD.",
