@@ -252,6 +252,12 @@ Observed success markers:
   while any expanded capability row remains open, and keeps the
   hosted-governance row open until GitHub runner admission, billing visibility,
   and branch protection are proven for the current head.
+- `mucaro capabilities contracts` reports
+  `ADVANCED_CAPABILITY_CONTRACTS_READY` when the GIS, OCR, web browsing,
+  coding/programming, and transparency/objectivity proof contracts are
+  structurally complete. This is a contract-readiness signal only; product and
+  completion audits must remain open until adapters, fixtures, provenance
+  ledgers, and enforcement hooks exist.
 - `mucaro release hosted-governance` reports `HOSTED_GOVERNANCE_OPEN` with
   support-bundle readiness separated from CI job admission and branch
   protection readiness.

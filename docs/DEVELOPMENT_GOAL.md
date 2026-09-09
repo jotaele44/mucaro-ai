@@ -118,13 +118,15 @@ byte-pinned proof layer for a particular commit. Verify them with
 5. Use `mucaro audit product` and `mucaro audit roadmap` to keep expanded GIS,
    OCR, browsing, coding, and transparency/objectivity gaps visible until they
    have implemented contracts and receipt-backed gates.
-6. Use support bundles to escalate hosted governance blockers without
+6. Use `mucaro capabilities contracts` to inspect the shared proof contracts
+   that advanced capability adapters must satisfy before availability claims.
+7. Use support bundles to escalate hosted governance blockers without
    weakening local certification boundaries.
-7. Treat all future execution adapters as subordinate to Skill Fabric identity,
+8. Treat all future execution adapters as subordinate to Skill Fabric identity,
    permission, audit, and certification boundaries.
-8. Preserve local-first default behavior and fail closed whenever live provider,
+9. Preserve local-first default behavior and fail closed whenever live provider,
    hosted runner, optional dependency, or index state is missing.
-9. Keep release claims scoped: local certification can pass while hosted
+10. Keep release claims scoped: local certification can pass while hosted
    governance remains open.
 
 ## Readiness Rule

@@ -49,6 +49,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro certify retrieval-quality` | Write an exact-head retrieval-quality release receipt | 0 | 2 |
 | `mucaro certify answer-trace-quality` | Write an exact-head cited-answer traceability release receipt | 0 | 2 |
 | `mucaro certify operator-workflow` | Write an exact-head local operator-workflow release receipt | 0 | 2 |
+| `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources, persistent index status, and semantic-store status | 0 | 2 |
@@ -219,6 +220,8 @@ approved and audited.
 | `GITHUB_ACTIONS_DIAGNOSTIC_FAIL` | hosted Actions diagnostic found a hard failure, such as current-head CI startup failure before jobs |
 | `PRODUCT_AUDIT_OPEN` | product audit found remaining governed-product or advanced-capability gaps |
 | `PRODUCT_AUDIT_BLOCKED` | product audit found a blocked requirement |
+| `ADVANCED_CAPABILITY_CONTRACTS_READY` | GIS, OCR, browsing, coding, and transparency/objectivity proof contracts are structurally complete |
+| `ADVANCED_CAPABILITY_CONTRACTS_FAILED` | one or more advanced capability contracts is missing required proof fields |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
@@ -286,6 +289,7 @@ mucaro tools request source_library.status --reason "readiness check" --format j
 mucaro tools approve TOOL_CALL_ID --format json
 mucaro tools run TOOL_CALL_ID --format json
 mucaro tools audit --format text
+mucaro capabilities contracts --format text
 mucaro ask "How does source lineage work?" --format json --no-persist
 mucaro ask "How does source lineage work?" --strategy persistent --format text
 mucaro ask "How does source lineage work?" --strategy semantic --format text

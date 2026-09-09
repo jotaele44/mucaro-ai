@@ -22,7 +22,7 @@
 | Artifact identity/provenance | Input/output handles, SHA-256 identity, staged commit, execution receipts | Next |
 | Exact-head release handoff | Distribution manifest, governance report, and support bundle verify against the canonical head while preserving hosted governance as OPEN | Current baseline is CLI-bound; verify with `mucaro audit completion --include-github` |
 | Hosted governance remediation | Resolve GitHub Actions startup-before-jobs, billing visibility, and private branch-protection plan gate | Open external lane |
-| Advanced capability contracts | Shared evidence, permission, uncertainty, contradiction, and falsification schema for GIS, OCR, browsing, and coding outputs | Next |
+| Advanced capability contracts | Shared evidence, permission, uncertainty, contradiction, and falsification schema for GIS, OCR, browsing, and coding outputs | Complete candidate; inspect with `mucaro capabilities contracts` |
 | GIS processing contract and evals | CRS, geometry validity, topology assertions, spatial joins, map/export provenance, and positive/negative spatial fixtures | Queued |
 | OCR analysis contract and evals | Source-image hashes, OCR engine identity, layout/text preservation, confidence thresholds, and OCR regression fixtures | Queued |
 | Governed web browsing contract and evals | URL policy, fetch snapshots, parser metadata, content hashes, retrieval UTC, cache/robots posture, and web citation fixtures | Queued |

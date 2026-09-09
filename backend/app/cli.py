@@ -16,6 +16,7 @@ from typing import Any, Sequence
 from urllib.parse import urlparse
 
 from .config import Settings, settings
+from .capability_contracts import build_capability_contract_report
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -499,6 +500,16 @@ def build_parser() -> argparse.ArgumentParser:
     tools_audit = tools_subcommands.add_parser("audit", help="List tool runtime audit events.")
     tools_audit.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tools_audit.set_defaults(handler=run_tools_audit)
+
+    capabilities = subcommands.add_parser("capabilities", help="Inspect governed advanced capability contracts.")
+    capabilities_subcommands = capabilities.add_subparsers(dest="capabilities_command", required=True)
+
+    capability_contracts = capabilities_subcommands.add_parser(
+        "contracts",
+        help="List GIS, OCR, web browsing, coding, and transparency/objectivity capability contracts.",
+    )
+    capability_contracts.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_contracts.set_defaults(handler=run_capability_contracts)
 
     memory = subcommands.add_parser("memory", help="Manage explicit local assistant memory.")
     memory_subcommands = memory.add_subparsers(dest="memory_command", required=True)
@@ -1265,6 +1276,21 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"{check.get('status')} {check.get('name')} {detail}")
         for command in payload.get("next_commands", []):
             print(f"command={command}")
+    elif status in {"ADVANCED_CAPABILITY_CONTRACTS_READY", "ADVANCED_CAPABILITY_CONTRACTS_FAILED"}:
+        print(f"schema_version={payload.get('schema_version')}")
+        print(f"contract_count={payload.get('contract_count')}")
+        print(f"complete_contract_count={payload.get('complete_contract_count')}")
+        states = payload.get("implementation_states", {})
+        if isinstance(states, dict):
+            print("implementation_states=" + ",".join(f"{key}:{value}" for key, value in sorted(states.items())))
+        for contract in payload.get("contracts", []):
+            if isinstance(contract, dict):
+                print(
+                    f"{contract.get('contract_status')} "
+                    f"{contract.get('implementation_status')} "
+                    f"{contract.get('capability_id')}"
+                )
+        print(f"next_step={payload.get('next_step')}")
     elif status in {"PACKAGE_ARTIFACT_READY", "PACKAGE_ARTIFACT_BLOCKED", "PACKAGE_ARTIFACT_VERIFIED", "PACKAGE_ARTIFACT_VERIFY_FAILED"}:
         print(f"project_root={payload.get('project_root')}")
         if payload.get("output_dir"):
@@ -6313,6 +6339,13 @@ def run_tools_run(args: argparse.Namespace, cfg: Settings) -> int:
 def run_tools_audit(args: argparse.Namespace, cfg: Settings) -> int:
     emit_payload(list_tool_audit_events(cfg), args.format)
     return 0
+
+
+def run_capability_contracts(args: argparse.Namespace, cfg: Settings) -> int:
+    del cfg
+    report = build_capability_contract_report()
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "ADVANCED_CAPABILITY_CONTRACTS_READY" else 2
 
 
 def run_memory_list(args: argparse.Namespace, cfg: Settings) -> int:
