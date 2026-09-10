@@ -202,9 +202,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "capability_expansion",
             "Assistant has powerful web browsing abilities governed by provenance, safety, and citation controls.",
             "OPEN",
-            "web.fetch is an approval-gated tool that enforces URL policy and writes byte-pinned snapshots plus a local snapshot ledger; web snapshots can be ingested as citeable local sources with URL, retrieval UTC, and hash metadata in answer traces.",
-            "Snapshot fetch, ledgering, citation wiring, web citation fixtures, response cache metadata, and basic robots enforcement exist, but richer page parsing, cache behavior policy, redirect-target robots completeness, and HTTP error-page citation policy remain open.",
-            "Add richer parser traces, cache behavior policy, redirect-target robots fixtures, and explicit HTTP error-page citation fixtures.",
+            "web.fetch is an approval-gated tool that enforces URL policy and writes byte-pinned snapshots plus a local snapshot ledger; web snapshots can be ingested as citeable local sources with URL, retrieval UTC, hash metadata, cache/robots metadata, HTML parser traces, non-text parser classification, and explicit HTTP error-page citation policy.",
+            "Snapshot fetch, ledgering, citation wiring, web citation fixtures, response cache metadata, basic robots enforcement, HTML parser traces, non-text parser classification, and HTTP error-page citation fixtures exist, but cache behavior policy, redirect-target robots completeness, PDF/deeper extraction, browser discovery, and session behavior remain open.",
+            "Add cache behavior policy fixtures, redirect-target robots fixtures, PDF/deeper parser traces, and browser discovery/session controls.",
         ),
         ProductRequirement(
             "coding_programming_expertise",

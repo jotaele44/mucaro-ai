@@ -116,6 +116,14 @@ def ingest_web_snapshot(snapshot_path: Path, cfg: Settings = settings) -> dict[s
     final_url = str(snapshot.get("final_url") or "")
     content_sha256 = str(snapshot.get("content_sha256") or "")
     retrieval_utc = str(snapshot.get("retrieval_utc") or "")
+    http_error_policy = snapshot.get("http_error_policy") if isinstance(snapshot.get("http_error_policy"), dict) else {}
+    if http_error_policy.get("is_http_error") and not http_error_policy.get("citation_allowed"):
+        return {
+            "status": "ERROR_WEB_SNAPSHOT_NOT_CITABLE",
+            "detail": "HTTP error-page snapshots require citation_allowed=true before ingestion.",
+            "snapshot_id": snapshot_id,
+            "snapshot_path": str(snapshot_path),
+        }
     source_id = stable_id("src_web", snapshot_id, final_url, content_sha256)
     chunks = chunk_text(source_id, text)
     parser_warnings = list(snapshot.get("parser_warnings") or [])
@@ -159,6 +167,8 @@ def ingest_web_snapshot(snapshot_path: Path, cfg: Settings = settings) -> dict[s
             "content_size_bytes": snapshot.get("content_size_bytes"),
             "cache_policy": snapshot.get("cache_policy", {}),
             "robots_policy": snapshot.get("robots_policy", {}),
+            "http_error_policy": http_error_policy,
+            "parser_trace": snapshot.get("parser_trace", {}),
             "charset": snapshot.get("charset"),
             "policy": snapshot.get("policy", {}),
         },

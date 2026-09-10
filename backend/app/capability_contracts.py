@@ -173,7 +173,9 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "content_type",
                 "content_sha256",
                 "parser_name",
+                "parser_trace",
                 "parser_warnings",
+                "http_error_policy",
             ),
             invariants=(
                 "mutable web content is snapshotted before use",
@@ -182,14 +184,16 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "failed fetches preserve status and do not fabricate source text",
             ),
             positive_regression_gates=(
-                "static HTML fixture produces cited text and byte hash",
+                "static HTML fixture produces cited text, byte hash, title, headings, links, and meta trace",
                 "redirect fixture records requested and final URLs",
-                "PDF/HTML content-type fixture selects the declared parser path",
+                "non-text content fixture records preview omission without fabricated text",
+                "explicitly citeable HTTP error-page fixture can be snapshotted and ingested",
             ),
             negative_regression_gates=(
                 "blocked URL policy prevents fetch",
                 "oversized response fails closed",
                 "404/500 pages remain fetch failures unless explicitly cited as error pages",
+                "unciteable HTTP error-page snapshots are rejected by source ingestion",
             ),
             output_requirements=(
                 "FACT/INFERENCE separation",
@@ -199,9 +203,10 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "falsification path",
             ),
             unavailable_until=(
-                "robots/cache and redirect-chain policy gates pass",
-                "richer parser traces cover HTML, PDF, and non-text responses",
-                "HTTP error-page citation policy is explicitly defined",
+                "cache behavior policy gates pass",
+                "redirect-target robots completeness fixtures pass",
+                "PDF parser traces and deeper page extraction pass",
+                "browser discovery and session policy are defined",
             ),
         ),
         CapabilityContract(

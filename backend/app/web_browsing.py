@@ -9,6 +9,7 @@ import urllib.error
 import urllib.robotparser
 import urllib.request
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urldefrag, urlparse
 
@@ -48,6 +49,62 @@ class WebFetchPolicy:
     max_bytes: int = DEFAULT_MAX_WEB_BYTES
     allow_private_hosts: bool = False
     respect_robots: bool = True
+    snapshot_http_errors: bool = False
+    cite_http_error_pages: bool = False
+
+
+class _HTMLTraceParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.title_parts: list[str] = []
+        self.headings: list[str] = []
+        self.link_samples: list[str] = []
+        self.meta_names: list[str] = []
+        self._in_title = False
+        self._heading_tag: str | None = None
+        self._heading_parts: list[str] = []
+        self.link_count = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        tag = tag.lower()
+        attr_map = {name.lower(): value for name, value in attrs if value}
+        if tag == "title":
+            self._in_title = True
+        elif tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+            self._heading_tag = tag
+            self._heading_parts = []
+        elif tag == "a" and attr_map.get("href"):
+            self.link_count += 1
+            if len(self.link_samples) < 5:
+                self.link_samples.append(str(attr_map["href"]))
+        elif tag == "meta":
+            name = attr_map.get("name") or attr_map.get("property")
+            if name and len(self.meta_names) < 12:
+                self.meta_names.append(str(name))
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag == "title":
+            self._in_title = False
+        elif self._heading_tag == tag:
+            heading = " ".join(" ".join(self._heading_parts).split())
+            if heading and len(self.headings) < 12:
+                self.headings.append(heading)
+            self._heading_tag = None
+            self._heading_parts = []
+
+    def handle_data(self, data: str) -> None:
+        text = " ".join(data.split())
+        if not text:
+            return
+        if self._in_title:
+            self.title_parts.append(text)
+        if self._heading_tag:
+            self._heading_parts.append(text)
+
+    @property
+    def title(self) -> str:
+        return " ".join(self.title_parts).strip()
 
 
 def _parse_bool(value: Any) -> bool:
@@ -150,6 +207,43 @@ def _decode_preview(content: bytes, content_type: str, *, limit: int = 4000) -> 
         warnings.append("WEB_TEXT_PREVIEW_TRUNCATED")
         text = text[:limit]
     return text, warnings, charset
+
+
+def _parser_trace(content: bytes, content_type: str, text_preview: str, charset: str) -> dict[str, Any]:
+    lowered = content_type.lower()
+    trace: dict[str, Any] = {
+        "parser_name": "web_snapshot_preview_v1",
+        "content_kind": "textual" if any(marker in lowered for marker in TEXTUAL_CONTENT_MARKERS) else "non_text",
+        "content_type": content_type,
+        "text_preview_length": len(text_preview),
+        "trace_warnings": [],
+    }
+    if "html" not in lowered:
+        return trace
+    try:
+        html_text = content.decode(charset or "utf-8", errors="replace")
+    except LookupError:
+        html_text = content.decode("utf-8", errors="replace")
+        trace["trace_warnings"].append("HTML_TRACE_CHARSET_UNKNOWN_USED_UTF8")
+    parser = _HTMLTraceParser()
+    parser.feed(html_text)
+    parser.close()
+    trace.update(
+        {
+            "content_kind": "html",
+            "html_title": parser.title,
+            "html_heading_count": len(parser.headings),
+            "html_headings": parser.headings,
+            "html_link_count": parser.link_count,
+            "html_link_samples": parser.link_samples,
+            "html_meta_names": parser.meta_names,
+        }
+    )
+    if not parser.title:
+        trace["trace_warnings"].append("HTML_TRACE_TITLE_MISSING")
+    if not parser.headings:
+        trace["trace_warnings"].append("HTML_TRACE_HEADINGS_MISSING")
+    return trace
 
 
 def _snapshot_ledger_path(cfg: Settings) -> Any:
@@ -257,6 +351,13 @@ def _check_robots_policy(fetch_url: str, policy: WebFetchPolicy) -> dict[str, An
     return result
 
 
+def _read_bounded_response(response: Any, max_bytes: int) -> bytes:
+    content = response.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise WebBrowsingError("ERROR_WEB_RESPONSE_TOO_LARGE", f"Response exceeded {max_bytes} bytes.")
+    return content
+
+
 class _GovernedRedirectHandler(urllib.request.HTTPRedirectHandler):
     def __init__(self, policy: WebFetchPolicy, redirect_chain: list[dict[str, Any]]) -> None:
         self.policy = policy
@@ -300,16 +401,30 @@ def fetch_web_snapshot(
     )
     try:
         with opener.open(request, timeout=policy.timeout_seconds) as response:
-            content = response.read(policy.max_bytes + 1)
-            if len(content) > policy.max_bytes:
-                raise WebBrowsingError("ERROR_WEB_RESPONSE_TOO_LARGE", f"Response exceeded {policy.max_bytes} bytes.")
+            content = _read_bounded_response(response, policy.max_bytes)
             final_url = response.geturl()
             http_status = int(getattr(response, "status", 200))
             headers = dict(response.headers.items())
+            http_error_policy = {
+                "is_http_error": False,
+                "snapshot_allowed": False,
+                "citation_allowed": False,
+            }
     except WebBrowsingError:
         raise
     except urllib.error.HTTPError as exc:
-        raise WebBrowsingError("ERROR_WEB_HTTP_STATUS", f"HTTP {exc.code}: {exc.reason}") from exc
+        if not policy.snapshot_http_errors:
+            raise WebBrowsingError("ERROR_WEB_HTTP_STATUS", f"HTTP {exc.code}: {exc.reason}") from exc
+        content = _read_bounded_response(exc, policy.max_bytes)
+        final_url = exc.geturl()
+        http_status = int(exc.code)
+        headers = dict(exc.headers.items())
+        http_error_policy = {
+            "is_http_error": True,
+            "snapshot_allowed": True,
+            "citation_allowed": bool(policy.cite_http_error_pages),
+            "reason": str(exc.reason),
+        }
     except urllib.error.URLError as exc:
         raise WebBrowsingError("ERROR_WEB_FETCH_FAILED", str(exc.reason)) from exc
     retrieved_at = utc_now()
@@ -323,10 +438,12 @@ def fetch_web_snapshot(
     }
     content_sha256 = hashlib.sha256(content).hexdigest()
     text_preview, parser_warnings, charset = _decode_preview(content, content_type)
+    parser_trace = _parser_trace(content, content_type, text_preview, charset)
     snapshot_id = stable_id("websnap", str(checked["requested_url"]), final_url, content_sha256, retrieved_at)
     snapshot = {
         "schema_version": WEB_SNAPSHOT_SCHEMA_VERSION,
         "snapshot_id": snapshot_id,
+        "snapshot_kind": "http_error_page" if http_error_policy["is_http_error"] else "web_page",
         "requested_url": checked["requested_url"],
         "fetch_url": checked["fetch_url"],
         "final_url": final_url,
@@ -338,10 +455,12 @@ def fetch_web_snapshot(
         "content_type": content_type,
         "cache_policy": cache_policy,
         "robots_policy": robots_policy,
+        "http_error_policy": http_error_policy,
         "content_sha256": content_sha256,
         "content_size_bytes": len(content),
         "content_base64": base64.b64encode(content).decode("ascii"),
         "parser_name": "web_snapshot_preview_v1",
+        "parser_trace": parser_trace,
         "parser_warnings": parser_warnings,
         "charset": charset,
         "text_preview": text_preview,
@@ -350,6 +469,8 @@ def fetch_web_snapshot(
             "max_bytes": policy.max_bytes,
             "allow_private_hosts": policy.allow_private_hosts,
             "respect_robots": policy.respect_robots,
+            "snapshot_http_errors": policy.snapshot_http_errors,
+            "cite_http_error_pages": policy.cite_http_error_pages,
         },
     }
     path = cfg.export_dir / WEB_SNAPSHOT_DIR / f"{snapshot_id}.json"
@@ -367,9 +488,12 @@ def fetch_web_snapshot(
 
 
 def build_web_fetch_policy(arguments: dict[str, Any]) -> WebFetchPolicy:
+    snapshot_http_errors = _parse_bool(arguments.get("snapshot_http_errors"))
     return WebFetchPolicy(
         timeout_seconds=_parse_positive_int(arguments.get("timeout_seconds"), DEFAULT_WEB_TIMEOUT_SECONDS),
         max_bytes=_parse_positive_int(arguments.get("max_bytes"), DEFAULT_MAX_WEB_BYTES),
         allow_private_hosts=_parse_bool(arguments.get("allow_private_hosts")),
         respect_robots=not _parse_bool(arguments.get("ignore_robots")),
+        snapshot_http_errors=snapshot_http_errors,
+        cite_http_error_pages=snapshot_http_errors and _parse_bool(arguments.get("cite_http_error_pages")),
     )

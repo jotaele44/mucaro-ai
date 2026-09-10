@@ -676,6 +676,12 @@ tools:
 HTTP(S) URL through the governed URL policy and writes a byte-pinned local
 snapshot under `data/exports/web_snapshots`.
 
+`web.fetch` records cache and robots metadata by default, removes URL fragments,
+retains safe redirects, and emits parser traces for HTML and non-text responses.
+HTTP error pages fail closed unless the tool call explicitly sets
+`snapshot_http_errors=true`; ingestion still rejects those snapshots unless
+`cite_http_error_pages=true` was also set on the fetch.
+
 After reviewing a saved snapshot, use
 `mucaro sources ingest-web-snapshot SNAPSHOT_PATH` to make that frozen web
 artifact available to retrieval and answer citations.
