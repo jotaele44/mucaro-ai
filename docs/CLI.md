@@ -677,8 +677,11 @@ HTTP(S) URL through the governed URL policy and writes a byte-pinned local
 snapshot under `data/exports/web_snapshots`.
 
 `web.fetch` records cache and robots metadata by default, removes URL fragments,
-retains safe redirects, and emits parser traces for HTML and non-text responses.
-HTTP error pages fail closed unless the tool call explicitly sets
+checks robots policy on redirect targets before following them, and emits parser
+traces for HTML, PDF, and non-text responses. Cache headers are recorded as
+source evidence, but the runtime remains immutable snapshot-only:
+`reuse_allowed=false` until a future revalidation policy explicitly changes
+that. HTTP error pages fail closed unless the tool call explicitly sets
 `snapshot_http_errors=true`; ingestion still rejects those snapshots unless
 `cite_http_error_pages=true` was also set on the fetch.
 

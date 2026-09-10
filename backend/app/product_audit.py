@@ -202,9 +202,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "capability_expansion",
             "Assistant has powerful web browsing abilities governed by provenance, safety, and citation controls.",
             "OPEN",
-            "web.fetch is an approval-gated tool that enforces URL policy and writes byte-pinned snapshots plus a local snapshot ledger; web snapshots can be ingested as citeable local sources with URL, retrieval UTC, hash metadata, cache/robots metadata, HTML parser traces, non-text parser classification, and explicit HTTP error-page citation policy.",
-            "Snapshot fetch, ledgering, citation wiring, web citation fixtures, response cache metadata, basic robots enforcement, HTML parser traces, non-text parser classification, and HTTP error-page citation fixtures exist, but cache behavior policy, redirect-target robots completeness, PDF/deeper extraction, browser discovery, and session behavior remain open.",
-            "Add cache behavior policy fixtures, redirect-target robots fixtures, PDF/deeper parser traces, and browser discovery/session controls.",
+            "web.fetch is an approval-gated tool that enforces URL policy and writes byte-pinned snapshots plus a local snapshot ledger; web snapshots can be ingested as citeable local sources with URL, retrieval UTC, hash metadata, cache/robots metadata, redirect-target robots evidence, HTML parser traces, PDF page traces, non-text parser classification, immutable snapshot-only cache policy, and explicit HTTP error-page citation policy.",
+            "Snapshot fetch, ledgering, citation wiring, web citation fixtures, response cache metadata, robots enforcement, redirect-target robots fixtures, HTML/PDF/non-text parser traces, immutable snapshot-only cache policy, and HTTP error-page citation fixtures exist, but deeper body extraction, browser discovery/search, session behavior, multi-page source selection, and replay receipts remain open.",
+            "Add deeper body extraction, browser discovery/search controls, session policy, multi-page source selection, and replay receipts.",
         ),
         ProductRequirement(
             "coding_programming_expertise",

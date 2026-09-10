@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from io import BytesIO
 import ipaddress
 import re
 import socket
@@ -51,6 +52,7 @@ class WebFetchPolicy:
     respect_robots: bool = True
     snapshot_http_errors: bool = False
     cite_http_error_pages: bool = False
+    cache_mode: str = "immutable_snapshot_only"
 
 
 class _HTMLTraceParser(HTMLParser):
@@ -218,6 +220,43 @@ def _parser_trace(content: bytes, content_type: str, text_preview: str, charset:
         "text_preview_length": len(text_preview),
         "trace_warnings": [],
     }
+    if "application/pdf" in lowered:
+        trace["content_kind"] = "pdf"
+        try:
+            from pypdf import PdfReader  # type: ignore
+        except Exception:
+            trace["trace_warnings"].append("PDF_TRACE_PARSER_UNAVAILABLE_INSTALL_PYPDF")
+            return trace
+        try:
+            reader = PdfReader(BytesIO(content))
+        except Exception as exc:
+            trace["trace_warnings"].append(f"PDF_TRACE_OPEN_FAILED:{exc.__class__.__name__}")
+            return trace
+        page_count = len(reader.pages)
+        pages_with_text = 0
+        pages_with_empty_text = 0
+        failed_pages = 0
+        for idx, page in enumerate(reader.pages):
+            try:
+                if (page.extract_text() or "").strip():
+                    pages_with_text += 1
+                else:
+                    pages_with_empty_text += 1
+                    if len(trace["trace_warnings"]) < 12:
+                        trace["trace_warnings"].append(f"PDF_TRACE_PAGE_EMPTY:{idx + 1}")
+            except Exception:
+                failed_pages += 1
+                if len(trace["trace_warnings"]) < 12:
+                    trace["trace_warnings"].append(f"PDF_TRACE_PAGE_PARSE_FAILED:{idx + 1}")
+        trace.update(
+            {
+                "pdf_page_count": page_count,
+                "pdf_pages_with_text": pages_with_text,
+                "pdf_pages_with_empty_text": pages_with_empty_text,
+                "pdf_failed_pages": failed_pages,
+            }
+        )
+        return trace
     if "html" not in lowered:
         return trace
     try:
@@ -244,6 +283,25 @@ def _parser_trace(content: bytes, content_type: str, text_preview: str, charset:
     if not parser.headings:
         trace["trace_warnings"].append("HTML_TRACE_HEADINGS_MISSING")
     return trace
+
+
+def _build_cache_policy(headers: dict[str, str], policy: WebFetchPolicy) -> dict[str, Any]:
+    values = {
+        "cache_control": headers.get("Cache-Control"),
+        "etag": headers.get("ETag"),
+        "last_modified": headers.get("Last-Modified"),
+        "expires": headers.get("Expires"),
+        "vary": headers.get("Vary"),
+    }
+    header_present = any(value for value in values.values())
+    return {
+        **values,
+        "cache_mode": policy.cache_mode,
+        "header_status": "CACHE_HEADERS_PRESENT" if header_present else "CACHE_HEADERS_ABSENT",
+        "reuse_allowed": False,
+        "revalidation_required_before_reuse": True,
+        "warnings": [] if header_present else ["CACHE_HEADERS_ABSENT_IMMUTABLE_SNAPSHOT_ONLY"],
+    }
 
 
 def _snapshot_ledger_path(cfg: Settings) -> Any:
@@ -305,7 +363,7 @@ def _check_robots_policy(fetch_url: str, policy: WebFetchPolicy) -> dict[str, An
         headers={"User-Agent": "MucaroAI/0.1 local-first governed-fetch"},
         method="GET",
     )
-    opener = urllib.request.build_opener(_GovernedRedirectHandler(policy, []))
+    opener = urllib.request.build_opener(_GovernedRedirectHandler(policy, [], check_target_robots=False))
     try:
         with opener.open(request, timeout=policy.timeout_seconds) as response:
             content = response.read(DEFAULT_ROBOTS_MAX_BYTES + 1)
@@ -359,9 +417,16 @@ def _read_bounded_response(response: Any, max_bytes: int) -> bytes:
 
 
 class _GovernedRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def __init__(self, policy: WebFetchPolicy, redirect_chain: list[dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        policy: WebFetchPolicy,
+        redirect_chain: list[dict[str, Any]],
+        *,
+        check_target_robots: bool = True,
+    ) -> None:
         self.policy = policy
         self.redirect_chain = redirect_chain
+        self.check_target_robots = check_target_robots
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
         redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
@@ -371,11 +436,21 @@ class _GovernedRedirectHandler(urllib.request.HTTPRedirectHandler):
             redirected.full_url,
             allow_private_hosts=self.policy.allow_private_hosts,
         )
+        target_robots_policy = (
+            _check_robots_policy(str(checked["fetch_url"]), self.policy)
+            if self.check_target_robots
+            else {
+                "status": "ROBOTS_NOT_CHECKED_FOR_INTERNAL_REQUEST",
+                "allowed": True,
+                "warnings": ["ROBOTS_TARGET_CHECK_SKIPPED_FOR_INTERNAL_REQUEST"],
+            }
+        )
         self.redirect_chain.append(
             {
                 "from_url": req.full_url,
                 "to_url": checked["fetch_url"],
                 "http_status": int(code),
+                "target_robots_policy": target_robots_policy,
             }
         )
         return redirected
@@ -429,13 +504,7 @@ def fetch_web_snapshot(
         raise WebBrowsingError("ERROR_WEB_FETCH_FAILED", str(exc.reason)) from exc
     retrieved_at = utc_now()
     content_type = headers.get("Content-Type", "application/octet-stream")
-    cache_policy = {
-        "cache_control": headers.get("Cache-Control"),
-        "etag": headers.get("ETag"),
-        "last_modified": headers.get("Last-Modified"),
-        "expires": headers.get("Expires"),
-        "vary": headers.get("Vary"),
-    }
+    cache_policy = _build_cache_policy(headers, policy)
     content_sha256 = hashlib.sha256(content).hexdigest()
     text_preview, parser_warnings, charset = _decode_preview(content, content_type)
     parser_trace = _parser_trace(content, content_type, text_preview, charset)
@@ -471,6 +540,7 @@ def fetch_web_snapshot(
             "respect_robots": policy.respect_robots,
             "snapshot_http_errors": policy.snapshot_http_errors,
             "cite_http_error_pages": policy.cite_http_error_pages,
+            "cache_mode": policy.cache_mode,
         },
     }
     path = cfg.export_dir / WEB_SNAPSHOT_DIR / f"{snapshot_id}.json"
@@ -496,4 +566,5 @@ def build_web_fetch_policy(arguments: dict[str, Any]) -> WebFetchPolicy:
         respect_robots=not _parse_bool(arguments.get("ignore_robots")),
         snapshot_http_errors=snapshot_http_errors,
         cite_http_error_pages=snapshot_http_errors and _parse_bool(arguments.get("cite_http_error_pages")),
+        cache_mode="immutable_snapshot_only",
     )

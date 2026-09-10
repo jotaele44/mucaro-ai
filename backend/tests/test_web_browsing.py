@@ -4,6 +4,7 @@ import base64
 import json
 import socket
 import threading
+from io import BytesIO
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -64,8 +65,35 @@ class StaticHandler(BaseHTTPRequestHandler):
         return
 
 
-def _serve_fixture(path: str = "/fixture.html") -> tuple[ThreadingHTTPServer, str]:
-    server = ThreadingHTTPServer(("127.0.0.1", 0), StaticHandler)
+def _make_handler(
+    *,
+    body: bytes | None = None,
+    content_type: str | None = None,
+    redirect_to: str | None = None,
+    robots_body: bytes | None = None,
+    cache_control: str | None = None,
+    response_status: int | None = None,
+) -> type[StaticHandler]:
+    class CustomStaticHandler(StaticHandler):
+        pass
+
+    if body is not None:
+        CustomStaticHandler.body = body
+    if content_type is not None:
+        CustomStaticHandler.content_type = content_type
+    if redirect_to is not None:
+        CustomStaticHandler.redirect_to = redirect_to
+    if robots_body is not None:
+        CustomStaticHandler.robots_body = robots_body
+    if cache_control is not None:
+        CustomStaticHandler.cache_control = cache_control
+    if response_status is not None:
+        CustomStaticHandler.response_status = response_status
+    return CustomStaticHandler
+
+
+def _serve_fixture(path: str = "/fixture.html", handler_cls: type[StaticHandler] = StaticHandler) -> tuple[ThreadingHTTPServer, str]:
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     host, port = server.server_address
@@ -126,6 +154,10 @@ def test_fetch_web_snapshot_records_policy_and_bytes(tmp_path: Path):
     assert saved["http_status"] == 200
     assert saved["content_type"] == "text/html; charset=utf-8"
     assert saved["cache_policy"]["cache_control"] == "max-age=60"
+    assert saved["cache_policy"]["cache_mode"] == "immutable_snapshot_only"
+    assert saved["cache_policy"]["header_status"] == "CACHE_HEADERS_PRESENT"
+    assert saved["cache_policy"]["reuse_allowed"] is False
+    assert saved["cache_policy"]["revalidation_required_before_reuse"] is True
     assert saved["robots_policy"]["status"] == "ROBOTS_ALLOWED"
     assert saved["robots_policy"]["allowed"] is True
     assert saved["robots_policy"]["content_sha256"]
@@ -306,8 +338,89 @@ def test_fetch_web_snapshot_records_safe_redirect_chain(tmp_path: Path):
             "from_url": first_url,
             "to_url": second_url,
             "http_status": 302,
+            "target_robots_policy": {
+                "status": "ROBOTS_ALLOWED",
+                "robots_url": second_url.rsplit("/", 1)[0] + "/robots.txt",
+                "robots_final_url": second_url.rsplit("/", 1)[0] + "/robots.txt",
+                "allowed": True,
+                "checked_at": saved["redirect_chain"][0]["target_robots_policy"]["checked_at"],
+                "http_status": 200,
+                "content_sha256": saved["redirect_chain"][0]["target_robots_policy"]["content_sha256"],
+                "content_size_bytes": len(StaticHandler.robots_body),
+                "warnings": [],
+            },
         }
     ]
+
+
+def test_fetch_web_snapshot_blocks_redirect_target_disallowed_by_robots(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    target_handler = _make_handler(robots_body=b"User-agent: *\nDisallow: /fixture.html\n")
+    second_server, second_url = _serve_fixture(handler_cls=target_handler)
+    redirect_handler = _make_handler(redirect_to=second_url)
+    first_server, first_url = _serve_fixture("/redirect", handler_cls=redirect_handler)
+    try:
+        try:
+            fetch_web_snapshot(
+                first_url,
+                cfg=cfg,
+                policy=WebFetchPolicy(timeout_seconds=5, max_bytes=1000, allow_private_hosts=True),
+            )
+        except WebBrowsingError as exc:
+            assert exc.status == "ERROR_WEB_ROBOTS_DISALLOWED"
+        else:
+            raise AssertionError("expected redirect-target robots disallow failure")
+    finally:
+        first_server.shutdown()
+        second_server.shutdown()
+
+
+def test_fetch_web_snapshot_records_absent_cache_headers_as_snapshot_only(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    handler = _make_handler(cache_control="")
+    server, url = _serve_fixture(handler_cls=handler)
+    try:
+        result = fetch_web_snapshot(
+            url,
+            cfg=cfg,
+            policy=WebFetchPolicy(timeout_seconds=5, max_bytes=1000, allow_private_hosts=True),
+        )
+    finally:
+        server.shutdown()
+
+    saved = json.loads(Path(result["snapshot_path"]).read_text(encoding="utf-8"))
+    assert saved["cache_policy"]["cache_control"] == ""
+    assert saved["cache_policy"]["header_status"] == "CACHE_HEADERS_ABSENT"
+    assert saved["cache_policy"]["reuse_allowed"] is False
+    assert saved["cache_policy"]["warnings"] == ["CACHE_HEADERS_ABSENT_IMMUTABLE_SNAPSHOT_ONLY"]
+
+
+def test_fetch_web_snapshot_records_pdf_parser_trace(tmp_path: Path):
+    from pypdf import PdfWriter  # type: ignore
+
+    cfg = make_settings(tmp_path)
+    buffer = BytesIO()
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    writer.write(buffer)
+    handler = _make_handler(body=buffer.getvalue(), content_type="application/pdf", cache_control="no-store")
+    server, url = _serve_fixture(handler_cls=handler)
+    try:
+        result = fetch_web_snapshot(
+            url,
+            cfg=cfg,
+            policy=WebFetchPolicy(timeout_seconds=5, max_bytes=2000, allow_private_hosts=True),
+        )
+    finally:
+        server.shutdown()
+
+    saved = json.loads(Path(result["snapshot_path"]).read_text(encoding="utf-8"))
+    assert saved["text_preview"] == ""
+    assert saved["parser_trace"]["content_kind"] == "pdf"
+    assert saved["parser_trace"]["pdf_page_count"] == 1
+    assert saved["parser_trace"]["pdf_pages_with_empty_text"] == 1
+    assert saved["parser_trace"]["pdf_failed_pages"] == 0
+    assert saved["parser_trace"]["trace_warnings"] == ["PDF_TRACE_PAGE_EMPTY:1"]
 
 
 def test_fetch_web_snapshot_preserves_binary_bytes_without_text_preview(tmp_path: Path):

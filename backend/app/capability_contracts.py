@@ -185,13 +185,16 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
             ),
             positive_regression_gates=(
                 "static HTML fixture produces cited text, byte hash, title, headings, links, and meta trace",
-                "redirect fixture records requested and final URLs",
+                "redirect fixture records requested URL, final URL, and target robots policy",
                 "non-text content fixture records preview omission without fabricated text",
+                "PDF fixture records parser trace page counts and page warnings without fabricated text",
+                "missing cache-header fixture records immutable snapshot-only reuse policy",
                 "explicitly citeable HTTP error-page fixture can be snapshotted and ingested",
             ),
             negative_regression_gates=(
                 "blocked URL policy prevents fetch",
                 "oversized response fails closed",
+                "redirect target disallowed by robots fails before snapshot creation",
                 "404/500 pages remain fetch failures unless explicitly cited as error pages",
                 "unciteable HTTP error-page snapshots are rejected by source ingestion",
             ),
@@ -203,10 +206,9 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "falsification path",
             ),
             unavailable_until=(
-                "cache behavior policy gates pass",
-                "redirect-target robots completeness fixtures pass",
-                "PDF parser traces and deeper page extraction pass",
-                "browser discovery and session policy are defined",
+                "deeper page extraction covers body structure beyond preview traces",
+                "browser discovery, search, and session policy are defined",
+                "multi-page browsing workflows have source selection and replay receipts",
             ),
         ),
         CapabilityContract(

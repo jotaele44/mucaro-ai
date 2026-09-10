@@ -67,7 +67,7 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
             "governed_web_browsing": {
                 "state": "CANDIDATE",
                 "contract": "mucaro-web-browsing/0.x",
-                "notes": "Approval-gated web.fetch can create byte-pinned snapshots that can be ingested and cited with HTML parser traces, non-text classification, and explicit HTTP error-page citation policy; PDF/deeper parser depth, cache behavior, redirect-target robots completeness, browser discovery, and session policy remain open.",
+                "notes": "Approval-gated web.fetch can create byte-pinned snapshots that can be ingested and cited with HTML/PDF/non-text parser traces, immutable snapshot-only cache policy, redirect-target robots evidence, and explicit HTTP error-page citation policy; deeper extraction, browser discovery/search, multi-page selection, replay receipts, and session policy remain open.",
             },
             "coding_programming_expertise": {
                 "state": "ABSENT",
