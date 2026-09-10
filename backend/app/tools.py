@@ -9,6 +9,7 @@ from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
 from .product_audit import build_product_audit
 from .utils import read_json, stable_id, utc_now, write_json
+from .web_browsing import WebBrowsingError, build_web_fetch_policy, fetch_web_snapshot
 from .workspaces import list_workspace_profiles
 
 TOOL_CALLS_NAME = "tool_calls.json"
@@ -66,6 +67,16 @@ def _memory_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     return list_memory_items(cfg, include_disabled=include_disabled)
 
 
+def _web_fetch(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    url = arguments.get("url")
+    if not isinstance(url, str):
+        raise ToolRuntimeError("ERROR_WEB_URL_REQUIRED", "web.fetch requires a string url argument.")
+    try:
+        return fetch_web_snapshot(url, cfg=cfg, policy=build_web_fetch_policy(arguments))
+    except WebBrowsingError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
 TOOL_REGISTRY: dict[str, ToolDefinition] = {
     "source_library.status": ToolDefinition(
         name="source_library.status",
@@ -94,6 +105,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_memory_list,
+    ),
+    "web.fetch": ToolDefinition(
+        name="web.fetch",
+        description="Fetch one HTTP(S) URL through governed policy and save a byte-pinned local snapshot.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_web_fetch,
     ),
 }
 
@@ -286,7 +304,25 @@ def run_tool_call(
     if tool is None:
         raise ToolRuntimeError("ERROR_TOOL_NOT_ALLOWED", f"Tool is not in the local allowlist: {tool_name}")
 
-    result = tool.handler(dict(call.get("arguments") or {}), cfg)
+    try:
+        result = tool.handler(dict(call.get("arguments") or {}), cfg)
+    except ToolRuntimeError as exc:
+        result = {"status": exc.status, "detail": exc.detail}
+        call = {**call, "status": "FAILED", "executed_at": utc_now(), "executed_by": executed_by, "result": result}
+        calls[index] = call
+        _write_tool_calls(calls, cfg)
+        _append_audit_event(
+            {
+                "event": "TOOL_CALL_FAILED",
+                "tool_call_id": tool_call_id,
+                "tool_name": tool_name,
+                "status": exc.status,
+                "actor": executed_by,
+                "result_status": exc.status,
+            },
+            cfg,
+        )
+        raise
     call = {**call, "status": "EXECUTED", "executed_at": utc_now(), "executed_by": executed_by, "result": result}
     calls[index] = call
     _write_tool_calls(calls, cfg)

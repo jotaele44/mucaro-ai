@@ -269,8 +269,9 @@ Observed success markers:
 - `mucaro audit product` now uses the expanded governed-release objective. The
   current scope reports `16 PASS`, `6 OPEN`, `0 BLOCKED`, and `72.7%`
   readiness: the existing local assistant capabilities and source-artifact
-  packaging pass, while advanced GIS processing, state-of-the-art OCR analysis,
-  governed web browsing, coding/programming expertise, cross-capability
+  packaging pass. Governed web browsing has candidate `web.fetch` snapshot and
+  ledger evidence, while advanced GIS processing, state-of-the-art OCR analysis,
+  full web citation integration, coding/programming expertise, cross-capability
   transparency/objectivity governance, and hosted GitHub governance remain
   open. Tag binding is verified separately by the release-state and GitHub
   governance commands.

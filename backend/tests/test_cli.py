@@ -88,15 +88,15 @@ def test_cli_capabilities_contracts_reports_expanded_scope(tmp_path: Path, capsy
     assert payload["status"] == "ADVANCED_CAPABILITY_CONTRACTS_READY"
     assert payload["contract_count"] == 5
     assert payload["complete_contract_count"] == 5
-    assert payload["implementation_states"] == {"ABSENT": 4, "CANDIDATE": 1}
+    assert payload["implementation_states"] == {"ABSENT": 3, "CANDIDATE": 2}
 
     assert main(["capabilities", "contracts", "--format", "text"], cfg=cfg) == 0
     output = capsys.readouterr().out
     assert "contract_count=5" in output
-    assert "implementation_states=ABSENT:4,CANDIDATE:1" in output
+    assert "implementation_states=ABSENT:3,CANDIDATE:2" in output
     assert "CONTRACT_DEFINED ABSENT advanced_gis_processing" in output
     assert "CONTRACT_DEFINED ABSENT state_of_art_ocr_analysis" in output
-    assert "CONTRACT_DEFINED ABSENT governed_web_browsing" in output
+    assert "CONTRACT_DEFINED CANDIDATE governed_web_browsing" in output
     assert "CONTRACT_DEFINED ABSENT coding_programming_expertise" in output
     assert "CONTRACT_DEFINED CANDIDATE transparency_objectivity_governance" in output
 

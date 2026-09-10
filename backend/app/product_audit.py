@@ -176,7 +176,7 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Assistant can safely use tools beyond retrieval-backed answering.",
             _status_from_files(cfg, [("backend", "app", "tools.py")]),
             "backend/app/tools.py with allowlisted tools, explicit approvals, execution gates, and audit events",
-            "The initial allowlist is intentionally read-only; broader action tools remain future scoped work.",
+            "The allowlist includes read-only inspection tools plus an approval-gated web.fetch tool that writes local snapshot evidence; broader action tools remain future scoped work.",
             "Add narrowly scoped write/action tools only with per-tool policies and stronger UX review.",
         ),
         ProductRequirement(
@@ -202,9 +202,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "capability_expansion",
             "Assistant has powerful web browsing abilities governed by provenance, safety, and citation controls.",
             "OPEN",
-            "backend/app/capability_contracts.py defines browsing URL policy, fetch snapshot, parser trace, and web citation requirements.",
-            "No URL allow/deny policy, fetch snapshot ledger, robots/cache policy, page parsing trace, or web citation eval gate is implemented.",
-            "Introduce browsing as an approved tool family with URL policy, snapshot hashes, retrieval UTC, parser metadata, and cited answer tests.",
+            "web.fetch is an approval-gated tool that enforces URL policy and writes byte-pinned snapshots plus a local snapshot ledger; backend/app/capability_contracts.py defines the remaining browsing proof contract.",
+            "Snapshot fetch and ledgering exist, but robots/cache policy, richer page parsing, answer citation integration, and web citation eval gates remain open.",
+            "Add web snapshot ingestion/citation, parser traces, robots/cache policy, and positive/negative web citation fixtures.",
         ),
         ProductRequirement(
             "coding_programming_expertise",

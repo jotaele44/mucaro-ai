@@ -157,7 +157,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
         CapabilityContract(
             capability_id="governed_web_browsing",
             title="Governed web browsing",
-            implementation_status="ABSENT",
+            implementation_status="CANDIDATE",
             contract_status="CONTRACT_DEFINED",
             purpose="Fetch and cite web sources with frozen snapshots, URL policy, and parser evidence.",
             permission_gates=(
@@ -199,9 +199,9 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "falsification path",
             ),
             unavailable_until=(
-                "approved browsing tool exists",
-                "fetch snapshot ledger exists",
                 "web citation fixtures pass",
+                "web snapshots can be ingested or cited by answer traces",
+                "robots/cache and redirect-chain policy gates pass",
             ),
         ),
         CapabilityContract(

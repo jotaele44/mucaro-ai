@@ -286,6 +286,7 @@ python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json
 python3 scripts/certify_python_distribution.py
 mucaro tools list --format text
 mucaro tools request source_library.status --reason "readiness check" --format json
+mucaro tools request web.fetch '{"url":"https://example.com","max_bytes":1000000}' --reason "source snapshot" --format json
 mucaro tools approve TOOL_CALL_ID --format json
 mucaro tools run TOOL_CALL_ID --format json
 mucaro tools audit --format text
@@ -661,12 +662,17 @@ deny-by-default: unknown tools are rejected, known tools start as
 `PENDING_APPROVAL`, and `mucaro tools run TOOL_CALL_ID` fails until the call is
 approved.
 
-Initial allowlisted tools are read-only:
+Initial allowlisted tools are approval-gated. Most are read-only inspection
+tools:
 
 - `source_library.status`
 - `product.audit`
 - `workspace_profiles.list`
 - `memory.list`
+
+`web.fetch` is also allowlisted, but it is state-changing because it fetches one
+HTTP(S) URL through the governed URL policy and writes a byte-pinned local
+snapshot under `data/exports/web_snapshots`.
 
 Tool call state is stored under `data/processed/tool_calls.json`. Audit events
 are stored under `data/processed/tool_audit_log.json`. These files are local

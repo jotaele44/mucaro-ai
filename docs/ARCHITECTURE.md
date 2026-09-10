@@ -87,12 +87,15 @@ tools, create a pending request for a specific tool and JSON argument object,
 approve or deny that request, then execute only an approved `tool_call_id`.
 Unknown tools are rejected and recorded as audit events.
 
-The initial allowlist is intentionally read-only:
+The initial allowlist separates read-only inspection from explicit local
+evidence creation:
 
 - `source_library.status`
 - `product.audit`
 - `workspace_profiles.list`
 - `memory.list`
+- `web.fetch`: approval-gated HTTP(S) fetch that writes byte-pinned local
+  snapshots under `data/exports/web_snapshots`
 
 Broader write/action tools should be added one at a time with explicit policy,
 operator UX, and regression tests for approval and audit behavior.

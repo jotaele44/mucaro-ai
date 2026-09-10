@@ -65,9 +65,9 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
                 "notes": "OCR extraction, layout analysis, confidence calibration, and OCR fixtures are planned but not implemented.",
             },
             "governed_web_browsing": {
-                "state": "ABSENT",
-                "contract": None,
-                "notes": "Web browsing requires approved-tool policy, URL controls, byte snapshots, parser traces, and web citation evals before availability.",
+                "state": "CANDIDATE",
+                "contract": "mucaro-web-browsing/0.x",
+                "notes": "Approval-gated web.fetch can create byte-pinned snapshots; parser traces, answer citation integration, and web citation evals remain open.",
             },
             "coding_programming_expertise": {
                 "state": "ABSENT",
