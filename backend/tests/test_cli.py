@@ -818,12 +818,12 @@ def test_cli_eval_answer_trace_reports_traceability_metrics(tmp_path: Path, caps
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "ANSWER_TRACE_EVAL_OK"
     assert payload["counts"] == {
-        "cases": 9,
-        "static_cases": 7,
-        "generated_cases": 2,
-        "passed": 9,
+        "cases": 12,
+        "static_cases": 9,
+        "generated_cases": 3,
+        "passed": 12,
         "failed": 0,
-        "expected_errors": 5,
+        "expected_errors": 6,
     }
     assert payload["case_pass_rate"] == 1.0
     assert payload["failures"] == []
@@ -834,9 +834,12 @@ def test_cli_eval_answer_trace_reports_traceability_metrics(tmp_path: Path, caps
     assert "valid_single_citation_trace" in text_output
     assert "generated_markdown_source_trace" in text_output
     assert "generated_multi_source_trace" in text_output
+    assert "generated_web_snapshot_trace" in text_output
+    assert "valid_web_snapshot_citation_trace" in text_output
+    assert "web_snapshot_citation_missing_url_fails" in text_output
     assert "invented_citation_fails" in text_output
-    assert "generated_cases=2" in text_output
-    assert "expected_errors=5" in text_output
+    assert "generated_cases=3" in text_output
+    assert "expected_errors=6" in text_output
 
 
 def test_cli_eval_answer_trace_requires_negative_cases(tmp_path: Path, capsys):

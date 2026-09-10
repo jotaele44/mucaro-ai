@@ -199,9 +199,9 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "falsification path",
             ),
             unavailable_until=(
-                "web citation fixtures pass",
                 "robots/cache and redirect-chain policy gates pass",
                 "richer parser traces cover HTML, PDF, and non-text responses",
+                "HTTP error-page citation policy is explicitly defined",
             ),
         ),
         CapabilityContract(

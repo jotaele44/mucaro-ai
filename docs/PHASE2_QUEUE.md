@@ -25,7 +25,7 @@
 | Advanced capability contracts | Shared evidence, permission, uncertainty, contradiction, and falsification schema for GIS, OCR, browsing, and coding outputs | Complete candidate; inspect with `mucaro capabilities contracts` |
 | GIS processing contract and evals | CRS, geometry validity, topology assertions, spatial joins, map/export provenance, and positive/negative spatial fixtures | Queued |
 | OCR analysis contract and evals | Source-image hashes, OCR engine identity, layout/text preservation, confidence thresholds, and OCR regression fixtures | Queued |
-| Governed web browsing contract and evals | URL policy, fetch snapshots, parser metadata, content hashes, retrieval UTC, cache/robots posture, and web citation fixtures | Candidate fetch/snapshot/citation wiring; cache/robots, richer parsing, and full eval suite queued |
+| Governed web browsing contract and evals | URL policy, fetch snapshots, parser metadata, content hashes, retrieval UTC, cache/robots posture, and web citation fixtures | Candidate fetch/snapshot/citation wiring with web answer-trace fixtures and basic robots/cache metadata; richer parsing, cache behavior, redirect-target robots completeness, and HTTP error-page policy queued |
 | Coding capability contract and evals | Repository read policy, patch/test/review action boundary, sandbox posture, diff receipts, and code-quality regression fixtures | Queued |
 | Agent/workflow DAG runtime | Durable multi-step plans with explicit state, restart/resume, and receipts | Queued |
 | Federation membership discovery | Consume canonical membership and repo capability descriptors once federation environment is available | Blocked on federation execution environment |

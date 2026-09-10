@@ -46,6 +46,28 @@
           "text": "A local weather note mentions a commit but does not describe release certification."
         }
       ]
+    },
+    {
+      "case_id": "generated_web_snapshot_trace",
+      "expected_status": "CITATION_OK",
+      "expected_flags": [],
+      "query": "What does governed web browsing preserve for citations?",
+      "retrieval_strategy": "persistent",
+      "top_k": 3,
+      "min_cited_chunks": 1,
+      "required_web_snapshot_ids": ["websnap_eval"],
+      "required_snippet_terms": ["Governed web browsing", "retrieval UTC", "content hash"],
+      "web_snapshots": [
+        {
+          "snapshot_id": "websnap_eval",
+          "requested_url": "https://example.com/mucaro-web-eval",
+          "fetch_url": "https://example.com/mucaro-web-eval",
+          "final_url": "https://example.com/mucaro-web-eval",
+          "retrieval_utc": "2026-09-10T00:00:01Z",
+          "content_sha256": "websnap_eval_content_hash",
+          "text_preview": "Governed web browsing preserves source URL, retrieval UTC, snapshot hash, and content hash for citations."
+        }
+      ]
     }
   ],
   "cases": [
@@ -110,6 +132,35 @@
       }
     },
     {
+      "case_id": "valid_web_snapshot_citation_trace",
+      "expected_status": "CITATION_OK",
+      "expected_flags": [],
+      "trace": {
+        "retrieved_chunk_ids": ["chunk_web"],
+        "cited_chunk_ids": ["chunk_web"],
+        "cited_chunks": [
+          {
+            "citation_order": 1,
+            "retrieval_rank": 1,
+            "chunk_id": "chunk_web",
+            "source_id": "src_web",
+            "chunk_index": 0,
+            "score": 0.87,
+            "retrieval_strategy": "persistent_tfidf_v1",
+            "matched_terms": ["web", "citation"],
+            "source_format": "web_snapshot",
+            "source_url": "https://example.com/mucaro-web-eval",
+            "snapshot_id": "websnap_eval",
+            "snapshot_sha256": "snapshot_hash",
+            "content_sha256": "content_hash",
+            "retrieval_utc": "2026-09-10T00:00:01Z",
+            "text_snippet": "Governed web browsing preserves source URL and snapshot hashes."
+          }
+        ],
+        "validation_flags": []
+      }
+    },
+    {
       "case_id": "uncited_answer_fails",
       "expected_status": "CITATION_ERROR",
       "expected_flags": ["ERROR_UNCITED_ANSWER"],
@@ -117,6 +168,31 @@
         "retrieved_chunk_ids": ["chunk_a"],
         "cited_chunk_ids": [],
         "cited_chunks": [],
+        "validation_flags": []
+      }
+    },
+    {
+      "case_id": "web_snapshot_citation_missing_url_fails",
+      "expected_status": "CITATION_ERROR",
+      "expected_flags": ["ERROR_WEB_CITATION_SOURCE_URL_MISSING"],
+      "trace": {
+        "retrieved_chunk_ids": ["chunk_web"],
+        "cited_chunk_ids": ["chunk_web"],
+        "cited_chunks": [
+          {
+            "citation_order": 1,
+            "retrieval_rank": 1,
+            "chunk_id": "chunk_web",
+            "source_id": "src_web",
+            "chunk_index": 0,
+            "source_format": "web_snapshot",
+            "snapshot_id": "websnap_eval",
+            "snapshot_sha256": "snapshot_hash",
+            "content_sha256": "content_hash",
+            "retrieval_utc": "2026-09-10T00:00:01Z",
+            "text_snippet": "A web citation without its source URL is not auditable."
+          }
+        ],
         "validation_flags": []
       }
     },

@@ -98,7 +98,7 @@ byte-pinned proof layer for a particular commit. Verify them with
 | Larger real-corpus retrieval | OPEN | Add non-fixture corpus snapshots with frozen manifests, source counts, source-format coverage, and repeatable eval thresholds |
 | Advanced GIS processing | OPEN | Define GIS capability contract, local engine/runtime adapter, CRS/geometry invariants, and spatial eval fixtures |
 | State-of-the-art OCR analysis | OPEN | Define OCR capability contract, local/optional model engine boundary, source-image trace schema, confidence thresholds, and OCR eval corpus |
-| Governed web browsing | OPEN | Add approved browser/fetch tool family with URL policy, byte snapshots, parser trace, and web citation regression gates |
+| Governed web browsing | OPEN | Candidate fetch/snapshot/citation path and basic robots/cache metadata exist; add richer parser traces, cache behavior, redirect-target robots completeness, and HTTP error-page policy before certification |
 | Coding/programming expertise | OPEN | Define read/patch/test/review action boundary, sandbox policy, diff receipts, and code-quality eval fixtures |
 | Transparency/objectivity across capabilities | OPEN | Require provenance, uncertainty, limitations, contradictory evidence handling, and falsification criteria in every advanced capability output |
 | Production packaging | OPEN | Verify the local distribution handoff manifest, then convert certified local artifacts into the chosen publish/install channel |

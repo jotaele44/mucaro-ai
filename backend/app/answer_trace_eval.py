@@ -9,10 +9,11 @@ from typing import Any
 
 from .citations import validate_citations
 from .config import Settings
-from .ingestion import ingest_file
+from .ingestion import ingest_file, ingest_web_snapshot
 from .release_receipts import write_release_receipt
 from .services import answer_question
-from .utils import read_json
+from .utils import read_json, write_json
+from .web_browsing import WEB_SNAPSHOT_SCHEMA_VERSION
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ANSWER_TRACE_FIXTURE = ROOT / "backend" / "tests" / "fixtures" / "answer_trace_eval.json"
@@ -77,6 +78,10 @@ def _trace_shape_flags(trace: dict[str, Any]) -> list[str]:
             flags.append("ERROR_CITATION_CHUNK_INDEX_MISSING")
         if not str(record.get("text_snippet") or "").strip():
             flags.append("ERROR_CITATION_SNIPPET_MISSING")
+        if record.get("source_format") == "web_snapshot":
+            for key in ("source_url", "snapshot_id", "snapshot_sha256", "content_sha256", "retrieval_utc"):
+                if not str(record.get(key) or "").strip():
+                    flags.append(f"ERROR_WEB_CITATION_{key.upper()}_MISSING")
     return sorted(set(flags))
 
 
@@ -147,6 +152,48 @@ def _write_generated_source(input_dir: Path, file_spec: dict[str, Any]) -> Path:
     return path
 
 
+def _write_generated_web_snapshot(export_dir: Path, snapshot_spec: dict[str, Any]) -> Path:
+    snapshot_id = str(snapshot_spec.get("snapshot_id") or "websnap_generated")
+    if "/" in snapshot_id or ".." in snapshot_id:
+        raise ValueError(f"web snapshot id must be contained: {snapshot_id}")
+    final_url = str(snapshot_spec.get("final_url") or snapshot_spec.get("requested_url") or "https://example.com/source")
+    path = export_dir / "web_snapshots" / f"{snapshot_id}.json"
+    payload = {
+        "schema_version": WEB_SNAPSHOT_SCHEMA_VERSION,
+        "snapshot_id": snapshot_id,
+        "requested_url": str(snapshot_spec.get("requested_url") or final_url),
+        "fetch_url": str(snapshot_spec.get("fetch_url") or final_url),
+        "final_url": final_url,
+        "redirect_chain": snapshot_spec.get("redirect_chain", []),
+        "fragment_removed": bool(snapshot_spec.get("fragment_removed", False)),
+        "retrieval_started_utc": str(snapshot_spec.get("retrieval_started_utc") or "2026-09-10T00:00:00Z"),
+        "retrieval_utc": str(snapshot_spec.get("retrieval_utc") or "2026-09-10T00:00:01Z"),
+        "http_status": int(snapshot_spec.get("http_status", 200)),
+        "content_type": str(snapshot_spec.get("content_type") or "text/html; charset=utf-8"),
+        "cache_policy": snapshot_spec.get("cache_policy")
+        or {"cache_control": None, "etag": None, "last_modified": None, "expires": None, "vary": None},
+        "robots_policy": snapshot_spec.get("robots_policy")
+        or {
+            "status": "ROBOTS_ALLOWED",
+            "robots_url": str(snapshot_spec.get("robots_url") or "https://example.com/robots.txt"),
+            "allowed": True,
+            "checked_at": "2026-09-10T00:00:00Z",
+            "warnings": [],
+        },
+        "content_sha256": str(snapshot_spec.get("content_sha256") or f"{snapshot_id}_content_sha256"),
+        "content_size_bytes": int(snapshot_spec.get("content_size_bytes", len(str(snapshot_spec.get("text_preview") or "")))),
+        "content_base64": str(snapshot_spec.get("content_base64") or ""),
+        "parser_name": str(snapshot_spec.get("parser_name") or "web_snapshot_preview_v1"),
+        "parser_warnings": list(snapshot_spec.get("parser_warnings") or []),
+        "charset": str(snapshot_spec.get("charset") or "utf-8"),
+        "text_preview": str(snapshot_spec.get("text_preview") or ""),
+        "policy": snapshot_spec.get("policy")
+        or {"timeout_seconds": 5, "max_bytes": 1000000, "allow_private_hosts": False},
+    }
+    write_json(path, payload)
+    return path
+
+
 def _generated_requirement_flags(
     result: dict[str, Any],
     case: dict[str, Any],
@@ -168,6 +215,18 @@ def _generated_requirement_flags(
             flags.append("ERROR_REQUIRED_SOURCE_NOT_INGESTED")
         elif source_id not in cited_source_ids:
             flags.append("ERROR_REQUIRED_SOURCE_NOT_CITED")
+    for snapshot_id in case.get("required_web_snapshot_ids", []):
+        source_id = source_ids_by_path.get(f"web:{snapshot_id}")
+        if source_id is None:
+            flags.append("ERROR_REQUIRED_WEB_SNAPSHOT_NOT_INGESTED")
+        elif source_id not in cited_source_ids:
+            flags.append("ERROR_REQUIRED_WEB_SNAPSHOT_NOT_CITED")
+    for record in cited_chunks:
+        if not isinstance(record, dict) or record.get("source_format") != "web_snapshot":
+            continue
+        for key in ("source_url", "snapshot_id", "snapshot_sha256", "content_sha256", "retrieval_utc"):
+            if not str(record.get(key) or "").strip():
+                flags.append(f"ERROR_WEB_CITATION_{key.upper()}_MISSING")
     snippets = " ".join(
         str(record.get("text_snippet") or "")
         for record in cited_chunks
@@ -192,13 +251,14 @@ def _evaluate_generated_case(case: dict[str, Any]) -> dict[str, Any]:
     expected_status = str(case.get("expected_status") or "CITATION_OK")
     expected_flags = sorted(str(flag) for flag in case.get("expected_flags", []))
     files = case.get("files", [])
-    if not isinstance(files, list) or not files:
+    web_snapshots = case.get("web_snapshots", [])
+    if (not isinstance(files, list) or not files) and (not isinstance(web_snapshots, list) or not web_snapshots):
         return {
             "case_type": "generated",
             "case_id": case_id,
             "status": "FAIL",
             "observed_status": "GENERATED_CASE_INVALID",
-            "observed_flags": ["ERROR_GENERATED_FILES_MISSING"],
+            "observed_flags": ["ERROR_GENERATED_SOURCES_MISSING"],
             "expected_status": expected_status,
             "expected_flags": expected_flags,
         }
@@ -214,6 +274,12 @@ def _evaluate_generated_case(case: dict[str, Any]) -> dict[str, Any]:
                 path = _write_generated_source(cfg.input_dir, file_spec)
                 ingest_result = ingest_file(path, cfg)
                 source_ids_by_path[str(file_spec.get("path"))] = str(ingest_result["source"]["source_id"])
+            for snapshot_spec in web_snapshots:
+                if not isinstance(snapshot_spec, dict):
+                    raise ValueError("generated web snapshot spec must be an object")
+                path = _write_generated_web_snapshot(cfg.export_dir, snapshot_spec)
+                ingest_result = ingest_web_snapshot(path, cfg)
+                source_ids_by_path[f"web:{snapshot_spec.get('snapshot_id')}"] = str(ingest_result["source"]["source_id"])
             result = answer_question(
                 str(case.get("query") or ""),
                 top_k=int(case.get("top_k", 5)),

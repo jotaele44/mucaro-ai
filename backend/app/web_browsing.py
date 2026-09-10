@@ -6,6 +6,7 @@ import ipaddress
 import re
 import socket
 import urllib.error
+import urllib.robotparser
 import urllib.request
 from dataclasses import dataclass
 from typing import Any
@@ -19,6 +20,7 @@ WEB_SNAPSHOT_DIR = "web_snapshots"
 WEB_SNAPSHOT_LEDGER_NAME = "web_snapshot_ledger.json"
 DEFAULT_WEB_TIMEOUT_SECONDS = 15
 DEFAULT_MAX_WEB_BYTES = 1_000_000
+DEFAULT_ROBOTS_MAX_BYTES = 100_000
 MAX_URL_LENGTH = 2048
 TEXTUAL_CONTENT_MARKERS = (
     "text/",
@@ -45,6 +47,7 @@ class WebFetchPolicy:
     timeout_seconds: int = DEFAULT_WEB_TIMEOUT_SECONDS
     max_bytes: int = DEFAULT_MAX_WEB_BYTES
     allow_private_hosts: bool = False
+    respect_robots: bool = True
 
 
 def _parse_bool(value: Any) -> bool:
@@ -186,6 +189,74 @@ def _append_snapshot_ledger_entry(cfg: Settings, snapshot: dict[str, Any], snaps
     return {"path": str(ledger_path), "entry": entry, "entry_count": len(entries)}
 
 
+def _robots_url(fetch_url: str) -> str:
+    parsed = urlparse(fetch_url)
+    netloc = parsed.netloc
+    return f"{parsed.scheme}://{netloc}/robots.txt"
+
+
+def _check_robots_policy(fetch_url: str, policy: WebFetchPolicy) -> dict[str, Any]:
+    checked_at = utc_now()
+    robots_url = _robots_url(fetch_url)
+    if not policy.respect_robots:
+        return {
+            "status": "ROBOTS_SKIPPED_BY_POLICY",
+            "robots_url": robots_url,
+            "allowed": True,
+            "checked_at": checked_at,
+            "warnings": ["ROBOTS_POLICY_DISABLED"],
+        }
+    request = urllib.request.Request(
+        robots_url,
+        headers={"User-Agent": "MucaroAI/0.1 local-first governed-fetch"},
+        method="GET",
+    )
+    opener = urllib.request.build_opener(_GovernedRedirectHandler(policy, []))
+    try:
+        with opener.open(request, timeout=policy.timeout_seconds) as response:
+            content = response.read(DEFAULT_ROBOTS_MAX_BYTES + 1)
+            if len(content) > DEFAULT_ROBOTS_MAX_BYTES:
+                raise WebBrowsingError("ERROR_WEB_ROBOTS_TOO_LARGE", f"robots.txt exceeded {DEFAULT_ROBOTS_MAX_BYTES} bytes.")
+            robots_status = int(getattr(response, "status", 200))
+            robots_final_url = response.geturl()
+    except urllib.error.HTTPError as exc:
+        if exc.code in {401, 403}:
+            raise WebBrowsingError("ERROR_WEB_ROBOTS_DISALLOWED", f"robots.txt returned HTTP {exc.code}.") from exc
+        return {
+            "status": "ROBOTS_UNAVAILABLE",
+            "robots_url": robots_url,
+            "allowed": True,
+            "checked_at": checked_at,
+            "http_status": exc.code,
+            "warnings": [f"ROBOTS_HTTP_{exc.code}_ALLOW_BY_DEFAULT"],
+        }
+    except urllib.error.URLError as exc:
+        return {
+            "status": "ROBOTS_UNAVAILABLE",
+            "robots_url": robots_url,
+            "allowed": True,
+            "checked_at": checked_at,
+            "warnings": [f"ROBOTS_FETCH_FAILED_ALLOW_BY_DEFAULT:{exc.reason}"],
+        }
+    parser = urllib.robotparser.RobotFileParser(robots_url)
+    parser.parse(content.decode("utf-8", errors="replace").splitlines())
+    allowed = bool(parser.can_fetch("MucaroAI", fetch_url))
+    result = {
+        "status": "ROBOTS_ALLOWED" if allowed else "ROBOTS_DISALLOWED",
+        "robots_url": robots_url,
+        "robots_final_url": robots_final_url,
+        "allowed": allowed,
+        "checked_at": checked_at,
+        "http_status": robots_status,
+        "content_sha256": hashlib.sha256(content).hexdigest(),
+        "content_size_bytes": len(content),
+        "warnings": [],
+    }
+    if not allowed:
+        raise WebBrowsingError("ERROR_WEB_ROBOTS_DISALLOWED", f"robots.txt disallows fetch: {fetch_url}")
+    return result
+
+
 class _GovernedRedirectHandler(urllib.request.HTTPRedirectHandler):
     def __init__(self, policy: WebFetchPolicy, redirect_chain: list[dict[str, Any]]) -> None:
         self.policy = policy
@@ -221,6 +292,7 @@ def fetch_web_snapshot(
     requested_at = utc_now()
     redirect_chain: list[dict[str, Any]] = []
     opener = urllib.request.build_opener(_GovernedRedirectHandler(policy, redirect_chain))
+    robots_policy = _check_robots_policy(str(checked["fetch_url"]), policy)
     request = urllib.request.Request(
         str(checked["fetch_url"]),
         headers={"User-Agent": "MucaroAI/0.1 local-first governed-fetch"},
@@ -242,6 +314,13 @@ def fetch_web_snapshot(
         raise WebBrowsingError("ERROR_WEB_FETCH_FAILED", str(exc.reason)) from exc
     retrieved_at = utc_now()
     content_type = headers.get("Content-Type", "application/octet-stream")
+    cache_policy = {
+        "cache_control": headers.get("Cache-Control"),
+        "etag": headers.get("ETag"),
+        "last_modified": headers.get("Last-Modified"),
+        "expires": headers.get("Expires"),
+        "vary": headers.get("Vary"),
+    }
     content_sha256 = hashlib.sha256(content).hexdigest()
     text_preview, parser_warnings, charset = _decode_preview(content, content_type)
     snapshot_id = stable_id("websnap", str(checked["requested_url"]), final_url, content_sha256, retrieved_at)
@@ -257,6 +336,8 @@ def fetch_web_snapshot(
         "retrieval_utc": retrieved_at,
         "http_status": http_status,
         "content_type": content_type,
+        "cache_policy": cache_policy,
+        "robots_policy": robots_policy,
         "content_sha256": content_sha256,
         "content_size_bytes": len(content),
         "content_base64": base64.b64encode(content).decode("ascii"),
@@ -268,6 +349,7 @@ def fetch_web_snapshot(
             "timeout_seconds": policy.timeout_seconds,
             "max_bytes": policy.max_bytes,
             "allow_private_hosts": policy.allow_private_hosts,
+            "respect_robots": policy.respect_robots,
         },
     }
     path = cfg.export_dir / WEB_SNAPSHOT_DIR / f"{snapshot_id}.json"
@@ -289,4 +371,5 @@ def build_web_fetch_policy(arguments: dict[str, Any]) -> WebFetchPolicy:
         timeout_seconds=_parse_positive_int(arguments.get("timeout_seconds"), DEFAULT_WEB_TIMEOUT_SECONDS),
         max_bytes=_parse_positive_int(arguments.get("max_bytes"), DEFAULT_MAX_WEB_BYTES),
         allow_private_hosts=_parse_bool(arguments.get("allow_private_hosts")),
+        respect_robots=not _parse_bool(arguments.get("ignore_robots")),
     )

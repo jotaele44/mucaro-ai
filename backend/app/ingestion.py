@@ -157,6 +157,8 @@ def ingest_web_snapshot(snapshot_path: Path, cfg: Settings = settings) -> dict[s
             "content_type": snapshot.get("content_type"),
             "content_sha256": content_sha256,
             "content_size_bytes": snapshot.get("content_size_bytes"),
+            "cache_policy": snapshot.get("cache_policy", {}),
+            "robots_policy": snapshot.get("robots_policy", {}),
             "charset": snapshot.get("charset"),
             "policy": snapshot.get("policy", {}),
         },

@@ -270,8 +270,9 @@ Observed success markers:
   current scope reports `16 PASS`, `6 OPEN`, `0 BLOCKED`, and `72.7%`
   readiness: the existing local assistant capabilities and source-artifact
   packaging pass. Governed web browsing has candidate `web.fetch` snapshot,
-  ledger, and citation-trace evidence, while advanced GIS processing,
-  state-of-the-art OCR analysis, full web policy/eval integration,
+  ledger, basic robots/cache metadata, and web citation fixture evidence, while
+  advanced GIS processing, state-of-the-art OCR analysis, full web parser/policy
+  integration,
   coding/programming expertise, cross-capability
   transparency/objectivity governance, and hosted GitHub governance remain
   open. Tag binding is verified separately by the release-state and GitHub

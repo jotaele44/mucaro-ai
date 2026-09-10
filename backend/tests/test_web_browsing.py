@@ -30,8 +30,17 @@ class StaticHandler(BaseHTTPRequestHandler):
     body = b"<html><body>Mucaro governed browsing fixture.</body></html>"
     content_type = "text/html; charset=utf-8"
     redirect_to: str | None = None
+    robots_body = b"User-agent: *\nAllow: /\n"
+    cache_control = "max-age=60"
 
     def do_GET(self) -> None:
+        if self.path == "/robots.txt":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(self.robots_body)))
+            self.end_headers()
+            self.wfile.write(self.robots_body)
+            return
         if self.path == "/redirect" and self.redirect_to:
             self.send_response(302)
             self.send_header("Location", self.redirect_to)
@@ -39,6 +48,7 @@ class StaticHandler(BaseHTTPRequestHandler):
             return
         self.send_response(200)
         self.send_header("Content-Type", self.content_type)
+        self.send_header("Cache-Control", self.cache_control)
         self.send_header("Content-Length", str(len(self.body)))
         self.end_headers()
         self.wfile.write(self.body)
@@ -108,6 +118,10 @@ def test_fetch_web_snapshot_records_policy_and_bytes(tmp_path: Path):
     assert saved["redirect_chain"] == []
     assert saved["http_status"] == 200
     assert saved["content_type"] == "text/html; charset=utf-8"
+    assert saved["cache_policy"]["cache_control"] == "max-age=60"
+    assert saved["robots_policy"]["status"] == "ROBOTS_ALLOWED"
+    assert saved["robots_policy"]["allowed"] is True
+    assert saved["robots_policy"]["content_sha256"]
     assert saved["content_size_bytes"] == len(StaticHandler.body)
     assert base64.b64decode(saved["content_base64"]) == StaticHandler.body
     assert saved["content_sha256"]
@@ -141,6 +155,8 @@ def test_ingest_web_snapshot_makes_snapshot_citeable(tmp_path: Path):
     assert result["source"]["parser_metadata"]["source_format"] == "web_snapshot"
     assert result["source"]["parser_metadata"]["final_url"] == url
     assert result["source"]["parser_metadata"]["snapshot_sha256"] == fetched["snapshot_sha256"]
+    assert result["source"]["parser_metadata"]["cache_policy"]["cache_control"] == "max-age=60"
+    assert result["source"]["parser_metadata"]["robots_policy"]["status"] == "ROBOTS_ALLOWED"
     sources = get_sources(cfg)
     chunks = get_chunks(cfg)
     assert sources[0]["source_id"] == result["source"]["source_id"]
@@ -148,6 +164,27 @@ def test_ingest_web_snapshot_makes_snapshot_citeable(tmp_path: Path):
     assert chunks[0]["source_url"] == url
     assert chunks[0]["snapshot_sha256"] == fetched["snapshot_sha256"]
     assert chunks[0]["content_sha256"] == result["source"]["parser_metadata"]["content_sha256"]
+
+
+def test_fetch_web_snapshot_blocks_robots_disallowed_path(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    original_robots_body = StaticHandler.robots_body
+    StaticHandler.robots_body = b"User-agent: *\nDisallow: /fixture.html\n"
+    server, url = _serve_fixture()
+    try:
+        try:
+            fetch_web_snapshot(
+                url,
+                cfg=cfg,
+                policy=WebFetchPolicy(timeout_seconds=5, max_bytes=1000, allow_private_hosts=True),
+            )
+        except WebBrowsingError as exc:
+            assert exc.status == "ERROR_WEB_ROBOTS_DISALLOWED"
+        else:
+            raise AssertionError("expected robots disallow failure")
+    finally:
+        server.shutdown()
+        StaticHandler.robots_body = original_robots_body
 
 
 def test_fetch_web_snapshot_records_safe_redirect_chain(tmp_path: Path):
@@ -182,8 +219,10 @@ def test_fetch_web_snapshot_preserves_binary_bytes_without_text_preview(tmp_path
     cfg = make_settings(tmp_path)
     original_body = StaticHandler.body
     original_content_type = StaticHandler.content_type
+    original_robots_body = StaticHandler.robots_body
     StaticHandler.body = b"\x89PNG\r\n\x1a\n\x00\x00"
     StaticHandler.content_type = "image/png"
+    StaticHandler.robots_body = b"User-agent: *\nAllow: /\n"
     server, url = _serve_fixture()
     try:
         result = fetch_web_snapshot(
@@ -195,6 +234,7 @@ def test_fetch_web_snapshot_preserves_binary_bytes_without_text_preview(tmp_path
         server.shutdown()
         StaticHandler.body = original_body
         StaticHandler.content_type = original_content_type
+        StaticHandler.robots_body = original_robots_body
 
     saved = json.loads(Path(result["snapshot_path"]).read_text(encoding="utf-8"))
     assert base64.b64decode(saved["content_base64"]) == b"\x89PNG\r\n\x1a\n\x00\x00"
