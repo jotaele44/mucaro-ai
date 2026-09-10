@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from backend.app.config import Settings
+from backend.app.ingestion import get_chunks, get_sources, ingest_web_snapshot
 from backend.app.web_browsing import WebBrowsingError, WebFetchPolicy, fetch_web_snapshot, validate_web_fetch_url
 
 
@@ -118,6 +119,35 @@ def test_fetch_web_snapshot_records_policy_and_bytes(tmp_path: Path):
     assert ledger["entry_count"] == 1
     assert ledger["entries"][0]["snapshot_id"] == saved["snapshot_id"]
     assert ledger["entries"][0]["snapshot_sha256"] == result["snapshot_sha256"]
+
+
+def test_ingest_web_snapshot_makes_snapshot_citeable(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    server, url = _serve_fixture()
+    try:
+        fetched = fetch_web_snapshot(
+            url,
+            cfg=cfg,
+            policy=WebFetchPolicy(timeout_seconds=5, max_bytes=1000, allow_private_hosts=True),
+        )
+    finally:
+        server.shutdown()
+
+    result = ingest_web_snapshot(Path(fetched["snapshot_path"]), cfg)
+
+    assert result["status"] == "WEB_SNAPSHOT_INGEST_OK"
+    assert result["citation_ready"] is True
+    assert result["chunks_added"] == 1
+    assert result["source"]["parser_metadata"]["source_format"] == "web_snapshot"
+    assert result["source"]["parser_metadata"]["final_url"] == url
+    assert result["source"]["parser_metadata"]["snapshot_sha256"] == fetched["snapshot_sha256"]
+    sources = get_sources(cfg)
+    chunks = get_chunks(cfg)
+    assert sources[0]["source_id"] == result["source"]["source_id"]
+    assert chunks[0]["source_format"] == "web_snapshot"
+    assert chunks[0]["source_url"] == url
+    assert chunks[0]["snapshot_sha256"] == fetched["snapshot_sha256"]
+    assert chunks[0]["content_sha256"] == result["source"]["parser_metadata"]["content_sha256"]
 
 
 def test_fetch_web_snapshot_records_safe_redirect_chain(tmp_path: Path):

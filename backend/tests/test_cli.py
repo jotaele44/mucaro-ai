@@ -101,6 +101,44 @@ def test_cli_capabilities_contracts_reports_expanded_scope(tmp_path: Path, capsy
     assert "CONTRACT_DEFINED CANDIDATE transparency_objectivity_governance" in output
 
 
+def test_cli_sources_ingest_web_snapshot(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    cfg.ensure_dirs()
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "mucaro_web_snapshot_v1",
+                "snapshot_id": "websnap_cli",
+                "requested_url": "https://example.com/cli",
+                "fetch_url": "https://example.com/cli",
+                "final_url": "https://example.com/cli",
+                "redirect_chain": [],
+                "fragment_removed": False,
+                "retrieval_started_utc": "2026-09-10T00:00:00Z",
+                "retrieval_utc": "2026-09-10T00:00:01Z",
+                "http_status": 200,
+                "content_type": "text/html; charset=utf-8",
+                "content_sha256": "contenthash",
+                "content_size_bytes": 64,
+                "content_base64": "",
+                "parser_name": "web_snapshot_preview_v1",
+                "parser_warnings": [],
+                "charset": "utf-8",
+                "text_preview": "CLI web snapshot citation fixture.",
+                "policy": {"timeout_seconds": 5, "max_bytes": 1000, "allow_private_hosts": False},
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["sources", "ingest-web-snapshot", str(snapshot_path), "--format", "text"], cfg=cfg) == 0
+    output = capsys.readouterr().out
+    assert "source_id=src_web_" in output
+    assert "chunks_added=1" in output
+
+
 def test_cli_models_list_reports_provider_registry(tmp_path: Path, capsys, monkeypatch):
     monkeypatch.delenv("MUCARO_AI_LIVE_MODE", raising=False)
     cfg = make_settings(tmp_path)

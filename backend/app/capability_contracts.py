@@ -200,8 +200,8 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
             ),
             unavailable_until=(
                 "web citation fixtures pass",
-                "web snapshots can be ingested or cited by answer traces",
                 "robots/cache and redirect-chain policy gates pass",
+                "richer parser traces cover HTML, PDF, and non-text responses",
             ),
         ),
         CapabilityContract(

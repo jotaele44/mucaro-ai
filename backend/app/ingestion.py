@@ -12,12 +12,43 @@ from .parser import detect_mime, parse_file
 from .semantic_store import build_semantic_store, get_semantic_store_status
 from .utils import read_json, sha256_file, stable_id, utc_now, write_json
 from .vector_index import build_persistent_index, fingerprint_chunks, load_persistent_index
+from .web_browsing import WEB_SNAPSHOT_SCHEMA_VERSION
 
 MANIFEST_NAME = "source_manifest.json"
 CHUNKS_NAME = "document_chunks.json"
 HTML_SUFFIXES = {".html", ".htm"}
 DOCX_SUFFIXES = {".docx"}
 EMAIL_SUFFIXES = {".eml", ".msg"}
+
+
+def _source_path_string(path: Path, cfg: Settings) -> str:
+    return str(path.relative_to(cfg.project_root)) if path.is_relative_to(cfg.project_root) else str(path)
+
+
+def _store_source_payload(source_payload: dict[str, Any], chunks: list[dict[str, Any]], cfg: Settings) -> dict[str, Any]:
+    manifest_path = cfg.processed_dir / MANIFEST_NAME
+    chunk_path = cfg.processed_dir / CHUNKS_NAME
+    manifest = read_json(manifest_path, [])
+    manifest = [m for m in manifest if m.get("source_id") != source_payload["source_id"]]
+    manifest.append(source_payload)
+    all_chunks = read_json(chunk_path, [])
+    all_chunks = [c for c in all_chunks if c.get("source_id") != source_payload["source_id"]]
+    all_chunks.extend(chunks)
+    write_json(manifest_path, manifest)
+    write_json(chunk_path, all_chunks)
+    upsert_payload("sources", "source_id", source_payload, cfg.sqlite_path)
+    for chunk in chunks:
+        upsert_payload("chunks", "chunk_id", chunk, cfg.sqlite_path)
+    index_payload = build_persistent_index(all_chunks, cfg)
+    semantic_payload = build_semantic_store(all_chunks, cfg)
+    return {
+        "index_status": index_payload["status"],
+        "index_version": index_payload["version"],
+        "indexed_chunk_count": index_payload["indexed_chunk_count"],
+        "semantic_store_status": semantic_payload["status"],
+        "semantic_store_version": semantic_payload["version"],
+        "semantic_store_indexed_chunk_count": semantic_payload["indexed_chunk_count"],
+    }
 
 
 def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
@@ -39,7 +70,7 @@ def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
         warnings.append("NO_TEXT_CHUNKS_EXTRACTED")
     source_payload = {
         "source_id": source_id,
-        "source_path": str(target.relative_to(cfg.project_root)) if target.is_relative_to(cfg.project_root) else str(target),
+        "source_path": _source_path_string(target, cfg),
         "source_sha256": file_sha,
         "bytes": parse_result.get("bytes", path.stat().st_size),
         "file_name": path.name,
@@ -58,31 +89,93 @@ def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
         "errors": [],
         "warnings": warnings,
     }
-    manifest_path = cfg.processed_dir / MANIFEST_NAME
-    chunk_path = cfg.processed_dir / CHUNKS_NAME
-    manifest = read_json(manifest_path, [])
-    manifest = [m for m in manifest if m.get("source_id") != source_id]
-    manifest.append(source_payload)
-    all_chunks = read_json(chunk_path, [])
-    all_chunks = [c for c in all_chunks if c.get("source_id") != source_id]
-    all_chunks.extend(chunks)
-    write_json(manifest_path, manifest)
-    write_json(chunk_path, all_chunks)
-    upsert_payload("sources", "source_id", source_payload, cfg.sqlite_path)
-    for chunk in chunks:
-        upsert_payload("chunks", "chunk_id", chunk, cfg.sqlite_path)
-    index_payload = build_persistent_index(all_chunks, cfg)
-    semantic_payload = build_semantic_store(all_chunks, cfg)
+    store = _store_source_payload(source_payload, chunks, cfg)
     return {
         "status": "INGEST_OK",
         "source": source_payload,
         "chunks_added": len(chunks),
-        "index_status": index_payload["status"],
-        "index_version": index_payload["version"],
-        "indexed_chunk_count": index_payload["indexed_chunk_count"],
-        "semantic_store_status": semantic_payload["status"],
-        "semantic_store_version": semantic_payload["version"],
-        "semantic_store_indexed_chunk_count": semantic_payload["indexed_chunk_count"],
+        **store,
+    }
+
+
+def ingest_web_snapshot(snapshot_path: Path, cfg: Settings = settings) -> dict[str, Any]:
+    cfg.ensure_dirs()
+    init_db(cfg.sqlite_path)
+    if not snapshot_path.exists() or not snapshot_path.is_file():
+        raise FileNotFoundError(f"Web snapshot not found: {snapshot_path}")
+    snapshot = read_json(snapshot_path, {})
+    if snapshot.get("schema_version") != WEB_SNAPSHOT_SCHEMA_VERSION:
+        return {
+            "status": "ERROR_WEB_SNAPSHOT_SCHEMA",
+            "detail": f"Expected {WEB_SNAPSHOT_SCHEMA_VERSION}.",
+            "snapshot_path": str(snapshot_path),
+        }
+    text = str(snapshot.get("text_preview") or "").strip()
+    snapshot_file_sha = sha256_file(snapshot_path)
+    snapshot_id = str(snapshot.get("snapshot_id") or "")
+    final_url = str(snapshot.get("final_url") or "")
+    content_sha256 = str(snapshot.get("content_sha256") or "")
+    retrieval_utc = str(snapshot.get("retrieval_utc") or "")
+    source_id = stable_id("src_web", snapshot_id, final_url, content_sha256)
+    chunks = chunk_text(source_id, text)
+    parser_warnings = list(snapshot.get("parser_warnings") or [])
+    warnings = list(parser_warnings)
+    if not chunks:
+        warnings.append("NO_WEB_TEXT_PREVIEW_CHUNKS_EXTRACTED")
+    for chunk in chunks:
+        chunk.update(
+            {
+                "source_format": "web_snapshot",
+                "source_url": final_url,
+                "snapshot_id": snapshot_id,
+                "snapshot_sha256": snapshot_file_sha,
+                "content_sha256": content_sha256,
+                "retrieval_utc": retrieval_utc,
+                "parser_warnings": parser_warnings,
+            }
+        )
+    source_payload = {
+        "source_id": source_id,
+        "source_path": _source_path_string(snapshot_path, cfg),
+        "source_sha256": snapshot_file_sha,
+        "bytes": snapshot_path.stat().st_size,
+        "file_name": snapshot_path.name,
+        "mime_type": str(snapshot.get("content_type") or "application/octet-stream"),
+        "parser": "web_snapshot_preview_v1",
+        "parser_warnings": parser_warnings,
+        "parser_metadata": {
+            "source_format": "web_snapshot",
+            "snapshot_id": snapshot_id,
+            "snapshot_sha256": snapshot_file_sha,
+            "requested_url": snapshot.get("requested_url"),
+            "fetch_url": snapshot.get("fetch_url"),
+            "final_url": final_url,
+            "redirect_chain": snapshot.get("redirect_chain", []),
+            "retrieval_started_utc": snapshot.get("retrieval_started_utc"),
+            "retrieval_utc": retrieval_utc,
+            "http_status": snapshot.get("http_status"),
+            "content_type": snapshot.get("content_type"),
+            "content_sha256": content_sha256,
+            "content_size_bytes": snapshot.get("content_size_bytes"),
+            "charset": snapshot.get("charset"),
+            "policy": snapshot.get("policy", {}),
+        },
+        "parse_status": "OK" if chunks else "PARTIAL",
+        "ingested_at": utc_now(),
+        "lineage_status": "VALID" if chunks else "PARTIAL",
+        "chunk_count": len(chunks),
+        "errors": [],
+        "warnings": warnings,
+    }
+    store = _store_source_payload(source_payload, chunks, cfg)
+    return {
+        "status": "WEB_SNAPSHOT_INGEST_OK",
+        "source": source_payload,
+        "chunks_added": len(chunks),
+        "snapshot_id": snapshot_id,
+        "snapshot_sha256": snapshot_file_sha,
+        "citation_ready": bool(chunks),
+        **store,
     }
 
 

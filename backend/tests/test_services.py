@@ -5,8 +5,10 @@ import json
 from pathlib import Path
 
 from backend.app.config import Settings
+from backend.app.ingestion import ingest_web_snapshot
 from backend.app.services import answer_question
 from backend.app.utils import write_json
+from backend.app.web_browsing import WEB_SNAPSHOT_SCHEMA_VERSION
 from backend.app.vector_index import build_persistent_index
 
 
@@ -126,3 +128,54 @@ def test_answer_question_exports_citation_trace_records(tmp_path: Path, monkeypa
     assert rows[0]["chunk_id"] == "chunk_a"
     assert rows[0]["source_id"] == "src_a"
     assert rows[0]["retrieval_rank"] == "1"
+
+
+def test_answer_question_carries_web_snapshot_citation_metadata(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    cfg.ensure_dirs()
+    snapshot_path = cfg.export_dir / "web_snapshots" / "websnap_fixture.json"
+    write_json(
+        snapshot_path,
+        {
+            "schema_version": WEB_SNAPSHOT_SCHEMA_VERSION,
+            "snapshot_id": "websnap_fixture",
+            "requested_url": "https://example.com/brief",
+            "fetch_url": "https://example.com/brief",
+            "final_url": "https://example.com/brief",
+            "redirect_chain": [],
+            "fragment_removed": False,
+            "retrieval_started_utc": "2026-09-10T00:00:00Z",
+            "retrieval_utc": "2026-09-10T00:00:01Z",
+            "http_status": 200,
+            "content_type": "text/html; charset=utf-8",
+            "content_sha256": "contenthash",
+            "content_size_bytes": 80,
+            "content_base64": "",
+            "parser_name": "web_snapshot_preview_v1",
+            "parser_warnings": [],
+            "charset": "utf-8",
+            "text_preview": "Governed browsing citations preserve URL hash and retrieval time.",
+            "policy": {"timeout_seconds": 5, "max_bytes": 1000, "allow_private_hosts": False},
+        },
+    )
+    ingested = ingest_web_snapshot(snapshot_path, cfg)
+
+    result = answer_question("What do governed browsing citations preserve?", model_provider="mock", cfg=cfg)
+
+    assert result["citation_status"] == "CITATION_OK"
+    citation = result["cited_chunks"][0]
+    assert citation["source_id"] == ingested["source"]["source_id"]
+    assert citation["source_format"] == "web_snapshot"
+    assert citation["source_url"] == "https://example.com/brief"
+    assert citation["snapshot_id"] == "websnap_fixture"
+    assert citation["snapshot_sha256"] == ingested["snapshot_sha256"]
+    assert citation["content_sha256"] == "contenthash"
+    assert citation["retrieval_utc"] == "2026-09-10T00:00:01Z"
+    md_text = Path(result["export_paths"]["markdown"]).read_text(encoding="utf-8")
+    assert "source_format=web_snapshot" in md_text
+    assert "source_url=https://example.com/brief" in md_text
+    with Path(result["export_paths"]["csv"]).open(encoding="utf-8", newline="") as f:
+        row = next(csv.DictReader(f))
+    assert row["source_format"] == "web_snapshot"
+    assert row["source_url"] == "https://example.com/brief"
+    assert row["snapshot_id"] == "websnap_fixture"

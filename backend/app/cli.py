@@ -44,6 +44,7 @@ from .ingestion import (
     get_sources,
     ingest_file,
     ingest_folder,
+    ingest_web_snapshot,
     reindex_sources,
 )
 from .memory import (
@@ -406,6 +407,14 @@ def build_parser() -> argparse.ArgumentParser:
     sources_delete.add_argument("source_id", help="Source identifier to remove from the local source library.")
     sources_delete.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     sources_delete.set_defaults(handler=run_sources_delete)
+
+    sources_ingest_web_snapshot = sources_subcommands.add_parser(
+        "ingest-web-snapshot",
+        help="Ingest one governed web snapshot as a citeable local source.",
+    )
+    sources_ingest_web_snapshot.add_argument("snapshot_path", help="Path to a mucaro web snapshot JSON file.")
+    sources_ingest_web_snapshot.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    sources_ingest_web_snapshot.set_defaults(handler=run_sources_ingest_web_snapshot)
 
     conversations = subcommands.add_parser("conversations", help="Manage persistent local chat sessions.")
     conversations_subcommands = conversations.add_subparsers(dest="conversations_command", required=True)
@@ -1821,6 +1830,19 @@ def run_ingest(args: argparse.Namespace, cfg: Settings) -> int:
     result["directory_permission"] = permission
     emit_payload(result, args.format)
     return 0
+
+
+def run_sources_ingest_web_snapshot(args: argparse.Namespace, cfg: Settings) -> int:
+    path = Path(args.snapshot_path)
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        result = ingest_web_snapshot(path, cfg)
+    except FileNotFoundError as exc:
+        emit_error("ERROR_WEB_SNAPSHOT_NOT_FOUND", str(exc), args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
 
 
 def _doctor_check(name: str, status: str, detail: str) -> dict[str, str]:

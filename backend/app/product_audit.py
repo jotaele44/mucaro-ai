@@ -202,9 +202,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "capability_expansion",
             "Assistant has powerful web browsing abilities governed by provenance, safety, and citation controls.",
             "OPEN",
-            "web.fetch is an approval-gated tool that enforces URL policy and writes byte-pinned snapshots plus a local snapshot ledger; backend/app/capability_contracts.py defines the remaining browsing proof contract.",
-            "Snapshot fetch and ledgering exist, but robots/cache policy, richer page parsing, answer citation integration, and web citation eval gates remain open.",
-            "Add web snapshot ingestion/citation, parser traces, robots/cache policy, and positive/negative web citation fixtures.",
+            "web.fetch is an approval-gated tool that enforces URL policy and writes byte-pinned snapshots plus a local snapshot ledger; web snapshots can be ingested as citeable local sources with URL, retrieval UTC, and hash metadata in answer traces.",
+            "Snapshot fetch, ledgering, and citation wiring exist, but robots/cache policy, richer page parsing, and the full web citation eval suite remain open.",
+            "Add richer parser traces, robots/cache policy, and positive/negative web citation fixtures.",
         ),
         ProductRequirement(
             "coding_programming_expertise",

@@ -39,7 +39,18 @@ def build_citation_records(retrieved_chunks: list[dict[str, Any]], cited_chunk_i
             "chunk_index": chunk.get("chunk_index"),
             "text_snippet": _snippet(chunk.get("text")),
         }
-        for optional_key in ("score", "retrieval_strategy", "matched_terms", "source_format"):
+        for optional_key in (
+            "score",
+            "retrieval_strategy",
+            "matched_terms",
+            "source_format",
+            "source_url",
+            "snapshot_id",
+            "snapshot_sha256",
+            "content_sha256",
+            "retrieval_utc",
+            "parser_warnings",
+        ):
             if optional_key in chunk:
                 record[optional_key] = chunk[optional_key]
         records.append(record)

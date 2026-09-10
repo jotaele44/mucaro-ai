@@ -28,6 +28,11 @@ def export_answer_trace(answer_trace: dict[str, Any], cfg: Settings = settings) 
                 "score",
                 "retrieval_strategy",
                 "source_format",
+                "source_url",
+                "snapshot_id",
+                "snapshot_sha256",
+                "content_sha256",
+                "retrieval_utc",
                 "text_snippet",
             ],
         )
@@ -44,6 +49,11 @@ def export_answer_trace(answer_trace: dict[str, Any], cfg: Settings = settings) 
                     "score": record.get("score"),
                     "retrieval_strategy": record.get("retrieval_strategy"),
                     "source_format": record.get("source_format"),
+                    "source_url": record.get("source_url"),
+                    "snapshot_id": record.get("snapshot_id"),
+                    "snapshot_sha256": record.get("snapshot_sha256"),
+                    "content_sha256": record.get("content_sha256"),
+                    "retrieval_utc": record.get("retrieval_utc"),
                     "text_snippet": record.get("text_snippet"),
                 }
             )
@@ -74,6 +84,12 @@ def _to_markdown(answer_trace: dict[str, Any]) -> str:
         detail = f"source_id={source_id} retrieval_rank={rank}"
         if score is not None:
             detail = f"{detail} score={score}"
+        if record.get("source_format"):
+            detail = f"{detail} source_format={record.get('source_format')}"
+        if record.get("source_url"):
+            detail = f"{detail} source_url={record.get('source_url')}"
+        if record.get("snapshot_sha256"):
+            detail = f"{detail} snapshot_sha256={record.get('snapshot_sha256')}"
         lines.append(f"- `{chunk_id}` ({detail})")
         if snippet:
             lines.append(f"  - {snippet}")

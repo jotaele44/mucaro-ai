@@ -76,6 +76,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro package build` | Build the governed source ZIP and artifact manifest | 0 | 2 |
 | `mucaro package verify MANIFEST` | Verify a governed source ZIP against its artifact manifest | 0 | 2 |
 | `mucaro package distribution-manifest` | Build or verify the local distribution handoff manifest | 0 | 2 |
+| `mucaro sources ingest-web-snapshot SNAPSHOT_PATH` | Ingest one governed web snapshot as a citeable local source | 0 | 2 |
 | `mucaro tools list` | List locally allowlisted tools | 0 | 2 |
 | `mucaro tools request TOOL_NAME` | Create a pending tool-call request | 0 | 2 |
 | `mucaro tools approve TOOL_CALL_ID` | Approve a pending tool call | 0 | 2 |
@@ -286,9 +287,10 @@ python3 scripts/certify_source_artifact.py data/exports/packages/MANIFEST.json
 python3 scripts/certify_python_distribution.py
 mucaro tools list --format text
 mucaro tools request source_library.status --reason "readiness check" --format json
-mucaro tools request web.fetch '{"url":"https://example.com","max_bytes":1000000}' --reason "source snapshot" --format json
+mucaro tools request web.fetch --arguments '{"url":"https://example.com","max_bytes":1000000}' --reason "source snapshot" --format json
 mucaro tools approve TOOL_CALL_ID --format json
 mucaro tools run TOOL_CALL_ID --format json
+mucaro sources ingest-web-snapshot data/exports/web_snapshots/WEBSNAP.json --format text
 mucaro tools audit --format text
 mucaro capabilities contracts --format text
 mucaro ask "How does source lineage work?" --format json --no-persist
@@ -673,6 +675,10 @@ tools:
 `web.fetch` is also allowlisted, but it is state-changing because it fetches one
 HTTP(S) URL through the governed URL policy and writes a byte-pinned local
 snapshot under `data/exports/web_snapshots`.
+
+After reviewing a saved snapshot, use
+`mucaro sources ingest-web-snapshot SNAPSHOT_PATH` to make that frozen web
+artifact available to retrieval and answer citations.
 
 Tool call state is stored under `data/processed/tool_calls.json`. Audit events
 are stored under `data/processed/tool_audit_log.json`. These files are local
