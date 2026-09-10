@@ -96,6 +96,9 @@ evidence creation:
 - `memory.list`
 - `web.fetch`: approval-gated HTTP(S) fetch that writes byte-pinned local
   snapshots under `data/exports/web_snapshots`
+- `web.fetch_session`: approval-gated operator-supplied URL set fetch that
+  records source-selection decisions and replay receipts under
+  `data/exports/web_browse_sessions`
 
 Broader write/action tools should be added one at a time with explicit policy,
 operator UX, and regression tests for approval and audit behavior.

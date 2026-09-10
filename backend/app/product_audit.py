@@ -176,7 +176,7 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Assistant can safely use tools beyond retrieval-backed answering.",
             _status_from_files(cfg, [("backend", "app", "tools.py")]),
             "backend/app/tools.py with allowlisted tools, explicit approvals, execution gates, and audit events",
-            "The allowlist includes read-only inspection tools plus an approval-gated web.fetch tool that writes local snapshot evidence; broader action tools remain future scoped work.",
+            "The allowlist includes read-only inspection tools plus approval-gated web.fetch and web.fetch_session tools that write local snapshot and browsing-session evidence; broader action tools remain future scoped work.",
             "Add narrowly scoped write/action tools only with per-tool policies and stronger UX review.",
         ),
         ProductRequirement(
@@ -202,9 +202,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "capability_expansion",
             "Assistant has powerful web browsing abilities governed by provenance, safety, and citation controls.",
             "OPEN",
-            "web.fetch is an approval-gated tool that enforces URL policy and writes byte-pinned snapshots plus a local snapshot ledger; web snapshots can be ingested as citeable local sources with URL, retrieval UTC, hash metadata, cache/robots metadata, redirect-target robots evidence, HTML parser traces, PDF page traces, non-text parser classification, immutable snapshot-only cache policy, and explicit HTTP error-page citation policy.",
-            "Snapshot fetch, ledgering, citation wiring, web citation fixtures, response cache metadata, robots enforcement, redirect-target robots fixtures, HTML/PDF/non-text parser traces, immutable snapshot-only cache policy, and HTTP error-page citation fixtures exist, but deeper body extraction, browser discovery/search, session behavior, multi-page source selection, and replay receipts remain open.",
-            "Add deeper body extraction, browser discovery/search controls, session policy, multi-page source selection, and replay receipts.",
+            "web.fetch is an approval-gated tool that enforces URL policy and writes byte-pinned snapshots plus a local snapshot ledger; web.fetch_session adds operator-supplied multi-page source selection with replay receipts. Web snapshots can be ingested as citeable local sources with URL, retrieval UTC, hash metadata, cache/robots metadata, redirect-target robots evidence, HTML body/structure traces, PDF page traces, non-text parser classification, immutable snapshot-only cache policy, and explicit HTTP error-page citation policy.",
+            "Snapshot fetch, session receipts, ledgering, citation wiring, web citation fixtures, response cache metadata, robots enforcement, redirect-target robots fixtures, HTML/PDF/non-text parser traces, immutable snapshot-only cache policy, and HTTP error-page citation fixtures exist, but automated search/discovery, rendered-browser capture, and autonomous link-following policies remain open.",
+            "Add automated search/discovery controls, rendered-browser capture policy, and gated autonomous link-following only after source-selection safeguards exist.",
         ),
         ProductRequirement(
             "coding_programming_expertise",

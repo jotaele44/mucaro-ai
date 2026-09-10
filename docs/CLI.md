@@ -678,12 +678,18 @@ snapshot under `data/exports/web_snapshots`.
 
 `web.fetch` records cache and robots metadata by default, removes URL fragments,
 checks robots policy on redirect targets before following them, and emits parser
-traces for HTML, PDF, and non-text responses. Cache headers are recorded as
-source evidence, but the runtime remains immutable snapshot-only:
+traces for HTML body/structure, PDF, and non-text responses. Cache headers are
+recorded as source evidence, but the runtime remains immutable snapshot-only:
 `reuse_allowed=false` until a future revalidation policy explicitly changes
 that. HTTP error pages fail closed unless the tool call explicitly sets
 `snapshot_http_errors=true`; ingestion still rejects those snapshots unless
 `cite_http_error_pages=true` was also set on the fetch.
+
+For an operator-selected multi-page browsing run, request `web.fetch_session`
+with a `urls` array. The session tool does not perform autonomous search or
+link-following; it validates the supplied candidates, records selected and
+rejected URLs, fetches the selected pages through the same policy, and writes a
+replay receipt under `data/exports/web_browse_sessions`.
 
 After reviewing a saved snapshot, use
 `mucaro sources ingest-web-snapshot SNAPSHOT_PATH` to make that frozen web

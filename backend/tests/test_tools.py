@@ -38,6 +38,8 @@ def test_tool_runtime_lists_allowlisted_tools():
     assert by_name["source_library.status"]["mutates_state"] is False
     assert by_name["web.fetch"]["requires_approval"] is True
     assert by_name["web.fetch"]["mutates_state"] is True
+    assert by_name["web.fetch_session"]["requires_approval"] is True
+    assert by_name["web.fetch_session"]["mutates_state"] is True
 
 
 def test_tool_runtime_requires_approval_before_execution(tmp_path: Path):
@@ -108,6 +110,62 @@ def test_tool_runtime_executes_governed_web_fetch(monkeypatch, tmp_path: Path):
     events = list_tool_audit_events(cfg)["events"]
     assert events[-1]["event"] == "TOOL_CALL_EXECUTED"
     assert events[-1]["result_status"] == "WEB_FETCH_SNAPSHOT_OK"
+
+
+def test_tool_runtime_executes_governed_web_fetch_session(monkeypatch, tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    calls = []
+
+    def fake_fetch_session(urls, *, purpose, cfg, fetch_policy, session_policy):
+        calls.append((urls, purpose, cfg, fetch_policy, session_policy))
+        return {
+            "status": "WEB_BROWSE_SESSION_OK",
+            "session_id": "websession_test",
+            "receipt_path": str(tmp_path / "session.json"),
+            "receipt_sha256": "abc123",
+            "selected_count": 2,
+            "successful_fetch_count": 2,
+        }
+
+    monkeypatch.setattr("backend.app.tools.fetch_web_browse_session", fake_fetch_session)
+    requested = request_tool_call(
+        "web.fetch_session",
+        {
+            "urls": ["https://example.com/one", "https://example.com/two"],
+            "purpose": "compare sources",
+            "max_pages": 2,
+            "require_same_host": True,
+            "max_bytes": 5000,
+        },
+        cfg=cfg,
+        requested_by="test",
+    )
+    tool_call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
+
+    executed = run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
+
+    assert executed["status"] == "TOOL_CALL_EXECUTED"
+    assert executed["result"]["status"] == "WEB_BROWSE_SESSION_OK"
+    assert calls[0][0] == ["https://example.com/one", "https://example.com/two"]
+    assert calls[0][1] == "compare sources"
+    assert calls[0][3].max_bytes == 5000
+    assert calls[0][4].require_same_host is True
+    events = list_tool_audit_events(cfg)["events"]
+    assert events[-1]["event"] == "TOOL_CALL_EXECUTED"
+    assert events[-1]["result_status"] == "WEB_BROWSE_SESSION_OK"
+
+
+def test_tool_runtime_rejects_web_fetch_session_without_url_array(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    requested = request_tool_call("web.fetch_session", {"urls": "https://example.com"}, cfg=cfg, requested_by="test")
+    tool_call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
+
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
+
+    assert exc.value.status == "ERROR_WEB_SESSION_URLS_REQUIRED"
 
 
 def test_tool_runtime_audits_failed_web_fetch(tmp_path: Path):

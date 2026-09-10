@@ -190,6 +190,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "PDF fixture records parser trace page counts and page warnings without fabricated text",
                 "missing cache-header fixture records immutable snapshot-only reuse policy",
                 "explicitly citeable HTTP error-page fixture can be snapshotted and ingested",
+                "operator-supplied multi-page session writes selection decisions and replay receipt",
             ),
             negative_regression_gates=(
                 "blocked URL policy prevents fetch",
@@ -197,6 +198,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "redirect target disallowed by robots fails before snapshot creation",
                 "404/500 pages remain fetch failures unless explicitly cited as error pages",
                 "unciteable HTTP error-page snapshots are rejected by source ingestion",
+                "session with no selectable URL fails closed before fetching",
             ),
             output_requirements=(
                 "FACT/INFERENCE separation",
@@ -206,9 +208,9 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "falsification path",
             ),
             unavailable_until=(
-                "deeper page extraction covers body structure beyond preview traces",
-                "browser discovery, search, and session policy are defined",
-                "multi-page browsing workflows have source selection and replay receipts",
+                "automated search and discovery policy is defined",
+                "rendered-browser capture policy is defined",
+                "autonomous link-following remains disabled until source-selection gates exist",
             ),
         ),
         CapabilityContract(

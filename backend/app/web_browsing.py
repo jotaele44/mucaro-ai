@@ -18,7 +18,9 @@ from .config import Settings, settings
 from .utils import read_json, stable_id, utc_now, write_json
 
 WEB_SNAPSHOT_SCHEMA_VERSION = "mucaro_web_snapshot_v1"
+WEB_BROWSE_SESSION_SCHEMA_VERSION = "mucaro_web_browse_session_v1"
 WEB_SNAPSHOT_DIR = "web_snapshots"
+WEB_BROWSE_SESSION_DIR = "web_browse_sessions"
 WEB_SNAPSHOT_LEDGER_NAME = "web_snapshot_ledger.json"
 DEFAULT_WEB_TIMEOUT_SECONDS = 15
 DEFAULT_MAX_WEB_BYTES = 1_000_000
@@ -55,6 +57,15 @@ class WebFetchPolicy:
     cache_mode: str = "immutable_snapshot_only"
 
 
+@dataclass(frozen=True)
+class WebBrowseSessionPolicy:
+    max_pages: int = 5
+    require_same_host: bool = False
+    discovery_mode: str = "operator_supplied_urls"
+    search_enabled: bool = False
+    automated_link_following: bool = False
+
+
 class _HTMLTraceParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -62,16 +73,24 @@ class _HTMLTraceParser(HTMLParser):
         self.headings: list[str] = []
         self.link_samples: list[str] = []
         self.meta_names: list[str] = []
+        self.body_text_blocks: list[str] = []
+        self.body_text_parts: list[str] = []
         self._in_title = False
         self._heading_tag: str | None = None
         self._heading_parts: list[str] = []
+        self._in_body = False
+        self._skip_depth = 0
         self.link_count = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
         attr_map = {name.lower(): value for name, value in attrs if value}
+        if tag in {"script", "style", "noscript"}:
+            self._skip_depth += 1
         if tag == "title":
             self._in_title = True
+        elif tag == "body":
+            self._in_body = True
         elif tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
             self._heading_tag = tag
             self._heading_parts = []
@@ -86,8 +105,12 @@ class _HTMLTraceParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
+        if tag in {"script", "style", "noscript"} and self._skip_depth:
+            self._skip_depth -= 1
         if tag == "title":
             self._in_title = False
+        elif tag == "body":
+            self._in_body = False
         elif self._heading_tag == tag:
             heading = " ".join(" ".join(self._heading_parts).split())
             if heading and len(self.headings) < 12:
@@ -103,10 +126,18 @@ class _HTMLTraceParser(HTMLParser):
             self.title_parts.append(text)
         if self._heading_tag:
             self._heading_parts.append(text)
+        if self._in_body and not self._skip_depth:
+            self.body_text_parts.append(text)
+            if len(self.body_text_blocks) < 24:
+                self.body_text_blocks.append(text)
 
     @property
     def title(self) -> str:
         return " ".join(self.title_parts).strip()
+
+    @property
+    def body_text(self) -> str:
+        return " ".join(self.body_text_parts).strip()
 
 
 def _parse_bool(value: Any) -> bool:
@@ -276,12 +307,18 @@ def _parser_trace(content: bytes, content_type: str, text_preview: str, charset:
             "html_link_count": parser.link_count,
             "html_link_samples": parser.link_samples,
             "html_meta_names": parser.meta_names,
+            "html_body_text_preview": parser.body_text[:4000],
+            "html_visible_text_length": len(parser.body_text),
+            "html_text_block_count": len(parser.body_text_blocks),
+            "html_text_blocks": parser.body_text_blocks,
         }
     )
     if not parser.title:
         trace["trace_warnings"].append("HTML_TRACE_TITLE_MISSING")
     if not parser.headings:
         trace["trace_warnings"].append("HTML_TRACE_HEADINGS_MISSING")
+    if not parser.body_text:
+        trace["trace_warnings"].append("HTML_TRACE_BODY_TEXT_MISSING")
     return trace
 
 
@@ -306,6 +343,10 @@ def _build_cache_policy(headers: dict[str, str], policy: WebFetchPolicy) -> dict
 
 def _snapshot_ledger_path(cfg: Settings) -> Any:
     return cfg.export_dir / WEB_SNAPSHOT_DIR / WEB_SNAPSHOT_LEDGER_NAME
+
+
+def _browse_session_path(cfg: Settings, session_id: str) -> Any:
+    return cfg.export_dir / WEB_BROWSE_SESSION_DIR / f"{session_id}.json"
 
 
 def _append_snapshot_ledger_entry(cfg: Settings, snapshot: dict[str, Any], snapshot_path: str, snapshot_sha256: str) -> dict[str, Any]:
@@ -508,6 +549,9 @@ def fetch_web_snapshot(
     content_sha256 = hashlib.sha256(content).hexdigest()
     text_preview, parser_warnings, charset = _decode_preview(content, content_type)
     parser_trace = _parser_trace(content, content_type, text_preview, charset)
+    if parser_trace.get("content_kind") == "html" and parser_trace.get("html_body_text_preview"):
+        text_preview = str(parser_trace["html_body_text_preview"])
+        parser_trace["text_preview_length"] = len(text_preview)
     snapshot_id = stable_id("websnap", str(checked["requested_url"]), final_url, content_sha256, retrieved_at)
     snapshot = {
         "schema_version": WEB_SNAPSHOT_SCHEMA_VERSION,
@@ -568,3 +612,205 @@ def build_web_fetch_policy(arguments: dict[str, Any]) -> WebFetchPolicy:
         cite_http_error_pages=snapshot_http_errors and _parse_bool(arguments.get("cite_http_error_pages")),
         cache_mode="immutable_snapshot_only",
     )
+
+
+def build_web_browse_session_policy(arguments: dict[str, Any]) -> WebBrowseSessionPolicy:
+    return WebBrowseSessionPolicy(
+        max_pages=_parse_positive_int(arguments.get("max_pages"), 5),
+        require_same_host=_parse_bool(arguments.get("require_same_host")),
+    )
+
+
+def _select_session_urls(
+    urls: list[str],
+    *,
+    fetch_policy: WebFetchPolicy,
+    session_policy: WebBrowseSessionPolicy,
+) -> tuple[list[str], list[dict[str, Any]]]:
+    selected: list[str] = []
+    decisions: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    seed_host: str | None = None
+    for index, url in enumerate(urls):
+        try:
+            checked = validate_web_fetch_url(url, allow_private_hosts=fetch_policy.allow_private_hosts)
+        except WebBrowsingError as exc:
+            decisions.append(
+                {
+                    "candidate_index": index,
+                    "requested_url": url,
+                    "decision": "REJECTED",
+                    "reason": exc.status,
+                    "detail": exc.detail,
+                }
+            )
+            continue
+        fetch_url = str(checked["fetch_url"])
+        if fetch_url in seen:
+            decisions.append(
+                {
+                    "candidate_index": index,
+                    "requested_url": checked["requested_url"],
+                    "fetch_url": fetch_url,
+                    "decision": "REJECTED",
+                    "reason": "DUPLICATE_URL",
+                }
+            )
+            continue
+        if seed_host is None:
+            seed_host = str(checked["hostname"])
+        if session_policy.require_same_host and checked["hostname"] != seed_host:
+            decisions.append(
+                {
+                    "candidate_index": index,
+                    "requested_url": checked["requested_url"],
+                    "fetch_url": fetch_url,
+                    "hostname": checked["hostname"],
+                    "decision": "REJECTED",
+                    "reason": "CROSS_HOST_REJECTED",
+                    "required_hostname": seed_host,
+                }
+            )
+            continue
+        if len(selected) >= session_policy.max_pages:
+            decisions.append(
+                {
+                    "candidate_index": index,
+                    "requested_url": checked["requested_url"],
+                    "fetch_url": fetch_url,
+                    "hostname": checked["hostname"],
+                    "decision": "REJECTED",
+                    "reason": "MAX_PAGES_EXCEEDED",
+                    "max_pages": session_policy.max_pages,
+                }
+            )
+            continue
+        seen.add(fetch_url)
+        selected.append(fetch_url)
+        decisions.append(
+            {
+                "candidate_index": index,
+                "requested_url": checked["requested_url"],
+                "fetch_url": fetch_url,
+                "hostname": checked["hostname"],
+                "decision": "SELECTED",
+                "reason": "OPERATOR_SUPPLIED_URL_SELECTED",
+            }
+        )
+    return selected, decisions
+
+
+def fetch_web_browse_session(
+    urls: list[str],
+    *,
+    purpose: str = "",
+    cfg: Settings = settings,
+    fetch_policy: WebFetchPolicy | None = None,
+    session_policy: WebBrowseSessionPolicy | None = None,
+) -> dict[str, Any]:
+    cfg.ensure_dirs()
+    fetch_policy = fetch_policy or WebFetchPolicy()
+    session_policy = session_policy or WebBrowseSessionPolicy()
+    started_at = utc_now()
+    selected_urls, selection_decisions = _select_session_urls(
+        urls,
+        fetch_policy=fetch_policy,
+        session_policy=session_policy,
+    )
+    if not selected_urls:
+        raise WebBrowsingError("ERROR_WEB_BROWSE_SESSION_NO_SELECTED_URLS", "No URLs passed the session selection policy.")
+    session_id = stable_id("websession", purpose, *selected_urls, started_at)
+    fetches: list[dict[str, Any]] = []
+    for url in selected_urls:
+        try:
+            result = fetch_web_snapshot(url, cfg=cfg, policy=fetch_policy)
+        except WebBrowsingError as exc:
+            fetches.append(
+                {
+                    "url": url,
+                    "status": exc.status,
+                    "detail": exc.detail,
+                    "snapshot_id": None,
+                    "snapshot_path": None,
+                    "snapshot_sha256": None,
+                }
+            )
+            continue
+        snapshot = result.get("snapshot", {})
+        fetches.append(
+            {
+                "url": url,
+                "status": result.get("status"),
+                "snapshot_id": snapshot.get("snapshot_id"),
+                "snapshot_path": result.get("snapshot_path"),
+                "snapshot_sha256": result.get("snapshot_sha256"),
+                "final_url": snapshot.get("final_url"),
+                "http_status": snapshot.get("http_status"),
+                "content_sha256": snapshot.get("content_sha256"),
+            }
+        )
+    successful_fetches = [fetch for fetch in fetches if fetch.get("status") == "WEB_FETCH_SNAPSHOT_OK"]
+    completed_at = utc_now()
+    status = "WEB_BROWSE_SESSION_OK" if len(successful_fetches) == len(selected_urls) else "WEB_BROWSE_SESSION_PARTIAL"
+    receipt = {
+        "schema_version": WEB_BROWSE_SESSION_SCHEMA_VERSION,
+        "session_id": session_id,
+        "status": status,
+        "purpose": purpose,
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "browser_discovery_policy": {
+            "discovery_mode": session_policy.discovery_mode,
+            "search_enabled": session_policy.search_enabled,
+            "automated_link_following": session_policy.automated_link_following,
+            "candidate_source": "operator_supplied_urls",
+            "selection_basis": "validated_url_order",
+        },
+        "session_policy": {
+            "max_pages": session_policy.max_pages,
+            "require_same_host": session_policy.require_same_host,
+        },
+        "fetch_policy": {
+            "timeout_seconds": fetch_policy.timeout_seconds,
+            "max_bytes": fetch_policy.max_bytes,
+            "allow_private_hosts": fetch_policy.allow_private_hosts,
+            "respect_robots": fetch_policy.respect_robots,
+            "snapshot_http_errors": fetch_policy.snapshot_http_errors,
+            "cite_http_error_pages": fetch_policy.cite_http_error_pages,
+            "cache_mode": fetch_policy.cache_mode,
+        },
+        "candidate_count": len(urls),
+        "selected_count": len(selected_urls),
+        "successful_fetch_count": len(successful_fetches),
+        "selection_decisions": selection_decisions,
+        "fetches": fetches,
+        "replay": {
+            "tool_name": "web.fetch_session",
+            "arguments": {
+                "urls": urls,
+                "purpose": purpose,
+                "max_pages": session_policy.max_pages,
+                "require_same_host": session_policy.require_same_host,
+                "timeout_seconds": fetch_policy.timeout_seconds,
+                "max_bytes": fetch_policy.max_bytes,
+                "allow_private_hosts": fetch_policy.allow_private_hosts,
+                "ignore_robots": not fetch_policy.respect_robots,
+                "snapshot_http_errors": fetch_policy.snapshot_http_errors,
+                "cite_http_error_pages": fetch_policy.cite_http_error_pages,
+            },
+        },
+        "warnings": [] if successful_fetches else ["WEB_BROWSE_SESSION_NO_SUCCESSFUL_FETCHES"],
+    }
+    path = _browse_session_path(cfg, session_id)
+    write_json(path, receipt)
+    receipt_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+    return {
+        "status": status,
+        "session_id": session_id,
+        "receipt_path": str(path),
+        "receipt_sha256": receipt_sha256,
+        "candidate_count": len(urls),
+        "selected_count": len(selected_urls),
+        "successful_fetch_count": len(successful_fetches),
+        "receipt": receipt,
+    }

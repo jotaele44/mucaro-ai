@@ -9,7 +9,13 @@ from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
 from .product_audit import build_product_audit
 from .utils import read_json, stable_id, utc_now, write_json
-from .web_browsing import WebBrowsingError, build_web_fetch_policy, fetch_web_snapshot
+from .web_browsing import (
+    WebBrowsingError,
+    build_web_browse_session_policy,
+    build_web_fetch_policy,
+    fetch_web_browse_session,
+    fetch_web_snapshot,
+)
 from .workspaces import list_workspace_profiles
 
 TOOL_CALLS_NAME = "tool_calls.json"
@@ -77,6 +83,23 @@ def _web_fetch(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
+def _web_fetch_session(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    urls = arguments.get("urls")
+    if not isinstance(urls, list) or not all(isinstance(url, str) for url in urls):
+        raise ToolRuntimeError("ERROR_WEB_SESSION_URLS_REQUIRED", "web.fetch_session requires a urls array of strings.")
+    purpose = arguments.get("purpose")
+    try:
+        return fetch_web_browse_session(
+            urls,
+            purpose=str(purpose or ""),
+            cfg=cfg,
+            fetch_policy=build_web_fetch_policy(arguments),
+            session_policy=build_web_browse_session_policy(arguments),
+        )
+    except WebBrowsingError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
 TOOL_REGISTRY: dict[str, ToolDefinition] = {
     "source_library.status": ToolDefinition(
         name="source_library.status",
@@ -112,6 +135,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_web_fetch,
+    ),
+    "web.fetch_session": ToolDefinition(
+        name="web.fetch_session",
+        description="Fetch an approved operator-supplied URL set and save a replayable multi-page browsing receipt.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_web_fetch_session,
     ),
 }
 

@@ -270,14 +270,15 @@ Observed success markers:
   current scope reports `16 PASS`, `6 OPEN`, `0 BLOCKED`, and `72.7%`
   readiness: the existing local assistant capabilities and source-artifact
   packaging pass. Governed web browsing has candidate `web.fetch` snapshot,
-  ledger, robots/cache metadata, redirect-target robots evidence, HTML/PDF/
-  non-text parser traces, immutable snapshot-only cache policy, explicit HTTP
-  error-page citation policy, and web citation fixture evidence, while advanced
-  GIS processing, state-of-the-art OCR analysis, deeper web body extraction,
-  browser discovery/search, multi-page source selection, replay receipts,
-  session behavior, coding/programming expertise, cross-capability
-  transparency/objectivity governance, and hosted GitHub governance remain open.
-  Tag binding is verified separately by the release-state and GitHub
+  ledger, operator-supplied multi-page session receipts, robots/cache metadata,
+  redirect-target robots evidence, HTML body/structure traces, PDF/non-text
+  parser traces, immutable snapshot-only cache policy, explicit HTTP error-page
+  citation policy, and web citation fixture evidence, while advanced GIS
+  processing, state-of-the-art OCR analysis, automated search/discovery,
+  rendered-browser capture, autonomous link-following, coding/programming
+  expertise, cross-capability transparency/objectivity governance, and hosted
+  GitHub governance remain open. Tag binding is verified separately by the
+  release-state and GitHub
   governance commands.
 - `mucaro audit roadmap` groups the same product-audit rows into development
   stages without changing the denominator. It reports the canonical operator

@@ -10,7 +10,14 @@ from pathlib import Path
 
 from backend.app.config import Settings
 from backend.app.ingestion import get_chunks, get_sources, ingest_web_snapshot
-from backend.app.web_browsing import WebBrowsingError, WebFetchPolicy, fetch_web_snapshot, validate_web_fetch_url
+from backend.app.web_browsing import (
+    WebBrowseSessionPolicy,
+    WebBrowsingError,
+    WebFetchPolicy,
+    fetch_web_browse_session,
+    fetch_web_snapshot,
+    validate_web_fetch_url,
+)
 
 
 def make_settings(root: Path) -> Settings:
@@ -169,12 +176,19 @@ def test_fetch_web_snapshot_records_policy_and_bytes(tmp_path: Path):
     assert saved["parser_trace"]["html_link_count"] == 1
     assert saved["parser_trace"]["html_link_samples"] == ["/source"]
     assert saved["parser_trace"]["html_meta_names"] == ["author"]
+    assert saved["parser_trace"]["html_body_text_preview"] == "Governed browsing source Mucaro governed browsing fixture."
+    assert saved["parser_trace"]["html_visible_text_length"] == len("Governed browsing source Mucaro governed browsing fixture.")
+    assert saved["parser_trace"]["html_text_blocks"] == [
+        "Governed browsing",
+        "source",
+        "Mucaro governed browsing fixture.",
+    ]
     assert saved["content_size_bytes"] == len(StaticHandler.body)
     assert base64.b64decode(saved["content_base64"]) == StaticHandler.body
     assert saved["content_sha256"]
     assert saved["retrieval_utc"].endswith("Z")
     assert saved["policy"]["allow_private_hosts"] is True
-    assert "Mucaro governed browsing fixture" in saved["text_preview"]
+    assert saved["text_preview"] == "Governed browsing source Mucaro governed browsing fixture."
     ledger = json.loads(Path(result["ledger_path"]).read_text(encoding="utf-8"))
     assert ledger["schema_version"] == "mucaro_web_snapshot_ledger_v1"
     assert ledger["entry_count"] == 1
@@ -421,6 +435,62 @@ def test_fetch_web_snapshot_records_pdf_parser_trace(tmp_path: Path):
     assert saved["parser_trace"]["pdf_pages_with_empty_text"] == 1
     assert saved["parser_trace"]["pdf_failed_pages"] == 0
     assert saved["parser_trace"]["trace_warnings"] == ["PDF_TRACE_PAGE_EMPTY:1"]
+
+
+def test_fetch_web_browse_session_writes_selection_and_replay_receipt(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    server, first_url = _serve_fixture("/first.html")
+    second_url = first_url.rsplit("/", 1)[0] + "/second.html"
+    try:
+        result = fetch_web_browse_session(
+            [first_url, second_url, first_url],
+            purpose="compare governed fixtures",
+            cfg=cfg,
+            fetch_policy=WebFetchPolicy(timeout_seconds=5, max_bytes=1000, allow_private_hosts=True),
+            session_policy=WebBrowseSessionPolicy(max_pages=2, require_same_host=True),
+        )
+    finally:
+        server.shutdown()
+
+    assert result["status"] == "WEB_BROWSE_SESSION_OK"
+    assert result["candidate_count"] == 3
+    assert result["selected_count"] == 2
+    assert result["successful_fetch_count"] == 2
+    receipt = json.loads(Path(result["receipt_path"]).read_text(encoding="utf-8"))
+    assert receipt["schema_version"] == "mucaro_web_browse_session_v1"
+    assert receipt["browser_discovery_policy"] == {
+        "discovery_mode": "operator_supplied_urls",
+        "search_enabled": False,
+        "automated_link_following": False,
+        "candidate_source": "operator_supplied_urls",
+        "selection_basis": "validated_url_order",
+    }
+    assert [decision["decision"] for decision in receipt["selection_decisions"]] == [
+        "SELECTED",
+        "SELECTED",
+        "REJECTED",
+    ]
+    assert receipt["selection_decisions"][2]["reason"] == "DUPLICATE_URL"
+    assert [fetch["status"] for fetch in receipt["fetches"]] == ["WEB_FETCH_SNAPSHOT_OK", "WEB_FETCH_SNAPSHOT_OK"]
+    assert receipt["replay"]["tool_name"] == "web.fetch_session"
+    assert receipt["replay"]["arguments"]["urls"] == [first_url, second_url, first_url]
+    assert receipt["replay"]["arguments"]["require_same_host"] is True
+
+
+def test_fetch_web_browse_session_rejects_unselected_candidate_set(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+
+    try:
+        fetch_web_browse_session(
+            ["file:///etc/passwd"],
+            cfg=cfg,
+            fetch_policy=WebFetchPolicy(timeout_seconds=5, max_bytes=1000, allow_private_hosts=True),
+            session_policy=WebBrowseSessionPolicy(max_pages=2),
+        )
+    except WebBrowsingError as exc:
+        assert exc.status == "ERROR_WEB_BROWSE_SESSION_NO_SELECTED_URLS"
+    else:
+        raise AssertionError("expected empty session selection to fail")
 
 
 def test_fetch_web_snapshot_preserves_binary_bytes_without_text_preview(tmp_path: Path):
