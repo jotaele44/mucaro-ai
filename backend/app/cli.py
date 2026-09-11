@@ -1666,10 +1666,18 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"crs_status={source.get('crs_status')}")
         if payload.get("join_cardinality"):
             print(f"join_cardinality={payload.get('join_cardinality')}")
+        invariants = payload.get("invariants")
+        if isinstance(invariants, dict):
+            for key in ("crs_match", "crs_mismatch_allowed", "point_row_conservation"):
+                if key in invariants:
+                    print(f"{key}={invariants.get(key)}")
         state_counts = payload.get("state_counts")
         if isinstance(state_counts, dict):
             for state, count in state_counts.items():
                 print(f"{state}={count}")
+        warnings = payload.get("warnings")
+        if warnings:
+            print("warnings=" + ",".join(str(warning) for warning in warnings))
     elif "answer" in payload and "conversation" in payload:
         answer = payload.get("answer", {})
         conversation = payload.get("conversation", {})

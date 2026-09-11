@@ -289,7 +289,9 @@ def spatial_join_points_to_polygons(
     cfg.ensure_dirs()
     points_source = _load_geojson(points_path)
     polygons_source = _load_geojson(polygons_path)
-    if require_matching_crs and points_source.crs != polygons_source.crs:
+    crs_match = points_source.crs == polygons_source.crs
+    crs_mismatch_allowed = not require_matching_crs and not crs_match
+    if require_matching_crs and not crs_match:
         raise GISProcessingError(
             "ERROR_GIS_CRS_MISMATCH",
             f"Point CRS {points_source.crs} does not match polygon CRS {polygons_source.crs}.",
@@ -402,12 +404,20 @@ def spatial_join_points_to_polygons(
         },
         "point_results": point_results,
         "invariants": {
-            "crs_match": points_source.crs == polygons_source.crs,
+            "crs_match": crs_match,
+            "crs_mismatch_allowed": crs_mismatch_allowed,
             "point_row_conservation": len(point_results) == len(_features(points_source)),
             "polygon_candidate_count": len(polygon_features),
             "max_matches_per_point": max_matches_per_point,
             "max_points_per_polygon": max_points_per_polygon,
         },
-        "warnings": ["GIS_JOIN_MULTIPLICATION_PRESENT"] if cardinality in {"1:N", "N:1", "N:N"} else [],
+        "warnings": [
+            warning
+            for warning in [
+                "GIS_CRS_MISMATCH_ALLOWED" if crs_mismatch_allowed else "",
+                "GIS_JOIN_MULTIPLICATION_PRESENT" if cardinality in {"1:N", "N:1", "N:N"} else "",
+            ]
+            if warning
+        ],
     }
     return _write_report(cfg, report)

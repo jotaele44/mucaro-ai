@@ -200,8 +200,28 @@ def test_cli_gis_inspect_and_point_in_polygon(tmp_path: Path, capsys):
     join_output = capsys.readouterr().out
     assert "GIS_SPATIAL_JOIN_OK" in join_output
     assert "join_cardinality=1:1" in join_output
+    assert "crs_match=True" in join_output
+    assert "point_row_conservation=True" in join_output
     assert "FULLY_WITHIN=1" in join_output
     assert "OUTSIDE=1" in join_output
+
+    mismatched_polygons_path = tmp_path / "polygons_3857.geojson"
+    mismatched_payload = json.loads(polygons_path.read_text(encoding="utf-8"))
+    mismatched_payload["crs"]["properties"]["name"] = "EPSG:3857"
+    mismatched_polygons_path.write_text(json.dumps(mismatched_payload, sort_keys=True), encoding="utf-8")
+
+    assert main(["gis", "point-in-polygon", str(points_path), str(mismatched_polygons_path), "--format", "text"], cfg=cfg) == 2
+    denied_output = capsys.readouterr().err
+    assert "ERROR_GIS_CRS_MISMATCH" in denied_output
+
+    assert main(
+        ["gis", "point-in-polygon", str(points_path), str(mismatched_polygons_path), "--allow-crs-mismatch", "--format", "text"],
+        cfg=cfg,
+    ) == 0
+    allowed_output = capsys.readouterr().out
+    assert "crs_match=False" in allowed_output
+    assert "crs_mismatch_allowed=True" in allowed_output
+    assert "warnings=GIS_CRS_MISMATCH_ALLOWED" in allowed_output
 
 
 def test_cli_models_list_reports_provider_registry(tmp_path: Path, capsys, monkeypatch):
