@@ -269,12 +269,17 @@ Observed success markers:
 - `mucaro audit product` now uses the expanded governed-release objective. The
   current scope reports `16 PASS`, `6 OPEN`, `0 BLOCKED`, and `72.7%`
   readiness: the existing local assistant capabilities and source-artifact
-  packaging pass. Governed web browsing has candidate `web.fetch` snapshot,
+  packaging pass, and the GUI requirement is explicitly part of the local
+  operator-surface goal. Advanced GIS now has a narrow local GeoJSON inspection
+  and point-in-polygon receipt candidate; full GIS maturity remains open until
+  robust topology, CRS reprojection, spatial format adapters, map/export
+  provenance, and a broader GIS eval corpus are proven. Governed web browsing
+  has candidate `web.fetch` snapshot,
   ledger, operator-supplied multi-page session receipts, robots/cache metadata,
   redirect-target robots evidence, HTML body/structure traces, PDF/non-text
   parser traces, immutable snapshot-only cache policy, explicit HTTP error-page
-  citation policy, and web citation fixture evidence, while advanced GIS
-  processing, state-of-the-art OCR analysis, automated search/discovery,
+  citation policy, and web citation fixture evidence, while state-of-the-art
+  OCR analysis, automated search/discovery,
   rendered-browser capture, autonomous link-following, coding/programming
   expertise, cross-capability transparency/objectivity governance, and hosted
   GitHub governance remain open. Tag binding is verified separately by the

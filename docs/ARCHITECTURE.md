@@ -15,6 +15,7 @@ User Request
   → Retrieval
   → Model Router
   → Tool Runtime
+  → Capability Adapters
   → Citation Validator
   → Answer Trace Export
 ```
@@ -102,6 +103,20 @@ evidence creation:
 
 Broader write/action tools should be added one at a time with explicit policy,
 operator UX, and regression tests for approval and audit behavior.
+
+## Capability layer
+
+Advanced capabilities are introduced as bounded adapters beneath the same
+permission, provenance, and audit model as the rest of the app. The first GIS
+candidate supports local GeoJSON FeatureCollection inspection and
+point-in-polygon classification with CRS preservation, source SHA-256 hashes,
+geometry state counts, join cardinality, per-feature spatial states, and JSON
+receipts under `data/exports/gis_reports`.
+
+This is not full advanced GIS certification. Robust topology operations,
+explicit CRS reprojection, Hausdorff/topological equality checks, spatial
+format adapters, map/export provenance, and a broader spatial eval corpus
+remain open product requirements.
 
 ## Packaging layer
 

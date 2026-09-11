@@ -50,6 +50,8 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro certify answer-trace-quality` | Write an exact-head cited-answer traceability release receipt | 0 | 2 |
 | `mucaro certify operator-workflow` | Write an exact-head local operator-workflow release receipt | 0 | 2 |
 | `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
+| `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry receipt | 0 | 2 |
+| `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources, persistent index status, and semantic-store status | 0 | 2 |
@@ -223,6 +225,14 @@ approved and audited.
 | `PRODUCT_AUDIT_BLOCKED` | product audit found a blocked requirement |
 | `ADVANCED_CAPABILITY_CONTRACTS_READY` | GIS, OCR, browsing, coding, and transparency/objectivity proof contracts are structurally complete |
 | `ADVANCED_CAPABILITY_CONTRACTS_FAILED` | one or more advanced capability contracts is missing required proof fields |
+| `GIS_INSPECT_OK` | GeoJSON inspection completed with no invalid or unsupported geometries |
+| `GIS_INSPECT_WARN` | GeoJSON inspection completed but invalid or unsupported geometries were recorded |
+| `GIS_SPATIAL_JOIN_OK` | Point-in-polygon classification completed and wrote a spatial receipt |
+| `ERROR_GIS_INPUT_NOT_FOUND` | GeoJSON input path does not exist |
+| `ERROR_GIS_INVALID_JSON` | GeoJSON input could not be parsed as JSON |
+| `ERROR_GIS_UNSUPPORTED_GEOJSON` | GIS command received a JSON object that is not a FeatureCollection |
+| `ERROR_GIS_FEATURES_NOT_ARRAY` | GeoJSON FeatureCollection has a malformed `features` member |
+| `ERROR_GIS_CRS_MISMATCH` | Point and polygon inputs declared different CRS values and mismatch override was not selected |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
@@ -258,6 +268,8 @@ mucaro certify status --include-github --format text
 mucaro audit product --format text
 mucaro eval retrieval --format text
 mucaro eval answer-trace --format text
+mucaro gis inspect data/input/example.geojson --format text
+mucaro gis point-in-polygon data/input/points.geojson data/input/polygons.geojson --format text
 mucaro certify retrieval-quality --format text
 mucaro certify answer-trace-quality --format text
 mucaro certify operator-workflow --format text

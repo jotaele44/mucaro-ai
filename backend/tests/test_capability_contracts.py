@@ -11,7 +11,7 @@ def test_capability_contracts_cover_expanded_scope_without_overclaiming():
     assert report["schema_version"] == CAPABILITY_CONTRACT_SCHEMA_VERSION
     assert report["contract_count"] == 5
     assert report["complete_contract_count"] == 5
-    assert report["implementation_states"] == {"ABSENT": 3, "CANDIDATE": 2}
+    assert report["implementation_states"] == {"ABSENT": 2, "CANDIDATE": 3}
 
     contracts = {contract["capability_id"]: contract for contract in report["contracts"]}
     assert set(contracts) == {
@@ -32,6 +32,7 @@ def test_capability_contracts_cover_expanded_scope_without_overclaiming():
         assert contract["unavailable_until"]
 
     assert "crs" in contracts["advanced_gis_processing"]["provenance_fields"]
+    assert contracts["advanced_gis_processing"]["implementation_status"] == "CANDIDATE"
     assert "ocr_engine" in contracts["state_of_art_ocr_analysis"]["provenance_fields"]
     assert contracts["governed_web_browsing"]["implementation_status"] == "CANDIDATE"
     assert "content_sha256" in contracts["governed_web_browsing"]["provenance_fields"]

@@ -55,9 +55,9 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
                 "notes": "Local cited retrieval with BM25, persistent TF-IDF, and semantic strategies.",
             },
             "advanced_gis_processing": {
-                "state": "ABSENT",
-                "contract": None,
-                "notes": "GIS processing, spatial provenance, CRS preservation, and geometry regression gates are planned but not implemented.",
+                "state": "CANDIDATE",
+                "contract": "mucaro-gis-processing/0.x",
+                "notes": "Local GeoJSON inspection and point-in-polygon receipts exist with CRS preservation and geometry state counts; robust topology, reprojection, map export, broader formats, and GIS eval corpus remain open.",
             },
             "state_of_art_ocr_analysis": {
                 "state": "ABSENT",

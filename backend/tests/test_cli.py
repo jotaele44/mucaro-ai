@@ -88,13 +88,13 @@ def test_cli_capabilities_contracts_reports_expanded_scope(tmp_path: Path, capsy
     assert payload["status"] == "ADVANCED_CAPABILITY_CONTRACTS_READY"
     assert payload["contract_count"] == 5
     assert payload["complete_contract_count"] == 5
-    assert payload["implementation_states"] == {"ABSENT": 3, "CANDIDATE": 2}
+    assert payload["implementation_states"] == {"ABSENT": 2, "CANDIDATE": 3}
 
     assert main(["capabilities", "contracts", "--format", "text"], cfg=cfg) == 0
     output = capsys.readouterr().out
     assert "contract_count=5" in output
-    assert "implementation_states=ABSENT:3,CANDIDATE:2" in output
-    assert "CONTRACT_DEFINED ABSENT advanced_gis_processing" in output
+    assert "implementation_states=ABSENT:2,CANDIDATE:3" in output
+    assert "CONTRACT_DEFINED CANDIDATE advanced_gis_processing" in output
     assert "CONTRACT_DEFINED ABSENT state_of_art_ocr_analysis" in output
     assert "CONTRACT_DEFINED CANDIDATE governed_web_browsing" in output
     assert "CONTRACT_DEFINED ABSENT coding_programming_expertise" in output
@@ -137,6 +137,71 @@ def test_cli_sources_ingest_web_snapshot(tmp_path: Path, capsys):
     output = capsys.readouterr().out
     assert "source_id=src_web_" in output
     assert "chunks_added=1" in output
+
+
+def test_cli_gis_inspect_and_point_in_polygon(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    points_path = tmp_path / "points.geojson"
+    polygons_path = tmp_path / "polygons.geojson"
+    points_path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+                "features": [
+                    {
+                        "type": "Feature",
+                        "id": "inside",
+                        "properties": {"name": "inside"},
+                        "geometry": {"type": "Point", "coordinates": [5, 5]},
+                    },
+                    {
+                        "type": "Feature",
+                        "id": "outside",
+                        "properties": {"name": "outside"},
+                        "geometry": {"type": "Point", "coordinates": [15, 5]},
+                    },
+                ],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    polygons_path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+                "features": [
+                    {
+                        "type": "Feature",
+                        "id": "square",
+                        "properties": {"name": "square"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                        },
+                    }
+                ],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["gis", "inspect", str(points_path), "--format", "text"], cfg=cfg) == 0
+    inspect_output = capsys.readouterr().out
+    assert "GIS_INSPECT_OK" in inspect_output
+    assert "feature_count=2" in inspect_output
+    assert "crs=EPSG:4326" in inspect_output
+    assert "report_sha256=" in inspect_output
+
+    assert main(["gis", "point-in-polygon", str(points_path), str(polygons_path), "--format", "text"], cfg=cfg) == 0
+    join_output = capsys.readouterr().out
+    assert "GIS_SPATIAL_JOIN_OK" in join_output
+    assert "join_cardinality=1:1" in join_output
+    assert "FULLY_WITHIN=1" in join_output
+    assert "OUTSIDE=1" in join_output
 
 
 def test_cli_models_list_reports_provider_registry(tmp_path: Path, capsys, monkeypatch):

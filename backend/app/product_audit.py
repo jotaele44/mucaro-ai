@@ -16,7 +16,8 @@ OBJECTIVE = (
     "production-quality packaging. Capabilities must include advanced GIS "
     "processing, state-of-the-art OCR analysis, powerful web browsing "
     "abilities, coding and programming expertise, all governed by maximum "
-    "transparency and objectivity."
+    "transparency and objectivity within a clean, simple, efficient, and "
+    "powerful GUI for prompt-and-response task execution."
 )
 
 
@@ -65,7 +66,7 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
         ProductRequirement(
             "local_desktop_app",
             "assistant_surface",
-            "Local app can launch without a hosted service.",
+            "Local app can launch without a hosted service and provide a clean prompt-and-response GUI.",
             _status_from_files(cfg, [("scripts", "launch_app.py"), ("frontend", "src", "App.jsx")]),
             "scripts/launch_app.py and frontend/src/App.jsx",
             "",
@@ -184,9 +185,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "capability_expansion",
             "Assistant supports advanced GIS processing with spatial provenance and repeatable geometry checks.",
             "OPEN",
-            "backend/app/capability_contracts.py defines GIS permission, provenance, invariant, and regression-gate requirements.",
-            "No implemented GIS processing engine, spatial CRS/geometry validation gate, map export path, or GIS eval corpus is present.",
-            "Define local GIS adapters, geometry invariants, CRS preservation rules, and receipt-backed spatial regression fixtures before implementation.",
+            "backend/app/gis_processing.py adds a local GeoJSON inspection and point-in-polygon receipt boundary; backend/app/capability_contracts.py defines GIS permission, provenance, invariant, and regression-gate requirements.",
+            "The implemented boundary is narrow: robust topology engine support, CRS reprojection, Hausdorff/topological equality checks, spatial format adapters, map/export provenance, and a broader GIS eval corpus remain open.",
+            "Promote the local GeoJSON receipts through capability gates, then add robust GIS adapters and eval fixtures without weakening CRS/source-lineage invariants.",
         ),
         ProductRequirement(
             "state_of_art_ocr_analysis",
@@ -372,9 +373,9 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
                 "coding_programming_expertise",
                 "transparency_objectivity_governance",
             ),
-            "The expanded capability objective is now visible in product audit and roadmap output.",
-            "GIS, OCR, browsing, coding-agent behavior, and cross-capability objectivity contracts remain open by design.",
-            "Implement capability contracts first, then add adapters and eval fixtures behind permissioned, receipt-backed gates.",
+            "The expanded capability objective is visible in product audit and roadmap output; GIS now has a narrow local GeoJSON receipt candidate.",
+            "Full GIS maturity, OCR, automated/rendered browsing, coding-agent behavior, and cross-capability objectivity enforcement remain open by design.",
+            "Advance each capability from candidate receipts to stronger adapters and eval fixtures behind permissioned, receipt-backed gates.",
         ),
         ProductRoadmapStage(
             "release_packaging_certification",

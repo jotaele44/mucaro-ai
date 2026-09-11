@@ -9,7 +9,9 @@ traceability, explicit memory controls, approved tool execution, repeatable
 fresh-clone certification, and a clear path toward production-quality
 packaging. Capabilities must include advanced GIS processing,
 state-of-the-art OCR analysis, powerful web browsing abilities, coding and
-programming expertise, all governed by maximum transparency and objectivity.
+programming expertise, all governed by maximum transparency and objectivity
+within a clean, simple, efficient, and powerful GUI for prompt-and-response task
+execution.
 
 The canonical source of truth is the `mucaro-ai` repository. The previous
 prototype lineage remains useful as historical evidence, but new development,
@@ -21,7 +23,8 @@ the canonical repo.
 Mucaro AI has crossed the prototype-promotion line. The local product surface
 now includes a real CLI, local-first retrieval, source-lineage ingestion,
 cited answers, explicit memory controls, an approval-gated tool runtime,
-release receipts, package artifacts, and fresh-clone certification.
+release receipts, package artifacts, fresh-clone certification, and a local GUI
+foundation.
 
 The finish line is no longer "make the repo exist." The finish line is to make
 the repo repeatedly prove its behavior from a clean clone through ingestion,
@@ -49,7 +52,7 @@ limits.
 | Web browsing | URL policy, retrieval UTC, byte snapshots, parser metadata, content hashes, citation binding, robots/cache posture, and failure-preserving fetch logs |
 | Coding expertise | Codebase read policy, patch proposal receipts, diff/test evidence, sandbox boundaries, review output, and no hidden workspace mutation |
 | Transparency/objectivity | FACT/INFERENCE/ASSUMPTION/UNKNOWN separation, limitations, contradiction handling, falsification criteria, and reproducible verification hooks |
-| Operator workflow | Isolated proof that permission grants, ingestion, retrieval, answer traces, memory controls, run history, and approved tools work together |
+| GUI/operator workflow | Clean prompt-and-response surface, efficient task execution, and isolated proof that permission grants, ingestion, retrieval, answer traces, memory controls, run history, and approved tools work together |
 | Fresh clone | Exact-ref clone, install, CLI help, release check, launcher self-test, and desktop smoke certification |
 | Packaging | Source artifact manifest, archive SHA-256, member hashes, Python wheel/sdist receipts, local distribution handoff manifest, and package status gate |
 | Hosted governance | Current-head hosted CI, startup probe, branch-protection visibility, tag binding, and clear external blocker classification |
@@ -96,7 +99,7 @@ byte-pinned proof layer for a particular commit. Verify them with
 | Hosted GitHub Actions | OPEN | Hosted `CI` and `CI Startup Probe` have failed before jobs on current release-candidate heads; inspect Actions settings, billing/minutes, runner availability, and repository/account policy |
 | Private branch protection | OPEN | GitHub API currently reports a plan gate for private-repo branch protection; prove protection after plan/visibility changes or keep the release scope local |
 | Larger real-corpus retrieval | OPEN | Add non-fixture corpus snapshots with frozen manifests, source counts, source-format coverage, and repeatable eval thresholds |
-| Advanced GIS processing | OPEN | Define GIS capability contract, local engine/runtime adapter, CRS/geometry invariants, and spatial eval fixtures |
+| Advanced GIS processing | OPEN | Local GeoJSON inspection and point-in-polygon receipt candidate exists; add robust topology adapter, CRS reprojection, map/export provenance, broader spatial formats, and spatial eval fixtures |
 | State-of-the-art OCR analysis | OPEN | Define OCR capability contract, local/optional model engine boundary, source-image trace schema, confidence thresholds, and OCR eval corpus |
 | Governed web browsing | OPEN | Candidate fetch/snapshot/citation path, operator-supplied multi-page session receipts, robots/cache metadata, redirect-target robots evidence, HTML body/structure traces, PDF/non-text parser traces, immutable snapshot-only cache policy, and explicit HTTP error-page citation policy exist; add automated search/discovery controls, rendered-browser capture policy, and gated autonomous link-following before certification |
 | Coding/programming expertise | OPEN | Define read/patch/test/review action boundary, sandbox policy, diff receipts, and code-quality eval fixtures |
@@ -120,13 +123,15 @@ byte-pinned proof layer for a particular commit. Verify them with
    have implemented contracts and receipt-backed gates.
 6. Use `mucaro capabilities contracts` to inspect the shared proof contracts
    that advanced capability adapters must satisfy before availability claims.
-7. Use support bundles to escalate hosted governance blockers without
+7. Keep the GUI as the clean operator workspace for prompt-and-response task
+   execution while preserving the CLI as the scriptable certification boundary.
+8. Use support bundles to escalate hosted governance blockers without
    weakening local certification boundaries.
-8. Treat all future execution adapters as subordinate to Skill Fabric identity,
+9. Treat all future execution adapters as subordinate to Skill Fabric identity,
    permission, audit, and certification boundaries.
-9. Preserve local-first default behavior and fail closed whenever live provider,
+10. Preserve local-first default behavior and fail closed whenever live provider,
    hosted runner, optional dependency, or index state is missing.
-10. Keep release claims scoped: local certification can pass while hosted
+11. Keep release claims scoped: local certification can pass while hosted
    governance remains open.
 
 ## Readiness Rule

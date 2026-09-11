@@ -57,7 +57,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
         CapabilityContract(
             capability_id="advanced_gis_processing",
             title="Advanced GIS processing",
-            implementation_status="ABSENT",
+            implementation_status="CANDIDATE",
             contract_status="CONTRACT_DEFINED",
             purpose="Run spatial operations without losing source identity, CRS, geometry semantics, or uncertainty.",
             permission_gates=(
@@ -99,9 +99,9 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "limitations and falsification criteria",
             ),
             unavailable_until=(
-                "GIS engine adapter exists",
-                "spatial fixtures pass",
-                "source-lineage receipts cover spatial outputs",
+                "broader GIS engine adapter supports robust topology operations",
+                "CRS reprojection is explicit and receipt-backed",
+                "map/export provenance and spatial eval corpus are complete",
             ),
         ),
         CapabilityContract(

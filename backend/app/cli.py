@@ -38,6 +38,7 @@ from .conversations import (
 )
 from .db import list_payloads
 from .execution_gate import analyze_task
+from .gis_processing import GISProcessingError, inspect_geojson, spatial_join_points_to_polygons
 from .ingestion import (
     delete_source,
     get_index_status,
@@ -415,6 +416,28 @@ def build_parser() -> argparse.ArgumentParser:
     sources_ingest_web_snapshot.add_argument("snapshot_path", help="Path to a mucaro web snapshot JSON file.")
     sources_ingest_web_snapshot.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     sources_ingest_web_snapshot.set_defaults(handler=run_sources_ingest_web_snapshot)
+
+    gis = subcommands.add_parser("gis", help="Run local GIS inspections and spatial joins with receipts.")
+    gis_subcommands = gis.add_subparsers(dest="gis_command", required=True)
+
+    gis_inspect = gis_subcommands.add_parser("inspect", help="Inspect a GeoJSON FeatureCollection and write a GIS receipt.")
+    gis_inspect.add_argument("geojson_path", help="Path to a GeoJSON FeatureCollection.")
+    gis_inspect.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_inspect.set_defaults(handler=run_gis_inspect)
+
+    gis_point_in_polygon = gis_subcommands.add_parser(
+        "point-in-polygon",
+        help="Join point GeoJSON features to polygon GeoJSON features and write a GIS receipt.",
+    )
+    gis_point_in_polygon.add_argument("points_path", help="Path to point GeoJSON FeatureCollection.")
+    gis_point_in_polygon.add_argument("polygons_path", help="Path to polygon GeoJSON FeatureCollection.")
+    gis_point_in_polygon.add_argument(
+        "--allow-crs-mismatch",
+        action="store_true",
+        help="Permit point/polygon CRS mismatch while preserving the mismatch in the receipt.",
+    )
+    gis_point_in_polygon.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_point_in_polygon.set_defaults(handler=run_gis_point_in_polygon)
 
     conversations = subcommands.add_parser("conversations", help="Manage persistent local chat sessions.")
     conversations_subcommands = conversations.add_subparsers(dest="conversations_command", required=True)
@@ -1630,6 +1653,23 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             if stage.get("gap"):
                 print(f"gap={stage.get('gap')}")
             print(f"next_step={stage.get('next_step')}")
+    elif status in {"GIS_INSPECT_OK", "GIS_INSPECT_WARN", "GIS_SPATIAL_JOIN_OK"}:
+        print(status)
+        print(f"operation={payload.get('operation')}")
+        print(f"report_id={payload.get('report_id')}")
+        print(f"report_path={payload.get('report_path')}")
+        print(f"report_sha256={payload.get('report_sha256')}")
+        source = payload.get("source")
+        if isinstance(source, dict):
+            print(f"feature_count={source.get('feature_count')}")
+            print(f"crs={source.get('crs')}")
+            print(f"crs_status={source.get('crs_status')}")
+        if payload.get("join_cardinality"):
+            print(f"join_cardinality={payload.get('join_cardinality')}")
+        state_counts = payload.get("state_counts")
+        if isinstance(state_counts, dict):
+            for state, count in state_counts.items():
+                print(f"{state}={count}")
     elif "answer" in payload and "conversation" in payload:
         answer = payload.get("answer", {})
         conversation = payload.get("conversation", {})
@@ -1840,6 +1880,40 @@ def run_sources_ingest_web_snapshot(args: argparse.Namespace, cfg: Settings) -> 
         result = ingest_web_snapshot(path, cfg)
     except FileNotFoundError as exc:
         emit_error("ERROR_WEB_SNAPSHOT_NOT_FOUND", str(exc), args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_gis_inspect(args: argparse.Namespace, cfg: Settings) -> int:
+    path = Path(args.geojson_path)
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        result = inspect_geojson(path, cfg=cfg)
+    except GISProcessingError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_gis_point_in_polygon(args: argparse.Namespace, cfg: Settings) -> int:
+    points_path = Path(args.points_path)
+    polygons_path = Path(args.polygons_path)
+    if not points_path.is_absolute():
+        points_path = cfg.project_root / points_path
+    if not polygons_path.is_absolute():
+        polygons_path = cfg.project_root / polygons_path
+    try:
+        result = spatial_join_points_to_polygons(
+            points_path,
+            polygons_path,
+            cfg=cfg,
+            require_matching_crs=not args.allow_crs_mismatch,
+        )
+    except GISProcessingError as exc:
+        emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
     return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
