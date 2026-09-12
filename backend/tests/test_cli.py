@@ -101,6 +101,52 @@ def test_cli_capabilities_contracts_reports_expanded_scope(tmp_path: Path, capsy
     assert "CONTRACT_DEFINED CANDIDATE transparency_objectivity_governance" in output
 
 
+def test_cli_capabilities_validate_gis_report_checks_saved_receipts(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    geojson = tmp_path / "measure.geojson"
+    geojson.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": "EPSG:3857"}},
+                "features": [
+                    {
+                        "type": "Feature",
+                        "id": "square",
+                        "properties": {"name": "square"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                        },
+                    }
+                ],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["gis", "measure", str(geojson), "--coordinate-units", "meters", "--format", "json"], cfg=cfg) == 0
+    measurement = json.loads(capsys.readouterr().out)
+
+    assert main(["capabilities", "validate-gis-report", measurement["report_path"], "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["capability_id"] == "advanced_gis_processing"
+    assert payload["operation"] == "measure_geojson"
+    assert payload["counts"]["fail"] == 0
+
+    report_payload = json.loads(Path(measurement["report_path"]).read_text(encoding="utf-8"))
+    report_payload["invariants"]["row_accounting_closed"] = False
+    weak_report = tmp_path / "weak-report.json"
+    weak_report.write_text(json.dumps(report_payload), encoding="utf-8")
+
+    assert main(["capabilities", "validate-gis-report", str(weak_report), "--format", "text"], cfg=cfg) == 2
+    output = capsys.readouterr().out
+    assert "CAPABILITY_OUTPUT_CONTRACT_FAILED" in output
+    assert "FAIL invariants.row_accounting_closed" in output
+
+
 def test_cli_ocr_analyze_reports_receipt_summary(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     image = tmp_path / "scan.png"

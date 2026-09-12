@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
 CAPABILITY_CONTRACT_SCHEMA_VERSION = "mucaro_advanced_capability_contracts_v1"
+CAPABILITY_OUTPUT_CONTRACT_OK = "CAPABILITY_OUTPUT_CONTRACT_OK"
+CAPABILITY_OUTPUT_CONTRACT_FAILED = "CAPABILITY_OUTPUT_CONTRACT_FAILED"
+GIS_REPORT_SCHEMA_VERSION = "mucaro_gis_report_v1"
 
 
 @dataclass(frozen=True)
@@ -50,6 +55,156 @@ def _contract_row_complete(contract: dict[str, Any]) -> bool:
         "unavailable_until",
     )
     return all(contract.get(field) for field in required_sequence_fields)
+
+
+def _contract_check(name: str, passed: bool, detail: str) -> dict[str, str]:
+    return {"name": name, "status": "PASS" if passed else "FAIL", "detail": detail}
+
+
+def _dotted(payload: Any, dotted_path: str) -> Any:
+    current = payload
+    for part in dotted_path.split("."):
+        if isinstance(current, dict):
+            current = current.get(part)
+            continue
+        return None
+    return current
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _validate_source_identity(payload: dict[str, Any]) -> list[dict[str, str]]:
+    checks: list[dict[str, str]] = []
+    source = payload.get("source")
+    input_source = payload.get("input")
+    inputs = payload.get("inputs")
+    checks.append(
+        _contract_check(
+            "source_or_inputs_present",
+            isinstance(source, dict) or isinstance(input_source, dict) or isinstance(inputs, dict),
+            "report must identify source or input provenance",
+        )
+    )
+    source_objects: list[tuple[str, dict[str, Any]]] = []
+    if isinstance(source, dict):
+        source_objects.append(("source", source))
+    if isinstance(input_source, dict):
+        source_objects.append(("input", input_source))
+    if isinstance(inputs, dict):
+        for name, value in inputs.items():
+            if isinstance(value, dict):
+                source_objects.append((f"inputs.{name}", value))
+    for name, value in source_objects:
+        checks.append(_contract_check(f"{name}.sha256_present", bool(value.get("sha256")), "source/input must record a SHA-256"))
+        if "crs" in value:
+            checks.append(_contract_check(f"{name}.crs_present", bool(value.get("crs")), "spatial source/input CRS must be recorded"))
+        if "feature_count" in value:
+            checks.append(_contract_check(f"{name}.feature_count_non_negative", isinstance(value.get("feature_count"), int) and value["feature_count"] >= 0, "feature count must be a non-negative integer"))
+    return checks
+
+
+def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
+    checks: list[dict[str, str]] = [
+        _contract_check("payload_object", isinstance(report, dict), "report payload must be a JSON object"),
+        _contract_check("schema_version", report.get("schema_version") == GIS_REPORT_SCHEMA_VERSION, f"schema_version must be {GIS_REPORT_SCHEMA_VERSION}"),
+        _contract_check("report_id_present", bool(report.get("report_id")), "report_id is required"),
+        _contract_check("status_present", isinstance(report.get("status"), str) and str(report.get("status")).startswith("GIS_"), "status must be a GIS status string"),
+        _contract_check("operation_present", bool(report.get("operation")), "operation is required"),
+        _contract_check("created_at_present", bool(report.get("created_at")), "created_at is required"),
+        _contract_check("warnings_array", isinstance(report.get("warnings"), list), "warnings must be an array"),
+        _contract_check("invariants_object", isinstance(report.get("invariants"), dict), "invariants must be an object"),
+        _contract_check("limitations_non_empty", isinstance(report.get("limitations"), list) and all(isinstance(item, str) and item for item in report.get("limitations", [])) and bool(report.get("limitations")), "limitations must be non-empty strings"),
+        _contract_check("falsification_criteria_non_empty", isinstance(report.get("falsification_criteria"), list) and all(isinstance(item, str) and item for item in report.get("falsification_criteria", [])) and bool(report.get("falsification_criteria")), "falsification criteria must be non-empty strings"),
+    ]
+    checks.extend(_validate_source_identity(report))
+
+    status = str(report.get("status") or "")
+    warnings = report.get("warnings")
+    if status.endswith("_WARN"):
+        checks.append(_contract_check("warn_status_has_warnings", isinstance(warnings, list) and bool(warnings), "WARN status must include warning labels"))
+    if isinstance(warnings, list):
+        checks.append(_contract_check("warning_labels_non_empty", all(isinstance(warning, str) and warning for warning in warnings), "warning labels must be non-empty strings"))
+
+    invariants = report.get("invariants", {})
+    if isinstance(invariants, dict):
+        for key in (
+            "row_accounting_closed",
+            "point_row_conservation",
+            "feature_key_conservation",
+            "feature_row_conservation",
+            "coordinate_count_conservation",
+            "crs_preserved",
+        ):
+            if key in invariants:
+                checks.append(_contract_check(f"invariants.{key}", invariants.get(key) is True, f"{key} must be true when asserted"))
+
+    operation = str(report.get("operation") or "")
+    if operation == "measure_geojson":
+        checks.extend(
+            [
+                _contract_check("measure.parameters.adapter", _dotted(report, "parameters.adapter") == "local_planar_shoelace_v1", "measure reports must name the local planar adapter"),
+                _contract_check("measure.parameters.coordinate_units", bool(_dotted(report, "parameters.coordinate_units")), "measure reports must record coordinate units"),
+                _contract_check("measure.measurements_array", isinstance(report.get("measurements"), list), "measure reports must include per-feature measurements"),
+                _contract_check("measure.total_area_numeric", _is_number(_dotted(report, "invariants.total_area")), "total_area must be numeric"),
+                _contract_check("measure.total_length_numeric", _is_number(_dotted(report, "invariants.total_length")), "total_length must be numeric"),
+                _contract_check("measure.measured_count_present", isinstance(_dotted(report, "invariants.measured_feature_count"), int), "measured_feature_count must be recorded"),
+            ]
+        )
+    elif operation == "filter_geojson_by_bbox":
+        checks.extend(
+            [
+                _contract_check("bbox.parameters.bbox", isinstance(_dotted(report, "parameters.bbox"), list) and len(_dotted(report, "parameters.bbox")) == 4, "bbox reports must record four query bbox values"),
+                _contract_check("bbox.output_hash", bool(_dotted(report, "output.sha256")), "bbox reports must record derived output hash"),
+                _contract_check("bbox.retained_count_present", isinstance(_dotted(report, "invariants.retained_feature_count"), int), "retained_feature_count must be recorded"),
+            ]
+        )
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": CAPABILITY_OUTPUT_CONTRACT_OK if not failed else CAPABILITY_OUTPUT_CONTRACT_FAILED,
+        "schema_version": "mucaro_capability_output_contract_v1",
+        "capability_id": "advanced_gis_processing",
+        "report_path": report_path,
+        "report_status": report.get("status"),
+        "operation": report.get("operation"),
+        "checks": checks,
+        "counts": {
+            "pass": sum(1 for check in checks if check["status"] == "PASS"),
+            "fail": len(failed),
+            "total": len(checks),
+        },
+        "failed_checks": failed,
+    }
+
+
+def validate_gis_report_file(path: Path) -> dict[str, Any]:
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "advanced_gis_processing",
+            "report_path": str(path),
+            "checks": [_contract_check("report_file_exists", False, f"report not found: {path}")],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [_contract_check("report_file_exists", False, f"report not found: {path}")],
+        }
+    except json.JSONDecodeError as exc:
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "advanced_gis_processing",
+            "report_path": str(path),
+            "checks": [_contract_check("report_json_valid", False, str(exc))],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [_contract_check("report_json_valid", False, str(exc))],
+        }
+    if not isinstance(report, dict):
+        report = {}
+    return validate_gis_report_contract(report, report_path=str(path))
 
 
 def list_advanced_capability_contracts() -> list[dict[str, Any]]:
@@ -113,6 +268,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "CSV point fixture records header, source rows, output features, skipped rows, CRS, and output hash",
                 "bbox filter fixture records query bbox, filter mode, retained features, excluded features, NULL/EMPTY residue, CRS, and output hash",
                 "planar measurement fixture records polygon area with holes, line length, null residue, units, and aggregate totals",
+                "GIS report contract validator accepts real saved measurement receipts and rejects weak provenance or false accounting",
                 "GIS eval manifest runs positive and negative fixtures through the supported CLI boundary",
                 "map export fixture preserves source and derived layer hashes",
             ),
@@ -122,6 +278,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "CSV point conversion fails closed on missing required headers, duplicate headers, malformed coordinates, and no valid output features",
                 "bbox filtering fails closed on malformed query extents and unsupported modes",
                 "planar measurement fails closed on missing units and records invalid or unsupported geometries as residue",
+                "GIS report contract validation fails when warning status, source hashes, CRS, or asserted accounting are missing or inconsistent",
                 "ambiguous nearest-neighbor match remains UNRESOLVED",
                 "M:N spatial join requires explicit multiplication counts",
                 "feature comparison with unmatched keys records left-only and right-only residue",

@@ -16,7 +16,7 @@ from typing import Any, Sequence
 from urllib.parse import urlparse
 
 from .config import Settings, settings
-from .capability_contracts import build_capability_contract_report
+from .capability_contracts import build_capability_contract_report, validate_gis_report_file
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -675,6 +675,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     capability_contracts.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     capability_contracts.set_defaults(handler=run_capability_contracts)
+
+    capability_validate_gis = capabilities_subcommands.add_parser(
+        "validate-gis-report",
+        help="Validate a GIS receipt against the advanced capability output contract.",
+    )
+    capability_validate_gis.add_argument("report_path", type=Path, help="Path to a saved GIS report JSON file.")
+    capability_validate_gis.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_gis.set_defaults(handler=run_capability_validate_gis_report)
 
     memory = subcommands.add_parser("memory", help="Manage explicit local assistant memory.")
     memory_subcommands = memory.add_subparsers(dest="memory_command", required=True)
@@ -1462,6 +1470,21 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                     f"{contract.get('capability_id')}"
                 )
         print(f"next_step={payload.get('next_step')}")
+    elif status in {"CAPABILITY_OUTPUT_CONTRACT_OK", "CAPABILITY_OUTPUT_CONTRACT_FAILED"}:
+        print(f"schema_version={payload.get('schema_version')}")
+        print(f"capability_id={payload.get('capability_id')}")
+        print(f"report_path={payload.get('report_path')}")
+        print(f"report_status={payload.get('report_status')}")
+        print(f"operation={payload.get('operation')}")
+        counts = payload.get("counts", {})
+        if isinstance(counts, dict):
+            print(f"pass={counts.get('pass')}")
+            print(f"fail={counts.get('fail')}")
+            print(f"total={counts.get('total')}")
+        for check in payload.get("checks", []):
+            if isinstance(check, dict):
+                detail = str(check.get("detail")).replace("\n", "\\n")
+                print(f"{check.get('status')} {check.get('name')} {detail}")
     elif status in {"PACKAGE_ARTIFACT_READY", "PACKAGE_ARTIFACT_BLOCKED", "PACKAGE_ARTIFACT_VERIFIED", "PACKAGE_ARTIFACT_VERIFY_FAILED"}:
         print(f"project_root={payload.get('project_root')}")
         if payload.get("output_dir"):
@@ -6847,6 +6870,15 @@ def run_capability_contracts(args: argparse.Namespace, cfg: Settings) -> int:
     report = build_capability_contract_report()
     emit_payload(report, args.format)
     return 0 if report.get("status") == "ADVANCED_CAPABILITY_CONTRACTS_READY" else 2
+
+
+def run_capability_validate_gis_report(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_gis_report_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
 
 
 def run_memory_list(args: argparse.Namespace, cfg: Settings) -> int:

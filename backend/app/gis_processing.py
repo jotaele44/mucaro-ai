@@ -420,6 +420,16 @@ def convert_csv_points_to_geojson(
             "coordinate_dimension": "XY",
         },
         "warnings": warnings,
+        "limitations": [
+            "CSV point conversion preserves raw row properties but only creates XY Point geometries",
+            "coordinate validation checks numeric longitude and latitude ranges, not geocoding accuracy",
+            "source schema interpretation is limited to the provided longitude and latitude column names",
+        ],
+        "falsification_criteria": [
+            "reject the conversion if source_row_count does not equal output_feature_count plus skipped_row_count",
+            "reject EPSG:4326 output if any retained longitude or latitude is outside the valid coordinate range",
+            "recompute source and output SHA-256 values before using the derived GeoJSON as current evidence",
+        ],
     }
     return _write_report(cfg, report)
 
@@ -560,6 +570,11 @@ def filter_geojson_by_bbox(
             "bounding-box filtering uses feature coordinate extents, not robust polygon clipping",
             "intersects mode is inclusive at bbox edges",
             "within mode requires the feature bbox to be fully inside the query bbox",
+        ],
+        "falsification_criteria": [
+            "reject the filter result if input_feature_count does not equal retained plus excluded feature counts",
+            "reject the output if any retained feature lacks a RETAINED_* filter state in the receipt",
+            "recompute source and output SHA-256 values before using the filtered GeoJSON as current evidence",
         ],
     }
     return _write_report(cfg, report)
@@ -816,6 +831,11 @@ def measure_geojson(
             "polygon area uses the shoelace formula and subtracts interior ring area",
             "this command does not perform robust overlay, clipping, datum transformation, or topology repair",
         ],
+        "falsification_criteria": [
+            "reject the measurement if row_accounting_closed is false",
+            "reject area or length claims if the source CRS units label is wrong or unknown for the claim",
+            "compare material area or length values against an independent GIS engine before geodesic or legal-boundary use",
+        ],
     }
     return _write_report(cfg, report)
 
@@ -869,6 +889,14 @@ def inspect_geojson(path: Path, *, cfg: Settings = settings) -> dict[str, Any]:
         },
         "features": inspected,
         "warnings": [] if invalid_count == 0 else ["GIS_GEOMETRY_WARNINGS_PRESENT"],
+        "limitations": [
+            "inspection classifies local GeoJSON structure and coordinate dimensionality only",
+            "geometry validity checks are syntactic and do not replace a robust topology engine",
+        ],
+        "falsification_criteria": [
+            "reject the inspection if feature_count does not equal the number of inspected feature receipts",
+            "reject geometry status conclusions that cannot be reproduced from the saved source SHA-256",
+        ],
     }
     return _write_report(cfg, report)
 
@@ -1066,6 +1094,11 @@ def reproject_geojson(
             "local reprojection currently supports EPSG:4326 and EPSG:3857 only",
             "datum transformations, grid shifts, axis-order variants, vertical CRS, and time-dependent CRS are not implemented",
             "coordinates outside the Web Mercator supported extent fail closed",
+        ],
+        "falsification_criteria": [
+            "reject the reprojection if feature_row_conservation or coordinate_count_conservation is false",
+            "reject unsupported CRS pairs unless a new adapter and fixture update explicitly certify them",
+            "compare sampled transformed coordinates against an independent CRS engine before broad GIS claims",
         ],
     }
     return _write_report(cfg, report)
@@ -1285,6 +1318,11 @@ def compare_geojson_geometries(
             "topological equality is limited to Point, Polygon, and MultiPolygon coordinates",
             "Hausdorff distance and symmetric difference are vertex-based receipt checks, not robust planar overlay results",
         ],
+        "falsification_criteria": [
+            "reject the comparison if feature_key_conservation is false or unmatched residue is not reported",
+            "reject topology conclusions when topology_state is UNRESOLVED inside the claimed scope",
+            "compare area or overlay differences with a robust GIS engine before treating vertex metrics as planar overlay proof",
+        ],
     }
     return _write_report(cfg, report)
 
@@ -1492,6 +1530,16 @@ def spatial_join_points_to_polygons(
                 "GIS_JOIN_MULTIPLICATION_PRESENT" if cardinality in {"1:N", "N:1", "N:N"} else "",
             ]
             if warning
+        ],
+        "limitations": [
+            "point-in-polygon uses local ray casting against GeoJSON polygon coordinates",
+            "CRS mismatch is rejected by default; explicit mismatch override records but does not repair CRS disagreement",
+            "spatial joins classify point relations only and do not perform polygon overlay or distance operations",
+        ],
+        "falsification_criteria": [
+            "reject the join if point_row_conservation is false",
+            "treat CRS_MISMATCH_ALLOWED results as provisional until both layers are reprojected into a common CRS",
+            "review any 1:N, N:1, or N:N cardinality before using joined rows as identity proof",
         ],
     }
     return _write_report(cfg, report)

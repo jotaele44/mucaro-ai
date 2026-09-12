@@ -223,9 +223,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "capability_expansion",
             "All advanced capabilities preserve maximum transparency and objectivity through evidence, uncertainty, and contradiction handling.",
             "OPEN",
-            "backend/app/capability_contracts.py defines a cross-capability evidence taxonomy, uncertainty, contradiction, and falsification contract.",
-            "GIS, OCR, and browsing have candidate receipt-backed outputs, but the shared transparency/objectivity contract is not yet enforced across every advanced capability output; coding outputs remain absent.",
-            "Apply the cross-capability evidence contract to every advanced capability output and add fixtures that reject unsupported certainty.",
+            "backend/app/capability_contracts.py defines a cross-capability evidence taxonomy, uncertainty, contradiction, and falsification contract, and now includes an executable GIS report validator for saved advanced GIS receipts.",
+            "GIS has an initial executable report validator, but OCR, browsing, retrieval, and coding outputs are not yet covered by shared transparency/objectivity validators; coding outputs remain absent.",
+            "Expand executable capability-output validation from GIS reports to OCR, browsing, retrieval, and coding outputs, then add fixtures that reject unsupported certainty.",
         ),
         ProductRequirement(
             "multimodal_interface",
@@ -385,8 +385,8 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
                 "transparency_objectivity_governance",
             ),
             "The expanded capability objective is visible in product audit and roadmap output; GIS has narrow local GeoJSON inspection, spatial join, comparison, limited reprojection, CSV point conversion, bbox filtering, and planar measurement receipt candidates, and OCR has a narrow local image receipt candidate.",
-            "Full GIS maturity, full document-intelligence OCR, automated/rendered browsing, coding-agent behavior, and cross-capability objectivity enforcement remain open by design.",
-            "Advance each capability from candidate receipts to stronger adapters and eval fixtures behind permissioned, receipt-backed gates.",
+            "Full GIS maturity, full document-intelligence OCR, automated/rendered browsing, coding-agent behavior, and cross-capability objectivity enforcement beyond the initial GIS validator remain open by design.",
+            "Advance each capability from candidate receipts to stronger adapters, executable output validators, and eval fixtures behind permissioned, receipt-backed gates.",
         ),
         ProductRoadmapStage(
             "release_packaging_certification",

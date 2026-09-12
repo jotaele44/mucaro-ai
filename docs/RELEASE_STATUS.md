@@ -283,10 +283,14 @@ Observed success markers:
   retained/excluded accounting, measurement units, polygon-hole area
   subtraction, line length, null measurement residue, fail-closed invalid bbox
   extents, fail-closed empty measurement units, and fail-closed invalid
-  coordinates; full GIS maturity remains open until robust topology, geodesic
-  measurement, broader CRS/datum/grid-shift/axis-order support, planar overlay
-  checks, geometry clipping, broader spatial format adapters, raster/vector
-  processing, map/export provenance, and a broader GIS eval corpus are proven.
+  coordinates. `mucaro capabilities validate-gis-report` is the first
+  executable capability-output validator: it checks saved GIS report schema,
+  source/input hashes, CRS where present, warning consistency, asserted
+  conservation invariants, bbox fields, and planar measurement fields. Full GIS
+  maturity remains open until robust topology, geodesic measurement, broader
+  CRS/datum/grid-shift/axis-order support, planar overlay checks, geometry
+  clipping, broader spatial format adapters, raster/vector processing,
+  map/export provenance, and a broader GIS eval corpus are proven.
   State-of-the-art OCR
   remains open, but a narrow local image OCR receipt candidate now preserves
   source-image hashes, Tesseract engine identity, raw/normalized/canonical text,
@@ -300,9 +304,9 @@ Observed success markers:
   parser traces, immutable snapshot-only cache policy, explicit HTTP error-page
   citation policy, and web citation fixture evidence, while automated search/discovery,
   rendered-browser capture, autonomous link-following, coding/programming
-  expertise, cross-capability transparency/objectivity governance, and hosted
-  GitHub governance remain open. Tag binding is verified separately by the
-  release-state and GitHub
+  expertise, cross-capability transparency/objectivity governance beyond the
+  initial GIS output validator, and hosted GitHub governance remain open. Tag
+  binding is verified separately by the release-state and GitHub
   governance commands.
 - `mucaro audit roadmap` groups the same product-audit rows into development
   stages without changing the denominator. It reports the canonical operator
