@@ -185,9 +185,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "capability_expansion",
             "Assistant supports advanced GIS processing with spatial provenance and repeatable geometry checks.",
             "OPEN",
-            "backend/app/gis_processing.py adds local GeoJSON inspection, point-in-polygon, geometry comparison, and limited EPSG:4326/EPSG:3857 reprojection receipts with CRS, dimensionality, row/coordinate conservation, cardinality, topological equality, vertex Hausdorff distance, vertex symmetric-difference, adapter, and output-hash evidence.",
-            "The implemented boundary is narrow: robust topology engine support, broader CRS/datum/grid-shift/axis-order handling, planar overlay/symmetric-difference area, spatial format adapters, map/export provenance, raster/vector processing, and a broader GIS eval corpus remain open.",
-            "Promote the local GeoJSON receipts through capability gates, then add robust GIS adapters and eval fixtures without weakening CRS/source-lineage invariants.",
+            "backend/app/gis_processing.py adds local GeoJSON inspection, point-in-polygon, geometry comparison, and limited EPSG:4326/EPSG:3857 reprojection receipts with CRS, dimensionality, row/coordinate conservation, cardinality, topological equality, vertex Hausdorff distance, vertex symmetric-difference, adapter, and output-hash evidence; backend/app/gis_eval.py and mucaro eval gis add a committed positive/negative fixture harness.",
+            "The implemented boundary is narrow: robust topology engine support, broader CRS/datum/grid-shift/axis-order handling, planar overlay/symmetric-difference area, spatial format adapters, map/export provenance, raster/vector processing, and a broader real spatial eval corpus remain open.",
+            "Promote the local GeoJSON receipts through capability gates, then add robust GIS adapters and larger eval fixtures without weakening CRS/source-lineage invariants.",
         ),
         ProductRequirement(
             "state_of_art_ocr_analysis",

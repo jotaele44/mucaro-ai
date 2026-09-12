@@ -46,6 +46,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro audit roadmap` | Group product-audit rows into development stages | 0 | 2 with `--strict` while stages remain open |
 | `mucaro eval retrieval` | Evaluate local retrieval quality against fixture suites | 0 | 2 |
 | `mucaro eval answer-trace` | Evaluate cited-answer trace records against positive and negative fixtures | 0 | 2 |
+| `mucaro eval gis` | Evaluate local GIS receipt behavior against positive and negative spatial fixtures | 0 | 2 |
 | `mucaro certify retrieval-quality` | Write an exact-head retrieval-quality release receipt | 0 | 2 |
 | `mucaro certify answer-trace-quality` | Write an exact-head cited-answer traceability release receipt | 0 | 2 |
 | `mucaro certify operator-workflow` | Write an exact-head local operator-workflow release receipt | 0 | 2 |
@@ -244,6 +245,8 @@ approved and audited.
 | `GIS_GEOMETRY_COMPARE_WARN` | GeoJSON geometry comparison completed and recorded CRS, topology, dimensionality, or unmatched-key warnings |
 | `GIS_REPROJECT_OK` | GeoJSON reprojection completed with supported CRS, output hash, and row/coordinate conservation |
 | `GIS_REPROJECT_WARN` | GeoJSON reprojection completed while preserving no-op or null/empty geometry warnings |
+| `GIS_EVAL_OK` | GIS fixture manifest validation and every configured spatial case passed |
+| `GIS_EVAL_FAILED` | GIS fixture validation failed or one or more spatial cases regressed |
 | `OCR_ANALYSIS_OK` | Local image OCR completed with at least one extracted text span and wrote an OCR receipt |
 | `OCR_ANALYSIS_NO_TEXT` | Local image OCR completed without extracting text; no text was synthesized |
 | `ERROR_GIS_INPUT_NOT_FOUND` | GeoJSON input path does not exist |
@@ -298,6 +301,7 @@ mucaro certify status --include-github --format text
 mucaro audit product --format text
 mucaro eval retrieval --format text
 mucaro eval answer-trace --format text
+mucaro eval gis --format text
 mucaro gis inspect data/input/example.geojson --format text
 mucaro gis point-in-polygon data/input/points.geojson data/input/polygons.geojson --format text
 mucaro certify retrieval-quality --format text
@@ -577,6 +581,17 @@ mixed-format coverage itself is part of the release claim. It returns
 `RETRIEVAL_EVAL_INVALID` for malformed benchmark fixtures and
 `RETRIEVAL_EVAL_FAILED` when configured thresholds are not met, so release
 automation can fail on invalid or regressed retrieval evidence.
+
+Use `mucaro eval gis` to run the committed GIS fixture manifest from the
+supported CLI surface. The command validates the manifest shape, required case
+count, operation diversity, negative-case coverage, and then materializes
+temporary GeoJSON inputs to exercise the same public GIS functions used by
+operators. Current cases cover coordinate dimensionality, point-in-polygon
+holes and join multiplication, geometry comparison with rotated polygon rings,
+limited EPSG:4326 to EPSG:3857 reprojection, and fail-closed invalid Web
+Mercator latitude handling. It returns `GIS_EVAL_OK` only when the fixture and
+every case pass; `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives
+automation a hard regression signal.
 
 Use `mucaro certify retrieval-quality` when the release needs exact-head
 retrieval evidence instead of an ad hoc score. The certification profile runs

@@ -45,6 +45,7 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
+from .gis_eval import DEFAULT_GIS_EVAL_FIXTURE, GIS_EVAL_OK, build_gis_eval_report, format_gis_eval_text
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
 from .ingestion import (
     delete_source,
@@ -310,6 +311,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     eval_answer_trace.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     eval_answer_trace.set_defaults(handler=run_eval_answer_trace)
+
+    eval_gis = eval_subcommands.add_parser(
+        "gis",
+        help="Evaluate local GIS receipts against a fixture manifest.",
+    )
+    eval_gis.add_argument("--fixture", type=Path, default=DEFAULT_GIS_EVAL_FIXTURE, help="GIS evaluation fixture path.")
+    eval_gis.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    eval_gis.set_defaults(handler=run_eval_gis)
 
     certify = subcommands.add_parser("certify", help="Inspect release certification readiness.")
     certify_subcommands = certify.add_subparsers(dest="certify_command", required=True)
@@ -1339,6 +1348,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(line)
     elif status in {"ANSWER_TRACE_EVAL_OK", "ANSWER_TRACE_EVAL_FAILED"}:
         for line in format_answer_trace_eval_text(payload)[:-1]:
+            print(line)
+    elif status in {"GIS_EVAL_OK", "GIS_EVAL_FAILED"}:
+        for line in format_gis_eval_text(payload)[:-1]:
             print(line)
     elif status in {"ANSWER_TRACE_QUALITY_CERT_OK", "ANSWER_TRACE_QUALITY_CERT_FAILED"}:
         for line in format_answer_trace_quality_certification_text(payload)[:-1]:
@@ -6389,6 +6401,13 @@ def run_eval_answer_trace(args: argparse.Namespace, cfg: Settings) -> int:
     )
     emit_payload(report, args.format)
     return 0 if report["status"] == ANSWER_TRACE_EVAL_OK else 2
+
+
+def run_eval_gis(args: argparse.Namespace, cfg: Settings) -> int:
+    del cfg
+    report = build_gis_eval_report(fixture_path=args.fixture)
+    emit_payload(report, args.format)
+    return 0 if report["status"] == GIS_EVAL_OK else 2
 
 
 def run_certify_answer_trace_quality(args: argparse.Namespace, cfg: Settings) -> int:

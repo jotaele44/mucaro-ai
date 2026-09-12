@@ -1068,6 +1068,26 @@ def test_cli_eval_answer_trace_requires_negative_cases(tmp_path: Path, capsys):
     assert payload["failures"][0]["case_id"] == "fixture"
 
 
+def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "GIS_EVAL_OK"
+    assert payload["counts"]["cases"] == 5
+    assert payload["counts"]["passed"] == 5
+    assert payload["counts"]["failed"] == 0
+    assert payload["counts"]["operations"] == 4
+    assert payload["counts"]["negative_cases"] == 1
+
+    assert main(["eval", "gis", "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "GIS_EVAL_OK" in text_output
+    assert "operation_count=4" in text_output
+    assert "PASS inspect inspect_dimensionality" in text_output
+    assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
+
+
 def test_cli_certify_answer_trace_quality_writes_exact_head_receipt(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 

@@ -1,0 +1,535 @@
+{
+  "schema_version": "mucaro_gis_eval_fixture_v1",
+  "minimums": {
+    "case_count": 5,
+    "operation_count": 4,
+    "negative_case_count": 1
+  },
+  "cases": [
+    {
+      "case_id": "inspect_dimensionality",
+      "operation": "inspect",
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "xy",
+              "properties": {
+                "name": "xy"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  1,
+                  2
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "xyz",
+              "properties": {
+                "name": "xyz"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  1,
+                  2,
+                  3
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "xyzm",
+              "properties": {
+                "name": "xyzm"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  1,
+                  2,
+                  3,
+                  4
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_INSPECT_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "feature_count": 3,
+        "coordinate_dimension_counts": {
+          "XY": 1,
+          "XYZ": 1,
+          "XYZM": 1
+        },
+        "features_with_z": 2,
+        "features_with_m": 1
+      },
+      "expected_fields": {
+        "source.crs": "EPSG:4326",
+        "geometry_counts.Point": 3
+      }
+    },
+    {
+      "case_id": "point_in_polygon_overlap",
+      "operation": "point_in_polygon",
+      "inputs": {
+        "points": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "in_hole",
+              "properties": {
+                "name": "in_hole"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  5,
+                  5
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "overlap",
+              "properties": {
+                "name": "overlap"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  10,
+                  5
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "donut_only",
+              "properties": {
+                "name": "donut_only"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  2,
+                  2
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "multipolygon",
+              "properties": {
+                "name": "multipolygon"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  32,
+                  32
+                ]
+              }
+            }
+          ]
+        },
+        "polygons": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "donut",
+              "properties": {
+                "name": "donut"
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      12,
+                      0
+                    ],
+                    [
+                      12,
+                      12
+                    ],
+                    [
+                      0,
+                      12
+                    ],
+                    [
+                      0,
+                      0
+                    ]
+                  ],
+                  [
+                    [
+                      4,
+                      4
+                    ],
+                    [
+                      8,
+                      4
+                    ],
+                    [
+                      8,
+                      8
+                    ],
+                    [
+                      4,
+                      8
+                    ],
+                    [
+                      4,
+                      4
+                    ]
+                  ]
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "overlap_poly",
+              "properties": {
+                "name": "overlap_poly"
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      6,
+                      0
+                    ],
+                    [
+                      14,
+                      0
+                    ],
+                    [
+                      14,
+                      10
+                    ],
+                    [
+                      6,
+                      10
+                    ],
+                    [
+                      6,
+                      0
+                    ]
+                  ]
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "islands",
+              "properties": {
+                "name": "islands"
+              },
+              "geometry": {
+                "type": "MultiPolygon",
+                "coordinates": [
+                  [
+                    [
+                      [
+                        20,
+                        20
+                      ],
+                      [
+                        25,
+                        20
+                      ],
+                      [
+                        25,
+                        25
+                      ],
+                      [
+                        20,
+                        25
+                      ],
+                      [
+                        20,
+                        20
+                      ]
+                    ]
+                  ],
+                  [
+                    [
+                      [
+                        30,
+                        30
+                      ],
+                      [
+                        35,
+                        30
+                      ],
+                      [
+                        35,
+                        35
+                      ],
+                      [
+                        30,
+                        35
+                      ],
+                      [
+                        30,
+                        30
+                      ]
+                    ]
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_SPATIAL_JOIN_OK",
+      "expected_warnings": [
+        "GIS_JOIN_MULTIPLICATION_PRESENT"
+      ],
+      "expected_invariants": {
+        "point_row_conservation": true,
+        "max_matches_per_point": 2
+      },
+      "expected_fields": {
+        "join_cardinality": "N:N",
+        "state_counts.FULLY_WITHIN": 3,
+        "state_counts.OUTSIDE": 1,
+        "point_results.1.match_count": 2
+      }
+    },
+    {
+      "case_id": "compare_rotated_polygon",
+      "operation": "compare",
+      "parameters": {
+        "match_on": "id"
+      },
+      "inputs": {
+        "left": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "square",
+              "properties": {
+                "name": "square"
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      10,
+                      0
+                    ],
+                    [
+                      10,
+                      10
+                    ],
+                    [
+                      0,
+                      10
+                    ],
+                    [
+                      0,
+                      0
+                    ]
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        "right": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "square",
+              "properties": {
+                "name": "square"
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      10,
+                      10
+                    ],
+                    [
+                      0,
+                      10
+                    ],
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      10,
+                      0
+                    ],
+                    [
+                      10,
+                      10
+                    ]
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_GEOMETRY_COMPARE_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "feature_key_conservation": true,
+        "compared_count": 1,
+        "exact_equal_count": 0,
+        "topological_equal_count": 1,
+        "vertex_symmetric_difference_total": 0
+      },
+      "expected_fields": {
+        "comparisons.0.topology_state": "EQUAL",
+        "comparisons.0.exact_coordinate_equal": false
+      }
+    },
+    {
+      "case_id": "reproject_wgs84_to_webmercator",
+      "operation": "reproject",
+      "parameters": {
+        "target_crs": "EPSG:3857"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "origin",
+              "properties": {
+                "name": "origin"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  0,
+                  0,
+                  7
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_REPROJECT_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "source_crs": "EPSG:4326",
+        "target_crs": "EPSG:3857",
+        "crs_changed": true,
+        "feature_row_conservation": true,
+        "coordinate_count_conservation": true,
+        "transformed_feature_count": 1,
+        "features_with_z": 1
+      },
+      "expected_output": {
+        "crs": "EPSG:3857",
+        "feature_count": 1
+      }
+    },
+    {
+      "case_id": "reproject_invalid_latitude_fails_closed",
+      "operation": "reproject",
+      "parameters": {
+        "target_crs": "EPSG:3857"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "invalid_latitude",
+              "properties": {
+                "name": "invalid_latitude"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  0,
+                  89
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_REPROJECT_INVALID_COORDINATES",
+      "expected_warnings": []
+    }
+  ]
+}

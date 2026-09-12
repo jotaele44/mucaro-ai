@@ -96,6 +96,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "point-in-polygon fixture classifies FULLY_WITHIN, TOUCH_ONLY, OUTSIDE, and NULL_EMPTY",
                 "geometry comparison fixture records exact equality, topological equality, Hausdorff distance, and vertex symmetric difference",
                 "reprojection fixture records source CRS, target CRS, adapter identity, output hash, and row/coordinate conservation",
+                "GIS eval manifest runs positive and negative fixtures through the supported CLI boundary",
                 "map export fixture preserves source and derived layer hashes",
             ),
             negative_regression_gates=(
@@ -115,7 +116,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "broader GIS engine adapter supports robust topology operations",
                 "broader CRS, datum transformation, grid shift, axis-order, and vertical CRS support is explicit and receipt-backed",
                 "vertex-based comparison is replaced or supplemented by robust planar overlay checks",
-                "map/export provenance and spatial eval corpus are complete",
+                "map/export provenance and broader spatial eval corpus are complete",
             ),
         ),
         CapabilityContract(

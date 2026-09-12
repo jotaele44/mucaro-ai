@@ -273,10 +273,12 @@ Observed success markers:
   operator-surface goal while GUI expansion is deferred to the final phase.
   Advanced GIS now has narrow local GeoJSON inspection, point-in-polygon,
   geometry comparison, and limited EPSG:4326/EPSG:3857 reprojection receipt
-  candidates; full GIS maturity remains open until robust topology, broader
-  CRS/datum/grid-shift/axis-order support, planar overlay checks, spatial
-  format adapters, raster/vector processing, map/export provenance, and a
-  broader GIS eval corpus are proven. State-of-the-art OCR
+  candidates plus a committed `mucaro eval gis` fixture harness covering
+  dimensionality, join multiplication, topology equality, reprojection, and
+  fail-closed invalid coordinates; full GIS maturity remains open until robust
+  topology, broader CRS/datum/grid-shift/axis-order support, planar overlay
+  checks, spatial format adapters, raster/vector processing, map/export
+  provenance, and a broader GIS eval corpus are proven. State-of-the-art OCR
   remains open, but a narrow local image OCR receipt candidate now preserves
   source-image hashes, Tesseract engine identity, raw/normalized/canonical text,
   confidence states, source-coordinate spans, and no-text states; PDF/page
