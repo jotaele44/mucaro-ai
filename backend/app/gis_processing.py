@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,18 @@ GIS_REPORT_SCHEMA_VERSION = "mucaro_gis_report_v1"
 GIS_REPORT_DIR = "gis_reports"
 DEFAULT_CRS = "EPSG:4326"
 EPSILON = 1e-9
+WEB_MERCATOR_RADIUS = 6378137.0
+WEB_MERCATOR_MAX_LATITUDE = 85.0511287798066
+WEB_MERCATOR_MAX_EXTENT = 20037508.342789244
+SUPPORTED_REPROJECT_CRS = {"EPSG:4326", "EPSG:3857"}
+SUPPORTED_REPROJECT_GEOMETRY_TYPES = {
+    "Point",
+    "MultiPoint",
+    "LineString",
+    "MultiLineString",
+    "Polygon",
+    "MultiPolygon",
+}
 
 
 class GISProcessingError(RuntimeError):
@@ -215,6 +228,12 @@ def _write_report(cfg: Settings, report: dict[str, Any]) -> dict[str, Any]:
     return {**report, "report_path": str(path), "report_sha256": report_sha256}
 
 
+def _write_geojson_output(cfg: Settings, report_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    path = cfg.export_dir / GIS_REPORT_DIR / f"{report_id}.geojson"
+    write_json(path, payload)
+    return {"path": str(path), "sha256": _sha256_file(path)}
+
+
 def inspect_geojson(path: Path, *, cfg: Settings = settings) -> dict[str, Any]:
     cfg.ensure_dirs()
     source = _load_geojson(path)
@@ -264,6 +283,204 @@ def inspect_geojson(path: Path, *, cfg: Settings = settings) -> dict[str, Any]:
         },
         "features": inspected,
         "warnings": [] if invalid_count == 0 else ["GIS_GEOMETRY_WARNINGS_PRESENT"],
+    }
+    return _write_report(cfg, report)
+
+
+def _normalize_crs_name(value: str) -> str:
+    return value.strip().upper()
+
+
+def _require_supported_reprojection(source_crs: str, target_crs: str) -> None:
+    if source_crs not in SUPPORTED_REPROJECT_CRS:
+        raise GISProcessingError("ERROR_GIS_REPROJECT_UNSUPPORTED_CRS", f"Unsupported source CRS: {source_crs}")
+    if target_crs not in SUPPORTED_REPROJECT_CRS:
+        raise GISProcessingError("ERROR_GIS_REPROJECT_UNSUPPORTED_CRS", f"Unsupported target CRS: {target_crs}")
+
+
+def _reproject_xy(x: float, y: float, *, source_crs: str, target_crs: str) -> tuple[float, float]:
+    if source_crs == target_crs:
+        return x, y
+    if not math.isfinite(x) or not math.isfinite(y):
+        raise GISProcessingError("ERROR_GIS_REPROJECT_INVALID_COORDINATES", "Coordinate values must be finite numbers.")
+    if source_crs == "EPSG:4326" and target_crs == "EPSG:3857":
+        if x < -180.0 or x > 180.0:
+            raise GISProcessingError("ERROR_GIS_REPROJECT_INVALID_COORDINATES", f"Longitude outside EPSG:4326 range: {x}")
+        if y < -WEB_MERCATOR_MAX_LATITUDE or y > WEB_MERCATOR_MAX_LATITUDE:
+            raise GISProcessingError(
+                "ERROR_GIS_REPROJECT_INVALID_COORDINATES",
+                f"Latitude outside Web Mercator supported range: {y}",
+            )
+        projected_x = WEB_MERCATOR_RADIUS * math.radians(x)
+        projected_y = WEB_MERCATOR_RADIUS * math.log(math.tan(math.pi / 4.0 + math.radians(y) / 2.0))
+        return (0.0 if abs(projected_x) < EPSILON else projected_x, 0.0 if abs(projected_y) < EPSILON else projected_y)
+    if source_crs == "EPSG:3857" and target_crs == "EPSG:4326":
+        if abs(x) > WEB_MERCATOR_MAX_EXTENT or abs(y) > WEB_MERCATOR_MAX_EXTENT:
+            raise GISProcessingError("ERROR_GIS_REPROJECT_INVALID_COORDINATES", "EPSG:3857 coordinate outside Web Mercator extent.")
+        lon = math.degrees(x / WEB_MERCATOR_RADIUS)
+        lat = math.degrees(2.0 * math.atan(math.exp(y / WEB_MERCATOR_RADIUS)) - math.pi / 2.0)
+        return (0.0 if abs(lon) < EPSILON else lon, 0.0 if abs(lat) < EPSILON else lat)
+    raise GISProcessingError(
+        "ERROR_GIS_REPROJECT_UNSUPPORTED_CRS",
+        f"Unsupported reprojection pair: {source_crs} to {target_crs}",
+    )
+
+
+def _reproject_position(position: Any, *, source_crs: str, target_crs: str) -> list[Any]:
+    if not _is_position(position):
+        raise GISProcessingError("ERROR_GIS_REPROJECT_INVALID_COORDINATES", "Geometry coordinates contain an invalid position.")
+    projected_x, projected_y = _reproject_xy(float(position[0]), float(position[1]), source_crs=source_crs, target_crs=target_crs)
+    return [projected_x, projected_y, *position[2:]]
+
+
+def _reproject_coordinates(value: Any, *, source_crs: str, target_crs: str) -> Any:
+    if _is_position(value):
+        return _reproject_position(value, source_crs=source_crs, target_crs=target_crs)
+    if isinstance(value, list):
+        return [_reproject_coordinates(item, source_crs=source_crs, target_crs=target_crs) for item in value]
+    raise GISProcessingError("ERROR_GIS_REPROJECT_INVALID_COORDINATES", "Geometry coordinates contain a non-position value.")
+
+
+def _reproject_geometry(geometry: Any, *, source_crs: str, target_crs: str) -> tuple[Any, str, list[str]]:
+    if geometry is None:
+        return None, "NULL_EMPTY", ["GEOMETRY_NULL"]
+    if not isinstance(geometry, dict):
+        raise GISProcessingError("ERROR_GIS_REPROJECT_UNSUPPORTED_GEOMETRY", "Geometry must be an object or null.")
+    geometry_type = geometry.get("type")
+    if geometry_type not in SUPPORTED_REPROJECT_GEOMETRY_TYPES:
+        raise GISProcessingError("ERROR_GIS_REPROJECT_UNSUPPORTED_GEOMETRY", f"Unsupported geometry type: {geometry_type}")
+    coordinates = geometry.get("coordinates")
+    if _coordinates_empty(coordinates):
+        copied = deepcopy(geometry)
+        return copied, "NULL_EMPTY", ["GEOMETRY_COORDINATES_EMPTY"]
+    copied = deepcopy(geometry)
+    copied["coordinates"] = _reproject_coordinates(coordinates, source_crs=source_crs, target_crs=target_crs)
+    return copied, "TRANSFORMED" if source_crs != target_crs else "NOOP", []
+
+
+def reproject_geojson(
+    path: Path,
+    *,
+    target_crs: str,
+    cfg: Settings = settings,
+    source_crs: str | None = None,
+) -> dict[str, Any]:
+    cfg.ensure_dirs()
+    source = _load_geojson(path)
+    effective_source_crs = _normalize_crs_name(source_crs) if source_crs is not None else _normalize_crs_name(source.crs)
+    normalized_target_crs = _normalize_crs_name(target_crs)
+    if not normalized_target_crs:
+        raise GISProcessingError("ERROR_GIS_REPROJECT_UNSUPPORTED_CRS", "Target CRS is required.")
+    _require_supported_reprojection(effective_source_crs, normalized_target_crs)
+    output_payload = deepcopy(source.payload)
+    raw_features = output_payload.get("features")
+    if not isinstance(raw_features, list):
+        raise GISProcessingError("ERROR_GIS_FEATURES_NOT_ARRAY", "GeoJSON FeatureCollection features must be an array.")
+    if not all(isinstance(feature, dict) for feature in raw_features):
+        raise GISProcessingError("ERROR_GIS_REPROJECT_FEATURES_NOT_OBJECTS", "All GeoJSON features must be objects.")
+
+    feature_receipts: list[dict[str, Any]] = []
+    source_coordinate_count = 0
+    output_coordinate_count = 0
+    for index, feature in enumerate(raw_features):
+        geometry = feature.get("geometry")
+        before_dimensions = _coordinate_dimension_summary(geometry if isinstance(geometry, dict) else None)
+        before_coordinate_count = len(_iter_positions(geometry.get("coordinates") if isinstance(geometry, dict) else None))
+        reprojected_geometry, transform_state, warnings = _reproject_geometry(
+            geometry,
+            source_crs=effective_source_crs,
+            target_crs=normalized_target_crs,
+        )
+        feature["geometry"] = reprojected_geometry
+        after_dimensions = _coordinate_dimension_summary(reprojected_geometry if isinstance(reprojected_geometry, dict) else None)
+        after_coordinate_count = len(_iter_positions(reprojected_geometry.get("coordinates") if isinstance(reprojected_geometry, dict) else None))
+        source_coordinate_count += before_coordinate_count
+        output_coordinate_count += after_coordinate_count
+        feature_receipts.append(
+            {
+                "feature_index": index,
+                "feature_id": _feature_id(feature, index),
+                "geometry_type": reprojected_geometry.get("type") if isinstance(reprojected_geometry, dict) else None,
+                "transform_state": transform_state,
+                "source_coordinate_count": before_coordinate_count,
+                "output_coordinate_count": after_coordinate_count,
+                "source_coordinate_dimension": before_dimensions["coordinate_dimension"],
+                "output_coordinate_dimension": after_dimensions["coordinate_dimension"],
+                "coordinate_dimension_preserved": before_dimensions["coordinate_dimension"] == after_dimensions["coordinate_dimension"],
+                "has_z": after_dimensions["has_z"],
+                "has_m": after_dimensions["has_m"],
+                "warnings": warnings,
+            }
+        )
+    output_payload["crs"] = {"type": "name", "properties": {"name": normalized_target_crs}}
+    created_at = utc_now()
+    report_id = stable_id(
+        "gisreport",
+        "reproject",
+        source.sha256,
+        effective_source_crs,
+        normalized_target_crs,
+        created_at,
+    )
+    output = _write_geojson_output(cfg, report_id, output_payload)
+    null_empty_count = sum(1 for row in feature_receipts if row["transform_state"] == "NULL_EMPTY")
+    dimension_mismatch_count = sum(1 for row in feature_receipts if not row["coordinate_dimension_preserved"])
+    warnings = [
+        warning
+        for warning in [
+            "GIS_REPROJECT_NOOP" if effective_source_crs == normalized_target_crs else "",
+            "GIS_NULL_EMPTY_GEOMETRY_PRESERVED" if null_empty_count else "",
+            "GIS_COORDINATE_DIMENSION_MISMATCH" if dimension_mismatch_count else "",
+        ]
+        if warning
+    ]
+    report = {
+        "schema_version": GIS_REPORT_SCHEMA_VERSION,
+        "report_id": report_id,
+        "status": "GIS_REPROJECT_OK" if not warnings else "GIS_REPROJECT_WARN",
+        "operation": "reproject_geojson",
+        "created_at": created_at,
+        "parameters": {
+            "source_crs_override": source_crs,
+            "effective_source_crs": effective_source_crs,
+            "target_crs": normalized_target_crs,
+            "adapter": "local_web_mercator_formula_v1",
+            "supported_crs": sorted(SUPPORTED_REPROJECT_CRS),
+        },
+        "input": {
+            "path": str(path),
+            "sha256": source.sha256,
+            "declared_crs": source.crs,
+            "declared_crs_status": source.crs_status,
+            "feature_count": len(raw_features),
+        },
+        "output": {
+            "path": output["path"],
+            "sha256": output["sha256"],
+            "crs": normalized_target_crs,
+            "feature_count": len(raw_features),
+        },
+        "features": feature_receipts,
+        "invariants": {
+            "source_crs": effective_source_crs,
+            "target_crs": normalized_target_crs,
+            "crs_changed": effective_source_crs != normalized_target_crs,
+            "feature_row_conservation": len(raw_features) == len(feature_receipts),
+            "source_coordinate_count": source_coordinate_count,
+            "output_coordinate_count": output_coordinate_count,
+            "coordinate_count_conservation": source_coordinate_count == output_coordinate_count,
+            "transformed_feature_count": sum(1 for row in feature_receipts if row["transform_state"] == "TRANSFORMED"),
+            "null_empty_count": null_empty_count,
+            "coordinate_dimension_mismatch_count": dimension_mismatch_count,
+            "features_with_z": sum(1 for row in feature_receipts if row["has_z"]),
+            "features_with_m": sum(1 for row in feature_receipts if row["has_m"]),
+        },
+        "warnings": warnings,
+        "limitations": [
+            "local reprojection currently supports EPSG:4326 and EPSG:3857 only",
+            "datum transformations, grid shifts, axis-order variants, vertical CRS, and time-dependent CRS are not implemented",
+            "coordinates outside the Web Mercator supported extent fail closed",
+        ],
     }
     return _write_report(cfg, report)
 

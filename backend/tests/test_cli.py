@@ -312,6 +312,18 @@ def test_cli_gis_inspect_and_point_in_polygon(tmp_path: Path, capsys):
     assert "topological_equal_count=1" in compare_output
     assert "vertex_symmetric_difference_total=0" in compare_output
 
+    assert main(["gis", "reproject", str(points_path), "--target-crs", "EPSG:3857", "--format", "text"], cfg=cfg) == 0
+    reproject_output = capsys.readouterr().out
+    assert "GIS_REPROJECT_OK" in reproject_output
+    assert "operation=reproject_geojson" in reproject_output
+    assert "output_path=" in reproject_output
+    assert "output_crs=EPSG:3857" in reproject_output
+    assert "source_crs=EPSG:4326" in reproject_output
+    assert "target_crs=EPSG:3857" in reproject_output
+    assert "crs_changed=True" in reproject_output
+    assert "feature_row_conservation=True" in reproject_output
+    assert "coordinate_count_conservation=True" in reproject_output
+
 
 def test_cli_models_list_reports_provider_registry(tmp_path: Path, capsys, monkeypatch):
     monkeypatch.delenv("MUCARO_AI_LIVE_MODE", raising=False)

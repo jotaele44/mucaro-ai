@@ -70,6 +70,9 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "source_sha256",
                 "retrieval_utc",
                 "crs",
+                "source_crs",
+                "target_crs",
+                "crs_transform_adapter",
                 "geometry_type",
                 "feature_count",
                 "operation_name",
@@ -92,11 +95,12 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
             positive_regression_gates=(
                 "point-in-polygon fixture classifies FULLY_WITHIN, TOUCH_ONLY, OUTSIDE, and NULL_EMPTY",
                 "geometry comparison fixture records exact equality, topological equality, Hausdorff distance, and vertex symmetric difference",
-                "reprojection fixture records source and target CRS",
+                "reprojection fixture records source CRS, target CRS, adapter identity, output hash, and row/coordinate conservation",
                 "map export fixture preserves source and derived layer hashes",
             ),
             negative_regression_gates=(
                 "mismatched CRS fails closed unless reprojection is explicit",
+                "unsupported CRS transformation fails closed without output synthesis",
                 "ambiguous nearest-neighbor match remains UNRESOLVED",
                 "M:N spatial join requires explicit multiplication counts",
                 "feature comparison with unmatched keys records left-only and right-only residue",
@@ -109,7 +113,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
             ),
             unavailable_until=(
                 "broader GIS engine adapter supports robust topology operations",
-                "CRS reprojection is explicit and receipt-backed",
+                "broader CRS, datum transformation, grid shift, axis-order, and vertical CRS support is explicit and receipt-backed",
                 "vertex-based comparison is replaced or supplemented by robust planar overlay checks",
                 "map/export provenance and spatial eval corpus are complete",
             ),

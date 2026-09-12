@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 
 from backend.app.config import Settings
@@ -6,6 +7,7 @@ from backend.app.gis_processing import (
     GISProcessingError,
     compare_geojson_geometries,
     inspect_geojson,
+    reproject_geojson,
     spatial_join_points_to_polygons,
 )
 
@@ -338,3 +340,80 @@ def test_compare_geojson_geometries_can_match_by_index(tmp_path: Path):
     assert result["status"] == "GIS_GEOMETRY_COMPARE_OK"
     assert result["comparisons"][0]["feature_key"] == "index:0"
     assert result["comparisons"][0]["topology_state"] == "EQUAL"
+
+
+def test_reproject_geojson_writes_output_and_preserves_dimensions(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    source = write_geojson(
+        tmp_path / "wgs84.geojson",
+        [
+            point_feature("origin", [0, 0]),
+            point_feature("z_m", [1, 1, 7, 9]),
+            polygon_feature("square", [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]]),
+        ],
+        crs="EPSG:4326",
+    )
+
+    result = reproject_geojson(source, target_crs="EPSG:3857", cfg=cfg)
+
+    assert result["status"] == "GIS_REPROJECT_OK"
+    assert result["parameters"]["adapter"] == "local_web_mercator_formula_v1"
+    assert result["input"]["declared_crs"] == "EPSG:4326"
+    assert result["output"]["crs"] == "EPSG:3857"
+    assert result["invariants"]["crs_changed"] is True
+    assert result["invariants"]["feature_row_conservation"] is True
+    assert result["invariants"]["coordinate_count_conservation"] is True
+    assert result["invariants"]["transformed_feature_count"] == 3
+    assert result["invariants"]["features_with_z"] == 1
+    assert result["invariants"]["features_with_m"] == 1
+    output = json.loads(Path(result["output"]["path"]).read_text(encoding="utf-8"))
+    assert output["crs"]["properties"]["name"] == "EPSG:3857"
+    assert output["features"][0]["geometry"]["coordinates"] == [0.0, 0.0]
+    projected = output["features"][1]["geometry"]["coordinates"]
+    assert math.isclose(projected[0], 111319.49079327357, rel_tol=0, abs_tol=1e-6)
+    assert math.isclose(projected[1], 111325.1428663851, rel_tol=0, abs_tol=1e-6)
+    assert projected[2:] == [7, 9]
+    receipt = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
+    assert receipt["report_id"] == result["report_id"]
+    assert result["report_sha256"]
+
+
+def test_reproject_geojson_supports_inverse_web_mercator(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    source = write_geojson(
+        tmp_path / "webmercator.geojson",
+        [point_feature("one_degree", [111319.49079327357, 111325.1428663851])],
+        crs="EPSG:3857",
+    )
+
+    result = reproject_geojson(source, target_crs="EPSG:4326", cfg=cfg)
+
+    output = json.loads(Path(result["output"]["path"]).read_text(encoding="utf-8"))
+    lon, lat = output["features"][0]["geometry"]["coordinates"]
+    assert result["status"] == "GIS_REPROJECT_OK"
+    assert math.isclose(lon, 1.0, rel_tol=0, abs_tol=1e-9)
+    assert math.isclose(lat, 1.0, rel_tol=0, abs_tol=1e-9)
+
+
+def test_reproject_geojson_fails_closed_on_unsupported_crs(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    source = write_geojson(tmp_path / "local.geojson", [point_feature("a", [1, 2])], crs="EPSG:2263")
+
+    try:
+        reproject_geojson(source, target_crs="EPSG:4326", cfg=cfg)
+    except GISProcessingError as exc:
+        assert exc.status == "ERROR_GIS_REPROJECT_UNSUPPORTED_CRS"
+    else:
+        raise AssertionError("expected unsupported CRS to fail closed")
+
+
+def test_reproject_geojson_fails_closed_on_invalid_web_mercator_latitude(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    source = write_geojson(tmp_path / "invalid.geojson", [point_feature("north", [0, 89])], crs="EPSG:4326")
+
+    try:
+        reproject_geojson(source, target_crs="EPSG:3857", cfg=cfg)
+    except GISProcessingError as exc:
+        assert exc.status == "ERROR_GIS_REPROJECT_INVALID_COORDINATES"
+    else:
+        raise AssertionError("expected invalid latitude to fail closed")

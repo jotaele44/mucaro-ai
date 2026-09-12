@@ -38,7 +38,13 @@ from .conversations import (
 )
 from .db import list_payloads
 from .execution_gate import analyze_task
-from .gis_processing import GISProcessingError, compare_geojson_geometries, inspect_geojson, spatial_join_points_to_polygons
+from .gis_processing import (
+    GISProcessingError,
+    compare_geojson_geometries,
+    inspect_geojson,
+    reproject_geojson,
+    spatial_join_points_to_polygons,
+)
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
 from .ingestion import (
     delete_source,
@@ -454,6 +460,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gis_compare.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_compare.set_defaults(handler=run_gis_compare)
+
+    gis_reproject = gis_subcommands.add_parser(
+        "reproject",
+        help="Reproject a GeoJSON FeatureCollection and write a CRS transformation receipt.",
+    )
+    gis_reproject.add_argument("geojson_path", help="Path to a GeoJSON FeatureCollection.")
+    gis_reproject.add_argument("--target-crs", required=True, help="Target CRS identifier, currently EPSG:4326 or EPSG:3857.")
+    gis_reproject.add_argument("--source-crs", help="Optional operator override for the source CRS.")
+    gis_reproject.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_reproject.set_defaults(handler=run_gis_reproject)
 
     ocr = subcommands.add_parser("ocr", help="Run local OCR analysis with source-image receipts.")
     ocr_subcommands = ocr.add_subparsers(dest="ocr_command", required=True)
@@ -1686,7 +1702,15 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             if stage.get("gap"):
                 print(f"gap={stage.get('gap')}")
             print(f"next_step={stage.get('next_step')}")
-    elif status in {"GIS_INSPECT_OK", "GIS_INSPECT_WARN", "GIS_SPATIAL_JOIN_OK", "GIS_GEOMETRY_COMPARE_OK", "GIS_GEOMETRY_COMPARE_WARN"}:
+    elif status in {
+        "GIS_INSPECT_OK",
+        "GIS_INSPECT_WARN",
+        "GIS_SPATIAL_JOIN_OK",
+        "GIS_GEOMETRY_COMPARE_OK",
+        "GIS_GEOMETRY_COMPARE_WARN",
+        "GIS_REPROJECT_OK",
+        "GIS_REPROJECT_WARN",
+    }:
         print(status)
         print(f"operation={payload.get('operation')}")
         print(f"report_id={payload.get('report_id')}")
@@ -1701,12 +1725,23 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"join_cardinality={payload.get('join_cardinality')}")
         if payload.get("match_on"):
             print(f"match_on={payload.get('match_on')}")
+        output = payload.get("output")
+        if isinstance(output, dict):
+            print(f"output_path={output.get('path')}")
+            print(f"output_sha256={output.get('sha256')}")
+            print(f"output_crs={output.get('crs')}")
         invariants = payload.get("invariants")
         if isinstance(invariants, dict):
             for key in (
                 "crs_match",
                 "crs_mismatch_allowed",
                 "point_row_conservation",
+                "source_crs",
+                "target_crs",
+                "crs_changed",
+                "feature_row_conservation",
+                "coordinate_count_conservation",
+                "transformed_feature_count",
                 "feature_key_conservation",
                 "compared_count",
                 "exact_equal_count",
@@ -2008,6 +2043,19 @@ def run_gis_compare(args: argparse.Namespace, cfg: Settings) -> int:
         right_path = cfg.project_root / right_path
     try:
         result = compare_geojson_geometries(left_path, right_path, cfg=cfg, match_on=args.match_on)
+    except GISProcessingError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_gis_reproject(args: argparse.Namespace, cfg: Settings) -> int:
+    path = Path(args.geojson_path)
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        result = reproject_geojson(path, target_crs=args.target_crs, cfg=cfg, source_crs=args.source_crs)
     except GISProcessingError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2

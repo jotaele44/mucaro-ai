@@ -57,7 +57,7 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
             "advanced_gis_processing": {
                 "state": "CANDIDATE",
                 "contract": "mucaro-gis-processing/0.x",
-                "notes": "Local GeoJSON inspection, point-in-polygon, and comparison receipts exist with CRS preservation, geometry state counts, coordinate dimensionality, topology-style equality, vertex Hausdorff distance, and vertex symmetric-difference evidence; robust topology, reprojection, planar overlay, map export, broader formats, raster/vector processing, and GIS eval corpus remain open.",
+                "notes": "Local GeoJSON inspection, point-in-polygon, comparison, and limited EPSG:4326/EPSG:3857 reprojection receipts exist with CRS preservation, geometry state counts, coordinate dimensionality, topology-style equality, vertex Hausdorff distance, vertex symmetric-difference, adapter, and output-hash evidence; robust topology, broader CRS/datum/grid-shift/axis-order support, planar overlay, map export, broader formats, raster/vector processing, and GIS eval corpus remain open.",
             },
             "state_of_art_ocr_analysis": {
                 "state": "CANDIDATE",
