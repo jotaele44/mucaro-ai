@@ -324,6 +324,92 @@ def test_cli_gis_inspect_and_point_in_polygon(tmp_path: Path, capsys):
     assert "feature_row_conservation=True" in reproject_output
     assert "coordinate_count_conservation=True" in reproject_output
 
+    csv_path = tmp_path / "points.csv"
+    csv_path.write_text(
+        "id,lat,lon,label\n"
+        "alpha,18.4,-66.1,valid first point\n"
+        "bad,91,-66.2,invalid latitude\n"
+        "bravo,18.5,-66.3,valid second point\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "gis",
+                "csv-points",
+                str(csv_path),
+                "--lat-column",
+                "lat",
+                "--lon-column",
+                "lon",
+                "--id-column",
+                "id",
+                "--skip-invalid-rows",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    csv_payload = json.loads(capsys.readouterr().out)
+    assert csv_payload["status"] == "GIS_CSV_POINTS_WARN"
+    assert csv_payload["output"]["feature_count"] == 2
+    assert csv_payload["skipped_rows"][0]["row_number"] == 3
+    assert csv_payload["invariants"]["row_accounting_closed"] is True
+
+    assert (
+        main(
+            [
+                "gis",
+                "csv-points",
+                str(csv_path),
+                "--lat-column",
+                "lat",
+                "--lon-column",
+                "lon",
+                "--id-column",
+                "id",
+                "--skip-invalid-rows",
+                "--format",
+                "text",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    csv_output = capsys.readouterr().out
+    assert "GIS_CSV_POINTS_WARN" in csv_output
+    assert "operation=csv_points_to_geojson" in csv_output
+    assert "source_row_count=3" in csv_output
+    assert "output_feature_count=2" in csv_output
+    assert "skipped_row_count=1" in csv_output
+    assert "row_accounting_closed=True" in csv_output
+    assert "warnings=GIS_CSV_INVALID_ROWS_SKIPPED" in csv_output
+
+    assert (
+        main(
+            [
+                "gis",
+                "csv-points",
+                str(csv_path),
+                "--lat-column",
+                "lat",
+                "--lon-column",
+                "lon",
+                "--id-column",
+                "id",
+                "--format",
+                "text",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    csv_error_output = capsys.readouterr().err
+    assert "ERROR_GIS_CSV_INVALID_COORDINATES" in csv_error_output
+
 
 def test_cli_models_list_reports_provider_registry(tmp_path: Path, capsys, monkeypatch):
     monkeypatch.delenv("MUCARO_AI_LIVE_MODE", raising=False)
@@ -1074,17 +1160,18 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 5
-    assert payload["counts"]["passed"] == 5
+    assert payload["counts"]["cases"] == 6
+    assert payload["counts"]["passed"] == 6
     assert payload["counts"]["failed"] == 0
-    assert payload["counts"]["operations"] == 4
+    assert payload["counts"]["operations"] == 5
     assert payload["counts"]["negative_cases"] == 1
 
     assert main(["eval", "gis", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_EVAL_OK" in text_output
-    assert "operation_count=4" in text_output
+    assert "operation_count=5" in text_output
     assert "PASS inspect inspect_dimensionality" in text_output
+    assert "PASS csv_points csv_points_skip_invalid_rows" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
 
 
@@ -1135,7 +1222,8 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
-    assert "eval_case_count=5" in text_output
+    assert "eval_case_count=6" in text_output
+    assert "PASS csv_points csv_points_skip_invalid_rows" in text_output
     assert "PASS compare compare_rotated_polygon" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
 

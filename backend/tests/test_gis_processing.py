@@ -1,3 +1,4 @@
+import csv
 import json
 import math
 from pathlib import Path
@@ -6,6 +7,7 @@ from backend.app.config import Settings
 from backend.app.gis_processing import (
     GISProcessingError,
     compare_geojson_geometries,
+    convert_csv_points_to_geojson,
     inspect_geojson,
     reproject_geojson,
     spatial_join_points_to_polygons,
@@ -41,6 +43,16 @@ def write_geojson(path: Path, features: list[dict], *, crs: str = "EPSG:4326") -
     return path
 
 
+def write_csv(path: Path, rows: list[dict[str, str]], *, fieldnames: list[str] | None = None) -> Path:
+    headers = fieldnames or list(rows[0].keys())
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=headers, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+    return path
+
+
 def polygon_feature(feature_id: str, coordinates: list[list[list[float]]]) -> dict:
     return {
         "type": "Feature",
@@ -67,6 +79,98 @@ def point_feature(feature_id: str, coordinates) -> dict:
         "properties": {"name": feature_id},
         "geometry": geometry,
     }
+
+
+def test_convert_csv_points_to_geojson_writes_output_preserves_rows_and_receipt(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    source = write_csv(
+        tmp_path / "points.csv",
+        [
+            {"id": "alpha", "lat": "18.4001", "lon": "-66.1001", "label": "raw first"},
+            {"id": "bravo", "lat": "18.5002", "lon": "-66.3002", "label": "raw second"},
+        ],
+    )
+
+    result = convert_csv_points_to_geojson(source, latitude_column="lat", longitude_column="lon", id_column="id", cfg=cfg)
+
+    assert result["status"] == "GIS_CSV_POINTS_OK"
+    assert result["source"]["header"] == ["id", "lat", "lon", "label"]
+    assert result["source"]["row_count"] == 2
+    assert result["source"]["sha256"]
+    assert result["output"]["feature_count"] == 2
+    assert result["output"]["sha256"]
+    assert result["invariants"]["row_accounting_closed"] is True
+    assert result["invariants"]["source_row_count"] == 2
+    assert result["invariants"]["output_feature_count"] == 2
+    assert result["invariants"]["skipped_row_count"] == 0
+    assert result["warnings"] == []
+    output = json.loads(Path(result["output"]["path"]).read_text(encoding="utf-8"))
+    assert output["crs"]["properties"]["name"] == "EPSG:4326"
+    assert output["features"][0]["id"] == "alpha"
+    assert output["features"][0]["geometry"]["coordinates"] == [-66.1001, 18.4001]
+    assert output["features"][0]["properties"]["lat"] == "18.4001"
+    receipt = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
+    assert receipt["report_id"] == result["report_id"]
+    assert result["report_sha256"]
+
+
+def test_convert_csv_points_to_geojson_fails_closed_on_invalid_coordinates(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    source = write_csv(tmp_path / "points.csv", [{"id": "bad", "lat": "91", "lon": "-66.1"}])
+
+    try:
+        convert_csv_points_to_geojson(source, latitude_column="lat", longitude_column="lon", id_column="id", cfg=cfg)
+    except GISProcessingError as exc:
+        assert exc.status == "ERROR_GIS_CSV_INVALID_COORDINATES"
+    else:
+        raise AssertionError("expected invalid CSV coordinates to fail closed")
+
+
+def test_convert_csv_points_to_geojson_can_skip_invalid_rows_with_receipt(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    source = write_csv(
+        tmp_path / "points.csv",
+        [
+            {"id": "alpha", "lat": "18.4", "lon": "-66.1"},
+            {"id": "bad", "lat": "not-a-number", "lon": "-66.2"},
+            {"id": "bravo", "lat": "18.5", "lon": "-66.3"},
+        ],
+    )
+
+    result = convert_csv_points_to_geojson(
+        source,
+        latitude_column="lat",
+        longitude_column="lon",
+        id_column="id",
+        skip_invalid_rows=True,
+        cfg=cfg,
+    )
+
+    assert result["status"] == "GIS_CSV_POINTS_WARN"
+    assert result["warnings"] == ["GIS_CSV_INVALID_ROWS_SKIPPED"]
+    assert result["skipped_rows"] == [
+        {
+            "row_number": 3,
+            "status": "ERROR_GIS_CSV_INVALID_COORDINATES",
+            "detail": "CSV row 3 has invalid lat: 'not-a-number'",
+        }
+    ]
+    assert result["invariants"]["source_row_count"] == 3
+    assert result["invariants"]["output_feature_count"] == 2
+    assert result["invariants"]["skipped_row_count"] == 1
+    assert result["invariants"]["row_accounting_closed"] is True
+
+
+def test_convert_csv_points_to_geojson_fails_closed_on_missing_columns(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    source = write_csv(tmp_path / "points.csv", [{"id": "alpha", "latitude": "18.4", "longitude": "-66.1"}])
+
+    try:
+        convert_csv_points_to_geojson(source, latitude_column="lat", longitude_column="lon", id_column="id", cfg=cfg)
+    except GISProcessingError as exc:
+        assert exc.status == "ERROR_GIS_CSV_REQUIRED_COLUMN_MISSING"
+    else:
+        raise AssertionError("expected missing CSV coordinate columns to fail closed")
 
 
 def test_inspect_geojson_preserves_crs_geometry_state_and_receipt(tmp_path: Path):

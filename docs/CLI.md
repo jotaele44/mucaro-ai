@@ -56,6 +56,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
 | `mucaro gis reproject GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON between supported local CRS pairs and write a transformation receipt | 0 | 2 |
+| `mucaro gis csv-points CSV_PATH --lat-column LAT --lon-column LON` | Convert CSV coordinate rows into GeoJSON point features and write a row-accounted GIS receipt | 0 | 2 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
@@ -114,6 +115,15 @@ structured Outlook property extraction remains a future parser upgrade. Media
 files are metadata-only in this release: they preserve source lineage, byte
 counts, dimensions or container facts where available, and parser warnings, but
 do not perform semantic image/audio/video understanding.
+
+CSV point conversion is intentionally part of the GIS command family, not
+ordinary source ingestion. `mucaro gis csv-points CSV_PATH --lat-column LAT
+--lon-column LON` reads UTF-8 CSV headers, rejects duplicate or missing required
+columns, records the input SHA-256, preserves raw row values as feature
+properties, writes a derived GeoJSON FeatureCollection, and writes a GIS receipt
+with source row count, output feature count, skipped row count, CRS, and row
+accounting. Invalid rows fail closed by default; `--skip-invalid-rows` must be
+selected explicitly and every skipped row is listed in the receipt.
 
 OCR analysis is intentionally separate from ingestion. `mucaro ocr analyze
 IMAGE_PATH` runs a local Tesseract engine against one image, preserves the
@@ -246,6 +256,8 @@ approved and audited.
 | `GIS_GEOMETRY_COMPARE_WARN` | GeoJSON geometry comparison completed and recorded CRS, topology, dimensionality, or unmatched-key warnings |
 | `GIS_REPROJECT_OK` | GeoJSON reprojection completed with supported CRS, output hash, and row/coordinate conservation |
 | `GIS_REPROJECT_WARN` | GeoJSON reprojection completed while preserving no-op or null/empty geometry warnings |
+| `GIS_CSV_POINTS_OK` | CSV point conversion completed with required columns, output GeoJSON hash, and closed row accounting |
+| `GIS_CSV_POINTS_WARN` | CSV point conversion completed after explicitly skipped invalid rows were recorded in the receipt |
 | `GIS_EVAL_OK` | GIS fixture manifest validation and every configured spatial case passed |
 | `GIS_EVAL_FAILED` | GIS fixture validation failed or one or more spatial cases regressed |
 | `GIS_QUALITY_CERT_OK` | exact-head GIS fixture-quality certification wrote a release receipt |
@@ -262,6 +274,15 @@ approved and audited.
 | `ERROR_GIS_REPROJECT_INVALID_COORDINATES` | GIS reprojection found non-finite, malformed, or out-of-domain coordinates |
 | `ERROR_GIS_REPROJECT_UNSUPPORTED_GEOMETRY` | GIS reprojection received an unsupported geometry object or type |
 | `ERROR_GIS_REPROJECT_FEATURES_NOT_OBJECTS` | GIS reprojection found a non-object member in the feature array |
+| `ERROR_GIS_CSV_DELIMITER_INVALID` | CSV point conversion received a delimiter that is not exactly one character |
+| `ERROR_GIS_CSV_CRS_INVALID` | CSV point conversion received an empty CRS value |
+| `ERROR_GIS_CSV_ENCODING` | CSV point conversion received bytes that are not valid UTF-8 |
+| `ERROR_GIS_CSV_INVALID` | CSV point conversion could not parse the CSV structure |
+| `ERROR_GIS_CSV_HEADER_MISSING` | CSV point conversion received a file with no header row |
+| `ERROR_GIS_CSV_DUPLICATE_HEADERS` | CSV point conversion found duplicate header names |
+| `ERROR_GIS_CSV_REQUIRED_COLUMN_MISSING` | CSV point conversion was missing the requested latitude, longitude, or ID column |
+| `ERROR_GIS_CSV_INVALID_COORDINATES` | CSV point conversion found malformed, non-finite, or out-of-range EPSG:4326 coordinates |
+| `ERROR_GIS_CSV_NO_VALID_POINTS` | CSV point conversion skipped or rejected every row and produced no features |
 | `ERROR_OCR_INPUT_NOT_FOUND` | OCR input path does not exist |
 | `ERROR_OCR_UNSUPPORTED_INPUT` | OCR command received an unsupported input type; current OCR analysis supports local images only |
 | `ERROR_OCR_ENGINE_UNAVAILABLE` | local Tesseract executable was not found and no explicit `--tesseract-path` was supplied |
@@ -589,13 +610,14 @@ automation can fail on invalid or regressed retrieval evidence.
 Use `mucaro eval gis` to run the committed GIS fixture manifest from the
 supported CLI surface. The command validates the manifest shape, required case
 count, operation diversity, negative-case coverage, and then materializes
-temporary GeoJSON inputs to exercise the same public GIS functions used by
+temporary GeoJSON and CSV inputs to exercise the same public GIS functions used by
 operators. Current cases cover coordinate dimensionality, point-in-polygon
 holes and join multiplication, geometry comparison with rotated polygon rings,
-limited EPSG:4326 to EPSG:3857 reprojection, and fail-closed invalid Web
-Mercator latitude handling. It returns `GIS_EVAL_OK` only when the fixture and
-every case pass; `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives
-automation a hard regression signal.
+limited EPSG:4326 to EPSG:3857 reprojection, CSV point conversion with explicit
+invalid-row skipping, and fail-closed invalid Web Mercator latitude handling. It
+returns `GIS_EVAL_OK` only when the fixture and every case pass;
+`GIS_EVAL_FAILED` keeps broader GIS maturity open and gives automation a hard
+regression signal.
 
 Use `mucaro certify gis-quality` when the release needs exact-head GIS fixture
 evidence instead of an ad hoc eval result. The certification wraps

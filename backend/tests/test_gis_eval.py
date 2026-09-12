@@ -12,19 +12,21 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 5,
-        "passed": 5,
+        "cases": 6,
+        "passed": 6,
         "failed": 0,
-        "positive_cases": 4,
+        "positive_cases": 5,
         "negative_cases": 1,
-        "operations": 4,
-        "operation_names": ["compare", "inspect", "point_in_polygon", "reproject"],
+        "operations": 5,
+        "operation_names": ["compare", "csv_points", "inspect", "point_in_polygon", "reproject"],
     }
     by_id = {case["case_id"]: case for case in report["cases"]}
     assert by_id["inspect_dimensionality"]["observed_status"] == "GIS_INSPECT_OK"
     assert by_id["point_in_polygon_overlap"]["observed_warnings"] == ["GIS_JOIN_MULTIPLICATION_PRESENT"]
     assert by_id["compare_rotated_polygon"]["observed_status"] == "GIS_GEOMETRY_COMPARE_OK"
     assert by_id["reproject_wgs84_to_webmercator"]["observed_status"] == "GIS_REPROJECT_OK"
+    assert by_id["csv_points_skip_invalid_rows"]["observed_status"] == "GIS_CSV_POINTS_WARN"
+    assert by_id["csv_points_skip_invalid_rows"]["observed_warnings"] == ["GIS_CSV_INVALID_ROWS_SKIPPED"]
     assert by_id["reproject_invalid_latitude_fails_closed"]["case_type"] == "negative"
     assert by_id["reproject_invalid_latitude_fails_closed"]["observed_status"] == "ERROR_GIS_REPROJECT_INVALID_COORDINATES"
 

@@ -1,8 +1,8 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 5,
-    "operation_count": 4,
+    "case_count": 6,
+    "operation_count": 5,
     "negative_case_count": 1
   },
   "cases": [
@@ -492,6 +492,69 @@
       "expected_output": {
         "crs": "EPSG:3857",
         "feature_count": 1
+      }
+    },
+    {
+      "case_id": "csv_points_skip_invalid_rows",
+      "operation": "csv_points",
+      "parameters": {
+        "latitude_column": "lat",
+        "longitude_column": "lon",
+        "id_column": "id",
+        "crs": "EPSG:4326",
+        "skip_invalid_rows": true
+      },
+      "inputs": {
+        "csv": {
+          "format": "csv",
+          "header": [
+            "id",
+            "lat",
+            "lon",
+            "label"
+          ],
+          "rows": [
+            {
+              "id": "alpha",
+              "lat": "18.4",
+              "lon": "-66.1",
+              "label": "valid first point"
+            },
+            {
+              "id": "bad_lat",
+              "lat": "91",
+              "lon": "-66.2",
+              "label": "invalid latitude"
+            },
+            {
+              "id": "bravo",
+              "lat": "18.5",
+              "lon": "-66.3",
+              "label": "valid second point"
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_CSV_POINTS_WARN",
+      "expected_warnings": [
+        "GIS_CSV_INVALID_ROWS_SKIPPED"
+      ],
+      "expected_invariants": {
+        "required_columns_present": true,
+        "source_row_count": 3,
+        "output_feature_count": 2,
+        "skipped_row_count": 1,
+        "row_accounting_closed": true,
+        "coordinate_dimension": "XY"
+      },
+      "expected_output": {
+        "crs": "EPSG:4326",
+        "feature_count": 2
+      },
+      "expected_fields": {
+        "source.header_count": 4,
+        "skipped_rows.0.row_number": 3,
+        "skipped_rows.0.status": "ERROR_GIS_CSV_INVALID_COORDINATES"
       }
     },
     {

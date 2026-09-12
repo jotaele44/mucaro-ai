@@ -41,6 +41,7 @@ from .execution_gate import analyze_task
 from .gis_processing import (
     GISProcessingError,
     compare_geojson_geometries,
+    convert_csv_points_to_geojson,
     inspect_geojson,
     reproject_geojson,
     spatial_join_points_to_polygons,
@@ -502,6 +503,24 @@ def build_parser() -> argparse.ArgumentParser:
     gis_reproject.add_argument("--source-crs", help="Optional operator override for the source CRS.")
     gis_reproject.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_reproject.set_defaults(handler=run_gis_reproject)
+
+    gis_csv_points = gis_subcommands.add_parser(
+        "csv-points",
+        help="Convert CSV longitude/latitude rows into GeoJSON point features and write a GIS receipt.",
+    )
+    gis_csv_points.add_argument("csv_path", help="Path to a CSV file with point coordinates.")
+    gis_csv_points.add_argument("--lat-column", required=True, help="Latitude column name.")
+    gis_csv_points.add_argument("--lon-column", required=True, help="Longitude column name.")
+    gis_csv_points.add_argument("--id-column", help="Optional feature ID column name.")
+    gis_csv_points.add_argument("--crs", default="EPSG:4326", help="CRS identifier to record on the GeoJSON output.")
+    gis_csv_points.add_argument("--delimiter", default=",", help="Single-character CSV delimiter.")
+    gis_csv_points.add_argument(
+        "--skip-invalid-rows",
+        action="store_true",
+        help="Skip invalid coordinate rows and record them in the receipt.",
+    )
+    gis_csv_points.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_csv_points.set_defaults(handler=run_gis_csv_points)
 
     ocr = subcommands.add_parser("ocr", help="Run local OCR analysis with source-image receipts.")
     ocr_subcommands = ocr.add_subparsers(dest="ocr_command", required=True)
@@ -1748,6 +1767,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_GEOMETRY_COMPARE_WARN",
         "GIS_REPROJECT_OK",
         "GIS_REPROJECT_WARN",
+        "GIS_CSV_POINTS_OK",
+        "GIS_CSV_POINTS_WARN",
     }:
         print(status)
         print(f"operation={payload.get('operation')}")
@@ -1756,9 +1777,18 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(f"report_sha256={payload.get('report_sha256')}")
         source = payload.get("source")
         if isinstance(source, dict):
-            print(f"feature_count={source.get('feature_count')}")
-            print(f"crs={source.get('crs')}")
-            print(f"crs_status={source.get('crs_status')}")
+            if "feature_count" in source:
+                print(f"feature_count={source.get('feature_count')}")
+            if "row_count" in source:
+                print(f"source_row_count={source.get('row_count')}")
+            if "sha256" in source:
+                print(f"source_sha256={source.get('sha256')}")
+            if "header_count" in source:
+                print(f"header_count={source.get('header_count')}")
+            if "crs" in source:
+                print(f"crs={source.get('crs')}")
+            if "crs_status" in source:
+                print(f"crs_status={source.get('crs_status')}")
         if payload.get("join_cardinality"):
             print(f"join_cardinality={payload.get('join_cardinality')}")
         if payload.get("match_on"):
@@ -1789,9 +1819,20 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "coordinate_dimension_mismatch_count",
                 "vertex_symmetric_difference_total",
                 "max_hausdorff_vertex_distance",
+                "required_columns_present",
+                "source_row_count",
+                "output_feature_count",
+                "skipped_row_count",
+                "row_accounting_closed",
+                "coordinate_dimension",
             ):
                 if key in invariants:
                     print(f"{key}={invariants.get(key)}")
+        skipped_rows = payload.get("skipped_rows")
+        if isinstance(skipped_rows, list) and skipped_rows:
+            for row in skipped_rows:
+                if isinstance(row, dict):
+                    print(f"skipped_row={row.get('row_number')} status={row.get('status')}")
         state_counts = payload.get("state_counts")
         if isinstance(state_counts, dict):
             for state, count in state_counts.items():
@@ -2094,6 +2135,28 @@ def run_gis_reproject(args: argparse.Namespace, cfg: Settings) -> int:
         path = cfg.project_root / path
     try:
         result = reproject_geojson(path, target_crs=args.target_crs, cfg=cfg, source_crs=args.source_crs)
+    except GISProcessingError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_gis_csv_points(args: argparse.Namespace, cfg: Settings) -> int:
+    path = Path(args.csv_path)
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        result = convert_csv_points_to_geojson(
+            path,
+            latitude_column=args.lat_column,
+            longitude_column=args.lon_column,
+            cfg=cfg,
+            id_column=args.id_column,
+            crs=args.crs,
+            delimiter=args.delimiter,
+            skip_invalid_rows=args.skip_invalid_rows,
+        )
     except GISProcessingError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2

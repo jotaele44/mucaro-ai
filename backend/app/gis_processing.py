@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import math
@@ -232,6 +233,165 @@ def _write_geojson_output(cfg: Settings, report_id: str, payload: dict[str, Any]
     path = cfg.export_dir / GIS_REPORT_DIR / f"{report_id}.geojson"
     write_json(path, payload)
     return {"path": str(path), "sha256": _sha256_file(path)}
+
+
+def _parse_csv_coordinate(value: Any, *, label: str, row_number: int) -> float:
+    try:
+        coordinate = float(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise GISProcessingError(
+            "ERROR_GIS_CSV_INVALID_COORDINATES",
+            f"CSV row {row_number} has invalid {label}: {value!r}",
+        ) from exc
+    if not math.isfinite(coordinate):
+        raise GISProcessingError(
+            "ERROR_GIS_CSV_INVALID_COORDINATES",
+            f"CSV row {row_number} has non-finite {label}: {value!r}",
+        )
+    return coordinate
+
+
+def _validate_csv_point_coordinate(lon: float, lat: float, *, crs: str, row_number: int) -> None:
+    if _normalize_crs_name(crs) != "EPSG:4326":
+        return
+    if lon < -180.0 or lon > 180.0:
+        raise GISProcessingError(
+            "ERROR_GIS_CSV_INVALID_COORDINATES",
+            f"CSV row {row_number} longitude outside EPSG:4326 range: {lon}",
+        )
+    if lat < -90.0 or lat > 90.0:
+        raise GISProcessingError(
+            "ERROR_GIS_CSV_INVALID_COORDINATES",
+            f"CSV row {row_number} latitude outside EPSG:4326 range: {lat}",
+        )
+
+
+def convert_csv_points_to_geojson(
+    path: Path,
+    *,
+    latitude_column: str,
+    longitude_column: str,
+    cfg: Settings = settings,
+    id_column: str | None = None,
+    crs: str = DEFAULT_CRS,
+    delimiter: str = ",",
+    skip_invalid_rows: bool = False,
+) -> dict[str, Any]:
+    cfg.ensure_dirs()
+    if not path.exists() or not path.is_file():
+        raise GISProcessingError("ERROR_GIS_INPUT_NOT_FOUND", f"CSV input not found: {path}")
+    if len(delimiter) != 1:
+        raise GISProcessingError("ERROR_GIS_CSV_DELIMITER_INVALID", "CSV delimiter must be exactly one character.")
+    if not latitude_column.strip() or not longitude_column.strip():
+        raise GISProcessingError("ERROR_GIS_CSV_REQUIRED_COLUMN_MISSING", "Latitude and longitude column names are required.")
+    if not crs.strip():
+        raise GISProcessingError("ERROR_GIS_CSV_CRS_INVALID", "CSV point CRS must be non-empty.")
+
+    try:
+        with path.open(encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle, delimiter=delimiter)
+            headers = list(reader.fieldnames or [])
+            rows = list(reader)
+    except UnicodeDecodeError as exc:
+        raise GISProcessingError("ERROR_GIS_CSV_ENCODING", f"CSV input is not valid UTF-8: {path}") from exc
+    except csv.Error as exc:
+        raise GISProcessingError("ERROR_GIS_CSV_INVALID", f"CSV input could not be parsed: {exc}") from exc
+
+    if not headers:
+        raise GISProcessingError("ERROR_GIS_CSV_HEADER_MISSING", "CSV input must include a header row.")
+    duplicate_headers = sorted({header for header in headers if headers.count(header) > 1})
+    if duplicate_headers:
+        raise GISProcessingError("ERROR_GIS_CSV_DUPLICATE_HEADERS", f"CSV input has duplicate headers: {', '.join(duplicate_headers)}")
+    required_columns = [latitude_column, longitude_column, *([id_column] if id_column else [])]
+    missing_columns = [column for column in required_columns if column not in headers]
+    if missing_columns:
+        raise GISProcessingError("ERROR_GIS_CSV_REQUIRED_COLUMN_MISSING", f"CSV input is missing columns: {', '.join(missing_columns)}")
+
+    features: list[dict[str, Any]] = []
+    skipped_rows: list[dict[str, Any]] = []
+    for index, row in enumerate(rows, start=2):
+        try:
+            lat = _parse_csv_coordinate(row.get(latitude_column), label=latitude_column, row_number=index)
+            lon = _parse_csv_coordinate(row.get(longitude_column), label=longitude_column, row_number=index)
+            _validate_csv_point_coordinate(lon, lat, crs=crs, row_number=index)
+        except GISProcessingError as exc:
+            if not skip_invalid_rows:
+                raise
+            skipped_rows.append({"row_number": index, "status": exc.status, "detail": exc.detail})
+            continue
+        feature_id = str(row.get(id_column) or "").strip() if id_column else ""
+        features.append(
+            {
+                "type": "Feature",
+                "id": feature_id or f"row_{index}",
+                "properties": {header: row.get(header) for header in headers},
+                "geometry": {"type": "Point", "coordinates": [lon, lat]},
+            }
+        )
+    if not features:
+        raise GISProcessingError("ERROR_GIS_CSV_NO_VALID_POINTS", "CSV conversion produced no valid point features.")
+
+    output_payload = {
+        "type": "FeatureCollection",
+        "crs": {"type": "name", "properties": {"name": crs.strip()}},
+        "features": features,
+    }
+    created_at = utc_now()
+    source_sha256 = _sha256_file(path)
+    report_id = stable_id(
+        "gisreport",
+        "csv_points",
+        str(path),
+        source_sha256,
+        latitude_column,
+        longitude_column,
+        id_column or "",
+        crs,
+        created_at,
+    )
+    output = _write_geojson_output(cfg, report_id, output_payload)
+    warnings = ["GIS_CSV_INVALID_ROWS_SKIPPED"] if skipped_rows else []
+    report = {
+        "schema_version": GIS_REPORT_SCHEMA_VERSION,
+        "report_id": report_id,
+        "status": "GIS_CSV_POINTS_OK" if not warnings else "GIS_CSV_POINTS_WARN",
+        "operation": "csv_points_to_geojson",
+        "created_at": created_at,
+        "parameters": {
+            "latitude_column": latitude_column,
+            "longitude_column": longitude_column,
+            "id_column": id_column,
+            "crs": crs.strip(),
+            "delimiter": delimiter,
+            "skip_invalid_rows": skip_invalid_rows,
+        },
+        "source": {
+            "path": str(path),
+            "sha256": source_sha256,
+            "encoding": "utf-8-sig",
+            "header": headers,
+            "header_count": len(headers),
+            "row_count": len(rows),
+        },
+        "output": {
+            "path": output["path"],
+            "sha256": output["sha256"],
+            "crs": crs.strip(),
+            "feature_count": len(features),
+        },
+        "skipped_rows": skipped_rows,
+        "invariants": {
+            "required_columns_present": not missing_columns,
+            "source_row_count": len(rows),
+            "output_feature_count": len(features),
+            "skipped_row_count": len(skipped_rows),
+            "row_accounting_closed": len(rows) == len(features) + len(skipped_rows),
+            "crs": crs.strip(),
+            "coordinate_dimension": "XY",
+        },
+        "warnings": warnings,
+    }
+    return _write_report(cfg, report)
 
 
 def inspect_geojson(path: Path, *, cfg: Settings = settings) -> dict[str, Any]:

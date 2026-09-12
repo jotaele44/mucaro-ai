@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import subprocess
 import sys
@@ -11,6 +12,7 @@ from .config import Settings
 from .gis_processing import (
     GISProcessingError,
     compare_geojson_geometries,
+    convert_csv_points_to_geojson,
     inspect_geojson,
     reproject_geojson,
     spatial_join_points_to_polygons,
@@ -28,7 +30,7 @@ GIS_QUALITY_FAILED = "GIS_QUALITY_CERT_FAILED"
 GIS_QUALITY_PROFILE = "v0.1.23-local-release"
 GIS_QUALITY_RECEIPT_TYPE = "gis_quality"
 
-VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "reproject"}
+VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "reproject", "csv_points"}
 
 
 def current_git_head(root: Path) -> str:
@@ -67,6 +69,25 @@ def _temp_settings(root: Path) -> Settings:
 def _write_geojson(path: Path, payload: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    return path
+
+
+def _write_csv(path: Path, payload: dict[str, Any]) -> Path:
+    headers = payload.get("header")
+    rows = payload.get("rows")
+    if not isinstance(headers, list) or not headers:
+        raise ValueError(f"{path.name} CSV input must include a non-empty header array")
+    if not isinstance(rows, list):
+        raise ValueError(f"{path.name} CSV input must include a rows array")
+    fieldnames = [str(header) for header in headers]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            if not isinstance(row, dict):
+                raise ValueError(f"{path.name} CSV row must be an object")
+            writer.writerow({field: row.get(field, "") for field in fieldnames})
     return path
 
 
@@ -144,8 +165,11 @@ def _materialize_inputs(case: dict[str, Any], input_root: Path) -> dict[str, Pat
     materialized: dict[str, Path] = {}
     for name, payload in inputs.items():
         if not isinstance(payload, dict):
-            raise ValueError(f"{case_id}.{name} input must be a GeoJSON object")
-        materialized[name] = _write_geojson(input_root / f"{case_id}_{name}.geojson", payload)
+            raise ValueError(f"{case_id}.{name} input must be an object")
+        if payload.get("format") == "csv":
+            materialized[name] = _write_csv(input_root / f"{case_id}_{name}.csv", payload)
+        else:
+            materialized[name] = _write_geojson(input_root / f"{case_id}_{name}.geojson", payload)
     return materialized
 
 
@@ -177,6 +201,17 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             cfg=cfg,
             target_crs=str(parameters.get("target_crs") or ""),
             source_crs=parameters.get("source_crs"),
+        )
+    if operation == "csv_points":
+        return convert_csv_points_to_geojson(
+            paths["csv"],
+            latitude_column=str(parameters.get("latitude_column") or ""),
+            longitude_column=str(parameters.get("longitude_column") or ""),
+            cfg=cfg,
+            id_column=parameters.get("id_column"),
+            crs=str(parameters.get("crs") or "EPSG:4326"),
+            delimiter=str(parameters.get("delimiter") or ","),
+            skip_invalid_rows=bool(parameters.get("skip_invalid_rows", False)),
         )
     raise ValueError(f"Unsupported GIS eval operation: {operation}")
 
