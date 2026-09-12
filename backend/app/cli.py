@@ -44,6 +44,7 @@ from .gis_processing import (
     convert_csv_points_to_geojson,
     filter_geojson_by_bbox,
     inspect_geojson,
+    measure_geojson,
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
@@ -540,6 +541,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gis_filter_bbox.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_filter_bbox.set_defaults(handler=run_gis_filter_bbox)
+
+    gis_measure = gis_subcommands.add_parser(
+        "measure",
+        help="Measure GeoJSON feature area/length in source coordinate units and write a GIS receipt.",
+    )
+    gis_measure.add_argument("geojson_path", help="Path to a GeoJSON FeatureCollection.")
+    gis_measure.add_argument(
+        "--coordinate-units",
+        default="source_crs_units",
+        help="Label for source coordinate units recorded in area/length fields.",
+    )
+    gis_measure.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_measure.set_defaults(handler=run_gis_measure)
 
     ocr = subcommands.add_parser("ocr", help="Run local OCR analysis with source-image receipts.")
     ocr_subcommands = ocr.add_subparsers(dest="ocr_command", required=True)
@@ -1790,6 +1804,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_CSV_POINTS_WARN",
         "GIS_BBOX_FILTER_OK",
         "GIS_BBOX_FILTER_WARN",
+        "GIS_MEASURE_OK",
+        "GIS_MEASURE_WARN",
     }:
         print(status)
         print(f"operation={payload.get('operation')}")
@@ -1853,6 +1869,17 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "skipped_row_count",
                 "row_accounting_closed",
                 "coordinate_dimension",
+                "feature_count",
+                "measured_feature_count",
+                "null_empty_count",
+                "invalid_count",
+                "unsupported_count",
+                "total_coordinate_count",
+                "total_part_count",
+                "total_ring_count",
+                "total_hole_count",
+                "total_area",
+                "total_length",
             ):
                 if key in invariants:
                     print(f"{key}={invariants.get(key)}")
@@ -2206,6 +2233,19 @@ def run_gis_filter_bbox(args: argparse.Namespace, cfg: Settings) -> int:
             cfg=cfg,
             mode=args.mode,
         )
+    except GISProcessingError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_gis_measure(args: argparse.Namespace, cfg: Settings) -> int:
+    path = Path(args.geojson_path)
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        result = measure_geojson(path, cfg=cfg, coordinate_units=args.coordinate_units)
     except GISProcessingError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2

@@ -15,6 +15,7 @@ from .gis_processing import (
     convert_csv_points_to_geojson,
     filter_geojson_by_bbox,
     inspect_geojson,
+    measure_geojson,
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
@@ -31,7 +32,7 @@ GIS_QUALITY_FAILED = "GIS_QUALITY_CERT_FAILED"
 GIS_QUALITY_PROFILE = "v0.1.23-local-release"
 GIS_QUALITY_RECEIPT_TYPE = "gis_quality"
 
-VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "reproject", "csv_points", "bbox_filter"}
+VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "reproject", "csv_points", "bbox_filter", "measure"}
 
 
 def current_git_head(root: Path) -> str:
@@ -226,6 +227,13 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             max_y=bbox[3],
             cfg=cfg,
             mode=str(parameters.get("mode") or "intersects"),
+        )
+    if operation == "measure":
+        coordinate_units = parameters.get("coordinate_units", "source_crs_units")
+        return measure_geojson(
+            paths["geojson"],
+            cfg=cfg,
+            coordinate_units=str(coordinate_units),
         )
     raise ValueError(f"Unsupported GIS eval operation: {operation}")
 

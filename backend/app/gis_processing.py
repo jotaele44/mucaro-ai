@@ -29,6 +29,14 @@ SUPPORTED_REPROJECT_GEOMETRY_TYPES = {
     "MultiPolygon",
 }
 SUPPORTED_BBOX_FILTER_MODES = {"intersects", "within"}
+SUPPORTED_MEASURE_GEOMETRY_TYPES = {
+    "Point",
+    "MultiPoint",
+    "LineString",
+    "MultiLineString",
+    "Polygon",
+    "MultiPolygon",
+}
 
 
 class GISProcessingError(RuntimeError):
@@ -552,6 +560,261 @@ def filter_geojson_by_bbox(
             "bounding-box filtering uses feature coordinate extents, not robust polygon clipping",
             "intersects mode is inclusive at bbox edges",
             "within mode requires the feature bbox to be fully inside the query bbox",
+        ],
+    }
+    return _write_report(cfg, report)
+
+
+def _line_length(coordinates: list[Any]) -> float:
+    if len(coordinates) < 2 or not all(_is_position(position) for position in coordinates):
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "LineString coordinates must contain at least two valid positions.")
+    return sum(math.dist(_xy(start), _xy(end)) for start, end in zip(coordinates, coordinates[1:]))
+
+
+def _multiline_length(coordinates: list[Any]) -> float:
+    if not coordinates or not all(isinstance(line, list) for line in coordinates):
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "MultiLineString coordinates must contain at least one line.")
+    return sum(_line_length(line) for line in coordinates)
+
+
+def _ring_signed_area(ring: list[Any]) -> float:
+    if not _ring_valid(ring):
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "Polygon rings must be closed and contain at least four positions.")
+    total = 0.0
+    for start, end in zip(ring, ring[1:]):
+        x1, y1 = _xy(start)
+        x2, y2 = _xy(end)
+        total += x1 * y2 - x2 * y1
+    return total / 2.0
+
+
+def _polygon_measurements(coordinates: list[Any]) -> dict[str, Any]:
+    if not _polygon_valid(coordinates):
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "Polygon coordinates must contain valid closed rings.")
+    outer_area = abs(_ring_signed_area(coordinates[0]))
+    hole_areas = [abs(_ring_signed_area(ring)) for ring in coordinates[1:]]
+    perimeter = sum(_line_length(ring) for ring in coordinates)
+    area = outer_area - sum(hole_areas)
+    warnings = ["GIS_MEASURE_HOLE_AREA_EXCEEDS_OUTER"] if area < -EPSILON else []
+    return {
+        "area": round(area, 12),
+        "length": round(perimeter, 12),
+        "ring_count": len(coordinates),
+        "hole_count": max(len(coordinates) - 1, 0),
+        "warnings": warnings,
+    }
+
+
+def _measure_geometry(geometry: dict[str, Any]) -> dict[str, Any]:
+    geometry_type = geometry.get("type")
+    coordinates = geometry.get("coordinates")
+    if geometry_type == "Point":
+        if not _is_position(coordinates):
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "Point coordinates must be a valid position.")
+        return {"area": 0.0, "length": 0.0, "part_count": 1, "ring_count": 0, "hole_count": 0, "warnings": []}
+    if geometry_type == "MultiPoint":
+        if not isinstance(coordinates, list) or not coordinates or not all(_is_position(position) for position in coordinates):
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "MultiPoint coordinates must contain valid positions.")
+        return {"area": 0.0, "length": 0.0, "part_count": len(coordinates), "ring_count": 0, "hole_count": 0, "warnings": []}
+    if geometry_type == "LineString":
+        if not isinstance(coordinates, list):
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "LineString coordinates must be an array.")
+        return {
+            "area": 0.0,
+            "length": round(_line_length(coordinates), 12),
+            "part_count": 1,
+            "ring_count": 0,
+            "hole_count": 0,
+            "warnings": [],
+        }
+    if geometry_type == "MultiLineString":
+        if not isinstance(coordinates, list):
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "MultiLineString coordinates must be an array.")
+        return {
+            "area": 0.0,
+            "length": round(_multiline_length(coordinates), 12),
+            "part_count": len(coordinates),
+            "ring_count": 0,
+            "hole_count": 0,
+            "warnings": [],
+        }
+    if geometry_type == "Polygon":
+        if not isinstance(coordinates, list):
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "Polygon coordinates must be an array.")
+        polygon = _polygon_measurements(coordinates)
+        return {**polygon, "part_count": 1}
+    if geometry_type == "MultiPolygon":
+        if not isinstance(coordinates, list) or not coordinates:
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "MultiPolygon coordinates must contain at least one polygon.")
+        polygons = [_polygon_measurements(polygon) for polygon in coordinates if isinstance(polygon, list)]
+        if len(polygons) != len(coordinates):
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "MultiPolygon members must be polygon coordinate arrays.")
+        warnings = sorted({warning for polygon in polygons for warning in polygon["warnings"]})
+        return {
+            "area": round(sum(float(polygon["area"]) for polygon in polygons), 12),
+            "length": round(sum(float(polygon["length"]) for polygon in polygons), 12),
+            "part_count": len(polygons),
+            "ring_count": sum(int(polygon["ring_count"]) for polygon in polygons),
+            "hole_count": sum(int(polygon["hole_count"]) for polygon in polygons),
+            "warnings": warnings,
+        }
+    raise GISProcessingError("ERROR_GIS_MEASURE_UNSUPPORTED_GEOMETRY", f"Unsupported geometry type for measurement: {geometry_type}")
+
+
+def measure_geojson(
+    path: Path,
+    *,
+    cfg: Settings = settings,
+    coordinate_units: str = "source_crs_units",
+) -> dict[str, Any]:
+    cfg.ensure_dirs()
+    source = _load_geojson(path)
+    raw_features = source.payload.get("features")
+    if not isinstance(raw_features, list):
+        raise GISProcessingError("ERROR_GIS_FEATURES_NOT_ARRAY", "GeoJSON FeatureCollection features must be an array.")
+    if not all(isinstance(feature, dict) for feature in raw_features):
+        raise GISProcessingError("ERROR_GIS_MEASURE_FEATURES_NOT_OBJECTS", "All GeoJSON features must be objects.")
+    if not coordinate_units.strip():
+        raise GISProcessingError("ERROR_GIS_MEASURE_UNITS_REQUIRED", "Coordinate units label is required.")
+
+    feature_measurements: list[dict[str, Any]] = []
+    state_counts = {"MEASURED": 0, "NULL_EMPTY": 0, "INVALID": 0, "UNSUPPORTED": 0}
+    total_area = 0.0
+    total_length = 0.0
+    total_coordinate_count = 0
+    total_part_count = 0
+    total_ring_count = 0
+    total_hole_count = 0
+
+    for index, feature in enumerate(raw_features):
+        geometry = feature.get("geometry")
+        classification = _classify_geometry(geometry)
+        feature_id = _feature_id(feature, index)
+        coordinate_count = len(_iter_positions(geometry.get("coordinates") if isinstance(geometry, dict) else None))
+        total_coordinate_count += coordinate_count
+        dimensions = _coordinate_dimension_summary(geometry if isinstance(geometry, dict) else None)
+        row = {
+            "feature_index": index,
+            "feature_id": feature_id,
+            "geometry_type": classification["geometry_type"],
+            "geometry_status": classification["geometry_status"],
+            "measurement_state": "UNSUPPORTED",
+            "bbox": _bbox_for_geometry(geometry) if isinstance(geometry, dict) else None,
+            "coordinate_count": coordinate_count,
+            "coordinate_dimension": dimensions["coordinate_dimension"],
+            "area": None,
+            "length": None,
+            "part_count": 0,
+            "ring_count": 0,
+            "hole_count": 0,
+            "warnings": list(classification["warnings"]),
+        }
+        if classification["geometry_status"] == "NULL_EMPTY":
+            if isinstance(geometry, dict) and isinstance(geometry.get("type"), str) and geometry["type"] not in SUPPORTED_MEASURE_GEOMETRY_TYPES:
+                row["measurement_state"] = "UNSUPPORTED"
+                row["geometry_status"] = "UNSUPPORTED"
+                row["warnings"] = [f"GEOMETRY_UNSUPPORTED:{geometry['type']}"]
+                state_counts["UNSUPPORTED"] += 1
+                feature_measurements.append(row)
+                continue
+            row["measurement_state"] = "NULL_EMPTY"
+            state_counts["NULL_EMPTY"] += 1
+            feature_measurements.append(row)
+            continue
+        if not isinstance(geometry, dict) or not isinstance(geometry.get("type"), str):
+            row["measurement_state"] = "INVALID"
+            state_counts["INVALID"] += 1
+            feature_measurements.append(row)
+            continue
+        if geometry["type"] not in SUPPORTED_MEASURE_GEOMETRY_TYPES:
+            row["measurement_state"] = "UNSUPPORTED"
+            state_counts["UNSUPPORTED"] += 1
+            feature_measurements.append(row)
+            continue
+        try:
+            measurements = _measure_geometry(geometry)
+        except GISProcessingError as exc:
+            row["measurement_state"] = "INVALID"
+            row["warnings"] = [exc.status]
+            state_counts["INVALID"] += 1
+            feature_measurements.append(row)
+            continue
+        row.update(
+            {
+                "measurement_state": "MEASURED",
+                "geometry_status": "VALID",
+                "area": measurements["area"],
+                "length": measurements["length"],
+                "part_count": measurements["part_count"],
+                "ring_count": measurements["ring_count"],
+                "hole_count": measurements["hole_count"],
+                "warnings": measurements["warnings"],
+            }
+        )
+        state_counts["MEASURED"] += 1
+        total_area += float(measurements["area"])
+        total_length += float(measurements["length"])
+        total_part_count += int(measurements["part_count"])
+        total_ring_count += int(measurements["ring_count"])
+        total_hole_count += int(measurements["hole_count"])
+        feature_measurements.append(row)
+
+    warnings = [
+        warning
+        for warning in [
+            "GIS_MEASURE_NO_MEASURABLE_FEATURES" if state_counts["MEASURED"] == 0 else "",
+            "GIS_MEASURE_NULL_EMPTY_GEOMETRY" if state_counts["NULL_EMPTY"] else "",
+            "GIS_MEASURE_INVALID_GEOMETRY" if state_counts["INVALID"] else "",
+            "GIS_MEASURE_UNSUPPORTED_GEOMETRY" if state_counts["UNSUPPORTED"] else "",
+            "GIS_MEASURE_HOLE_AREA_EXCEEDS_OUTER"
+            if any("GIS_MEASURE_HOLE_AREA_EXCEEDS_OUTER" in row["warnings"] for row in feature_measurements)
+            else "",
+        ]
+        if warning
+    ]
+    created_at = utc_now()
+    report_id = stable_id("gisreport", "measure", str(path), source.sha256, coordinate_units.strip(), created_at)
+    report = {
+        "schema_version": GIS_REPORT_SCHEMA_VERSION,
+        "report_id": report_id,
+        "status": "GIS_MEASURE_OK" if not warnings else "GIS_MEASURE_WARN",
+        "operation": "measure_geojson",
+        "created_at": created_at,
+        "parameters": {
+            "coordinate_units": coordinate_units.strip(),
+            "area_units": f"{coordinate_units.strip()}^2",
+            "length_units": coordinate_units.strip(),
+            "adapter": "local_planar_shoelace_v1",
+        },
+        "source": {
+            "path": str(path),
+            "sha256": source.sha256,
+            "crs": source.crs,
+            "crs_status": source.crs_status,
+            "feature_count": len(raw_features),
+        },
+        "measurements": feature_measurements,
+        "state_counts": state_counts,
+        "invariants": {
+            "crs": source.crs,
+            "feature_count": len(raw_features),
+            "measured_feature_count": state_counts["MEASURED"],
+            "null_empty_count": state_counts["NULL_EMPTY"],
+            "invalid_count": state_counts["INVALID"],
+            "unsupported_count": state_counts["UNSUPPORTED"],
+            "row_accounting_closed": len(raw_features) == sum(state_counts.values()),
+            "total_coordinate_count": total_coordinate_count,
+            "total_part_count": total_part_count,
+            "total_ring_count": total_ring_count,
+            "total_hole_count": total_hole_count,
+            "total_area": round(total_area, 12),
+            "total_length": round(total_length, 12),
+        },
+        "warnings": warnings,
+        "limitations": [
+            "measurements are planar in the source coordinate units, not geodesic",
+            "polygon area uses the shoelace formula and subtracts interior ring area",
+            "this command does not perform robust overlay, clipping, datum transformation, or topology repair",
         ],
     }
     return _write_report(cfg, report)

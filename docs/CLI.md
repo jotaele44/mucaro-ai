@@ -58,6 +58,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis reproject GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON between supported local CRS pairs and write a transformation receipt | 0 | 2 |
 | `mucaro gis csv-points CSV_PATH --lat-column LAT --lon-column LON` | Convert CSV coordinate rows into GeoJSON point features and write a row-accounted GIS receipt | 0 | 2 |
 | `mucaro gis filter-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Filter whole GeoJSON features by bbox extent and write retained/excluded accounting | 0 | 2 |
+| `mucaro gis measure GEOJSON_PATH` | Measure GeoJSON feature area/length in source coordinate units and write a planar GIS receipt | 0 | 2 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
@@ -132,6 +133,15 @@ bbox. Use `--mode within` when a feature's entire bbox must fit inside the
 query bbox. The command preserves CRS, writes a derived GeoJSON output, records
 per-feature filter states, and closes retained/excluded accounting. It does not
 clip or rewrite geometries; robust clipping and overlay remain future GIS work.
+
+`mucaro gis measure GEOJSON_PATH` measures Point, MultiPoint, LineString,
+MultiLineString, Polygon, and MultiPolygon features in the source coordinate
+units. Use `--coordinate-units` to label the receipt units. The command records
+per-feature measurement state, bbox, coordinate count, polygon hole count,
+aggregate area, aggregate length, null/invalid/unsupported geometry residue,
+and row-accounting closure. Polygon area uses local planar shoelace math with
+interior rings subtracted. It does not perform geodesic measurement, robust
+overlay, clipping, datum transformation, or topology repair.
 
 OCR analysis is intentionally separate from ingestion. `mucaro ocr analyze
 IMAGE_PATH` runs a local Tesseract engine against one image, preserves the
@@ -268,6 +278,8 @@ approved and audited.
 | `GIS_CSV_POINTS_WARN` | CSV point conversion completed after explicitly skipped invalid rows were recorded in the receipt |
 | `GIS_BBOX_FILTER_OK` | GeoJSON bbox filtering completed with CRS preserved and retained/excluded feature accounting closed |
 | `GIS_BBOX_FILTER_WARN` | GeoJSON bbox filtering completed while recording empty output, null/empty, or unresolved exclusions |
+| `GIS_MEASURE_OK` | GeoJSON planar measurement completed with feature accounting closed and no residue warnings |
+| `GIS_MEASURE_WARN` | GeoJSON planar measurement completed while recording null, invalid, unsupported, or malformed polygon-hole residue |
 | `GIS_EVAL_OK` | GIS fixture manifest validation and every configured spatial case passed |
 | `GIS_EVAL_FAILED` | GIS fixture validation failed or one or more spatial cases regressed |
 | `GIS_QUALITY_CERT_OK` | exact-head GIS fixture-quality certification wrote a release receipt |
@@ -296,6 +308,8 @@ approved and audited.
 | `ERROR_GIS_BBOX_INVALID` | GeoJSON bbox filtering received non-finite coordinates or inverted min/max extents |
 | `ERROR_GIS_BBOX_FILTER_MODE` | GeoJSON bbox filtering received an unsupported mode |
 | `ERROR_GIS_BBOX_FEATURES_NOT_OBJECTS` | GeoJSON bbox filtering found a non-object member in the feature array |
+| `ERROR_GIS_MEASURE_FEATURES_NOT_OBJECTS` | GeoJSON measurement found a non-object member in the feature array |
+| `ERROR_GIS_MEASURE_UNITS_REQUIRED` | GeoJSON measurement received an empty coordinate-units label |
 | `ERROR_OCR_INPUT_NOT_FOUND` | OCR input path does not exist |
 | `ERROR_OCR_UNSUPPORTED_INPUT` | OCR command received an unsupported input type; current OCR analysis supports local images only |
 | `ERROR_OCR_ENGINE_UNAVAILABLE` | local Tesseract executable was not found and no explicit `--tesseract-path` was supplied |

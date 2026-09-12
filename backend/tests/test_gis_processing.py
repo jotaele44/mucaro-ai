@@ -10,6 +10,7 @@ from backend.app.gis_processing import (
     convert_csv_points_to_geojson,
     filter_geojson_by_bbox,
     inspect_geojson,
+    measure_geojson,
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
@@ -79,6 +80,15 @@ def point_feature(feature_id: str, coordinates) -> dict:
         "id": feature_id,
         "properties": {"name": feature_id},
         "geometry": geometry,
+    }
+
+
+def line_feature(feature_id: str, coordinates: list[list[float]]) -> dict:
+    return {
+        "type": "Feature",
+        "id": feature_id,
+        "properties": {"name": feature_id},
+        "geometry": {"type": "LineString", "coordinates": coordinates},
     }
 
 
@@ -246,6 +256,92 @@ def test_filter_geojson_by_bbox_fails_closed_on_invalid_bbox(tmp_path: Path):
         assert exc.status == "ERROR_GIS_BBOX_INVALID"
     else:
         raise AssertionError("expected invalid bbox to fail closed")
+
+
+def test_measure_geojson_records_planar_area_length_and_residue(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(
+        tmp_path / "measured.geojson",
+        [
+            polygon_feature(
+                "donut",
+                [
+                    [[0, 0], [6, 0], [6, 6], [0, 6], [0, 0]],
+                    [[2, 2], [4, 2], [4, 4], [2, 4], [2, 2]],
+                ],
+            ),
+            line_feature("route", [[0, 0], [3, 4], [6, 4]]),
+            point_feature("null", None),
+        ],
+    )
+
+    result = measure_geojson(geojson, cfg=cfg, coordinate_units="meters")
+
+    assert result["status"] == "GIS_MEASURE_WARN"
+    assert result["warnings"] == ["GIS_MEASURE_NULL_EMPTY_GEOMETRY"]
+    assert result["parameters"]["adapter"] == "local_planar_shoelace_v1"
+    assert result["parameters"]["area_units"] == "meters^2"
+    assert result["state_counts"] == {"MEASURED": 2, "NULL_EMPTY": 1, "INVALID": 0, "UNSUPPORTED": 0}
+    assert result["invariants"]["row_accounting_closed"] is True
+    assert result["invariants"]["measured_feature_count"] == 2
+    assert result["invariants"]["total_area"] == 32.0
+    assert result["invariants"]["total_length"] == 40.0
+    assert result["invariants"]["total_ring_count"] == 2
+    assert result["invariants"]["total_hole_count"] == 1
+    by_id = {row["feature_id"]: row for row in result["measurements"]}
+    assert by_id["donut"]["area"] == 32.0
+    assert by_id["donut"]["length"] == 32.0
+    assert by_id["donut"]["hole_count"] == 1
+    assert by_id["route"]["length"] == 8.0
+    assert by_id["route"]["geometry_status"] == "VALID"
+    assert by_id["route"]["warnings"] == []
+    assert by_id["null"]["measurement_state"] == "NULL_EMPTY"
+    receipt = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
+    assert receipt["report_id"] == result["report_id"]
+    assert result["report_sha256"]
+
+
+def test_measure_geojson_records_invalid_and_unsupported_geometries(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(
+        tmp_path / "invalid.geojson",
+        [
+            line_feature("bad_line", [[0, 0]]),
+            {
+                "type": "Feature",
+                "id": "collection",
+                "properties": {},
+                "geometry": {"type": "GeometryCollection", "geometries": []},
+            },
+        ],
+    )
+
+    result = measure_geojson(geojson, cfg=cfg)
+
+    assert result["status"] == "GIS_MEASURE_WARN"
+    assert result["warnings"] == [
+        "GIS_MEASURE_NO_MEASURABLE_FEATURES",
+        "GIS_MEASURE_INVALID_GEOMETRY",
+        "GIS_MEASURE_UNSUPPORTED_GEOMETRY",
+    ]
+    assert result["state_counts"] == {"MEASURED": 0, "NULL_EMPTY": 0, "INVALID": 1, "UNSUPPORTED": 1}
+    assert result["invariants"]["row_accounting_closed"] is True
+    by_id = {row["feature_id"]: row for row in result["measurements"]}
+    assert by_id["bad_line"]["measurement_state"] == "INVALID"
+    assert "ERROR_GIS_MEASURE_INVALID_GEOMETRY" in by_id["bad_line"]["warnings"]
+    assert by_id["collection"]["measurement_state"] == "UNSUPPORTED"
+
+
+def test_measure_geojson_fails_closed_without_coordinate_units(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(tmp_path / "features.geojson", [point_feature("a", [1, 2])])
+
+    try:
+        measure_geojson(geojson, cfg=cfg, coordinate_units=" ")
+    except GISProcessingError as exc:
+        assert exc.status == "ERROR_GIS_MEASURE_UNITS_REQUIRED"
+    else:
+        raise AssertionError("expected empty coordinate units to fail closed")
 
 
 def test_inspect_geojson_preserves_crs_geometry_state_and_receipt(tmp_path: Path):

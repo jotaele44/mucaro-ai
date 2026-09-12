@@ -276,15 +276,17 @@ Observed success markers:
   governance gates are stronger.
   Advanced GIS now has narrow local GeoJSON inspection, point-in-polygon,
   geometry comparison, limited EPSG:4326/EPSG:3857 reprojection, CSV
-  point-to-GeoJSON conversion, and bbox feature-filter receipt candidates plus
-  a committed `mucaro eval gis` fixture harness covering dimensionality, join
-  multiplication, topology equality, reprojection, CSV
-  header/skipped-row/row-accounting evidence, bbox retained/excluded accounting,
-  fail-closed invalid bbox extents, and fail-closed invalid coordinates; full
-  GIS maturity remains open until robust topology, broader
-  CRS/datum/grid-shift/axis-order support, planar overlay checks, geometry
-  clipping, broader spatial format adapters, raster/vector processing,
-  map/export provenance, and a broader GIS eval corpus are proven.
+  point-to-GeoJSON conversion, bbox feature filtering, and planar area/length
+  measurement receipt candidates plus a committed `mucaro eval gis` fixture
+  harness covering dimensionality, join multiplication, topology equality,
+  reprojection, CSV header/skipped-row/row-accounting evidence, bbox
+  retained/excluded accounting, measurement units, polygon-hole area
+  subtraction, line length, null measurement residue, fail-closed invalid bbox
+  extents, fail-closed empty measurement units, and fail-closed invalid
+  coordinates; full GIS maturity remains open until robust topology, geodesic
+  measurement, broader CRS/datum/grid-shift/axis-order support, planar overlay
+  checks, geometry clipping, broader spatial format adapters, raster/vector
+  processing, map/export provenance, and a broader GIS eval corpus are proven.
   State-of-the-art OCR
   remains open, but a narrow local image OCR receipt candidate now preserves
   source-image hashes, Tesseract engine identity, raw/normalized/canonical text,

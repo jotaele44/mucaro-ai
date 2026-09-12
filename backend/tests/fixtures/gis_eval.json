@@ -1,9 +1,9 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 8,
-    "operation_count": 6,
-    "negative_case_count": 2
+    "case_count": 10,
+    "operation_count": 7,
+    "negative_case_count": 3
   },
   "cases": [
     {
@@ -686,6 +686,178 @@
       },
       "expect_error": true,
       "expected_status": "ERROR_GIS_BBOX_INVALID",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "measure_planar_polygon_line_and_null",
+      "operation": "measure",
+      "parameters": {
+        "coordinate_units": "meters"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:3857"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "donut",
+              "properties": {
+                "name": "donut"
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      6,
+                      0
+                    ],
+                    [
+                      6,
+                      6
+                    ],
+                    [
+                      0,
+                      6
+                    ],
+                    [
+                      0,
+                      0
+                    ]
+                  ],
+                  [
+                    [
+                      2,
+                      2
+                    ],
+                    [
+                      4,
+                      2
+                    ],
+                    [
+                      4,
+                      4
+                    ],
+                    [
+                      2,
+                      4
+                    ],
+                    [
+                      2,
+                      2
+                    ]
+                  ]
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "route",
+              "properties": {
+                "name": "route"
+              },
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    0,
+                    0
+                  ],
+                  [
+                    3,
+                    4
+                  ],
+                  [
+                    6,
+                    4
+                  ]
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "null_geom",
+              "properties": {
+                "name": "null_geom"
+              },
+              "geometry": null
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_MEASURE_WARN",
+      "expected_warnings": [
+        "GIS_MEASURE_NULL_EMPTY_GEOMETRY"
+      ],
+      "expected_invariants": {
+        "crs": "EPSG:3857",
+        "feature_count": 3,
+        "measured_feature_count": 2,
+        "null_empty_count": 1,
+        "invalid_count": 0,
+        "unsupported_count": 0,
+        "row_accounting_closed": true,
+        "total_area": 32.0,
+        "total_length": 40.0,
+        "total_ring_count": 2,
+        "total_hole_count": 1
+      },
+      "expected_fields": {
+        "parameters.adapter": "local_planar_shoelace_v1",
+        "parameters.area_units": "meters^2",
+        "state_counts.MEASURED": 2,
+        "state_counts.NULL_EMPTY": 1,
+        "measurements.0.area": 32.0,
+        "measurements.0.hole_count": 1,
+        "measurements.1.length": 8.0,
+        "measurements.2.measurement_state": "NULL_EMPTY"
+      }
+    },
+    {
+      "case_id": "measure_units_required_fails_closed",
+      "operation": "measure",
+      "parameters": {
+        "coordinate_units": ""
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "point",
+              "properties": {
+                "name": "point"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  1,
+                  2
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_MEASURE_UNITS_REQUIRED",
       "expected_warnings": []
     },
     {
