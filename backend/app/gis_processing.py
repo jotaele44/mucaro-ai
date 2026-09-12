@@ -9,6 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from shapely.errors import ShapelyError
+from shapely.geometry import box as shapely_box
+from shapely.geometry import mapping as shapely_mapping
+from shapely.geometry import shape as shapely_shape
+
 from .config import Settings, settings
 from .utils import stable_id, utc_now, write_json
 
@@ -30,6 +35,14 @@ SUPPORTED_REPROJECT_GEOMETRY_TYPES = {
     "MultiPolygon",
 }
 SUPPORTED_BBOX_FILTER_MODES = {"intersects", "within"}
+SUPPORTED_CLIP_GEOMETRY_TYPES = {
+    "Point",
+    "MultiPoint",
+    "LineString",
+    "MultiLineString",
+    "Polygon",
+    "MultiPolygon",
+}
 SUPPORTED_MEASURE_GEOMETRY_TYPES = {
     "Point",
     "MultiPoint",
@@ -195,6 +208,18 @@ def _ring_valid(ring: Any) -> bool:
     )
 
 
+def _multipoint_valid(coordinates: Any) -> bool:
+    return isinstance(coordinates, list) and bool(coordinates) and all(_is_position(position) for position in coordinates)
+
+
+def _line_valid(coordinates: Any) -> bool:
+    return isinstance(coordinates, list) and len(coordinates) >= 2 and all(_is_position(position) for position in coordinates)
+
+
+def _multiline_valid(coordinates: Any) -> bool:
+    return isinstance(coordinates, list) and bool(coordinates) and all(_line_valid(line) for line in coordinates)
+
+
 def _polygon_valid(coordinates: Any) -> bool:
     return isinstance(coordinates, list) and bool(coordinates) and all(_ring_valid(ring) for ring in coordinates)
 
@@ -212,6 +237,12 @@ def _classify_geometry(geometry: Any) -> dict[str, Any]:
         return {"geometry_type": geometry_type, "geometry_status": "NULL_EMPTY", "warnings": ["GEOMETRY_COORDINATES_EMPTY"]}
     if geometry_type == "Point":
         valid = _is_position(coordinates)
+    elif geometry_type == "MultiPoint":
+        valid = _multipoint_valid(coordinates)
+    elif geometry_type == "LineString":
+        valid = _line_valid(coordinates)
+    elif geometry_type == "MultiLineString":
+        valid = _multiline_valid(coordinates)
     elif geometry_type == "Polygon":
         valid = _polygon_valid(coordinates)
     elif geometry_type == "MultiPolygon":
@@ -577,6 +608,228 @@ def filter_geojson_by_bbox(
             "reject the filter result if input_feature_count does not equal retained plus excluded feature counts",
             "reject the output if any retained feature lacks a RETAINED_* filter state in the receipt",
             "recompute source and output SHA-256 values before using the filtered GeoJSON as current evidence",
+        ],
+    }
+    return _write_report(cfg, report)
+
+
+def _json_geometry(value: Any) -> Any:
+    if isinstance(value, tuple):
+        return [_json_geometry(item) for item in value]
+    if isinstance(value, list):
+        return [_json_geometry(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _json_geometry(item) for key, item in value.items()}
+    return value
+
+
+def _shapely_geojson_geometry(geometry: dict[str, Any]) -> Any:
+    try:
+        shaped = shapely_shape(geometry)
+    except (AttributeError, ShapelyError, TypeError, ValueError) as exc:
+        raise GISProcessingError("ERROR_GIS_CLIP_INVALID_GEOMETRY", f"Geometry could not be loaded by Shapely: {exc}") from exc
+    if shaped.is_empty:
+        return shaped
+    if not shaped.is_valid:
+        raise GISProcessingError("ERROR_GIS_CLIP_INVALID_TOPOLOGY", "Geometry is not topologically valid for clipping.")
+    return shaped
+
+
+def clip_geojson_by_bbox(
+    path: Path,
+    *,
+    min_x: float,
+    min_y: float,
+    max_x: float,
+    max_y: float,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    cfg.ensure_dirs()
+    source = _load_geojson(path)
+    query_bbox = _validate_bbox((min_x, min_y, max_x, max_y))
+    raw_features = source.payload.get("features")
+    if not isinstance(raw_features, list):
+        raise GISProcessingError("ERROR_GIS_FEATURES_NOT_ARRAY", "GeoJSON FeatureCollection features must be an array.")
+    if not all(isinstance(feature, dict) for feature in raw_features):
+        raise GISProcessingError("ERROR_GIS_CLIP_FEATURES_NOT_OBJECTS", "All GeoJSON features must be objects.")
+
+    clip_bounds = shapely_box(*query_bbox)
+    output_features: list[dict[str, Any]] = []
+    feature_receipts: list[dict[str, Any]] = []
+    state_counts = {
+        "RETAINED_UNCHANGED": 0,
+        "RETAINED_CLIPPED": 0,
+        "EXCLUDED_OUTSIDE": 0,
+        "EXCLUDED_NULL_EMPTY": 0,
+        "EXCLUDED_UNRESOLVED": 0,
+    }
+    source_coordinate_count = 0
+    output_coordinate_count = 0
+
+    for index, feature in enumerate(raw_features):
+        geometry = feature.get("geometry")
+        classification = _classify_geometry(geometry)
+        feature_id = _feature_id(feature, index)
+        source_bbox = _bbox_for_geometry(geometry) if isinstance(geometry, dict) else None
+        source_count = len(_iter_positions(geometry.get("coordinates") if isinstance(geometry, dict) else None))
+        source_coordinate_count += source_count
+        dimensions = _coordinate_dimension_summary(geometry if isinstance(geometry, dict) else None)
+        row = {
+            "feature_index": index,
+            "feature_id": feature_id,
+            "source_geometry_type": classification["geometry_type"],
+            "source_geometry_status": classification["geometry_status"],
+            "source_bbox": source_bbox,
+            "output_geometry_type": None,
+            "output_bbox": None,
+            "source_coordinate_count": source_count,
+            "output_coordinate_count": 0,
+            "coordinate_dimension": dimensions["coordinate_dimension"],
+            "clip_state": "EXCLUDED_UNRESOLVED",
+            "warnings": list(classification["warnings"]),
+        }
+        if classification["geometry_status"] == "NULL_EMPTY":
+            row["clip_state"] = "EXCLUDED_NULL_EMPTY"
+            state_counts["EXCLUDED_NULL_EMPTY"] += 1
+            feature_receipts.append(row)
+            continue
+        if not isinstance(geometry, dict) or not isinstance(geometry.get("type"), str):
+            row["warnings"] = row["warnings"] or ["GEOMETRY_INVALID"]
+            state_counts["EXCLUDED_UNRESOLVED"] += 1
+            feature_receipts.append(row)
+            continue
+        if geometry["type"] not in SUPPORTED_CLIP_GEOMETRY_TYPES:
+            row["warnings"] = [f"GIS_CLIP_UNSUPPORTED_GEOMETRY:{geometry['type']}"]
+            state_counts["EXCLUDED_UNRESOLVED"] += 1
+            feature_receipts.append(row)
+            continue
+        if dimensions["has_z"] or dimensions["has_m"]:
+            row["warnings"] = ["GIS_CLIP_COORDINATE_DIMENSION_UNSUPPORTED"]
+            state_counts["EXCLUDED_UNRESOLVED"] += 1
+            feature_receipts.append(row)
+            continue
+        try:
+            source_geometry = _shapely_geojson_geometry(geometry)
+            clipped = source_geometry.intersection(clip_bounds)
+        except GISProcessingError as exc:
+            row["warnings"] = [exc.status]
+            state_counts["EXCLUDED_UNRESOLVED"] += 1
+            feature_receipts.append(row)
+            continue
+        except (AttributeError, ShapelyError, TypeError, ValueError) as exc:
+            row["warnings"] = ["ERROR_GIS_CLIP_RUNTIME"]
+            row["error_detail"] = str(exc)
+            state_counts["EXCLUDED_UNRESOLVED"] += 1
+            feature_receipts.append(row)
+            continue
+
+        if clipped.is_empty:
+            row["clip_state"] = "EXCLUDED_OUTSIDE"
+            row["warnings"] = []
+            state_counts["EXCLUDED_OUTSIDE"] += 1
+            feature_receipts.append(row)
+            continue
+        if clipped.geom_type not in SUPPORTED_CLIP_GEOMETRY_TYPES:
+            row["warnings"] = [f"GIS_CLIP_OUTPUT_UNSUPPORTED_GEOMETRY:{clipped.geom_type}"]
+            state_counts["EXCLUDED_UNRESOLVED"] += 1
+            feature_receipts.append(row)
+            continue
+
+        output_geometry = _json_geometry(shapely_mapping(clipped))
+        output_count = len(_iter_positions(output_geometry.get("coordinates") if isinstance(output_geometry, dict) else None))
+        output_coordinate_count += output_count
+        output_bbox = _bbox_for_geometry(output_geometry) if isinstance(output_geometry, dict) else None
+        clip_state = "RETAINED_UNCHANGED" if source_geometry.equals(clipped) else "RETAINED_CLIPPED"
+        retained_feature = deepcopy(feature)
+        retained_feature["geometry"] = output_geometry
+        output_features.append(retained_feature)
+        row.update(
+            {
+                "clip_state": clip_state,
+                "output_geometry_type": output_geometry.get("type") if isinstance(output_geometry, dict) else None,
+                "output_bbox": output_bbox,
+                "output_coordinate_count": output_count,
+                "warnings": [],
+            }
+        )
+        state_counts[clip_state] += 1
+        feature_receipts.append(row)
+
+    output_payload = deepcopy(source.payload)
+    output_payload["features"] = output_features
+    created_at = utc_now()
+    report_id = stable_id(
+        "gisreport",
+        "clip_bbox",
+        source.sha256,
+        *[str(value) for value in query_bbox],
+        created_at,
+    )
+    output = _write_geojson_output(cfg, report_id, output_payload)
+    unresolved_count = state_counts["EXCLUDED_UNRESOLVED"]
+    null_empty_count = state_counts["EXCLUDED_NULL_EMPTY"]
+    retained_count = state_counts["RETAINED_UNCHANGED"] + state_counts["RETAINED_CLIPPED"]
+    warnings = [
+        warning
+        for warning in [
+            "GIS_CLIP_BBOX_EMPTY" if retained_count == 0 else "",
+            "GIS_CLIP_BBOX_NULL_EMPTY_EXCLUDED" if null_empty_count else "",
+            "GIS_CLIP_BBOX_UNRESOLVED_EXCLUDED" if unresolved_count else "",
+        ]
+        if warning
+    ]
+    report = {
+        "schema_version": GIS_REPORT_SCHEMA_VERSION,
+        "report_id": report_id,
+        "status": "GIS_CLIP_BBOX_OK" if not warnings else "GIS_CLIP_BBOX_WARN",
+        "operation": "clip_geojson_by_bbox",
+        "created_at": created_at,
+        "parameters": {
+            "bbox": query_bbox,
+            "adapter": "shapely_bbox_intersection_v1",
+            "supported_geometry_types": sorted(SUPPORTED_CLIP_GEOMETRY_TYPES),
+        },
+        "source": {
+            "path": str(path),
+            "sha256": source.sha256,
+            "crs": source.crs,
+            "crs_status": source.crs_status,
+            "feature_count": len(raw_features),
+        },
+        "output": {
+            "path": output["path"],
+            "sha256": output["sha256"],
+            "crs": source.crs,
+            "feature_count": len(output_features),
+        },
+        "features": feature_receipts,
+        "state_counts": state_counts,
+        "invariants": {
+            "crs": source.crs,
+            "input_feature_count": len(raw_features),
+            "output_feature_count": len(output_features),
+            "retained_feature_count": retained_count,
+            "clipped_feature_count": state_counts["RETAINED_CLIPPED"],
+            "unchanged_feature_count": state_counts["RETAINED_UNCHANGED"],
+            "excluded_feature_count": state_counts["EXCLUDED_OUTSIDE"] + null_empty_count + unresolved_count,
+            "excluded_outside_count": state_counts["EXCLUDED_OUTSIDE"],
+            "excluded_null_empty_count": null_empty_count,
+            "excluded_unresolved_count": unresolved_count,
+            "row_accounting_closed": len(raw_features) == retained_count + state_counts["EXCLUDED_OUTSIDE"] + null_empty_count + unresolved_count,
+            "source_coordinate_count": source_coordinate_count,
+            "output_coordinate_count": output_coordinate_count,
+            "crs_preserved": True,
+        },
+        "warnings": warnings,
+        "limitations": [
+            "bbox clipping uses a local Shapely intersection adapter against an axis-aligned bbox",
+            "Z and M coordinate dimensions are not clipped in this adapter and are recorded as unresolved residue",
+            "this command does not reproject inputs, repair invalid topology, or perform non-bbox overlay analysis",
+        ],
+        "falsification_criteria": [
+            "reject the clipped output if row_accounting_closed or crs_preserved is false",
+            "reject clipped geometry claims if unresolved residue exists inside the claimed scope",
+            "validate material clipping results against an independent GIS engine before legal-boundary or engineering use",
         ],
     }
     return _write_report(cfg, report)

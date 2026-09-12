@@ -512,6 +512,43 @@ def test_cli_gis_inspect_and_point_in_polygon(tmp_path: Path, capsys):
         main(
             [
                 "gis",
+                "clip-bbox",
+                str(polygons_path),
+                "--min-x",
+                "0",
+                "--min-y",
+                "0",
+                "--max-x",
+                "2",
+                "--max-y",
+                "2",
+                "--format",
+                "text",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    clip_output = capsys.readouterr().out
+    assert "GIS_CLIP_BBOX_OK" in clip_output
+    assert "operation=clip_geojson_by_bbox" in clip_output
+    assert "adapter=shapely_bbox_intersection_v1" in clip_output
+    assert "bbox=[0.0, 0.0, 2.0, 2.0]" in clip_output
+    assert "output_path=" in clip_output
+    assert "input_feature_count=1" in clip_output
+    assert "retained_feature_count=1" in clip_output
+    assert "clipped_feature_count=1" in clip_output
+    assert "unchanged_feature_count=0" in clip_output
+    assert "excluded_feature_count=0" in clip_output
+    assert "source_coordinate_count=5" in clip_output
+    assert "output_coordinate_count=5" in clip_output
+    assert "row_accounting_closed=True" in clip_output
+    assert "RETAINED_CLIPPED=1" in clip_output
+
+    assert (
+        main(
+            [
+                "gis",
                 "filter-bbox",
                 str(points_path),
                 "--min-x",
@@ -531,6 +568,30 @@ def test_cli_gis_inspect_and_point_in_polygon(tmp_path: Path, capsys):
     )
     filter_error_output = capsys.readouterr().err
     assert "ERROR_GIS_BBOX_INVALID" in filter_error_output
+
+    assert (
+        main(
+            [
+                "gis",
+                "clip-bbox",
+                str(points_path),
+                "--min-x",
+                "10",
+                "--min-y",
+                "0",
+                "--max-x",
+                "0",
+                "--max-y",
+                "10",
+                "--format",
+                "text",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    clip_error_output = capsys.readouterr().err
+    assert "ERROR_GIS_BBOX_INVALID" in clip_error_output
 
     csv_path = tmp_path / "points.csv"
     csv_path.write_text(
@@ -1374,18 +1435,20 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 12
-    assert payload["counts"]["passed"] == 12
+    assert payload["counts"]["cases"] == 14
+    assert payload["counts"]["passed"] == 14
     assert payload["counts"]["failed"] == 0
-    assert payload["counts"]["operations"] == 7
-    assert payload["counts"]["negative_cases"] == 4
+    assert payload["counts"]["operations"] == 8
+    assert payload["counts"]["negative_cases"] == 5
 
     assert main(["eval", "gis", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_EVAL_OK" in text_output
-    assert "operation_count=7" in text_output
+    assert "operation_count=8" in text_output
     assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
     assert "PASS bbox_filter bbox_filter_invalid_bbox_fails_closed" in text_output
+    assert "PASS clip_bbox clip_bbox_polygon_point_and_residue" in text_output
+    assert "PASS clip_bbox clip_bbox_invalid_bbox_fails_closed" in text_output
     assert "PASS measure measure_planar_polygon_line_and_null" in text_output
     assert "PASS measure measure_geodesic_wgs84_square" in text_output
     assert "PASS measure measure_geodesic_non_wgs84_fails_closed" in text_output
@@ -1442,8 +1505,10 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
-    assert "eval_case_count=12" in text_output
+    assert "eval_case_count=14" in text_output
     assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
+    assert "PASS clip_bbox clip_bbox_polygon_point_and_residue" in text_output
+    assert "PASS clip_bbox clip_bbox_invalid_bbox_fails_closed" in text_output
     assert "PASS measure measure_planar_polygon_line_and_null" in text_output
     assert "PASS measure measure_geodesic_wgs84_square" in text_output
     assert "PASS measure measure_geodesic_non_wgs84_fails_closed" in text_output

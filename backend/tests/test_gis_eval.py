@@ -12,13 +12,13 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 12,
-        "passed": 12,
+        "cases": 14,
+        "passed": 14,
         "failed": 0,
-        "positive_cases": 8,
-        "negative_cases": 4,
-        "operations": 7,
-        "operation_names": ["bbox_filter", "compare", "csv_points", "inspect", "measure", "point_in_polygon", "reproject"],
+        "positive_cases": 9,
+        "negative_cases": 5,
+        "operations": 8,
+        "operation_names": ["bbox_filter", "clip_bbox", "compare", "csv_points", "inspect", "measure", "point_in_polygon", "reproject"],
     }
     by_id = {case["case_id"]: case for case in report["cases"]}
     assert by_id["inspect_dimensionality"]["observed_status"] == "GIS_INSPECT_OK"
@@ -30,6 +30,13 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["bbox_filter_intersects_with_null_residue"]["observed_status"] == "GIS_BBOX_FILTER_WARN"
     assert by_id["bbox_filter_invalid_bbox_fails_closed"]["case_type"] == "negative"
     assert by_id["bbox_filter_invalid_bbox_fails_closed"]["observed_status"] == "ERROR_GIS_BBOX_INVALID"
+    assert by_id["clip_bbox_polygon_point_and_residue"]["observed_status"] == "GIS_CLIP_BBOX_WARN"
+    assert by_id["clip_bbox_polygon_point_and_residue"]["observed_warnings"] == [
+        "GIS_CLIP_BBOX_NULL_EMPTY_EXCLUDED",
+        "GIS_CLIP_BBOX_UNRESOLVED_EXCLUDED",
+    ]
+    assert by_id["clip_bbox_invalid_bbox_fails_closed"]["case_type"] == "negative"
+    assert by_id["clip_bbox_invalid_bbox_fails_closed"]["observed_status"] == "ERROR_GIS_BBOX_INVALID"
     assert by_id["measure_planar_polygon_line_and_null"]["observed_status"] == "GIS_MEASURE_WARN"
     assert by_id["measure_planar_polygon_line_and_null"]["observed_warnings"] == ["GIS_MEASURE_NULL_EMPTY_GEOMETRY"]
     assert by_id["measure_geodesic_wgs84_square"]["observed_status"] == "GIS_MEASURE_OK"

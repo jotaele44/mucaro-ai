@@ -6,6 +6,7 @@ from pathlib import Path
 from backend.app.config import Settings
 from backend.app.gis_processing import (
     GISProcessingError,
+    clip_geojson_by_bbox,
     compare_geojson_geometries,
     convert_csv_points_to_geojson,
     filter_geojson_by_bbox,
@@ -256,6 +257,69 @@ def test_filter_geojson_by_bbox_fails_closed_on_invalid_bbox(tmp_path: Path):
         assert exc.status == "ERROR_GIS_BBOX_INVALID"
     else:
         raise AssertionError("expected invalid bbox to fail closed")
+
+
+def test_clip_geojson_by_bbox_clips_geometries_and_records_residue(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(
+        tmp_path / "clip.geojson",
+        [
+            polygon_feature("wide", [[[-1, -1], [3, -1], [3, 3], [-1, 3], [-1, -1]]]),
+            point_feature("inside", [1, 1]),
+            point_feature("outside", [5, 5]),
+            point_feature("null_geom", None),
+            point_feature("z_point", [1, 1, 7]),
+        ],
+    )
+
+    result = clip_geojson_by_bbox(geojson, min_x=0, min_y=0, max_x=2, max_y=2, cfg=cfg)
+
+    assert result["status"] == "GIS_CLIP_BBOX_WARN"
+    assert result["parameters"]["bbox"] == [0.0, 0.0, 2.0, 2.0]
+    assert result["parameters"]["adapter"] == "shapely_bbox_intersection_v1"
+    assert result["warnings"] == ["GIS_CLIP_BBOX_NULL_EMPTY_EXCLUDED", "GIS_CLIP_BBOX_UNRESOLVED_EXCLUDED"]
+    assert result["source"]["feature_count"] == 5
+    assert result["output"]["feature_count"] == 2
+    assert result["state_counts"] == {
+        "RETAINED_UNCHANGED": 1,
+        "RETAINED_CLIPPED": 1,
+        "EXCLUDED_OUTSIDE": 1,
+        "EXCLUDED_NULL_EMPTY": 1,
+        "EXCLUDED_UNRESOLVED": 1,
+    }
+    assert result["invariants"]["crs_preserved"] is True
+    assert result["invariants"]["row_accounting_closed"] is True
+    assert result["invariants"]["retained_feature_count"] == 2
+    assert result["invariants"]["clipped_feature_count"] == 1
+    assert result["invariants"]["unchanged_feature_count"] == 1
+    assert result["invariants"]["excluded_feature_count"] == 3
+    assert result["invariants"]["source_coordinate_count"] == 8
+    assert result["invariants"]["output_coordinate_count"] == 6
+    by_id = {row["feature_id"]: row for row in result["features"]}
+    assert by_id["wide"]["clip_state"] == "RETAINED_CLIPPED"
+    assert by_id["wide"]["output_bbox"] == [0.0, 0.0, 2.0, 2.0]
+    assert by_id["inside"]["clip_state"] == "RETAINED_UNCHANGED"
+    assert by_id["outside"]["clip_state"] == "EXCLUDED_OUTSIDE"
+    assert by_id["null_geom"]["clip_state"] == "EXCLUDED_NULL_EMPTY"
+    assert by_id["z_point"]["clip_state"] == "EXCLUDED_UNRESOLVED"
+    assert by_id["z_point"]["warnings"] == ["GIS_CLIP_COORDINATE_DIMENSION_UNSUPPORTED"]
+    output = json.loads(Path(result["output"]["path"]).read_text(encoding="utf-8"))
+    assert [feature["id"] for feature in output["features"]] == ["wide", "inside"]
+    receipt = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
+    assert receipt["report_id"] == result["report_id"]
+    assert result["report_sha256"]
+
+
+def test_clip_geojson_by_bbox_fails_closed_on_invalid_bbox(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(tmp_path / "features.geojson", [point_feature("inside", [5, 5])])
+
+    try:
+        clip_geojson_by_bbox(geojson, min_x=10, min_y=0, max_x=0, max_y=10, cfg=cfg)
+    except GISProcessingError as exc:
+        assert exc.status == "ERROR_GIS_BBOX_INVALID"
+    else:
+        raise AssertionError("expected invalid clip bbox to fail closed")
 
 
 def test_measure_geojson_records_planar_area_length_and_residue(tmp_path: Path):

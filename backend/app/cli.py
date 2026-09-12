@@ -40,6 +40,7 @@ from .db import list_payloads
 from .execution_gate import analyze_task
 from .gis_processing import (
     GISProcessingError,
+    clip_geojson_by_bbox,
     compare_geojson_geometries,
     convert_csv_points_to_geojson,
     filter_geojson_by_bbox,
@@ -543,6 +544,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gis_filter_bbox.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_filter_bbox.set_defaults(handler=run_gis_filter_bbox)
+
+    gis_clip_bbox = gis_subcommands.add_parser(
+        "clip-bbox",
+        help="Clip GeoJSON geometries to a bounding box and write retained/excluded accounting.",
+    )
+    gis_clip_bbox.add_argument("geojson_path", help="Path to a GeoJSON FeatureCollection.")
+    gis_clip_bbox.add_argument("--min-x", type=float, required=True, help="Minimum X/longitude of the clipping bbox.")
+    gis_clip_bbox.add_argument("--min-y", type=float, required=True, help="Minimum Y/latitude of the clipping bbox.")
+    gis_clip_bbox.add_argument("--max-x", type=float, required=True, help="Maximum X/longitude of the clipping bbox.")
+    gis_clip_bbox.add_argument("--max-y", type=float, required=True, help="Maximum Y/latitude of the clipping bbox.")
+    gis_clip_bbox.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_clip_bbox.set_defaults(handler=run_gis_clip_bbox)
 
     gis_measure = gis_subcommands.add_parser(
         "measure",
@@ -1872,6 +1885,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_CSV_POINTS_WARN",
         "GIS_BBOX_FILTER_OK",
         "GIS_BBOX_FILTER_WARN",
+        "GIS_CLIP_BBOX_OK",
+        "GIS_CLIP_BBOX_WARN",
         "GIS_MEASURE_OK",
         "GIS_MEASURE_WARN",
     }:
@@ -1900,7 +1915,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"match_on={payload.get('match_on')}")
         parameters = payload.get("parameters")
         if isinstance(parameters, dict):
-            for key in ("measurement_mode", "adapter", "coordinate_units", "area_units", "length_units"):
+            for key in ("measurement_mode", "adapter", "coordinate_units", "area_units", "length_units", "mode", "bbox"):
                 if key in parameters:
                     print(f"{key}={parameters.get(key)}")
         output = payload.get("output")
@@ -1934,10 +1949,14 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "output_feature_count",
                 "input_feature_count",
                 "retained_feature_count",
+                "clipped_feature_count",
+                "unchanged_feature_count",
                 "excluded_feature_count",
                 "excluded_outside_count",
                 "excluded_null_empty_count",
                 "excluded_unresolved_count",
+                "source_coordinate_count",
+                "output_coordinate_count",
                 "output_crs",
                 "skipped_row_count",
                 "row_accounting_closed",
@@ -2305,6 +2324,26 @@ def run_gis_filter_bbox(args: argparse.Namespace, cfg: Settings) -> int:
             max_y=args.max_y,
             cfg=cfg,
             mode=args.mode,
+        )
+    except GISProcessingError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_gis_clip_bbox(args: argparse.Namespace, cfg: Settings) -> int:
+    path = Path(args.geojson_path)
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        result = clip_geojson_by_bbox(
+            path,
+            min_x=args.min_x,
+            min_y=args.min_y,
+            max_x=args.max_x,
+            max_y=args.max_y,
+            cfg=cfg,
         )
     except GISProcessingError as exc:
         emit_error(exc.status, exc.detail, args.format)

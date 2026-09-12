@@ -60,6 +60,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis reproject GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON between supported local CRS pairs and write a transformation receipt | 0 | 2 |
 | `mucaro gis csv-points CSV_PATH --lat-column LAT --lon-column LON` | Convert CSV coordinate rows into GeoJSON point features and write a row-accounted GIS receipt | 0 | 2 |
 | `mucaro gis filter-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Filter whole GeoJSON features by bbox extent and write retained/excluded accounting | 0 | 2 |
+| `mucaro gis clip-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Clip GeoJSON geometries to a bbox and write clipped/unchanged/excluded accounting | 0 | 2 |
 | `mucaro gis measure GEOJSON_PATH` | Measure GeoJSON feature area/length with planar or EPSG:4326 geodesic receipts | 0 | 2 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
@@ -135,7 +136,19 @@ retains whole GeoJSON features whose coordinate extent intersects the query
 bbox. Use `--mode within` when a feature's entire bbox must fit inside the
 query bbox. The command preserves CRS, writes a derived GeoJSON output, records
 per-feature filter states, and closes retained/excluded accounting. It does not
-clip or rewrite geometries; robust clipping and overlay remain future GIS work.
+clip or rewrite geometries.
+
+`mucaro gis clip-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y`
+clips Point, MultiPoint, LineString, MultiLineString, Polygon, and MultiPolygon
+GeoJSON geometries against an axis-aligned bbox with the local Shapely
+intersection adapter. The command preserves CRS, writes a derived GeoJSON
+output, records per-feature `RETAINED_CLIPPED`, `RETAINED_UNCHANGED`,
+`EXCLUDED_OUTSIDE`, `EXCLUDED_NULL_EMPTY`, and `EXCLUDED_UNRESOLVED` states,
+records source/output coordinate counts, and closes retained/excluded/clipped
+accounting. Z and M dimensions are not flattened; they are recorded as
+unresolved residue until a dimension-preserving clipping adapter is added.
+Non-bbox overlay, repair of invalid topology, raster/vector engines, and
+ellipsoidal GIS-engine validation remain future GIS work.
 
 `mucaro gis measure GEOJSON_PATH` measures Point, MultiPoint, LineString,
 MultiLineString, Polygon, and MultiPolygon features. The default
@@ -300,6 +313,8 @@ approved and audited.
 | `GIS_CSV_POINTS_WARN` | CSV point conversion completed after explicitly skipped invalid rows were recorded in the receipt |
 | `GIS_BBOX_FILTER_OK` | GeoJSON bbox filtering completed with CRS preserved and retained/excluded feature accounting closed |
 | `GIS_BBOX_FILTER_WARN` | GeoJSON bbox filtering completed while recording empty output, null/empty, or unresolved exclusions |
+| `GIS_CLIP_BBOX_OK` | GeoJSON bbox clipping completed with CRS preserved and clipped/unchanged/excluded feature accounting closed |
+| `GIS_CLIP_BBOX_WARN` | GeoJSON bbox clipping completed while recording empty output, null/empty, or unresolved dimensional/topology exclusions |
 | `GIS_MEASURE_OK` | GeoJSON planar or geodesic measurement completed with feature accounting closed and no residue warnings |
 | `GIS_MEASURE_WARN` | GeoJSON planar or geodesic measurement completed while recording null, invalid, unsupported, coordinate, or malformed polygon-hole residue |
 | `GIS_EVAL_OK` | GIS fixture manifest validation and every configured spatial case passed |
@@ -332,6 +347,9 @@ approved and audited.
 | `ERROR_GIS_BBOX_INVALID` | GeoJSON bbox filtering received non-finite coordinates or inverted min/max extents |
 | `ERROR_GIS_BBOX_FILTER_MODE` | GeoJSON bbox filtering received an unsupported mode |
 | `ERROR_GIS_BBOX_FEATURES_NOT_OBJECTS` | GeoJSON bbox filtering found a non-object member in the feature array |
+| `ERROR_GIS_CLIP_FEATURES_NOT_OBJECTS` | GeoJSON bbox clipping found a non-object member in the feature array |
+| `ERROR_GIS_CLIP_INVALID_GEOMETRY` | GeoJSON bbox clipping could not load a geometry through the local Shapely adapter |
+| `ERROR_GIS_CLIP_INVALID_TOPOLOGY` | GeoJSON bbox clipping found invalid topology and recorded unresolved residue instead of repairing it silently |
 | `ERROR_GIS_MEASURE_FEATURES_NOT_OBJECTS` | GeoJSON measurement found a non-object member in the feature array |
 | `ERROR_GIS_MEASURE_UNITS_REQUIRED` | GeoJSON measurement received an empty coordinate-units label |
 | `ERROR_GIS_MEASURE_MODE_UNSUPPORTED` | GeoJSON measurement received an unsupported measurement mode |
@@ -642,8 +660,9 @@ Use `mucaro capabilities validate-gis-report REPORT_PATH` to check a saved GIS
 receipt against the executable advanced-capability output contract. The
 validator checks report schema, status, operation, source/input provenance,
 source hashes, CRS where present, warning structure, asserted row/conservation
-invariants, and operation-specific fields for bbox plus planar/geodesic measurement
-reports. It returns `CAPABILITY_OUTPUT_CONTRACT_FAILED` when a report claims a
+invariants, and operation-specific fields for bbox filtering, bbox clipping,
+and planar/geodesic measurement reports. It returns
+`CAPABILITY_OUTPUT_CONTRACT_FAILED` when a report claims a
 warning status without warnings, asserts false accounting, omits hashes, or
 misses required measurement/bbox fields. This is an enforcement bridge between
 the descriptive capability contract and concrete GIS receipts; broader GIS
@@ -683,7 +702,8 @@ operators. Current cases cover coordinate dimensionality, point-in-polygon
 holes and join multiplication, geometry comparison with rotated polygon rings,
 limited EPSG:4326 to EPSG:3857 reprojection, CSV point conversion with explicit
 invalid-row skipping, bbox filtering with null-residue accounting, fail-closed
-invalid bbox extents, and fail-closed invalid Web Mercator latitude handling.
+invalid bbox extents, bbox clipping with null and dimensional residue
+accounting, and fail-closed invalid Web Mercator latitude handling.
 It returns `GIS_EVAL_OK` only when the fixture and every case pass;
 `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives automation a hard
 regression signal.

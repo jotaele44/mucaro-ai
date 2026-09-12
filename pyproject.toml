@@ -14,6 +14,7 @@ dependencies = [
     "python-multipart==0.0.29",
     "jsonschema==4.26.0",
     "pypdf==6.4.1",
+    "shapely==2.1.2",
 ]
 
 [project.optional-dependencies]

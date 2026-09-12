@@ -11,6 +11,7 @@ from typing import Any
 from .config import Settings
 from .gis_processing import (
     GISProcessingError,
+    clip_geojson_by_bbox,
     compare_geojson_geometries,
     convert_csv_points_to_geojson,
     filter_geojson_by_bbox,
@@ -32,7 +33,7 @@ GIS_QUALITY_FAILED = "GIS_QUALITY_CERT_FAILED"
 GIS_QUALITY_PROFILE = "v0.1.23-local-release"
 GIS_QUALITY_RECEIPT_TYPE = "gis_quality"
 
-VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "reproject", "csv_points", "bbox_filter", "measure"}
+VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "reproject", "csv_points", "bbox_filter", "clip_bbox", "measure"}
 
 
 def current_git_head(root: Path) -> str:
@@ -227,6 +228,18 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             max_y=bbox[3],
             cfg=cfg,
             mode=str(parameters.get("mode") or "intersects"),
+        )
+    if operation == "clip_bbox":
+        bbox = parameters.get("bbox")
+        if not isinstance(bbox, list) or len(bbox) != 4:
+            raise ValueError("clip_bbox parameters.bbox must be a four-number array")
+        return clip_geojson_by_bbox(
+            paths["geojson"],
+            min_x=bbox[0],
+            min_y=bbox[1],
+            max_x=bbox[2],
+            max_y=bbox[3],
+            cfg=cfg,
         )
     if operation == "measure":
         coordinate_units = parameters.get("coordinate_units", "source_crs_units")

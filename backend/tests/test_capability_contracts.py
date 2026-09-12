@@ -36,6 +36,7 @@ def test_capability_contracts_cover_expanded_scope_without_overclaiming():
         assert contract["unavailable_until"]
 
     assert "crs" in contracts["advanced_gis_processing"]["provenance_fields"]
+    assert "clip_adapter" in contracts["advanced_gis_processing"]["provenance_fields"]
     assert contracts["advanced_gis_processing"]["implementation_status"] == "CANDIDATE"
     assert "ocr_engine" in contracts["state_of_art_ocr_analysis"]["provenance_fields"]
     assert contracts["state_of_art_ocr_analysis"]["implementation_status"] == "CANDIDATE"
@@ -118,6 +119,61 @@ def test_validate_gis_report_contract_accepts_geodesic_measurement_receipts():
         "warnings": [],
         "limitations": ["local spherical geodesic measurement fixture"],
         "falsification_criteria": ["reject if source CRS is not EPSG:4326"],
+    }
+
+    result = validate_gis_report_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert result["counts"]["fail"] == 0
+
+
+def test_validate_gis_report_contract_accepts_bbox_clip_receipts():
+    report = {
+        "schema_version": "mucaro_gis_report_v1",
+        "report_id": "gisreport_clip",
+        "status": "GIS_CLIP_BBOX_WARN",
+        "operation": "clip_geojson_by_bbox",
+        "created_at": "2026-09-12T00:00:00Z",
+        "parameters": {
+            "bbox": [0.0, 0.0, 2.0, 2.0],
+            "adapter": "shapely_bbox_intersection_v1",
+            "supported_geometry_types": ["LineString", "Point", "Polygon"],
+        },
+        "source": {
+            "path": "fixtures/clip.geojson",
+            "sha256": "d" * 64,
+            "crs": "EPSG:4326",
+            "feature_count": 5,
+        },
+        "output": {
+            "path": "data/exports/gis_reports/gisreport_clip.geojson",
+            "sha256": "e" * 64,
+            "crs": "EPSG:4326",
+            "feature_count": 2,
+        },
+        "features": [],
+        "state_counts": {
+            "RETAINED_UNCHANGED": 1,
+            "RETAINED_CLIPPED": 1,
+            "EXCLUDED_OUTSIDE": 1,
+            "EXCLUDED_NULL_EMPTY": 1,
+            "EXCLUDED_UNRESOLVED": 1,
+        },
+        "invariants": {
+            "row_accounting_closed": True,
+            "crs_preserved": True,
+            "input_feature_count": 5,
+            "output_feature_count": 2,
+            "retained_feature_count": 2,
+            "clipped_feature_count": 1,
+            "unchanged_feature_count": 1,
+            "excluded_feature_count": 3,
+            "source_coordinate_count": 8,
+            "output_coordinate_count": 6,
+        },
+        "warnings": ["GIS_CLIP_BBOX_UNRESOLVED_EXCLUDED"],
+        "limitations": ["local bbox clipping fixture"],
+        "falsification_criteria": ["reject if clipped feature accounting does not close"],
     }
 
     result = validate_gis_report_contract(report)

@@ -178,6 +178,20 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 _contract_check("bbox.retained_count_present", isinstance(_dotted(report, "invariants.retained_feature_count"), int), "retained_feature_count must be recorded"),
             ]
         )
+    elif operation == "clip_geojson_by_bbox":
+        checks.extend(
+            [
+                _contract_check("clip.parameters.bbox", isinstance(_dotted(report, "parameters.bbox"), list) and len(_dotted(report, "parameters.bbox")) == 4, "clip reports must record four query bbox values"),
+                _contract_check("clip.parameters.adapter", _dotted(report, "parameters.adapter") == "shapely_bbox_intersection_v1", "clip reports must name the Shapely bbox intersection adapter"),
+                _contract_check("clip.output_hash", bool(_dotted(report, "output.sha256")), "clip reports must record derived output hash"),
+                _contract_check("clip.retained_count_present", isinstance(_dotted(report, "invariants.retained_feature_count"), int), "retained_feature_count must be recorded"),
+                _contract_check("clip.clipped_count_present", isinstance(_dotted(report, "invariants.clipped_feature_count"), int), "clipped_feature_count must be recorded"),
+                _contract_check("clip.unchanged_count_present", isinstance(_dotted(report, "invariants.unchanged_feature_count"), int), "unchanged_feature_count must be recorded"),
+                _contract_check("clip.excluded_count_present", isinstance(_dotted(report, "invariants.excluded_feature_count"), int), "excluded_feature_count must be recorded"),
+                _contract_check("clip.source_coordinate_count_present", isinstance(_dotted(report, "invariants.source_coordinate_count"), int), "source coordinate count must be recorded"),
+                _contract_check("clip.output_coordinate_count_present", isinstance(_dotted(report, "invariants.output_coordinate_count"), int), "output coordinate count must be recorded"),
+            ]
+        )
 
     failed = [check for check in checks if check["status"] == "FAIL"]
     return {
@@ -407,6 +421,8 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "crs_transform_adapter",
                 "query_bbox",
                 "bbox_filter_mode",
+                "clip_bbox",
+                "clip_adapter",
                 "geometry_type",
                 "feature_count",
                 "retained_feature_count",
@@ -436,6 +452,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "geometry comparisons separate exact coordinate equality from topological equality",
                 "CSV-derived point features preserve raw properties and close source/output/skipped row counts",
                 "bbox filtering preserves CRS and closes retained/excluded feature counts",
+                "bbox clipping preserves CRS and closes retained/excluded/clipped/unchanged feature counts",
                 "planar and geodesic measurements preserve CRS, units labels, per-feature residue, and total area/length accounting",
             ),
             positive_regression_gates=(
@@ -444,6 +461,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "reprojection fixture records source CRS, target CRS, adapter identity, output hash, and row/coordinate conservation",
                 "CSV point fixture records header, source rows, output features, skipped rows, CRS, and output hash",
                 "bbox filter fixture records query bbox, filter mode, retained features, excluded features, NULL/EMPTY residue, CRS, and output hash",
+                "bbox clip fixture records query bbox, adapter identity, clipped features, unchanged features, unresolved Z/M residue, CRS, and output hash",
                 "planar measurement fixture records polygon area with holes, line length, null residue, units, and aggregate totals",
                 "geodesic measurement fixture records EPSG:4326 source CRS, meter units, adapter identity, and aggregate totals",
                 "GIS report contract validator accepts real saved measurement receipts and rejects weak provenance or false accounting",
@@ -455,6 +473,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "unsupported CRS transformation fails closed without output synthesis",
                 "CSV point conversion fails closed on missing required headers, duplicate headers, malformed coordinates, and no valid output features",
                 "bbox filtering fails closed on malformed query extents and unsupported modes",
+                "bbox clipping fails closed on malformed query extents and records Z/M dimensionality as unresolved residue",
                 "planar measurement fails closed on missing units and records invalid or unsupported geometries as residue",
                 "geodesic measurement fails closed for non-EPSG:4326 sources and records invalid longitude/latitude coordinates as residue",
                 "GIS report contract validation fails when warning status, source hashes, CRS, or asserted accounting are missing or inconsistent",
