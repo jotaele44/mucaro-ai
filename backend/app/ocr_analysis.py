@@ -232,5 +232,15 @@ def analyze_image_ocr(
             "bounding_boxes_have_source_coordinates": all(bool(span["bbox"]) for span in spans),
         },
         "warnings": warnings,
+        "limitations": [
+            "local OCR currently supports image files only, not PDF page rendering or document containers",
+            "layout evidence is word/span level and does not reconstruct tables, forms, handwriting, or reading order beyond engine output",
+            "confidence values are engine-reported and require corpus calibration before broad document-intelligence claims",
+        ],
+        "falsification_criteria": [
+            "reject the OCR report if span_count does not equal the number of saved spans",
+            "reject text claims if raw, normalized, and canonical text are not preserved as separate fields",
+            "treat low or unknown confidence spans as review-required evidence instead of corrected text",
+        ],
     }
     return _write_report(cfg, report)

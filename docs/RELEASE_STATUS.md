@@ -294,10 +294,13 @@ Observed success markers:
   State-of-the-art OCR
   remains open, but a narrow local image OCR receipt candidate now preserves
   source-image hashes, Tesseract engine identity, raw/normalized/canonical text,
-  confidence states, source-coordinate spans, and no-text states; PDF/page
-  rendering, calibrated layout reconstruction, representative document fixtures,
-  table/form/handwriting coverage, optional provider policy, and confidence
-  thresholds remain open. Governed web browsing
+  confidence states, source-coordinate spans, no-text states, limitations, and
+  falsification criteria. `mucaro capabilities validate-ocr-report` checks saved
+  image OCR reports for source-image metadata, engine identity, confidence
+  scale, text tiers, warning consistency, and span/confidence accounting;
+  PDF/page rendering, calibrated layout reconstruction, representative document
+  fixtures, table/form/handwriting coverage, optional provider policy, and
+  confidence thresholds remain open. Governed web browsing
   has candidate `web.fetch` snapshot,
   ledger, operator-supplied multi-page session receipts, robots/cache metadata,
   redirect-target robots evidence, HTML body/structure traces, PDF/non-text
@@ -305,7 +308,7 @@ Observed success markers:
   citation policy, and web citation fixture evidence, while automated search/discovery,
   rendered-browser capture, autonomous link-following, coding/programming
   expertise, cross-capability transparency/objectivity governance beyond the
-  initial GIS output validator, and hosted GitHub governance remain open. Tag
+  initial GIS/OCR output validators, and hosted GitHub governance remain open. Tag
   binding is verified separately by the release-state and GitHub
   governance commands.
 - `mucaro audit roadmap` groups the same product-audit rows into development

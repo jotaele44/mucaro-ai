@@ -53,6 +53,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro certify operator-workflow` | Write an exact-head local operator-workflow release receipt | 0 | 2 |
 | `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
 | `mucaro capabilities validate-gis-report REPORT_PATH` | Validate a saved GIS receipt against the advanced capability output contract | 0 | 2 |
+| `mucaro capabilities validate-ocr-report REPORT_PATH` | Validate a saved OCR receipt against the state-of-the-art OCR output contract | 0 | 2 |
 | `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry receipt | 0 | 2 |
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
@@ -152,6 +153,16 @@ bounding boxes, warnings, and a JSON receipt under `data/exports/ocr_reports`.
 It is a narrow local image receipt candidate; PDF/page rendering, calibrated
 document layout, handwriting, tables/forms, and optional external OCR providers
 remain future governed-document-intelligence work.
+
+Use `mucaro capabilities validate-ocr-report REPORT_PATH` to check a saved OCR
+receipt against the executable state-of-the-art OCR output contract. The
+validator checks report schema, source-image hashes and dimensions, local engine
+identity, confidence scale, raw/normalized/canonical text tiers, span bounding
+boxes, warning consistency, limitations, falsification criteria, and computed
+span/confidence accounting. It returns `CAPABILITY_OUTPUT_CONTRACT_FAILED` when
+a report omits source or engine proof, claims text without saved spans, misses a
+required no-text or low-confidence warning, or asserts span/confidence counts
+that do not match the saved spans.
 
 ## Output Contracts
 
@@ -286,7 +297,7 @@ approved and audited.
 | `GIS_QUALITY_CERT_OK` | exact-head GIS fixture-quality certification wrote a release receipt |
 | `GIS_QUALITY_CERT_FAILED` | exact-head GIS fixture-quality certification failed or could not write a receipt |
 | `CAPABILITY_OUTPUT_CONTRACT_OK` | Saved advanced-capability output passed the executable contract validator |
-| `CAPABILITY_OUTPUT_CONTRACT_FAILED` | Saved advanced-capability output is missing required provenance, invariant, warning, or operation-specific contract fields |
+| `CAPABILITY_OUTPUT_CONTRACT_FAILED` | Saved advanced-capability output is missing required provenance, invariant, warning, limit, falsification, or operation-specific contract fields |
 | `OCR_ANALYSIS_OK` | Local image OCR completed with at least one extracted text span and wrote an OCR receipt |
 | `OCR_ANALYSIS_NO_TEXT` | Local image OCR completed without extracting text; no text was synthesized |
 | `ERROR_GIS_INPUT_NOT_FOUND` | GeoJSON input path does not exist |
@@ -622,8 +633,9 @@ invariants, and operation-specific fields for bbox and planar measurement
 reports. It returns `CAPABILITY_OUTPUT_CONTRACT_FAILED` when a report claims a
 warning status without warnings, asserts false accounting, omits hashes, or
 misses required measurement/bbox fields. This is an enforcement bridge between
-the descriptive capability contract and concrete GIS receipts; broader OCR,
-web, retrieval, and coding validators remain future work.
+the descriptive capability contract and concrete GIS receipts; broader GIS
+operation-specific checks plus web, retrieval, and coding validators remain
+future work.
 
 Use `mucaro eval retrieval` to run the committed retrieval-quality fixture from
 the supported CLI surface. The command reports the fixture path, chunk/query

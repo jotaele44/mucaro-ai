@@ -210,6 +210,65 @@ def test_cli_ocr_analyze_reports_receipt_summary(tmp_path: Path, capsys, monkeyp
     assert "warnings=OCR_UNKNOWN_CONFIDENCE_PRESENT" in output
 
 
+def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    report = {
+        "schema_version": "mucaro_ocr_report_v1",
+        "report_id": "ocrreport_cli",
+        "status": "OCR_ANALYSIS_NO_TEXT",
+        "operation": "image_ocr",
+        "created_at": "2026-09-12T00:00:00Z",
+        "source": {
+            "path": "fixtures/blank.png",
+            "sha256": "c" * 64,
+            "mime_type": "image/png",
+            "media_kind": "image",
+            "bytes": 64,
+            "width": 8,
+            "height": 6,
+            "parser_warnings": [],
+        },
+        "engine": {
+            "name": "tesseract",
+            "version": "tesseract 5.3.0",
+            "language": "eng",
+            "layout_mode": "single_block",
+            "confidence_scale": "0-100",
+        },
+        "text": {"raw": "", "normalized": "", "canonical": ""},
+        "spans": [],
+        "invariants": {
+            "raw_normalized_canonical_separated": True,
+            "span_count": 0,
+            "low_confidence_count": 0,
+            "unknown_confidence_count": 0,
+            "empty_text_state": True,
+            "bounding_boxes_have_source_coordinates": True,
+        },
+        "warnings": ["OCR_NO_TEXT_DETECTED"],
+        "limitations": ["image-only OCR fixture"],
+        "falsification_criteria": ["reject if no-text state is not explicit"],
+    }
+    report_path = tmp_path / "ocr-report.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-ocr-report", str(report_path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["capability_id"] == "state_of_art_ocr_analysis"
+    assert payload["operation"] == "image_ocr"
+    assert payload["counts"]["fail"] == 0
+
+    report["warnings"] = []
+    weak_report = tmp_path / "weak-ocr-report.json"
+    weak_report.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-ocr-report", str(weak_report), "--format", "text"], cfg=cfg) == 2
+    output = capsys.readouterr().out
+    assert "CAPABILITY_OUTPUT_CONTRACT_FAILED" in output
+    assert "FAIL no_text_status_has_warning" in output
+
+
 def test_cli_ocr_analyze_reports_adapter_errors(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     image = tmp_path / "scan.png"

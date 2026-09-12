@@ -10,6 +10,7 @@ CAPABILITY_CONTRACT_SCHEMA_VERSION = "mucaro_advanced_capability_contracts_v1"
 CAPABILITY_OUTPUT_CONTRACT_OK = "CAPABILITY_OUTPUT_CONTRACT_OK"
 CAPABILITY_OUTPUT_CONTRACT_FAILED = "CAPABILITY_OUTPUT_CONTRACT_FAILED"
 GIS_REPORT_SCHEMA_VERSION = "mucaro_gis_report_v1"
+OCR_REPORT_SCHEMA_VERSION = "mucaro_ocr_report_v1"
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,10 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _non_empty_string_list(value: Any) -> bool:
+    return isinstance(value, list) and bool(value) and all(isinstance(item, str) and item for item in value)
+
+
 def _validate_source_identity(payload: dict[str, Any]) -> list[dict[str, str]]:
     checks: list[dict[str, str]] = []
     source = payload.get("source")
@@ -115,8 +120,8 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
         _contract_check("created_at_present", bool(report.get("created_at")), "created_at is required"),
         _contract_check("warnings_array", isinstance(report.get("warnings"), list), "warnings must be an array"),
         _contract_check("invariants_object", isinstance(report.get("invariants"), dict), "invariants must be an object"),
-        _contract_check("limitations_non_empty", isinstance(report.get("limitations"), list) and all(isinstance(item, str) and item for item in report.get("limitations", [])) and bool(report.get("limitations")), "limitations must be non-empty strings"),
-        _contract_check("falsification_criteria_non_empty", isinstance(report.get("falsification_criteria"), list) and all(isinstance(item, str) and item for item in report.get("falsification_criteria", [])) and bool(report.get("falsification_criteria")), "falsification criteria must be non-empty strings"),
+        _contract_check("limitations_non_empty", _non_empty_string_list(report.get("limitations")), "limitations must be non-empty strings"),
+        _contract_check("falsification_criteria_non_empty", _non_empty_string_list(report.get("falsification_criteria")), "falsification criteria must be non-empty strings"),
     ]
     checks.extend(_validate_source_identity(report))
 
@@ -205,6 +210,164 @@ def validate_gis_report_file(path: Path) -> dict[str, Any]:
     if not isinstance(report, dict):
         report = {}
     return validate_gis_report_contract(report, report_path=str(path))
+
+
+def validate_ocr_report_contract(report: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
+    checks: list[dict[str, str]] = [
+        _contract_check("payload_object", isinstance(report, dict), "report payload must be a JSON object"),
+        _contract_check("schema_version", report.get("schema_version") == OCR_REPORT_SCHEMA_VERSION, f"schema_version must be {OCR_REPORT_SCHEMA_VERSION}"),
+        _contract_check("report_id_present", bool(report.get("report_id")), "report_id is required"),
+        _contract_check("status_valid", report.get("status") in {"OCR_ANALYSIS_OK", "OCR_ANALYSIS_NO_TEXT"}, "status must be OCR_ANALYSIS_OK or OCR_ANALYSIS_NO_TEXT"),
+        _contract_check("operation", report.get("operation") == "image_ocr", "OCR reports must use image_ocr operation"),
+        _contract_check("created_at_present", bool(report.get("created_at")), "created_at is required"),
+        _contract_check("warnings_array", isinstance(report.get("warnings"), list), "warnings must be an array"),
+        _contract_check("invariants_object", isinstance(report.get("invariants"), dict), "invariants must be an object"),
+        _contract_check("limitations_non_empty", _non_empty_string_list(report.get("limitations")), "limitations must be non-empty strings"),
+        _contract_check("falsification_criteria_non_empty", _non_empty_string_list(report.get("falsification_criteria")), "falsification criteria must be non-empty strings"),
+    ]
+
+    source = report.get("source")
+    checks.append(_contract_check("source_object", isinstance(source, dict), "source image metadata must be recorded"))
+    if isinstance(source, dict):
+        checks.extend(
+            [
+                _contract_check("source.sha256_present", bool(source.get("sha256")), "source image must record a SHA-256"),
+                _contract_check("source.mime_type_present", bool(source.get("mime_type")), "source image MIME type must be recorded"),
+                _contract_check("source.media_kind_image", source.get("media_kind") == "image", "OCR source media_kind must be image"),
+                _contract_check("source.bytes_positive", isinstance(source.get("bytes"), int) and source["bytes"] > 0, "source image byte count must be positive"),
+                _contract_check("source.width_positive", isinstance(source.get("width"), int) and source["width"] > 0, "source image width must be positive"),
+                _contract_check("source.height_positive", isinstance(source.get("height"), int) and source["height"] > 0, "source image height must be positive"),
+                _contract_check("source.parser_warnings_array", isinstance(source.get("parser_warnings"), list), "source parser warnings must be an array"),
+            ]
+        )
+
+    engine = report.get("engine")
+    checks.append(_contract_check("engine_object", isinstance(engine, dict), "OCR engine metadata must be recorded"))
+    if isinstance(engine, dict):
+        checks.extend(
+            [
+                _contract_check("engine.name", engine.get("name") == "tesseract", "current OCR reports must identify the local Tesseract engine"),
+                _contract_check("engine.version_present", bool(engine.get("version")), "OCR engine version must be recorded"),
+                _contract_check("engine.language_present", bool(engine.get("language")), "OCR language must be recorded"),
+                _contract_check("engine.layout_mode_present", bool(engine.get("layout_mode")), "OCR layout mode must be recorded"),
+                _contract_check("engine.confidence_scale", engine.get("confidence_scale") == "0-100", "OCR confidence scale must be 0-100"),
+            ]
+        )
+
+    text = report.get("text")
+    checks.append(_contract_check("text_object", isinstance(text, dict), "OCR text tiers must be recorded"))
+    if isinstance(text, dict):
+        raw = text.get("raw")
+        normalized = text.get("normalized")
+        canonical = text.get("canonical")
+        checks.extend(
+            [
+                _contract_check("text.raw_string", isinstance(raw, str), "raw OCR text must be a string"),
+                _contract_check("text.normalized_string", isinstance(normalized, str), "normalized OCR text must be a string"),
+                _contract_check("text.canonical_string", isinstance(canonical, str), "canonical OCR text must be a string"),
+                _contract_check("text.canonical_matches_normalized", isinstance(normalized, str) and canonical == normalized.casefold(), "canonical OCR text must derive from normalized text"),
+            ]
+        )
+
+    spans = report.get("spans")
+    checks.append(_contract_check("spans_array", isinstance(spans, list), "OCR spans must be an array"))
+    valid_span_count = 0
+    low_confidence_count = 0
+    unknown_confidence_count = 0
+    if isinstance(spans, list):
+        for index, span in enumerate(spans):
+            if not isinstance(span, dict):
+                checks.append(_contract_check(f"spans.{index}.object", False, "each OCR span must be an object"))
+                continue
+            valid_span_count += 1
+            state = span.get("confidence_state")
+            bbox = span.get("bbox")
+            if state == "LOW":
+                low_confidence_count += 1
+            if state == "UNKNOWN":
+                unknown_confidence_count += 1
+            checks.extend(
+                [
+                    _contract_check(f"spans.{index}.raw_text_string", isinstance(span.get("raw_text"), str), "span raw_text must be a string"),
+                    _contract_check(f"spans.{index}.normalized_text_string", isinstance(span.get("normalized_text"), str), "span normalized_text must be a string"),
+                    _contract_check(f"spans.{index}.canonical_text_string", isinstance(span.get("canonical_text"), str), "span canonical_text must be a string"),
+                    _contract_check(f"spans.{index}.confidence_state", state in {"HIGH", "MEDIUM", "LOW", "UNKNOWN"}, "span confidence_state must be a known state"),
+                    _contract_check(f"spans.{index}.page_index", isinstance(span.get("page_index"), int) and span["page_index"] >= 0, "span page_index must be a non-negative integer"),
+                    _contract_check(f"spans.{index}.bbox", isinstance(bbox, dict) and all(isinstance(bbox.get(key), int) and bbox[key] >= 0 for key in ("x", "y", "width", "height")), "span bbox must include non-negative source coordinates"),
+                ]
+            )
+
+    invariants = report.get("invariants", {})
+    if isinstance(invariants, dict):
+        checks.extend(
+            [
+                _contract_check("invariants.raw_normalized_canonical_separated", invariants.get("raw_normalized_canonical_separated") is True, "OCR text tiers must remain separated"),
+                _contract_check("invariants.span_count_matches", invariants.get("span_count") == valid_span_count, "span_count must equal saved spans"),
+                _contract_check("invariants.low_confidence_count_matches", invariants.get("low_confidence_count") == low_confidence_count, "low-confidence count must equal saved spans"),
+                _contract_check("invariants.unknown_confidence_count_matches", invariants.get("unknown_confidence_count") == unknown_confidence_count, "unknown-confidence count must equal saved spans"),
+                _contract_check("invariants.empty_text_state_matches", invariants.get("empty_text_state") == (valid_span_count == 0), "empty_text_state must match saved spans"),
+                _contract_check("invariants.bounding_boxes_have_source_coordinates", invariants.get("bounding_boxes_have_source_coordinates") is True, "span bounding boxes must retain source coordinates"),
+            ]
+        )
+
+    warnings = report.get("warnings")
+    if isinstance(warnings, list):
+        checks.append(_contract_check("warning_labels_non_empty", all(isinstance(warning, str) and warning for warning in warnings), "warning labels must be non-empty strings"))
+        if report.get("status") == "OCR_ANALYSIS_NO_TEXT":
+            checks.append(_contract_check("no_text_status_has_warning", "OCR_NO_TEXT_DETECTED" in warnings, "no-text OCR reports must carry OCR_NO_TEXT_DETECTED"))
+        if low_confidence_count:
+            checks.append(_contract_check("low_confidence_has_warning", "OCR_LOW_CONFIDENCE_PRESENT" in warnings, "low-confidence spans must be reflected in warnings"))
+        if unknown_confidence_count:
+            checks.append(_contract_check("unknown_confidence_has_warning", "OCR_UNKNOWN_CONFIDENCE_PRESENT" in warnings, "unknown-confidence spans must be reflected in warnings"))
+    if report.get("status") == "OCR_ANALYSIS_OK":
+        checks.append(_contract_check("ok_status_has_text", valid_span_count > 0, "OCR_ANALYSIS_OK requires at least one saved span"))
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": CAPABILITY_OUTPUT_CONTRACT_OK if not failed else CAPABILITY_OUTPUT_CONTRACT_FAILED,
+        "schema_version": "mucaro_capability_output_contract_v1",
+        "capability_id": "state_of_art_ocr_analysis",
+        "report_path": report_path,
+        "report_status": report.get("status"),
+        "operation": report.get("operation"),
+        "checks": checks,
+        "counts": {
+            "pass": sum(1 for check in checks if check["status"] == "PASS"),
+            "fail": len(failed),
+            "total": len(checks),
+        },
+        "failed_checks": failed,
+    }
+
+
+def validate_ocr_report_file(path: Path) -> dict[str, Any]:
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        failed_check = _contract_check("report_file_exists", False, f"report not found: {path}")
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "state_of_art_ocr_analysis",
+            "report_path": str(path),
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    except json.JSONDecodeError as exc:
+        failed_check = _contract_check("report_json_valid", False, str(exc))
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "state_of_art_ocr_analysis",
+            "report_path": str(path),
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    if not isinstance(report, dict):
+        report = {}
+    return validate_ocr_report_contract(report, report_path=str(path))
 
 
 def list_advanced_capability_contracts() -> list[dict[str, Any]]:
@@ -327,11 +490,13 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "clear printed text fixture extracts expected raw strings",
                 "multi-column fixture preserves reading-order evidence",
                 "accented/mojibake fixture preserves RAW/NORMALIZED/CANONICAL separation",
+                "OCR report contract validator accepts saved image OCR receipts and rejects false span/confidence accounting",
             ),
             negative_regression_gates=(
                 "blank image returns no-text state without synthesis",
                 "illegible span stays low confidence",
                 "language mismatch emits warning instead of fabricated certainty",
+                "OCR report contract validation fails when source metadata, engine identity, confidence scale, warnings, or span counts are missing or inconsistent",
             ),
             output_requirements=(
                 "raw extracted text",
