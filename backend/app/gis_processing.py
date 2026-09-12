@@ -28,6 +28,7 @@ SUPPORTED_REPROJECT_GEOMETRY_TYPES = {
     "Polygon",
     "MultiPolygon",
 }
+SUPPORTED_BBOX_FILTER_MODES = {"intersects", "within"}
 
 
 class GISProcessingError(RuntimeError):
@@ -151,6 +152,27 @@ def _bbox_for_geometry(geometry: dict[str, Any] | None) -> list[float] | None:
     xs = [point[0] for point in positions]
     ys = [point[1] for point in positions]
     return [min(xs), min(ys), max(xs), max(ys)]
+
+
+def _validate_bbox(values: tuple[Any, Any, Any, Any]) -> list[float]:
+    try:
+        coordinates = [float(value) for value in values]
+    except (TypeError, ValueError) as exc:
+        raise GISProcessingError("ERROR_GIS_BBOX_INVALID", "Bounding-box coordinates must be numbers.") from exc
+    min_x, min_y, max_x, max_y = coordinates
+    if not all(math.isfinite(value) for value in coordinates):
+        raise GISProcessingError("ERROR_GIS_BBOX_INVALID", "Bounding-box coordinates must be finite numbers.")
+    if min_x > max_x or min_y > max_y:
+        raise GISProcessingError("ERROR_GIS_BBOX_INVALID", "Bounding-box minimums must be less than or equal to maximums.")
+    return [min_x, min_y, max_x, max_y]
+
+
+def _bbox_intersects(left: list[float], right: list[float]) -> bool:
+    return left[0] <= right[2] and left[2] >= right[0] and left[1] <= right[3] and left[3] >= right[1]
+
+
+def _bbox_within(inner: list[float], outer: list[float]) -> bool:
+    return inner[0] >= outer[0] and inner[1] >= outer[1] and inner[2] <= outer[2] and inner[3] <= outer[3]
 
 
 def _ring_valid(ring: Any) -> bool:
@@ -390,6 +412,147 @@ def convert_csv_points_to_geojson(
             "coordinate_dimension": "XY",
         },
         "warnings": warnings,
+    }
+    return _write_report(cfg, report)
+
+
+def filter_geojson_by_bbox(
+    path: Path,
+    *,
+    min_x: float,
+    min_y: float,
+    max_x: float,
+    max_y: float,
+    cfg: Settings = settings,
+    mode: str = "intersects",
+) -> dict[str, Any]:
+    cfg.ensure_dirs()
+    source = _load_geojson(path)
+    normalized_mode = mode.strip().lower()
+    if normalized_mode not in SUPPORTED_BBOX_FILTER_MODES:
+        raise GISProcessingError(
+            "ERROR_GIS_BBOX_FILTER_MODE",
+            f"Unsupported bounding-box filter mode: {mode}",
+        )
+    query_bbox = _validate_bbox((min_x, min_y, max_x, max_y))
+    raw_features = source.payload.get("features")
+    if not isinstance(raw_features, list):
+        raise GISProcessingError("ERROR_GIS_FEATURES_NOT_ARRAY", "GeoJSON FeatureCollection features must be an array.")
+    if not all(isinstance(feature, dict) for feature in raw_features):
+        raise GISProcessingError("ERROR_GIS_BBOX_FEATURES_NOT_OBJECTS", "All GeoJSON features must be objects.")
+
+    retained_features: list[dict[str, Any]] = []
+    feature_receipts: list[dict[str, Any]] = []
+    retained_count = 0
+    excluded_outside_count = 0
+    excluded_null_empty_count = 0
+    excluded_unresolved_count = 0
+
+    for index, feature in enumerate(raw_features):
+        geometry = feature.get("geometry")
+        classification = _classify_geometry(geometry)
+        geometry_bbox = _bbox_for_geometry(geometry) if isinstance(geometry, dict) else None
+        feature_id = _feature_id(feature, index)
+        if classification["geometry_status"] == "NULL_EMPTY":
+            filter_state = "EXCLUDED_NULL_EMPTY"
+            excluded_null_empty_count += 1
+        elif classification["geometry_status"] != "VALID" or geometry_bbox is None:
+            filter_state = "EXCLUDED_UNRESOLVED"
+            excluded_unresolved_count += 1
+        else:
+            retained = (
+                _bbox_intersects(geometry_bbox, query_bbox)
+                if normalized_mode == "intersects"
+                else _bbox_within(geometry_bbox, query_bbox)
+            )
+            if retained:
+                filter_state = "RETAINED_INTERSECTS" if normalized_mode == "intersects" else "RETAINED_WITHIN"
+                retained_features.append(deepcopy(feature))
+                retained_count += 1
+            else:
+                filter_state = "EXCLUDED_OUTSIDE"
+                excluded_outside_count += 1
+        feature_receipts.append(
+            {
+                "feature_index": index,
+                "feature_id": feature_id,
+                "geometry_type": classification["geometry_type"],
+                "geometry_status": classification["geometry_status"],
+                "source_bbox": geometry_bbox,
+                "filter_state": filter_state,
+                "warnings": classification["warnings"],
+            }
+        )
+
+    output_payload = deepcopy(source.payload)
+    output_payload["features"] = retained_features
+    created_at = utc_now()
+    report_id = stable_id(
+        "gisreport",
+        "bbox_filter",
+        source.sha256,
+        normalized_mode,
+        *[str(value) for value in query_bbox],
+        created_at,
+    )
+    output = _write_geojson_output(cfg, report_id, output_payload)
+    warnings = [
+        warning
+        for warning in [
+            "GIS_BBOX_FILTER_EMPTY" if not retained_features else "",
+            "GIS_BBOX_FILTER_NULL_EMPTY_EXCLUDED" if excluded_null_empty_count else "",
+            "GIS_BBOX_FILTER_UNRESOLVED_EXCLUDED" if excluded_unresolved_count else "",
+        ]
+        if warning
+    ]
+    report = {
+        "schema_version": GIS_REPORT_SCHEMA_VERSION,
+        "report_id": report_id,
+        "status": "GIS_BBOX_FILTER_OK" if not warnings else "GIS_BBOX_FILTER_WARN",
+        "operation": "filter_geojson_by_bbox",
+        "created_at": created_at,
+        "parameters": {
+            "bbox": query_bbox,
+            "mode": normalized_mode,
+        },
+        "source": {
+            "path": str(path),
+            "sha256": source.sha256,
+            "crs": source.crs,
+            "crs_status": source.crs_status,
+            "feature_count": len(raw_features),
+        },
+        "output": {
+            "path": output["path"],
+            "sha256": output["sha256"],
+            "crs": source.crs,
+            "feature_count": len(retained_features),
+        },
+        "features": feature_receipts,
+        "state_counts": {
+            "RETAINED": retained_count,
+            "EXCLUDED_OUTSIDE": excluded_outside_count,
+            "EXCLUDED_NULL_EMPTY": excluded_null_empty_count,
+            "EXCLUDED_UNRESOLVED": excluded_unresolved_count,
+        },
+        "invariants": {
+            "source_crs": source.crs,
+            "output_crs": source.crs,
+            "crs_preserved": True,
+            "input_feature_count": len(raw_features),
+            "retained_feature_count": retained_count,
+            "excluded_feature_count": excluded_outside_count + excluded_null_empty_count + excluded_unresolved_count,
+            "excluded_outside_count": excluded_outside_count,
+            "excluded_null_empty_count": excluded_null_empty_count,
+            "excluded_unresolved_count": excluded_unresolved_count,
+            "row_accounting_closed": len(raw_features) == retained_count + excluded_outside_count + excluded_null_empty_count + excluded_unresolved_count,
+        },
+        "warnings": warnings,
+        "limitations": [
+            "bounding-box filtering uses feature coordinate extents, not robust polygon clipping",
+            "intersects mode is inclusive at bbox edges",
+            "within mode requires the feature bbox to be fully inside the query bbox",
+        ],
     }
     return _write_report(cfg, report)
 

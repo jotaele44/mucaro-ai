@@ -324,6 +324,63 @@ def test_cli_gis_inspect_and_point_in_polygon(tmp_path: Path, capsys):
     assert "feature_row_conservation=True" in reproject_output
     assert "coordinate_count_conservation=True" in reproject_output
 
+    assert (
+        main(
+            [
+                "gis",
+                "filter-bbox",
+                str(points_path),
+                "--min-x",
+                "0",
+                "--min-y",
+                "0",
+                "--max-x",
+                "10",
+                "--max-y",
+                "10",
+                "--format",
+                "text",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    filter_output = capsys.readouterr().out
+    assert "GIS_BBOX_FILTER_OK" in filter_output
+    assert "operation=filter_geojson_by_bbox" in filter_output
+    assert "output_path=" in filter_output
+    assert "input_feature_count=2" in filter_output
+    assert "retained_feature_count=1" in filter_output
+    assert "excluded_feature_count=1" in filter_output
+    assert "excluded_outside_count=1" in filter_output
+    assert "row_accounting_closed=True" in filter_output
+    assert "RETAINED=1" in filter_output
+    assert "EXCLUDED_OUTSIDE=1" in filter_output
+
+    assert (
+        main(
+            [
+                "gis",
+                "filter-bbox",
+                str(points_path),
+                "--min-x",
+                "10",
+                "--min-y",
+                "0",
+                "--max-x",
+                "0",
+                "--max-y",
+                "10",
+                "--format",
+                "text",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    filter_error_output = capsys.readouterr().err
+    assert "ERROR_GIS_BBOX_INVALID" in filter_error_output
+
     csv_path = tmp_path / "points.csv"
     csv_path.write_text(
         "id,lat,lon,label\n"
@@ -1160,16 +1217,18 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 6
-    assert payload["counts"]["passed"] == 6
+    assert payload["counts"]["cases"] == 8
+    assert payload["counts"]["passed"] == 8
     assert payload["counts"]["failed"] == 0
-    assert payload["counts"]["operations"] == 5
-    assert payload["counts"]["negative_cases"] == 1
+    assert payload["counts"]["operations"] == 6
+    assert payload["counts"]["negative_cases"] == 2
 
     assert main(["eval", "gis", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_EVAL_OK" in text_output
-    assert "operation_count=5" in text_output
+    assert "operation_count=6" in text_output
+    assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
+    assert "PASS bbox_filter bbox_filter_invalid_bbox_fails_closed" in text_output
     assert "PASS inspect inspect_dimensionality" in text_output
     assert "PASS csv_points csv_points_skip_invalid_rows" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
@@ -1222,7 +1281,8 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
-    assert "eval_case_count=6" in text_output
+    assert "eval_case_count=8" in text_output
+    assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
     assert "PASS csv_points csv_points_skip_invalid_rows" in text_output
     assert "PASS compare compare_rotated_polygon" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output

@@ -42,6 +42,7 @@ from .gis_processing import (
     GISProcessingError,
     compare_geojson_geometries,
     convert_csv_points_to_geojson,
+    filter_geojson_by_bbox,
     inspect_geojson,
     reproject_geojson,
     spatial_join_points_to_polygons,
@@ -521,6 +522,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gis_csv_points.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_csv_points.set_defaults(handler=run_gis_csv_points)
+
+    gis_filter_bbox = gis_subcommands.add_parser(
+        "filter-bbox",
+        help="Filter whole GeoJSON features by bounding-box extent and write a GIS receipt.",
+    )
+    gis_filter_bbox.add_argument("geojson_path", help="Path to a GeoJSON FeatureCollection.")
+    gis_filter_bbox.add_argument("--min-x", type=float, required=True, help="Minimum X/longitude of the query bounding box.")
+    gis_filter_bbox.add_argument("--min-y", type=float, required=True, help="Minimum Y/latitude of the query bounding box.")
+    gis_filter_bbox.add_argument("--max-x", type=float, required=True, help="Maximum X/longitude of the query bounding box.")
+    gis_filter_bbox.add_argument("--max-y", type=float, required=True, help="Maximum Y/latitude of the query bounding box.")
+    gis_filter_bbox.add_argument(
+        "--mode",
+        choices=["intersects", "within"],
+        default="intersects",
+        help="Retain features whose bbox intersects the query bbox, or whose bbox is fully within it.",
+    )
+    gis_filter_bbox.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_filter_bbox.set_defaults(handler=run_gis_filter_bbox)
 
     ocr = subcommands.add_parser("ocr", help="Run local OCR analysis with source-image receipts.")
     ocr_subcommands = ocr.add_subparsers(dest="ocr_command", required=True)
@@ -1769,6 +1788,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_REPROJECT_WARN",
         "GIS_CSV_POINTS_OK",
         "GIS_CSV_POINTS_WARN",
+        "GIS_BBOX_FILTER_OK",
+        "GIS_BBOX_FILTER_WARN",
     }:
         print(status)
         print(f"operation={payload.get('operation')}")
@@ -1822,6 +1843,13 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "required_columns_present",
                 "source_row_count",
                 "output_feature_count",
+                "input_feature_count",
+                "retained_feature_count",
+                "excluded_feature_count",
+                "excluded_outside_count",
+                "excluded_null_empty_count",
+                "excluded_unresolved_count",
+                "output_crs",
                 "skipped_row_count",
                 "row_accounting_closed",
                 "coordinate_dimension",
@@ -2156,6 +2184,27 @@ def run_gis_csv_points(args: argparse.Namespace, cfg: Settings) -> int:
             crs=args.crs,
             delimiter=args.delimiter,
             skip_invalid_rows=args.skip_invalid_rows,
+        )
+    except GISProcessingError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_gis_filter_bbox(args: argparse.Namespace, cfg: Settings) -> int:
+    path = Path(args.geojson_path)
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        result = filter_geojson_by_bbox(
+            path,
+            min_x=args.min_x,
+            min_y=args.min_y,
+            max_x=args.max_x,
+            max_y=args.max_y,
+            cfg=cfg,
+            mode=args.mode,
         )
     except GISProcessingError as exc:
         emit_error(exc.status, exc.detail, args.format)

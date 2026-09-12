@@ -13,6 +13,7 @@ from .gis_processing import (
     GISProcessingError,
     compare_geojson_geometries,
     convert_csv_points_to_geojson,
+    filter_geojson_by_bbox,
     inspect_geojson,
     reproject_geojson,
     spatial_join_points_to_polygons,
@@ -30,7 +31,7 @@ GIS_QUALITY_FAILED = "GIS_QUALITY_CERT_FAILED"
 GIS_QUALITY_PROFILE = "v0.1.23-local-release"
 GIS_QUALITY_RECEIPT_TYPE = "gis_quality"
 
-VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "reproject", "csv_points"}
+VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "reproject", "csv_points", "bbox_filter"}
 
 
 def current_git_head(root: Path) -> str:
@@ -212,6 +213,19 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             crs=str(parameters.get("crs") or "EPSG:4326"),
             delimiter=str(parameters.get("delimiter") or ","),
             skip_invalid_rows=bool(parameters.get("skip_invalid_rows", False)),
+        )
+    if operation == "bbox_filter":
+        bbox = parameters.get("bbox")
+        if not isinstance(bbox, list) or len(bbox) != 4:
+            raise ValueError("bbox_filter parameters.bbox must be a four-number array")
+        return filter_geojson_by_bbox(
+            paths["geojson"],
+            min_x=bbox[0],
+            min_y=bbox[1],
+            max_x=bbox[2],
+            max_y=bbox[3],
+            cfg=cfg,
+            mode=str(parameters.get("mode") or "intersects"),
         )
     raise ValueError(f"Unsupported GIS eval operation: {operation}")
 

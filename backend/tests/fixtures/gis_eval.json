@@ -1,9 +1,9 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 6,
-    "operation_count": 5,
-    "negative_case_count": 1
+    "case_count": 8,
+    "operation_count": 6,
+    "negative_case_count": 2
   },
   "cases": [
     {
@@ -556,6 +556,137 @@
         "skipped_rows.0.row_number": 3,
         "skipped_rows.0.status": "ERROR_GIS_CSV_INVALID_COORDINATES"
       }
+    },
+    {
+      "case_id": "bbox_filter_intersects_with_null_residue",
+      "operation": "bbox_filter",
+      "parameters": {
+        "bbox": [
+          0,
+          0,
+          10,
+          10
+        ],
+        "mode": "intersects"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "inside",
+              "properties": {
+                "name": "inside"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  5,
+                  5
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "outside",
+              "properties": {
+                "name": "outside"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  20,
+                  20
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "null_geom",
+              "properties": {
+                "name": "null_geom"
+              },
+              "geometry": null
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_BBOX_FILTER_WARN",
+      "expected_warnings": [
+        "GIS_BBOX_FILTER_NULL_EMPTY_EXCLUDED"
+      ],
+      "expected_invariants": {
+        "crs_preserved": true,
+        "input_feature_count": 3,
+        "retained_feature_count": 1,
+        "excluded_feature_count": 2,
+        "excluded_outside_count": 1,
+        "excluded_null_empty_count": 1,
+        "excluded_unresolved_count": 0,
+        "row_accounting_closed": true
+      },
+      "expected_output": {
+        "crs": "EPSG:4326",
+        "feature_count": 1
+      },
+      "expected_fields": {
+        "state_counts.RETAINED": 1,
+        "state_counts.EXCLUDED_OUTSIDE": 1,
+        "state_counts.EXCLUDED_NULL_EMPTY": 1,
+        "features.0.filter_state": "RETAINED_INTERSECTS",
+        "features.1.filter_state": "EXCLUDED_OUTSIDE",
+        "features.2.filter_state": "EXCLUDED_NULL_EMPTY"
+      }
+    },
+    {
+      "case_id": "bbox_filter_invalid_bbox_fails_closed",
+      "operation": "bbox_filter",
+      "parameters": {
+        "bbox": [
+          10,
+          0,
+          0,
+          10
+        ],
+        "mode": "intersects"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "inside",
+              "properties": {
+                "name": "inside"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  5,
+                  5
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_BBOX_INVALID",
+      "expected_warnings": []
     },
     {
       "case_id": "reproject_invalid_latitude_fails_closed",

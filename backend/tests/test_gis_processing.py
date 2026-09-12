@@ -8,6 +8,7 @@ from backend.app.gis_processing import (
     GISProcessingError,
     compare_geojson_geometries,
     convert_csv_points_to_geojson,
+    filter_geojson_by_bbox,
     inspect_geojson,
     reproject_geojson,
     spatial_join_points_to_polygons,
@@ -171,6 +172,80 @@ def test_convert_csv_points_to_geojson_fails_closed_on_missing_columns(tmp_path:
         assert exc.status == "ERROR_GIS_CSV_REQUIRED_COLUMN_MISSING"
     else:
         raise AssertionError("expected missing CSV coordinate columns to fail closed")
+
+
+def test_filter_geojson_by_bbox_retains_whole_features_and_records_residue(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(
+        tmp_path / "features.geojson",
+        [
+            point_feature("inside", [5, 5]),
+            point_feature("outside", [20, 20]),
+            point_feature("null_geom", None),
+        ],
+    )
+
+    result = filter_geojson_by_bbox(geojson, min_x=0, min_y=0, max_x=10, max_y=10, cfg=cfg)
+
+    assert result["status"] == "GIS_BBOX_FILTER_WARN"
+    assert result["warnings"] == ["GIS_BBOX_FILTER_NULL_EMPTY_EXCLUDED"]
+    assert result["source"]["feature_count"] == 3
+    assert result["output"]["feature_count"] == 1
+    assert result["state_counts"] == {
+        "RETAINED": 1,
+        "EXCLUDED_OUTSIDE": 1,
+        "EXCLUDED_NULL_EMPTY": 1,
+        "EXCLUDED_UNRESOLVED": 0,
+    }
+    assert result["invariants"]["crs_preserved"] is True
+    assert result["invariants"]["row_accounting_closed"] is True
+    assert result["features"][0]["filter_state"] == "RETAINED_INTERSECTS"
+    assert result["features"][1]["filter_state"] == "EXCLUDED_OUTSIDE"
+    assert result["features"][2]["filter_state"] == "EXCLUDED_NULL_EMPTY"
+    output = json.loads(Path(result["output"]["path"]).read_text(encoding="utf-8"))
+    assert [feature["id"] for feature in output["features"]] == ["inside"]
+    receipt = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
+    assert receipt["report_id"] == result["report_id"]
+    assert result["report_sha256"]
+
+
+def test_filter_geojson_by_bbox_within_mode_requires_full_extent_inside(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(
+        tmp_path / "features.geojson",
+        [
+            polygon_feature("wide", [[[-1, -1], [8, -1], [8, 8], [-1, 8], [-1, -1]]]),
+            polygon_feature("inner", [[[1, 1], [8, 1], [8, 8], [1, 8], [1, 1]]]),
+        ],
+    )
+
+    result = filter_geojson_by_bbox(
+        geojson,
+        min_x=0,
+        min_y=0,
+        max_x=10,
+        max_y=10,
+        mode="within",
+        cfg=cfg,
+    )
+
+    assert result["status"] == "GIS_BBOX_FILTER_OK"
+    assert result["warnings"] == []
+    assert result["output"]["feature_count"] == 1
+    assert result["features"][0]["filter_state"] == "EXCLUDED_OUTSIDE"
+    assert result["features"][1]["filter_state"] == "RETAINED_WITHIN"
+
+
+def test_filter_geojson_by_bbox_fails_closed_on_invalid_bbox(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(tmp_path / "features.geojson", [point_feature("inside", [5, 5])])
+
+    try:
+        filter_geojson_by_bbox(geojson, min_x=10, min_y=0, max_x=0, max_y=10, cfg=cfg)
+    except GISProcessingError as exc:
+        assert exc.status == "ERROR_GIS_BBOX_INVALID"
+    else:
+        raise AssertionError("expected invalid bbox to fail closed")
 
 
 def test_inspect_geojson_preserves_crs_geometry_state_and_receipt(tmp_path: Path):
