@@ -274,10 +274,7 @@ def build_gis_eval_report(*, fixture_path: Path = DEFAULT_GIS_EVAL_FIXTURE) -> d
 
 def format_gis_eval_text(report: dict[str, Any]) -> list[str]:
     counts = report.get("counts", {})
-    lines = [
-        str(report.get("status")),
-        f"fixture={report.get('fixture')}",
-    ]
+    lines = [f"fixture={report.get('fixture')}"]
     if isinstance(counts, dict):
         lines.extend(
             [
