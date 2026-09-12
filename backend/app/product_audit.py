@@ -194,9 +194,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "capability_expansion",
             "Assistant supports state-of-the-art OCR analysis with confidence, layout, and source-image traceability.",
             "OPEN",
-            "backend/app/capability_contracts.py defines OCR permission, source-image, layout, confidence, and regression-gate requirements.",
-            "No OCR engine adapter, image text extraction pipeline, confidence calibration, layout preservation, or OCR regression corpus is present.",
-            "Add an OCR capability contract covering image permissions, raw text preservation, confidence thresholds, layout evidence, and negative fixtures.",
+            "backend/app/ocr_analysis.py and mucaro ocr analyze provide a local Tesseract-backed image OCR receipt candidate with source SHA-256, engine identity, raw/normalized/canonical text separation, confidence states, bounding boxes, no-text handling, and parser warnings.",
+            "The implemented boundary is narrow: PDF/page rendering, page-level evidence, representative document accuracy, layout reconstruction, table/form/handwriting support, confidence calibration, optional provider policy, and broader OCR regression corpus remain open.",
+            "Expand the OCR candidate into document-intelligence gates with frozen image/PDF fixtures, layout and confidence thresholds, and optional cloud/private engines only behind explicit privacy policy.",
         ),
         ProductRequirement(
             "governed_web_browsing",
@@ -222,7 +222,7 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "All advanced capabilities preserve maximum transparency and objectivity through evidence, uncertainty, and contradiction handling.",
             "OPEN",
             "backend/app/capability_contracts.py defines a cross-capability evidence taxonomy, uncertainty, contradiction, and falsification contract.",
-            "Advanced GIS, OCR, browsing, and coding outputs do not yet exist and therefore cannot prove enforcement of the transparency/objectivity contract.",
+            "GIS, OCR, and browsing have candidate receipt-backed outputs, but the shared transparency/objectivity contract is not yet enforced across every advanced capability output; coding outputs remain absent.",
             "Apply the cross-capability evidence contract to every advanced capability output and add fixtures that reject unsupported certainty.",
         ),
         ProductRequirement(
@@ -373,8 +373,8 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
                 "coding_programming_expertise",
                 "transparency_objectivity_governance",
             ),
-            "The expanded capability objective is visible in product audit and roadmap output; GIS now has a narrow local GeoJSON receipt candidate.",
-            "Full GIS maturity, OCR, automated/rendered browsing, coding-agent behavior, and cross-capability objectivity enforcement remain open by design.",
+            "The expanded capability objective is visible in product audit and roadmap output; GIS has a narrow local GeoJSON receipt candidate and OCR has a narrow local image receipt candidate.",
+            "Full GIS maturity, full document-intelligence OCR, automated/rendered browsing, coding-agent behavior, and cross-capability objectivity enforcement remain open by design.",
             "Advance each capability from candidate receipts to stronger adapters and eval fixtures behind permissioned, receipt-backed gates.",
         ),
         ProductRoadmapStage(

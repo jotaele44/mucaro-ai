@@ -107,7 +107,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
         CapabilityContract(
             capability_id="state_of_art_ocr_analysis",
             title="State-of-the-art OCR analysis",
-            implementation_status="ABSENT",
+            implementation_status="CANDIDATE",
             contract_status="CONTRACT_DEFINED",
             purpose="Extract text and layout from images while preserving raw text, confidence, and source-image identity.",
             permission_gates=(
@@ -149,9 +149,10 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "limitations and falsification criteria",
             ),
             unavailable_until=(
-                "OCR adapter exists",
-                "OCR regression corpus exists",
-                "confidence and layout gates pass",
+                "PDF/page rendering and page-level evidence are receipt-backed",
+                "layout reconstruction is calibrated against representative document fixtures",
+                "confidence thresholds pass a frozen OCR regression corpus",
+                "optional cloud/private OCR engines have explicit privacy and provider policies",
             ),
         ),
         CapabilityContract(

@@ -39,6 +39,7 @@ from .conversations import (
 from .db import list_payloads
 from .execution_gate import analyze_task
 from .gis_processing import GISProcessingError, inspect_geojson, spatial_join_points_to_polygons
+from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
 from .ingestion import (
     delete_source,
     get_index_status,
@@ -438,6 +439,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gis_point_in_polygon.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_point_in_polygon.set_defaults(handler=run_gis_point_in_polygon)
+
+    ocr = subcommands.add_parser("ocr", help="Run local OCR analysis with source-image receipts.")
+    ocr_subcommands = ocr.add_subparsers(dest="ocr_command", required=True)
+
+    ocr_analyze = ocr_subcommands.add_parser("analyze", help="Analyze a local image with a local OCR engine.")
+    ocr_analyze.add_argument("image_path", help="Path to a local image file.")
+    ocr_analyze.add_argument("--language", default="eng", help="OCR language code passed to the local engine.")
+    ocr_analyze.add_argument(
+        "--layout",
+        choices=["single_block", "auto"],
+        default="single_block",
+        help="OCR layout mode.",
+    )
+    ocr_analyze.add_argument("--tesseract-path", help="Explicit path to the local tesseract executable.")
+    ocr_analyze.add_argument("--timeout-seconds", type=int, default=30, help="OCR engine timeout.")
+    ocr_analyze.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    ocr_analyze.set_defaults(handler=run_ocr_analyze)
 
     conversations = subcommands.add_parser("conversations", help="Manage persistent local chat sessions.")
     conversations_subcommands = conversations.add_subparsers(dest="conversations_command", required=True)
@@ -1678,6 +1696,30 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         warnings = payload.get("warnings")
         if warnings:
             print("warnings=" + ",".join(str(warning) for warning in warnings))
+    elif status in {"OCR_ANALYSIS_OK", "OCR_ANALYSIS_NO_TEXT"}:
+        print(status)
+        print(f"operation={payload.get('operation')}")
+        print(f"report_id={payload.get('report_id')}")
+        print(f"report_path={payload.get('report_path')}")
+        print(f"report_sha256={payload.get('report_sha256')}")
+        source = payload.get("source")
+        if isinstance(source, dict):
+            print(f"source_sha256={source.get('sha256')}")
+            print(f"mime_type={source.get('mime_type')}")
+            print(f"dimensions={source.get('width')}x{source.get('height')}")
+        engine = payload.get("engine")
+        if isinstance(engine, dict):
+            print(f"ocr_engine={engine.get('name')}")
+            print(f"ocr_engine_version={engine.get('version')}")
+            print(f"language={engine.get('language')}")
+            print(f"layout_mode={engine.get('layout_mode')}")
+        invariants = payload.get("invariants")
+        if isinstance(invariants, dict):
+            for key in ("span_count", "low_confidence_count", "empty_text_state"):
+                print(f"{key}={invariants.get(key)}")
+        warnings = payload.get("warnings")
+        if warnings:
+            print("warnings=" + ",".join(str(warning) for warning in warnings))
     elif "answer" in payload and "conversation" in payload:
         answer = payload.get("answer", {})
         conversation = payload.get("conversation", {})
@@ -1921,6 +1963,26 @@ def run_gis_point_in_polygon(args: argparse.Namespace, cfg: Settings) -> int:
             require_matching_crs=not args.allow_crs_mismatch,
         )
     except GISProcessingError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_ocr_analyze(args: argparse.Namespace, cfg: Settings) -> int:
+    path = Path(args.image_path)
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        result = analyze_image_ocr(
+            path,
+            cfg=cfg,
+            language=args.language,
+            layout_mode=args.layout,
+            tesseract_path=args.tesseract_path,
+            timeout_seconds=args.timeout_seconds,
+        )
+    except OCRAnalysisError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)

@@ -100,7 +100,7 @@ byte-pinned proof layer for a particular commit. Verify them with
 | Private branch protection | OPEN | GitHub API currently reports a plan gate for private-repo branch protection; prove protection after plan/visibility changes or keep the release scope local |
 | Larger real-corpus retrieval | OPEN | Add non-fixture corpus snapshots with frozen manifests, source counts, source-format coverage, and repeatable eval thresholds |
 | Advanced GIS processing | OPEN | Local GeoJSON inspection and point-in-polygon receipt candidate exists; add robust topology adapter, CRS reprojection, map/export provenance, broader spatial formats, and spatial eval fixtures |
-| State-of-the-art OCR analysis | OPEN | Define OCR capability contract, local/optional model engine boundary, source-image trace schema, confidence thresholds, and OCR eval corpus |
+| State-of-the-art OCR analysis | OPEN | Local image OCR receipt candidate exists through `mucaro ocr analyze`; add PDF/page rendering, layout calibration, document/table/form/handwriting fixtures, confidence thresholds, optional provider privacy gates, and broader OCR eval corpus |
 | Governed web browsing | OPEN | Candidate fetch/snapshot/citation path, operator-supplied multi-page session receipts, robots/cache metadata, redirect-target robots evidence, HTML body/structure traces, PDF/non-text parser traces, immutable snapshot-only cache policy, and explicit HTTP error-page citation policy exist; add automated search/discovery controls, rendered-browser capture policy, and gated autonomous link-following before certification |
 | Coding/programming expertise | OPEN | Define read/patch/test/review action boundary, sandbox policy, diff receipts, and code-quality eval fixtures |
 | Transparency/objectivity across capabilities | OPEN | Require provenance, uncertainty, limitations, contradictory evidence handling, and falsification criteria in every advanced capability output |
@@ -123,8 +123,8 @@ byte-pinned proof layer for a particular commit. Verify them with
    have implemented contracts and receipt-backed gates.
 6. Use `mucaro capabilities contracts` to inspect the shared proof contracts
    that advanced capability adapters must satisfy before availability claims.
-7. Keep the GUI as the clean operator workspace for prompt-and-response task
-   execution while preserving the CLI as the scriptable certification boundary.
+7. Leave GUI expansion for the final phase; keep the CLI as the scriptable
+   certification boundary while backend capability contracts mature.
 8. Use support bundles to escalate hosted governance blockers without
    weakening local certification boundaries.
 9. Treat all future execution adapters as subordinate to Skill Fabric identity,

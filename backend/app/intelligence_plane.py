@@ -60,9 +60,9 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
                 "notes": "Local GeoJSON inspection and point-in-polygon receipts exist with CRS preservation and geometry state counts; robust topology, reprojection, map export, broader formats, and GIS eval corpus remain open.",
             },
             "state_of_art_ocr_analysis": {
-                "state": "ABSENT",
-                "contract": None,
-                "notes": "OCR extraction, layout analysis, confidence calibration, and OCR fixtures are planned but not implemented.",
+                "state": "CANDIDATE",
+                "contract": "mucaro-ocr-analysis/0.x",
+                "notes": "Local image OCR receipts exist with source-image hashes, engine identity, raw/normalized/canonical text separation, confidence states, and source-coordinate spans. PDF/page rendering, layout calibration, handwriting/table/form support, optional provider policy, and broader OCR eval corpus remain open.",
             },
             "governed_web_browsing": {
                 "state": "CANDIDATE",

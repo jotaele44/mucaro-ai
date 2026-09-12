@@ -52,6 +52,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
 | `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry receipt | 0 | 2 |
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
+| `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources, persistent index status, and semantic-store status | 0 | 2 |
@@ -109,6 +110,15 @@ structured Outlook property extraction remains a future parser upgrade. Media
 files are metadata-only in this release: they preserve source lineage, byte
 counts, dimensions or container facts where available, and parser warnings, but
 do not perform semantic image/audio/video understanding.
+
+OCR analysis is intentionally separate from ingestion. `mucaro ocr analyze
+IMAGE_PATH` runs a local Tesseract engine against one image, preserves the
+source image SHA-256, engine path/version, language, layout mode, raw text,
+normalized text, canonical text, per-span confidence state, source-coordinate
+bounding boxes, warnings, and a JSON receipt under `data/exports/ocr_reports`.
+It is a narrow local image receipt candidate; PDF/page rendering, calibrated
+document layout, handwriting, tables/forms, and optional external OCR providers
+remain future governed-document-intelligence work.
 
 ## Output Contracts
 
@@ -228,11 +238,20 @@ approved and audited.
 | `GIS_INSPECT_OK` | GeoJSON inspection completed with no invalid or unsupported geometries |
 | `GIS_INSPECT_WARN` | GeoJSON inspection completed but invalid or unsupported geometries were recorded |
 | `GIS_SPATIAL_JOIN_OK` | Point-in-polygon classification completed and wrote a spatial receipt |
+| `OCR_ANALYSIS_OK` | Local image OCR completed with at least one extracted text span and wrote an OCR receipt |
+| `OCR_ANALYSIS_NO_TEXT` | Local image OCR completed without extracting text; no text was synthesized |
 | `ERROR_GIS_INPUT_NOT_FOUND` | GeoJSON input path does not exist |
 | `ERROR_GIS_INVALID_JSON` | GeoJSON input could not be parsed as JSON |
 | `ERROR_GIS_UNSUPPORTED_GEOJSON` | GIS command received a JSON object that is not a FeatureCollection |
 | `ERROR_GIS_FEATURES_NOT_ARRAY` | GeoJSON FeatureCollection has a malformed `features` member |
 | `ERROR_GIS_CRS_MISMATCH` | Point and polygon inputs declared different CRS values and mismatch override was not selected |
+| `ERROR_OCR_INPUT_NOT_FOUND` | OCR input path does not exist |
+| `ERROR_OCR_UNSUPPORTED_INPUT` | OCR command received an unsupported input type; current OCR analysis supports local images only |
+| `ERROR_OCR_ENGINE_UNAVAILABLE` | local Tesseract executable was not found and no explicit `--tesseract-path` was supplied |
+| `ERROR_OCR_LANGUAGE_INVALID` | OCR language code was empty or had surrounding whitespace |
+| `ERROR_OCR_LAYOUT_INVALID` | OCR layout mode was not one of the supported adapter modes |
+| `ERROR_OCR_TIMEOUT` | OCR engine exceeded the configured timeout |
+| `ERROR_OCR_ENGINE_FAILED` | OCR engine exited with a non-zero status |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |

@@ -24,9 +24,9 @@ Mucaro is being developed independently as an `INTELLIGENCE_PLANE_CANDIDATE`. Th
 | FEDERATION LOCKSTEP client | ABSENT | Activation and compatibility impact gates |
 | Cross-repo orchestration | ABSENT | Contract-bound orchestration without direct domain-data ownership |
 | Federation worker plane | ABSENT | Optional heavy execution target; domain repos remain autonomous |
-| Advanced GIS processing | ABSENT | Spatial engine/runtime with CRS, geometry, topology, map/export, and provenance gates |
-| State-of-the-art OCR analysis | ABSENT | OCR/layout/confidence pipeline with source-image traceability and regression fixtures |
-| Governed web browsing | ABSENT | Approved browsing tool family with URL policy, byte snapshots, parser traces, and citations |
+| Advanced GIS processing | CANDIDATE | Narrow local GeoJSON inspection and point-in-polygon receipts exist; robust topology, reprojection, raster/vector adapters, map/export, and spatial eval corpus remain open |
+| State-of-the-art OCR analysis | CANDIDATE | Narrow local image OCR receipts exist with source-image hashes, engine identity, raw text, confidence states, and source-coordinate spans; PDF/page rendering, layout calibration, table/form/handwriting coverage, provider policy, and OCR eval corpus remain open |
+| Governed web browsing | CANDIDATE | Approved fetch/session snapshot family exists with URL policy, byte snapshots, parser traces, and citations; automated search, rendered capture, and autonomous link-following remain open |
 | Coding/programming expertise | ABSENT | Governed code read/patch/test/review capability with sandbox and diff receipts |
 | Transparency/objectivity governance | CANDIDATE | Cross-capability evidence taxonomy, uncertainty, contradiction, and falsification rules |
 
@@ -67,9 +67,9 @@ These remain implementation details unless promoted by a future federation contr
 - domain-repo adapters
 - federated execution provenance and artifact identity
 - provider-neutral model runtime beyond current mock/Anthropic adapters
-- advanced GIS processing and spatial evidence gates
-- OCR/layout/confidence analysis with source-image traceability
-- governed web browsing with URL policy and immutable fetch snapshots
+- full advanced GIS processing and spatial evidence gates beyond the current GeoJSON receipt boundary
+- full OCR/layout/confidence document intelligence beyond the current local image receipt boundary
+- automated/rendered governed web browsing beyond the current URL-policy and immutable snapshot boundary
 - coding-agent read/patch/test/review behavior inside explicit workspace safety boundaries
 - cross-capability transparency/objectivity contracts for uncertainty, contradictory
   evidence, and falsification criteria

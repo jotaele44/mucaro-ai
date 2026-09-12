@@ -88,17 +88,97 @@ def test_cli_capabilities_contracts_reports_expanded_scope(tmp_path: Path, capsy
     assert payload["status"] == "ADVANCED_CAPABILITY_CONTRACTS_READY"
     assert payload["contract_count"] == 5
     assert payload["complete_contract_count"] == 5
-    assert payload["implementation_states"] == {"ABSENT": 2, "CANDIDATE": 3}
+    assert payload["implementation_states"] == {"ABSENT": 1, "CANDIDATE": 4}
 
     assert main(["capabilities", "contracts", "--format", "text"], cfg=cfg) == 0
     output = capsys.readouterr().out
     assert "contract_count=5" in output
-    assert "implementation_states=ABSENT:2,CANDIDATE:3" in output
+    assert "implementation_states=ABSENT:1,CANDIDATE:4" in output
     assert "CONTRACT_DEFINED CANDIDATE advanced_gis_processing" in output
-    assert "CONTRACT_DEFINED ABSENT state_of_art_ocr_analysis" in output
+    assert "CONTRACT_DEFINED CANDIDATE state_of_art_ocr_analysis" in output
     assert "CONTRACT_DEFINED CANDIDATE governed_web_browsing" in output
     assert "CONTRACT_DEFINED ABSENT coding_programming_expertise" in output
     assert "CONTRACT_DEFINED CANDIDATE transparency_objectivity_governance" in output
+
+
+def test_cli_ocr_analyze_reports_receipt_summary(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    image = tmp_path / "scan.png"
+    image.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (8).to_bytes(4, "big") + (6).to_bytes(4, "big"))
+
+    def fake_analyze(path: Path, **kwargs):
+        assert path == image
+        assert kwargs["cfg"] == cfg
+        assert kwargs["language"] == "eng"
+        assert kwargs["layout_mode"] == "auto"
+        assert kwargs["tesseract_path"] == "/usr/bin/tesseract"
+        assert kwargs["timeout_seconds"] == 12
+        return {
+            "status": "OCR_ANALYSIS_OK",
+            "operation": "image_ocr",
+            "report_id": "ocrreport_fixture",
+            "report_path": str(tmp_path / "data" / "exports" / "ocr_reports" / "ocrreport_fixture.json"),
+            "report_sha256": "a" * 64,
+            "source": {"sha256": "b" * 64, "mime_type": "image/png", "width": 8, "height": 6},
+            "engine": {
+                "name": "tesseract",
+                "version": "tesseract 5.3.0",
+                "language": "eng",
+                "layout_mode": "auto",
+            },
+            "invariants": {"span_count": 1, "low_confidence_count": 0, "empty_text_state": False},
+            "warnings": ["OCR_UNKNOWN_CONFIDENCE_PRESENT"],
+        }
+
+    monkeypatch.setattr(cli, "analyze_image_ocr", fake_analyze)
+
+    assert (
+        main(
+            [
+                "ocr",
+                "analyze",
+                str(image),
+                "--language",
+                "eng",
+                "--layout",
+                "auto",
+                "--tesseract-path",
+                "/usr/bin/tesseract",
+                "--timeout-seconds",
+                "12",
+                "--format",
+                "text",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "OCR_ANALYSIS_OK" in output
+    assert "operation=image_ocr" in output
+    assert "source_sha256=" + "b" * 64 in output
+    assert "ocr_engine=tesseract" in output
+    assert "language=eng" in output
+    assert "layout_mode=auto" in output
+    assert "span_count=1" in output
+    assert "warnings=OCR_UNKNOWN_CONFIDENCE_PRESENT" in output
+
+
+def test_cli_ocr_analyze_reports_adapter_errors(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    image = tmp_path / "scan.png"
+    image.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    def fake_analyze(path: Path, **kwargs):
+        del path, kwargs
+        raise cli.OCRAnalysisError("ERROR_OCR_ENGINE_UNAVAILABLE", "Local tesseract executable was not found.")
+
+    monkeypatch.setattr(cli, "analyze_image_ocr", fake_analyze)
+
+    assert main(["ocr", "analyze", str(image), "--format", "text"], cfg=cfg) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "ERROR_OCR_ENGINE_UNAVAILABLE Local tesseract executable was not found." in captured.err
 
 
 def test_cli_sources_ingest_web_snapshot(tmp_path: Path, capsys):
