@@ -147,9 +147,12 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
 
     operation = str(report.get("operation") or "")
     if operation == "measure_geojson":
+        measurement_mode = _dotted(report, "parameters.measurement_mode") or "planar"
+        adapter = _dotted(report, "parameters.adapter")
         checks.extend(
             [
-                _contract_check("measure.parameters.adapter", _dotted(report, "parameters.adapter") == "local_planar_shoelace_v1", "measure reports must name the local planar adapter"),
+                _contract_check("measure.parameters.measurement_mode", measurement_mode in {"planar", "geodesic"}, "measure reports must record planar or geodesic mode"),
+                _contract_check("measure.parameters.adapter", adapter in {"local_planar_shoelace_v1", "local_spherical_geodesic_v1"}, "measure reports must name a supported measurement adapter"),
                 _contract_check("measure.parameters.coordinate_units", bool(_dotted(report, "parameters.coordinate_units")), "measure reports must record coordinate units"),
                 _contract_check("measure.measurements_array", isinstance(report.get("measurements"), list), "measure reports must include per-feature measurements"),
                 _contract_check("measure.total_area_numeric", _is_number(_dotted(report, "invariants.total_area")), "total_area must be numeric"),
@@ -157,6 +160,16 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 _contract_check("measure.measured_count_present", isinstance(_dotted(report, "invariants.measured_feature_count"), int), "measured_feature_count must be recorded"),
             ]
         )
+        if measurement_mode == "geodesic":
+            source_crs = str(_dotted(report, "source.crs") or "").strip().upper()
+            checks.extend(
+                [
+                    _contract_check("measure.geodesic.adapter", adapter == "local_spherical_geodesic_v1", "geodesic reports must name the spherical geodesic adapter"),
+                    _contract_check("measure.geodesic.source_crs", source_crs == "EPSG:4326", "geodesic reports must use EPSG:4326 source coordinates"),
+                    _contract_check("measure.geodesic.area_units", _dotted(report, "parameters.area_units") == "meters^2", "geodesic area units must be meters^2"),
+                    _contract_check("measure.geodesic.length_units", _dotted(report, "parameters.length_units") == "meters", "geodesic length units must be meters"),
+                ]
+            )
     elif operation == "filter_geojson_by_bbox":
         checks.extend(
             [
@@ -401,6 +414,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "measured_feature_count",
                 "total_area",
                 "total_length",
+                "measurement_mode",
                 "area_units",
                 "length_units",
                 "operation_name",
@@ -422,7 +436,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "geometry comparisons separate exact coordinate equality from topological equality",
                 "CSV-derived point features preserve raw properties and close source/output/skipped row counts",
                 "bbox filtering preserves CRS and closes retained/excluded feature counts",
-                "planar measurements preserve CRS, units labels, per-feature residue, and total area/length accounting",
+                "planar and geodesic measurements preserve CRS, units labels, per-feature residue, and total area/length accounting",
             ),
             positive_regression_gates=(
                 "point-in-polygon fixture classifies FULLY_WITHIN, TOUCH_ONLY, OUTSIDE, and NULL_EMPTY",
@@ -431,6 +445,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "CSV point fixture records header, source rows, output features, skipped rows, CRS, and output hash",
                 "bbox filter fixture records query bbox, filter mode, retained features, excluded features, NULL/EMPTY residue, CRS, and output hash",
                 "planar measurement fixture records polygon area with holes, line length, null residue, units, and aggregate totals",
+                "geodesic measurement fixture records EPSG:4326 source CRS, meter units, adapter identity, and aggregate totals",
                 "GIS report contract validator accepts real saved measurement receipts and rejects weak provenance or false accounting",
                 "GIS eval manifest runs positive and negative fixtures through the supported CLI boundary",
                 "map export fixture preserves source and derived layer hashes",
@@ -441,6 +456,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "CSV point conversion fails closed on missing required headers, duplicate headers, malformed coordinates, and no valid output features",
                 "bbox filtering fails closed on malformed query extents and unsupported modes",
                 "planar measurement fails closed on missing units and records invalid or unsupported geometries as residue",
+                "geodesic measurement fails closed for non-EPSG:4326 sources and records invalid longitude/latitude coordinates as residue",
                 "GIS report contract validation fails when warning status, source hashes, CRS, or asserted accounting are missing or inconsistent",
                 "ambiguous nearest-neighbor match remains UNRESOLVED",
                 "M:N spatial join requires explicit multiplication counts",
@@ -455,7 +471,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
             unavailable_until=(
                 "broader GIS engine adapter supports robust topology operations",
                 "broader CRS, datum transformation, grid shift, axis-order, and vertical CRS support is explicit and receipt-backed",
-                "local planar measurement is replaced or supplemented by robust geodesic and overlay checks where required",
+                "local spherical geodesic measurement is supplemented by ellipsoidal GIS-engine measurement and overlay checks where required",
                 "map/export provenance and broader spatial eval corpus are complete",
             ),
         ),

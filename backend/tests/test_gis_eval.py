@@ -12,11 +12,11 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 10,
-        "passed": 10,
+        "cases": 12,
+        "passed": 12,
         "failed": 0,
-        "positive_cases": 7,
-        "negative_cases": 3,
+        "positive_cases": 8,
+        "negative_cases": 4,
         "operations": 7,
         "operation_names": ["bbox_filter", "compare", "csv_points", "inspect", "measure", "point_in_polygon", "reproject"],
     }
@@ -32,6 +32,9 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["bbox_filter_invalid_bbox_fails_closed"]["observed_status"] == "ERROR_GIS_BBOX_INVALID"
     assert by_id["measure_planar_polygon_line_and_null"]["observed_status"] == "GIS_MEASURE_WARN"
     assert by_id["measure_planar_polygon_line_and_null"]["observed_warnings"] == ["GIS_MEASURE_NULL_EMPTY_GEOMETRY"]
+    assert by_id["measure_geodesic_wgs84_square"]["observed_status"] == "GIS_MEASURE_OK"
+    assert by_id["measure_geodesic_non_wgs84_fails_closed"]["case_type"] == "negative"
+    assert by_id["measure_geodesic_non_wgs84_fails_closed"]["observed_status"] == "ERROR_GIS_MEASURE_GEODESIC_CRS"
     assert by_id["measure_units_required_fails_closed"]["case_type"] == "negative"
     assert by_id["measure_units_required_fails_closed"]["observed_status"] == "ERROR_GIS_MEASURE_UNITS_REQUIRED"
     assert by_id["reproject_invalid_latitude_fails_closed"]["case_type"] == "negative"

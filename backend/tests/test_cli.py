@@ -422,12 +422,42 @@ def test_cli_gis_inspect_and_point_in_polygon(tmp_path: Path, capsys):
     measure_output = capsys.readouterr().out
     assert "GIS_MEASURE_OK" in measure_output
     assert "operation=measure_geojson" in measure_output
+    assert "measurement_mode=planar" in measure_output
+    assert "adapter=local_planar_shoelace_v1" in measure_output
+    assert "area_units=meters^2" in measure_output
+    assert "length_units=meters" in measure_output
     assert "feature_count=1" in measure_output
     assert "measured_feature_count=1" in measure_output
     assert "row_accounting_closed=True" in measure_output
     assert "total_area=100.0" in measure_output
     assert "total_length=40.0" in measure_output
     assert "MEASURED=1" in measure_output
+
+    assert (
+        main(
+            [
+                "gis",
+                "measure",
+                str(polygons_path),
+                "--measurement-mode",
+                "geodesic",
+                "--coordinate-units",
+                "degrees",
+                "--format",
+                "text",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    geodesic_output = capsys.readouterr().out
+    assert "GIS_MEASURE_OK" in geodesic_output
+    assert "measurement_mode=geodesic" in geodesic_output
+    assert "adapter=local_spherical_geodesic_v1" in geodesic_output
+    assert "coordinate_units=degrees" in geodesic_output
+    assert "area_units=meters^2" in geodesic_output
+    assert "length_units=meters" in geodesic_output
+    assert "row_accounting_closed=True" in geodesic_output
 
     assert main(["gis", "measure", str(polygons_path), "--coordinate-units", " ", "--format", "text"], cfg=cfg) == 2
     measure_error_output = capsys.readouterr().err
@@ -1344,11 +1374,11 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 10
-    assert payload["counts"]["passed"] == 10
+    assert payload["counts"]["cases"] == 12
+    assert payload["counts"]["passed"] == 12
     assert payload["counts"]["failed"] == 0
     assert payload["counts"]["operations"] == 7
-    assert payload["counts"]["negative_cases"] == 3
+    assert payload["counts"]["negative_cases"] == 4
 
     assert main(["eval", "gis", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
@@ -1357,6 +1387,8 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
     assert "PASS bbox_filter bbox_filter_invalid_bbox_fails_closed" in text_output
     assert "PASS measure measure_planar_polygon_line_and_null" in text_output
+    assert "PASS measure measure_geodesic_wgs84_square" in text_output
+    assert "PASS measure measure_geodesic_non_wgs84_fails_closed" in text_output
     assert "PASS measure measure_units_required_fails_closed" in text_output
     assert "PASS inspect inspect_dimensionality" in text_output
     assert "PASS csv_points csv_points_skip_invalid_rows" in text_output
@@ -1410,9 +1442,11 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
-    assert "eval_case_count=10" in text_output
+    assert "eval_case_count=12" in text_output
     assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
     assert "PASS measure measure_planar_polygon_line_and_null" in text_output
+    assert "PASS measure measure_geodesic_wgs84_square" in text_output
+    assert "PASS measure measure_geodesic_non_wgs84_fails_closed" in text_output
     assert "PASS csv_points csv_points_skip_invalid_rows" in text_output
     assert "PASS compare compare_rotated_polygon" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output

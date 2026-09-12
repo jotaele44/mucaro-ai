@@ -281,21 +281,24 @@ Observed success markers:
   governance gates are stronger.
   Advanced GIS now has narrow local GeoJSON inspection, point-in-polygon,
   geometry comparison, limited EPSG:4326/EPSG:3857 reprojection, CSV
-  point-to-GeoJSON conversion, bbox feature filtering, and planar area/length
-  measurement receipt candidates plus a committed `mucaro eval gis` fixture
+  point-to-GeoJSON conversion, bbox feature filtering, planar area/length
+  measurement receipts, and bounded EPSG:4326 spherical geodesic measurement
+  receipts plus a committed `mucaro eval gis` fixture
   harness covering dimensionality, join multiplication, topology equality,
   reprojection, CSV header/skipped-row/row-accounting evidence, bbox
   retained/excluded accounting, measurement units, polygon-hole area
-  subtraction, line length, null measurement residue, fail-closed invalid bbox
-  extents, fail-closed empty measurement units, and fail-closed invalid
-  coordinates. `mucaro capabilities validate-gis-report` is the first
+  subtraction, line length, null measurement residue, geodesic meter units,
+  fail-closed geodesic CRS mismatch, fail-closed invalid bbox extents,
+  fail-closed empty measurement units, and fail-closed invalid coordinates.
+  `mucaro capabilities validate-gis-report` is the first
   executable capability-output validator: it checks saved GIS report schema,
   source/input hashes, CRS where present, warning consistency, asserted
-  conservation invariants, bbox fields, and planar measurement fields. Full GIS
-  maturity remains open until robust topology, geodesic measurement, broader
-  CRS/datum/grid-shift/axis-order support, planar overlay checks, geometry
-  clipping, broader spatial format adapters, raster/vector processing,
-  map/export provenance, and a broader GIS eval corpus are proven.
+  conservation invariants, bbox fields, and planar/geodesic measurement fields.
+  Full GIS maturity remains open until robust topology, ellipsoidal
+  GIS-engine geodesic validation, broader CRS/datum/grid-shift/axis-order
+  support, planar overlay checks, geometry clipping, broader spatial format
+  adapters, raster/vector processing, map/export provenance, and a broader GIS
+  eval corpus are proven.
   State-of-the-art OCR
   remains open, but a narrow local image OCR receipt candidate now preserves
   source-image hashes, Tesseract engine identity, raw/normalized/canonical text,

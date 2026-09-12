@@ -19,6 +19,7 @@ EPSILON = 1e-9
 WEB_MERCATOR_RADIUS = 6378137.0
 WEB_MERCATOR_MAX_LATITUDE = 85.0511287798066
 WEB_MERCATOR_MAX_EXTENT = 20037508.342789244
+EARTH_MEAN_RADIUS_METERS = 6371008.8
 SUPPORTED_REPROJECT_CRS = {"EPSG:4326", "EPSG:3857"}
 SUPPORTED_REPROJECT_GEOMETRY_TYPES = {
     "Point",
@@ -37,6 +38,7 @@ SUPPORTED_MEASURE_GEOMETRY_TYPES = {
     "Polygon",
     "MultiPolygon",
 }
+SUPPORTED_MEASUREMENT_MODES = {"planar", "geodesic"}
 
 
 class GISProcessingError(RuntimeError):
@@ -620,7 +622,153 @@ def _polygon_measurements(coordinates: list[Any]) -> dict[str, Any]:
     }
 
 
-def _measure_geometry(geometry: dict[str, Any]) -> dict[str, Any]:
+def _normalize_measurement_mode(value: str) -> str:
+    mode = value.strip().lower()
+    if mode not in SUPPORTED_MEASUREMENT_MODES:
+        raise GISProcessingError(
+            "ERROR_GIS_MEASURE_MODE_UNSUPPORTED",
+            f"Unsupported measurement mode: {value}",
+        )
+    return mode
+
+
+def _lonlat_degrees(position: Any) -> tuple[float, float]:
+    if not _is_position(position):
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "Geodesic coordinates must be valid longitude/latitude positions.")
+    lon, lat = float(position[0]), float(position[1])
+    if not math.isfinite(lon) or not math.isfinite(lat):
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_COORDINATES", "Geodesic coordinates must be finite.")
+    if lon < -180.0 or lon > 180.0:
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_COORDINATES", f"Longitude outside EPSG:4326 range: {lon}")
+    if lat < -90.0 or lat > 90.0:
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_COORDINATES", f"Latitude outside EPSG:4326 range: {lat}")
+    return lon, lat
+
+
+def _normalize_longitude_delta_radians(delta: float) -> float:
+    while delta > math.pi:
+        delta -= 2.0 * math.pi
+    while delta < -math.pi:
+        delta += 2.0 * math.pi
+    return delta
+
+
+def _geodesic_segment_length(start: Any, end: Any) -> float:
+    lon1, lat1 = _lonlat_degrees(start)
+    lon2, lat2 = _lonlat_degrees(end)
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    delta_lat = lat2_rad - lat1_rad
+    delta_lon = _normalize_longitude_delta_radians(math.radians(lon2 - lon1))
+    haversine = (
+        math.sin(delta_lat / 2.0) ** 2
+        + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2.0) ** 2
+    )
+    angular_distance = 2.0 * math.atan2(math.sqrt(min(1.0, haversine)), math.sqrt(max(0.0, 1.0 - haversine)))
+    return EARTH_MEAN_RADIUS_METERS * angular_distance
+
+
+def _geodesic_line_length(coordinates: list[Any]) -> float:
+    if len(coordinates) < 2 or not all(_is_position(position) for position in coordinates):
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "LineString coordinates must contain at least two valid positions.")
+    return sum(_geodesic_segment_length(start, end) for start, end in zip(coordinates, coordinates[1:]))
+
+
+def _geodesic_multiline_length(coordinates: list[Any]) -> float:
+    if not coordinates or not all(isinstance(line, list) for line in coordinates):
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "MultiLineString coordinates must contain at least one line.")
+    return sum(_geodesic_line_length(line) for line in coordinates)
+
+
+def _geodesic_ring_signed_area(ring: list[Any]) -> float:
+    if not _ring_valid(ring):
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "Polygon rings must be closed and contain at least four positions.")
+    total = 0.0
+    for start, end in zip(ring, ring[1:]):
+        lon1, lat1 = _lonlat_degrees(start)
+        lon2, lat2 = _lonlat_degrees(end)
+        delta_lon = _normalize_longitude_delta_radians(math.radians(lon2 - lon1))
+        total += delta_lon * (2.0 + math.sin(math.radians(lat1)) + math.sin(math.radians(lat2)))
+    return (total * EARTH_MEAN_RADIUS_METERS * EARTH_MEAN_RADIUS_METERS) / 2.0
+
+
+def _geodesic_polygon_measurements(coordinates: list[Any]) -> dict[str, Any]:
+    if not _polygon_valid(coordinates):
+        raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "Polygon coordinates must contain valid closed rings.")
+    outer_area = abs(_geodesic_ring_signed_area(coordinates[0]))
+    hole_areas = [abs(_geodesic_ring_signed_area(ring)) for ring in coordinates[1:]]
+    perimeter = sum(_geodesic_line_length(ring) for ring in coordinates)
+    area = outer_area - sum(hole_areas)
+    warnings = ["GIS_MEASURE_HOLE_AREA_EXCEEDS_OUTER"] if area < -EPSILON else []
+    return {
+        "area": round(area, 6),
+        "length": round(perimeter, 6),
+        "ring_count": len(coordinates),
+        "hole_count": max(len(coordinates) - 1, 0),
+        "warnings": warnings,
+    }
+
+
+def _geodesic_measure_geometry(geometry: dict[str, Any]) -> dict[str, Any]:
+    geometry_type = geometry.get("type")
+    coordinates = geometry.get("coordinates")
+    if geometry_type == "Point":
+        _lonlat_degrees(coordinates)
+        return {"area": 0.0, "length": 0.0, "part_count": 1, "ring_count": 0, "hole_count": 0, "warnings": []}
+    if geometry_type == "MultiPoint":
+        if not isinstance(coordinates, list) or not coordinates or not all(_is_position(position) for position in coordinates):
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "MultiPoint coordinates must contain valid positions.")
+        for position in coordinates:
+            _lonlat_degrees(position)
+        return {"area": 0.0, "length": 0.0, "part_count": len(coordinates), "ring_count": 0, "hole_count": 0, "warnings": []}
+    if geometry_type == "LineString":
+        if not isinstance(coordinates, list):
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "LineString coordinates must be an array.")
+        return {
+            "area": 0.0,
+            "length": round(_geodesic_line_length(coordinates), 6),
+            "part_count": 1,
+            "ring_count": 0,
+            "hole_count": 0,
+            "warnings": [],
+        }
+    if geometry_type == "MultiLineString":
+        if not isinstance(coordinates, list):
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "MultiLineString coordinates must be an array.")
+        return {
+            "area": 0.0,
+            "length": round(_geodesic_multiline_length(coordinates), 6),
+            "part_count": len(coordinates),
+            "ring_count": 0,
+            "hole_count": 0,
+            "warnings": [],
+        }
+    if geometry_type == "Polygon":
+        if not isinstance(coordinates, list):
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "Polygon coordinates must be an array.")
+        polygon = _geodesic_polygon_measurements(coordinates)
+        return {**polygon, "part_count": 1}
+    if geometry_type == "MultiPolygon":
+        if not isinstance(coordinates, list) or not coordinates:
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "MultiPolygon coordinates must contain at least one polygon.")
+        polygons = [_geodesic_polygon_measurements(polygon) for polygon in coordinates if isinstance(polygon, list)]
+        if len(polygons) != len(coordinates):
+            raise GISProcessingError("ERROR_GIS_MEASURE_INVALID_GEOMETRY", "MultiPolygon members must be polygon coordinate arrays.")
+        warnings = sorted({warning for polygon in polygons for warning in polygon["warnings"]})
+        return {
+            "area": round(sum(float(polygon["area"]) for polygon in polygons), 6),
+            "length": round(sum(float(polygon["length"]) for polygon in polygons), 6),
+            "part_count": len(polygons),
+            "ring_count": sum(int(polygon["ring_count"]) for polygon in polygons),
+            "hole_count": sum(int(polygon["hole_count"]) for polygon in polygons),
+            "warnings": warnings,
+        }
+    raise GISProcessingError("ERROR_GIS_MEASURE_UNSUPPORTED_GEOMETRY", f"Unsupported geometry type for geodesic measurement: {geometry_type}")
+
+
+def _measure_geometry(geometry: dict[str, Any], *, measurement_mode: str = "planar") -> dict[str, Any]:
+    if measurement_mode == "geodesic":
+        return _geodesic_measure_geometry(geometry)
     geometry_type = geometry.get("type")
     coordinates = geometry.get("coordinates")
     if geometry_type == "Point":
@@ -681,6 +829,7 @@ def measure_geojson(
     *,
     cfg: Settings = settings,
     coordinate_units: str = "source_crs_units",
+    measurement_mode: str = "planar",
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
     source = _load_geojson(path)
@@ -691,6 +840,20 @@ def measure_geojson(
         raise GISProcessingError("ERROR_GIS_MEASURE_FEATURES_NOT_OBJECTS", "All GeoJSON features must be objects.")
     if not coordinate_units.strip():
         raise GISProcessingError("ERROR_GIS_MEASURE_UNITS_REQUIRED", "Coordinate units label is required.")
+    normalized_measurement_mode = _normalize_measurement_mode(measurement_mode)
+    normalized_source_crs = _normalize_crs_name(source.crs)
+    if normalized_measurement_mode == "geodesic" and normalized_source_crs != "EPSG:4326":
+        raise GISProcessingError(
+            "ERROR_GIS_MEASURE_GEODESIC_CRS",
+            f"Geodesic measurement requires EPSG:4326 coordinates; source CRS is {source.crs}.",
+        )
+    adapter = (
+        "local_spherical_geodesic_v1"
+        if normalized_measurement_mode == "geodesic"
+        else "local_planar_shoelace_v1"
+    )
+    area_units = "meters^2" if normalized_measurement_mode == "geodesic" else f"{coordinate_units.strip()}^2"
+    length_units = "meters" if normalized_measurement_mode == "geodesic" else coordinate_units.strip()
 
     feature_measurements: list[dict[str, Any]] = []
     state_counts = {"MEASURED": 0, "NULL_EMPTY": 0, "INVALID": 0, "UNSUPPORTED": 0}
@@ -747,7 +910,7 @@ def measure_geojson(
             feature_measurements.append(row)
             continue
         try:
-            measurements = _measure_geometry(geometry)
+            measurements = _measure_geometry(geometry, measurement_mode=normalized_measurement_mode)
         except GISProcessingError as exc:
             row["measurement_state"] = "INVALID"
             row["warnings"] = [exc.status]
@@ -788,7 +951,41 @@ def measure_geojson(
         if warning
     ]
     created_at = utc_now()
-    report_id = stable_id("gisreport", "measure", str(path), source.sha256, coordinate_units.strip(), created_at)
+    report_id = stable_id(
+        "gisreport",
+        "measure",
+        str(path),
+        source.sha256,
+        coordinate_units.strip(),
+        normalized_measurement_mode,
+        created_at,
+    )
+    limitations = (
+        [
+            "geodesic measurements use a local spherical Earth approximation with mean radius, not an ellipsoidal GIS engine",
+            "geodesic mode requires EPSG:4326 longitude/latitude degree coordinates and returns area/length in meters",
+            "this command does not perform robust overlay, clipping, datum transformation, antimeridian topology repair, or polar-area adjudication",
+        ]
+        if normalized_measurement_mode == "geodesic"
+        else [
+            "measurements are planar in the source coordinate units, not geodesic",
+            "polygon area uses the shoelace formula and subtracts interior ring area",
+            "this command does not perform robust overlay, clipping, datum transformation, or topology repair",
+        ]
+    )
+    falsification_criteria = (
+        [
+            "reject the measurement if row_accounting_closed is false",
+            "reject geodesic meter claims if the source CRS is not EPSG:4326 or retained coordinates are outside longitude/latitude bounds",
+            "compare material area or length values against an independent ellipsoidal GIS engine before legal-boundary, engineering, or high-stakes use",
+        ]
+        if normalized_measurement_mode == "geodesic"
+        else [
+            "reject the measurement if row_accounting_closed is false",
+            "reject area or length claims if the source CRS units label is wrong or unknown for the claim",
+            "compare material area or length values against an independent GIS engine before geodesic or legal-boundary use",
+        ]
+    )
     report = {
         "schema_version": GIS_REPORT_SCHEMA_VERSION,
         "report_id": report_id,
@@ -797,9 +994,10 @@ def measure_geojson(
         "created_at": created_at,
         "parameters": {
             "coordinate_units": coordinate_units.strip(),
-            "area_units": f"{coordinate_units.strip()}^2",
-            "length_units": coordinate_units.strip(),
-            "adapter": "local_planar_shoelace_v1",
+            "measurement_mode": normalized_measurement_mode,
+            "area_units": area_units,
+            "length_units": length_units,
+            "adapter": adapter,
         },
         "source": {
             "path": str(path),
@@ -826,16 +1024,8 @@ def measure_geojson(
             "total_length": round(total_length, 12),
         },
         "warnings": warnings,
-        "limitations": [
-            "measurements are planar in the source coordinate units, not geodesic",
-            "polygon area uses the shoelace formula and subtracts interior ring area",
-            "this command does not perform robust overlay, clipping, datum transformation, or topology repair",
-        ],
-        "falsification_criteria": [
-            "reject the measurement if row_accounting_closed is false",
-            "reject area or length claims if the source CRS units label is wrong or unknown for the claim",
-            "compare material area or length values against an independent GIS engine before geodesic or legal-boundary use",
-        ],
+        "limitations": limitations,
+        "falsification_criteria": falsification_criteria,
     }
     return _write_report(cfg, report)
 

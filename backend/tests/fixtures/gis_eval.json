@@ -1,9 +1,9 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 10,
+    "case_count": 12,
     "operation_count": 7,
-    "negative_case_count": 3
+    "negative_case_count": 4
   },
   "cases": [
     {
@@ -814,7 +814,9 @@
       },
       "expected_fields": {
         "parameters.adapter": "local_planar_shoelace_v1",
+        "parameters.measurement_mode": "planar",
         "parameters.area_units": "meters^2",
+        "parameters.length_units": "meters",
         "state_counts.MEASURED": 2,
         "state_counts.NULL_EMPTY": 1,
         "measurements.0.area": 32.0,
@@ -822,6 +824,125 @@
         "measurements.1.length": 8.0,
         "measurements.2.measurement_state": "NULL_EMPTY"
       }
+    },
+    {
+      "case_id": "measure_geodesic_wgs84_square",
+      "operation": "measure",
+      "parameters": {
+        "coordinate_units": "degrees",
+        "measurement_mode": "geodesic"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "one_degree_square",
+              "properties": {
+                "name": "one_degree_square"
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      1,
+                      0
+                    ],
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      0,
+                      0
+                    ]
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_MEASURE_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "crs": "EPSG:4326",
+        "feature_count": 1,
+        "measured_feature_count": 1,
+        "null_empty_count": 0,
+        "invalid_count": 0,
+        "unsupported_count": 0,
+        "row_accounting_closed": true,
+        "total_area": 12363718145.179935,
+        "total_length": 444763.384955,
+        "total_ring_count": 1,
+        "total_hole_count": 0
+      },
+      "expected_fields": {
+        "parameters.adapter": "local_spherical_geodesic_v1",
+        "parameters.measurement_mode": "geodesic",
+        "parameters.coordinate_units": "degrees",
+        "parameters.area_units": "meters^2",
+        "parameters.length_units": "meters",
+        "state_counts.MEASURED": 1,
+        "measurements.0.area": 12363718145.179935,
+        "measurements.0.length": 444763.384955,
+        "measurements.0.measurement_state": "MEASURED"
+      }
+    },
+    {
+      "case_id": "measure_geodesic_non_wgs84_fails_closed",
+      "operation": "measure",
+      "parameters": {
+        "coordinate_units": "meters",
+        "measurement_mode": "geodesic"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:3857"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "projected_point",
+              "properties": {
+                "name": "projected_point"
+              },
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  0,
+                  0
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_MEASURE_GEODESIC_CRS",
+      "expected_warnings": []
     },
     {
       "case_id": "measure_units_required_fails_closed",

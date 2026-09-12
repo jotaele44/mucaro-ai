@@ -546,13 +546,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     gis_measure = gis_subcommands.add_parser(
         "measure",
-        help="Measure GeoJSON feature area/length in source coordinate units and write a GIS receipt.",
+        help="Measure GeoJSON feature area/length with planar or geodesic receipts.",
     )
     gis_measure.add_argument("geojson_path", help="Path to a GeoJSON FeatureCollection.")
     gis_measure.add_argument(
+        "--measurement-mode",
+        choices=["planar", "geodesic"],
+        default="planar",
+        help="Measurement adapter. Geodesic mode requires EPSG:4326 and reports meters.",
+    )
+    gis_measure.add_argument(
         "--coordinate-units",
         default="source_crs_units",
-        help="Label for source coordinate units recorded in area/length fields.",
+        help="Label for source coordinate units; geodesic mode records this as input units and reports meter outputs.",
     )
     gis_measure.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_measure.set_defaults(handler=run_gis_measure)
@@ -1892,6 +1898,11 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"join_cardinality={payload.get('join_cardinality')}")
         if payload.get("match_on"):
             print(f"match_on={payload.get('match_on')}")
+        parameters = payload.get("parameters")
+        if isinstance(parameters, dict):
+            for key in ("measurement_mode", "adapter", "coordinate_units", "area_units", "length_units"):
+                if key in parameters:
+                    print(f"{key}={parameters.get(key)}")
         output = payload.get("output")
         if isinstance(output, dict):
             print(f"output_path={output.get('path')}")
@@ -2307,7 +2318,12 @@ def run_gis_measure(args: argparse.Namespace, cfg: Settings) -> int:
     if not path.is_absolute():
         path = cfg.project_root / path
     try:
-        result = measure_geojson(path, cfg=cfg, coordinate_units=args.coordinate_units)
+        result = measure_geojson(
+            path,
+            cfg=cfg,
+            coordinate_units=args.coordinate_units,
+            measurement_mode=args.measurement_mode,
+        )
     except GISProcessingError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2

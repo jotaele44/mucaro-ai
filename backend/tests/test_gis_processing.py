@@ -301,6 +301,72 @@ def test_measure_geojson_records_planar_area_length_and_residue(tmp_path: Path):
     assert result["report_sha256"]
 
 
+def test_measure_geojson_geodesic_records_meter_units_and_adapter(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(
+        tmp_path / "wgs84.geojson",
+        [
+            polygon_feature("one_degree_square", [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]),
+            line_feature("equator_degree", [[0, 0], [1, 0]]),
+        ],
+        crs="EPSG:4326",
+    )
+
+    result = measure_geojson(geojson, cfg=cfg, coordinate_units="degrees", measurement_mode="geodesic")
+
+    assert result["status"] == "GIS_MEASURE_OK"
+    assert result["parameters"]["measurement_mode"] == "geodesic"
+    assert result["parameters"]["adapter"] == "local_spherical_geodesic_v1"
+    assert result["parameters"]["coordinate_units"] == "degrees"
+    assert result["parameters"]["area_units"] == "meters^2"
+    assert result["parameters"]["length_units"] == "meters"
+    assert result["source"]["crs"] == "EPSG:4326"
+    assert result["state_counts"] == {"MEASURED": 2, "NULL_EMPTY": 0, "INVALID": 0, "UNSUPPORTED": 0}
+    assert result["invariants"]["row_accounting_closed"] is True
+    assert result["invariants"]["measured_feature_count"] == 2
+    by_id = {row["feature_id"]: row for row in result["measurements"]}
+    assert math.isclose(by_id["one_degree_square"]["area"], 12363718145.179935, rel_tol=0, abs_tol=0.01)
+    assert math.isclose(by_id["one_degree_square"]["length"], 444763.384955, rel_tol=0, abs_tol=0.01)
+    assert math.isclose(by_id["equator_degree"]["length"], 111195.080234, rel_tol=0, abs_tol=0.01)
+    assert math.isclose(result["invariants"]["total_area"], 12363718145.179935, rel_tol=0, abs_tol=0.01)
+    assert math.isclose(result["invariants"]["total_length"], 555958.465189, rel_tol=0, abs_tol=0.01)
+
+
+def test_measure_geojson_geodesic_requires_epsg4326_source(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(tmp_path / "webmercator.geojson", [point_feature("a", [0, 0])], crs="EPSG:3857")
+
+    try:
+        measure_geojson(geojson, cfg=cfg, coordinate_units="meters", measurement_mode="geodesic")
+    except GISProcessingError as exc:
+        assert exc.status == "ERROR_GIS_MEASURE_GEODESIC_CRS"
+    else:
+        raise AssertionError("expected geodesic measurement to require EPSG:4326")
+
+
+def test_measure_geojson_geodesic_records_invalid_lonlat_residue(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(
+        tmp_path / "invalid_lonlat.geojson",
+        [
+            point_feature("bad_lon", [181, 0]),
+            line_feature("valid_line", [[0, 0], [0, 1]]),
+        ],
+        crs="EPSG:4326",
+    )
+
+    result = measure_geojson(geojson, cfg=cfg, coordinate_units="degrees", measurement_mode="geodesic")
+
+    assert result["status"] == "GIS_MEASURE_WARN"
+    assert result["warnings"] == ["GIS_MEASURE_INVALID_GEOMETRY"]
+    assert result["state_counts"] == {"MEASURED": 1, "NULL_EMPTY": 0, "INVALID": 1, "UNSUPPORTED": 0}
+    assert result["invariants"]["row_accounting_closed"] is True
+    by_id = {row["feature_id"]: row for row in result["measurements"]}
+    assert by_id["bad_lon"]["measurement_state"] == "INVALID"
+    assert by_id["bad_lon"]["warnings"] == ["ERROR_GIS_MEASURE_INVALID_COORDINATES"]
+    assert by_id["valid_line"]["measurement_state"] == "MEASURED"
+
+
 def test_measure_geojson_records_invalid_and_unsupported_geometries(tmp_path: Path):
     cfg = make_settings(tmp_path)
     geojson = write_geojson(

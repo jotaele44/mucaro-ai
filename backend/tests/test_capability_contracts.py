@@ -54,7 +54,9 @@ def test_validate_gis_report_contract_accepts_measurement_receipts():
         "created_at": "2026-09-12T00:00:00Z",
         "parameters": {
             "coordinate_units": "meters",
+            "measurement_mode": "planar",
             "area_units": "meters^2",
+            "length_units": "meters",
             "adapter": "local_planar_shoelace_v1",
         },
         "source": {
@@ -82,6 +84,46 @@ def test_validate_gis_report_contract_accepts_measurement_receipts():
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
     assert result["counts"]["fail"] == 0
     assert result["capability_id"] == "advanced_gis_processing"
+
+
+def test_validate_gis_report_contract_accepts_geodesic_measurement_receipts():
+    report = {
+        "schema_version": "mucaro_gis_report_v1",
+        "report_id": "gisreport_geodesic",
+        "status": "GIS_MEASURE_OK",
+        "operation": "measure_geojson",
+        "created_at": "2026-09-12T00:00:00Z",
+        "parameters": {
+            "coordinate_units": "degrees",
+            "measurement_mode": "geodesic",
+            "area_units": "meters^2",
+            "length_units": "meters",
+            "adapter": "local_spherical_geodesic_v1",
+        },
+        "source": {
+            "path": "fixtures/wgs84.geojson",
+            "sha256": "c" * 64,
+            "crs": "epsg:4326",
+            "feature_count": 1,
+        },
+        "measurements": [],
+        "state_counts": {"MEASURED": 1, "NULL_EMPTY": 0, "INVALID": 0, "UNSUPPORTED": 0},
+        "invariants": {
+            "row_accounting_closed": True,
+            "feature_count": 1,
+            "measured_feature_count": 1,
+            "total_area": 12363718145.179935,
+            "total_length": 444763.384955,
+        },
+        "warnings": [],
+        "limitations": ["local spherical geodesic measurement fixture"],
+        "falsification_criteria": ["reject if source CRS is not EPSG:4326"],
+    }
+
+    result = validate_gis_report_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert result["counts"]["fail"] == 0
 
 
 def test_validate_gis_report_contract_accepts_singular_input_provenance():

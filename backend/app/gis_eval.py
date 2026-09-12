@@ -230,10 +230,12 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
         )
     if operation == "measure":
         coordinate_units = parameters.get("coordinate_units", "source_crs_units")
+        measurement_mode = parameters.get("measurement_mode", "planar")
         return measure_geojson(
             paths["geojson"],
             cfg=cfg,
             coordinate_units=str(coordinate_units),
+            measurement_mode=str(measurement_mode),
         )
     raise ValueError(f"Unsupported GIS eval operation: {operation}")
 

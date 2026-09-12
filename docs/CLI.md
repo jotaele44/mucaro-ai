@@ -60,7 +60,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis reproject GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON between supported local CRS pairs and write a transformation receipt | 0 | 2 |
 | `mucaro gis csv-points CSV_PATH --lat-column LAT --lon-column LON` | Convert CSV coordinate rows into GeoJSON point features and write a row-accounted GIS receipt | 0 | 2 |
 | `mucaro gis filter-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Filter whole GeoJSON features by bbox extent and write retained/excluded accounting | 0 | 2 |
-| `mucaro gis measure GEOJSON_PATH` | Measure GeoJSON feature area/length in source coordinate units and write a planar GIS receipt | 0 | 2 |
+| `mucaro gis measure GEOJSON_PATH` | Measure GeoJSON feature area/length with planar or EPSG:4326 geodesic receipts | 0 | 2 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
@@ -138,13 +138,18 @@ per-feature filter states, and closes retained/excluded accounting. It does not
 clip or rewrite geometries; robust clipping and overlay remain future GIS work.
 
 `mucaro gis measure GEOJSON_PATH` measures Point, MultiPoint, LineString,
-MultiLineString, Polygon, and MultiPolygon features in the source coordinate
-units. Use `--coordinate-units` to label the receipt units. The command records
+MultiLineString, Polygon, and MultiPolygon features. The default
+`--measurement-mode planar` measures in the source coordinate units; use
+`--coordinate-units` to label those units. `--measurement-mode geodesic`
+requires EPSG:4326 longitude/latitude coordinates and reports area/length in
+meters using the local spherical geodesic adapter. The command records
 per-feature measurement state, bbox, coordinate count, polygon hole count,
 aggregate area, aggregate length, null/invalid/unsupported geometry residue,
-and row-accounting closure. Polygon area uses local planar shoelace math with
-interior rings subtracted. It does not perform geodesic measurement, robust
-overlay, clipping, datum transformation, or topology repair.
+adapter identity, measurement mode, units, and row-accounting closure. Planar
+polygon area uses local shoelace math with interior rings subtracted. Geodesic
+mode is not a full ellipsoidal GIS-engine measurement and does not perform
+robust overlay, clipping, datum transformation, antimeridian topology repair,
+or polar-area adjudication.
 
 OCR analysis is intentionally separate from ingestion. `mucaro ocr analyze
 IMAGE_PATH` runs a local Tesseract engine against one image, preserves the
@@ -295,8 +300,8 @@ approved and audited.
 | `GIS_CSV_POINTS_WARN` | CSV point conversion completed after explicitly skipped invalid rows were recorded in the receipt |
 | `GIS_BBOX_FILTER_OK` | GeoJSON bbox filtering completed with CRS preserved and retained/excluded feature accounting closed |
 | `GIS_BBOX_FILTER_WARN` | GeoJSON bbox filtering completed while recording empty output, null/empty, or unresolved exclusions |
-| `GIS_MEASURE_OK` | GeoJSON planar measurement completed with feature accounting closed and no residue warnings |
-| `GIS_MEASURE_WARN` | GeoJSON planar measurement completed while recording null, invalid, unsupported, or malformed polygon-hole residue |
+| `GIS_MEASURE_OK` | GeoJSON planar or geodesic measurement completed with feature accounting closed and no residue warnings |
+| `GIS_MEASURE_WARN` | GeoJSON planar or geodesic measurement completed while recording null, invalid, unsupported, coordinate, or malformed polygon-hole residue |
 | `GIS_EVAL_OK` | GIS fixture manifest validation and every configured spatial case passed |
 | `GIS_EVAL_FAILED` | GIS fixture validation failed or one or more spatial cases regressed |
 | `GIS_QUALITY_CERT_OK` | exact-head GIS fixture-quality certification wrote a release receipt |
@@ -329,6 +334,9 @@ approved and audited.
 | `ERROR_GIS_BBOX_FEATURES_NOT_OBJECTS` | GeoJSON bbox filtering found a non-object member in the feature array |
 | `ERROR_GIS_MEASURE_FEATURES_NOT_OBJECTS` | GeoJSON measurement found a non-object member in the feature array |
 | `ERROR_GIS_MEASURE_UNITS_REQUIRED` | GeoJSON measurement received an empty coordinate-units label |
+| `ERROR_GIS_MEASURE_MODE_UNSUPPORTED` | GeoJSON measurement received an unsupported measurement mode |
+| `ERROR_GIS_MEASURE_GEODESIC_CRS` | Geodesic measurement was requested for a source CRS other than EPSG:4326 |
+| `ERROR_GIS_MEASURE_INVALID_COORDINATES` | Geodesic measurement found malformed, non-finite, or out-of-range longitude/latitude coordinates |
 | `ERROR_OCR_INPUT_NOT_FOUND` | OCR input path does not exist |
 | `ERROR_OCR_UNSUPPORTED_INPUT` | OCR command received an unsupported input type; current OCR analysis supports local images only |
 | `ERROR_OCR_ENGINE_UNAVAILABLE` | local Tesseract executable was not found and no explicit `--tesseract-path` was supplied |
@@ -634,7 +642,7 @@ Use `mucaro capabilities validate-gis-report REPORT_PATH` to check a saved GIS
 receipt against the executable advanced-capability output contract. The
 validator checks report schema, status, operation, source/input provenance,
 source hashes, CRS where present, warning structure, asserted row/conservation
-invariants, and operation-specific fields for bbox and planar measurement
+invariants, and operation-specific fields for bbox plus planar/geodesic measurement
 reports. It returns `CAPABILITY_OUTPUT_CONTRACT_FAILED` when a report claims a
 warning status without warnings, asserts false accounting, omits hashes, or
 misses required measurement/bbox fields. This is an enforcement bridge between
