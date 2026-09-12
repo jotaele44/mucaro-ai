@@ -591,9 +591,11 @@ Use `mucaro audit roadmap` to group those same product-audit rows into
 development stages. The roadmap preserves the audit denominator and adds
 stage-level status for the canonical operator surface, permissioned source
 grounding, controlled assistant behavior, release packaging certification, and
-hosted release governance. Text output includes the next recommended stage,
-next recommended vector, per-stage counts, open requirement IDs, gaps, and next
-steps so a development cycle can continue from the supported CLI boundary.
+hosted release governance, plus a final operator GUI stage that remains open
+until backend and CLI evidence can support it. Text output includes the next
+recommended stage, next recommended vector, per-stage counts, open requirement
+IDs, gaps, and next steps so a development cycle can continue from the
+supported CLI boundary without pulling GUI work forward prematurely.
 
 Use `mucaro eval retrieval` to run the committed retrieval-quality fixture from
 the supported CLI surface. The command reports the fixture path, chunk/query

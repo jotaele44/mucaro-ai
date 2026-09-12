@@ -16,8 +16,10 @@ OBJECTIVE = (
     "production-quality packaging. Capabilities must include advanced GIS "
     "processing, state-of-the-art OCR analysis, powerful web browsing "
     "abilities, coding and programming expertise, all governed by maximum "
-    "transparency and objectivity within a clean, simple, efficient, and "
-    "powerful GUI for prompt-and-response task execution."
+    "transparency and objectivity. The existing desktop launcher remains a "
+    "local operator surface, while expanded GUI/workspace development is a "
+    "final-phase goal after backend, CLI, provenance, capability, packaging, "
+    "and hosted-governance gates are stronger."
 )
 
 
@@ -277,6 +279,15 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Hosted GitHub Actions startup currently fails before jobs and branch protection is not enforced; tag binding is verified by the release-state and GitHub governance commands.",
             "Repair hosted Actions startup, enable branch protection after CI is healthy, then require current-head GitHub governance before promoting a governed release.",
         ),
+        ProductRequirement(
+            "final_phase_gui_operator_workspace",
+            "assistant_surface",
+            "Expanded GUI/operator workspace remains the last product phase, after backend and CLI certification gates are stronger.",
+            "OPEN",
+            "The existing desktop launcher and frontend smoke path are present, but expanded GUI work is explicitly deferred; CLI remains the certification boundary.",
+            "The final conversation-first work feed, specialized workspaces, synchronized maps/tables/code/artifacts, and GUI proof that grants, evidence, memory, tools, and run history work together are not yet implemented.",
+            "Do not expand GUI behavior until backend capability contracts, provenance, retrieval, OCR/GIS/web/coding gates, packaging, and hosted-governance evidence have been advanced.",
+        ),
     ]
 
     rows = [requirement.as_dict() for requirement in requirements]
@@ -392,6 +403,14 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
             "GitHub governance remains separate from local certification so hosted failures do not masquerade as product test failures.",
             "Hosted GitHub Actions startup and private branch-protection enforcement are not yet proven.",
             "Repair hosted Actions startup, enforce branch protection when available, and rerun current-head governance certification.",
+        ),
+        ProductRoadmapStage(
+            "final_operator_gui",
+            "Final operator GUI",
+            ("final_phase_gui_operator_workspace",),
+            "The GUI remains a final-phase operator surface over proven backend, CLI, provenance, permission, and certification workflows.",
+            "The full conversation-first GUI/workspace experience is intentionally not the active implementation vector.",
+            "Keep GUI expansion deferred until backend capability gates and release governance can support it without hiding uncertainty.",
         ),
     ]
 

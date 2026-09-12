@@ -267,10 +267,13 @@ Observed success markers:
   policy, and distribution policy pass; hosted GitHub Actions startup remains
   open.
 - `mucaro audit product` now uses the expanded governed-release objective. The
-  current scope reports `16 PASS`, `6 OPEN`, `0 BLOCKED`, and `72.7%`
+  current scope reports `16 PASS`, `7 OPEN`, `0 BLOCKED`, and `69.6%`
   readiness: the existing local assistant capabilities and source-artifact
-  packaging pass, and the existing GUI requirement remains part of the local
-  operator-surface goal while GUI expansion is deferred to the final phase.
+  packaging pass, while the expanded GUI/operator workspace is represented as a
+  separate final-phase open requirement. The existing launcher remains covered
+  by local smoke evidence, but GUI expansion is not the active development
+  vector until backend, CLI, provenance, capability, packaging, and hosted
+  governance gates are stronger.
   Advanced GIS now has narrow local GeoJSON inspection, point-in-polygon,
   geometry comparison, limited EPSG:4326/EPSG:3857 reprojection, CSV
   point-to-GeoJSON conversion, and bbox feature-filter receipt candidates plus
@@ -303,8 +306,9 @@ Observed success markers:
   stages without changing the denominator. It reports the canonical operator
   surface, permissioned source grounding, controlled assistant behavior,
   advanced capability expansion, release packaging certification, and hosted
-  release governance as stage-level gates, with
-  `advanced_capability_expansion` as the current open stage.
+  release governance as stage-level gates, plus a final operator GUI stage that
+  remains open by design, with `advanced_capability_expansion` as the current
+  open stage.
 - HTML and HTM files are now first-class local document-ingestion inputs. The
   parser extracts visible text, preserves title and link-count metadata in the
   source manifest, excludes script/style/template content from retrieval text,

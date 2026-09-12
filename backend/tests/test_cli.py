@@ -591,8 +591,8 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert main(["audit", "product", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "PRODUCT_AUDIT_OPEN"
-    assert payload["readiness_percent"] == 72.7
-    assert payload["counts"] == {"pass": 16, "open": 6, "blocked": 0, "total": 22}
+    assert payload["readiness_percent"] == 69.6
+    assert payload["counts"] == {"pass": 16, "open": 7, "blocked": 0, "total": 23}
     by_id = {row["requirement_id"]: row for row in payload["requirements"]}
     assert by_id["permission_gated_user_directory"]["status"] == "PASS"
     assert by_id["source_lineage_citations"]["status"] == "PASS"
@@ -608,6 +608,8 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert by_id["production_security"]["status"] == "PASS"
     assert by_id["source_artifact_packaging"]["status"] == "PASS"
     assert by_id["github_release_governance"]["status"] == "OPEN"
+    assert by_id["final_phase_gui_operator_workspace"]["status"] == "OPEN"
+    assert "deferred" in by_id["final_phase_gui_operator_workspace"]["evidence"]
     assert payload["next_recommended_vector"] == "advanced_gis_processing"
 
     assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 2
@@ -616,6 +618,7 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert "OPEN advanced_gis_processing" in strict_output
     assert "PASS source_artifact_packaging" in strict_output
     assert "OPEN github_release_governance" in strict_output
+    assert "OPEN final_phase_gui_operator_workspace" in strict_output
 
 
 def test_cli_product_roadmap_groups_audit_gaps(tmp_path: Path, capsys):
@@ -625,7 +628,7 @@ def test_cli_product_roadmap_groups_audit_gaps(tmp_path: Path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "PRODUCT_ROADMAP_OPEN"
     assert payload["audit_status"] == "PRODUCT_AUDIT_OPEN"
-    assert payload["audit_counts"] == {"pass": 16, "open": 6, "blocked": 0, "total": 22}
+    assert payload["audit_counts"] == {"pass": 16, "open": 7, "blocked": 0, "total": 23}
     assert payload["next_recommended_stage"] == "advanced_capability_expansion"
     assert payload["next_recommended_vector"] == "advanced_gis_processing"
 
@@ -644,14 +647,17 @@ def test_cli_product_roadmap_groups_audit_gaps(tmp_path: Path, capsys):
     assert stages["release_packaging_certification"]["status"] == "PASS"
     assert stages["hosted_release_governance"]["status"] == "OPEN"
     assert stages["hosted_release_governance"]["open_requirements"] == ["github_release_governance"]
+    assert stages["final_operator_gui"]["status"] == "OPEN"
+    assert stages["final_operator_gui"]["open_requirements"] == ["final_phase_gui_operator_workspace"]
 
     assert main(["audit", "roadmap", "--strict", "--format", "text"], cfg=cfg) == 2
     strict_output = capsys.readouterr().out
     assert "PRODUCT_ROADMAP_OPEN" in strict_output
-    assert "audit_total=22" in strict_output
+    assert "audit_total=23" in strict_output
     assert "next_recommended_stage=advanced_capability_expansion" in strict_output
     assert "OPEN advanced_capability_expansion" in strict_output
     assert "OPEN hosted_release_governance" in strict_output
+    assert "OPEN final_operator_gui" in strict_output
     assert "open_requirements=advanced_gis_processing,state_of_art_ocr_analysis,governed_web_browsing,coding_programming_expertise,transparency_objectivity_governance" in strict_output
 
 

@@ -24,7 +24,10 @@ Mucaro AI has crossed the prototype-promotion line. The local product surface
 now includes a real CLI, local-first retrieval, source-lineage ingestion,
 cited answers, explicit memory controls, an approval-gated tool runtime,
 release receipts, package artifacts, fresh-clone certification, and a local GUI
-foundation.
+foundation. The GUI foundation is not the active product-completion vector:
+expanded conversation/workspace UI work is intentionally reserved for the final
+phase after backend capability, provenance, packaging, and governance gates are
+stronger.
 
 The finish line is no longer "make the repo exist." The finish line is to make
 the repo repeatedly prove its behavior from a clean clone through ingestion,
@@ -52,7 +55,7 @@ limits.
 | Web browsing | URL policy, retrieval UTC, byte snapshots, parser metadata, content hashes, citation binding, robots/cache posture, and failure-preserving fetch logs |
 | Coding expertise | Codebase read policy, patch proposal receipts, diff/test evidence, sandbox boundaries, review output, and no hidden workspace mutation |
 | Transparency/objectivity | FACT/INFERENCE/ASSUMPTION/UNKNOWN separation, limitations, contradiction handling, falsification criteria, and reproducible verification hooks |
-| GUI/operator workflow | Clean prompt-and-response surface, efficient task execution, and isolated proof that permission grants, ingestion, retrieval, answer traces, memory controls, run history, and approved tools work together |
+| GUI/operator workflow | Final-phase clean prompt-and-response surface, efficient task execution, synchronized work feed, specialized workspaces, and isolated proof that permission grants, ingestion, retrieval, answer traces, memory controls, run history, and approved tools work together after backend/CLI gates are strong enough to expose |
 | Fresh clone | Exact-ref clone, install, CLI help, release check, launcher self-test, and desktop smoke certification |
 | Packaging | Source artifact manifest, archive SHA-256, member hashes, Python wheel/sdist receipts, local distribution handoff manifest, and package status gate |
 | Hosted governance | Current-head hosted CI, startup probe, branch-protection visibility, tag binding, and clear external blocker classification |
@@ -73,10 +76,11 @@ mucaro audit completion --include-github --format text
 ```
 
 The exact-head local release baseline is certified only when the current
-checkout has seven valid release receipts:
+checkout has eight valid release receipts:
 
 - `ANSWER_TRACE_QUALITY_CERT_OK`
 - `CERTIFY_RELEASE_OK`
+- `GIS_QUALITY_CERT_OK`
 - `RETRIEVAL_QUALITY_CERT_OK`
 - `OPERATOR_WORKFLOW_CERT_OK`
 - `PYTHON_DIST_CERT_OK`
@@ -104,6 +108,7 @@ byte-pinned proof layer for a particular commit. Verify them with
 | Governed web browsing | OPEN | Candidate fetch/snapshot/citation path, operator-supplied multi-page session receipts, robots/cache metadata, redirect-target robots evidence, HTML body/structure traces, PDF/non-text parser traces, immutable snapshot-only cache policy, and explicit HTTP error-page citation policy exist; add automated search/discovery controls, rendered-browser capture policy, and gated autonomous link-following before certification |
 | Coding/programming expertise | OPEN | Define read/patch/test/review action boundary, sandbox policy, diff receipts, and code-quality eval fixtures |
 | Transparency/objectivity across capabilities | OPEN | Require provenance, uncertainty, limitations, contradictory evidence handling, and falsification criteria in every advanced capability output |
+| Final-phase GUI/operator workspace | OPEN | Keep GUI expansion deferred until backend capability contracts, CLI workflows, provenance, retrieval, OCR/GIS/web/coding gates, packaging, and hosted governance can support it without hiding uncertainty |
 | Production packaging | OPEN | Verify the local distribution handoff manifest, then convert certified local artifacts into the chosen publish/install channel |
 | Sustained workflow validation | OPEN | Run end-to-end operator workflows across ingest, ask, trace review, memory, tools, receipts, and recovery paths |
 
