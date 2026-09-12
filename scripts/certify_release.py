@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -111,6 +112,80 @@ def gate_command(name: str, cmd: list[str], *, cwd: Path = ROOT) -> Gate:
     return Gate(name, status, detail)
 
 
+def _node_candidates() -> list[str]:
+    candidates = []
+    env_node = os.environ.get("MUCARO_NODE")
+    if env_node:
+        candidates.append(env_node)
+    bundled_node = Path.home() / ".cache" / "codex-runtimes" / "codex-primary-runtime" / "dependencies" / "node" / "bin" / "node"
+    candidates.append(str(bundled_node))
+    system_node = shutil.which("node")
+    if system_node:
+        candidates.append(system_node)
+    seen = set()
+    return [candidate for candidate in candidates if not (candidate in seen or seen.add(candidate))]
+
+
+def _working_node() -> str | None:
+    for candidate in _node_candidates():
+        if not Path(candidate).exists():
+            continue
+        proc = subprocess.run(
+            [candidate, "--version"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        if proc.returncode == 0:
+            return candidate
+    return None
+
+
+def _npm_cli_candidates() -> list[Path]:
+    env_npm_cli = os.environ.get("MUCARO_NPM_CLI")
+    candidates = [Path(env_npm_cli)] if env_npm_cli else []
+    candidates.extend(
+        [
+            Path("/usr/local/lib/node_modules/npm/bin/npm-cli.js"),
+            Path("/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js"),
+        ]
+    )
+    return [candidate for candidate in candidates if candidate.exists()]
+
+
+def gate_npm_audit() -> Gate:
+    primary = gate_command("npm_audit", ["npm", "audit", "--audit-level=moderate"], cwd=ROOT / "frontend")
+    if primary.status == "PASS":
+        return primary
+    node = _working_node()
+    npm_cli = next(iter(_npm_cli_candidates()), None)
+    if not node or npm_cli is None:
+        return primary
+    proc = run([node, str(npm_cli), "audit", "--audit-level=moderate"], cwd=ROOT / "frontend", check=False)
+    if proc.returncode != 0:
+        detail = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else f"returncode={proc.returncode}"
+        return Gate("npm_audit", "FAIL", f"{primary.detail}; fallback_failed={detail}")
+    detail = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else "fallback npm audit passed"
+    return Gate("npm_audit", "PASS", f"fallback_node={node} npm_cli={npm_cli} detail={detail}")
+
+
+def gate_frontend_build() -> Gate:
+    primary = gate_command("frontend_build", ["npm", "run", "build"], cwd=ROOT / "frontend")
+    if primary.status == "PASS":
+        return primary
+    node = _working_node()
+    vite_bin = ROOT / "frontend" / "node_modules" / "vite" / "bin" / "vite.js"
+    if not node or not vite_bin.exists():
+        return primary
+    proc = run([node, str(vite_bin), "build"], cwd=ROOT / "frontend", check=False)
+    if proc.returncode != 0:
+        detail = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else f"returncode={proc.returncode}"
+        return Gate("frontend_build", "FAIL", f"{primary.detail}; fallback_failed={detail}")
+    detail = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else "fallback frontend build passed"
+    return Gate("frontend_build", "PASS", f"fallback_node={node} vite={vite_bin.relative_to(ROOT)} detail={detail}")
+
+
 def gate_package_artifact() -> tuple[Gate, dict | None]:
     proc = run([sys.executable, "scripts/mucaro.py", "package", "build", "--format", "json"], check=False)
     try:
@@ -207,8 +282,8 @@ def main() -> int:
     gates.append(gate_package_artifact_verification(package_artifact))
     gates.extend(
         [
-            gate_command("npm_audit", ["npm", "audit", "--audit-level=moderate"], cwd=ROOT / "frontend"),
-            gate_command("frontend_build", ["npm", "run", "build"], cwd=ROOT / "frontend"),
+            gate_npm_audit(),
+            gate_frontend_build(),
         ]
     )
     failed = [gate for gate in gates if gate.status != "PASS"]

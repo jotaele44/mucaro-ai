@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys
 import tarfile
+from pathlib import Path
 
 import pytest
 
@@ -114,6 +115,54 @@ def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
     assert "PASS package_artifact manifest_member_count=1" in output
     assert "PASS package_artifact_verify manifest_member_count=1" in output
     assert "CERTIFY_RELEASE_OK" in output
+
+
+def test_certify_release_npm_audit_uses_working_node_fallback(monkeypatch):
+    def fake_gate_command(name, cmd, *, cwd=certify_release.ROOT):
+        del cmd, cwd
+        return certify_release.Gate(name, "FAIL", "broken system npm")
+
+    def fake_run(cmd, *, cwd=certify_release.ROOT, check=True):
+        del cwd, check
+        assert cmd == ["/tmp/node", "/tmp/npm-cli.js", "audit", "--audit-level=moderate"]
+        return subprocess.CompletedProcess(cmd, 0, "found 0 vulnerabilities\n")
+
+    monkeypatch.setattr(certify_release, "gate_command", fake_gate_command)
+    monkeypatch.setattr(certify_release, "_working_node", lambda: "/tmp/node")
+    monkeypatch.setattr(certify_release, "_npm_cli_candidates", lambda: [Path("/tmp/npm-cli.js")])
+    monkeypatch.setattr(certify_release, "run", fake_run)
+
+    result = certify_release.gate_npm_audit()
+
+    assert result.status == "PASS"
+    assert "fallback_node=/tmp/node" in result.detail
+
+
+def test_certify_release_frontend_build_uses_working_node_fallback(tmp_path, monkeypatch):
+    frontend = tmp_path / "frontend"
+    vite = frontend / "node_modules" / "vite" / "bin" / "vite.js"
+    vite.parent.mkdir(parents=True)
+    vite.write_text("// vite\n", encoding="utf-8")
+
+    def fake_gate_command(name, cmd, *, cwd=certify_release.ROOT):
+        del cmd, cwd
+        return certify_release.Gate(name, "FAIL", "broken system node")
+
+    def fake_run(cmd, *, cwd=certify_release.ROOT, check=True):
+        del cwd, check
+        assert cmd == ["/tmp/node", str(vite), "build"]
+        return subprocess.CompletedProcess(cmd, 0, "built\n")
+
+    monkeypatch.setattr(certify_release, "ROOT", tmp_path)
+    monkeypatch.setattr(certify_release, "gate_command", fake_gate_command)
+    monkeypatch.setattr(certify_release, "_working_node", lambda: "/tmp/node")
+    monkeypatch.setattr(certify_release, "run", fake_run)
+
+    result = certify_release.gate_frontend_build()
+
+    assert result.status == "PASS"
+    assert "fallback_node=/tmp/node" in result.detail
+    assert "node_modules/vite/bin/vite.js" in result.detail
 
 
 def test_fresh_clone_uses_shallow_branch_clone_for_named_refs(tmp_path, monkeypatch):
