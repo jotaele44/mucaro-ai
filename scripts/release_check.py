@@ -7,11 +7,38 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from scripts import certify_release as release_certification  # noqa: E402
 
 
 def run(cmd: list[str], *, env: dict[str, str] | None = None, cwd: Path = ROOT) -> None:
     print("RUN", " ".join(cmd))
     subprocess.run(cmd, cwd=cwd, env=env or os.environ.copy(), check=True)
+
+
+def node_first_env(base_env: dict[str, str], node: str) -> dict[str, str]:
+    env = base_env.copy()
+    node_dir = str(Path(node).parent)
+    existing_path = env.get("PATH", "")
+    env["PATH"] = f"{node_dir}{os.pathsep}{existing_path}" if existing_path else node_dir
+    env["NODE"] = node
+    env["npm_config_node"] = node
+    return env
+
+
+def run_frontend_build(env: dict[str, str]) -> None:
+    frontend = ROOT / "frontend"
+    try:
+        run(["npm", "run", "build"], env=env, cwd=frontend)
+        return
+    except subprocess.CalledProcessError:
+        node = release_certification._working_node()
+        vite_bin = frontend / "node_modules" / "vite" / "bin" / "vite.js"
+        if not node or not vite_bin.exists():
+            raise
+        fallback_env = node_first_env(env, node)
+        run([node, str(vite_bin), "build"], env=fallback_env, cwd=frontend)
 
 
 def main() -> int:
@@ -34,7 +61,7 @@ def main() -> int:
     package = ROOT / "frontend" / "package.json"
     node_modules = ROOT / "frontend" / "node_modules"
     if package.exists() and node_modules.exists():
-        run(["npm", "run", "build"], env=env, cwd=ROOT / "frontend")
+        run_frontend_build(env)
     else:
         print("FRONTEND_BUILD_SKIPPED node_modules_not_installed")
     print("RELEASE_CHECK_OK")

@@ -14,6 +14,7 @@ import scripts.certify_python_distribution as certify_python_distribution
 import scripts.certify_release as certify_release
 import scripts.certify_source_artifact as certify_source_artifact
 import scripts.launch_app as launch_app
+import scripts.release_check as release_check
 from backend.app.packaging import build_macos_app_bundle, verify_macos_app_bundle
 
 
@@ -165,6 +166,33 @@ def test_certify_release_frontend_build_uses_working_node_fallback(tmp_path, mon
     assert "node_modules/vite/bin/vite.js" in result.detail
 
 
+def test_release_check_frontend_build_uses_working_node_fallback(tmp_path, monkeypatch):
+    frontend = tmp_path / "frontend"
+    vite = frontend / "node_modules" / "vite" / "bin" / "vite.js"
+    vite.parent.mkdir(parents=True)
+    vite.write_text("// vite\n", encoding="utf-8")
+    calls = []
+
+    def fake_run(cmd, *, env=None, cwd=release_check.ROOT):
+        calls.append((cmd, env, cwd))
+        if cmd == ["npm", "run", "build"]:
+            raise subprocess.CalledProcessError(-6, cmd)
+
+    monkeypatch.setattr(release_check, "ROOT", tmp_path)
+    monkeypatch.setattr(release_check, "run", fake_run)
+    monkeypatch.setattr(release_check.release_certification, "_working_node", lambda: "/tmp/node")
+
+    release_check.run_frontend_build({"PATH": "/usr/bin"})
+
+    primary, fallback = calls
+    assert primary == (["npm", "run", "build"], {"PATH": "/usr/bin"}, frontend)
+    assert fallback[0] == ["/tmp/node", str(vite), "build"]
+    assert fallback[1]["PATH"].split(release_check.os.pathsep)[0] == "/tmp"
+    assert fallback[1]["NODE"] == "/tmp/node"
+    assert fallback[1]["npm_config_node"] == "/tmp/node"
+    assert fallback[2] == frontend
+
+
 def test_fresh_clone_uses_shallow_branch_clone_for_named_refs(tmp_path, monkeypatch):
     calls = []
 
@@ -216,6 +244,37 @@ def test_fresh_clone_fetches_exact_commit_sha(tmp_path, monkeypatch):
     ]
 
 
+def test_fresh_clone_npm_ci_uses_working_node_fallback(tmp_path, monkeypatch):
+    frontend = tmp_path / "frontend"
+    frontend.mkdir()
+    calls = []
+
+    def fake_run(cmd, *, cwd, check=True, env=None):
+        del check
+        calls.append((cmd, cwd, env))
+        if cmd == ["npm", "ci", "--registry=https://registry.npmjs.org/"]:
+            return subprocess.CompletedProcess(cmd, 134, "dyld missing libsimdutf\n")
+        return subprocess.CompletedProcess(cmd, 0, "added packages\n")
+
+    monkeypatch.setattr(certify_fresh_clone, "run", fake_run)
+    monkeypatch.setattr(certify_fresh_clone.release_certification, "_working_node", lambda: "/tmp/node")
+    monkeypatch.setattr(
+        certify_fresh_clone.release_certification,
+        "_npm_cli_candidates",
+        lambda: [Path("/tmp/npm-cli.js")],
+    )
+
+    certify_fresh_clone.run_npm_ci(frontend)
+
+    primary, fallback = calls
+    assert primary == (["npm", "ci", "--registry=https://registry.npmjs.org/"], frontend, None)
+    assert fallback[0] == ["/tmp/node", "/tmp/npm-cli.js", "ci", "--registry=https://registry.npmjs.org/"]
+    assert fallback[1] == frontend
+    assert fallback[2]["PATH"].split(certify_fresh_clone.os.pathsep)[0] == "/tmp"
+    assert fallback[2]["NODE"] == "/tmp/node"
+    assert fallback[2]["npm_config_node"] == "/tmp/node"
+
+
 def test_source_artifact_extracts_expected_archive_root(tmp_path):
     archive_path = tmp_path / "source.zip"
     with certify_source_artifact.zipfile.ZipFile(archive_path, "w") as archive:
@@ -244,6 +303,37 @@ def test_source_artifact_rejects_unexpected_archive_root(tmp_path):
 
     with pytest.raises(ValueError, match="unexpected archive root"):
         certify_source_artifact.extract_source_archive(manifest, tmp_path / "extract")
+
+
+def test_source_artifact_npm_ci_uses_working_node_fallback(tmp_path, monkeypatch):
+    frontend = tmp_path / "frontend"
+    frontend.mkdir()
+    calls = []
+
+    def fake_run(cmd, *, cwd, check=True, env=None):
+        del check
+        calls.append((cmd, cwd, env))
+        if cmd == ["npm", "ci", "--registry=https://registry.npmjs.org/"]:
+            return subprocess.CompletedProcess(cmd, 134, "dyld missing libsimdutf\n")
+        return subprocess.CompletedProcess(cmd, 0, "added packages\n")
+
+    monkeypatch.setattr(certify_source_artifact, "run", fake_run)
+    monkeypatch.setattr(certify_source_artifact.release_certification, "_working_node", lambda: "/tmp/node")
+    monkeypatch.setattr(
+        certify_source_artifact.release_certification,
+        "_npm_cli_candidates",
+        lambda: [Path("/tmp/npm-cli.js")],
+    )
+
+    certify_source_artifact.run_npm_ci(frontend)
+
+    primary, fallback = calls
+    assert primary == (["npm", "ci", "--registry=https://registry.npmjs.org/"], frontend, None)
+    assert fallback[0] == ["/tmp/node", "/tmp/npm-cli.js", "ci", "--registry=https://registry.npmjs.org/"]
+    assert fallback[1] == frontend
+    assert fallback[2]["PATH"].split(certify_source_artifact.os.pathsep)[0] == "/tmp"
+    assert fallback[2]["NODE"] == "/tmp/node"
+    assert fallback[2]["npm_config_node"] == "/tmp/node"
 
 
 def test_python_distribution_summarizes_wheel_artifact(tmp_path):

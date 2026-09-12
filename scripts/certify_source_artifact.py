@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -15,11 +16,49 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from backend.app.release_receipts import write_release_receipt  # noqa: E402
+from scripts import certify_release as release_certification  # noqa: E402
 
 
-def run(cmd: list[str], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
+def run(
+    cmd: list[str],
+    *,
+    cwd: Path,
+    check: bool = True,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     print("RUN", " ".join(cmd))
-    return subprocess.run(cmd, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=check)
+    return subprocess.run(cmd, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=check, env=env)
+
+
+def node_first_env(node: str) -> dict[str, str]:
+    env = os.environ.copy()
+    node_dir = str(Path(node).parent)
+    existing_path = env.get("PATH", "")
+    env["PATH"] = f"{node_dir}{os.pathsep}{existing_path}" if existing_path else node_dir
+    env["NODE"] = node
+    env["npm_config_node"] = node
+    return env
+
+
+def run_npm_ci(frontend_dir: Path) -> None:
+    cmd = ["npm", "ci", "--registry=https://registry.npmjs.org/"]
+    primary = run(cmd, cwd=frontend_dir, check=False)
+    if primary.returncode == 0:
+        return
+
+    node = release_certification._working_node()
+    npm_cli = next(iter(release_certification._npm_cli_candidates()), None)
+    if not node or npm_cli is None:
+        primary.check_returncode()
+
+    fallback = run(
+        [node, str(npm_cli), "ci", "--registry=https://registry.npmjs.org/"],
+        cwd=frontend_dir,
+        check=False,
+        env=node_first_env(node),
+    )
+    if fallback.returncode != 0:
+        fallback.check_returncode()
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
@@ -67,7 +106,7 @@ def certify_source_dir(source_dir: Path) -> None:
     run([str(venv_python), "-m", "pip", "install", "--upgrade", "pip"], cwd=source_dir)
     run([str(venv_python), "-m", "pip", "install", "-e", ".[dev]"], cwd=source_dir)
     if (source_dir / "frontend" / "package-lock.json").exists():
-        run(["npm", "ci", "--registry=https://registry.npmjs.org/"], cwd=source_dir / "frontend")
+        run_npm_ci(source_dir / "frontend")
     run([str(venv_python), "scripts/release_check.py"], cwd=source_dir)
     run([str(venv_mucaro), "--help"], cwd=source_dir)
     run([str(venv_python), "scripts/package_desktop.py", "--self-test"], cwd=source_dir)
