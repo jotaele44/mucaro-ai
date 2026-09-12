@@ -49,6 +49,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro eval gis` | Evaluate local GIS receipt behavior against positive and negative spatial fixtures | 0 | 2 |
 | `mucaro certify retrieval-quality` | Write an exact-head retrieval-quality release receipt | 0 | 2 |
 | `mucaro certify answer-trace-quality` | Write an exact-head cited-answer traceability release receipt | 0 | 2 |
+| `mucaro certify gis-quality` | Write an exact-head GIS fixture-quality release receipt | 0 | 2 |
 | `mucaro certify operator-workflow` | Write an exact-head local operator-workflow release receipt | 0 | 2 |
 | `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
 | `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry receipt | 0 | 2 |
@@ -247,6 +248,8 @@ approved and audited.
 | `GIS_REPROJECT_WARN` | GeoJSON reprojection completed while preserving no-op or null/empty geometry warnings |
 | `GIS_EVAL_OK` | GIS fixture manifest validation and every configured spatial case passed |
 | `GIS_EVAL_FAILED` | GIS fixture validation failed or one or more spatial cases regressed |
+| `GIS_QUALITY_CERT_OK` | exact-head GIS fixture-quality certification wrote a release receipt |
+| `GIS_QUALITY_CERT_FAILED` | exact-head GIS fixture-quality certification failed or could not write a receipt |
 | `OCR_ANALYSIS_OK` | Local image OCR completed with at least one extracted text span and wrote an OCR receipt |
 | `OCR_ANALYSIS_NO_TEXT` | Local image OCR completed without extracting text; no text was synthesized |
 | `ERROR_GIS_INPUT_NOT_FOUND` | GeoJSON input path does not exist |
@@ -306,6 +309,7 @@ mucaro gis inspect data/input/example.geojson --format text
 mucaro gis point-in-polygon data/input/points.geojson data/input/polygons.geojson --format text
 mucaro certify retrieval-quality --format text
 mucaro certify answer-trace-quality --format text
+mucaro certify gis-quality --format text
 mucaro certify operator-workflow --format text
 mucaro permissions grant ~/Documents/mucaro-sources --yes --format json
 mucaro permissions list --format text
@@ -399,7 +403,7 @@ Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,
 `SOURCE_ARTIFACT_CERTIFIED`, `PYTHON_DIST_CERTIFIED`,
-`RETRIEVAL_QUALITY_CERTIFIED`, `OPERATOR_WORKFLOW_CERTIFIED`,
+`RETRIEVAL_QUALITY_CERTIFIED`, `GIS_QUALITY_CERTIFIED`, `OPERATOR_WORKFLOW_CERTIFIED`,
 `GITHUB_GOVERNANCE_OPEN`, `GOVERNED_RELEASE_READY`, and
 `PRODUCTION_READY`.
 The command reuses existing audit, package, Git,
@@ -592,6 +596,15 @@ limited EPSG:4326 to EPSG:3857 reprojection, and fail-closed invalid Web
 Mercator latitude handling. It returns `GIS_EVAL_OK` only when the fixture and
 every case pass; `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives
 automation a hard regression signal.
+
+Use `mucaro certify gis-quality` when the release needs exact-head GIS fixture
+evidence instead of an ad hoc eval result. The certification wraps
+`mucaro eval gis`, records the current `HEAD`, profile, fixture, full eval
+report, and failed cases, then writes a `gis_quality` receipt under
+`data/exports/release_receipts`. It returns `GIS_QUALITY_CERT_OK` only when the
+committed GIS fixture manifest and every spatial case pass. The receipt proves
+the current narrow GIS regression boundary; it does not close the broader
+advanced GIS product gap.
 
 Use `mucaro certify retrieval-quality` when the release needs exact-head
 retrieval evidence instead of an ad hoc score. The certification profile runs

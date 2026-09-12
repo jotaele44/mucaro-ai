@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -13,6 +15,7 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
+from .release_receipts import write_release_receipt
 from .utils import utc_now
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,8 +23,24 @@ DEFAULT_GIS_EVAL_FIXTURE = ROOT / "backend" / "tests" / "fixtures" / "gis_eval.j
 GIS_EVAL_SCHEMA_VERSION = "mucaro_gis_eval_fixture_v1"
 GIS_EVAL_OK = "GIS_EVAL_OK"
 GIS_EVAL_FAILED = "GIS_EVAL_FAILED"
+GIS_QUALITY_OK = "GIS_QUALITY_CERT_OK"
+GIS_QUALITY_FAILED = "GIS_QUALITY_CERT_FAILED"
+GIS_QUALITY_PROFILE = "v0.1.23-local-release"
+GIS_QUALITY_RECEIPT_TYPE = "gis_quality"
 
 VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "reproject"}
+
+
+def current_git_head(root: Path) -> str:
+    proc = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    return proc.stdout.strip() if proc.returncode == 0 else "UNKNOWN_HEAD"
 
 
 def _fixture_label(path: Path) -> str:
@@ -305,4 +324,70 @@ def format_gis_eval_text(report: dict[str, Any]) -> list[str]:
                         f"FAIL {case.get('case_id')}.{check.get('name')} "
                         f"observed={check.get('observed')} expected={check.get('expected')}"
                     )
+    return [*lines, ""]
+
+
+def build_gis_quality_certification(
+    root: Path,
+    *,
+    profile: str = GIS_QUALITY_PROFILE,
+    fixture_path: Path = DEFAULT_GIS_EVAL_FIXTURE,
+    command: list[str] | None = None,
+    write_receipt: bool = True,
+) -> dict[str, Any]:
+    head_sha = current_git_head(root)
+    report = build_gis_eval_report(fixture_path=fixture_path)
+    status = GIS_QUALITY_OK if report["status"] == GIS_EVAL_OK else GIS_QUALITY_FAILED
+    result: dict[str, Any] = {
+        "status": status,
+        "profile": profile,
+        "head_sha": head_sha,
+        "fixture": report.get("fixture"),
+        "report": report,
+        "failed_cases": [case for case in report.get("cases", []) if isinstance(case, dict) and case.get("status") != "PASS"],
+        "receipt": None,
+    }
+    if write_receipt:
+        try:
+            receipt = write_release_receipt(
+                root,
+                receipt_type=GIS_QUALITY_RECEIPT_TYPE,
+                status=status,
+                head_sha=head_sha,
+                command=command or [sys.executable, "scripts/certify_gis_quality.py"],
+                payload={
+                    "profile": profile,
+                    "fixture": report.get("fixture"),
+                    "report": report,
+                },
+            )
+            result["receipt"] = str(receipt.relative_to(root) if receipt.is_relative_to(root) else receipt)
+        except OSError as exc:
+            result["status"] = GIS_QUALITY_FAILED
+            result["receipt_error"] = f"{type(exc).__name__}: {exc}"
+    return result
+
+
+def format_gis_quality_certification_text(report: dict[str, Any]) -> list[str]:
+    lines = [
+        f"profile={report.get('profile')}",
+        f"head_sha={report.get('head_sha')}",
+        f"fixture={report.get('fixture')}",
+    ]
+    if report.get("receipt"):
+        lines.append(f"receipt={report.get('receipt')}")
+    eval_report = report.get("report", {})
+    if isinstance(eval_report, dict):
+        for line in format_gis_eval_text(eval_report)[:-1]:
+            if line.startswith(("PASS ", "FAIL ")):
+                lines.append(line)
+            elif "=" in line:
+                lines.append(f"eval_{line}")
+            else:
+                lines.append(line)
+    for case in report.get("failed_cases", []):
+        if isinstance(case, dict):
+            lines.append(f"FAILED_CASE {case.get('case_id')} observed={case.get('observed_status')}")
+    if report.get("receipt_error"):
+        lines.append(f"receipt_error={report.get('receipt_error')}")
     return [*lines, ""]

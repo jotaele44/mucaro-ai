@@ -45,7 +45,16 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
-from .gis_eval import DEFAULT_GIS_EVAL_FIXTURE, GIS_EVAL_OK, build_gis_eval_report, format_gis_eval_text
+from .gis_eval import (
+    DEFAULT_GIS_EVAL_FIXTURE,
+    GIS_EVAL_OK,
+    GIS_QUALITY_OK,
+    GIS_QUALITY_PROFILE,
+    build_gis_eval_report,
+    build_gis_quality_certification,
+    format_gis_eval_text,
+    format_gis_quality_certification_text,
+)
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
 from .ingestion import (
     delete_source,
@@ -66,6 +75,7 @@ from .memory import (
 )
 from .packaging import (
     DISTRIBUTION_MANIFEST_DIR,
+    REQUIRED_DISTRIBUTION_RECEIPTS,
     build_distribution_manifest,
     build_package_status,
     build_release_artifacts,
@@ -396,6 +406,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     certify_answer_trace.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     certify_answer_trace.set_defaults(handler=run_certify_answer_trace_quality)
+
+    certify_gis = certify_subcommands.add_parser(
+        "gis-quality",
+        help="Certify GIS fixture quality against the release fixture manifest.",
+    )
+    certify_gis.add_argument(
+        "--profile",
+        default=GIS_QUALITY_PROFILE,
+        help="Named GIS-quality profile to record in the release receipt.",
+    )
+    certify_gis.add_argument("--fixture", type=Path, default=DEFAULT_GIS_EVAL_FIXTURE, help="GIS evaluation fixture path.")
+    certify_gis.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    certify_gis.set_defaults(handler=run_certify_gis_quality)
 
     certify_operator_workflow = certify_subcommands.add_parser(
         "operator-workflow",
@@ -1351,6 +1374,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(line)
     elif status in {"GIS_EVAL_OK", "GIS_EVAL_FAILED"}:
         for line in format_gis_eval_text(payload)[:-1]:
+            print(line)
+    elif status in {"GIS_QUALITY_CERT_OK", "GIS_QUALITY_CERT_FAILED"}:
+        for line in format_gis_quality_certification_text(payload)[:-1]:
             print(line)
     elif status in {"ANSWER_TRACE_QUALITY_CERT_OK", "ANSWER_TRACE_QUALITY_CERT_FAILED"}:
         for line in format_answer_trace_quality_certification_text(payload)[:-1]:
@@ -4211,12 +4237,18 @@ def build_release_handoff_report(
         require_current_head=True,
     )
 
+    expected_receipt_count = len(REQUIRED_DISTRIBUTION_RECEIPTS)
     checks = [
         *preflight_checks,
         *refresh_checks,
         _certification_gate(
             "current_head_receipts",
-            "PASS" if receipt_summary.get("total") == 7 and receipt_summary.get("valid") == 7 else "FAIL",
+            (
+                "PASS"
+                if receipt_summary.get("total") == expected_receipt_count
+                and receipt_summary.get("valid") == expected_receipt_count
+                else "FAIL"
+            ),
             f"total={receipt_summary.get('total')} valid={receipt_summary.get('valid')} invalid={receipt_summary.get('invalid')}",
         ),
         _certification_gate(
@@ -4523,7 +4555,7 @@ def build_completion_audit_report(
 
     current_head_receipts_status = (
         "PASS"
-        if receipt_summary.get("total", 0) >= 7
+        if receipt_summary.get("total", 0) >= len(REQUIRED_DISTRIBUTION_RECEIPTS)
         and receipt_summary.get("valid") == receipt_summary.get("total")
         and receipt_summary.get("invalid") == 0
         else "OPEN"
@@ -6160,6 +6192,11 @@ def build_release_state_report(
         receipt_type="retrieval_quality",
         head_sha=head_sha,
     )
+    gis_quality_receipt = load_release_receipt(
+        cfg.project_root,
+        receipt_type="gis_quality",
+        head_sha=head_sha,
+    )
     local_release_status, local_release_evidence = _receipt_state(local_release_receipt, "CERTIFY_RELEASE_OK")
     fresh_clone_status, fresh_clone_evidence = _receipt_state(fresh_clone_receipt, "FRESH_CLONE_CERT_OK")
     source_artifact_status, source_artifact_evidence = _receipt_state(source_artifact_receipt, "SOURCE_ARTIFACT_CERT_OK")
@@ -6175,6 +6212,10 @@ def build_release_state_report(
     retrieval_quality_status, retrieval_quality_evidence = _receipt_state(
         retrieval_quality_receipt,
         "RETRIEVAL_QUALITY_CERT_OK",
+    )
+    gis_quality_status, gis_quality_evidence = _receipt_state(
+        gis_quality_receipt,
+        "GIS_QUALITY_CERT_OK",
     )
     canonical_local_pass = (
         git_repository is not None
@@ -6195,6 +6236,8 @@ def build_release_state_report(
     answer_trace_quality_open = include_github and not answer_trace_quality_certified
     retrieval_quality_certified = retrieval_quality_status == "PASS"
     retrieval_quality_open = include_github and not retrieval_quality_certified
+    gis_quality_certified = gis_quality_status == "PASS"
+    gis_quality_open = include_github and not gis_quality_certified
     operator_workflow_certified = operator_workflow_status == "PASS"
     operator_workflow_open = include_github and not operator_workflow_certified
     governed_ready = (
@@ -6203,6 +6246,7 @@ def build_release_state_report(
         and source_artifact_certified
         and answer_trace_quality_certified
         and retrieval_quality_certified
+        and gis_quality_certified
         and operator_workflow_certified
     )
 
@@ -6217,6 +6261,8 @@ def build_release_state_report(
         current_state = "ANSWER_TRACE_QUALITY_CERTIFICATION_OPEN"
     elif retrieval_quality_open:
         current_state = "RETRIEVAL_QUALITY_CERTIFICATION_OPEN"
+    elif gis_quality_open:
+        current_state = "GIS_QUALITY_CERTIFICATION_OPEN"
     elif operator_workflow_open:
         current_state = "OPERATOR_WORKFLOW_CERTIFICATION_OPEN"
     else:
@@ -6276,6 +6322,12 @@ def build_release_state_report(
             "Run python3 scripts/certify_retrieval_quality.py.",
         ),
         _release_state(
+            "GIS_QUALITY_CERTIFIED",
+            gis_quality_status,
+            gis_quality_evidence,
+            "Run python3 scripts/certify_gis_quality.py.",
+        ),
+        _release_state(
             "OPERATOR_WORKFLOW_CERTIFIED",
             operator_workflow_status,
             operator_workflow_evidence,
@@ -6312,6 +6364,7 @@ def build_release_state_report(
         "python3 scripts/certify_python_distribution.py",
         "python3 scripts/certify_answer_trace_quality.py",
         "python3 scripts/certify_retrieval_quality.py",
+        "python3 scripts/certify_gis_quality.py",
         "python3 scripts/certify_operator_workflow.py",
     ]
     if not include_github:
@@ -6340,6 +6393,7 @@ def build_release_state_report(
             "operator_workflow": operator_workflow_receipt,
             "answer_trace_quality": answer_trace_quality_receipt,
             "retrieval_quality": retrieval_quality_receipt,
+            "gis_quality": gis_quality_receipt,
         },
         "product_audit_status": audit.get("status"),
         "package_status": package.get("status"),
@@ -6408,6 +6462,22 @@ def run_eval_gis(args: argparse.Namespace, cfg: Settings) -> int:
     report = build_gis_eval_report(fixture_path=args.fixture)
     emit_payload(report, args.format)
     return 0 if report["status"] == GIS_EVAL_OK else 2
+
+
+def run_certify_gis_quality(args: argparse.Namespace, cfg: Settings) -> int:
+    command = ["mucaro", "certify", "gis-quality"]
+    if args.profile != GIS_QUALITY_PROFILE:
+        command.extend(["--profile", args.profile])
+    if args.fixture != DEFAULT_GIS_EVAL_FIXTURE:
+        command.extend(["--fixture", str(args.fixture)])
+    report = build_gis_quality_certification(
+        cfg.project_root,
+        profile=args.profile,
+        fixture_path=args.fixture,
+        command=command,
+    )
+    emit_payload(report, args.format)
+    return 0 if report["status"] == GIS_QUALITY_OK else 2
 
 
 def run_certify_answer_trace_quality(args: argparse.Namespace, cfg: Settings) -> int:

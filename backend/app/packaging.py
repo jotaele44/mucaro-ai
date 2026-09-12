@@ -47,6 +47,7 @@ REQUIRED_DISTRIBUTION_RECEIPTS = [
     ("python_dist", "PYTHON_DIST_CERT_OK"),
     ("answer_trace_quality", "ANSWER_TRACE_QUALITY_CERT_OK"),
     ("retrieval_quality", "RETRIEVAL_QUALITY_CERT_OK"),
+    ("gis_quality", "GIS_QUALITY_CERT_OK"),
     ("operator_workflow", "OPERATOR_WORKFLOW_CERT_OK"),
 ]
 

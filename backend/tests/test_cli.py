@@ -1114,6 +1114,32 @@ def test_cli_certify_answer_trace_quality_writes_exact_head_receipt(tmp_path: Pa
     assert "case_pass_rate=1.0" in text_output
 
 
+def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["certify", "gis-quality", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "GIS_QUALITY_CERT_OK"
+    assert payload["profile"] == "v0.1.23-local-release"
+    assert payload["head_sha"] == "UNKNOWN_HEAD"
+    assert payload["receipt"] == "data/exports/release_receipts/gis_quality-UNKNOWN_HEAD.json"
+    assert payload["report"]["status"] == "GIS_EVAL_OK"
+
+    receipt_path = tmp_path / payload["receipt"]
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["receipt_type"] == "gis_quality"
+    assert receipt["status"] == "GIS_QUALITY_CERT_OK"
+    assert receipt["head_sha"] == "UNKNOWN_HEAD"
+    assert receipt["payload"]["profile"] == "v0.1.23-local-release"
+
+    assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "GIS_QUALITY_CERT_OK" in text_output
+    assert "eval_case_count=5" in text_output
+    assert "PASS compare compare_rotated_polygon" in text_output
+    assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
+
+
 def write_package_fixture(root: Path, *, frontend_version: str = "0.1.23", lock_version: str | None = None) -> None:
     (root / "scripts").mkdir(parents=True)
     (root / "frontend").mkdir(parents=True)
@@ -1307,6 +1333,14 @@ def write_distribution_manifest_fixture_receipts(root: Path, head_sha: str) -> d
         status="RETRIEVAL_QUALITY_CERT_OK",
         head_sha=head_sha,
         command=["python3", "scripts/certify_retrieval_quality.py"],
+        payload={"checks": []},
+    )
+    write_release_receipt(
+        root,
+        receipt_type="gis_quality",
+        status="GIS_QUALITY_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_gis_quality.py"],
         payload={"checks": []},
     )
     write_release_receipt(
@@ -1744,6 +1778,14 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     )
     write_release_receipt(
         tmp_path,
+        receipt_type="gis_quality",
+        status="GIS_QUALITY_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_gis_quality.py"],
+        payload={"checks": []},
+    )
+    write_release_receipt(
+        tmp_path,
         receipt_type="operator_workflow",
         status="OPERATOR_WORKFLOW_CERT_OK",
         head_sha=head_sha,
@@ -1785,6 +1827,7 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     assert states["PYTHON_DIST_CERTIFIED"]["status"] == "PASS"
     assert states["ANSWER_TRACE_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "PASS"
+    assert states["GIS_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["OPERATOR_WORKFLOW_CERTIFIED"]["status"] == "PASS"
     assert payload["receipts"]["local_release"]["head_sha"] == head_sha
     assert payload["receipts"]["fresh_clone"]["head_sha"] == head_sha
@@ -1792,6 +1835,7 @@ def test_cli_release_state_uses_exact_head_certification_receipts(tmp_path: Path
     assert payload["receipts"]["python_dist"]["head_sha"] == head_sha
     assert payload["receipts"]["answer_trace_quality"]["head_sha"] == head_sha
     assert payload["receipts"]["retrieval_quality"]["head_sha"] == head_sha
+    assert payload["receipts"]["gis_quality"]["head_sha"] == head_sha
     assert payload["receipts"]["operator_workflow"]["head_sha"] == head_sha
 
 
@@ -1808,6 +1852,7 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
         ("python_dist", "PYTHON_DIST_CERT_OK"),
         ("answer_trace_quality", "ANSWER_TRACE_QUALITY_CERT_OK"),
         ("retrieval_quality", "RETRIEVAL_QUALITY_CERT_OK"),
+        ("gis_quality", "GIS_QUALITY_CERT_OK"),
         ("operator_workflow", "OPERATOR_WORKFLOW_CERT_OK"),
     ]:
         write_release_receipt(
@@ -1903,8 +1948,8 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert payload["current_state"] == "GITHUB_GOVERNANCE_OPEN"
     assert payload["head_sha"] == head_sha
     assert payload["tags_at_head"] == [tag_name]
-    assert payload["current_head_receipts_summary"]["total"] == 7
-    assert payload["current_head_receipts_summary"]["valid"] == 7
+    assert payload["current_head_receipts_summary"]["total"] == 8
+    assert payload["current_head_receipts_summary"]["valid"] == 8
     assert payload["startup_blocker"]["status"] == "FAIL"
     assert payload["github_actions"]["check_suites"]["total_count"] == 2
     assert payload["github_actions"]["check_suites"]["suites"][0]["latest_check_runs_count"] == 0
@@ -1931,8 +1976,8 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert "startup_blocker_causes=" in text_output
     assert "github_support_classification=HOSTED_STARTUP_BEFORE_JOBS" in text_output
     assert "github_support_check_suite_counts=github_actions=2 zero_check_run_startup_failures=2 queued_external=0" in text_output
-    assert "receipt_count=7" in text_output
-    assert "receipt_valid=7" in text_output
+    assert "receipt_count=8" in text_output
+    assert "receipt_valid=8" in text_output
     assert "next_action=Upgrade GitHub plan or make the repository public" in text_output
 
     output_path = tmp_path / "data" / "exports" / "governance_reports" / "handoff.json"
@@ -2085,7 +2130,7 @@ def write_dashboard_governance_report_fixture(root: Path, head_sha: str) -> Path
             "status": "GOVERNANCE_REPORT_OPEN",
             "current_state": "GITHUB_GOVERNANCE_OPEN",
             "head_sha": head_sha,
-            "current_head_receipts_summary": {"total": 7, "valid": 7, "invalid": 0},
+            "current_head_receipts_summary": {"total": 8, "valid": 8, "invalid": 0},
             "startup_blocker": {"status": "FAIL"},
         },
     }
@@ -2138,7 +2183,7 @@ def test_cli_release_dashboard_summarizes_current_handoff_artifacts(tmp_path: Pa
     assert payload["distribution_manifest_status"] == "DISTRIBUTION_MANIFEST_VERIFIED"
     assert payload["governance_report_status"] == "GOVERNANCE_REPORT_VERIFIED"
     assert payload["remote_branch_status"] == "PASS"
-    assert payload["current_head_receipts_summary"]["total"] == 7
+    assert payload["current_head_receipts_summary"]["total"] == 8
     assert checks["current_head_receipts"]["status"] == "PASS"
     assert checks["distribution_manifest"]["status"] == "PASS"
     assert checks["governance_report"]["status"] == "PASS"
@@ -2299,7 +2344,7 @@ def test_cli_release_support_bundle_save_creates_missing_governance_report(tmp_p
             "status": "GOVERNANCE_REPORT_OPEN",
             "current_state": "GITHUB_GOVERNANCE_OPEN",
             "head_sha": head_sha,
-            "current_head_receipts_summary": {"total": 7, "valid": 7, "invalid": 0},
+            "current_head_receipts_summary": {"total": 8, "valid": 8, "invalid": 0},
             "startup_blocker": {"status": "FAIL"},
         }
 
@@ -2447,6 +2492,7 @@ def test_cli_release_state_requires_exact_head_quality_receipts_for_governed_rea
     assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "PASS"
     assert states["ANSWER_TRACE_QUALITY_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["GIS_QUALITY_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
 
     write_release_receipt(
@@ -2466,6 +2512,7 @@ def test_cli_release_state_requires_exact_head_quality_receipts_for_governed_rea
     assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "PASS"
     assert states["ANSWER_TRACE_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["GIS_QUALITY_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
 
     write_release_receipt(
@@ -2481,8 +2528,27 @@ def test_cli_release_state_requires_exact_head_quality_receipts_for_governed_rea
     payload = json.loads(capsys.readouterr().out)
     states = {row["state"]: row for row in payload["states"]}
     assert payload["status"] == "RELEASE_STATE_OPEN"
-    assert payload["current_state"] == "OPERATOR_WORKFLOW_CERTIFICATION_OPEN"
+    assert payload["current_state"] == "GIS_QUALITY_CERTIFICATION_OPEN"
     assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "PASS"
+    assert states["GIS_QUALITY_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["OPERATOR_WORKFLOW_CERTIFIED"]["status"] == "UNVERIFIED"
+    assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
+
+    write_release_receipt(
+        tmp_path,
+        receipt_type="gis_quality",
+        status="GIS_QUALITY_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_gis_quality.py"],
+        payload={"checks": []},
+    )
+
+    assert main(["release", "state", "--include-github", "--strict", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    states = {row["state"]: row for row in payload["states"]}
+    assert payload["status"] == "RELEASE_STATE_OPEN"
+    assert payload["current_state"] == "OPERATOR_WORKFLOW_CERTIFICATION_OPEN"
+    assert states["GIS_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["OPERATOR_WORKFLOW_CERTIFIED"]["status"] == "UNVERIFIED"
     assert states["GOVERNED_RELEASE_READY"]["status"] == "OPEN"
 
@@ -2503,6 +2569,7 @@ def test_cli_release_state_requires_exact_head_quality_receipts_for_governed_rea
     assert states["SOURCE_ARTIFACT_CERTIFIED"]["status"] == "PASS"
     assert states["ANSWER_TRACE_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["RETRIEVAL_QUALITY_CERTIFIED"]["status"] == "PASS"
+    assert states["GIS_QUALITY_CERTIFIED"]["status"] == "PASS"
     assert states["OPERATOR_WORKFLOW_CERTIFIED"]["status"] == "PASS"
     assert states["GOVERNED_RELEASE_READY"]["status"] == "PASS"
 
@@ -2579,6 +2646,7 @@ def test_cli_audit_completion_reports_hosted_governance_open(tmp_path: Path, cap
                 {"state": "PYTHON_DIST_CERTIFIED", "status": "PASS", "evidence": "python dist", "next_step": ""},
                 {"state": "ANSWER_TRACE_QUALITY_CERTIFIED", "status": "PASS", "evidence": "answer trace", "next_step": ""},
                 {"state": "RETRIEVAL_QUALITY_CERTIFIED", "status": "PASS", "evidence": "retrieval", "next_step": ""},
+                {"state": "GIS_QUALITY_CERTIFIED", "status": "PASS", "evidence": "gis", "next_step": ""},
                 {"state": "OPERATOR_WORKFLOW_CERTIFIED", "status": "PASS", "evidence": "operator", "next_step": ""},
                 {"state": "GITHUB_GOVERNANCE_OPEN", "status": "OPEN", "evidence": "startup failure", "next_step": ""},
                 {"state": "GOVERNED_RELEASE_READY", "status": "OPEN", "evidence": "not governed", "next_step": ""},
@@ -2618,7 +2686,7 @@ def test_cli_audit_completion_reports_hosted_governance_open(tmp_path: Path, cap
                     ],
                 },
             },
-            "current_head_receipts_summary": {"total": 7, "valid": 7, "invalid": 0},
+            "current_head_receipts_summary": {"total": 8, "valid": 8, "invalid": 0},
             "next_commands": ["mucaro release dashboard --include-github --format text"],
         }
 
@@ -2693,6 +2761,7 @@ def test_cli_audit_completion_is_ready_when_release_grade_gates_pass(tmp_path: P
                 {"state": "PYTHON_DIST_CERTIFIED", "status": "PASS", "evidence": "python dist", "next_step": ""},
                 {"state": "ANSWER_TRACE_QUALITY_CERTIFIED", "status": "PASS", "evidence": "answer trace", "next_step": ""},
                 {"state": "RETRIEVAL_QUALITY_CERTIFIED", "status": "PASS", "evidence": "retrieval", "next_step": ""},
+                {"state": "GIS_QUALITY_CERTIFIED", "status": "PASS", "evidence": "gis", "next_step": ""},
                 {"state": "OPERATOR_WORKFLOW_CERTIFIED", "status": "PASS", "evidence": "operator", "next_step": ""},
                 {"state": "GITHUB_GOVERNANCE_OPEN", "status": "PASS", "evidence": "github governed", "next_step": ""},
                 {"state": "GOVERNED_RELEASE_READY", "status": "PASS", "evidence": "governed", "next_step": ""},
@@ -2714,7 +2783,7 @@ def test_cli_audit_completion_is_ready_when_release_grade_gates_pass(tmp_path: P
             "distribution_manifest_status": "DISTRIBUTION_MANIFEST_VERIFIED",
             "governance_report_status": "GOVERNANCE_REPORT_VERIFIED",
             "hosted_governance_status": "PASS",
-            "current_head_receipts_summary": {"total": 7, "valid": 7, "invalid": 0},
+            "current_head_receipts_summary": {"total": 8, "valid": 8, "invalid": 0},
             "next_commands": [],
         }
 
@@ -2775,6 +2844,7 @@ def test_cli_audit_completion_fails_bad_artifact_status(tmp_path: Path, capsys, 
                 {"state": "PYTHON_DIST_CERTIFIED", "status": "PASS", "evidence": "python dist", "next_step": ""},
                 {"state": "ANSWER_TRACE_QUALITY_CERTIFIED", "status": "PASS", "evidence": "answer trace", "next_step": ""},
                 {"state": "RETRIEVAL_QUALITY_CERTIFIED", "status": "PASS", "evidence": "retrieval", "next_step": ""},
+                {"state": "GIS_QUALITY_CERTIFIED", "status": "PASS", "evidence": "gis", "next_step": ""},
                 {"state": "OPERATOR_WORKFLOW_CERTIFIED", "status": "PASS", "evidence": "operator", "next_step": ""},
                 {"state": "GITHUB_GOVERNANCE_OPEN", "status": "PASS", "evidence": "github governed", "next_step": ""},
                 {"state": "GOVERNED_RELEASE_READY", "status": "PASS", "evidence": "governed", "next_step": ""},
@@ -2796,7 +2866,7 @@ def test_cli_audit_completion_fails_bad_artifact_status(tmp_path: Path, capsys, 
             "distribution_manifest_status": "DISTRIBUTION_MANIFEST_VERIFY_FAILED",
             "governance_report_status": "GOVERNANCE_REPORT_VERIFIED",
             "hosted_governance_status": "PASS",
-            "current_head_receipts_summary": {"total": 7, "valid": 7, "invalid": 0},
+            "current_head_receipts_summary": {"total": 8, "valid": 8, "invalid": 0},
             "next_commands": [],
         }
 
@@ -3728,7 +3798,7 @@ def test_cli_release_handoff_saves_and_verifies_ordered_artifact_set(tmp_path: P
     next_actions_path = tmp_path / "data" / "exports" / "release_next_actions" / f"next-actions-{head_sha[:12]}.json"
     receipts = [
         {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-        for index in range(7)
+        for index in range(8)
     ]
 
     def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
@@ -3944,7 +4014,7 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
             return []
         return [
             {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-            for index in range(7)
+            for index in range(8)
         ]
 
     def fake_distribution(root: Path, *, output_path: Path | None = None, save: bool = False):
@@ -4094,7 +4164,7 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
         "source_artifact",
         "fresh_clone",
     ]
-    assert payload["current_head_receipts_summary"]["total"] == 7
+    assert payload["current_head_receipts_summary"]["total"] == 8
     assert receipt_calls["count"] == 2
     assert calls == [
         "refresh:local_release",
@@ -4149,7 +4219,7 @@ def test_cli_release_handoff_refresh_step_selects_canonical_subset(tmp_path: Pat
             return []
         return [
             {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-            for index in range(7)
+            for index in range(8)
         ]
 
     monkeypatch.setattr(cli, "_command_output", fake_command_output)
