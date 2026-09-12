@@ -2,7 +2,12 @@ import json
 from pathlib import Path
 
 from backend.app.config import Settings
-from backend.app.gis_processing import GISProcessingError, inspect_geojson, spatial_join_points_to_polygons
+from backend.app.gis_processing import (
+    GISProcessingError,
+    compare_geojson_geometries,
+    inspect_geojson,
+    spatial_join_points_to_polygons,
+)
 
 
 def make_settings(root: Path) -> Settings:
@@ -90,6 +95,30 @@ def test_inspect_geojson_preserves_crs_geometry_state_and_receipt(tmp_path: Path
     receipt = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
     assert receipt["report_id"] == result["report_id"]
     assert result["report_sha256"]
+
+
+def test_inspect_geojson_preserves_coordinate_dimensionality(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(
+        tmp_path / "dimensions.geojson",
+        [
+            point_feature("xy", [1, 2]),
+            point_feature("xyz", [1, 2, 3]),
+            point_feature("xyzm", [1, 2, 3, 4]),
+        ],
+    )
+
+    result = inspect_geojson(geojson, cfg=cfg)
+
+    by_id = {row["feature_id"]: row for row in result["features"]}
+    assert by_id["xy"]["coordinate_dimension"] == "XY"
+    assert by_id["xyz"]["coordinate_dimension"] == "XYZ"
+    assert by_id["xyz"]["has_z"] is True
+    assert by_id["xyzm"]["coordinate_dimension"] == "XYZM"
+    assert by_id["xyzm"]["has_m"] is True
+    assert result["invariants"]["coordinate_dimension_counts"] == {"XY": 1, "XYZ": 1, "XYZM": 1}
+    assert result["invariants"]["features_with_z"] == 2
+    assert result["invariants"]["features_with_m"] == 1
 
 
 def test_inspect_geojson_stringifies_unusual_feature_ids(tmp_path: Path):
@@ -239,3 +268,73 @@ def test_spatial_join_can_record_operator_allowed_crs_mismatch(tmp_path: Path):
     assert result["invariants"]["crs_match"] is False
     assert result["invariants"]["crs_mismatch_allowed"] is True
     assert result["warnings"] == ["GIS_CRS_MISMATCH_ALLOWED"]
+
+
+def test_compare_geojson_geometries_records_topology_and_vertex_metrics(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    left = write_geojson(
+        tmp_path / "left.geojson",
+        [
+            polygon_feature("rotated", [[[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]]]),
+            point_feature("moved", [10, 10, 5]),
+        ],
+    )
+    right = write_geojson(
+        tmp_path / "right.geojson",
+        [
+            polygon_feature("rotated", [[[4, 4], [0, 4], [0, 0], [4, 0], [4, 4]]]),
+            point_feature("moved", [13, 14, 5]),
+        ],
+    )
+
+    result = compare_geojson_geometries(left, right, cfg=cfg)
+
+    assert result["status"] == "GIS_GEOMETRY_COMPARE_WARN"
+    assert result["match_on"] == "id"
+    assert result["warnings"] == ["GIS_GEOMETRY_DIFFERENCE_PRESENT"]
+    assert result["invariants"]["feature_key_conservation"] is True
+    assert result["invariants"]["compared_count"] == 2
+    assert result["invariants"]["exact_equal_count"] == 0
+    assert result["invariants"]["topological_equal_count"] == 1
+    assert result["invariants"]["geometry_difference_count"] == 1
+    assert result["invariants"]["vertex_symmetric_difference_total"] == 2
+    assert result["invariants"]["max_hausdorff_vertex_distance"] == 5.0
+    by_key = {row["feature_key"]: row for row in result["comparisons"]}
+    assert by_key["id:rotated"]["exact_coordinate_equal"] is False
+    assert by_key["id:rotated"]["topological_equal"] is True
+    assert by_key["id:rotated"]["hausdorff_vertex_distance"] == 0.0
+    assert by_key["id:moved"]["left_coordinate_dimension"] == "XYZ"
+    assert by_key["id:moved"]["coordinate_dimension_preserved"] is True
+    receipt = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
+    assert receipt["report_id"] == result["report_id"]
+    assert result["report_sha256"]
+
+
+def test_compare_geojson_geometries_records_unmatched_and_dimension_mismatch(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    left = write_geojson(tmp_path / "left.geojson", [point_feature("a", [1, 2]), point_feature("left_only", [3, 4])])
+    right = write_geojson(tmp_path / "right.geojson", [point_feature("a", [1, 2, 3]), point_feature("right_only", [5, 6])])
+
+    result = compare_geojson_geometries(left, right, cfg=cfg)
+
+    assert result["status"] == "GIS_GEOMETRY_COMPARE_WARN"
+    assert result["left_only_feature_keys"] == ["id:left_only"]
+    assert result["right_only_feature_keys"] == ["id:right_only"]
+    assert result["warnings"] == ["GIS_UNMATCHED_FEATURES", "GIS_COORDINATE_DIMENSION_MISMATCH"]
+    assert result["invariants"]["left_only_count"] == 1
+    assert result["invariants"]["right_only_count"] == 1
+    assert result["invariants"]["coordinate_dimension_mismatch_count"] == 1
+    assert result["comparisons"][0]["topology_state"] == "EQUAL"
+    assert result["comparisons"][0]["exact_coordinate_equal"] is False
+
+
+def test_compare_geojson_geometries_can_match_by_index(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    left = write_geojson(tmp_path / "left.geojson", [point_feature("left_name", [1, 2])])
+    right = write_geojson(tmp_path / "right.geojson", [point_feature("right_name", [1, 2])])
+
+    result = compare_geojson_geometries(left, right, cfg=cfg, match_on="index")
+
+    assert result["status"] == "GIS_GEOMETRY_COMPARE_OK"
+    assert result["comparisons"][0]["feature_key"] == "index:0"
+    assert result["comparisons"][0]["topology_state"] == "EQUAL"

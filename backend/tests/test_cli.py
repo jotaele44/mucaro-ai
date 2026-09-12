@@ -303,6 +303,15 @@ def test_cli_gis_inspect_and_point_in_polygon(tmp_path: Path, capsys):
     assert "crs_mismatch_allowed=True" in allowed_output
     assert "warnings=GIS_CRS_MISMATCH_ALLOWED" in allowed_output
 
+    assert main(["gis", "compare", str(polygons_path), str(polygons_path), "--format", "text"], cfg=cfg) == 0
+    compare_output = capsys.readouterr().out
+    assert "GIS_GEOMETRY_COMPARE_OK" in compare_output
+    assert "match_on=id" in compare_output
+    assert "feature_key_conservation=True" in compare_output
+    assert "compared_count=1" in compare_output
+    assert "topological_equal_count=1" in compare_output
+    assert "vertex_symmetric_difference_total=0" in compare_output
+
 
 def test_cli_models_list_reports_provider_registry(tmp_path: Path, capsys, monkeypatch):
     monkeypatch.delenv("MUCARO_AI_LIVE_MODE", raising=False)

@@ -52,6 +52,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
 | `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry receipt | 0 | 2 |
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
+| `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
@@ -238,6 +239,8 @@ approved and audited.
 | `GIS_INSPECT_OK` | GeoJSON inspection completed with no invalid or unsupported geometries |
 | `GIS_INSPECT_WARN` | GeoJSON inspection completed but invalid or unsupported geometries were recorded |
 | `GIS_SPATIAL_JOIN_OK` | Point-in-polygon classification completed and wrote a spatial receipt |
+| `GIS_GEOMETRY_COMPARE_OK` | GeoJSON geometry comparison completed without CRS, topology, dimensionality, or unmatched-key warnings |
+| `GIS_GEOMETRY_COMPARE_WARN` | GeoJSON geometry comparison completed and recorded CRS, topology, dimensionality, or unmatched-key warnings |
 | `OCR_ANALYSIS_OK` | Local image OCR completed with at least one extracted text span and wrote an OCR receipt |
 | `OCR_ANALYSIS_NO_TEXT` | Local image OCR completed without extracting text; no text was synthesized |
 | `ERROR_GIS_INPUT_NOT_FOUND` | GeoJSON input path does not exist |
@@ -245,6 +248,7 @@ approved and audited.
 | `ERROR_GIS_UNSUPPORTED_GEOJSON` | GIS command received a JSON object that is not a FeatureCollection |
 | `ERROR_GIS_FEATURES_NOT_ARRAY` | GeoJSON FeatureCollection has a malformed `features` member |
 | `ERROR_GIS_CRS_MISMATCH` | Point and polygon inputs declared different CRS values and mismatch override was not selected |
+| `ERROR_GIS_COMPARE_MATCH_MODE` | GIS comparison received an unsupported feature matching mode |
 | `ERROR_OCR_INPUT_NOT_FOUND` | OCR input path does not exist |
 | `ERROR_OCR_UNSUPPORTED_INPUT` | OCR command received an unsupported input type; current OCR analysis supports local images only |
 | `ERROR_OCR_ENGINE_UNAVAILABLE` | local Tesseract executable was not found and no explicit `--tesseract-path` was supplied |

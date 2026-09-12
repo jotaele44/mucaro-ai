@@ -271,10 +271,11 @@ Observed success markers:
   readiness: the existing local assistant capabilities and source-artifact
   packaging pass, and the existing GUI requirement remains part of the local
   operator-surface goal while GUI expansion is deferred to the final phase.
-  Advanced GIS now has a narrow local GeoJSON inspection
-  and point-in-polygon receipt candidate; full GIS maturity remains open until
-  robust topology, CRS reprojection, spatial format adapters, map/export
-  provenance, and a broader GIS eval corpus are proven. State-of-the-art OCR
+  Advanced GIS now has narrow local GeoJSON inspection, point-in-polygon, and
+  geometry comparison receipt candidates; full GIS maturity remains open until
+  robust topology, CRS reprojection, planar overlay checks, spatial format
+  adapters, raster/vector processing, map/export provenance, and a broader GIS
+  eval corpus are proven. State-of-the-art OCR
   remains open, but a narrow local image OCR receipt candidate now preserves
   source-image hashes, Tesseract engine identity, raw/normalized/canonical text,
   confidence states, source-coordinate spans, and no-text states; PDF/page

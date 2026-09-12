@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -93,6 +94,40 @@ def _iter_positions(value: Any) -> list[tuple[float, float]]:
     return []
 
 
+def _iter_position_dimensions(value: Any) -> list[int]:
+    if _is_position(value):
+        return [len(value)]
+    if isinstance(value, list):
+        dimensions: list[int] = []
+        for item in value:
+            dimensions.extend(_iter_position_dimensions(item))
+        return dimensions
+    return []
+
+
+def _coordinate_dimension_summary(geometry: dict[str, Any] | None) -> dict[str, Any]:
+    if not geometry:
+        return {"coordinate_dimension": "EMPTY", "dimension_counts": {}, "has_z": False, "has_m": False}
+    dimensions = _iter_position_dimensions(geometry.get("coordinates"))
+    counts: dict[str, int] = {}
+    for dimension in dimensions:
+        label = {2: "XY", 3: "XYZ", 4: "XYZM"}.get(dimension, f"{dimension}D")
+        counts[label] = counts.get(label, 0) + 1
+    labels = sorted(counts)
+    if not labels:
+        coordinate_dimension = "EMPTY"
+    elif len(labels) == 1:
+        coordinate_dimension = labels[0]
+    else:
+        coordinate_dimension = "MIXED:" + ",".join(labels)
+    return {
+        "coordinate_dimension": coordinate_dimension,
+        "dimension_counts": counts,
+        "has_z": any(dimension >= 3 for dimension in dimensions),
+        "has_m": any(dimension >= 4 for dimension in dimensions),
+    }
+
+
 def _bbox_for_geometry(geometry: dict[str, Any] | None) -> list[float] | None:
     if not geometry:
         return None
@@ -164,6 +199,7 @@ def _inspect_features(source: GeoJSONSource) -> tuple[list[dict[str, Any]], dict
                 "feature_id": _feature_id(feature, index),
                 "geometry_type": classification["geometry_type"],
                 "geometry_status": classification["geometry_status"],
+                **_coordinate_dimension_summary(geometry if isinstance(geometry, dict) else None),
                 "bbox": _bbox_for_geometry(geometry) if isinstance(geometry, dict) else None,
                 "property_keys": sorted(str(key) for key in properties),
                 "warnings": classification["warnings"],
@@ -208,9 +244,244 @@ def inspect_geojson(path: Path, *, cfg: Settings = settings) -> dict[str, Any]:
             "invalid_or_unsupported_count": invalid_count,
             "null_empty_count": null_empty_count,
             "crs_preserved": True,
+            "coordinate_dimension_counts": {
+                label: sum(
+                    int(feature.get("dimension_counts", {}).get(label, 0))
+                    for feature in inspected
+                    if isinstance(feature.get("dimension_counts"), dict)
+                )
+                for label in sorted(
+                    {
+                        str(label)
+                        for feature in inspected
+                        if isinstance(feature.get("dimension_counts"), dict)
+                        for label in feature["dimension_counts"]
+                    }
+                )
+            },
+            "features_with_z": sum(1 for feature in inspected if feature.get("has_z")),
+            "features_with_m": sum(1 for feature in inspected if feature.get("has_m")),
         },
         "features": inspected,
         "warnings": [] if invalid_count == 0 else ["GIS_GEOMETRY_WARNINGS_PRESENT"],
+    }
+    return _write_report(cfg, report)
+
+
+def _xy(position: Any) -> tuple[float, float]:
+    return (float(position[0]), float(position[1]))
+
+
+def _canonical_ring(ring: list[Any]) -> tuple[tuple[float, float], ...] | None:
+    if not _ring_valid(ring):
+        return None
+    coordinates = [_xy(position) for position in ring[:-1]]
+    if not coordinates:
+        return None
+    rotations = [tuple(coordinates[index:] + coordinates[:index]) for index in range(len(coordinates))]
+    reversed_coordinates = list(reversed(coordinates))
+    rotations.extend(
+        tuple(reversed_coordinates[index:] + reversed_coordinates[:index])
+        for index in range(len(reversed_coordinates))
+    )
+    return min(rotations)
+
+
+def _canonical_polygon(coordinates: Any) -> tuple[tuple[tuple[float, float], ...], tuple[tuple[tuple[float, float], ...], ...]] | None:
+    if not _polygon_valid(coordinates):
+        return None
+    outer = _canonical_ring(coordinates[0])
+    if outer is None:
+        return None
+    holes: list[tuple[tuple[float, float], ...]] = []
+    for ring in coordinates[1:]:
+        canonical_hole = _canonical_ring(ring)
+        if canonical_hole is None:
+            return None
+        holes.append(canonical_hole)
+    return (outer, tuple(sorted(holes)))
+
+
+def _canonical_geometry(geometry: Any) -> tuple[str, Any] | None:
+    classification = _classify_geometry(geometry)
+    if classification["geometry_status"] != "VALID" or not isinstance(geometry, dict):
+        return None
+    geometry_type = geometry.get("type")
+    coordinates = geometry.get("coordinates")
+    if geometry_type == "Point":
+        return ("Point", _xy(coordinates))
+    if geometry_type == "Polygon":
+        polygon = _canonical_polygon(coordinates)
+        return ("Polygon", polygon) if polygon is not None else None
+    if geometry_type == "MultiPolygon" and isinstance(coordinates, list):
+        polygons = [_canonical_polygon(polygon) for polygon in coordinates]
+        if any(polygon is None for polygon in polygons):
+            return None
+        return ("MultiPolygon", tuple(sorted(polygon for polygon in polygons if polygon is not None)))
+    return None
+
+
+def _topological_equal(left_geometry: Any, right_geometry: Any) -> bool | None:
+    left = _canonical_geometry(left_geometry)
+    right = _canonical_geometry(right_geometry)
+    if left is None or right is None:
+        return None
+    return left == right
+
+
+def _hausdorff_vertex_distance(left_geometry: Any, right_geometry: Any) -> float | None:
+    left_positions = _iter_positions(left_geometry.get("coordinates") if isinstance(left_geometry, dict) else None)
+    right_positions = _iter_positions(right_geometry.get("coordinates") if isinstance(right_geometry, dict) else None)
+    if not left_positions or not right_positions:
+        return None
+    left_to_right = max(min(math.dist(left, right) for right in right_positions) for left in left_positions)
+    right_to_left = max(min(math.dist(right, left) for left in left_positions) for right in right_positions)
+    return round(max(left_to_right, right_to_left), 12)
+
+
+def _vertex_symmetric_difference_count(left_geometry: Any, right_geometry: Any) -> int | None:
+    left_positions = _iter_positions(left_geometry.get("coordinates") if isinstance(left_geometry, dict) else None)
+    right_positions = _iter_positions(right_geometry.get("coordinates") if isinstance(right_geometry, dict) else None)
+    if not left_positions or not right_positions:
+        return None
+    return len(set(left_positions) ^ set(right_positions))
+
+
+def _feature_key(feature: dict[str, Any], index: int, *, match_on: str) -> str:
+    if match_on == "index":
+        return f"index:{index}"
+    raw_id = feature.get("id")
+    if raw_id is not None and raw_id != "":
+        return f"id:{raw_id}"
+    return f"index:{index}"
+
+
+def _indexed_features(source: GeoJSONSource, *, match_on: str) -> dict[str, tuple[int, dict[str, Any]]]:
+    indexed: dict[str, tuple[int, dict[str, Any]]] = {}
+    for index, feature in enumerate(_features(source)):
+        indexed[_feature_key(feature, index, match_on=match_on)] = (index, feature)
+    return indexed
+
+
+def compare_geojson_geometries(
+    left_path: Path,
+    right_path: Path,
+    *,
+    cfg: Settings = settings,
+    match_on: str = "id",
+) -> dict[str, Any]:
+    cfg.ensure_dirs()
+    if match_on not in {"id", "index"}:
+        raise GISProcessingError("ERROR_GIS_COMPARE_MATCH_MODE", f"Unsupported GIS compare match mode: {match_on}")
+    left_source = _load_geojson(left_path)
+    right_source = _load_geojson(right_path)
+    left_index = _indexed_features(left_source, match_on=match_on)
+    right_index = _indexed_features(right_source, match_on=match_on)
+    shared_keys = sorted(set(left_index) & set(right_index))
+    left_only = sorted(set(left_index) - set(right_index))
+    right_only = sorted(set(right_index) - set(left_index))
+    comparisons: list[dict[str, Any]] = []
+    for key in shared_keys:
+        left_feature_index, left_feature = left_index[key]
+        right_feature_index, right_feature = right_index[key]
+        left_geometry = left_feature.get("geometry")
+        right_geometry = right_feature.get("geometry")
+        left_classification = _classify_geometry(left_geometry)
+        right_classification = _classify_geometry(right_geometry)
+        topological_equal = _topological_equal(left_geometry, right_geometry)
+        dimension_left = _coordinate_dimension_summary(left_geometry if isinstance(left_geometry, dict) else None)
+        dimension_right = _coordinate_dimension_summary(right_geometry if isinstance(right_geometry, dict) else None)
+        comparisons.append(
+            {
+                "feature_key": key,
+                "left_feature_id": _feature_id(left_feature, left_feature_index),
+                "right_feature_id": _feature_id(right_feature, right_feature_index),
+                "left_feature_index": left_feature_index,
+                "right_feature_index": right_feature_index,
+                "left_geometry_type": left_classification["geometry_type"],
+                "right_geometry_type": right_classification["geometry_type"],
+                "left_geometry_status": left_classification["geometry_status"],
+                "right_geometry_status": right_classification["geometry_status"],
+                "left_coordinate_dimension": dimension_left["coordinate_dimension"],
+                "right_coordinate_dimension": dimension_right["coordinate_dimension"],
+                "coordinate_dimension_preserved": dimension_left["coordinate_dimension"] == dimension_right["coordinate_dimension"],
+                "exact_coordinate_equal": left_geometry == right_geometry,
+                "topological_equal": topological_equal,
+                "topology_state": "UNRESOLVED" if topological_equal is None else ("EQUAL" if topological_equal else "DIFFERENT"),
+                "hausdorff_vertex_distance": _hausdorff_vertex_distance(left_geometry, right_geometry),
+                "vertex_symmetric_difference_count": _vertex_symmetric_difference_count(left_geometry, right_geometry),
+            }
+        )
+    topology_unresolved_count = sum(1 for row in comparisons if row["topology_state"] == "UNRESOLVED")
+    geometry_difference_count = sum(1 for row in comparisons if row["topology_state"] != "EQUAL")
+    dimension_mismatch_count = sum(1 for row in comparisons if not row["coordinate_dimension_preserved"])
+    vertex_symmetric_difference_total = sum(
+        int(row["vertex_symmetric_difference_count"] or 0)
+        for row in comparisons
+    )
+    hausdorff_distances = [
+        float(row["hausdorff_vertex_distance"])
+        for row in comparisons
+        if row["hausdorff_vertex_distance"] is not None
+    ]
+    created_at = utc_now()
+    report_id = stable_id("gisreport", "compare", left_source.sha256, right_source.sha256, match_on, created_at)
+    warnings = [
+        warning
+        for warning in [
+            "GIS_CRS_MISMATCH" if left_source.crs != right_source.crs else "",
+            "GIS_UNMATCHED_FEATURES" if left_only or right_only else "",
+            "GIS_GEOMETRY_DIFFERENCE_PRESENT" if geometry_difference_count else "",
+            "GIS_TOPOLOGY_UNRESOLVED" if topology_unresolved_count else "",
+            "GIS_COORDINATE_DIMENSION_MISMATCH" if dimension_mismatch_count else "",
+        ]
+        if warning
+    ]
+    report = {
+        "schema_version": GIS_REPORT_SCHEMA_VERSION,
+        "report_id": report_id,
+        "status": "GIS_GEOMETRY_COMPARE_OK" if not warnings else "GIS_GEOMETRY_COMPARE_WARN",
+        "operation": "compare_geojson_geometries",
+        "created_at": created_at,
+        "match_on": match_on,
+        "inputs": {
+            "left": {
+                "path": str(left_path),
+                "sha256": left_source.sha256,
+                "crs": left_source.crs,
+                "crs_status": left_source.crs_status,
+                "feature_count": len(_features(left_source)),
+            },
+            "right": {
+                "path": str(right_path),
+                "sha256": right_source.sha256,
+                "crs": right_source.crs,
+                "crs_status": right_source.crs_status,
+                "feature_count": len(_features(right_source)),
+            },
+        },
+        "left_only_feature_keys": left_only,
+        "right_only_feature_keys": right_only,
+        "comparisons": comparisons,
+        "invariants": {
+            "crs_match": left_source.crs == right_source.crs,
+            "feature_key_conservation": len(shared_keys) + len(left_only) + len(right_only) == len(set(left_index) | set(right_index)),
+            "compared_count": len(comparisons),
+            "left_only_count": len(left_only),
+            "right_only_count": len(right_only),
+            "exact_equal_count": sum(1 for row in comparisons if row["exact_coordinate_equal"]),
+            "topological_equal_count": sum(1 for row in comparisons if row["topology_state"] == "EQUAL"),
+            "topology_unresolved_count": topology_unresolved_count,
+            "geometry_difference_count": geometry_difference_count,
+            "coordinate_dimension_mismatch_count": dimension_mismatch_count,
+            "vertex_symmetric_difference_total": vertex_symmetric_difference_total,
+            "max_hausdorff_vertex_distance": max(hausdorff_distances, default=None),
+        },
+        "warnings": warnings,
+        "limitations": [
+            "topological equality is limited to Point, Polygon, and MultiPolygon coordinates",
+            "Hausdorff distance and symmetric difference are vertex-based receipt checks, not robust planar overlay results",
+        ],
     }
     return _write_report(cfg, report)
 

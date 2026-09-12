@@ -24,7 +24,7 @@ Mucaro is being developed independently as an `INTELLIGENCE_PLANE_CANDIDATE`. Th
 | FEDERATION LOCKSTEP client | ABSENT | Activation and compatibility impact gates |
 | Cross-repo orchestration | ABSENT | Contract-bound orchestration without direct domain-data ownership |
 | Federation worker plane | ABSENT | Optional heavy execution target; domain repos remain autonomous |
-| Advanced GIS processing | CANDIDATE | Narrow local GeoJSON inspection and point-in-polygon receipts exist; robust topology, reprojection, raster/vector adapters, map/export, and spatial eval corpus remain open |
+| Advanced GIS processing | CANDIDATE | Narrow local GeoJSON inspection, point-in-polygon, and comparison receipts exist; robust topology, reprojection, planar overlay, raster/vector adapters, map/export, and spatial eval corpus remain open |
 | State-of-the-art OCR analysis | CANDIDATE | Narrow local image OCR receipts exist with source-image hashes, engine identity, raw text, confidence states, and source-coordinate spans; PDF/page rendering, layout calibration, table/form/handwriting coverage, provider policy, and OCR eval corpus remain open |
 | Governed web browsing | CANDIDATE | Approved fetch/session snapshot family exists with URL policy, byte snapshots, parser traces, and citations; automated search, rendered capture, and autonomous link-following remain open |
 | Coding/programming expertise | ABSENT | Governed code read/patch/test/review capability with sandbox and diff receipts |

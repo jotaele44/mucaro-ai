@@ -74,6 +74,11 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "feature_count",
                 "operation_name",
                 "operation_parameters",
+                "feature_match_key",
+                "coordinate_dimension",
+                "topology_state",
+                "hausdorff_vertex_distance",
+                "vertex_symmetric_difference_count",
             ),
             invariants=(
                 "row conservation or explicit retained/excluded counts",
@@ -81,9 +86,12 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "CRS preservation or explicit reprojection record",
                 "geometry validity and NULL/EMPTY classification",
                 "join cardinality classification for spatial joins",
+                "coordinate dimensionality, Z, and M presence are retained",
+                "geometry comparisons separate exact coordinate equality from topological equality",
             ),
             positive_regression_gates=(
                 "point-in-polygon fixture classifies FULLY_WITHIN, TOUCH_ONLY, OUTSIDE, and NULL_EMPTY",
+                "geometry comparison fixture records exact equality, topological equality, Hausdorff distance, and vertex symmetric difference",
                 "reprojection fixture records source and target CRS",
                 "map export fixture preserves source and derived layer hashes",
             ),
@@ -91,6 +99,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "mismatched CRS fails closed unless reprojection is explicit",
                 "ambiguous nearest-neighbor match remains UNRESOLVED",
                 "M:N spatial join requires explicit multiplication counts",
+                "feature comparison with unmatched keys records left-only and right-only residue",
             ),
             output_requirements=(
                 "FACT/INFERENCE/ASSUMPTION/UNKNOWN separation",
@@ -101,6 +110,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
             unavailable_until=(
                 "broader GIS engine adapter supports robust topology operations",
                 "CRS reprojection is explicit and receipt-backed",
+                "vertex-based comparison is replaced or supplemented by robust planar overlay checks",
                 "map/export provenance and spatial eval corpus are complete",
             ),
         ),
