@@ -1,6 +1,7 @@
 import hashlib
 import json
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -1483,6 +1484,7 @@ def test_cli_package_status_reports_packaging_readiness(tmp_path: Path, capsys):
     assert checks["version_consistency"]["status"] == "PASS"
     assert checks["frontend_lockfile"]["status"] == "PASS"
     assert checks["generated_outputs"]["status"] == "WARN"
+    assert checks["macos_app_bundle"]["status"] == "WARN"
     assert checks["release_artifact_policy"]["status"] == "PASS"
     assert checks["distribution_policy"]["status"] == "PASS"
     assert checks["hosted_release_gate"]["status"] == "WARN"
@@ -1492,6 +1494,39 @@ def test_cli_package_status_reports_packaging_readiness(tmp_path: Path, capsys):
     assert "PACKAGE_WARN" in text_output
     assert "PASS cli_entrypoint backend.app.cli:main" in text_output
     assert "WARN hosted_release_gate" in text_output
+
+
+def test_cli_package_macos_app_builds_and_verifies_bundle(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    (tmp_path / "frontend" / "dist").mkdir(parents=True)
+    (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
+    output_dir = tmp_path / "desktop-apps"
+
+    assert (
+        main(
+            [
+                "package",
+                "macos-app",
+                "--output-dir",
+                str(output_dir),
+                "--python-executable",
+                sys.executable,
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "MACOS_APP_BUNDLE_READY"
+    assert payload["app_path"] == str(output_dir / "Mucaro AI.app")
+
+    assert main(["package", "macos-app", "--verify", payload["app_path"], "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "MACOS_APP_BUNDLE_VERIFIED" in text_output
+    assert "PASS launcher_points_to_launch_app" in text_output
 
 
 def test_cli_package_status_fails_on_version_mismatch(tmp_path: Path, capsys):

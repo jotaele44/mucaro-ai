@@ -80,8 +80,10 @@ from .packaging import (
     DISTRIBUTION_MANIFEST_DIR,
     REQUIRED_DISTRIBUTION_RECEIPTS,
     build_distribution_manifest,
+    build_macos_app_bundle,
     build_package_status,
     build_release_artifacts,
+    verify_macos_app_bundle,
     verify_distribution_manifest,
     verify_release_artifact,
 )
@@ -764,6 +766,16 @@ def build_parser() -> argparse.ArgumentParser:
     package_verify.add_argument("--require-current-head", action="store_true", help="Require manifest head_sha to match current Git HEAD.")
     package_verify.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     package_verify.set_defaults(handler=run_package_verify)
+
+    package_macos_app = package_subcommands.add_parser(
+        "macos-app",
+        help="Build or verify the double-clickable local macOS Application bundle.",
+    )
+    package_macos_app.add_argument("--output-dir", type=Path, default=None, help="Directory where Mucaro AI.app should be built.")
+    package_macos_app.add_argument("--verify", type=Path, help="Verify an existing .app bundle instead of building one.")
+    package_macos_app.add_argument("--python-executable", help="Python executable to embed in the app launcher.")
+    package_macos_app.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    package_macos_app.set_defaults(handler=run_package_macos_app)
 
     package_distribution_manifest = package_subcommands.add_parser(
         "distribution-manifest",
@@ -1514,6 +1526,25 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             if manifest.get("sha256"):
                 print(f"manifest_sha256={manifest.get('sha256')}")
             print(f"manifest_member_count={manifest.get('member_count')}")
+    elif status in {"MACOS_APP_BUNDLE_READY", "MACOS_APP_BUNDLE_FAILED", "MACOS_APP_BUNDLE_VERIFIED", "MACOS_APP_BUNDLE_VERIFY_FAILED"}:
+        print(status)
+        print(f"schema_version={payload.get('schema_version')}")
+        print(f"project_root={payload.get('project_root')}")
+        print(f"app_path={payload.get('app_path')}")
+        print(f"head_sha={payload.get('head_sha')}")
+        receipt = payload.get("receipt")
+        if isinstance(receipt, dict):
+            print(f"receipt_path={receipt.get('path')}")
+            print(f"receipt_sha256={receipt.get('sha256')}")
+        executable = payload.get("executable")
+        if isinstance(executable, dict):
+            print(f"executable_path={executable.get('path')}")
+            print(f"executable_sha256={executable.get('sha256')}")
+            print(f"executable_mode={executable.get('mode')}")
+        for check in payload.get("checks", []):
+            if isinstance(check, dict):
+                detail = str(check.get("detail")).replace("\n", "\\n")
+                print(f"{check.get('status')} {check.get('name')} {detail}")
     elif status in {
         "DISTRIBUTION_MANIFEST_READY",
         "DISTRIBUTION_MANIFEST_FAILED",
@@ -2560,6 +2591,20 @@ def run_package_verify(args: argparse.Namespace, cfg: Settings) -> int:
     report = verify_release_artifact(args.manifest, root=cfg.project_root, require_current_head=args.require_current_head)
     emit_payload(report, args.format)
     return 0 if report["status"] == "PACKAGE_ARTIFACT_VERIFIED" else 2
+
+
+def run_package_macos_app(args: argparse.Namespace, cfg: Settings) -> int:
+    if args.verify is not None:
+        report = verify_macos_app_bundle(args.verify, root=cfg.project_root)
+        emit_payload(report, args.format)
+        return 0 if report["status"] == "MACOS_APP_BUNDLE_VERIFIED" else 2
+    report = build_macos_app_bundle(
+        cfg.project_root,
+        output_dir=args.output_dir,
+        python_executable=args.python_executable,
+    )
+    emit_payload(report, args.format)
+    return 0 if report["status"] == "MACOS_APP_BUNDLE_READY" else 2
 
 
 def run_package_distribution_manifest(args: argparse.Namespace, cfg: Settings) -> int:

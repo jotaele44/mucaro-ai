@@ -57,7 +57,7 @@ limits.
 | Transparency/objectivity | FACT/INFERENCE/ASSUMPTION/UNKNOWN separation, limitations, contradiction handling, falsification criteria, and reproducible verification hooks |
 | GUI/operator workflow | Final-phase clean prompt-and-response surface, efficient task execution, synchronized work feed, specialized workspaces, and isolated proof that permission grants, ingestion, retrieval, answer traces, memory controls, run history, and approved tools work together after backend/CLI gates are strong enough to expose |
 | Fresh clone | Exact-ref clone, install, CLI help, release check, launcher self-test, and desktop smoke certification |
-| Packaging | Source artifact manifest, archive SHA-256, member hashes, Python wheel/sdist receipts, local distribution handoff manifest, and package status gate |
+| Packaging | Source artifact manifest, archive SHA-256, member hashes, Python wheel/sdist receipts, source-bound macOS Application bundle, local distribution handoff manifest, and package status gate |
 | Hosted governance | Current-head hosted CI, startup probe, branch-protection visibility, tag binding, and clear external blocker classification |
 
 ## Current Baseline
@@ -109,7 +109,7 @@ byte-pinned proof layer for a particular commit. Verify them with
 | Coding/programming expertise | OPEN | Define read/patch/test/review action boundary, sandbox policy, diff receipts, and code-quality eval fixtures |
 | Transparency/objectivity across capabilities | OPEN | Initial GIS and OCR report validation exists for saved advanced GIS and local image OCR receipts; expand executable validators so provenance, uncertainty, limitations, contradictory evidence handling, falsification criteria, warning states, and arithmetic closure are enforced across browsing, retrieval, and coding outputs |
 | Final-phase GUI/operator workspace | OPEN | Keep GUI expansion deferred until backend capability contracts, CLI workflows, provenance, retrieval, OCR/GIS/web/coding gates, packaging, and hosted governance can support it without hiding uncertainty |
-| Production packaging | OPEN | Verify the local distribution handoff manifest, then convert certified local artifacts into the chosen publish/install channel |
+| Production packaging | OPEN | Source-bound local macOS Application bundle can be built and verified with `mucaro package macos-app`; convert this into a portable signed installer with embedded runtime, no-setup reinstall, upgrade, and rollback guarantees |
 | Sustained workflow validation | OPEN | Run end-to-end operator workflows across ingest, ask, trace review, memory, tools, receipts, and recovery paths |
 
 ## Development Vector

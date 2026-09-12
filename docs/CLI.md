@@ -87,6 +87,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro package status` | Inspect packaging and distribution readiness | 0 | 2 on failures, or with `--strict` warnings/failures |
 | `mucaro package build` | Build the governed source ZIP and artifact manifest | 0 | 2 |
 | `mucaro package verify MANIFEST` | Verify a governed source ZIP against its artifact manifest | 0 | 2 |
+| `mucaro package macos-app` | Build or verify the double-clickable local macOS Application bundle | 0 | 2 |
 | `mucaro package distribution-manifest` | Build or verify the local distribution handoff manifest | 0 | 2 |
 | `mucaro sources ingest-web-snapshot SNAPSHOT_PATH` | Ingest one governed web snapshot as a citeable local source | 0 | 2 |
 | `mucaro tools list` | List locally allowlisted tools | 0 | 2 |
@@ -258,6 +259,10 @@ approved and audited.
 | `HOSTED_INCIDENT_PACKET_NOT_REQUIRED` | hosted governance is already ready, so an incident packet was not required |
 | `HOSTED_INCIDENT_PACKET_VERIFIED` | saved hosted-governance incident packet passed schema, hash, payload, copy-line, command, and optional current-head checks |
 | `HOSTED_INCIDENT_PACKET_VERIFY_FAILED` | saved hosted-governance incident packet is missing, malformed, hash-mismatched, stale for current `HEAD`, or otherwise invalid |
+| `MACOS_APP_BUNDLE_READY` | Local source-bound `Mucaro AI.app` bundle was built and verified |
+| `MACOS_APP_BUNDLE_FAILED` | Local macOS Application bundle could not be built from the current source/runtime inputs |
+| `MACOS_APP_BUNDLE_VERIFIED` | Existing local `Mucaro AI.app` bundle passed structure, executable, receipt, and launcher-target checks |
+| `MACOS_APP_BUNDLE_VERIFY_FAILED` | Existing local macOS Application bundle is missing or does not pass required structure/launcher checks |
 | `RELEASE_NEXT_ACTIONS_OPEN` | one or more release or hosted-governance actions remain open; output includes prioritized operator commands and verification commands |
 | `RELEASE_NEXT_ACTIONS_READY` | no release next actions remain open |
 | `RELEASE_NEXT_ACTIONS_VERIFIED` | saved release next-actions runbook passed schema, hash, payload, and requested head-binding checks |
@@ -720,6 +725,16 @@ path existence, archive SHA-256, archive size, ZIP path safety, duplicate
 archive members, exact archive member set, and per-member size/hash bindings.
 Add `--require-current-head` when the manifest must bind to the current checkout
 before a release or distribution decision.
+
+Use `mucaro package macos-app --format text` to build a local double-clickable
+`Mucaro AI.app` bundle under `data/exports/desktop_apps`. The bundle is a
+source-bound wrapper: it launches this checked-out repository with the Python
+executable recorded at build time, then runs `scripts/launch_app.py`, which
+starts the local backend and opens the browser UI. Use `mucaro package
+macos-app --verify data/exports/desktop_apps/Mucaro\ AI.app --format text` to
+verify the bundle structure, executable bit, Info.plist binding, receipt, and
+launcher target. This is not yet a portable signed installer with embedded
+runtime, reinstall, upgrade, and rollback guarantees.
 
 Use `mucaro package distribution-manifest --save` after exact-head release,
 fresh-clone, source-artifact, Python-distribution, answer-trace-quality,

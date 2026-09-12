@@ -186,6 +186,11 @@ Observed success markers:
   launcher entrypoint, desktop package manifest, optional generated outputs, and
   current distribution blockers through the supported CLI boundary while
   `scripts/package_desktop.py` remains the desktop-package manifest entrypoint.
+- `mucaro package macos-app` builds or verifies a source-bound local
+  `Mucaro AI.app` bundle under `data/exports/desktop_apps`. The bundle launches
+  this checkout with the recorded Python executable and delegates to
+  `scripts/launch_app.py`; portable signed installer, embedded runtime,
+  no-setup reinstall, upgrade, and rollback remain open.
 - `mucaro package build` creates the current governed release artifact: a
   tracked-source ZIP plus JSON manifest under `data/exports/packages`, with
   exact Git `HEAD`, archive SHA-256, member count, and per-member SHA-256
@@ -263,9 +268,9 @@ Observed success markers:
   protection readiness.
 - `mucaro package status` currently reports `PACKAGE_WARN`: required package
   inputs, Python/frontend version consistency, CLI entrypoint, launcher
-  entrypoint, desktop package manifest, generated outputs, release artifact
-  policy, and distribution policy pass; hosted GitHub Actions startup remains
-  open.
+  entrypoint, desktop package manifest, generated outputs, source-bound macOS
+  app-wrapper path, release artifact policy, and distribution policy pass;
+  hosted GitHub Actions startup remains open.
 - `mucaro audit product` now uses the expanded governed-release objective. The
   current scope reports `16 PASS`, `7 OPEN`, `0 BLOCKED`, and `69.6%`
   readiness: the existing local assistant capabilities and source-artifact
@@ -380,6 +385,7 @@ Observed success markers:
   65 queries, 55 positive queries, 10 no-context queries, 60 expected bindings,
   51 source IDs, 5 multi-binding queries, and 20 query categories.
 - Desktop package self-test: `DESKTOP_PACKAGE_READY`
+- Local macOS app wrapper: `MACOS_APP_BUNDLE_READY` / `MACOS_APP_BUNDLE_VERIFIED`
 - `INGEST_FOLDER_OK`
 - `CITATION_OK`
 - `npm audit` reported 0 vulnerabilities after Vite/package-lock repair

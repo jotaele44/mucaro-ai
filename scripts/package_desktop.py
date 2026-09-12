@@ -11,13 +11,29 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "backend"))
 
-from backend.app.packaging import build_desktop_package_manifest  # noqa: E402
+from backend.app.packaging import build_desktop_package_manifest, build_macos_app_bundle, verify_macos_app_bundle  # noqa: E402
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Prepare or validate the local desktop package manifest.")
     parser.add_argument("--self-test", action="store_true", help="Validate packaging inputs without writing an artifact.")
+    parser.add_argument("--build-app", action="store_true", help="Build the local double-clickable macOS Application bundle.")
+    parser.add_argument("--verify-app", type=Path, help="Verify an existing macOS Application bundle.")
+    parser.add_argument("--output-dir", type=Path, default=None, help="Directory for generated desktop app artifacts.")
+    parser.add_argument("--python-executable", help="Python executable to embed in the app launcher.")
     args = parser.parse_args()
+
+    if args.verify_app is not None:
+        report = verify_macos_app_bundle(args.verify_app, root=ROOT)
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        print(report["status"])
+        return 0 if report["status"] == "MACOS_APP_BUNDLE_VERIFIED" else 2
+
+    if args.build_app:
+        report = build_macos_app_bundle(ROOT, output_dir=args.output_dir, python_executable=args.python_executable)
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        print(report["status"])
+        return 0 if report["status"] == "MACOS_APP_BUNDLE_READY" else 2
 
     manifest = build_desktop_package_manifest(ROOT)
     print(json.dumps(manifest, indent=2, ensure_ascii=False))

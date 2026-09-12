@@ -16,10 +16,10 @@ OBJECTIVE = (
     "production-quality packaging. Capabilities must include advanced GIS "
     "processing, state-of-the-art OCR analysis, powerful web browsing "
     "abilities, coding and programming expertise, all governed by maximum "
-    "transparency and objectivity. The existing desktop launcher remains a "
-    "local operator surface, while expanded GUI/workspace development is a "
-    "final-phase goal after backend, CLI, provenance, capability, packaging, "
-    "and hosted-governance gates are stronger."
+    "transparency and objectivity. The desktop launcher and source-bound "
+    "macOS Application wrapper are local operator surfaces, while expanded "
+    "GUI/workspace development remains a final-phase goal after backend, CLI, "
+    "provenance, capability, packaging, and hosted-governance gates are stronger."
 )
 
 
@@ -266,9 +266,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
                     ("scripts", "certify_release.py"),
                 ],
             ),
-            "mucaro package status/build, docs/PACKAGING_POLICY.md, and the release package_artifact gate",
-            "",
-            "Keep generated artifact receipts bound to exact Git HEAD before any governed release tag.",
+            "mucaro package status/build, mucaro package macos-app, docs/PACKAGING_POLICY.md, and the release package_artifact gate",
+            "A source-bound local macOS .app wrapper can launch this checkout, but portable signed installer, embedded runtime, upgrade, and rollback remain open.",
+            "Keep generated artifact receipts bound to exact Git HEAD before any governed release tag; promote the source-bound app wrapper toward a portable installer only after the runtime and rollback contract are explicit.",
         ),
         ProductRequirement(
             "github_release_governance",
@@ -284,7 +284,7 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "assistant_surface",
             "Expanded GUI/operator workspace remains the last product phase, after backend and CLI certification gates are stronger.",
             "OPEN",
-            "The existing desktop launcher and frontend smoke path are present, but expanded GUI work is explicitly deferred; CLI remains the certification boundary.",
+            "The existing desktop launcher, source-bound macOS Application wrapper, and frontend smoke path are present, but expanded GUI work is explicitly deferred; CLI remains the certification boundary.",
             "The final conversation-first work feed, specialized workspaces, synchronized maps/tables/code/artifacts, and GUI proof that grants, evidence, memory, tools, and run history work together are not yet implemented.",
             "Do not expand GUI behavior until backend capability contracts, provenance, retrieval, OCR/GIS/web/coding gates, packaging, and hosted-governance evidence have been advanced.",
         ),
@@ -392,9 +392,9 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
             "release_packaging_certification",
             "Release packaging certification",
             ("source_artifact_packaging",),
-            "Source-artifact packaging is part of the product audit and release-state receipt path.",
-            "",
-            "Keep source artifacts, distribution checks, and receipts exact-head bound before release tags.",
+            "Source-artifact packaging and a source-bound local macOS Application wrapper are part of the product audit and release-state receipt path.",
+            "Portable signed installer, embedded runtime, no-setup reinstall, upgrade, and rollback are still open.",
+            "Keep source artifacts, app-wrapper checks, distribution checks, and receipts exact-head bound before release tags.",
         ),
         ProductRoadmapStage(
             "hosted_release_governance",

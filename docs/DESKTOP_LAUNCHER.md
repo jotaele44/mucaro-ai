@@ -4,6 +4,45 @@ Desktop Launcher Mode lets Mucaro AI run with one command.
 
 It starts the private local backend on `127.0.0.1:8000`, serves the built React UI through FastAPI, opens the browser, and stops cleanly with `Ctrl+C`.
 
+## Double-Click App
+
+Build a local source-bound macOS Application bundle:
+
+```bash
+python scripts/package_desktop.py --build-app
+```
+
+Expected marker:
+
+```text
+MACOS_APP_BUNDLE_READY
+```
+
+The generated app is:
+
+```text
+data/exports/desktop_apps/Mucaro AI.app
+```
+
+Double-clicking that app launches this checked-out source tree with the Python
+executable recorded at build time, then runs `scripts/launch_app.py`.
+
+Verify an existing bundle with:
+
+```bash
+python scripts/package_desktop.py --verify-app "data/exports/desktop_apps/Mucaro AI.app"
+```
+
+Expected marker:
+
+```text
+MACOS_APP_BUNDLE_VERIFIED
+```
+
+This is a local source-bound wrapper. A portable signed installer with embedded
+runtime, no-setup reinstall, upgrade, and rollback guarantees remains future
+packaging work.
+
 ## Run
 
 ```bash

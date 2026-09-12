@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import subprocess
 import sys
 import tarfile
@@ -12,6 +13,7 @@ import scripts.certify_python_distribution as certify_python_distribution
 import scripts.certify_release as certify_release
 import scripts.certify_source_artifact as certify_source_artifact
 import scripts.launch_app as launch_app
+from backend.app.packaging import build_macos_app_bundle, verify_macos_app_bundle
 
 
 def test_launch_app_self_test():
@@ -36,6 +38,39 @@ def test_package_desktop_self_test():
     )
     assert proc.returncode == 0
     assert "DESKTOP_PACKAGE_READY" in proc.stdout
+
+
+def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "frontend" / "dist").mkdir(parents=True)
+    (tmp_path / "scripts" / "launch_app.py").write_text("# launcher\n", encoding="utf-8")
+    (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n', encoding="utf-8")
+
+    result = build_macos_app_bundle(tmp_path, output_dir=tmp_path / "apps", python_executable=sys.executable)
+
+    assert result["status"] == "MACOS_APP_BUNDLE_READY"
+    app_path = tmp_path / "apps" / "Mucaro AI.app"
+    executable = app_path / "Contents" / "MacOS" / "mucaro-ai"
+    receipt = app_path / "Contents" / "Resources" / "mucaro-app-receipt.json"
+    assert app_path.is_dir()
+    assert executable.exists()
+    assert executable.stat().st_mode & 0o111
+    assert "scripts/launch_app.py" in executable.read_text(encoding="utf-8")
+    assert '"$@"' in executable.read_text(encoding="utf-8")
+    assert json.loads(receipt.read_text(encoding="utf-8"))["scope"] == "source_bound_local_macos_app_wrapper"
+
+    verification = verify_macos_app_bundle(app_path, root=tmp_path)
+    assert verification["status"] == "MACOS_APP_BUNDLE_VERIFIED"
+
+
+def test_verify_macos_app_bundle_rejects_missing_bundle(tmp_path):
+    result = verify_macos_app_bundle(tmp_path / "Missing.app", root=tmp_path)
+
+    assert result["status"] == "MACOS_APP_BUNDLE_VERIFY_FAILED"
+    failed_names = {check["name"] for check in result["checks"] if check["status"] == "FAIL"}
+    assert "app_bundle_exists" in failed_names
+    assert "launcher_executable" in failed_names
 
 
 def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):

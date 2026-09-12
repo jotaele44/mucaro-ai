@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shlex
 import subprocess
+import sys
 import tomllib
 import zipfile
 from collections import Counter
@@ -40,6 +43,9 @@ OPTIONAL_GENERATED_OUTPUTS = [
 ]
 DISTRIBUTION_MANIFEST_SCHEMA_VERSION = "mucaro_distribution_manifest_v1"
 DISTRIBUTION_MANIFEST_DIR = Path("data") / "exports" / "distribution_manifests"
+MACOS_APP_BUNDLE_SCHEMA_VERSION = "mucaro_macos_app_bundle_v1"
+MACOS_APP_BUNDLE_NAME = "Mucaro AI.app"
+MACOS_APP_BUNDLE_DIR = Path("data") / "exports" / "desktop_apps"
 REQUIRED_DISTRIBUTION_RECEIPTS = [
     ("local_release", "CERTIFY_RELEASE_OK"),
     ("fresh_clone", "FRESH_CLONE_CERT_OK"),
@@ -89,12 +95,26 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _write_executable(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    path.chmod(path.stat().st_mode | 0o755)
+
+
 def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
 def _utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _project_version(root: Path) -> str:
+    try:
+        project = _load_toml(root / "pyproject.toml").get("project", {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return "0.0.0"
+    return _string_value(project, "version") or "0.0.0"
 
 
 def _file_summary(path_value: str | None, root: Path) -> dict[str, Any]:
@@ -162,14 +182,194 @@ def build_desktop_package_manifest(root: Path = ROOT) -> dict[str, Any]:
     except (OSError, tomllib.TOMLDecodeError) as exc:
         metadata_error = str(exc)
     ready = not missing and metadata_error is None
+    app_bundle_path = root / MACOS_APP_BUNDLE_DIR / MACOS_APP_BUNDLE_NAME
     return {
         "status": "DESKTOP_PACKAGE_READY" if ready else "DESKTOP_PACKAGE_INCOMPLETE",
         "version": version,
         "entrypoint": "scripts/launch_app.py",
+        "macos_app_bundle": {
+            "name": MACOS_APP_BUNDLE_NAME,
+            "path": str(app_bundle_path),
+            "exists": app_bundle_path.exists() and app_bundle_path.is_dir(),
+            "builder": "mucaro package macos-app",
+        },
         "required_files": required,
         "missing_files": missing,
         "metadata_error": metadata_error,
-        "outputs": ["frontend/dist", "local Python editable install", "launcher smoke path"],
+        "outputs": ["frontend/dist", "local Python editable install", "launcher smoke path", str(MACOS_APP_BUNDLE_DIR / MACOS_APP_BUNDLE_NAME)],
+    }
+
+
+def build_macos_app_bundle(
+    root: Path = ROOT,
+    *,
+    output_dir: Path | None = None,
+    python_executable: str | None = None,
+) -> dict[str, Any]:
+    output_dir = _resolve_package_path(root, output_dir or root / MACOS_APP_BUNDLE_DIR)
+    app_path = output_dir / MACOS_APP_BUNDLE_NAME
+    contents = app_path / "Contents"
+    macos_dir = contents / "MacOS"
+    resources_dir = contents / "Resources"
+    executable_path = macos_dir / "mucaro-ai"
+    plist_path = contents / "Info.plist"
+    receipt_path = resources_dir / "mucaro-app-receipt.json"
+    runtime_python = python_executable or sys.executable
+
+    checks: list[dict[str, str]] = []
+    required_files = [
+        root / "scripts" / "launch_app.py",
+        root / "frontend" / "dist" / "index.html",
+        root / "pyproject.toml",
+    ]
+    missing_files = [str(path.relative_to(root)) for path in required_files if not path.exists()]
+    checks.append(_check("required_runtime_inputs", "PASS" if not missing_files else "FAIL", "all present" if not missing_files else f"missing={','.join(missing_files)}"))
+    checks.append(_check("python_executable", "PASS" if Path(runtime_python).exists() else "FAIL", runtime_python))
+
+    ok, head_sha = _git_output(root, ["rev-parse", "HEAD"])
+    checks.append(_check("git_head", "PASS" if ok else "WARN", head_sha or "unavailable"))
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    if failed:
+        return {
+            "status": "MACOS_APP_BUNDLE_FAILED",
+            "schema_version": MACOS_APP_BUNDLE_SCHEMA_VERSION,
+            "project_root": str(root),
+            "app_path": str(app_path),
+            "checks": checks,
+            "failed_checks": [check["name"] for check in failed],
+        }
+
+    launcher = f"""#!/usr/bin/env bash
+set -euo pipefail
+REPO_ROOT={shlex.quote(str(root))}
+PYTHON_EXECUTABLE={shlex.quote(runtime_python)}
+cd "${{REPO_ROOT}}"
+exec "${{PYTHON_EXECUTABLE}}" scripts/launch_app.py "$@"
+"""
+    info_plist = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>
+  <string>Mucaro AI</string>
+  <key>CFBundleDisplayName</key>
+  <string>Mucaro AI</string>
+  <key>CFBundleExecutable</key>
+  <string>mucaro-ai</string>
+  <key>CFBundleIdentifier</key>
+  <string>ai.mucaro.local</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>{_project_version(root)}</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>12.0</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+</dict>
+</plist>
+"""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    _write_executable(executable_path, launcher)
+    plist_path.parent.mkdir(parents=True, exist_ok=True)
+    plist_path.write_text(info_plist, encoding="utf-8")
+    resources_dir.mkdir(parents=True, exist_ok=True)
+    receipt = {
+        "schema_version": MACOS_APP_BUNDLE_SCHEMA_VERSION,
+        "status": "MACOS_APP_BUNDLE_READY",
+        "created_utc": _utc_now(),
+        "project_root": str(root),
+        "app_path": str(app_path),
+        "bundle_name": MACOS_APP_BUNDLE_NAME,
+        "head_sha": head_sha if ok else None,
+        "python_executable": runtime_python,
+        "entrypoint": "scripts/launch_app.py",
+        "frontend_dist": "frontend/dist/index.html",
+        "scope": "source_bound_local_macos_app_wrapper",
+        "limitations": [
+            "this bundle launches the checked-out source tree on this machine",
+            "portable signed installer, embedded Python runtime, upgrade, and rollback remain future packaging work",
+        ],
+    }
+    receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    verify_report = verify_macos_app_bundle(app_path, root=root)
+    checks.extend(verify_report.get("checks", []))
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": "MACOS_APP_BUNDLE_READY" if not failed else "MACOS_APP_BUNDLE_FAILED",
+        "schema_version": MACOS_APP_BUNDLE_SCHEMA_VERSION,
+        "project_root": str(root),
+        "app_path": str(app_path),
+        "head_sha": head_sha if ok else None,
+        "receipt": {
+            "path": str(receipt_path),
+            "sha256": _sha256_file(receipt_path),
+        },
+        "executable": {
+            "path": str(executable_path),
+            "sha256": _sha256_file(executable_path),
+            "mode": oct(executable_path.stat().st_mode & 0o777),
+        },
+        "checks": checks,
+        "failed_checks": [check["name"] for check in failed],
+        "verification": verify_report,
+    }
+
+
+def verify_macos_app_bundle(app_path: Path, *, root: Path = ROOT) -> dict[str, Any]:
+    app_path = _resolve_package_path(root, app_path)
+    contents = app_path / "Contents"
+    executable_path = contents / "MacOS" / "mucaro-ai"
+    plist_path = contents / "Info.plist"
+    receipt_path = contents / "Resources" / "mucaro-app-receipt.json"
+    checks: list[dict[str, str]] = [
+        _check("app_bundle_exists", "PASS" if app_path.exists() and app_path.is_dir() else "FAIL", str(app_path)),
+        _check("bundle_extension", "PASS" if app_path.name.endswith(".app") else "FAIL", app_path.name),
+        _check("contents_dir", "PASS" if contents.exists() and contents.is_dir() else "FAIL", str(contents)),
+        _check("info_plist", "PASS" if plist_path.exists() else "FAIL", str(plist_path)),
+        _check("launcher_executable", "PASS" if executable_path.exists() and os.access(executable_path, os.X_OK) else "FAIL", str(executable_path)),
+        _check("receipt_json", "PASS" if receipt_path.exists() else "FAIL", str(receipt_path)),
+    ]
+
+    receipt: dict[str, Any] = {}
+    if receipt_path.exists():
+        try:
+            receipt = _load_json(receipt_path)
+            checks.append(_check("receipt_schema", "PASS" if receipt.get("schema_version") == MACOS_APP_BUNDLE_SCHEMA_VERSION else "FAIL", str(receipt.get("schema_version"))))
+            checks.append(_check("receipt_entrypoint", "PASS" if receipt.get("entrypoint") == "scripts/launch_app.py" else "FAIL", str(receipt.get("entrypoint"))))
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            checks.append(_check("receipt_parse", "FAIL", str(exc)))
+
+    if plist_path.exists():
+        plist_text = plist_path.read_text(encoding="utf-8", errors="replace")
+        checks.append(_check("plist_executable_binding", "PASS" if "<string>mucaro-ai</string>" in plist_text else "FAIL", "CFBundleExecutable=mucaro-ai"))
+        checks.append(_check("plist_package_type", "PASS" if "<string>APPL</string>" in plist_text else "FAIL", "CFBundlePackageType=APPL"))
+
+    if executable_path.exists():
+        launcher_text = executable_path.read_text(encoding="utf-8", errors="replace")
+        checks.append(_check("launcher_points_to_repo", "PASS" if str(root) in launcher_text else "FAIL", str(root)))
+        checks.append(_check("launcher_points_to_launch_app", "PASS" if "scripts/launch_app.py" in launcher_text else "FAIL", "scripts/launch_app.py"))
+        checks.append(_check("launcher_forwards_arguments", "PASS" if '"$@"' in launcher_text else "FAIL", "bundle executable forwards launch_app arguments"))
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": "MACOS_APP_BUNDLE_VERIFIED" if not failed else "MACOS_APP_BUNDLE_VERIFY_FAILED",
+        "schema_version": MACOS_APP_BUNDLE_SCHEMA_VERSION,
+        "project_root": str(root),
+        "app_path": str(app_path),
+        "checks": checks,
+        "failed_checks": [check["name"] for check in failed],
+        "receipt": {
+            "path": str(receipt_path),
+            "sha256": _sha256_file(receipt_path) if receipt_path.exists() else None,
+        },
+        "executable": {
+            "path": str(executable_path),
+            "sha256": _sha256_file(executable_path) if executable_path.exists() else None,
+            "mode": oct(executable_path.stat().st_mode & 0o777) if executable_path.exists() else None,
+        },
     }
 
 
@@ -281,6 +481,24 @@ def build_package_status(root: Path = ROOT) -> dict[str, Any]:
             str(desktop_manifest.get("status")),
         )
     )
+    app_bundle_path = root / MACOS_APP_BUNDLE_DIR / MACOS_APP_BUNDLE_NAME
+    if app_bundle_path.exists():
+        app_verification = verify_macos_app_bundle(app_bundle_path, root=root)
+        checks.append(
+            _check(
+                "macos_app_bundle",
+                "PASS" if app_verification.get("status") == "MACOS_APP_BUNDLE_VERIFIED" else "FAIL",
+                str(app_verification.get("status")),
+            )
+        )
+    else:
+        checks.append(
+            _check(
+                "macos_app_bundle",
+                "WARN",
+                f"missing={MACOS_APP_BUNDLE_DIR / MACOS_APP_BUNDLE_NAME}",
+            )
+        )
 
     missing_outputs = [path for path in OPTIONAL_GENERATED_OUTPUTS if not (root / path).exists()]
     checks.append(
@@ -324,6 +542,8 @@ def build_package_status(root: Path = ROOT) -> dict[str, Any]:
         "blockers": blockers,
         "next_commands": [
             "python3 scripts/package_desktop.py --self-test",
+            "python3 scripts/package_desktop.py --build-app",
+            "PYTHONPATH=.:backend python3 scripts/mucaro.py package macos-app --format text",
             "PYTHONPATH=.:backend python3 scripts/mucaro.py package build --format text",
             "PYTHONPATH=.:backend python3 scripts/mucaro.py package verify MANIFEST_PATH --require-current-head --format text",
             "python3 scripts/certify_python_distribution.py",
