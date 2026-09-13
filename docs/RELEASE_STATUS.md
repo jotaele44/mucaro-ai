@@ -279,12 +279,12 @@ Observed success markers:
   by local smoke evidence, but GUI expansion is not the active development
   vector until backend, CLI, provenance, capability, packaging, and hosted
   governance gates are stronger.
-  Advanced GIS now has narrow local GeoJSON inspection, point-in-polygon,
+  Advanced GIS now has narrow local GeoJSON inspection with Shapely planar topology state, point-in-polygon,
   geometry comparison with Polygon/MultiPolygon planar overlay metrics, limited EPSG:4326/EPSG:3857 reprojection, CSV
   point-to-GeoJSON conversion, bbox feature filtering, bbox geometry clipping,
   planar area/length measurement receipts, and bounded EPSG:4326 spherical geodesic measurement
   receipts plus a committed `mucaro eval gis` fixture
-  harness covering dimensionality, join multiplication, topology equality,
+  harness covering dimensionality, invalid topology inspection, join multiplication, topology equality,
   planar overlay area difference, reprojection, CSV header/skipped-row/row-accounting evidence, bbox
   retained/excluded accounting, bbox clipped/unchanged/unresolved accounting,
   measurement units, polygon-hole area
@@ -294,8 +294,8 @@ Observed success markers:
   `mucaro capabilities validate-gis-report` is the first
   executable capability-output validator: it checks saved GIS report schema,
   source/input hashes, CRS where present, warning consistency, asserted
-  conservation invariants, bbox filter/clip fields, and planar/geodesic measurement fields.
-  Full GIS maturity remains open until robust topology, ellipsoidal
+  conservation invariants, inspect topology fields, bbox filter/clip fields, and planar/geodesic measurement fields.
+  Full GIS maturity remains open until robust topology repair/operation support, ellipsoidal
   GIS-engine geodesic validation, broader CRS/datum/grid-shift/axis-order
   support, standalone non-bbox overlay/clipping operations, independent planar
   overlay validation, broader spatial format

@@ -44,6 +44,14 @@ SUPPORTED_CLIP_GEOMETRY_TYPES = {
     "MultiPolygon",
 }
 SUPPORTED_OVERLAY_GEOMETRY_TYPES = {"Polygon", "MultiPolygon"}
+SUPPORTED_TOPOLOGY_GEOMETRY_TYPES = {
+    "Point",
+    "MultiPoint",
+    "LineString",
+    "MultiLineString",
+    "Polygon",
+    "MultiPolygon",
+}
 SUPPORTED_MEASURE_GEOMETRY_TYPES = {
     "Point",
     "MultiPoint",
@@ -268,19 +276,26 @@ def _inspect_features(source: GeoJSONSource) -> tuple[list[dict[str, Any]], dict
     for index, feature in enumerate(_features(source)):
         geometry = feature.get("geometry")
         classification = _classify_geometry(geometry)
+        topology = _inspect_topology_state(geometry, classification)
         geometry_type = classification["geometry_type"] or "NULL"
         geometry_counts[geometry_type] = geometry_counts.get(geometry_type, 0) + 1
         properties = feature.get("properties") if isinstance(feature.get("properties"), dict) else {}
+        warnings = list(classification["warnings"])
+        if topology["topology_warning"]:
+            warnings.append(str(topology["topology_warning"]))
         inspected.append(
             {
                 "feature_index": index,
                 "feature_id": _feature_id(feature, index),
                 "geometry_type": classification["geometry_type"],
                 "geometry_status": classification["geometry_status"],
+                "topology_state": topology["topology_state"],
+                "topology_adapter": topology["topology_adapter"],
+                "topology_warning": topology["topology_warning"],
                 **_coordinate_dimension_summary(geometry if isinstance(geometry, dict) else None),
                 "bbox": _bbox_for_geometry(geometry) if isinstance(geometry, dict) else None,
                 "property_keys": sorted(str(key) for key in properties),
-                "warnings": classification["warnings"],
+                "warnings": warnings,
             }
         )
     return inspected, geometry_counts
@@ -639,6 +654,50 @@ def _shapely_geojson_geometry(
     if not shaped.is_valid:
         raise GISProcessingError(topology_status, "Geometry is not topologically valid for this operation.")
     return shaped
+
+
+def _inspect_topology_state(geometry: Any, classification: dict[str, Any]) -> dict[str, Any]:
+    geometry_type = classification.get("geometry_type")
+    geometry_status = classification.get("geometry_status")
+    if geometry_status == "NULL_EMPTY":
+        return {"topology_state": "NULL_EMPTY", "topology_adapter": None, "topology_warning": None}
+    if geometry_status != "VALID" or not isinstance(geometry, dict):
+        return {
+            "topology_state": "UNRESOLVED",
+            "topology_adapter": None,
+            "topology_warning": "GIS_TOPOLOGY_SYNTAX_UNRESOLVED",
+        }
+    if geometry_type not in SUPPORTED_TOPOLOGY_GEOMETRY_TYPES:
+        return {
+            "topology_state": "UNSUPPORTED",
+            "topology_adapter": None,
+            "topology_warning": f"GIS_TOPOLOGY_UNSUPPORTED_GEOMETRY:{geometry_type}",
+        }
+    dimensions = _coordinate_dimension_summary(geometry)
+    dimension_warning = "GIS_TOPOLOGY_PLANAR_XY_ONLY" if dimensions["has_z"] or dimensions["has_m"] else None
+    if dimensions["has_m"]:
+        return {
+            "topology_state": "UNRESOLVED",
+            "topology_adapter": "shapely_is_valid_v1",
+            "topology_warning": "GIS_TOPOLOGY_COORDINATE_DIMENSION_UNSUPPORTED",
+        }
+    try:
+        _shapely_geojson_geometry(
+            geometry,
+            invalid_status="ERROR_GIS_INSPECT_TOPOLOGY_INVALID_GEOMETRY",
+            topology_status="ERROR_GIS_INSPECT_TOPOLOGY_INVALID",
+        )
+    except GISProcessingError as exc:
+        return {
+            "topology_state": "INVALID" if exc.status == "ERROR_GIS_INSPECT_TOPOLOGY_INVALID" else "UNRESOLVED",
+            "topology_adapter": "shapely_is_valid_v1",
+            "topology_warning": exc.status,
+        }
+    return {
+        "topology_state": "VALID_PLANAR_XY" if dimension_warning else "VALID",
+        "topology_adapter": "shapely_is_valid_v1",
+        "topology_warning": dimension_warning,
+    }
 
 
 def clip_geojson_by_bbox(
@@ -1295,13 +1354,26 @@ def inspect_geojson(path: Path, *, cfg: Settings = settings) -> dict[str, Any]:
     inspected, geometry_counts = _inspect_features(source)
     invalid_count = sum(1 for feature in inspected if feature["geometry_status"] in {"INVALID", "UNSUPPORTED"})
     null_empty_count = sum(1 for feature in inspected if feature["geometry_status"] == "NULL_EMPTY")
+    topology_invalid_count = sum(1 for feature in inspected if feature["topology_state"] == "INVALID")
+    topology_unresolved_count = sum(1 for feature in inspected if feature["topology_state"] == "UNRESOLVED")
+    topology_planar_xy_only_count = sum(1 for feature in inspected if feature["topology_state"] == "VALID_PLANAR_XY")
+    topology_not_applicable_count = sum(1 for feature in inspected if feature["topology_state"] in {"NULL_EMPTY", "UNSUPPORTED"})
     feature_count = len(inspected)
     created_at = utc_now()
     report_id = stable_id("gisreport", "inspect", str(path), source.sha256, created_at)
+    warnings = [
+        warning
+        for warning in [
+            "GIS_GEOMETRY_WARNINGS_PRESENT" if invalid_count else "",
+            "GIS_TOPOLOGY_WARNINGS_PRESENT" if topology_invalid_count or topology_unresolved_count else "",
+            "GIS_TOPOLOGY_PLANAR_XY_ONLY_PRESENT" if topology_planar_xy_only_count else "",
+        ]
+        if warning
+    ]
     report = {
         "schema_version": GIS_REPORT_SCHEMA_VERSION,
         "report_id": report_id,
-        "status": "GIS_INSPECT_OK" if invalid_count == 0 else "GIS_INSPECT_WARN",
+        "status": "GIS_INSPECT_OK" if not warnings else "GIS_INSPECT_WARN",
         "operation": "inspect_geojson",
         "created_at": created_at,
         "source": {
@@ -1317,6 +1389,11 @@ def inspect_geojson(path: Path, *, cfg: Settings = settings) -> dict[str, Any]:
             "valid_or_null_empty_count": feature_count - invalid_count,
             "invalid_or_unsupported_count": invalid_count,
             "null_empty_count": null_empty_count,
+            "topology_valid_count": sum(1 for feature in inspected if feature["topology_state"] in {"VALID", "VALID_PLANAR_XY"}),
+            "topology_invalid_count": topology_invalid_count,
+            "topology_unresolved_count": topology_unresolved_count,
+            "topology_planar_xy_only_count": topology_planar_xy_only_count,
+            "topology_not_applicable_count": topology_not_applicable_count,
             "crs_preserved": True,
             "coordinate_dimension_counts": {
                 label: sum(
@@ -1337,14 +1414,16 @@ def inspect_geojson(path: Path, *, cfg: Settings = settings) -> dict[str, Any]:
             "features_with_m": sum(1 for feature in inspected if feature.get("has_m")),
         },
         "features": inspected,
-        "warnings": [] if invalid_count == 0 else ["GIS_GEOMETRY_WARNINGS_PRESENT"],
+        "warnings": warnings,
         "limitations": [
-            "inspection classifies local GeoJSON structure and coordinate dimensionality only",
-            "geometry validity checks are syntactic and do not replace a robust topology engine",
+            "inspection classifies local GeoJSON structure, coordinate dimensionality, and Shapely planar topology state",
+            "topology validation is planar XY and does not prove 3D/M topology semantics",
+            "inspection does not repair invalid topology or transform geometries",
         ],
         "falsification_criteria": [
             "reject the inspection if feature_count does not equal the number of inspected feature receipts",
             "reject geometry status conclusions that cannot be reproduced from the saved source SHA-256",
+            "reject topology conclusions if topology warnings are omitted or unresolved topology is hidden inside the claimed scope",
         ],
     }
     return _write_report(cfg, report)

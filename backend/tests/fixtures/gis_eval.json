@@ -1,7 +1,7 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 15,
+    "case_count": 16,
     "operation_count": 8,
     "negative_case_count": 5
   },
@@ -67,8 +67,11 @@
           ]
         }
       },
-      "expected_status": "GIS_INSPECT_OK",
-      "expected_warnings": [],
+      "expected_status": "GIS_INSPECT_WARN",
+      "expected_warnings": [
+        "GIS_TOPOLOGY_PLANAR_XY_ONLY_PRESENT",
+        "GIS_TOPOLOGY_WARNINGS_PRESENT"
+      ],
       "expected_invariants": {
         "feature_count": 3,
         "coordinate_dimension_counts": {
@@ -77,11 +80,92 @@
           "XYZM": 1
         },
         "features_with_z": 2,
-        "features_with_m": 1
+        "features_with_m": 1,
+        "topology_valid_count": 2,
+        "topology_invalid_count": 0,
+        "topology_unresolved_count": 1,
+        "topology_planar_xy_only_count": 1,
+        "topology_not_applicable_count": 0
       },
       "expected_fields": {
         "source.crs": "EPSG:4326",
-        "geometry_counts.Point": 3
+        "geometry_counts.Point": 3,
+        "features.0.topology_state": "VALID",
+        "features.1.topology_state": "VALID_PLANAR_XY",
+        "features.1.topology_warning": "GIS_TOPOLOGY_PLANAR_XY_ONLY",
+        "features.2.topology_state": "UNRESOLVED",
+        "features.2.topology_warning": "GIS_TOPOLOGY_COORDINATE_DIMENSION_UNSUPPORTED"
+      }
+    },
+    {
+      "case_id": "inspect_invalid_topology_warns_without_repair",
+      "operation": "inspect",
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "bowtie",
+              "properties": {
+                "name": "bowtie"
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      2,
+                      2
+                    ],
+                    [
+                      0,
+                      2
+                    ],
+                    [
+                      2,
+                      0
+                    ],
+                    [
+                      0,
+                      0
+                    ]
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_INSPECT_WARN",
+      "expected_warnings": [
+        "GIS_TOPOLOGY_WARNINGS_PRESENT"
+      ],
+      "expected_invariants": {
+        "feature_count": 1,
+        "invalid_or_unsupported_count": 0,
+        "topology_valid_count": 0,
+        "topology_invalid_count": 1,
+        "topology_unresolved_count": 0,
+        "topology_planar_xy_only_count": 0,
+        "topology_not_applicable_count": 0
+      },
+      "expected_fields": {
+        "geometry_counts.Polygon": 1,
+        "features.0.geometry_status": "VALID",
+        "features.0.topology_state": "INVALID",
+        "features.0.topology_adapter": "shapely_is_valid_v1",
+        "features.0.topology_warning": "ERROR_GIS_INSPECT_TOPOLOGY_INVALID"
       }
     },
     {

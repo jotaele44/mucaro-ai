@@ -54,7 +54,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
 | `mucaro capabilities validate-gis-report REPORT_PATH` | Validate a saved GIS receipt against the advanced capability output contract | 0 | 2 |
 | `mucaro capabilities validate-ocr-report REPORT_PATH` | Validate a saved OCR receipt against the state-of-the-art OCR output contract | 0 | 2 |
-| `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry receipt | 0 | 2 |
+| `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry/topology receipt | 0 | 2 |
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
 | `mucaro gis reproject GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON between supported local CRS pairs and write a transformation receipt | 0 | 2 |
@@ -130,6 +130,14 @@ properties, writes a derived GeoJSON FeatureCollection, and writes a GIS receipt
 with source row count, output feature count, skipped row count, CRS, and row
 accounting. Invalid rows fail closed by default; `--skip-invalid-rows` must be
 selected explicitly and every skipped row is listed in the receipt.
+
+`mucaro gis inspect GEOJSON_PATH` records CRS, source hash, geometry type,
+geometry syntax state, bbox, coordinate dimensionality, Z/M presence, and
+Shapely planar topology state for each feature. Topology inspection distinguishes
+valid planar XY topology, invalid topology, unresolved topology, null/empty
+geometry, and topology that is only valid after ignoring Z. M coordinates remain
+unresolved because the local Shapely adapter cannot prove M-dimensional topology.
+The command does not repair invalid topology or transform geometries.
 
 `mucaro gis filter-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y`
 retains whole GeoJSON features whose coordinate extent intersects the query
@@ -312,8 +320,8 @@ approved and audited.
 | `PRODUCT_AUDIT_BLOCKED` | product audit found a blocked requirement |
 | `ADVANCED_CAPABILITY_CONTRACTS_READY` | GIS, OCR, browsing, coding, and transparency/objectivity proof contracts are structurally complete |
 | `ADVANCED_CAPABILITY_CONTRACTS_FAILED` | one or more advanced capability contracts is missing required proof fields |
-| `GIS_INSPECT_OK` | GeoJSON inspection completed with no invalid or unsupported geometries |
-| `GIS_INSPECT_WARN` | GeoJSON inspection completed but invalid or unsupported geometries were recorded |
+| `GIS_INSPECT_OK` | GeoJSON inspection completed with no invalid geometry or topology residue |
+| `GIS_INSPECT_WARN` | GeoJSON inspection completed while recording invalid/unsupported geometry, invalid topology, unresolved topology, or planar-XY-only topology residue |
 | `GIS_SPATIAL_JOIN_OK` | Point-in-polygon classification completed and wrote a spatial receipt |
 | `GIS_GEOMETRY_COMPARE_OK` | GeoJSON geometry comparison completed without CRS, topology, overlay, dimensionality, or unmatched-key warnings |
 | `GIS_GEOMETRY_COMPARE_WARN` | GeoJSON geometry comparison completed and recorded CRS, topology, overlay, dimensionality, or unmatched-key warnings |
@@ -344,6 +352,8 @@ approved and audited.
 | `ERROR_GIS_PLANAR_OVERLAY_INVALID_GEOMETRY` | GIS comparison could not load a polygon geometry through the local Shapely overlay adapter |
 | `ERROR_GIS_PLANAR_OVERLAY_INVALID_TOPOLOGY` | GIS comparison found invalid polygon topology and recorded unresolved overlay residue instead of repairing it silently |
 | `ERROR_GIS_PLANAR_OVERLAY_RUNTIME` | GIS comparison hit an unexpected local Shapely overlay runtime failure and recorded unresolved residue |
+| `ERROR_GIS_INSPECT_TOPOLOGY_INVALID_GEOMETRY` | GeoJSON inspection could not load a geometry through the local Shapely topology adapter |
+| `ERROR_GIS_INSPECT_TOPOLOGY_INVALID` | GeoJSON inspection found invalid topology and recorded warning-state residue instead of repairing it silently |
 | `ERROR_GIS_REPROJECT_UNSUPPORTED_CRS` | GIS reprojection received a CRS or CRS pair outside the local supported set |
 | `ERROR_GIS_REPROJECT_INVALID_COORDINATES` | GIS reprojection found non-finite, malformed, or out-of-domain coordinates |
 | `ERROR_GIS_REPROJECT_UNSUPPORTED_GEOMETRY` | GIS reprojection received an unsupported geometry object or type |
@@ -673,11 +683,11 @@ Use `mucaro capabilities validate-gis-report REPORT_PATH` to check a saved GIS
 receipt against the executable advanced-capability output contract. The
 validator checks report schema, status, operation, source/input provenance,
 source hashes, CRS where present, warning structure, asserted row/conservation
-invariants, and operation-specific fields for geometry comparison, bbox
-filtering, bbox clipping, and planar/geodesic measurement reports. It returns
+invariants, and operation-specific fields for GeoJSON inspection topology,
+geometry comparison, bbox filtering, bbox clipping, and planar/geodesic measurement reports. It returns
 `CAPABILITY_OUTPUT_CONTRACT_FAILED` when a report claims a
 warning status without warnings, asserts false accounting, omits hashes, or
-misses required compare, measurement, or bbox fields. This is an enforcement bridge between
+misses required inspect, compare, measurement, or bbox fields. This is an enforcement bridge between
 the descriptive capability contract and concrete GIS receipts; broader GIS
 operation-specific checks plus web, retrieval, and coding validators remain
 future work.
@@ -711,7 +721,8 @@ Use `mucaro eval gis` to run the committed GIS fixture manifest from the
 supported CLI surface. The command validates the manifest shape, required case
 count, operation diversity, negative-case coverage, and then materializes
 temporary GeoJSON and CSV inputs to exercise the same public GIS functions used by
-operators. Current cases cover coordinate dimensionality, point-in-polygon
+operators. Current cases cover coordinate dimensionality, invalid topology
+inspection without repair, point-in-polygon
 holes and join multiplication, geometry comparison with rotated polygon rings,
 geometry comparison with planar overlay area differences, limited EPSG:4326 to
 EPSG:3857 reprojection, CSV point conversion with explicit

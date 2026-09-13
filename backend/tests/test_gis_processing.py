@@ -494,11 +494,22 @@ def test_inspect_geojson_preserves_crs_geometry_state_and_receipt(tmp_path: Path
     assert result["source"]["feature_count"] == 3
     assert result["source"]["sha256"]
     assert result["geometry_counts"] == {"Point": 1, "NULL": 1, "Polygon": 1}
+    assert result["warnings"] == ["GIS_GEOMETRY_WARNINGS_PRESENT", "GIS_TOPOLOGY_WARNINGS_PRESENT"]
     assert result["invariants"]["invalid_or_unsupported_count"] == 1
     assert result["invariants"]["null_empty_count"] == 1
+    assert result["invariants"]["topology_valid_count"] == 1
+    assert result["invariants"]["topology_invalid_count"] == 0
+    assert result["invariants"]["topology_unresolved_count"] == 1
+    assert result["invariants"]["topology_planar_xy_only_count"] == 0
+    assert result["invariants"]["topology_not_applicable_count"] == 1
     assert result["features"][0]["bbox"] == [1.0, 1.0, 1.0, 1.0]
+    assert result["features"][0]["topology_state"] == "VALID"
+    assert result["features"][0]["topology_adapter"] == "shapely_is_valid_v1"
     assert result["features"][1]["geometry_status"] == "NULL_EMPTY"
+    assert result["features"][1]["topology_state"] == "NULL_EMPTY"
     assert result["features"][2]["geometry_status"] == "INVALID"
+    assert result["features"][2]["topology_state"] == "UNRESOLVED"
+    assert result["features"][2]["topology_warning"] == "GIS_TOPOLOGY_SYNTAX_UNRESOLVED"
     receipt = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
     assert receipt["report_id"] == result["report_id"]
     assert result["report_sha256"]
@@ -517,15 +528,52 @@ def test_inspect_geojson_preserves_coordinate_dimensionality(tmp_path: Path):
 
     result = inspect_geojson(geojson, cfg=cfg)
 
+    assert result["status"] == "GIS_INSPECT_WARN"
+    assert result["warnings"] == ["GIS_TOPOLOGY_WARNINGS_PRESENT", "GIS_TOPOLOGY_PLANAR_XY_ONLY_PRESENT"]
     by_id = {row["feature_id"]: row for row in result["features"]}
     assert by_id["xy"]["coordinate_dimension"] == "XY"
+    assert by_id["xy"]["topology_state"] == "VALID"
     assert by_id["xyz"]["coordinate_dimension"] == "XYZ"
     assert by_id["xyz"]["has_z"] is True
+    assert by_id["xyz"]["topology_state"] == "VALID_PLANAR_XY"
+    assert by_id["xyz"]["topology_warning"] == "GIS_TOPOLOGY_PLANAR_XY_ONLY"
     assert by_id["xyzm"]["coordinate_dimension"] == "XYZM"
     assert by_id["xyzm"]["has_m"] is True
+    assert by_id["xyzm"]["topology_state"] == "UNRESOLVED"
+    assert by_id["xyzm"]["topology_warning"] == "GIS_TOPOLOGY_COORDINATE_DIMENSION_UNSUPPORTED"
     assert result["invariants"]["coordinate_dimension_counts"] == {"XY": 1, "XYZ": 1, "XYZM": 1}
     assert result["invariants"]["features_with_z"] == 2
     assert result["invariants"]["features_with_m"] == 1
+    assert result["invariants"]["topology_valid_count"] == 2
+    assert result["invariants"]["topology_invalid_count"] == 0
+    assert result["invariants"]["topology_unresolved_count"] == 1
+    assert result["invariants"]["topology_planar_xy_only_count"] == 1
+    assert result["invariants"]["topology_not_applicable_count"] == 0
+
+
+def test_inspect_geojson_records_invalid_topology_without_repair(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    geojson = write_geojson(
+        tmp_path / "bowtie.geojson",
+        [
+            polygon_feature("bowtie", [[[0, 0], [2, 2], [0, 2], [2, 0], [0, 0]]]),
+        ],
+    )
+
+    result = inspect_geojson(geojson, cfg=cfg)
+
+    assert result["status"] == "GIS_INSPECT_WARN"
+    assert result["warnings"] == ["GIS_TOPOLOGY_WARNINGS_PRESENT"]
+    assert result["invariants"]["invalid_or_unsupported_count"] == 0
+    assert result["invariants"]["topology_valid_count"] == 0
+    assert result["invariants"]["topology_invalid_count"] == 1
+    assert result["invariants"]["topology_unresolved_count"] == 0
+    assert result["invariants"]["topology_planar_xy_only_count"] == 0
+    assert result["invariants"]["topology_not_applicable_count"] == 0
+    assert result["features"][0]["geometry_status"] == "VALID"
+    assert result["features"][0]["topology_state"] == "INVALID"
+    assert result["features"][0]["topology_adapter"] == "shapely_is_valid_v1"
+    assert result["features"][0]["topology_warning"] == "ERROR_GIS_INSPECT_TOPOLOGY_INVALID"
 
 
 def test_inspect_geojson_stringifies_unusual_feature_ids(tmp_path: Path):

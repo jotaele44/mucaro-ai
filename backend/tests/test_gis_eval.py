@@ -12,16 +12,24 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 15,
-        "passed": 15,
+        "cases": 16,
+        "passed": 16,
         "failed": 0,
-        "positive_cases": 10,
+        "positive_cases": 11,
         "negative_cases": 5,
         "operations": 8,
         "operation_names": ["bbox_filter", "clip_bbox", "compare", "csv_points", "inspect", "measure", "point_in_polygon", "reproject"],
     }
     by_id = {case["case_id"]: case for case in report["cases"]}
-    assert by_id["inspect_dimensionality"]["observed_status"] == "GIS_INSPECT_OK"
+    assert by_id["inspect_dimensionality"]["observed_status"] == "GIS_INSPECT_WARN"
+    assert by_id["inspect_dimensionality"]["observed_warnings"] == [
+        "GIS_TOPOLOGY_PLANAR_XY_ONLY_PRESENT",
+        "GIS_TOPOLOGY_WARNINGS_PRESENT",
+    ]
+    assert by_id["inspect_invalid_topology_warns_without_repair"]["observed_status"] == "GIS_INSPECT_WARN"
+    assert by_id["inspect_invalid_topology_warns_without_repair"]["observed_warnings"] == [
+        "GIS_TOPOLOGY_WARNINGS_PRESENT"
+    ]
     assert by_id["point_in_polygon_overlap"]["observed_warnings"] == ["GIS_JOIN_MULTIPLICATION_PRESENT"]
     assert by_id["compare_rotated_polygon"]["observed_status"] == "GIS_GEOMETRY_COMPARE_OK"
     assert by_id["compare_planar_overlay_difference"]["observed_status"] == "GIS_GEOMETRY_COMPARE_WARN"

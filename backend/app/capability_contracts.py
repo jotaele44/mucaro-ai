@@ -146,7 +146,72 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 checks.append(_contract_check(f"invariants.{key}", invariants.get(key) is True, f"{key} must be true when asserted"))
 
     operation = str(report.get("operation") or "")
-    if operation == "compare_geojson_geometries":
+    if operation == "inspect_geojson":
+        features = report.get("features")
+        feature_count = _dotted(report, "invariants.feature_count")
+        topology_valid_count = _dotted(report, "invariants.topology_valid_count")
+        topology_invalid_count = _dotted(report, "invariants.topology_invalid_count")
+        topology_unresolved_count = _dotted(report, "invariants.topology_unresolved_count")
+        topology_not_applicable_count = _dotted(report, "invariants.topology_not_applicable_count")
+        topology_counts_present = all(
+            isinstance(value, int)
+            for value in (
+                topology_valid_count,
+                topology_invalid_count,
+                topology_unresolved_count,
+                _dotted(report, "invariants.topology_planar_xy_only_count"),
+                topology_not_applicable_count,
+            )
+        )
+        checks.extend(
+            [
+                _contract_check("inspect.geometry_counts_object", isinstance(report.get("geometry_counts"), dict), "inspect reports must record geometry counts"),
+                _contract_check("inspect.features_array", isinstance(features, list), "inspect reports must include per-feature inspection receipts"),
+                _contract_check("inspect.feature_count_present", isinstance(feature_count, int), "feature_count must be recorded"),
+                _contract_check("inspect.topology_counts_present", topology_counts_present, "topology state counts must be recorded"),
+                _contract_check(
+                    "inspect.source_feature_count_matches",
+                    isinstance(feature_count, int) and _dotted(report, "source.feature_count") == feature_count,
+                    "source feature_count must match invariant feature_count",
+                ),
+            ]
+        )
+        if isinstance(features, list):
+            checks.append(
+                _contract_check(
+                    "inspect.feature_count_matches_receipts",
+                    isinstance(feature_count, int) and feature_count == len(features),
+                    "feature_count must equal per-feature inspection receipts",
+                )
+            )
+            if topology_counts_present and isinstance(feature_count, int):
+                checks.append(
+                    _contract_check(
+                        "inspect.topology_accounting_closed",
+                        topology_valid_count + topology_invalid_count + topology_unresolved_count + topology_not_applicable_count == feature_count,
+                        "topology valid/invalid/unresolved/not-applicable counts must close to feature_count",
+                    )
+                )
+            for index, feature in enumerate(features):
+                if not isinstance(feature, dict):
+                    checks.append(_contract_check(f"inspect.features.{index}.object", False, "inspect feature receipts must be objects"))
+                    continue
+                topology_state = feature.get("topology_state")
+                topology_warning = feature.get("topology_warning")
+                warning_required = topology_state in {"INVALID", "UNRESOLVED", "UNSUPPORTED", "VALID_PLANAR_XY"}
+                checks.extend(
+                    [
+                        _contract_check(f"inspect.features.{index}.topology_state", isinstance(topology_state, str) and bool(topology_state), "feature topology_state must be recorded"),
+                        _contract_check(f"inspect.features.{index}.topology_adapter_key", "topology_adapter" in feature, "feature topology_adapter key must be present"),
+                        _contract_check(f"inspect.features.{index}.topology_warning_key", "topology_warning" in feature, "feature topology_warning key must be present"),
+                        _contract_check(
+                            f"inspect.features.{index}.topology_warning_consistent",
+                            (isinstance(topology_warning, str) and bool(topology_warning)) if warning_required else topology_warning is None,
+                            "topology warnings must be explicit only when topology residue is present",
+                        ),
+                    ]
+                )
+    elif operation == "compare_geojson_geometries":
         checks.extend(
             [
                 _contract_check("compare.match_on", report.get("match_on") in {"id", "index"}, "compare reports must record id or index matching"),
@@ -453,6 +518,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "skipped_row_count",
                 "topology_state",
                 "topology_adapter",
+                "topology_warning",
                 "planar_overlay_adapter",
                 "planar_overlay_state",
                 "intersection_area",
@@ -467,6 +533,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "stable ID uniqueness when stable IDs are present",
                 "CRS preservation or explicit reprojection record",
                 "geometry validity and NULL/EMPTY classification",
+                "GeoJSON inspection records Shapely planar topology state and closes topology state counts",
                 "join cardinality classification for spatial joins",
                 "coordinate dimensionality, Z, and M presence are retained",
                 "geometry comparisons separate exact coordinate equality from topological equality",
@@ -478,6 +545,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
             ),
             positive_regression_gates=(
                 "point-in-polygon fixture classifies FULLY_WITHIN, TOUCH_ONLY, OUTSIDE, and NULL_EMPTY",
+                "GeoJSON inspection fixture records invalid topology without repairing or flattening geometries",
                 "geometry comparison fixture records exact equality, topological equality, Hausdorff distance, and vertex symmetric difference",
                 "geometry comparison fixture records Polygon/MultiPolygon planar intersection and symmetric-difference area",
                 "reprojection fixture records source CRS, target CRS, adapter identity, output hash, and row/coordinate conservation",
@@ -496,6 +564,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "CSV point conversion fails closed on missing required headers, duplicate headers, malformed coordinates, and no valid output features",
                 "bbox filtering fails closed on malformed query extents and unsupported modes",
                 "bbox clipping fails closed on malformed query extents and records Z/M dimensionality as unresolved residue",
+                "GeoJSON inspection records invalid topology as warning-state residue instead of repairing it silently",
                 "planar measurement fails closed on missing units and records invalid or unsupported geometries as residue",
                 "geodesic measurement fails closed for non-EPSG:4326 sources and records invalid longitude/latitude coordinates as residue",
                 "GIS report contract validation fails when warning status, source hashes, CRS, or asserted accounting are missing or inconsistent",
