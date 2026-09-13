@@ -127,6 +127,60 @@ def test_validate_gis_report_contract_accepts_geodesic_measurement_receipts():
     assert result["counts"]["fail"] == 0
 
 
+def test_validate_gis_report_contract_accepts_compare_overlay_receipts():
+    report = {
+        "schema_version": "mucaro_gis_report_v1",
+        "report_id": "gisreport_compare",
+        "status": "GIS_GEOMETRY_COMPARE_WARN",
+        "operation": "compare_geojson_geometries",
+        "created_at": "2026-09-12T00:00:00Z",
+        "match_on": "id",
+        "parameters": {
+            "match_on": "id",
+            "topology_adapter": "local_canonical_geometry_v1",
+            "planar_overlay_adapter": "shapely_planar_overlay_v1",
+        },
+        "inputs": {
+            "left": {
+                "path": "fixtures/left.geojson",
+                "sha256": "a" * 64,
+                "crs": "EPSG:4326",
+                "feature_count": 1,
+            },
+            "right": {
+                "path": "fixtures/right.geojson",
+                "sha256": "b" * 64,
+                "crs": "EPSG:4326",
+                "feature_count": 1,
+            },
+        },
+        "comparisons": [
+            {
+                "feature_key": "id:overlap",
+                "planar_overlay_state": "MEASURED",
+                "intersection_area": 4.0,
+                "symmetric_difference_area": 24.0,
+            }
+        ],
+        "invariants": {
+            "feature_key_conservation": True,
+            "compared_count": 1,
+            "planar_overlay_measured_count": 1,
+            "planar_overlay_unresolved_count": 0,
+            "planar_overlay_difference_count": 1,
+            "planar_overlay_symmetric_difference_area_total": 24.0,
+        },
+        "warnings": ["GIS_GEOMETRY_DIFFERENCE_PRESENT"],
+        "limitations": ["local planar overlay comparison fixture"],
+        "falsification_criteria": ["reject if overlay accounting does not close"],
+    }
+
+    result = validate_gis_report_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert result["counts"]["fail"] == 0
+
+
 def test_validate_gis_report_contract_accepts_bbox_clip_receipts():
     report = {
         "schema_version": "mucaro_gis_report_v1",

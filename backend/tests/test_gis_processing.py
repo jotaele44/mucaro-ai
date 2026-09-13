@@ -706,15 +706,58 @@ def test_compare_geojson_geometries_records_topology_and_vertex_metrics(tmp_path
     assert result["invariants"]["geometry_difference_count"] == 1
     assert result["invariants"]["vertex_symmetric_difference_total"] == 2
     assert result["invariants"]["max_hausdorff_vertex_distance"] == 5.0
+    assert result["invariants"]["planar_overlay_measured_count"] == 1
+    assert result["invariants"]["planar_overlay_not_applicable_count"] == 1
+    assert result["invariants"]["planar_overlay_unresolved_count"] == 0
+    assert result["invariants"]["planar_overlay_difference_count"] == 0
+    assert result["invariants"]["planar_overlay_symmetric_difference_area_total"] == 0.0
     by_key = {row["feature_key"]: row for row in result["comparisons"]}
     assert by_key["id:rotated"]["exact_coordinate_equal"] is False
     assert by_key["id:rotated"]["topological_equal"] is True
     assert by_key["id:rotated"]["hausdorff_vertex_distance"] == 0.0
+    assert by_key["id:rotated"]["planar_overlay_state"] == "MEASURED"
+    assert by_key["id:rotated"]["left_area"] == 16.0
+    assert by_key["id:rotated"]["right_area"] == 16.0
+    assert by_key["id:rotated"]["intersection_area"] == 16.0
+    assert by_key["id:rotated"]["symmetric_difference_area"] == 0.0
     assert by_key["id:moved"]["left_coordinate_dimension"] == "XYZ"
     assert by_key["id:moved"]["coordinate_dimension_preserved"] is True
+    assert by_key["id:moved"]["planar_overlay_state"] == "NOT_APPLICABLE"
     receipt = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
     assert receipt["report_id"] == result["report_id"]
     assert result["report_sha256"]
+
+
+def test_compare_geojson_geometries_records_planar_overlay_area_difference(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    left = write_geojson(
+        tmp_path / "left.geojson",
+        [polygon_feature("overlap", [[[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]]])],
+    )
+    right = write_geojson(
+        tmp_path / "right.geojson",
+        [polygon_feature("overlap", [[[2, 2], [6, 2], [6, 6], [2, 6], [2, 2]]])],
+    )
+
+    result = compare_geojson_geometries(left, right, cfg=cfg)
+
+    assert result["status"] == "GIS_GEOMETRY_COMPARE_WARN"
+    assert result["parameters"]["planar_overlay_adapter"] == "shapely_planar_overlay_v1"
+    assert result["warnings"] == ["GIS_GEOMETRY_DIFFERENCE_PRESENT", "GIS_PLANAR_OVERLAY_DIFFERENCE_PRESENT"]
+    assert result["invariants"]["compared_count"] == 1
+    assert result["invariants"]["topological_equal_count"] == 0
+    assert result["invariants"]["geometry_difference_count"] == 1
+    assert result["invariants"]["planar_overlay_measured_count"] == 1
+    assert result["invariants"]["planar_overlay_difference_count"] == 1
+    assert result["invariants"]["planar_overlay_intersection_area_total"] == 4.0
+    assert result["invariants"]["planar_overlay_symmetric_difference_area_total"] == 24.0
+    assert result["invariants"]["max_planar_symmetric_difference_area"] == 24.0
+    comparison = result["comparisons"][0]
+    assert comparison["planar_overlay_state"] == "MEASURED"
+    assert comparison["left_area"] == 16.0
+    assert comparison["right_area"] == 16.0
+    assert comparison["intersection_area"] == 4.0
+    assert comparison["symmetric_difference_area"] == 24.0
 
 
 def test_compare_geojson_geometries_records_unmatched_and_dimension_mismatch(tmp_path: Path):

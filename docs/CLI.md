@@ -138,6 +138,16 @@ query bbox. The command preserves CRS, writes a derived GeoJSON output, records
 per-feature filter states, and closes retained/excluded accounting. It does not
 clip or rewrite geometries.
 
+`mucaro gis compare LEFT_PATH RIGHT_PATH` compares GeoJSON features by stable ID
+by default, or by feature index with `--match-on index`. The receipt separates
+exact coordinate equality, canonical topology equality, vertex Hausdorff
+distance, vertex symmetric-difference count, unmatched feature residue, and
+coordinate dimensionality. For Polygon and MultiPolygon pairs, it also records
+local Shapely planar overlay metrics: left area, right area, intersection area,
+and symmetric-difference area in source CRS units. Non-polygon rows are marked
+`NOT_APPLICABLE`; Z/M polygon overlay remains unresolved instead of being
+flattened.
+
 `mucaro gis clip-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y`
 clips Point, MultiPoint, LineString, MultiLineString, Polygon, and MultiPolygon
 GeoJSON geometries against an axis-aligned bbox with the local Shapely
@@ -305,8 +315,8 @@ approved and audited.
 | `GIS_INSPECT_OK` | GeoJSON inspection completed with no invalid or unsupported geometries |
 | `GIS_INSPECT_WARN` | GeoJSON inspection completed but invalid or unsupported geometries were recorded |
 | `GIS_SPATIAL_JOIN_OK` | Point-in-polygon classification completed and wrote a spatial receipt |
-| `GIS_GEOMETRY_COMPARE_OK` | GeoJSON geometry comparison completed without CRS, topology, dimensionality, or unmatched-key warnings |
-| `GIS_GEOMETRY_COMPARE_WARN` | GeoJSON geometry comparison completed and recorded CRS, topology, dimensionality, or unmatched-key warnings |
+| `GIS_GEOMETRY_COMPARE_OK` | GeoJSON geometry comparison completed without CRS, topology, overlay, dimensionality, or unmatched-key warnings |
+| `GIS_GEOMETRY_COMPARE_WARN` | GeoJSON geometry comparison completed and recorded CRS, topology, overlay, dimensionality, or unmatched-key warnings |
 | `GIS_REPROJECT_OK` | GeoJSON reprojection completed with supported CRS, output hash, and row/coordinate conservation |
 | `GIS_REPROJECT_WARN` | GeoJSON reprojection completed while preserving no-op or null/empty geometry warnings |
 | `GIS_CSV_POINTS_OK` | CSV point conversion completed with required columns, output GeoJSON hash, and closed row accounting |
@@ -331,6 +341,9 @@ approved and audited.
 | `ERROR_GIS_FEATURES_NOT_ARRAY` | GeoJSON FeatureCollection has a malformed `features` member |
 | `ERROR_GIS_CRS_MISMATCH` | Point and polygon inputs declared different CRS values and mismatch override was not selected |
 | `ERROR_GIS_COMPARE_MATCH_MODE` | GIS comparison received an unsupported feature matching mode |
+| `ERROR_GIS_PLANAR_OVERLAY_INVALID_GEOMETRY` | GIS comparison could not load a polygon geometry through the local Shapely overlay adapter |
+| `ERROR_GIS_PLANAR_OVERLAY_INVALID_TOPOLOGY` | GIS comparison found invalid polygon topology and recorded unresolved overlay residue instead of repairing it silently |
+| `ERROR_GIS_PLANAR_OVERLAY_RUNTIME` | GIS comparison hit an unexpected local Shapely overlay runtime failure and recorded unresolved residue |
 | `ERROR_GIS_REPROJECT_UNSUPPORTED_CRS` | GIS reprojection received a CRS or CRS pair outside the local supported set |
 | `ERROR_GIS_REPROJECT_INVALID_COORDINATES` | GIS reprojection found non-finite, malformed, or out-of-domain coordinates |
 | `ERROR_GIS_REPROJECT_UNSUPPORTED_GEOMETRY` | GIS reprojection received an unsupported geometry object or type |
@@ -660,11 +673,11 @@ Use `mucaro capabilities validate-gis-report REPORT_PATH` to check a saved GIS
 receipt against the executable advanced-capability output contract. The
 validator checks report schema, status, operation, source/input provenance,
 source hashes, CRS where present, warning structure, asserted row/conservation
-invariants, and operation-specific fields for bbox filtering, bbox clipping,
-and planar/geodesic measurement reports. It returns
+invariants, and operation-specific fields for geometry comparison, bbox
+filtering, bbox clipping, and planar/geodesic measurement reports. It returns
 `CAPABILITY_OUTPUT_CONTRACT_FAILED` when a report claims a
 warning status without warnings, asserts false accounting, omits hashes, or
-misses required measurement/bbox fields. This is an enforcement bridge between
+misses required compare, measurement, or bbox fields. This is an enforcement bridge between
 the descriptive capability contract and concrete GIS receipts; broader GIS
 operation-specific checks plus web, retrieval, and coding validators remain
 future work.
@@ -700,7 +713,8 @@ count, operation diversity, negative-case coverage, and then materializes
 temporary GeoJSON and CSV inputs to exercise the same public GIS functions used by
 operators. Current cases cover coordinate dimensionality, point-in-polygon
 holes and join multiplication, geometry comparison with rotated polygon rings,
-limited EPSG:4326 to EPSG:3857 reprojection, CSV point conversion with explicit
+geometry comparison with planar overlay area differences, limited EPSG:4326 to
+EPSG:3857 reprojection, CSV point conversion with explicit
 invalid-row skipping, bbox filtering with null-residue accounting, fail-closed
 invalid bbox extents, bbox clipping with null and dimensional residue
 accounting, and fail-closed invalid Web Mercator latitude handling.

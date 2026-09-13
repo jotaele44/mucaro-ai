@@ -43,6 +43,7 @@ SUPPORTED_CLIP_GEOMETRY_TYPES = {
     "Polygon",
     "MultiPolygon",
 }
+SUPPORTED_OVERLAY_GEOMETRY_TYPES = {"Polygon", "MultiPolygon"}
 SUPPORTED_MEASURE_GEOMETRY_TYPES = {
     "Point",
     "MultiPoint",
@@ -623,15 +624,20 @@ def _json_geometry(value: Any) -> Any:
     return value
 
 
-def _shapely_geojson_geometry(geometry: dict[str, Any]) -> Any:
+def _shapely_geojson_geometry(
+    geometry: dict[str, Any],
+    *,
+    invalid_status: str = "ERROR_GIS_CLIP_INVALID_GEOMETRY",
+    topology_status: str = "ERROR_GIS_CLIP_INVALID_TOPOLOGY",
+) -> Any:
     try:
         shaped = shapely_shape(geometry)
     except (AttributeError, ShapelyError, TypeError, ValueError) as exc:
-        raise GISProcessingError("ERROR_GIS_CLIP_INVALID_GEOMETRY", f"Geometry could not be loaded by Shapely: {exc}") from exc
+        raise GISProcessingError(invalid_status, f"Geometry could not be loaded by Shapely: {exc}") from exc
     if shaped.is_empty:
         return shaped
     if not shaped.is_valid:
-        raise GISProcessingError("ERROR_GIS_CLIP_INVALID_TOPOLOGY", "Geometry is not topologically valid for clipping.")
+        raise GISProcessingError(topology_status, "Geometry is not topologically valid for this operation.")
     return shaped
 
 
@@ -1626,6 +1632,71 @@ def _vertex_symmetric_difference_count(left_geometry: Any, right_geometry: Any) 
     return len(set(left_positions) ^ set(right_positions))
 
 
+def _planar_overlay_metrics(left_geometry: Any, right_geometry: Any) -> dict[str, Any]:
+    left_type = left_geometry.get("type") if isinstance(left_geometry, dict) else None
+    right_type = right_geometry.get("type") if isinstance(right_geometry, dict) else None
+    if left_type not in SUPPORTED_OVERLAY_GEOMETRY_TYPES or right_type not in SUPPORTED_OVERLAY_GEOMETRY_TYPES:
+        return {
+            "planar_overlay_state": "NOT_APPLICABLE",
+            "planar_overlay_warning": None,
+            "left_area": None,
+            "right_area": None,
+            "intersection_area": None,
+            "symmetric_difference_area": None,
+        }
+    left_dimensions = _coordinate_dimension_summary(left_geometry)
+    right_dimensions = _coordinate_dimension_summary(right_geometry)
+    if left_dimensions["has_z"] or left_dimensions["has_m"] or right_dimensions["has_z"] or right_dimensions["has_m"]:
+        return {
+            "planar_overlay_state": "UNRESOLVED",
+            "planar_overlay_warning": "GIS_PLANAR_OVERLAY_DIMENSION_UNSUPPORTED",
+            "left_area": None,
+            "right_area": None,
+            "intersection_area": None,
+            "symmetric_difference_area": None,
+        }
+    try:
+        left_shape = _shapely_geojson_geometry(
+            left_geometry,
+            invalid_status="ERROR_GIS_PLANAR_OVERLAY_INVALID_GEOMETRY",
+            topology_status="ERROR_GIS_PLANAR_OVERLAY_INVALID_TOPOLOGY",
+        )
+        right_shape = _shapely_geojson_geometry(
+            right_geometry,
+            invalid_status="ERROR_GIS_PLANAR_OVERLAY_INVALID_GEOMETRY",
+            topology_status="ERROR_GIS_PLANAR_OVERLAY_INVALID_TOPOLOGY",
+        )
+        intersection_area = left_shape.intersection(right_shape).area
+        symmetric_difference_area = left_shape.symmetric_difference(right_shape).area
+    except GISProcessingError as exc:
+        return {
+            "planar_overlay_state": "UNRESOLVED",
+            "planar_overlay_warning": exc.status,
+            "left_area": None,
+            "right_area": None,
+            "intersection_area": None,
+            "symmetric_difference_area": None,
+        }
+    except (AttributeError, ShapelyError, TypeError, ValueError) as exc:
+        return {
+            "planar_overlay_state": "UNRESOLVED",
+            "planar_overlay_warning": "ERROR_GIS_PLANAR_OVERLAY_RUNTIME",
+            "left_area": None,
+            "right_area": None,
+            "intersection_area": None,
+            "symmetric_difference_area": None,
+            "error_detail": str(exc),
+        }
+    return {
+        "planar_overlay_state": "MEASURED",
+        "planar_overlay_warning": None,
+        "left_area": round(float(left_shape.area), 12),
+        "right_area": round(float(right_shape.area), 12),
+        "intersection_area": round(float(intersection_area), 12),
+        "symmetric_difference_area": round(float(symmetric_difference_area), 12),
+    }
+
+
 def _feature_key(feature: dict[str, Any], index: int, *, match_on: str) -> str:
     if match_on == "index":
         return f"index:{index}"
@@ -1668,6 +1739,7 @@ def compare_geojson_geometries(
         left_classification = _classify_geometry(left_geometry)
         right_classification = _classify_geometry(right_geometry)
         topological_equal = _topological_equal(left_geometry, right_geometry)
+        overlay_metrics = _planar_overlay_metrics(left_geometry, right_geometry)
         dimension_left = _coordinate_dimension_summary(left_geometry if isinstance(left_geometry, dict) else None)
         dimension_right = _coordinate_dimension_summary(right_geometry if isinstance(right_geometry, dict) else None)
         comparisons.append(
@@ -1689,6 +1761,7 @@ def compare_geojson_geometries(
                 "topology_state": "UNRESOLVED" if topological_equal is None else ("EQUAL" if topological_equal else "DIFFERENT"),
                 "hausdorff_vertex_distance": _hausdorff_vertex_distance(left_geometry, right_geometry),
                 "vertex_symmetric_difference_count": _vertex_symmetric_difference_count(left_geometry, right_geometry),
+                **overlay_metrics,
             }
         )
     topology_unresolved_count = sum(1 for row in comparisons if row["topology_state"] == "UNRESOLVED")
@@ -1703,6 +1776,15 @@ def compare_geojson_geometries(
         for row in comparisons
         if row["hausdorff_vertex_distance"] is not None
     ]
+    measured_overlay_rows = [row for row in comparisons if row["planar_overlay_state"] == "MEASURED"]
+    overlay_symmetric_difference_areas = [
+        float(row["symmetric_difference_area"])
+        for row in measured_overlay_rows
+        if row["symmetric_difference_area"] is not None
+    ]
+    planar_overlay_unresolved_count = sum(1 for row in comparisons if row["planar_overlay_state"] == "UNRESOLVED")
+    planar_overlay_not_applicable_count = sum(1 for row in comparisons if row["planar_overlay_state"] == "NOT_APPLICABLE")
+    planar_overlay_difference_count = sum(1 for value in overlay_symmetric_difference_areas if value > EPSILON)
     created_at = utc_now()
     report_id = stable_id("gisreport", "compare", left_source.sha256, right_source.sha256, match_on, created_at)
     warnings = [
@@ -1712,6 +1794,8 @@ def compare_geojson_geometries(
             "GIS_UNMATCHED_FEATURES" if left_only or right_only else "",
             "GIS_GEOMETRY_DIFFERENCE_PRESENT" if geometry_difference_count else "",
             "GIS_TOPOLOGY_UNRESOLVED" if topology_unresolved_count else "",
+            "GIS_PLANAR_OVERLAY_DIFFERENCE_PRESENT" if planar_overlay_difference_count else "",
+            "GIS_PLANAR_OVERLAY_UNRESOLVED" if planar_overlay_unresolved_count else "",
             "GIS_COORDINATE_DIMENSION_MISMATCH" if dimension_mismatch_count else "",
         ]
         if warning
@@ -1723,6 +1807,12 @@ def compare_geojson_geometries(
         "operation": "compare_geojson_geometries",
         "created_at": created_at,
         "match_on": match_on,
+        "parameters": {
+            "match_on": match_on,
+            "topology_adapter": "local_canonical_geometry_v1",
+            "planar_overlay_adapter": "shapely_planar_overlay_v1",
+            "supported_overlay_geometry_types": sorted(SUPPORTED_OVERLAY_GEOMETRY_TYPES),
+        },
         "inputs": {
             "left": {
                 "path": str(left_path),
@@ -1755,16 +1845,27 @@ def compare_geojson_geometries(
             "coordinate_dimension_mismatch_count": dimension_mismatch_count,
             "vertex_symmetric_difference_total": vertex_symmetric_difference_total,
             "max_hausdorff_vertex_distance": max(hausdorff_distances, default=None),
+            "planar_overlay_measured_count": len(measured_overlay_rows),
+            "planar_overlay_not_applicable_count": planar_overlay_not_applicable_count,
+            "planar_overlay_unresolved_count": planar_overlay_unresolved_count,
+            "planar_overlay_difference_count": planar_overlay_difference_count,
+            "planar_overlay_intersection_area_total": round(
+                sum(float(row["intersection_area"] or 0.0) for row in measured_overlay_rows),
+                12,
+            ),
+            "planar_overlay_symmetric_difference_area_total": round(sum(overlay_symmetric_difference_areas), 12),
+            "max_planar_symmetric_difference_area": max(overlay_symmetric_difference_areas, default=None),
         },
         "warnings": warnings,
         "limitations": [
             "topological equality is limited to Point, Polygon, and MultiPolygon coordinates",
-            "Hausdorff distance and symmetric difference are vertex-based receipt checks, not robust planar overlay results",
+            "planar overlay area metrics are limited to Polygon and MultiPolygon pairs in source CRS units",
+            "Hausdorff distance and vertex symmetric difference remain vertex-based receipt checks",
         ],
         "falsification_criteria": [
             "reject the comparison if feature_key_conservation is false or unmatched residue is not reported",
             "reject topology conclusions when topology_state is UNRESOLVED inside the claimed scope",
-            "compare area or overlay differences with a robust GIS engine before treating vertex metrics as planar overlay proof",
+            "compare material overlay differences with an independent GIS engine before legal-boundary or engineering use",
         ],
     }
     return _write_report(cfg, report)

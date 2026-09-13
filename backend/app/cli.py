@@ -1915,7 +1915,17 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"match_on={payload.get('match_on')}")
         parameters = payload.get("parameters")
         if isinstance(parameters, dict):
-            for key in ("measurement_mode", "adapter", "coordinate_units", "area_units", "length_units", "mode", "bbox"):
+            for key in (
+                "measurement_mode",
+                "adapter",
+                "topology_adapter",
+                "planar_overlay_adapter",
+                "coordinate_units",
+                "area_units",
+                "length_units",
+                "mode",
+                "bbox",
+            ):
                 if key in parameters:
                     print(f"{key}={parameters.get(key)}")
         output = payload.get("output")
@@ -1944,6 +1954,13 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "coordinate_dimension_mismatch_count",
                 "vertex_symmetric_difference_total",
                 "max_hausdorff_vertex_distance",
+                "planar_overlay_measured_count",
+                "planar_overlay_not_applicable_count",
+                "planar_overlay_unresolved_count",
+                "planar_overlay_difference_count",
+                "planar_overlay_intersection_area_total",
+                "planar_overlay_symmetric_difference_area_total",
+                "max_planar_symmetric_difference_area",
                 "required_columns_present",
                 "source_row_count",
                 "output_feature_count",

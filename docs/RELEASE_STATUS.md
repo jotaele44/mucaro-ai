@@ -280,12 +280,12 @@ Observed success markers:
   vector until backend, CLI, provenance, capability, packaging, and hosted
   governance gates are stronger.
   Advanced GIS now has narrow local GeoJSON inspection, point-in-polygon,
-  geometry comparison, limited EPSG:4326/EPSG:3857 reprojection, CSV
+  geometry comparison with Polygon/MultiPolygon planar overlay metrics, limited EPSG:4326/EPSG:3857 reprojection, CSV
   point-to-GeoJSON conversion, bbox feature filtering, bbox geometry clipping,
   planar area/length measurement receipts, and bounded EPSG:4326 spherical geodesic measurement
   receipts plus a committed `mucaro eval gis` fixture
   harness covering dimensionality, join multiplication, topology equality,
-  reprojection, CSV header/skipped-row/row-accounting evidence, bbox
+  planar overlay area difference, reprojection, CSV header/skipped-row/row-accounting evidence, bbox
   retained/excluded accounting, bbox clipped/unchanged/unresolved accounting,
   measurement units, polygon-hole area
   subtraction, line length, null measurement residue, geodesic meter units,
@@ -297,7 +297,8 @@ Observed success markers:
   conservation invariants, bbox filter/clip fields, and planar/geodesic measurement fields.
   Full GIS maturity remains open until robust topology, ellipsoidal
   GIS-engine geodesic validation, broader CRS/datum/grid-shift/axis-order
-  support, non-bbox overlay/clipping checks, broader spatial format
+  support, standalone non-bbox overlay/clipping operations, independent planar
+  overlay validation, broader spatial format
   adapters, raster/vector processing, map/export provenance, and a broader GIS
   eval corpus are proven.
   State-of-the-art OCR

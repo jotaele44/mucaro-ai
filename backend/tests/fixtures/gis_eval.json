@@ -1,7 +1,7 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 14,
+    "case_count": 15,
     "operation_count": 8,
     "negative_case_count": 5
   },
@@ -440,8 +440,135 @@
         "vertex_symmetric_difference_total": 0
       },
       "expected_fields": {
+        "parameters.planar_overlay_adapter": "shapely_planar_overlay_v1",
+        "comparisons.0.planar_overlay_state": "MEASURED",
+        "comparisons.0.intersection_area": 100.0,
+        "comparisons.0.symmetric_difference_area": 0.0,
         "comparisons.0.topology_state": "EQUAL",
         "comparisons.0.exact_coordinate_equal": false
+      }
+    },
+    {
+      "case_id": "compare_planar_overlay_difference",
+      "operation": "compare",
+      "parameters": {
+        "match_on": "id"
+      },
+      "inputs": {
+        "left": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "overlap",
+              "properties": {
+                "name": "overlap"
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      4,
+                      0
+                    ],
+                    [
+                      4,
+                      4
+                    ],
+                    [
+                      0,
+                      4
+                    ],
+                    [
+                      0,
+                      0
+                    ]
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        "right": {
+          "type": "FeatureCollection",
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "EPSG:4326"
+            }
+          },
+          "features": [
+            {
+              "type": "Feature",
+              "id": "overlap",
+              "properties": {
+                "name": "overlap"
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      2,
+                      2
+                    ],
+                    [
+                      6,
+                      2
+                    ],
+                    [
+                      6,
+                      6
+                    ],
+                    [
+                      2,
+                      6
+                    ],
+                    [
+                      2,
+                      2
+                    ]
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_GEOMETRY_COMPARE_WARN",
+      "expected_warnings": [
+        "GIS_GEOMETRY_DIFFERENCE_PRESENT",
+        "GIS_PLANAR_OVERLAY_DIFFERENCE_PRESENT"
+      ],
+      "expected_invariants": {
+        "feature_key_conservation": true,
+        "compared_count": 1,
+        "topological_equal_count": 0,
+        "geometry_difference_count": 1,
+        "planar_overlay_measured_count": 1,
+        "planar_overlay_difference_count": 1,
+        "planar_overlay_intersection_area_total": 4.0,
+        "planar_overlay_symmetric_difference_area_total": 24.0,
+        "max_planar_symmetric_difference_area": 24.0
+      },
+      "expected_fields": {
+        "parameters.planar_overlay_adapter": "shapely_planar_overlay_v1",
+        "comparisons.0.planar_overlay_state": "MEASURED",
+        "comparisons.0.left_area": 16.0,
+        "comparisons.0.right_area": 16.0,
+        "comparisons.0.intersection_area": 4.0,
+        "comparisons.0.symmetric_difference_area": 24.0
       }
     },
     {

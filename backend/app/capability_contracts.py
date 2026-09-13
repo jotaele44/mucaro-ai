@@ -146,7 +146,20 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 checks.append(_contract_check(f"invariants.{key}", invariants.get(key) is True, f"{key} must be true when asserted"))
 
     operation = str(report.get("operation") or "")
-    if operation == "measure_geojson":
+    if operation == "compare_geojson_geometries":
+        checks.extend(
+            [
+                _contract_check("compare.match_on", report.get("match_on") in {"id", "index"}, "compare reports must record id or index matching"),
+                _contract_check("compare.parameters.planar_overlay_adapter", _dotted(report, "parameters.planar_overlay_adapter") == "shapely_planar_overlay_v1", "compare reports must name the Shapely planar overlay adapter"),
+                _contract_check("compare.comparisons_array", isinstance(report.get("comparisons"), list), "compare reports must include per-feature comparisons"),
+                _contract_check("compare.compared_count_present", isinstance(_dotted(report, "invariants.compared_count"), int), "compared_count must be recorded"),
+                _contract_check("compare.planar_overlay_measured_count_present", isinstance(_dotted(report, "invariants.planar_overlay_measured_count"), int), "planar overlay measured count must be recorded"),
+                _contract_check("compare.planar_overlay_unresolved_count_present", isinstance(_dotted(report, "invariants.planar_overlay_unresolved_count"), int), "planar overlay unresolved count must be recorded"),
+                _contract_check("compare.planar_overlay_difference_count_present", isinstance(_dotted(report, "invariants.planar_overlay_difference_count"), int), "planar overlay difference count must be recorded"),
+                _contract_check("compare.planar_overlay_symmetric_difference_area_total_numeric", _is_number(_dotted(report, "invariants.planar_overlay_symmetric_difference_area_total")), "planar overlay symmetric-difference area total must be numeric"),
+            ]
+        )
+    elif operation == "measure_geojson":
         measurement_mode = _dotted(report, "parameters.measurement_mode") or "planar"
         adapter = _dotted(report, "parameters.adapter")
         checks.extend(
@@ -439,6 +452,13 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "coordinate_dimension",
                 "skipped_row_count",
                 "topology_state",
+                "topology_adapter",
+                "planar_overlay_adapter",
+                "planar_overlay_state",
+                "intersection_area",
+                "symmetric_difference_area",
+                "planar_overlay_intersection_area_total",
+                "planar_overlay_symmetric_difference_area_total",
                 "hausdorff_vertex_distance",
                 "vertex_symmetric_difference_count",
             ),
@@ -450,6 +470,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "join cardinality classification for spatial joins",
                 "coordinate dimensionality, Z, and M presence are retained",
                 "geometry comparisons separate exact coordinate equality from topological equality",
+                "polygon geometry comparisons record planar overlay area metrics without applying them to non-polygon rows",
                 "CSV-derived point features preserve raw properties and close source/output/skipped row counts",
                 "bbox filtering preserves CRS and closes retained/excluded feature counts",
                 "bbox clipping preserves CRS and closes retained/excluded/clipped/unchanged feature counts",
@@ -458,6 +479,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
             positive_regression_gates=(
                 "point-in-polygon fixture classifies FULLY_WITHIN, TOUCH_ONLY, OUTSIDE, and NULL_EMPTY",
                 "geometry comparison fixture records exact equality, topological equality, Hausdorff distance, and vertex symmetric difference",
+                "geometry comparison fixture records Polygon/MultiPolygon planar intersection and symmetric-difference area",
                 "reprojection fixture records source CRS, target CRS, adapter identity, output hash, and row/coordinate conservation",
                 "CSV point fixture records header, source rows, output features, skipped rows, CRS, and output hash",
                 "bbox filter fixture records query bbox, filter mode, retained features, excluded features, NULL/EMPTY residue, CRS, and output hash",
@@ -480,6 +502,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "ambiguous nearest-neighbor match remains UNRESOLVED",
                 "M:N spatial join requires explicit multiplication counts",
                 "feature comparison with unmatched keys records left-only and right-only residue",
+                "planar overlay comparison records unsupported dimensionality as unresolved residue instead of dropping Z/M",
             ),
             output_requirements=(
                 "FACT/INFERENCE/ASSUMPTION/UNKNOWN separation",
