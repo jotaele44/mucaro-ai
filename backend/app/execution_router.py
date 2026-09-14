@@ -4,10 +4,11 @@ from typing import Any, Callable
 
 from .capability_policy import RUNTIME_CAPABILITY
 from .config import Settings
+from .container_runtime import ContainerRuntimeError, get_container_binding, run_container_worker
 from .local_worker import run_local_worker
 
 ROUTER_SCHEMA_VERSION = "mucaro-execution-router/1.0"
-SUPPORTED_ROUTES = {"IN_PROCESS", "LOCAL_WORKER"}
+SUPPORTED_ROUTES = {"IN_PROCESS", "LOCAL_WORKER", "CONTAINER"}
 
 
 class ExecutionRouterError(RuntimeError):
@@ -67,6 +68,25 @@ def execute_routed(
             "route": route,
             "result": worker.get("result"),
             "adapter_receipt": worker,
+        }
+    if route == "CONTAINER":
+        try:
+            binding = get_container_binding(skill_id)
+        except ContainerRuntimeError as exc:
+            raise ExecutionRouterError(exc.status, exc.detail) from exc
+        granted = set(policy_decision.get("granted", []))
+        container = run_container_worker(
+            project_root=cfg.project_root,
+            skill_id=skill_id,
+            image=binding.image,
+            arguments=arguments,
+            network_allowed="network.public_http" in granted,
+        )
+        receipt = {**container, "binding": binding.as_dict()}
+        return {
+            "route": route,
+            "result": container.get("result"),
+            "adapter_receipt": receipt,
         }
     if route not in SUPPORTED_ROUTES:
         raise ExecutionRouterError("ERROR_EXECUTION_ROUTE_UNAVAILABLE", route)
