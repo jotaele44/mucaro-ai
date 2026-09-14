@@ -62,7 +62,7 @@ def test_router_rejects_unauthorized_policy() -> None:
     assert exc.value.status == "ERROR_EXECUTION_ROUTE_POLICY"
 
 
-def test_router_fails_closed_for_not_yet_implemented_container(tmp_path: Path) -> None:
+def test_router_fails_closed_when_container_skill_has_no_binding(tmp_path: Path) -> None:
     decision = _decision("runtime.container")
     with pytest.raises(ExecutionRouterError) as exc:
         execute_routed(
@@ -73,4 +73,4 @@ def test_router_fails_closed_for_not_yet_implemented_container(tmp_path: Path) -
             cfg=make_settings(tmp_path),
             policy_decision=decision,
         )
-    assert exc.value.status == "ERROR_EXECUTION_ROUTE_UNAVAILABLE"
+    assert exc.value.status == "ERROR_CONTAINER_BINDING_MISSING"
