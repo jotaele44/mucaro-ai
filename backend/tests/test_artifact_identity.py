@@ -130,13 +130,13 @@ def test_invalid_lineage_transition_fails_closed(tmp_path: Path) -> None:
         producer="test",
         producer_version="1",
     )
-    export = create_artifact_record(
-        processed_dir=processed,
-        artifact_type="EXPORT",
-        payload=b"export",
-        logical_identity="export:x",
-        producer="test",
-        producer_version="1",
-        parent_artifact_ids=[source.artifact_id],
-    )
-    assert export.artifact_type == "EXPORT"
+    with pytest.raises(ArtifactIdentityError, match="invalid parent types"):
+        create_artifact_record(
+            processed_dir=processed,
+            artifact_type="EXPORT",
+            payload=b"export",
+            logical_identity="export:x",
+            producer="test",
+            producer_version="1",
+            parent_artifact_ids=[source.artifact_id],
+        )
