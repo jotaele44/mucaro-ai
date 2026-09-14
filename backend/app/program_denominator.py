@@ -7,9 +7,11 @@ from typing import Any
 
 DENOMINATOR_SCHEMA_VERSION = "MUCARO_V1_DENOMINATOR/1.0"
 DENOMINATOR_ROW_COUNT = 100
+DENOMINATOR_BASELINE_SOURCE_HEAD = "9a06357afa9e34367776b1f46223a803ab23c958"
 DENOMINATOR_BASELINE_RAW_PERCENT = 61.5
 DENOMINATOR_BASELINE_WEIGHTED_PERCENT = 62.6
-ALLOWED_STATES = {"PASS", "PROVISIONAL", "OPEN", "BLOCKED", "UNVERIFIED"}
+DENOMINATOR_SCORING = {"PASS": 1.0, "PROVISIONAL": 0.5, "OPEN": 0.0, "BLOCKED": 0.0, "UNVERIFIED": 0.0}
+ALLOWED_STATES = set(DENOMINATOR_SCORING)
 ALLOWED_TRACKS = {
     "BACKEND",
     "CLI",
@@ -34,6 +36,11 @@ EXPECTED_PREFIXES = {
     "PACKAGING": "PKG-",
     "GOVERNANCE": "GOV-",
 }
+EXPECTED_IDS = frozenset(
+    f"{prefix}{index:02d}"
+    for prefix in EXPECTED_PREFIXES.values()
+    for index in range(1, 11)
+)
 
 
 @dataclass(frozen=True)
@@ -68,18 +75,20 @@ def load_denominator(project_root: Path) -> dict[str, Any]:
 def validate_denominator(payload: dict[str, Any]) -> DenominatorValidation:
     errors: list[str] = []
     if payload.get("schema_version") != DENOMINATOR_SCHEMA_VERSION:
-        errors.append(
-            f"schema_version must equal {DENOMINATOR_SCHEMA_VERSION}"
-        )
+        errors.append(f"schema_version must equal {DENOMINATOR_SCHEMA_VERSION}")
 
     baseline = payload.get("baseline")
     if not isinstance(baseline, dict):
         errors.append("baseline must be an object")
         baseline = {}
+    if baseline.get("source_head") != DENOMINATOR_BASELINE_SOURCE_HEAD:
+        errors.append(f"baseline source_head must equal {DENOMINATOR_BASELINE_SOURCE_HEAD}")
     if baseline.get("raw_completion_percent") != DENOMINATOR_BASELINE_RAW_PERCENT:
         errors.append("baseline raw completion percent drifted from 61.5")
     if baseline.get("weighted_completion_percent") != DENOMINATOR_BASELINE_WEIGHTED_PERCENT:
         errors.append("baseline weighted completion percent drifted from 62.6")
+    if baseline.get("scoring") != DENOMINATOR_SCORING:
+        errors.append("baseline scoring map drifted from the frozen V1 scoring contract")
 
     tracks = payload.get("tracks")
     if not isinstance(tracks, dict):
@@ -126,9 +135,7 @@ def validate_denominator(payload: dict[str, Any]) -> DenominatorValidation:
             track_counts[str(track)] += 1
             expected_prefix = EXPECTED_PREFIXES[str(track)]
             if isinstance(requirement_id, str) and not requirement_id.startswith(expected_prefix):
-                errors.append(
-                    f"requirements[{index}] id {requirement_id} does not match track prefix {expected_prefix}"
-                )
+                errors.append(f"requirements[{index}] id {requirement_id} does not match track prefix {expected_prefix}")
         if state not in ALLOWED_STATES:
             errors.append(f"requirements[{index}].state invalid: {state}")
         if not isinstance(title, str) or not title.strip():
@@ -137,6 +144,14 @@ def validate_denominator(payload: dict[str, Any]) -> DenominatorValidation:
     unique_id_count = len(set(ids))
     if unique_id_count != len(ids):
         errors.append("requirement IDs must be globally unique")
+    actual_ids = set(ids)
+    if actual_ids != EXPECTED_IDS:
+        missing_ids = sorted(EXPECTED_IDS - actual_ids)
+        unexpected_ids = sorted(actual_ids - EXPECTED_IDS)
+        errors.append(
+            "requirement ID set must equal the frozen V1 set; "
+            f"missing={','.join(missing_ids) or 'none'} unexpected={','.join(unexpected_ids) or 'none'}"
+        )
     for track, count in sorted(track_counts.items()):
         if count != 10:
             errors.append(f"track {track} must contain exactly 10 requirements; found {count}")
