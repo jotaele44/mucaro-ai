@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/local_worker_execution.schema.json",
+  "title": "Mucaro Local Worker Execution 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "protocol",
+    "skill_id",
+    "network_allowed",
+    "timeout_seconds",
+    "max_output_bytes",
+    "max_memory_mb",
+    "max_cpu_seconds",
+    "posix_resource_limits",
+    "result"
+  ],
+  "properties": {
+    "status": {"const": "LOCAL_WORKER_OK"},
+    "protocol": {"const": "mucaro-local-worker/1.0"},
+    "skill_id": {"type": "string", "minLength": 1},
+    "network_allowed": {"type": "boolean"},
+    "timeout_seconds": {"type": "integer", "minimum": 1},
+    "max_output_bytes": {"type": "integer", "minimum": 1},
+    "max_memory_mb": {"type": "integer", "minimum": 1},
+    "max_cpu_seconds": {"type": "integer", "minimum": 1},
+    "posix_resource_limits": {"type": "boolean"},
+    "result": {}
+  }
+}
