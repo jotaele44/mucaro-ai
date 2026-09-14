@@ -22,15 +22,15 @@ def test_policy_authorizes_only_declared_and_allowed_capabilities() -> None:
 
 
 def test_policy_denies_undeclared_self_escalation() -> None:
-    policy = CapabilityPolicy.build(policy_id="read-only", allowed={"filesystem.read", "network.fetch"})
+    policy = CapabilityPolicy.build(policy_id="read-only", allowed={"filesystem.read", "network.public_http"})
     decision = evaluate_capabilities(
         policy=policy,
         declared_capabilities={"filesystem.read"},
-        requested_capabilities={"filesystem.read", "network.fetch"},
+        requested_capabilities={"filesystem.read", "network.public_http"},
     )
     assert decision.authorized is False
     assert decision.granted == ()
-    assert "network.fetch" in decision.denied
+    assert "network.public_http" in decision.denied
     assert any("exceeds declared" in reason for reason in decision.reasons)
 
 
@@ -48,13 +48,13 @@ def test_policy_denies_capability_outside_allowlist() -> None:
 def test_policy_explicit_deny_overrides_allow() -> None:
     policy = CapabilityPolicy.build(
         policy_id="deny-network",
-        allowed={"filesystem.read", "network.fetch"},
-        denied={"network.fetch"},
+        allowed={"filesystem.read", "network.public_http"},
+        denied={"network.public_http"},
     )
     decision = evaluate_capabilities(
         policy=policy,
-        declared_capabilities={"network.fetch"},
-        requested_capabilities={"network.fetch"},
+        declared_capabilities={"network.public_http"},
+        requested_capabilities={"network.public_http"},
     )
     assert decision.authorized is False
     assert any("explicitly denied" in reason for reason in decision.reasons)
