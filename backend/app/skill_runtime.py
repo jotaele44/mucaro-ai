@@ -223,19 +223,27 @@ def activate_skill(
     index, mount = matches[0]
     if mount.get("digest") != skill.digest:
         raise SkillRuntimeError("ERROR_SKILL_DIGEST_MISMATCH", skill_id)
-    if mount.get("state") == "ACTIVE":
-        return {"status": "SKILL_ALREADY_ACTIVE", "mount": mount}
+
+    decision_payload = decision.as_dict()
+    if mount.get("state") == "ACTIVE" and mount.get("policy_decision") == decision_payload:
+        return {"status": "SKILL_ALREADY_ACTIVE", "mount": mount, "policy_decision": decision_payload}
+
     activated_at = utc_now()
+    was_active = mount.get("state") == "ACTIVE"
     updated = {
         **mount,
         "state": "ACTIVE",
         "activated_by": activated_by,
         "activated_at": activated_at,
-        "policy_decision": decision.as_dict(),
+        "policy_decision": decision_payload,
     }
     mounts[index] = updated
     _write_mounts(mounts, cfg)
-    return {"status": "SKILL_ACTIVATED", "mount": updated, "policy_decision": decision.as_dict()}
+    return {
+        "status": "SKILL_REAUTHORIZED" if was_active else "SKILL_ACTIVATED",
+        "mount": updated,
+        "policy_decision": decision_payload,
+    }
 
 
 def execute_skill(
