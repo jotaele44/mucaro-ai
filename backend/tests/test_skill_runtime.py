@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from backend.app.capability_policy import CapabilityPolicy
 from backend.app.config import Settings
 from backend.app.skill_runtime import (
     SkillDefinition,
@@ -60,10 +61,13 @@ def test_skill_must_mount_then_activate_before_execution(tmp_path: Path):
 
     activated = activate_skill(skill_id, cfg=cfg, activated_by="test")
     assert activated["mount"]["state"] == "ACTIVE"
+    assert activated["policy_decision"]["status"] == "AUTHORIZED"
+    assert activated["policy_decision"]["requested"] == ["runtime.in_process"]
 
     executed = execute_skill(skill_id, cfg=cfg, executed_by="test")
     assert executed["status"] == "SKILL_EXECUTED"
     assert executed["execution"]["status"] == "PASS"
+    assert executed["execution"]["policy_decision"]["status"] == "AUTHORIZED"
     assert executed["result"]["repo_id"] == "mucaro-ai"
     assert executed["result"]["membership_status"] == "PROVISIONAL"
     assert executed["result"]["baseline_required"] is False
@@ -128,3 +132,41 @@ def test_capability_authorization_fails_closed(monkeypatch, tmp_path: Path):
 
     activated = activate_skill(skill_id, cfg=cfg, allowed_capabilities={"network.public_http"})
     assert activated["mount"]["state"] == "ACTIVE"
+    assert set(activated["policy_decision"]["granted"]) == {"network.public_http", "runtime.in_process"}
+
+
+def test_explicit_policy_can_deny_runtime_even_when_skill_capability_is_allowed(monkeypatch, tmp_path: Path):
+    from backend.app import skill_runtime
+
+    cfg = make_settings(tmp_path)
+    skill_id = "test/runtime-policy-skill"
+
+    def handler(arguments, cfg):
+        del arguments, cfg
+        return {"status": "OK"}
+
+    definition = SkillDefinition(
+        skill_id=skill_id,
+        version="1.0.0",
+        description="Synthetic runtime policy test.",
+        runtime="IN_PROCESS",
+        capabilities=("filesystem.read",),
+        input_schema="test.input/1",
+        output_schema="test.output/1",
+        handler=handler,
+    )
+    monkeypatch.setitem(skill_runtime.SKILL_REGISTRY, skill_id, definition)
+    mount_skill(skill_id, cfg=cfg)
+    policy = CapabilityPolicy.build(
+        policy_id="deny-in-process",
+        allowed={"filesystem.read", "runtime.in_process"},
+        denied={"runtime.in_process"},
+    )
+
+    try:
+        activate_skill(skill_id, cfg=cfg, policy=policy)
+    except SkillRuntimeError as exc:
+        assert exc.status == "ERROR_SKILL_CAPABILITY_NOT_AUTHORIZED"
+        assert "runtime.in_process" in exc.detail
+    else:
+        raise AssertionError("expected runtime authorization failure")
