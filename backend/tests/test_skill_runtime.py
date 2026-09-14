@@ -170,3 +170,22 @@ def test_explicit_policy_can_deny_runtime_even_when_skill_capability_is_allowed(
         assert "runtime.in_process" in exc.detail
     else:
         raise AssertionError("expected runtime authorization failure")
+
+
+def test_active_mount_can_be_reauthorized_under_a_new_policy(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/intelligence-plane-health"
+    mount_skill(skill_id, cfg=cfg)
+    first = activate_skill(skill_id, cfg=cfg)
+    assert first["status"] == "SKILL_ACTIVATED"
+
+    replacement_policy = CapabilityPolicy.build(
+        policy_id="replacement-policy",
+        allowed={"runtime.in_process"},
+    )
+    second = activate_skill(skill_id, cfg=cfg, policy=replacement_policy)
+    assert second["status"] == "SKILL_REAUTHORIZED"
+    assert second["policy_decision"]["policy_id"] == "replacement-policy"
+
+    executed = execute_skill(skill_id, cfg=cfg)
+    assert executed["execution"]["policy_decision"]["policy_id"] == "replacement-policy"
