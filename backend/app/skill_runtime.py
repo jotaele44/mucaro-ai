@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .capability_policy import CapabilityPolicy, RUNTIME_CAPABILITY, evaluate_capabilities
 from .config import Settings, settings
 from .utils import read_json, stable_id, utc_now, write_json
 
@@ -176,6 +177,7 @@ def mount_skill(
         "mounted_at": mounted_at,
         "activated_by": None,
         "activated_at": None,
+        "policy_decision": None,
     }
     mounts.append(mount)
     _write_mounts(mounts, cfg)
@@ -186,6 +188,7 @@ def activate_skill(
     skill_id: str,
     *,
     allowed_capabilities: set[str] | None = None,
+    policy: CapabilityPolicy | None = None,
     cfg: Settings = settings,
     activated_by: str = "operator",
 ) -> dict[str, Any]:
@@ -194,9 +197,25 @@ def activate_skill(
     if skill is None:
         raise SkillRuntimeError("ERROR_SKILL_NOT_REGISTERED", skill_id)
     _validate_definition(skill)
-    missing = sorted(set(skill.capabilities) - set(allowed_capabilities))
-    if missing:
-        raise SkillRuntimeError("ERROR_SKILL_CAPABILITY_NOT_AUTHORIZED", ",".join(missing))
+
+    runtime_capability = RUNTIME_CAPABILITY[skill.runtime]
+    declared = set(skill.capabilities) | {runtime_capability}
+    if policy is None:
+        policy = CapabilityPolicy.build(
+            policy_id="legacy-activation-compatibility",
+            allowed=set(allowed_capabilities) | {runtime_capability},
+        )
+    decision = evaluate_capabilities(
+        policy=policy,
+        declared_capabilities=declared,
+        requested_capabilities=declared,
+    )
+    if not decision.authorized:
+        raise SkillRuntimeError(
+            "ERROR_SKILL_CAPABILITY_NOT_AUTHORIZED",
+            "; ".join(decision.reasons) or skill_id,
+        )
+
     mounts = _load_mounts(cfg)
     matches = [(index, item) for index, item in enumerate(mounts) if item.get("skill_id") == skill_id]
     if not matches:
@@ -204,13 +223,27 @@ def activate_skill(
     index, mount = matches[0]
     if mount.get("digest") != skill.digest:
         raise SkillRuntimeError("ERROR_SKILL_DIGEST_MISMATCH", skill_id)
-    if mount.get("state") == "ACTIVE":
-        return {"status": "SKILL_ALREADY_ACTIVE", "mount": mount}
+
+    decision_payload = decision.as_dict()
+    if mount.get("state") == "ACTIVE" and mount.get("policy_decision") == decision_payload:
+        return {"status": "SKILL_ALREADY_ACTIVE", "mount": mount, "policy_decision": decision_payload}
+
     activated_at = utc_now()
-    updated = {**mount, "state": "ACTIVE", "activated_by": activated_by, "activated_at": activated_at}
+    was_active = mount.get("state") == "ACTIVE"
+    updated = {
+        **mount,
+        "state": "ACTIVE",
+        "activated_by": activated_by,
+        "activated_at": activated_at,
+        "policy_decision": decision_payload,
+    }
     mounts[index] = updated
     _write_mounts(mounts, cfg)
-    return {"status": "SKILL_ACTIVATED", "mount": updated}
+    return {
+        "status": "SKILL_REAUTHORIZED" if was_active else "SKILL_ACTIVATED",
+        "mount": updated,
+        "policy_decision": decision_payload,
+    }
 
 
 def execute_skill(
@@ -233,6 +266,9 @@ def execute_skill(
     mount = matches[0]
     if mount.get("digest") != skill.digest:
         raise SkillRuntimeError("ERROR_SKILL_DIGEST_MISMATCH", skill_id)
+    policy_decision = mount.get("policy_decision")
+    if not isinstance(policy_decision, dict) or policy_decision.get("status") != "AUTHORIZED":
+        raise SkillRuntimeError("ERROR_SKILL_POLICY_NOT_AUTHORIZED", skill_id)
 
     started_at = utc_now()
     execution_id = stable_id(
@@ -265,6 +301,7 @@ def execute_skill(
         "arguments": arguments,
         "result": result,
         "error": error,
+        "policy_decision": policy_decision,
     }
     _append_execution(event, cfg)
     if status != "PASS":
