@@ -28,29 +28,32 @@ def test_local_worker_executes_in_distinct_process_with_minimal_environment(monk
 
 
 def test_local_worker_rejects_in_process_skill() -> None:
-    with pytest.raises(LocalWorkerError, match="ERROR_LOCAL_WORKER_FAILED") as exc:
+    with pytest.raises(LocalWorkerError) as exc:
         run_local_worker(
             project_root=PROJECT_ROOT,
             skill_id="mucaro/intelligence-plane-health",
             timeout_seconds=10,
         )
+    assert exc.value.status == "ERROR_LOCAL_WORKER_FAILED"
     assert "ERROR_LOCAL_WORKER_RUNTIME_MISMATCH" in exc.value.detail
 
 
 def test_local_worker_rejects_oversized_request_before_spawn() -> None:
-    with pytest.raises(LocalWorkerError, match="200"):
+    with pytest.raises(LocalWorkerError) as exc:
         run_local_worker(
             project_root=PROJECT_ROOT,
             skill_id="mucaro/local-worker-health",
             arguments={"payload": "x" * 200},
             max_output_bytes=64,
         )
+    assert exc.value.status == "ERROR_LOCAL_WORKER_REQUEST_TOO_LARGE"
 
 
 def test_local_worker_requires_positive_limits() -> None:
-    with pytest.raises(LocalWorkerError, match="worker limits must be positive"):
+    with pytest.raises(LocalWorkerError) as exc:
         run_local_worker(
             project_root=PROJECT_ROOT,
             skill_id="mucaro/local-worker-health",
             timeout_seconds=0,
         )
+    assert exc.value.status == "ERROR_LOCAL_WORKER_LIMIT"
