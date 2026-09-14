@@ -17,6 +17,7 @@ from .gis_processing import (
     filter_geojson_by_bbox,
     inspect_geojson,
     measure_geojson,
+    overlay_geojson_collections,
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
@@ -33,7 +34,7 @@ GIS_QUALITY_FAILED = "GIS_QUALITY_CERT_FAILED"
 GIS_QUALITY_PROFILE = "v0.1.23-local-release"
 GIS_QUALITY_RECEIPT_TYPE = "gis_quality"
 
-VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "reproject", "csv_points", "bbox_filter", "clip_bbox", "measure"}
+VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "overlay", "reproject", "csv_points", "bbox_filter", "clip_bbox", "measure"}
 
 
 def current_git_head(root: Path) -> str:
@@ -196,6 +197,14 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             paths["left"],
             paths["right"],
             cfg=cfg,
+            match_on=str(parameters.get("match_on") or "id"),
+        )
+    if operation == "overlay":
+        return overlay_geojson_collections(
+            paths["left"],
+            paths["right"],
+            cfg=cfg,
+            operation=str(parameters.get("overlay_operation") or "intersection"),
             match_on=str(parameters.get("match_on") or "id"),
         )
     if operation == "reproject":

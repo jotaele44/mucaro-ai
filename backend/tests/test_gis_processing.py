@@ -3,6 +3,8 @@ import json
 import math
 from pathlib import Path
 
+import pytest
+
 from backend.app.config import Settings
 from backend.app.gis_processing import (
     GISProcessingError,
@@ -12,6 +14,7 @@ from backend.app.gis_processing import (
     filter_geojson_by_bbox,
     inspect_geojson,
     measure_geojson,
+    overlay_geojson_collections,
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
@@ -806,6 +809,150 @@ def test_compare_geojson_geometries_records_planar_overlay_area_difference(tmp_p
     assert comparison["right_area"] == 16.0
     assert comparison["intersection_area"] == 4.0
     assert comparison["symmetric_difference_area"] == 24.0
+
+
+def test_overlay_geojson_collections_writes_intersection_output_and_receipt(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    left = write_geojson(
+        tmp_path / "left.geojson",
+        [polygon_feature("overlap", [[[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]]])],
+    )
+    right = write_geojson(
+        tmp_path / "right.geojson",
+        [polygon_feature("overlap", [[[2, 2], [6, 2], [6, 6], [2, 6], [2, 2]]])],
+    )
+
+    result = overlay_geojson_collections(left, right, cfg=cfg, operation="intersection")
+
+    assert result["status"] == "GIS_OVERLAY_OK"
+    assert result["operation"] == "overlay_geojson_collections"
+    assert result["parameters"]["overlay_operation"] == "intersection"
+    assert result["parameters"]["adapter"] == "shapely_planar_overlay_v1"
+    assert result["parameters"]["overlay_adapter"] == "shapely_planar_overlay_v1"
+    assert result["output"]["feature_count"] == 1
+    assert result["output"]["sha256"]
+    assert result["output"]["crs"] == "EPSG:4326"
+    assert result["warnings"] == []
+    assert result["state_counts"] == {
+        "EMITTED": 1,
+        "EMPTY_INPUT": 0,
+        "EMPTY_RESULT": 0,
+        "UNRESOLVED": 0,
+        "UNSUPPORTED": 0,
+        "NON_POLYGON_RESULT": 0,
+        "UNMATCHED_LEFT": 0,
+        "UNMATCHED_RIGHT": 0,
+    }
+    assert result["invariants"]["feature_key_accounting_closed"] is True
+    assert result["invariants"]["overlay_pair_accounting_closed"] is True
+    assert result["invariants"]["shared_feature_key_count"] == 1
+    assert result["invariants"]["output_feature_count"] == 1
+    assert result["invariants"]["emitted_feature_count"] == 1
+    assert result["invariants"]["result_area_total"] == 4.0
+    row = result["features"][0]
+    assert row["feature_key"] == "id:overlap"
+    assert row["overlay_state"] == "EMITTED"
+    assert row["result_geometry_type"] == "Polygon"
+    assert row["result_area"] == 4.0
+    output = json.loads(Path(result["output"]["path"]).read_text(encoding="utf-8"))
+    assert output["crs"]["properties"]["name"] == "EPSG:4326"
+    assert output["features"][0]["properties"]["feature_key"] == "id:overlap"
+    assert output["features"][0]["geometry"]["type"] == "Polygon"
+    receipt = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
+    assert receipt["report_id"] == result["report_id"]
+    assert result["report_sha256"]
+
+
+def test_overlay_geojson_collections_records_unmatched_empty_and_dimension_residue(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    left = write_geojson(
+        tmp_path / "left.geojson",
+        [
+            polygon_feature("overlap", [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]),
+            polygon_feature("left_only", [[[10, 10], [11, 10], [11, 11], [10, 11], [10, 10]]]),
+            polygon_feature("z_polygon", [[[0, 0, 5], [2, 0, 5], [2, 2, 5], [0, 2, 5], [0, 0, 5]]]),
+            line_feature("line", [[0, 0], [1, 1]]),
+        ],
+    )
+    right = write_geojson(
+        tmp_path / "right.geojson",
+        [
+            polygon_feature("overlap", [[[2, 2], [3, 2], [3, 3], [2, 3], [2, 2]]]),
+            polygon_feature("right_only", [[[20, 20], [21, 20], [21, 21], [20, 21], [20, 20]]]),
+            polygon_feature("z_polygon", [[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]]),
+            line_feature("line", [[0, 0], [1, 1]]),
+        ],
+    )
+
+    result = overlay_geojson_collections(left, right, cfg=cfg, operation="intersection")
+
+    assert result["status"] == "GIS_OVERLAY_WARN"
+    assert result["warnings"] == [
+        "GIS_UNMATCHED_FEATURES",
+        "GIS_OVERLAY_EMPTY_RESULTS",
+        "GIS_OVERLAY_UNSUPPORTED_GEOMETRY",
+        "GIS_OVERLAY_UNRESOLVED",
+    ]
+    assert result["left_only_feature_keys"] == ["id:left_only"]
+    assert result["right_only_feature_keys"] == ["id:right_only"]
+    assert result["state_counts"] == {
+        "EMITTED": 0,
+        "EMPTY_INPUT": 0,
+        "EMPTY_RESULT": 1,
+        "UNRESOLVED": 1,
+        "UNSUPPORTED": 1,
+        "NON_POLYGON_RESULT": 0,
+        "UNMATCHED_LEFT": 1,
+        "UNMATCHED_RIGHT": 1,
+    }
+    assert result["output"]["feature_count"] == 0
+    assert result["invariants"]["feature_key_accounting_closed"] is True
+    assert result["invariants"]["overlay_pair_accounting_closed"] is True
+    assert result["invariants"]["shared_feature_key_count"] == 3
+    assert result["invariants"]["left_only_count"] == 1
+    assert result["invariants"]["right_only_count"] == 1
+    by_key = {row["feature_key"]: row for row in result["features"]}
+    assert by_key["id:overlap"]["overlay_state"] == "EMPTY_RESULT"
+    assert by_key["id:z_polygon"]["overlay_state"] == "UNRESOLVED"
+    assert by_key["id:z_polygon"]["overlay_warning"] == "GIS_OVERLAY_COORDINATE_DIMENSION_UNSUPPORTED"
+    assert by_key["id:line"]["overlay_state"] == "UNSUPPORTED"
+    assert by_key["id:line"]["overlay_warning"] == "GIS_OVERLAY_UNSUPPORTED_GEOMETRY"
+
+
+def test_overlay_geojson_collections_fails_closed_on_invalid_operation_crs_and_duplicate_keys(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    left = write_geojson(
+        tmp_path / "left.geojson",
+        [polygon_feature("overlap", [[[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]]])],
+    )
+    right = write_geojson(
+        tmp_path / "right.geojson",
+        [polygon_feature("overlap", [[[2, 2], [6, 2], [6, 6], [2, 6], [2, 2]]])],
+    )
+    right_3857 = write_geojson(
+        tmp_path / "right_3857.geojson",
+        [polygon_feature("overlap", [[[2, 2], [6, 2], [6, 6], [2, 6], [2, 2]]])],
+        crs="EPSG:3857",
+    )
+    duplicate_left = write_geojson(
+        tmp_path / "duplicate_left.geojson",
+        [
+            polygon_feature("overlap", [[[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]]]),
+            polygon_feature("overlap", [[[5, 5], [7, 5], [7, 7], [5, 7], [5, 5]]]),
+        ],
+    )
+
+    with pytest.raises(GISProcessingError) as invalid_operation:
+        overlay_geojson_collections(left, right, cfg=cfg, operation="erase")
+    assert invalid_operation.value.status == "ERROR_GIS_OVERLAY_OPERATION"
+
+    with pytest.raises(GISProcessingError) as crs_mismatch:
+        overlay_geojson_collections(left, right_3857, cfg=cfg)
+    assert crs_mismatch.value.status == "ERROR_GIS_OVERLAY_CRS_MISMATCH"
+
+    with pytest.raises(GISProcessingError) as duplicate_keys:
+        overlay_geojson_collections(duplicate_left, right, cfg=cfg)
+    assert duplicate_keys.value.status == "ERROR_GIS_OVERLAY_DUPLICATE_FEATURE_KEYS"
 
 
 def test_compare_geojson_geometries_records_unmatched_and_dimension_mismatch(tmp_path: Path):

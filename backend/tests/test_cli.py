@@ -427,6 +427,49 @@ def test_cli_gis_inspect_and_point_in_polygon(tmp_path: Path, capsys):
     assert "planar_overlay_measured_count=1" in compare_output
     assert "planar_overlay_symmetric_difference_area_total=0.0" in compare_output
 
+    overlay_right_path = tmp_path / "overlay_right.geojson"
+    overlay_right_path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+                "features": [
+                    {
+                        "type": "Feature",
+                        "id": "square",
+                        "properties": {"name": "square"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[[5, 5], [15, 5], [15, 15], [5, 15], [5, 5]]],
+                        },
+                    }
+                ],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    assert main(["gis", "overlay", str(polygons_path), str(overlay_right_path), "--operation", "intersection", "--format", "text"], cfg=cfg) == 0
+    overlay_output = capsys.readouterr().out
+    assert "GIS_OVERLAY_OK" in overlay_output
+    assert "operation=overlay_geojson_collections" in overlay_output
+    assert "match_on=id" in overlay_output
+    assert "overlay_operation=intersection" in overlay_output
+    assert "adapter=shapely_planar_overlay_v1" in overlay_output
+    assert "overlay_adapter=shapely_planar_overlay_v1" in overlay_output
+    assert "output_path=" in overlay_output
+    assert "output_sha256=" in overlay_output
+    assert "output_crs=EPSG:4326" in overlay_output
+    assert "left_feature_count=1" in overlay_output
+    assert "right_feature_count=1" in overlay_output
+    assert "shared_feature_key_count=1" in overlay_output
+    assert "output_feature_count=1" in overlay_output
+    assert "emitted_feature_count=1" in overlay_output
+    assert "feature_key_accounting_closed=True" in overlay_output
+    assert "overlay_pair_accounting_closed=True" in overlay_output
+    assert "result_area_total=25.0" in overlay_output
+    assert "EMITTED=1" in overlay_output
+
     assert main(["gis", "measure", str(polygons_path), "--coordinate-units", "meters", "--format", "text"], cfg=cfg) == 0
     measure_output = capsys.readouterr().out
     assert "GIS_MEASURE_OK" in measure_output
@@ -1444,16 +1487,16 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 16
-    assert payload["counts"]["passed"] == 16
+    assert payload["counts"]["cases"] == 18
+    assert payload["counts"]["passed"] == 18
     assert payload["counts"]["failed"] == 0
-    assert payload["counts"]["operations"] == 8
-    assert payload["counts"]["negative_cases"] == 5
+    assert payload["counts"]["operations"] == 9
+    assert payload["counts"]["negative_cases"] == 6
 
     assert main(["eval", "gis", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_EVAL_OK" in text_output
-    assert "operation_count=8" in text_output
+    assert "operation_count=9" in text_output
     assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
     assert "PASS bbox_filter bbox_filter_invalid_bbox_fails_closed" in text_output
     assert "PASS clip_bbox clip_bbox_polygon_point_and_residue" in text_output
@@ -1465,6 +1508,8 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert "PASS inspect inspect_dimensionality" in text_output
     assert "PASS inspect inspect_invalid_topology_warns_without_repair" in text_output
     assert "PASS compare compare_planar_overlay_difference" in text_output
+    assert "PASS overlay overlay_intersection_outputs_feature" in text_output
+    assert "PASS overlay overlay_invalid_operation_fails_closed" in text_output
     assert "PASS csv_points csv_points_skip_invalid_rows" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
 
@@ -1516,7 +1561,7 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
-    assert "eval_case_count=16" in text_output
+    assert "eval_case_count=18" in text_output
     assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
     assert "PASS clip_bbox clip_bbox_polygon_point_and_residue" in text_output
     assert "PASS clip_bbox clip_bbox_invalid_bbox_fails_closed" in text_output
@@ -1526,6 +1571,8 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert "PASS csv_points csv_points_skip_invalid_rows" in text_output
     assert "PASS compare compare_rotated_polygon" in text_output
     assert "PASS compare compare_planar_overlay_difference" in text_output
+    assert "PASS overlay overlay_intersection_outputs_feature" in text_output
+    assert "PASS overlay overlay_invalid_operation_fails_closed" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
 
 

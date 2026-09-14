@@ -37,6 +37,7 @@ def test_capability_contracts_cover_expanded_scope_without_overclaiming():
 
     assert "crs" in contracts["advanced_gis_processing"]["provenance_fields"]
     assert "clip_adapter" in contracts["advanced_gis_processing"]["provenance_fields"]
+    assert "overlay_adapter" in contracts["advanced_gis_processing"]["provenance_fields"]
     assert contracts["advanced_gis_processing"]["implementation_status"] == "CANDIDATE"
     assert "ocr_engine" in contracts["state_of_art_ocr_analysis"]["provenance_fields"]
     assert contracts["state_of_art_ocr_analysis"]["implementation_status"] == "CANDIDATE"
@@ -179,6 +180,144 @@ def test_validate_gis_report_contract_accepts_compare_overlay_receipts():
 
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
     assert result["counts"]["fail"] == 0
+
+
+def test_validate_gis_report_contract_accepts_standalone_overlay_receipts():
+    report = {
+        "schema_version": "mucaro_gis_report_v1",
+        "report_id": "gisreport_overlay",
+        "status": "GIS_OVERLAY_OK",
+        "operation": "overlay_geojson_collections",
+        "created_at": "2026-09-12T00:00:00Z",
+        "match_on": "id",
+        "parameters": {
+            "overlay_operation": "intersection",
+            "match_on": "id",
+            "adapter": "shapely_planar_overlay_v1",
+            "overlay_adapter": "shapely_planar_overlay_v1",
+            "supported_operations": ["difference", "intersection", "symmetric_difference", "union"],
+            "supported_geometry_types": ["MultiPolygon", "Polygon"],
+        },
+        "inputs": {
+            "left": {
+                "path": "fixtures/left.geojson",
+                "sha256": "a" * 64,
+                "crs": "EPSG:4326",
+                "feature_count": 1,
+            },
+            "right": {
+                "path": "fixtures/right.geojson",
+                "sha256": "b" * 64,
+                "crs": "EPSG:4326",
+                "feature_count": 1,
+            },
+        },
+        "output": {
+            "path": "data/exports/gis_reports/gisreport_overlay.geojson",
+            "sha256": "c" * 64,
+            "crs": "EPSG:4326",
+            "feature_count": 1,
+        },
+        "left_only_feature_keys": [],
+        "right_only_feature_keys": [],
+        "features": [
+            {
+                "feature_key": "id:overlap",
+                "overlay_state": "EMITTED",
+                "result_geometry_type": "Polygon",
+                "result_area": 4.0,
+                "result_length": 8.0,
+            }
+        ],
+        "state_counts": {
+            "EMITTED": 1,
+            "EMPTY_INPUT": 0,
+            "EMPTY_RESULT": 0,
+            "UNRESOLVED": 0,
+            "UNSUPPORTED": 0,
+            "NON_POLYGON_RESULT": 0,
+            "UNMATCHED_LEFT": 0,
+            "UNMATCHED_RIGHT": 0,
+        },
+        "invariants": {
+            "crs_match": True,
+            "left_feature_count": 1,
+            "right_feature_count": 1,
+            "shared_feature_key_count": 1,
+            "left_only_count": 0,
+            "right_only_count": 0,
+            "output_feature_count": 1,
+            "emitted_feature_count": 1,
+            "empty_input_count": 0,
+            "empty_result_count": 0,
+            "unresolved_pair_count": 0,
+            "unsupported_pair_count": 0,
+            "non_polygon_result_count": 0,
+            "feature_key_accounting_closed": True,
+            "overlay_pair_accounting_closed": True,
+            "result_area_total": 4.0,
+            "result_length_total": 8.0,
+        },
+        "warnings": [],
+        "limitations": ["local planar overlay fixture"],
+        "falsification_criteria": ["reject if overlay accounting does not close"],
+    }
+
+    result = validate_gis_report_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert result["counts"]["fail"] == 0
+
+
+def test_validate_gis_report_contract_rejects_standalone_overlay_false_accounting():
+    report = {
+        "schema_version": "mucaro_gis_report_v1",
+        "report_id": "gisreport_overlay_bad",
+        "status": "GIS_OVERLAY_OK",
+        "operation": "overlay_geojson_collections",
+        "created_at": "2026-09-12T00:00:00Z",
+        "match_on": "id",
+        "parameters": {
+            "overlay_operation": "intersection",
+            "match_on": "id",
+            "adapter": "shapely_planar_overlay_v1",
+            "overlay_adapter": "shapely_planar_overlay_v1",
+        },
+        "inputs": {
+            "left": {"path": "fixtures/left.geojson", "sha256": "a" * 64, "crs": "EPSG:4326", "feature_count": 1},
+            "right": {"path": "fixtures/right.geojson", "sha256": "b" * 64, "crs": "EPSG:4326", "feature_count": 1},
+        },
+        "output": {"path": "data/exports/gis_reports/bad.geojson", "sha256": "c" * 64, "crs": "EPSG:4326", "feature_count": 2},
+        "features": [{"feature_key": "id:overlap", "overlay_state": "EMITTED"}],
+        "state_counts": {
+            "EMITTED": 1,
+            "EMPTY_INPUT": 0,
+            "EMPTY_RESULT": 0,
+            "UNRESOLVED": 0,
+            "UNSUPPORTED": 0,
+            "NON_POLYGON_RESULT": 0,
+        },
+        "invariants": {
+            "crs_match": True,
+            "shared_feature_key_count": 1,
+            "output_feature_count": 2,
+            "emitted_feature_count": 1,
+            "feature_key_accounting_closed": True,
+            "overlay_pair_accounting_closed": True,
+            "result_area_total": 4.0,
+            "result_length_total": 8.0,
+        },
+        "warnings": [],
+        "limitations": ["local planar overlay fixture"],
+        "falsification_criteria": ["reject if overlay accounting does not close"],
+    }
+
+    result = validate_gis_report_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert result["counts"]["fail"] >= 1
+    failures = {check["name"] for check in result["checks"] if check["status"] == "FAIL"}
+    assert "overlay.output_count_matches_emitted" in failures
 
 
 def test_validate_gis_report_contract_accepts_bbox_clip_receipts():

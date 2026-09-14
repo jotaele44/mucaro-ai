@@ -46,6 +46,7 @@ from .gis_processing import (
     filter_geojson_by_bbox,
     inspect_geojson,
     measure_geojson,
+    overlay_geojson_collections,
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
@@ -498,6 +499,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gis_compare.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_compare.set_defaults(handler=run_gis_compare)
+
+    gis_overlay = gis_subcommands.add_parser(
+        "overlay",
+        help="Overlay matched polygon GeoJSON features and write a derived-output receipt.",
+    )
+    gis_overlay.add_argument("left_path", help="Path to the left GeoJSON FeatureCollection.")
+    gis_overlay.add_argument("right_path", help="Path to the right GeoJSON FeatureCollection.")
+    gis_overlay.add_argument(
+        "--operation",
+        dest="overlay_operation",
+        choices=["difference", "intersection", "symmetric_difference", "union"],
+        default="intersection",
+        help="Planar overlay operation to apply to matched polygon pairs.",
+    )
+    gis_overlay.add_argument(
+        "--match-on",
+        choices=["id", "index"],
+        default="id",
+        help="Feature matching key.",
+    )
+    gis_overlay.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_overlay.set_defaults(handler=run_gis_overlay)
 
     gis_reproject = gis_subcommands.add_parser(
         "reproject",
@@ -1879,6 +1902,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_SPATIAL_JOIN_OK",
         "GIS_GEOMETRY_COMPARE_OK",
         "GIS_GEOMETRY_COMPARE_WARN",
+        "GIS_OVERLAY_OK",
+        "GIS_OVERLAY_WARN",
         "GIS_REPROJECT_OK",
         "GIS_REPROJECT_WARN",
         "GIS_CSV_POINTS_OK",
@@ -1920,11 +1945,13 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "adapter",
                 "topology_adapter",
                 "planar_overlay_adapter",
+                "overlay_adapter",
                 "coordinate_units",
                 "area_units",
                 "length_units",
                 "mode",
                 "bbox",
+                "overlay_operation",
             ):
                 if key in parameters:
                     print(f"{key}={parameters.get(key)}")
@@ -1981,6 +2008,21 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "output_crs",
                 "skipped_row_count",
                 "row_accounting_closed",
+                "left_feature_count",
+                "right_feature_count",
+                "shared_feature_key_count",
+                "left_only_count",
+                "right_only_count",
+                "emitted_feature_count",
+                "empty_input_count",
+                "empty_result_count",
+                "unresolved_pair_count",
+                "unsupported_pair_count",
+                "non_polygon_result_count",
+                "feature_key_accounting_closed",
+                "overlay_pair_accounting_closed",
+                "result_area_total",
+                "result_length_total",
                 "coordinate_dimension",
                 "feature_count",
                 "measured_feature_count",
@@ -2290,6 +2332,28 @@ def run_gis_compare(args: argparse.Namespace, cfg: Settings) -> int:
         right_path = cfg.project_root / right_path
     try:
         result = compare_geojson_geometries(left_path, right_path, cfg=cfg, match_on=args.match_on)
+    except GISProcessingError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_gis_overlay(args: argparse.Namespace, cfg: Settings) -> int:
+    left_path = Path(args.left_path)
+    right_path = Path(args.right_path)
+    if not left_path.is_absolute():
+        left_path = cfg.project_root / left_path
+    if not right_path.is_absolute():
+        right_path = cfg.project_root / right_path
+    try:
+        result = overlay_geojson_collections(
+            left_path,
+            right_path,
+            cfg=cfg,
+            operation=args.overlay_operation,
+            match_on=args.match_on,
+        )
     except GISProcessingError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2

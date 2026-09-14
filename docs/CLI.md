@@ -57,6 +57,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry/topology receipt | 0 | 2 |
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
+| `mucaro gis overlay LEFT_PATH RIGHT_PATH` | Overlay matched polygon GeoJSON features and write a derived-output receipt | 0 | 2 |
 | `mucaro gis reproject GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON between supported local CRS pairs and write a transformation receipt | 0 | 2 |
 | `mucaro gis csv-points CSV_PATH --lat-column LAT --lon-column LON` | Convert CSV coordinate rows into GeoJSON point features and write a row-accounted GIS receipt | 0 | 2 |
 | `mucaro gis filter-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Filter whole GeoJSON features by bbox extent and write retained/excluded accounting | 0 | 2 |
@@ -156,6 +157,18 @@ and symmetric-difference area in source CRS units. Non-polygon rows are marked
 `NOT_APPLICABLE`; Z/M polygon overlay remains unresolved instead of being
 flattened.
 
+`mucaro gis overlay LEFT_PATH RIGHT_PATH` applies a Shapely planar overlay
+operation to matched Polygon and MultiPolygon feature pairs. The default
+operation is `intersection`; `--operation difference`, `--operation union`, and
+`--operation symmetric_difference` are also supported. Features match by stable
+ID by default, or by index with `--match-on index`; duplicate match keys and CRS
+mismatches fail closed. The command preserves both input hashes, writes a
+derived GeoJSON output hash, records the overlay adapter, separates emitted
+features from empty results, unsupported geometry, Z/M dimensional residue,
+unmatched feature keys, invalid topology, and lower-dimensional overlay results,
+and closes feature-key and pair-state accounting. This is a narrow local
+matched-polygon overlay boundary, not a full GIS-engine overlay certification.
+
 `mucaro gis clip-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y`
 clips Point, MultiPoint, LineString, MultiLineString, Polygon, and MultiPolygon
 GeoJSON geometries against an axis-aligned bbox with the local Shapely
@@ -165,8 +178,9 @@ output, records per-feature `RETAINED_CLIPPED`, `RETAINED_UNCHANGED`,
 records source/output coordinate counts, and closes retained/excluded/clipped
 accounting. Z and M dimensions are not flattened; they are recorded as
 unresolved residue until a dimension-preserving clipping adapter is added.
-Non-bbox overlay, repair of invalid topology, raster/vector engines, and
-ellipsoidal GIS-engine validation remain future GIS work.
+Repair of invalid topology, broader clipping/overlay operation support,
+raster/vector engines, independent planar overlay validation, and ellipsoidal
+GIS-engine validation remain future GIS work.
 
 `mucaro gis measure GEOJSON_PATH` measures Point, MultiPoint, LineString,
 MultiLineString, Polygon, and MultiPolygon features. The default
@@ -325,6 +339,8 @@ approved and audited.
 | `GIS_SPATIAL_JOIN_OK` | Point-in-polygon classification completed and wrote a spatial receipt |
 | `GIS_GEOMETRY_COMPARE_OK` | GeoJSON geometry comparison completed without CRS, topology, overlay, dimensionality, or unmatched-key warnings |
 | `GIS_GEOMETRY_COMPARE_WARN` | GeoJSON geometry comparison completed and recorded CRS, topology, overlay, dimensionality, or unmatched-key warnings |
+| `GIS_OVERLAY_OK` | Matched polygon overlay completed with derived output hash and closed accounting |
+| `GIS_OVERLAY_WARN` | Matched polygon overlay completed while recording unmatched features, empty results, unsupported geometry, topology, dimensionality, or non-polygon result residue |
 | `GIS_REPROJECT_OK` | GeoJSON reprojection completed with supported CRS, output hash, and row/coordinate conservation |
 | `GIS_REPROJECT_WARN` | GeoJSON reprojection completed while preserving no-op or null/empty geometry warnings |
 | `GIS_CSV_POINTS_OK` | CSV point conversion completed with required columns, output GeoJSON hash, and closed row accounting |
@@ -352,6 +368,14 @@ approved and audited.
 | `ERROR_GIS_PLANAR_OVERLAY_INVALID_GEOMETRY` | GIS comparison could not load a polygon geometry through the local Shapely overlay adapter |
 | `ERROR_GIS_PLANAR_OVERLAY_INVALID_TOPOLOGY` | GIS comparison found invalid polygon topology and recorded unresolved overlay residue instead of repairing it silently |
 | `ERROR_GIS_PLANAR_OVERLAY_RUNTIME` | GIS comparison hit an unexpected local Shapely overlay runtime failure and recorded unresolved residue |
+| `ERROR_GIS_OVERLAY_OPERATION` | GIS standalone overlay received an unsupported overlay operation |
+| `ERROR_GIS_OVERLAY_MATCH_MODE` | GIS standalone overlay received an unsupported feature matching mode |
+| `ERROR_GIS_OVERLAY_FEATURES_NOT_OBJECTS` | GIS standalone overlay found a non-object member in the feature array |
+| `ERROR_GIS_OVERLAY_CRS_MISMATCH` | GIS standalone overlay inputs declared different CRS values |
+| `ERROR_GIS_OVERLAY_DUPLICATE_FEATURE_KEYS` | GIS standalone overlay found duplicate match keys in one input |
+| `ERROR_GIS_OVERLAY_INVALID_GEOMETRY` | GIS standalone overlay could not load a polygon geometry through the local Shapely adapter |
+| `ERROR_GIS_OVERLAY_INVALID_TOPOLOGY` | GIS standalone overlay found invalid polygon topology and recorded unresolved residue instead of repairing it silently |
+| `ERROR_GIS_OVERLAY_RUNTIME` | GIS standalone overlay hit an unexpected local Shapely runtime failure and recorded unresolved residue |
 | `ERROR_GIS_INSPECT_TOPOLOGY_INVALID_GEOMETRY` | GeoJSON inspection could not load a geometry through the local Shapely topology adapter |
 | `ERROR_GIS_INSPECT_TOPOLOGY_INVALID` | GeoJSON inspection found invalid topology and recorded warning-state residue instead of repairing it silently |
 | `ERROR_GIS_REPROJECT_UNSUPPORTED_CRS` | GIS reprojection received a CRS or CRS pair outside the local supported set |

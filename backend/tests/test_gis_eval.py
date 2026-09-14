@@ -12,13 +12,13 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 16,
-        "passed": 16,
+        "cases": 18,
+        "passed": 18,
         "failed": 0,
-        "positive_cases": 11,
-        "negative_cases": 5,
-        "operations": 8,
-        "operation_names": ["bbox_filter", "clip_bbox", "compare", "csv_points", "inspect", "measure", "point_in_polygon", "reproject"],
+        "positive_cases": 12,
+        "negative_cases": 6,
+        "operations": 9,
+        "operation_names": ["bbox_filter", "clip_bbox", "compare", "csv_points", "inspect", "measure", "overlay", "point_in_polygon", "reproject"],
     }
     by_id = {case["case_id"]: case for case in report["cases"]}
     assert by_id["inspect_dimensionality"]["observed_status"] == "GIS_INSPECT_WARN"
@@ -37,6 +37,9 @@ def test_gis_eval_default_fixture_covers_core_operations():
         "GIS_GEOMETRY_DIFFERENCE_PRESENT",
         "GIS_PLANAR_OVERLAY_DIFFERENCE_PRESENT",
     ]
+    assert by_id["overlay_intersection_outputs_feature"]["observed_status"] == "GIS_OVERLAY_OK"
+    assert by_id["overlay_invalid_operation_fails_closed"]["case_type"] == "negative"
+    assert by_id["overlay_invalid_operation_fails_closed"]["observed_status"] == "ERROR_GIS_OVERLAY_OPERATION"
     assert by_id["reproject_wgs84_to_webmercator"]["observed_status"] == "GIS_REPROJECT_OK"
     assert by_id["csv_points_skip_invalid_rows"]["observed_status"] == "GIS_CSV_POINTS_WARN"
     assert by_id["csv_points_skip_invalid_rows"]["observed_warnings"] == ["GIS_CSV_INVALID_ROWS_SKIPPED"]

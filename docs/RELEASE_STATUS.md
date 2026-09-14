@@ -280,25 +280,28 @@ Observed success markers:
   vector until backend, CLI, provenance, capability, packaging, and hosted
   governance gates are stronger.
   Advanced GIS now has narrow local GeoJSON inspection with Shapely planar topology state, point-in-polygon,
-  geometry comparison with Polygon/MultiPolygon planar overlay metrics, limited EPSG:4326/EPSG:3857 reprojection, CSV
+  geometry comparison with Polygon/MultiPolygon planar overlay metrics, matched
+  Polygon/MultiPolygon overlay output receipts, limited EPSG:4326/EPSG:3857 reprojection, CSV
   point-to-GeoJSON conversion, bbox feature filtering, bbox geometry clipping,
   planar area/length measurement receipts, and bounded EPSG:4326 spherical geodesic measurement
   receipts plus a committed `mucaro eval gis` fixture
   harness covering dimensionality, invalid topology inspection, join multiplication, topology equality,
   planar overlay area difference, reprojection, CSV header/skipped-row/row-accounting evidence, bbox
   retained/excluded accounting, bbox clipped/unchanged/unresolved accounting,
+  standalone overlay output hashes and pair-state accounting,
   measurement units, polygon-hole area
   subtraction, line length, null measurement residue, geodesic meter units,
   fail-closed geodesic CRS mismatch, fail-closed invalid bbox extents,
-  fail-closed empty measurement units, and fail-closed invalid coordinates.
+  fail-closed empty measurement units, fail-closed invalid coordinates, and
+  fail-closed invalid overlay operations.
   `mucaro capabilities validate-gis-report` is the first
   executable capability-output validator: it checks saved GIS report schema,
   source/input hashes, CRS where present, warning consistency, asserted
-  conservation invariants, inspect topology fields, bbox filter/clip fields, and planar/geodesic measurement fields.
+	  conservation invariants, inspect topology fields, standalone overlay fields, bbox filter/clip fields, and planar/geodesic measurement fields.
   Full GIS maturity remains open until robust topology repair/operation support, ellipsoidal
   GIS-engine geodesic validation, broader CRS/datum/grid-shift/axis-order
-  support, standalone non-bbox overlay/clipping operations, independent planar
-  overlay validation, broader spatial format
+  support, broader overlay/clipping operations beyond matched polygon pairs and
+  bbox clipping, independent planar overlay validation, broader spatial format
   adapters, raster/vector processing, map/export provenance, and a broader GIS
   eval corpus are proven.
   State-of-the-art OCR

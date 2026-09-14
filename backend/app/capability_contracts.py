@@ -211,6 +211,54 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                         ),
                     ]
                 )
+    elif operation == "overlay_geojson_collections":
+        features = report.get("features")
+        state_counts = report.get("state_counts")
+        output_feature_count = _dotted(report, "invariants.output_feature_count")
+        emitted_feature_count = _dotted(report, "invariants.emitted_feature_count")
+        checks.extend(
+            [
+                _contract_check("overlay.match_on", report.get("match_on") in {"id", "index"}, "overlay reports must record id or index matching"),
+                _contract_check(
+                    "overlay.parameters.overlay_operation",
+                    _dotted(report, "parameters.overlay_operation") in {"difference", "intersection", "symmetric_difference", "union"},
+                    "overlay reports must record a supported operation",
+                ),
+                _contract_check("overlay.parameters.adapter", _dotted(report, "parameters.adapter") == "shapely_planar_overlay_v1", "overlay reports must name the Shapely planar overlay adapter"),
+                _contract_check("overlay.parameters.overlay_adapter", _dotted(report, "parameters.overlay_adapter") == "shapely_planar_overlay_v1", "overlay reports must record the explicit overlay adapter"),
+                _contract_check("overlay.output_hash", bool(_dotted(report, "output.sha256")), "overlay reports must record derived output hash"),
+                _contract_check("overlay.output_feature_count_present", isinstance(output_feature_count, int), "output_feature_count must be recorded"),
+                _contract_check("overlay.emitted_feature_count_present", isinstance(emitted_feature_count, int), "emitted_feature_count must be recorded"),
+                _contract_check("overlay.features_array", isinstance(features, list), "overlay reports must include per-pair receipts"),
+                _contract_check("overlay.state_counts_object", isinstance(state_counts, dict), "overlay reports must include state counts"),
+                _contract_check("overlay.crs_match", _dotted(report, "invariants.crs_match") is True, "overlay reports must prove matching CRS"),
+                _contract_check("overlay.feature_key_accounting_closed", _dotted(report, "invariants.feature_key_accounting_closed") is True, "feature-key accounting must close"),
+                _contract_check("overlay.pair_accounting_closed", _dotted(report, "invariants.overlay_pair_accounting_closed") is True, "overlay pair accounting must close"),
+                _contract_check("overlay.result_area_total_numeric", _is_number(_dotted(report, "invariants.result_area_total")), "result_area_total must be numeric"),
+                _contract_check("overlay.result_length_total_numeric", _is_number(_dotted(report, "invariants.result_length_total")), "result_length_total must be numeric"),
+            ]
+        )
+        if isinstance(features, list) and isinstance(state_counts, dict):
+            shared_feature_key_count = _dotted(report, "invariants.shared_feature_key_count")
+            pair_state_count = sum(
+                int(state_counts.get(key, 0))
+                for key in ("EMITTED", "EMPTY_INPUT", "EMPTY_RESULT", "UNRESOLVED", "UNSUPPORTED", "NON_POLYGON_RESULT")
+                if isinstance(state_counts.get(key, 0), int)
+            )
+            checks.append(
+                _contract_check(
+                    "overlay.shared_count_matches_receipts",
+                    isinstance(shared_feature_key_count, int) and shared_feature_key_count == len(features) == pair_state_count,
+                    "shared feature count must match per-pair receipts and overlay state counts",
+                )
+            )
+            checks.append(
+                _contract_check(
+                    "overlay.output_count_matches_emitted",
+                    isinstance(output_feature_count, int) and isinstance(emitted_feature_count, int) and output_feature_count == emitted_feature_count == int(state_counts.get("EMITTED", -1)),
+                    "output feature count must match emitted overlay count",
+                )
+            )
     elif operation == "compare_geojson_geometries":
         checks.extend(
             [
@@ -501,6 +549,10 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "bbox_filter_mode",
                 "clip_bbox",
                 "clip_adapter",
+                "overlay_operation",
+                "overlay_state",
+                "overlay_warning",
+                "overlay_adapter",
                 "geometry_type",
                 "feature_count",
                 "retained_feature_count",
@@ -541,6 +593,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "CSV-derived point features preserve raw properties and close source/output/skipped row counts",
                 "bbox filtering preserves CRS and closes retained/excluded feature counts",
                 "bbox clipping preserves CRS and closes retained/excluded/clipped/unchanged feature counts",
+                "standalone polygon overlay preserves CRS, writes output hashes, and closes feature-key and pair-state accounting",
                 "planar and geodesic measurements preserve CRS, units labels, per-feature residue, and total area/length accounting",
             ),
             positive_regression_gates=(
@@ -552,6 +605,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "CSV point fixture records header, source rows, output features, skipped rows, CRS, and output hash",
                 "bbox filter fixture records query bbox, filter mode, retained features, excluded features, NULL/EMPTY residue, CRS, and output hash",
                 "bbox clip fixture records query bbox, adapter identity, clipped features, unchanged features, unresolved Z/M residue, CRS, and output hash",
+                "standalone overlay fixture records matched polygon intersection output, adapter identity, output hash, and result area accounting",
                 "planar measurement fixture records polygon area with holes, line length, null residue, units, and aggregate totals",
                 "geodesic measurement fixture records EPSG:4326 source CRS, meter units, adapter identity, and aggregate totals",
                 "GIS report contract validator accepts real saved measurement receipts and rejects weak provenance or false accounting",
@@ -565,6 +619,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "bbox filtering fails closed on malformed query extents and unsupported modes",
                 "bbox clipping fails closed on malformed query extents and records Z/M dimensionality as unresolved residue",
                 "GeoJSON inspection records invalid topology as warning-state residue instead of repairing it silently",
+                "standalone overlay fails closed on CRS mismatch or invalid operation and records unsupported geometry, dimensional, empty, and topology residue without silent output synthesis",
                 "planar measurement fails closed on missing units and records invalid or unsupported geometries as residue",
                 "geodesic measurement fails closed for non-EPSG:4326 sources and records invalid longitude/latitude coordinates as residue",
                 "GIS report contract validation fails when warning status, source hashes, CRS, or asserted accounting are missing or inconsistent",
@@ -580,7 +635,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "limitations and falsification criteria",
             ),
             unavailable_until=(
-                "broader GIS engine adapter supports robust topology operations",
+                "broader GIS engine adapter supports robust topology and overlay operations beyond the current planar Polygon/MultiPolygon boundary",
                 "broader CRS, datum transformation, grid shift, axis-order, and vertical CRS support is explicit and receipt-backed",
                 "local spherical geodesic measurement is supplemented by ellipsoidal GIS-engine measurement and overlay checks where required",
                 "map/export provenance and broader spatial eval corpus are complete",

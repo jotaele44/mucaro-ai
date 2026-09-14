@@ -44,6 +44,7 @@ SUPPORTED_CLIP_GEOMETRY_TYPES = {
     "MultiPolygon",
 }
 SUPPORTED_OVERLAY_GEOMETRY_TYPES = {"Polygon", "MultiPolygon"}
+SUPPORTED_OVERLAY_OPERATIONS = {"difference", "intersection", "symmetric_difference", "union"}
 SUPPORTED_TOPOLOGY_GEOMETRY_TYPES = {
     "Point",
     "MultiPoint",
@@ -1776,6 +1777,18 @@ def _planar_overlay_metrics(left_geometry: Any, right_geometry: Any) -> dict[str
     }
 
 
+def _apply_overlay_operation(left_shape: Any, right_shape: Any, operation: str) -> Any:
+    if operation == "intersection":
+        return left_shape.intersection(right_shape)
+    if operation == "union":
+        return left_shape.union(right_shape)
+    if operation == "difference":
+        return left_shape.difference(right_shape)
+    if operation == "symmetric_difference":
+        return left_shape.symmetric_difference(right_shape)
+    raise GISProcessingError("ERROR_GIS_OVERLAY_OPERATION", f"Unsupported GIS overlay operation: {operation}")
+
+
 def _feature_key(feature: dict[str, Any], index: int, *, match_on: str) -> str:
     if match_on == "index":
         return f"index:{index}"
@@ -1790,6 +1803,318 @@ def _indexed_features(source: GeoJSONSource, *, match_on: str) -> dict[str, tupl
     for index, feature in enumerate(_features(source)):
         indexed[_feature_key(feature, index, match_on=match_on)] = (index, feature)
     return indexed
+
+
+def _duplicate_feature_keys(source: GeoJSONSource, *, match_on: str) -> list[str]:
+    counts: dict[str, int] = {}
+    for index, feature in enumerate(_features(source)):
+        key = _feature_key(feature, index, match_on=match_on)
+        counts[key] = counts.get(key, 0) + 1
+    return sorted(key for key, count in counts.items() if count > 1)
+
+
+def overlay_geojson_collections(
+    left_path: Path,
+    right_path: Path,
+    *,
+    cfg: Settings = settings,
+    operation: str = "intersection",
+    match_on: str = "id",
+) -> dict[str, Any]:
+    cfg.ensure_dirs()
+    normalized_operation = operation.strip().lower()
+    if normalized_operation not in SUPPORTED_OVERLAY_OPERATIONS:
+        raise GISProcessingError("ERROR_GIS_OVERLAY_OPERATION", f"Unsupported GIS overlay operation: {operation}")
+    if match_on not in {"id", "index"}:
+        raise GISProcessingError("ERROR_GIS_OVERLAY_MATCH_MODE", f"Unsupported GIS overlay match mode: {match_on}")
+
+    left_source = _load_geojson(left_path)
+    right_source = _load_geojson(right_path)
+    left_raw_features = left_source.payload.get("features")
+    right_raw_features = right_source.payload.get("features")
+    if not isinstance(left_raw_features, list) or not isinstance(right_raw_features, list):
+        raise GISProcessingError("ERROR_GIS_FEATURES_NOT_ARRAY", "GeoJSON FeatureCollection features must be an array.")
+    if not all(isinstance(feature, dict) for feature in left_raw_features) or not all(isinstance(feature, dict) for feature in right_raw_features):
+        raise GISProcessingError("ERROR_GIS_OVERLAY_FEATURES_NOT_OBJECTS", "All overlay input features must be objects.")
+    if left_source.crs != right_source.crs:
+        raise GISProcessingError("ERROR_GIS_OVERLAY_CRS_MISMATCH", "Overlay inputs must declare the same CRS.")
+
+    duplicate_keys = {
+        "left": _duplicate_feature_keys(left_source, match_on=match_on),
+        "right": _duplicate_feature_keys(right_source, match_on=match_on),
+    }
+    if duplicate_keys["left"] or duplicate_keys["right"]:
+        raise GISProcessingError("ERROR_GIS_OVERLAY_DUPLICATE_FEATURE_KEYS", f"Overlay input feature keys must be unique: {duplicate_keys}")
+
+    left_index = _indexed_features(left_source, match_on=match_on)
+    right_index = _indexed_features(right_source, match_on=match_on)
+    shared_keys = sorted(set(left_index) & set(right_index))
+    left_only = sorted(set(left_index) - set(right_index))
+    right_only = sorted(set(right_index) - set(left_index))
+    state_counts = {
+        "EMITTED": 0,
+        "EMPTY_INPUT": 0,
+        "EMPTY_RESULT": 0,
+        "UNRESOLVED": 0,
+        "UNSUPPORTED": 0,
+        "NON_POLYGON_RESULT": 0,
+        "UNMATCHED_LEFT": len(left_only),
+        "UNMATCHED_RIGHT": len(right_only),
+    }
+    feature_receipts: list[dict[str, Any]] = []
+    output_features: list[dict[str, Any]] = []
+    result_area_total = 0.0
+    result_length_total = 0.0
+
+    for key in shared_keys:
+        left_feature_index, left_feature = left_index[key]
+        right_feature_index, right_feature = right_index[key]
+        left_geometry = left_feature.get("geometry")
+        right_geometry = right_feature.get("geometry")
+        left_classification = _classify_geometry(left_geometry)
+        right_classification = _classify_geometry(right_geometry)
+        left_dimensions = _coordinate_dimension_summary(left_geometry if isinstance(left_geometry, dict) else None)
+        right_dimensions = _coordinate_dimension_summary(right_geometry if isinstance(right_geometry, dict) else None)
+        row: dict[str, Any] = {
+            "feature_key": key,
+            "left_feature_id": _feature_id(left_feature, left_feature_index),
+            "right_feature_id": _feature_id(right_feature, right_feature_index),
+            "left_feature_index": left_feature_index,
+            "right_feature_index": right_feature_index,
+            "left_geometry_type": left_classification["geometry_type"],
+            "right_geometry_type": right_classification["geometry_type"],
+            "left_geometry_status": left_classification["geometry_status"],
+            "right_geometry_status": right_classification["geometry_status"],
+            "left_coordinate_dimension": left_dimensions["coordinate_dimension"],
+            "right_coordinate_dimension": right_dimensions["coordinate_dimension"],
+            "overlay_state": None,
+            "overlay_warning": None,
+            "result_feature_id": None,
+            "result_geometry_type": None,
+            "result_area": None,
+            "result_length": None,
+            "warnings": [],
+        }
+
+        if left_classification["geometry_status"] == "NULL_EMPTY" or right_classification["geometry_status"] == "NULL_EMPTY":
+            row["overlay_state"] = "EMPTY_INPUT"
+            row["overlay_warning"] = "GIS_OVERLAY_NULL_EMPTY_INPUT"
+            row["warnings"] = ["GIS_OVERLAY_NULL_EMPTY_INPUT"]
+            state_counts["EMPTY_INPUT"] += 1
+            feature_receipts.append(row)
+            continue
+        if left_classification["geometry_status"] != "VALID" or right_classification["geometry_status"] != "VALID":
+            row["overlay_state"] = "UNRESOLVED"
+            row["overlay_warning"] = "GIS_OVERLAY_INVALID_INPUT_GEOMETRY"
+            row["warnings"] = [*left_classification["warnings"], *right_classification["warnings"], "GIS_OVERLAY_INVALID_INPUT_GEOMETRY"]
+            state_counts["UNRESOLVED"] += 1
+            feature_receipts.append(row)
+            continue
+        left_type = left_geometry.get("type") if isinstance(left_geometry, dict) else None
+        right_type = right_geometry.get("type") if isinstance(right_geometry, dict) else None
+        if left_type not in SUPPORTED_OVERLAY_GEOMETRY_TYPES or right_type not in SUPPORTED_OVERLAY_GEOMETRY_TYPES:
+            row["overlay_state"] = "UNSUPPORTED"
+            row["overlay_warning"] = "GIS_OVERLAY_UNSUPPORTED_GEOMETRY"
+            row["warnings"] = ["GIS_OVERLAY_UNSUPPORTED_GEOMETRY"]
+            state_counts["UNSUPPORTED"] += 1
+            feature_receipts.append(row)
+            continue
+        if left_dimensions["has_z"] or left_dimensions["has_m"] or right_dimensions["has_z"] or right_dimensions["has_m"]:
+            row["overlay_state"] = "UNRESOLVED"
+            row["overlay_warning"] = "GIS_OVERLAY_COORDINATE_DIMENSION_UNSUPPORTED"
+            row["warnings"] = ["GIS_OVERLAY_COORDINATE_DIMENSION_UNSUPPORTED"]
+            state_counts["UNRESOLVED"] += 1
+            feature_receipts.append(row)
+            continue
+
+        try:
+            left_shape = _shapely_geojson_geometry(
+                left_geometry,
+                invalid_status="ERROR_GIS_OVERLAY_INVALID_GEOMETRY",
+                topology_status="ERROR_GIS_OVERLAY_INVALID_TOPOLOGY",
+            )
+            right_shape = _shapely_geojson_geometry(
+                right_geometry,
+                invalid_status="ERROR_GIS_OVERLAY_INVALID_GEOMETRY",
+                topology_status="ERROR_GIS_OVERLAY_INVALID_TOPOLOGY",
+            )
+            result_shape = _apply_overlay_operation(left_shape, right_shape, normalized_operation)
+        except GISProcessingError as exc:
+            row["overlay_state"] = "UNRESOLVED"
+            row["overlay_warning"] = exc.status
+            row["warnings"] = [exc.status]
+            state_counts["UNRESOLVED"] += 1
+            feature_receipts.append(row)
+            continue
+        except (AttributeError, ShapelyError, TypeError, ValueError) as exc:
+            row["overlay_state"] = "UNRESOLVED"
+            row["overlay_warning"] = "ERROR_GIS_OVERLAY_RUNTIME"
+            row["warnings"] = ["ERROR_GIS_OVERLAY_RUNTIME"]
+            row["error_detail"] = str(exc)
+            state_counts["UNRESOLVED"] += 1
+            feature_receipts.append(row)
+            continue
+
+        if result_shape.is_empty:
+            row["overlay_state"] = "EMPTY_RESULT"
+            state_counts["EMPTY_RESULT"] += 1
+            feature_receipts.append(row)
+            continue
+        result_geometry = _json_geometry(shapely_mapping(result_shape))
+        result_geometry_type = result_geometry.get("type") if isinstance(result_geometry, dict) else None
+        if result_geometry_type not in SUPPORTED_OVERLAY_GEOMETRY_TYPES:
+            row["overlay_state"] = "NON_POLYGON_RESULT"
+            row["overlay_warning"] = f"GIS_OVERLAY_NON_POLYGON_RESULT:{result_geometry_type}"
+            row["warnings"] = [str(row["overlay_warning"])]
+            row["result_geometry_type"] = result_geometry_type
+            state_counts["NON_POLYGON_RESULT"] += 1
+            feature_receipts.append(row)
+            continue
+
+        result_area = round(float(result_shape.area), 12)
+        result_length = round(float(result_shape.length), 12)
+        result_feature_id = stable_id("gisoverlay", normalized_operation, key, left_source.sha256, right_source.sha256)
+        output_features.append(
+            {
+                "type": "Feature",
+                "id": result_feature_id,
+                "properties": {
+                    "overlay_operation": normalized_operation,
+                    "feature_key": key,
+                    "left_feature_id": row["left_feature_id"],
+                    "right_feature_id": row["right_feature_id"],
+                    "left_feature_index": left_feature_index,
+                    "right_feature_index": right_feature_index,
+                    "left_source_sha256": left_source.sha256,
+                    "right_source_sha256": right_source.sha256,
+                },
+                "geometry": result_geometry,
+            }
+        )
+        row.update(
+            {
+                "overlay_state": "EMITTED",
+                "result_feature_id": result_feature_id,
+                "result_geometry_type": result_geometry_type,
+                "result_area": result_area,
+                "result_length": result_length,
+            }
+        )
+        state_counts["EMITTED"] += 1
+        result_area_total += result_area
+        result_length_total += result_length
+        feature_receipts.append(row)
+
+    created_at = utc_now()
+    report_id = stable_id(
+        "gisreport",
+        "overlay",
+        normalized_operation,
+        left_source.sha256,
+        right_source.sha256,
+        match_on,
+        created_at,
+    )
+    output_payload = {
+        "type": "FeatureCollection",
+        "crs": {"type": "name", "properties": {"name": left_source.crs}},
+        "features": output_features,
+    }
+    output = _write_geojson_output(cfg, report_id, output_payload)
+    warnings = [
+        warning
+        for warning in [
+            "GIS_UNMATCHED_FEATURES" if left_only or right_only else "",
+            "GIS_OVERLAY_EMPTY_INPUTS" if state_counts["EMPTY_INPUT"] else "",
+            "GIS_OVERLAY_EMPTY_RESULTS" if state_counts["EMPTY_RESULT"] else "",
+            "GIS_OVERLAY_UNSUPPORTED_GEOMETRY" if state_counts["UNSUPPORTED"] else "",
+            "GIS_OVERLAY_UNRESOLVED" if state_counts["UNRESOLVED"] else "",
+            "GIS_OVERLAY_NON_POLYGON_RESULTS" if state_counts["NON_POLYGON_RESULT"] else "",
+        ]
+        if warning
+    ]
+    pair_state_count = (
+        state_counts["EMITTED"]
+        + state_counts["EMPTY_INPUT"]
+        + state_counts["EMPTY_RESULT"]
+        + state_counts["UNRESOLVED"]
+        + state_counts["UNSUPPORTED"]
+        + state_counts["NON_POLYGON_RESULT"]
+    )
+    report = {
+        "schema_version": GIS_REPORT_SCHEMA_VERSION,
+        "report_id": report_id,
+        "status": "GIS_OVERLAY_OK" if not warnings else "GIS_OVERLAY_WARN",
+        "operation": "overlay_geojson_collections",
+        "created_at": created_at,
+        "match_on": match_on,
+        "parameters": {
+            "overlay_operation": normalized_operation,
+            "match_on": match_on,
+            "adapter": "shapely_planar_overlay_v1",
+            "overlay_adapter": "shapely_planar_overlay_v1",
+            "supported_operations": sorted(SUPPORTED_OVERLAY_OPERATIONS),
+            "supported_geometry_types": sorted(SUPPORTED_OVERLAY_GEOMETRY_TYPES),
+        },
+        "inputs": {
+            "left": {
+                "path": str(left_path),
+                "sha256": left_source.sha256,
+                "crs": left_source.crs,
+                "crs_status": left_source.crs_status,
+                "feature_count": len(left_raw_features),
+            },
+            "right": {
+                "path": str(right_path),
+                "sha256": right_source.sha256,
+                "crs": right_source.crs,
+                "crs_status": right_source.crs_status,
+                "feature_count": len(right_raw_features),
+            },
+        },
+        "output": {
+            "path": output["path"],
+            "sha256": output["sha256"],
+            "crs": left_source.crs,
+            "feature_count": len(output_features),
+        },
+        "left_only_feature_keys": left_only,
+        "right_only_feature_keys": right_only,
+        "features": feature_receipts,
+        "state_counts": state_counts,
+        "invariants": {
+            "crs_match": True,
+            "left_feature_count": len(left_raw_features),
+            "right_feature_count": len(right_raw_features),
+            "shared_feature_key_count": len(shared_keys),
+            "left_only_count": len(left_only),
+            "right_only_count": len(right_only),
+            "output_feature_count": len(output_features),
+            "emitted_feature_count": state_counts["EMITTED"],
+            "empty_input_count": state_counts["EMPTY_INPUT"],
+            "empty_result_count": state_counts["EMPTY_RESULT"],
+            "unresolved_pair_count": state_counts["UNRESOLVED"],
+            "unsupported_pair_count": state_counts["UNSUPPORTED"],
+            "non_polygon_result_count": state_counts["NON_POLYGON_RESULT"],
+            "feature_key_accounting_closed": len(shared_keys) + len(left_only) + len(right_only) == len(set(left_index) | set(right_index)),
+            "overlay_pair_accounting_closed": pair_state_count == len(shared_keys),
+            "result_area_total": round(result_area_total, 12),
+            "result_length_total": round(result_length_total, 12),
+        },
+        "warnings": warnings,
+        "limitations": [
+            "standalone overlay is limited to matched Polygon and MultiPolygon pairs",
+            "overlay uses Shapely planar operations in the input CRS and does not transform CRS",
+            "Z and M coordinates remain unresolved instead of being flattened into XY output",
+            "lower-dimensional or geometry-collection overlay results are recorded as residue, not emitted",
+        ],
+        "falsification_criteria": [
+            "reject the overlay if feature_key_accounting_closed or overlay_pair_accounting_closed is false",
+            "reject derived-output claims if output sha256 or output_feature_count does not match the saved GeoJSON",
+            "reject planar overlay results for geodesic, legal-boundary, or engineering use without independent GIS-engine validation",
+        ],
+    }
+    return _write_report(cfg, report)
 
 
 def compare_geojson_geometries(
