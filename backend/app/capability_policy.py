@@ -9,8 +9,7 @@ KNOWN_CAPABILITIES = frozenset(
     {
         "filesystem.read",
         "filesystem.write",
-        "network.fetch",
-        "network.render",
+        "network.public_http",
         "database.read",
         "database.write",
         "subprocess.execute",
@@ -22,6 +21,14 @@ KNOWN_CAPABILITIES = frozenset(
         "runtime.federation_worker",
     }
 )
+
+RUNTIME_CAPABILITY = {
+    "IN_PROCESS": "runtime.in_process",
+    "LOCAL_WORKER": "runtime.local_worker",
+    "CONTAINER": "runtime.container",
+    "SERVICE": "runtime.service",
+    "FEDERATION_WORKER": "runtime.federation_worker",
+}
 
 
 @dataclass(frozen=True)
