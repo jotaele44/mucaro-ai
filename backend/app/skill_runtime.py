@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -86,6 +87,18 @@ def _health_skill(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     }
 
 
+def _local_worker_health_skill(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    del arguments
+    cfg.ensure_dirs()
+    sensitive_keys = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "MUCARO_AI_OPERATOR_TOKEN")
+    return {
+        "status": "LOCAL_WORKER_HEALTH_OK",
+        "pid": os.getpid(),
+        "project_root": str(cfg.project_root),
+        "sensitive_environment_present": [key for key in sensitive_keys if os.getenv(key)],
+    }
+
+
 SKILL_REGISTRY: dict[str, SkillDefinition] = {
     "mucaro/intelligence-plane-health": SkillDefinition(
         skill_id="mucaro/intelligence-plane-health",
@@ -96,6 +109,16 @@ SKILL_REGISTRY: dict[str, SkillDefinition] = {
         input_schema="mucaro.skill-input/1.0",
         output_schema="mucaro.intelligence-plane-health/1.0",
         handler=_health_skill,
+    ),
+    "mucaro/local-worker-health": SkillDefinition(
+        skill_id="mucaro/local-worker-health",
+        version="1.0.0",
+        description="Return bounded local-worker process and environment health evidence.",
+        runtime="LOCAL_WORKER",
+        capabilities=(),
+        input_schema="mucaro.skill-input/1.0",
+        output_schema="mucaro.local-worker-health/1.0",
+        handler=_local_worker_health_skill,
     ),
 }
 
