@@ -4,7 +4,7 @@ from typing import Any, Callable
 
 from .capability_policy import RUNTIME_CAPABILITY
 from .config import Settings
-from .container_runtime import run_container_worker
+from .container_runtime import ContainerRuntimeError, get_container_binding, run_container_worker
 from .local_worker import run_local_worker
 
 ROUTER_SCHEMA_VERSION = "mucaro-execution-router/1.0"
@@ -43,7 +43,6 @@ def execute_routed(
     arguments: dict[str, Any],
     cfg: Settings,
     policy_decision: dict[str, Any],
-    container_image: str | None = None,
 ) -> dict[str, Any]:
     route = select_execution_route(runtime, policy_decision)
     if route == "IN_PROCESS":
@@ -71,20 +70,23 @@ def execute_routed(
             "adapter_receipt": worker,
         }
     if route == "CONTAINER":
-        if not container_image:
-            raise ExecutionRouterError("ERROR_EXECUTION_ROUTE_CONTAINER_IMAGE", "container skill has no pinned image")
+        try:
+            binding = get_container_binding(skill_id)
+        except ContainerRuntimeError as exc:
+            raise ExecutionRouterError(exc.status, exc.detail) from exc
         granted = set(policy_decision.get("granted", []))
         container = run_container_worker(
             project_root=cfg.project_root,
             skill_id=skill_id,
-            image=container_image,
+            image=binding.image,
             arguments=arguments,
             network_allowed="network.public_http" in granted,
         )
+        receipt = {**container, "binding": binding.as_dict()}
         return {
             "route": route,
             "result": container.get("result"),
-            "adapter_receipt": container,
+            "adapter_receipt": receipt,
         }
     if route not in SUPPORTED_ROUTES:
         raise ExecutionRouterError("ERROR_EXECUTION_ROUTE_UNAVAILABLE", route)
