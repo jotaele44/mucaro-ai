@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/artifact_identity.schema.json",
+  "title": "Mucaro Artifact Identity 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "artifact_type",
+    "sha256",
+    "byte_size",
+    "logical_identity",
+    "producer",
+    "producer_version",
+    "created_utc",
+    "parent_artifact_ids"
+  ],
+  "properties": {
+    "schema_version": {"const": "mucaro-artifact/1.0"},
+    "artifact_id": {"type": "string", "minLength": 1},
+    "artifact_type": {"enum": ["SOURCE", "PARSED", "INTERMEDIATE", "DERIVED", "EXPORT", "RECEIPT"]},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "byte_size": {"type": "integer", "minimum": 0},
+    "logical_identity": {"type": "string", "minLength": 1},
+    "producer": {"type": "string", "minLength": 1},
+    "producer_version": {"type": "string", "minLength": 1},
+    "created_utc": {"type": "string", "minLength": 1},
+    "parent_artifact_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "schema_id": {"type": ["string", "null"]},
+    "source_path_or_uri": {"type": ["string", "null"]}
+  }
+}
