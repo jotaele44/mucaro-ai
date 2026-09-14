@@ -95,6 +95,14 @@ def test_denominator_rejects_unknown_state_and_track() -> None:
     assert any("track invalid" in error for error in report.errors)
 
 
+def test_denominator_accepts_explicit_fail_as_zero_credit_regression_state() -> None:
+    payload = copy.deepcopy(load_denominator(PROJECT_ROOT))
+    payload["requirements"][0]["state"] = "FAIL"
+    report = validate_denominator(payload)
+    assert report.status == "MUCARO_V1_DENOMINATOR_OK"
+    assert DENOMINATOR_SCORING.get("FAIL", 0.0) == 0.0
+
+
 def test_denominator_rejects_weight_drift() -> None:
     payload = copy.deepcopy(load_denominator(PROJECT_ROOT))
     payload["tracks"]["GIS"]["weight"] = 13
