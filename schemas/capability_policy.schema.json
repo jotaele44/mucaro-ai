@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/capability_policy.schema.json",
+  "title": "Mucaro Capability Policy 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "policy_id", "allowed", "denied"],
+  "properties": {
+    "schema_version": {"const": "mucaro-capability-policy/1.0"},
+    "policy_id": {"type": "string", "minLength": 1},
+    "allowed": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/capability"}
+    },
+    "denied": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/capability"}
+    }
+  },
+  "$defs": {
+    "capability": {
+      "type": "string",
+      "enum": [
+        "filesystem.read",
+        "filesystem.write",
+        "network.public_http",
+        "database.read",
+        "database.write",
+        "subprocess.execute",
+        "model.invoke",
+        "runtime.in_process",
+        "runtime.local_worker",
+        "runtime.container",
+        "runtime.service",
+        "runtime.federation_worker"
+      ]
+    }
+  }
+}
