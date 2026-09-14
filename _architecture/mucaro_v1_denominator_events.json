@@ -1,0 +1,44 @@
+{
+  "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
+  "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
+  "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
+  "audit_head": "95996cfd1ae8baa0f8bec18548ed6812bee533cf",
+  "events": [
+    {
+      "event_id": "evt-bc07-policy-pass",
+      "requirement_id": "BC-07",
+      "from_state": "OPEN",
+      "to_state": "PASS",
+      "evidence_type": "MERGED_SOURCE_AND_REGRESSION_GATES",
+      "evidence": ["PR#6", "merge lineage on main"],
+      "reason": "Capability policy engine, explicit capability vocabulary, deny-by-default enforcement, runtime authorization, no-self-escalation gates, and regression coverage merged."
+    },
+    {
+      "event_id": "evt-bc08-worker-pass",
+      "requirement_id": "BC-08",
+      "from_state": "OPEN",
+      "to_state": "PASS",
+      "evidence_type": "MERGED_SOURCE_AND_REGRESSION_GATES",
+      "evidence": ["PR#9", "merge lineage on main"],
+      "reason": "Out-of-process LOCAL_WORKER, bounded protocol, resource ceilings, environment isolation, runtime mismatch handling, and positive/negative regression coverage merged."
+    },
+    {
+      "event_id": "evt-bc09-container-provisional",
+      "requirement_id": "BC-09",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_SOURCE_BOUNDARY_WITH_UNCERTIFIED_LIVE_RUNTIME",
+      "evidence": ["PR#10", "PR#11", "main@95996cfd1ae8baa0f8bec18548ed6812bee533cf"],
+      "reason": "Policy-driven router and pinned container boundary are merged, but live container image/engine execution remains explicitly uncertified."
+    },
+    {
+      "event_id": "evt-pr10-runtime-provisional",
+      "requirement_id": "PR-10",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_RUNTIME_IDENTITY_WITH_SCOPE_RESIDUE",
+      "evidence": ["PR#8", "PR#10", "PR#11"],
+      "reason": "Runtime/toolchain identity is bound to Skill Fabric execution receipts, but universal binding across every advanced-capability derivation is not yet closed."
+    }
+  ]
+}
