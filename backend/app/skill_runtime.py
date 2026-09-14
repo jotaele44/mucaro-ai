@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from .capability_policy import CapabilityPolicy, RUNTIME_CAPABILITY, evaluate_capabilities
 from .config import Settings, settings
+from .runtime_identity import build_runtime_identity
 from .utils import read_json, stable_id, utc_now, write_json
 
 SKILL_MOUNTS_NAME = "skill_mounts.json"
@@ -270,6 +271,13 @@ def execute_skill(
     if not isinstance(policy_decision, dict) or policy_decision.get("status") != "AUTHORIZED":
         raise SkillRuntimeError("ERROR_SKILL_POLICY_NOT_AUTHORIZED", skill_id)
 
+    runtime_identity = build_runtime_identity(
+        project_root=cfg.project_root,
+        runtime=skill.runtime,
+        skill_id=skill.skill_id,
+        skill_version=skill.version,
+        skill_digest=skill.digest,
+    )
     started_at = utc_now()
     execution_id = stable_id(
         "skillexec",
@@ -294,6 +302,7 @@ def execute_skill(
         "skill_version": skill.version,
         "skill_digest": skill.digest,
         "runtime": skill.runtime,
+        "runtime_identity": runtime_identity,
         "executed_by": executed_by,
         "started_at": started_at,
         "finished_at": finished_at,
