@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 CONTAINER_PROTOCOL = "mucaro-container-worker/1.0"
+CONTAINER_BINDING_SCHEMA_VERSION = "mucaro-container-binding/1.0"
 PINNED_IMAGE_PATTERN = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_OUTPUT_BYTES = 2 * 1024 * 1024
@@ -23,6 +26,33 @@ class ContainerRuntimeError(RuntimeError):
         self.detail = detail
 
 
+@dataclass(frozen=True)
+class ContainerBinding:
+    skill_id: str
+    image: str
+
+    @property
+    def digest(self) -> str:
+        validate_pinned_image(self.image)
+        payload = json.dumps(
+            {"schema_version": CONTAINER_BINDING_SCHEMA_VERSION, "skill_id": self.skill_id, "image": self.image},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
+    def as_dict(self) -> dict[str, str]:
+        return {
+            "schema_version": CONTAINER_BINDING_SCHEMA_VERSION,
+            "skill_id": self.skill_id,
+            "image": validate_pinned_image(self.image),
+            "binding_sha256": self.digest,
+        }
+
+
+CONTAINER_IMAGE_BINDINGS: dict[str, ContainerBinding] = {}
+
+
 def validate_pinned_image(image: str) -> str:
     if not isinstance(image, str) or not PINNED_IMAGE_PATTERN.fullmatch(image):
         raise ContainerRuntimeError(
@@ -30,6 +60,14 @@ def validate_pinned_image(image: str) -> str:
             "container image must use immutable name@sha256:<64 lowercase hex> form",
         )
     return image
+
+
+def get_container_binding(skill_id: str) -> ContainerBinding:
+    binding = CONTAINER_IMAGE_BINDINGS.get(skill_id)
+    if binding is None:
+        raise ContainerRuntimeError("ERROR_CONTAINER_BINDING_MISSING", skill_id)
+    validate_pinned_image(binding.image)
+    return binding
 
 
 def resolve_container_engine(preferred: str | None = None) -> str:
