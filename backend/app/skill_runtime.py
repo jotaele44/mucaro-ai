@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from .capability_policy import CapabilityPolicy, RUNTIME_CAPABILITY, evaluate_capabilities
 from .config import Settings, settings
+from .execution_router import ExecutionRouterError, execute_routed, select_execution_route
 from .runtime_identity import build_runtime_identity
 from .utils import read_json, stable_id, utc_now, write_json
 
@@ -294,9 +295,13 @@ def execute_skill(
     if not isinstance(policy_decision, dict) or policy_decision.get("status") != "AUTHORIZED":
         raise SkillRuntimeError("ERROR_SKILL_POLICY_NOT_AUTHORIZED", skill_id)
 
+    try:
+        route = select_execution_route(skill.runtime, policy_decision)
+    except ExecutionRouterError as exc:
+        raise SkillRuntimeError(exc.status, exc.detail) from exc
     runtime_identity = build_runtime_identity(
         project_root=cfg.project_root,
-        runtime=skill.runtime,
+        runtime=route,
         skill_id=skill.skill_id,
         skill_version=skill.version,
         skill_digest=skill.digest,
@@ -311,11 +316,21 @@ def execute_skill(
         started_at,
     )
     try:
-        result = skill.handler(arguments, cfg)
+        routed = execute_routed(
+            runtime=route,
+            skill_id=skill_id,
+            handler=skill.handler,
+            arguments=arguments,
+            cfg=cfg,
+            policy_decision=policy_decision,
+        )
+        result = routed["result"]
+        adapter_receipt = routed["adapter_receipt"]
         status = "PASS"
         error = None
     except Exception as exc:
         result = None
+        adapter_receipt = None
         status = "FAIL"
         error = {"type": type(exc).__name__, "detail": str(exc)}
     finished_at = utc_now()
@@ -325,7 +340,9 @@ def execute_skill(
         "skill_version": skill.version,
         "skill_digest": skill.digest,
         "runtime": skill.runtime,
+        "execution_route": route,
         "runtime_identity": runtime_identity,
+        "adapter_receipt": adapter_receipt,
         "executed_by": executed_by,
         "started_at": started_at,
         "finished_at": finished_at,
