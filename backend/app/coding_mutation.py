@@ -8,6 +8,7 @@ from typing import Any
 from .coding_patch import validate_patch_proposal
 from .coding_workspace import inspect_repository, resolve_repository
 from .config import Settings, settings
+from .permissions import is_within_path
 
 CODING_MUTATION_SCHEMA_VERSION = "mucaro-coding-mutation/1.0"
 
@@ -45,11 +46,16 @@ def _git_apply(repo_root: Path, patch_bytes: bytes, *, reverse: bool = False) ->
 
 def _current_preimage(repo_root: Path, path: str) -> dict[str, Any]:
     target = (repo_root / path).resolve()
+    if not is_within_path(target, repo_root):
+        raise CodingMutationError("ERROR_CODING_MUTATION_PATH_BOUNDARY", path)
     if not target.exists():
         return {"path": path, "state": "MISSING", "byte_size": None, "sha256": None}
     if not target.is_file():
         return {"path": path, "state": "NON_FILE", "byte_size": None, "sha256": None}
-    raw = target.read_bytes()
+    try:
+        raw = target.read_bytes()
+    except OSError as exc:
+        raise CodingMutationError("ERROR_CODING_MUTATION_FILE_READ", path) from exc
     return {"path": path, "state": "EXISTS", "byte_size": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
 
 
@@ -74,6 +80,27 @@ def _normalize_expected_preimages(value: list[dict[str, Any]]) -> list[dict[str,
     return sorted(rows, key=lambda item: item["path"])
 
 
+def _rollback_and_raise(
+    repo_root: Path,
+    patch_bytes: bytes,
+    expected: list[dict[str, Any]],
+    receipt: dict[str, Any],
+    detail: str,
+) -> None:
+    rollback_ok, rollback_detail = _git_apply(repo_root, patch_bytes, reverse=True)
+    restored = sorted((_current_preimage(repo_root, row["path"]) for row in expected), key=lambda item: item["path"])
+    rollback_succeeded = bool(rollback_ok and restored == expected)
+    receipt.update(
+        {
+            "rollback_attempted": True,
+            "rollback_succeeded": rollback_succeeded,
+            "rollback_detail": rollback_detail or None,
+            "status": "CODING_MUTATION_ROLLED_BACK" if rollback_succeeded else "CODING_MUTATION_ROLLBACK_FAILED",
+        }
+    )
+    raise CodingMutationError(receipt["status"], detail, receipt=receipt)
+
+
 def apply_patch_transaction(
     repo_root: str | Path,
     patch: str,
@@ -86,10 +113,7 @@ def apply_patch_transaction(
     context = resolve_repository(repo_root, cfg)
     before = inspect_repository(context.repo_root, cfg=cfg)
     if before["head_sha"] != expected_head_sha:
-        raise CodingMutationError(
-            "ERROR_CODING_MUTATION_HEAD_DRIFT",
-            f"expected {expected_head_sha}, observed {before['head_sha']}",
-        )
+        raise CodingMutationError("ERROR_CODING_MUTATION_HEAD_DRIFT", f"expected {expected_head_sha}, observed {before['head_sha']}")
 
     patch_bytes = patch.encode("utf-8")
     observed_patch_sha256 = hashlib.sha256(patch_bytes).hexdigest()
@@ -104,10 +128,7 @@ def apply_patch_transaction(
 
     expected = _normalize_expected_preimages(expected_preimages)
     if [row["path"] for row in expected] != proposal["patch_paths"]:
-        raise CodingMutationError(
-            "ERROR_CODING_MUTATION_CANDIDATE_DRIFT",
-            "approved preimage path set does not equal current patch candidate set",
-        )
+        raise CodingMutationError("ERROR_CODING_MUTATION_CANDIDATE_DRIFT", "approved preimage path set does not equal current patch candidate set")
     observed_preimages = sorted((_current_preimage(context.repo_root, row["path"]) for row in expected), key=lambda item: item["path"])
     if observed_preimages != expected:
         raise CodingMutationError("ERROR_CODING_MUTATION_PREIMAGE_DRIFT", "one or more approved patch preimages changed")
@@ -123,30 +144,8 @@ def apply_patch_transaction(
     newly_dirty = sorted(after_dirty - before_dirty)
     unexpected_new_dirty = sorted(set(newly_dirty) - set(proposal["patch_paths"]))
 
-    if unexpected_new_dirty:
-        rollback_ok, rollback_detail = _git_apply(context.repo_root, patch_bytes, reverse=True)
-        restored = sorted((_current_preimage(context.repo_root, row["path"]) for row in expected), key=lambda item: item["path"])
-        rollback_succeeded = bool(rollback_ok and restored == expected)
-        receipt = {
-            "schema_version": CODING_MUTATION_SCHEMA_VERSION,
-            "status": "CODING_MUTATION_ROLLED_BACK" if rollback_succeeded else "CODING_MUTATION_ROLLBACK_FAILED",
-            "repo_root": str(context.repo_root),
-            "head_sha": before["head_sha"],
-            "patch_sha256": observed_patch_sha256,
-            "patch_paths": proposal["patch_paths"],
-            "preimages": observed_preimages,
-            "postimages_before_rollback": postimages,
-            "newly_dirty_paths": newly_dirty,
-            "unexpected_new_dirty_paths": unexpected_new_dirty,
-            "rollback_attempted": True,
-            "rollback_succeeded": rollback_succeeded,
-            "rollback_detail": rollback_detail or None,
-        }
-        raise CodingMutationError(receipt["status"], "mutation produced unexpected dirty paths", receipt=receipt)
-
-    return {
+    base_receipt = {
         "schema_version": CODING_MUTATION_SCHEMA_VERSION,
-        "status": "CODING_MUTATION_APPLIED",
         "repo_root": str(context.repo_root),
         "head_sha": before["head_sha"],
         "branch": before["branch"],
@@ -155,12 +154,22 @@ def apply_patch_transaction(
         "preimages": observed_preimages,
         "postimages": postimages,
         "newly_dirty_paths": newly_dirty,
-        "unexpected_new_dirty_paths": [],
+        "unexpected_new_dirty_paths": unexpected_new_dirty,
+    }
+    if after["head_sha"] != before["head_sha"]:
+        _rollback_and_raise(context.repo_root, patch_bytes, expected, base_receipt, "mutation changed repository HEAD")
+    if unexpected_new_dirty:
+        _rollback_and_raise(context.repo_root, patch_bytes, expected, base_receipt, "mutation produced unexpected dirty paths")
+
+    return {
+        **base_receipt,
+        "status": "CODING_MUTATION_APPLIED",
         "rollback_attempted": False,
         "rollback_succeeded": None,
         "mutation_performed": True,
         "invariants": {
             "head_revalidated": True,
+            "head_conserved_after_mutation": True,
             "patch_hash_revalidated": True,
             "preimages_revalidated": True,
             "dirty_overlap_absent": True,
@@ -171,12 +180,13 @@ def apply_patch_transaction(
             "this transaction applies a pre-approved Git patch only; arbitrary shell mutation is not exposed",
             "HEAD is intentionally unchanged because the transaction does not commit",
             "unrelated pre-existing dirty paths are preserved and excluded from patch targets",
+            "rollback is best-effort and rollback failure remains explicit material residue",
         ],
         "falsification_criteria": [
-            "reject HEAD drift",
+            "reject HEAD drift before mutation",
             "reject patch-byte drift",
             "reject preimage drift or candidate-set drift",
             "reject dirty overlap with patch targets",
-            "rollback if mutation introduces paths outside the approved candidate set",
+            "rollback if HEAD changes or mutation introduces paths outside the approved candidate set",
         ],
     }
