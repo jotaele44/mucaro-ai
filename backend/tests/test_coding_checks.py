@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
-from backend.app.coding_checks import CodingCheck, run_coding_check_suite
+import pytest
+
+import backend.app.coding_container as coding_container
+from backend.app.coding_checks import CodingCheck, CodingCheckError, build_coding_check_suite_plan
 from backend.app.config import Settings
 
 PINNED = "ghcr.io/jotaele44/mucaro-coding@sha256:" + "a" * 64
@@ -24,83 +28,78 @@ def make_settings(root: Path) -> Settings:
     return cfg
 
 
-def test_check_suite_closes_accounting_and_fails_required_checks(tmp_path: Path, monkeypatch) -> None:
+def git(repo: Path, *args: str) -> None:
+    proc = subprocess.run(["git", *args], cwd=repo, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    assert proc.returncode == 0, proc.stderr
+
+
+def make_repo(root: Path) -> Path:
+    repo = root / "repo"
+    repo.mkdir()
+    git(repo, "init")
+    git(repo, "config", "user.email", "mucaro-tests@example.invalid")
+    git(repo, "config", "user.name", "Mucaro Tests")
+    (repo / "tracked.txt").write_text("alpha\n", encoding="utf-8")
+    git(repo, "add", "tracked.txt")
+    git(repo, "commit", "-m", "initial")
+    return repo
+
+
+def test_check_suite_plan_closes_accounting_without_execution(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = make_settings(tmp_path)
-    calls = []
+    repo = make_repo(tmp_path)
+    monkeypatch.setattr(coding_container, "resolve_container_engine", lambda preferred=None: preferred or "/usr/bin/docker")
 
-    class Plan:
-        def __init__(self, command):
-            self.command = tuple(command)
-
-    def fake_plan(repo_root, *, image, command, cfg, mount_mode, network_allowed):
-        calls.append((tuple(command), mount_mode, network_allowed))
-        return Plan(command)
-
-    def fake_execute(plan):
-        passed = "fail" not in plan.command
-        return {
-            "status": "CODING_CONTAINER_PASS" if passed else "CODING_CONTAINER_FAIL",
-            "returncode": 0 if passed else 1,
-            "stdout": "ok" if passed else "",
-            "stderr": "" if passed else "failed",
-            "stdout_sha256": "a" * 64,
-            "stderr_sha256": "b" * 64,
-            "stdout_bytes": 2 if passed else 0,
-            "stderr_bytes": 0 if passed else 6,
-            "plan_sha256": "c" * 64,
-            "image": PINNED,
-            "network_allowed": False,
-            "mount_mode": "read_only",
-        }
-
-    monkeypatch.setattr("backend.app.coding_checks.build_coding_container_plan", fake_plan)
-    monkeypatch.setattr("backend.app.coding_checks.execute_coding_container", fake_execute)
-
-    report = run_coding_check_suite(
-        tmp_path,
+    report = build_coding_check_suite_plan(
+        repo,
         image=PINNED,
         cfg=cfg,
         checks=[
             CodingCheck("pytest", "test", ("pytest", "-q"), True),
             CodingCheck("lint", "lint", ("ruff", "check", "."), True),
-            CodingCheck("optional", "benchmark", ("fail",), False),
+            CodingCheck("types", "type", ("mypy", "backend"), True),
+            CodingCheck("build", "build", ("python", "-m", "build"), True),
         ],
     )
 
-    assert report["status"] == "CODING_CHECK_SUITE_PASS"
-    assert report["check_count"] == 3
-    assert report["pass_count"] == 2
-    assert report["fail_count"] == 1
-    assert report["required_failure_count"] == 0
+    assert report["status"] == "CODING_CHECK_SUITE_PLAN_READY"
+    assert report["execution_status"] == "NOT_EXECUTED"
+    assert report["check_count"] == 4
+    assert report["state_counts"] == {"PLANNED": 4, "STALE": 0, "BLOCKED": 0}
+    assert report["required_planning_failure_count"] == 0
     assert all(report["invariants"].values())
-    assert all(mount == "read_only" and network is False for _command, mount, network in calls)
+    assert all(row["network_allowed"] is False for row in report["checks"])
+    assert all(row["mount_mode"] == "read_only" for row in report["checks"])
 
 
-def test_required_failure_fails_suite(tmp_path: Path, monkeypatch) -> None:
+def test_duplicate_check_id_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    monkeypatch.setattr(coding_container, "resolve_container_engine", lambda preferred=None: "/usr/bin/docker")
 
-    class Plan:
-        command = ("pytest",)
+    with pytest.raises(CodingCheckError) as exc:
+        build_coding_check_suite_plan(
+            repo,
+            image=PINNED,
+            cfg=cfg,
+            checks=[
+                CodingCheck("same", "test", ("pytest",), True),
+                CodingCheck("same", "lint", ("ruff", "check", "."), True),
+            ],
+        )
+    assert exc.value.status == "ERROR_CODING_CHECK_DUPLICATE"
 
-    monkeypatch.setattr("backend.app.coding_checks.build_coding_container_plan", lambda *args, **kwargs: Plan())
-    monkeypatch.setattr(
-        "backend.app.coding_checks.execute_coding_container",
-        lambda plan: {
-            "status": "CODING_CONTAINER_FAIL",
-            "returncode": 1,
-            "stdout": "",
-            "stderr": "failed",
-            "stdout_sha256": "a" * 64,
-            "stderr_sha256": "b" * 64,
-            "stdout_bytes": 0,
-            "stderr_bytes": 6,
-            "plan_sha256": "c" * 64,
-            "image": PINNED,
-            "network_allowed": False,
-            "mount_mode": "read_only",
-        },
-    )
 
-    report = run_coding_check_suite(tmp_path, image=PINNED, cfg=cfg, checks=[CodingCheck("pytest", "test", ("pytest",), True)])
-    assert report["status"] == "CODING_CHECK_SUITE_FAIL"
-    assert report["required_failures"] == ["pytest"]
+def test_invalid_kind_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    monkeypatch.setattr(coding_container, "resolve_container_engine", lambda preferred=None: "/usr/bin/docker")
+
+    with pytest.raises(CodingCheckError) as exc:
+        build_coding_check_suite_plan(
+            repo,
+            image=PINNED,
+            cfg=cfg,
+            checks=[CodingCheck("bad", "arbitrary", ("echo", "bad"), True)],
+        )
+    assert exc.value.status == "ERROR_CODING_CHECK_DEFINITION"
