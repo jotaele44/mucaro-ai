@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import shutil
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Sequence
 
-from .coding_workspace import CodingWorkspaceError, resolve_repository
+from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
 from .container_runtime import ContainerRuntimeError, resolve_container_engine, validate_pinned_image
 
@@ -35,14 +32,23 @@ class CodingContainerPlan:
     repo_root: Path
     image: str
     command: tuple[str, ...]
-    mount_mode: str
-    network_allowed: bool
+    head_sha: str
+    dirty_status: str
+    dirty_paths_sha256: str
     timeout_seconds: int
     max_output_bytes: int
     memory_mb: int
     cpus: float
     pids_limit: int
     engine: str
+
+    @property
+    def mount_mode(self) -> str:
+        return "read_only"
+
+    @property
+    def network_allowed(self) -> bool:
+        return False
 
     @property
     def plan_sha256(self) -> str:
@@ -52,6 +58,9 @@ class CodingContainerPlan:
                 "repo_root": str(self.repo_root),
                 "image": self.image,
                 "command": list(self.command),
+                "head_sha": self.head_sha,
+                "dirty_status": self.dirty_status,
+                "dirty_paths_sha256": self.dirty_paths_sha256,
                 "mount_mode": self.mount_mode,
                 "network_allowed": self.network_allowed,
                 "timeout_seconds": self.timeout_seconds,
@@ -90,13 +99,17 @@ def _validate_command(command: Sequence[str]) -> tuple[str, ...]:
     return tuple(result)
 
 
+def _dirty_paths_digest(paths: list[str]) -> str:
+    payload = json.dumps(sorted(paths), separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def build_coding_container_plan(
     repo_root: str | Path,
     *,
     image: str,
     command: Sequence[str],
     cfg: Settings = settings,
-    mount_mode: str = "read_only",
     network_allowed: bool = False,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
     max_output_bytes: int = DEFAULT_MAX_OUTPUT_BYTES,
@@ -107,6 +120,7 @@ def build_coding_container_plan(
 ) -> CodingContainerPlan:
     try:
         context = resolve_repository(repo_root, cfg)
+        state = inspect_repository(context.repo_root, cfg=cfg)
     except CodingWorkspaceError as exc:
         raise CodingContainerError(exc.status, exc.detail) from exc
     try:
@@ -114,19 +128,19 @@ def build_coding_container_plan(
         engine_path = resolve_container_engine(engine)
     except ContainerRuntimeError as exc:
         raise CodingContainerError(exc.status, exc.detail) from exc
-    if mount_mode not in {"read_only", "read_write"}:
-        raise CodingContainerError("ERROR_CODING_CONTAINER_MOUNT_MODE", mount_mode)
     if network_allowed:
         raise CodingContainerError(
             "ERROR_CODING_CONTAINER_NETWORK_POLICY",
-            "coding container network access is disabled in the current certified boundary",
+            "coding container network access is disabled in this boundary",
         )
+    dirty_paths = [str(path) for path in state.get("dirty_paths") or []]
     return CodingContainerPlan(
         repo_root=context.repo_root,
         image=pinned,
         command=_validate_command(command),
-        mount_mode=mount_mode,
-        network_allowed=False,
+        head_sha=str(state["head_sha"]),
+        dirty_status=str(state["dirty_status"]),
+        dirty_paths_sha256=_dirty_paths_digest(dirty_paths),
         timeout_seconds=_positive_int(timeout_seconds, "timeout_seconds"),
         max_output_bytes=_positive_int(max_output_bytes, "max_output_bytes"),
         memory_mb=_positive_int(memory_mb, "memory_mb"),
@@ -137,9 +151,7 @@ def build_coding_container_plan(
 
 
 def build_coding_container_command(plan: CodingContainerPlan) -> list[str]:
-    mount_suffix = "ro" if plan.mount_mode == "read_only" else "rw"
-    repo_mount = f"{plan.repo_root}:/workspace/repo:{mount_suffix}"
-    command = [
+    return [
         plan.engine,
         "run",
         "--rm",
@@ -149,7 +161,7 @@ def build_coding_container_command(plan: CodingContainerPlan) -> list[str]:
         "--security-opt=no-new-privileges",
         "--network=none",
         "--workdir=/workspace/repo",
-        f"--mount=type=bind,src={plan.repo_root},dst=/workspace/repo,{mount_suffix}",
+        f"--mount=type=bind,src={plan.repo_root},dst=/workspace/repo,ro",
         "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=256m",
         "--tmpfs=/workspace/out:rw,nosuid,nodev,size=256m",
         f"--memory={plan.memory_mb}m",
@@ -157,71 +169,46 @@ def build_coding_container_command(plan: CodingContainerPlan) -> list[str]:
         f"--pids-limit={plan.pids_limit}",
         "--env=HOME=/tmp/home",
         "--env=TMPDIR=/tmp",
+        "--env=XDG_CACHE_HOME=/tmp/cache",
+        "--env=PYTHONDONTWRITEBYTECODE=1",
+        "--env=NPM_CONFIG_CACHE=/tmp/npm-cache",
         plan.image,
         *plan.command,
     ]
-    # Keep the canonical bind description in the receipt independently of CLI token rendering.
-    del repo_mount
-    return command
 
 
-def execute_coding_container(plan: CodingContainerPlan) -> dict[str, Any]:
-    argv = build_coding_container_command(plan)
+def validate_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = settings) -> dict[str, object]:
     try:
-        proc = subprocess.run(
-            argv,
-            cwd=plan.repo_root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=plan.timeout_seconds,
-            env={key: value for key, value in os.environ.items() if key in {"PATH", "HOME", "TMPDIR", "TMP", "TEMP"}},
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise CodingContainerError("ERROR_CODING_CONTAINER_TIMEOUT", str(plan.timeout_seconds)) from exc
-    except OSError as exc:
-        raise CodingContainerError("ERROR_CODING_CONTAINER_START", str(exc)) from exc
-    if len(proc.stdout) > plan.max_output_bytes or len(proc.stderr) > plan.max_output_bytes:
-        raise CodingContainerError(
-            "ERROR_CODING_CONTAINER_OUTPUT_TOO_LARGE",
-            f"stdout={len(proc.stdout)} stderr={len(proc.stderr)}",
-        )
-    stdout = proc.stdout.decode("utf-8", errors="replace")
-    stderr = proc.stderr.decode("utf-8", errors="replace")
+        state = inspect_repository(plan.repo_root, cfg=cfg)
+    except CodingWorkspaceError as exc:
+        raise CodingContainerError(exc.status, exc.detail) from exc
+    current_dirty_paths = [str(path) for path in state.get("dirty_paths") or []]
+    current_dirty_digest = _dirty_paths_digest(current_dirty_paths)
+    head_match = state.get("head_sha") == plan.head_sha
+    dirty_match = state.get("dirty_status") == plan.dirty_status and current_dirty_digest == plan.dirty_paths_sha256
     return {
         "schema_version": CODING_CONTAINER_SCHEMA_VERSION,
-        "status": "CODING_CONTAINER_PASS" if proc.returncode == 0 else "CODING_CONTAINER_FAIL",
+        "status": "CODING_CONTAINER_PLAN_VALID" if head_match and dirty_match else "CODING_CONTAINER_PLAN_STALE",
         "plan_sha256": plan.plan_sha256,
-        "repo_root": str(plan.repo_root),
-        "image": plan.image,
-        "image_digest": plan.image.rsplit("@", 1)[1],
-        "engine": plan.engine,
-        "command": list(plan.command),
-        "mount_mode": plan.mount_mode,
+        "head_match": head_match,
+        "dirty_state_match": dirty_match,
+        "planned_head_sha": plan.head_sha,
+        "current_head_sha": state.get("head_sha"),
+        "planned_dirty_status": plan.dirty_status,
+        "current_dirty_status": state.get("dirty_status"),
+        "repository_read_only": True,
         "network_allowed": False,
-        "read_only_rootfs": True,
-        "cap_drop_all": True,
-        "no_new_privileges": True,
-        "timeout_seconds": plan.timeout_seconds,
-        "memory_mb": plan.memory_mb,
-        "cpus": plan.cpus,
-        "pids_limit": plan.pids_limit,
-        "returncode": proc.returncode,
-        "stdout": stdout,
-        "stderr": stderr,
-        "stdout_sha256": hashlib.sha256(proc.stdout).hexdigest(),
-        "stderr_sha256": hashlib.sha256(proc.stderr).hexdigest(),
-        "stdout_bytes": len(proc.stdout),
-        "stderr_bytes": len(proc.stderr),
+        "command_argv": list(plan.command),
+        "container_argv": build_coding_container_command(plan),
         "limitations": [
-            "network is fail-closed to none in this boundary",
-            "read_write repository mounts are reserved for separately approved mutation transactions",
-            "container image identity is pinned by digest but live engine/image certification remains separate",
+            "this function validates and emits an execution plan; it does not launch the container",
+            "writable repository mounts are intentionally unavailable in this boundary",
+            "live container image/engine execution remains separately uncertified",
         ],
         "falsification_criteria": [
-            "reject unpinned images",
-            "reject repository paths outside the explicit permission boundary",
-            "reject network-enabled coding execution",
-            "reject oversized command output rather than truncate it silently",
+            "reject unpinned image identity",
+            "reject network-enabled plans",
+            "treat HEAD or dirty-state drift as STALE before execution",
+            "never convert this read-only plan into a writable mount",
         ],
     }
