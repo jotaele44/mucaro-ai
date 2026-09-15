@@ -51,14 +51,26 @@ def make_repo(root: Path) -> Path:
     return repo
 
 
+def patch_for() -> str:
+    return (
+        "diff --git a/tracked.txt b/tracked.txt\n"
+        "--- a/tracked.txt\n"
+        "+++ b/tracked.txt\n"
+        "@@ -1 +1 @@\n"
+        "-alpha\n"
+        "+beta\n"
+    )
+
+
 def test_coding_tools_are_allowlisted_but_still_require_approval(tmp_path: Path) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
     tools = {tool["name"]: tool for tool in list_tools()["tools"]}
+    coding_names = ("coding.repo_status", "coding.read_file", "coding.diff", "coding.patch_check")
 
-    assert {"coding.repo_status", "coding.read_file", "coding.diff"}.issubset(tools)
-    assert all(tools[name]["requires_approval"] is True for name in ("coding.repo_status", "coding.read_file", "coding.diff"))
-    assert all(tools[name]["mutates_state"] is False for name in ("coding.repo_status", "coding.read_file", "coding.diff"))
+    assert set(coding_names).issubset(tools)
+    assert all(tools[name]["requires_approval"] is True for name in coding_names)
+    assert all(tools[name]["mutates_state"] is False for name in coding_names)
 
     requested = request_tool_call(
         "coding.repo_status",
@@ -81,17 +93,20 @@ def test_coding_tools_are_allowlisted_but_still_require_approval(tmp_path: Path)
     assert executed["result"]["dirty_status"] == "CLEAN"
 
 
-def test_coding_read_file_and_diff_use_same_approved_boundary(tmp_path: Path) -> None:
+def test_coding_read_file_diff_and_patch_check_use_same_approved_boundary(tmp_path: Path) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
-    (repo / "tracked.txt").write_text("beta\n", encoding="utf-8")
+    patch = patch_for()
 
     for tool_name, arguments, expected_status in (
         ("coding.read_file", {"repo_root": str(repo), "path": "tracked.txt"}, "CODING_FILE_READ_OK"),
         ("coding.diff", {"repo_root": str(repo), "base": "HEAD"}, "CODING_DIFF_OK"),
+        ("coding.patch_check", {"repo_root": str(repo), "patch": patch}, "CODING_PATCH_CHECK_OK"),
     ):
         requested = request_tool_call(tool_name, arguments, cfg=cfg, requested_by="test")
         tool_call_id = requested["tool_call"]["tool_call_id"]
         approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
         executed = run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
         assert executed["result"]["status"] == expected_status
+
+    assert (repo / "tracked.txt").read_text(encoding="utf-8") == "alpha\n"
