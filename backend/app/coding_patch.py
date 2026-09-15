@@ -54,6 +54,17 @@ def _single_header_path(line: str, prefix: str) -> str:
     return parts[1]
 
 
+def _rename_copy_path(line: str, prefix: str) -> str:
+    expected = prefix.split()
+    try:
+        parts = shlex.split(line)
+    except ValueError as exc:
+        raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid patch path header: {line}") from exc
+    if len(parts) != 3 or parts[:2] != expected:
+        raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid patch path header: {line}")
+    return _validate_relative_path(parts[2])
+
+
 def _parse_diff_paths(patch: str) -> list[str]:
     paths: set[str] = set()
     diff_headers = 0
@@ -84,12 +95,8 @@ def _parse_diff_paths(patch: str) -> list[str]:
                 paths.add(relative)
             continue
         for prefix in ("rename from", "rename to", "copy from", "copy to"):
-            marker = f"{prefix} "
-            if line.startswith(marker):
-                relative = line[len(marker):]
-                if not relative:
-                    raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid patch path header: {line}")
-                paths.add(_validate_relative_path(relative))
+            if line.startswith(f"{prefix} "):
+                paths.add(_rename_copy_path(line, prefix))
                 break
     if diff_headers == 0 or not paths:
         raise CodingWorkspaceError("ERROR_CODING_PATCH_FORMAT", "Patch must contain at least one 'diff --git' file header.")
@@ -188,6 +195,7 @@ def validate_patch_proposal(
         "limitations": [
             "proposal validation is read-only and never applies the patch",
             "all diff/file/rename/copy headers contribute to the preserved patch candidate set",
+            "quoted Git rename/copy paths are decoded before identity and boundary checks",
             "path identity is repository-relative and does not prove semantic equivalence across renamed files",
             "preimage SHA-256 proves byte identity only",
             "future application must revalidate HEAD, dirty state, path boundaries, and preimage hashes at execution time",
@@ -195,6 +203,7 @@ def validate_patch_proposal(
         "falsification_criteria": [
             "reject patches without explicit diff --git path headers",
             "reject traversal and .git administrative targets in any parsed patch path header",
+            "reject malformed or ambiguous rename/copy path headers",
             "reject patch payloads above the approved byte ceiling",
             "do not claim applicability when git apply --check rejects the proposal",
             "do not silently ignore dirty overlap with proposed target paths",
