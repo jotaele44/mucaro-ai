@@ -9,7 +9,7 @@ from typing import Any
 from .coding_container import (
     CodingContainerError,
     build_coding_container_plan,
-    execute_coding_container,
+    validate_coding_container_plan,
 )
 from .config import Settings, settings
 
@@ -36,7 +36,7 @@ class CodingCheck:
             raise CodingCheckError("ERROR_CODING_CHECK_DEFINITION", self.check_id or self.kind)
 
 
-def run_coding_check_suite(
+def build_coding_check_suite_plan(
     repo_root: str | Path,
     *,
     image: str,
@@ -47,7 +47,7 @@ def run_coding_check_suite(
         raise CodingCheckError("ERROR_CODING_CHECKS_REQUIRED", "at least one check is required")
     seen: set[str] = set()
     rows: list[dict[str, Any]] = []
-    required_failures: list[str] = []
+    planning_failures: list[str] = []
     for check in checks:
         check.validate()
         if check.check_id in seen:
@@ -59,64 +59,74 @@ def run_coding_check_suite(
                 image=image,
                 command=list(check.command),
                 cfg=cfg,
-                mount_mode="read_only",
                 network_allowed=False,
             )
-            execution = execute_coding_container(plan)
-        except CodingContainerError as exc:
-            execution = {
-                "status": "CODING_CONTAINER_ERROR",
-                "error_status": exc.status,
-                "error_detail": exc.detail,
-                "returncode": None,
-                "stdout": "",
-                "stderr": "",
-                "stdout_sha256": hashlib.sha256(b"").hexdigest(),
-                "stderr_sha256": hashlib.sha256(b"").hexdigest(),
-                "stdout_bytes": 0,
-                "stderr_bytes": 0,
-                "plan_sha256": None,
-                "image": image,
-                "network_allowed": False,
-                "mount_mode": "read_only",
-            }
-        passed = execution.get("status") == "CODING_CONTAINER_PASS"
-        if check.required and not passed:
-            required_failures.append(check.check_id)
-        rows.append(
-            {
+            validation = validate_coding_container_plan(plan, cfg=cfg)
+            planned = validation.get("status") == "CODING_CONTAINER_PLAN_VALID"
+            row = {
                 "check_id": check.check_id,
                 "kind": check.kind,
                 "command": list(check.command),
                 "required": check.required,
-                "state": "PASS" if passed else "FAIL",
-                "execution": execution,
+                "state": "PLANNED" if planned else "STALE",
+                "plan_sha256": plan.plan_sha256,
+                "head_sha": plan.head_sha,
+                "dirty_status": plan.dirty_status,
+                "dirty_paths_sha256": plan.dirty_paths_sha256,
+                "image": plan.image,
+                "network_allowed": plan.network_allowed,
+                "mount_mode": plan.mount_mode,
+                "validation": validation,
             }
-        )
+        except CodingContainerError as exc:
+            planned = False
+            row = {
+                "check_id": check.check_id,
+                "kind": check.kind,
+                "command": list(check.command),
+                "required": check.required,
+                "state": "BLOCKED",
+                "error_status": exc.status,
+                "error_detail": exc.detail,
+                "image": image,
+                "network_allowed": False,
+                "mount_mode": "read_only",
+            }
+        if check.required and not planned:
+            planning_failures.append(check.check_id)
+        rows.append(row)
+
+    state_counts = {
+        state: sum(row["state"] == state for row in rows)
+        for state in ("PLANNED", "STALE", "BLOCKED")
+    }
     payload = {
         "schema_version": CODING_CHECK_SUITE_SCHEMA_VERSION,
-        "status": "CODING_CHECK_SUITE_PASS" if not required_failures else "CODING_CHECK_SUITE_FAIL",
+        "status": "CODING_CHECK_SUITE_PLAN_READY" if not planning_failures else "CODING_CHECK_SUITE_PLAN_BLOCKED",
+        "execution_status": "NOT_EXECUTED",
         "image": image,
         "check_count": len(rows),
-        "pass_count": sum(row["state"] == "PASS" for row in rows),
-        "fail_count": sum(row["state"] == "FAIL" for row in rows),
-        "required_failure_count": len(required_failures),
-        "required_failures": required_failures,
+        "state_counts": state_counts,
+        "required_planning_failure_count": len(planning_failures),
+        "required_planning_failures": planning_failures,
         "checks": rows,
         "invariants": {
-            "row_accounting_closed": len(rows) == sum(row["state"] in {"PASS", "FAIL"} for row in rows),
+            "row_accounting_closed": len(rows) == sum(state_counts.values()),
             "unique_check_ids": len(seen) == len(rows),
-            "network_disabled_for_all": all(row["execution"].get("network_allowed") is False for row in rows),
-            "read_only_mount_for_all": all(row["execution"].get("mount_mode") == "read_only" for row in rows),
+            "network_disabled_for_all": all(row.get("network_allowed") is False for row in rows),
+            "read_only_mount_for_all": all(row.get("mount_mode") == "read_only" for row in rows),
+            "no_execution_claimed": True,
         },
         "limitations": [
-            "suite quality depends on the declared check commands and pinned image contents",
-            "a passing command is execution evidence, not release certification by itself",
+            "this artifact plans test/lint/type/build/security/benchmark checks but does not execute them",
+            "PASS/FAIL execution receipts remain unavailable until an approved isolated execution adapter is connected",
+            "a valid plan is not evidence that the declared command passes",
         ],
         "falsification_criteria": [
-            "fail the suite when any required check fails or cannot execute",
+            "block the suite plan when any required check cannot produce a current valid read-only plan",
             "reject duplicate check identities",
             "reject coding checks that request network access or writable repository mounts",
+            "never translate PLANNED into PASS without executable evidence",
         ],
     }
     payload["receipt_sha256"] = hashlib.sha256(
