@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .coding_mutation import CodingMutationError, apply_patch_transaction
 from .coding_patch import validate_patch_proposal
 from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
@@ -124,6 +125,35 @@ def _coding_patch_check(arguments: dict[str, Any], cfg: Settings) -> dict[str, A
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
+def _coding_patch_apply(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    patch = arguments.get("patch")
+    expected_head_sha = arguments.get("expected_head_sha")
+    expected_patch_sha256 = arguments.get("expected_patch_sha256")
+    expected_preimages = arguments.get("expected_preimages")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.patch_apply requires a non-empty repo_root argument.")
+    if not isinstance(patch, str) or not patch:
+        raise ToolRuntimeError("ERROR_CODING_PATCH_REQUIRED", "coding.patch_apply requires a non-empty patch string.")
+    if not isinstance(expected_head_sha, str) or not expected_head_sha:
+        raise ToolRuntimeError("ERROR_CODING_MUTATION_HEAD_REQUIRED", "coding.patch_apply requires expected_head_sha.")
+    if not isinstance(expected_patch_sha256, str) or len(expected_patch_sha256) != 64:
+        raise ToolRuntimeError("ERROR_CODING_MUTATION_PATCH_HASH_REQUIRED", "coding.patch_apply requires a 64-character expected_patch_sha256.")
+    if not isinstance(expected_preimages, list) or not expected_preimages:
+        raise ToolRuntimeError("ERROR_CODING_MUTATION_PREIMAGES_REQUIRED", "coding.patch_apply requires expected_preimages from the approved proposal receipt.")
+    try:
+        return apply_patch_transaction(
+            repo_root,
+            patch,
+            expected_head_sha=expected_head_sha,
+            expected_patch_sha256=expected_patch_sha256,
+            expected_preimages=expected_preimages,
+            cfg=cfg,
+        )
+    except CodingMutationError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
 def _web_fetch(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     url = arguments.get("url")
     if not isinstance(url, str):
@@ -207,6 +237,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_patch_check,
+    ),
+    "coding.patch_apply": ToolDefinition(
+        name="coding.patch_apply",
+        description="Apply only an explicitly approved patch after exact HEAD, patch-hash, candidate-set, preimage, and dirty-overlap revalidation.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_coding_patch_apply,
     ),
     "web.fetch": ToolDefinition(
         name="web.fetch",
