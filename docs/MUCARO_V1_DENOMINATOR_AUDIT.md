@@ -29,6 +29,25 @@ Events:
 Resulting overlay:
 
 - historical baseline: `61.5% raw / 62.6% weighted`
-- current source-backed overlay: `64.5% raw / 66.2% weighted`
+- source-backed overlay at that audit head: `64.5% raw / 66.2% weighted`
 
-The overlay is an audit state, not a replacement denominator version.
+## Coding read-only provisional overlay
+
+Audit head: `ff739b7c9a8ce7cb13fcbfeafe2ba7816c35a710` (PR #18 squash merge).
+
+Additional events:
+
+- `CODE-03 OPEN → PROVISIONAL`: approval-gated repository discovery, exact HEAD/branch state, bounded file reads, path boundaries and byte hashes are merged, but hosted regression execution is blocked before jobs start.
+- `CODE-04 OPEN → PROVISIONAL`: staged/unstaged/untracked candidate sets, explicit dirty state and patch dirty-overlap preservation are merged, while executed regressions remain blocked by hosted Actions startup failure.
+- `CODE-05 OPEN → PROVISIONAL`: bounded diff receipts and non-mutating patch SHA-256/path/preimage/applicability receipts are merged; patch mutation/application remains outside this scope and hosted tests have not executed.
+
+The GitHub Actions blocker is preserved as `BLOCKED`, not converted to a code `FAIL` and not used as PASS evidence. The frozen denominator file remains unchanged.
+
+Resulting overlay:
+
+- historical baseline: `61.5% raw / 62.6% weighted`
+- previous source-backed overlay: `64.5% raw / 66.2% weighted`
+- current source-backed overlay: `66.0% raw / 67.7% weighted`
+- CODING track: `30.0%` with `PASS=1`, `PROVISIONAL=4`, `OPEN=5`
+
+The overlay is an audit state, not a replacement denominator version and not a release certification claim.

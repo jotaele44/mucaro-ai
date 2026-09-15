@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "95996cfd1ae8baa0f8bec18548ed6812bee533cf",
+  "audit_head": "ff739b7c9a8ce7cb13fcbfeafe2ba7816c35a710",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -38,7 +38,34 @@
       "to_state": "PROVISIONAL",
       "evidence_type": "MERGED_RUNTIME_IDENTITY_WITH_SCOPE_RESIDUE",
       "evidence": ["PR#8", "PR#10", "PR#11"],
-      "reason": "Runtime/toolchain identity is bound to Skill Fabric execution receipts, but universal binding across every advanced-capability derivation is not yet closed."
+      "reason": "Runtime/toolchain identity is bound to Skill Fabric execution receipts, but universal binding across all advanced-capability derivations remains open."
+    },
+    {
+      "event_id": "evt-code03-repo-read-provisional",
+      "requirement_id": "CODE-03",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_SOURCE_WITH_EXECUTION_GATE_BLOCKED",
+      "evidence": ["PR#18", "main@ff739b7c9a8ce7cb13fcbfeafe2ba7816c35a710", "GitHub Actions startup_failure before jobs"],
+      "reason": "Approval-gated repository discovery, exact HEAD/branch state, bounded file reads, path boundaries, byte hashes, and source-level positive/negative regressions are merged, but hosted execution evidence is blocked before jobs start."
+    },
+    {
+      "event_id": "evt-code04-dirty-state-provisional",
+      "requirement_id": "CODE-04",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_SOURCE_WITH_EXECUTION_GATE_BLOCKED",
+      "evidence": ["PR#18", "main@ff739b7c9a8ce7cb13fcbfeafe2ba7816c35a710", "GitHub Actions startup_failure before jobs"],
+      "reason": "Merged coding receipts preserve staged, unstaged, and untracked candidate sets, compute explicit CLEAN/DIRTY state, detect patch dirty overlap, and do not mutate unrelated work; executed regression evidence remains blocked by zero-job hosted Actions startup failure."
+    },
+    {
+      "event_id": "evt-code05-patch-receipts-provisional",
+      "requirement_id": "CODE-05",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_NONMUTATING_PATCH_RECEIPTS_WITH_EXECUTION_GATE_BLOCKED",
+      "evidence": ["PR#18", "main@ff739b7c9a8ce7cb13fcbfeafe2ba7816c35a710", "GitHub Actions startup_failure before jobs"],
+      "reason": "Merged coding tools provide bounded diff receipts plus non-mutating patch SHA-256, parsed path candidate sets, byte preimages, dirty-overlap detection, traversal/.git rejection, and git apply --check; mutation/application and executed regressions remain outside this provisional scope."
     }
   ]
 }
