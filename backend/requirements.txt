@@ -6,3 +6,4 @@ jsonschema==4.26.0
 pytest==9.0.2
 pypdf==6.4.1
 shapely==2.1.2
+pyproj==3.7.2
