@@ -115,7 +115,7 @@ def _repository_state(context: RepositoryContext) -> dict[str, Any]:
     staged = sorted(_split_nul(_git_output(repo_root, ["diff", "--cached", "--name-only", "-z", "--"])))
     unstaged = sorted(_split_nul(_git_output(repo_root, ["diff", "--name-only", "-z", "--"])))
     untracked = sorted(_split_nul(_git_output(repo_root, ["ls-files", "--others", "--exclude-standard", "-z"])))
-    tracked = _split_nul(_git_output(repo_root, ["ls-files", "-z"])))
+    tracked = _split_nul(_git_output(repo_root, ["ls-files", "-z"]))
     dirty_paths = sorted(set(staged) | set(unstaged) | set(untracked))
 
     return {
