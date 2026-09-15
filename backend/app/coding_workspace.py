@@ -82,10 +82,10 @@ def resolve_repository(repo_root: str | Path, cfg: Settings = settings) -> Repos
     if not selected.is_dir():
         raise CodingWorkspaceError("ERROR_CODING_REPOSITORY_NOT_DIRECTORY", f"Repository selection is not a directory: {selected}")
 
-    top = _git_output(selected, ["rev-parse", "--show-toplevel"]).strip()
-    if not top:
+    top_proc = _git_process(selected, ["rev-parse", "--show-toplevel"])
+    if top_proc.returncode != 0 or not top_proc.stdout.strip():
         raise CodingWorkspaceError("ERROR_CODING_REPOSITORY_NOT_FOUND", f"No Git repository found at: {selected}")
-    canonical_root = Path(top).expanduser().resolve()
+    canonical_root = Path(top_proc.stdout.strip()).expanduser().resolve()
 
     try:
         root_permission = ensure_directory_permission(canonical_root, cfg)
@@ -146,6 +146,7 @@ def inspect_repository(repo_root: str | Path, *, cfg: Settings = settings) -> di
         "limitations": [
             "read-only repository inspection only",
             "ignored files are intentionally not enumerated",
+            "rename/copy status is not separately classified in this bounded status receipt",
             "submodules and worktree relationships are not expanded in this receipt",
         ],
         "falsification_criteria": [
@@ -168,6 +169,8 @@ def read_repository_file(
     requested = Path(relative_path)
     if requested.is_absolute() or not relative_path.strip():
         raise CodingWorkspaceError("ERROR_CODING_FILE_PATH_INVALID", "File path must be a non-empty repository-relative path.")
+    if requested.parts and requested.parts[0] == ".git":
+        raise CodingWorkspaceError("ERROR_CODING_GIT_ADMIN_PATH_BLOCKED", "Reading .git administrative files is blocked by the coding workspace boundary.")
 
     target = (context.repo_root / requested).resolve()
     if not is_within_path(target, context.repo_root):
@@ -179,13 +182,19 @@ def read_repository_file(
     if not target.exists() or not target.is_file():
         raise CodingWorkspaceError("ERROR_CODING_FILE_NOT_FOUND", f"Repository file not found: {relative_path}")
 
-    size = target.stat().st_size
+    try:
+        size = target.stat().st_size
+    except OSError as exc:
+        raise CodingWorkspaceError("ERROR_CODING_FILE_READ", f"Unable to inspect repository file: {relative_path}") from exc
     if size > limit:
         raise CodingWorkspaceError(
             "ERROR_CODING_FILE_TOO_LARGE",
             f"Repository file is {size} bytes, exceeding the approved {limit}-byte read ceiling.",
         )
-    raw = target.read_bytes()
+    try:
+        raw = target.read_bytes()
+    except OSError as exc:
+        raise CodingWorkspaceError("ERROR_CODING_FILE_READ", f"Unable to read repository file: {relative_path}") from exc
     digest = hashlib.sha256(raw).hexdigest()
     normalized_relative = target.relative_to(context.repo_root).as_posix()
     tracked_proc = _git_process(context.repo_root, ["ls-files", "--error-unmatch", "--", normalized_relative])
@@ -214,10 +223,12 @@ def read_repository_file(
         "max_bytes": limit,
         "limitations": [
             "UTF-8 text is returned exactly; non-UTF-8/binary content is not decoded or normalized",
+            ".git administrative files are blocked",
             "file identity is byte-level SHA-256 only and does not prove semantic identity",
         ],
         "falsification_criteria": [
             "reject if path escapes the selected repository after symlink resolution",
+            "reject .git administrative paths",
             "reject if byte size exceeds the approved read ceiling",
             "do not synthesize text for non-UTF-8 content",
         ],
@@ -238,7 +249,6 @@ def inspect_repository_diff(
 
     verified_base = _git_output(context.repo_root, ["rev-parse", "--verify", f"{base}^{{commit}}"] ).strip()
     changed_files = sorted(_split_nul(_git_output(context.repo_root, ["diff", "--name-only", "-z", verified_base, "--"])))
-    untracked_files = sorted(_split_nul(_git_output(context.repo_root, ["ls-files", "--others", "--exclude-standard", "-z"])))
     diff_text = _git_output(context.repo_root, ["diff", "--no-ext-diff", "--no-color", verified_base, "--"], timeout_seconds=30)
     diff_bytes = diff_text.encode("utf-8")
     if len(diff_bytes) > limit:
@@ -253,19 +263,25 @@ def inspect_repository_diff(
         "repo_root": str(context.repo_root),
         "head_sha": state["head_sha"],
         "branch": state["branch"],
+        "head_state": state["head_state"],
         "dirty_status": state["dirty_status"],
+        "dirty_path_count": state["dirty_path_count"],
+        "staged_files": state["staged_files"],
+        "unstaged_files": state["unstaged_files"],
+        "untracked_files": state["untracked_files"],
+        "dirty_paths": state["dirty_paths"],
         "base_ref": base,
         "base_commit_sha": verified_base,
         "changed_files": changed_files,
-        "untracked_files": untracked_files,
         "changed_file_count": len(changed_files),
-        "untracked_file_count": len(untracked_files),
+        "untracked_file_count": len(state["untracked_files"]),
         "diff_sha256": hashlib.sha256(diff_bytes).hexdigest(),
         "diff_bytes": len(diff_bytes),
         "diff": diff_text,
         "max_bytes": limit,
         "limitations": [
             "Git diff excludes untracked file contents; untracked paths are reported separately",
+            "rename/copy status is not separately classified in this bounded diff receipt",
             "this operation is read-only and does not propose or apply a patch",
             "binary diff semantics are not expanded beyond Git's textual diff representation",
         ],
