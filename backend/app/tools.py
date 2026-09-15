@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
@@ -73,6 +74,42 @@ def _memory_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     return list_memory_items(cfg, include_disabled=include_disabled)
 
 
+def _coding_repo_status(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.repo_status requires a non-empty repo_root argument.")
+    try:
+        return inspect_repository(repo_root, cfg=cfg)
+    except CodingWorkspaceError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _coding_read_file(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    path = arguments.get("path")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.read_file requires a non-empty repo_root argument.")
+    if not isinstance(path, str) or not path.strip():
+        raise ToolRuntimeError("ERROR_CODING_FILE_PATH_REQUIRED", "coding.read_file requires a non-empty repository-relative path argument.")
+    try:
+        return read_repository_file(repo_root, path, cfg=cfg, max_bytes=arguments.get("max_bytes"))
+    except CodingWorkspaceError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _coding_diff(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.diff requires a non-empty repo_root argument.")
+    base = arguments.get("base", "HEAD")
+    if not isinstance(base, str):
+        raise ToolRuntimeError("ERROR_CODING_BASE_REF_INVALID", "coding.diff base must be a string.")
+    try:
+        return inspect_repository_diff(repo_root, cfg=cfg, base=base, max_bytes=arguments.get("max_bytes"))
+    except CodingWorkspaceError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
 def _web_fetch(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     url = arguments.get("url")
     if not isinstance(url, str):
@@ -128,6 +165,27 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_memory_list,
+    ),
+    "coding.repo_status": ToolDefinition(
+        name="coding.repo_status",
+        description="Inspect an approved local Git repository, exact HEAD, branch, and dirty-state candidate sets without mutation.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_repo_status,
+    ),
+    "coding.read_file": ToolDefinition(
+        name="coding.read_file",
+        description="Read one bounded repository-relative file with byte SHA-256 and explicit text/binary classification.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_read_file,
+    ),
+    "coding.diff": ToolDefinition(
+        name="coding.diff",
+        description="Inspect a bounded read-only Git diff and report untracked residue separately from tracked changes.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_diff,
     ),
     "web.fetch": ToolDefinition(
         name="web.fetch",
