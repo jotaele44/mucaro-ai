@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
+import backend.app.coding_container as coding_container
 from backend.app.coding_container import (
     CodingContainerError,
     build_coding_container_command,
     build_coding_container_plan,
+    validate_coding_container_plan,
 )
 from backend.app.config import Settings
 
-pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git is required for coding container tests")
 PINNED = "ghcr.io/jotaele44/mucaro-coding@sha256:" + "a" * 64
 
 
@@ -33,9 +33,10 @@ def make_settings(root: Path) -> Settings:
     return cfg
 
 
-def git(repo: Path, *args: str) -> None:
+def git(repo: Path, *args: str) -> str:
     proc = subprocess.run(["git", *args], cwd=repo, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     assert proc.returncode == 0, proc.stderr
+    return proc.stdout
 
 
 def make_repo(root: Path) -> Path:
@@ -50,51 +51,40 @@ def make_repo(root: Path) -> Path:
     return repo
 
 
-def test_read_only_plan_has_fail_closed_container_defaults(tmp_path: Path, monkeypatch) -> None:
+def fake_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(coding_container, "resolve_container_engine", lambda preferred=None: preferred or "/usr/bin/docker")
+
+
+def test_plan_is_read_only_network_none_and_bound_to_repo_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
-    monkeypatch.setattr("backend.app.coding_container.resolve_container_engine", lambda preferred=None: "/usr/bin/docker")
+    fake_engine(monkeypatch)
 
     plan = build_coding_container_plan(repo, image=PINNED, command=["python", "-m", "pytest", "-q"], cfg=cfg)
     argv = build_coding_container_command(plan)
 
+    assert plan.head_sha == git(repo, "rev-parse", "HEAD").strip()
+    assert plan.dirty_status == "CLEAN"
     assert plan.mount_mode == "read_only"
     assert plan.network_allowed is False
     assert "--read-only" in argv
     assert "--cap-drop=ALL" in argv
     assert "--security-opt=no-new-privileges" in argv
     assert "--network=none" in argv
-    assert "--workdir=/workspace/repo" in argv
-    assert any(token.startswith("--mount=type=bind,src=") and token.endswith(",ro") for token in argv)
-    assert "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=256m" in argv
-    assert "--tmpfs=/workspace/out:rw,nosuid,nodev,size=256m" in argv
-    assert PINNED in argv
-    assert plan.plan_sha256 == plan.plan_sha256
+    assert f"--mount=type=bind,src={repo.resolve()},dst=/workspace/repo,ro" in argv
+    assert not any("/workspace/repo" in token and token.endswith(",rw") for token in argv)
+
+    validation = validate_coding_container_plan(plan, cfg=cfg)
+    assert validation["status"] == "CODING_CONTAINER_PLAN_VALID"
+    assert validation["head_match"] is True
+    assert validation["dirty_state_match"] is True
+    assert validation["repository_read_only"] is True
 
 
-def test_read_write_mount_is_explicit_and_network_stays_denied(tmp_path: Path, monkeypatch) -> None:
+def test_network_enablement_and_unpinned_images_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
-    monkeypatch.setattr("backend.app.coding_container.resolve_container_engine", lambda preferred=None: "podman")
-
-    plan = build_coding_container_plan(
-        repo,
-        image=PINNED,
-        command=["python", "-c", "print('ok')"],
-        cfg=cfg,
-        mount_mode="read_write",
-    )
-    argv = build_coding_container_command(plan)
-
-    assert plan.mount_mode == "read_write"
-    assert "--network=none" in argv
-    assert any(token.startswith("--mount=type=bind,src=") and token.endswith(",rw") for token in argv)
-
-
-def test_network_enablement_and_unpinned_images_fail_closed(tmp_path: Path, monkeypatch) -> None:
-    cfg = make_settings(tmp_path)
-    repo = make_repo(tmp_path)
-    monkeypatch.setattr("backend.app.coding_container.resolve_container_engine", lambda preferred=None: "docker")
+    fake_engine(monkeypatch)
 
     with pytest.raises(CodingContainerError) as network:
         build_coding_container_plan(repo, image=PINNED, command=["pytest"], cfg=cfg, network_allowed=True)
@@ -105,10 +95,39 @@ def test_network_enablement_and_unpinned_images_fail_closed(tmp_path: Path, monk
     assert image.value.status == "ERROR_CONTAINER_IMAGE_NOT_PINNED"
 
 
-def test_command_and_resource_limits_fail_closed(tmp_path: Path, monkeypatch) -> None:
+def test_dirty_candidate_drift_makes_plan_stale(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
-    monkeypatch.setattr("backend.app.coding_container.resolve_container_engine", lambda preferred=None: "docker")
+    fake_engine(monkeypatch)
+    plan = build_coding_container_plan(repo, image=PINNED, command=["ruff", "check", "."], cfg=cfg)
+
+    (repo / "tracked.txt").write_text("beta\n", encoding="utf-8")
+    validation = validate_coding_container_plan(plan, cfg=cfg)
+
+    assert validation["status"] == "CODING_CONTAINER_PLAN_STALE"
+    assert validation["head_match"] is True
+    assert validation["dirty_state_match"] is False
+
+
+def test_head_drift_makes_plan_stale(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    fake_engine(monkeypatch)
+    plan = build_coding_container_plan(repo, image=PINNED, command=["mypy", "backend"], cfg=cfg)
+
+    (repo / "second.txt").write_text("second\n", encoding="utf-8")
+    git(repo, "add", "second.txt")
+    git(repo, "commit", "-m", "second")
+    validation = validate_coding_container_plan(plan, cfg=cfg)
+
+    assert validation["status"] == "CODING_CONTAINER_PLAN_STALE"
+    assert validation["head_match"] is False
+
+
+def test_command_and_resource_limits_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    fake_engine(monkeypatch)
 
     with pytest.raises(CodingContainerError) as empty:
         build_coding_container_plan(repo, image=PINNED, command=[], cfg=cfg)
