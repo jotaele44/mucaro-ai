@@ -37,18 +37,29 @@ def _minimal_environment(project_root: Path) -> dict[str, str]:
 
 def _resource_limiter(max_memory_mb: int, max_cpu_seconds: int):
     if os.name != "posix":
-        return None
+        return None, []
     try:
         import resource
     except ImportError:
-        return None
+        return None, []
+
+    limits: list[tuple[int, tuple[int, int], str]] = []
+    if hasattr(resource, "RLIMIT_CPU"):
+        limits.append((resource.RLIMIT_CPU, (max_cpu_seconds, max_cpu_seconds), "RLIMIT_CPU"))
+    if sys.platform != "darwin" and hasattr(resource, "RLIMIT_AS"):
+        memory_bytes = max_memory_mb * 1024 * 1024
+        limits.append((resource.RLIMIT_AS, (memory_bytes, memory_bytes), "RLIMIT_AS"))
+    if not limits:
+        return None, []
 
     def apply_limits() -> None:
-        memory_bytes = max_memory_mb * 1024 * 1024
-        resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
-        resource.setrlimit(resource.RLIMIT_CPU, (max_cpu_seconds, max_cpu_seconds))
+        for limit, values, _name in limits:
+            try:
+                resource.setrlimit(limit, values)
+            except (OSError, ValueError):
+                continue
 
-    return apply_limits
+    return apply_limits, [name for _limit, _values, name in limits]
 
 
 def run_local_worker(
@@ -74,7 +85,7 @@ def run_local_worker(
     if len(request_bytes) > max_output_bytes:
         raise LocalWorkerError("ERROR_LOCAL_WORKER_REQUEST_TOO_LARGE", str(len(request_bytes)))
 
-    preexec_fn = _resource_limiter(max_memory_mb, max_cpu_seconds)
+    preexec_fn, resource_limit_names = _resource_limiter(max_memory_mb, max_cpu_seconds)
     try:
         proc = subprocess.run(
             [sys.executable, "-m", "backend.app.local_worker_entry"],
@@ -88,7 +99,7 @@ def run_local_worker(
         )
     except subprocess.TimeoutExpired as exc:
         raise LocalWorkerError("ERROR_LOCAL_WORKER_TIMEOUT", str(timeout_seconds)) from exc
-    except OSError as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
         raise LocalWorkerError("ERROR_LOCAL_WORKER_START", str(exc)) from exc
 
     if len(proc.stdout) > max_output_bytes or len(proc.stderr) > max_output_bytes:
@@ -111,6 +122,7 @@ def run_local_worker(
         "max_output_bytes": max_output_bytes,
         "max_memory_mb": max_memory_mb,
         "max_cpu_seconds": max_cpu_seconds,
-        "posix_resource_limits": preexec_fn is not None,
+        "posix_resource_limits": bool(resource_limit_names),
+        "posix_resource_limit_names": resource_limit_names,
         "result": payload.get("result"),
     }

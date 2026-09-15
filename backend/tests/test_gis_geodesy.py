@@ -9,7 +9,19 @@ from backend.app.gis_processing import GISProcessingError
 
 
 def cfg(tmp_path: Path) -> Settings:
-    value = Settings(project_root=tmp_path); value.ensure_dirs(); return value
+    value = Settings(
+        project_root=tmp_path,
+        data_dir=tmp_path / "data",
+        input_dir=tmp_path / "data" / "input",
+        processed_dir=tmp_path / "data" / "processed",
+        export_dir=tmp_path / "data" / "exports",
+        index_dir=tmp_path / "data" / "indexes",
+        sqlite_path=tmp_path / "data" / "processed" / "test.sqlite3",
+        default_model_provider="mock",
+        default_model_name="mock",
+    )
+    value.ensure_dirs()
+    return value
 
 
 def fc(path: Path, crs: str, geometry: dict) -> Path:

@@ -78,7 +78,8 @@ def repair_geojson_topology(path: Path, *, cfg: Settings = settings) -> dict[str
             continue
         try:
             shaped = shapely_shape(geometry)
-            repaired = shaped if shaped.is_valid else make_valid(shaped)
+            input_topology_valid = shaped.is_valid
+            repaired = shaped if input_topology_valid else make_valid(shaped)
         except (AttributeError, ShapelyError, TypeError, ValueError) as exc:
             row["warnings"] = ["ERROR_GIS_REPAIR_RUNTIME"]
             row["error_detail"] = str(exc)
@@ -95,14 +96,17 @@ def repair_geojson_topology(path: Path, *, cfg: Settings = settings) -> dict[str
             states["UNRESOLVED"] += 1
             receipts.append(row)
             continue
-        output_geometry = shapely_mapping(repaired)
-        # mapping() may return tuples; JSON serialization converts them losslessly to arrays.
-        import json
-        output_geometry = json.loads(json.dumps(output_geometry))
+        if input_topology_valid:
+            output_geometry = deepcopy(geometry)
+        else:
+            output_geometry = shapely_mapping(repaired)
+            # mapping() may return tuples; JSON serialization converts them losslessly to arrays.
+            import json
+            output_geometry = json.loads(json.dumps(output_geometry))
         retained = deepcopy(feature)
         retained["geometry"] = output_geometry
         output_features.append(retained)
-        state = "UNCHANGED_VALID" if shaped.is_valid and shaped.equals(repaired) else "REPAIRED"
+        state = "UNCHANGED_VALID" if input_topology_valid and shaped.equals(repaired) else "REPAIRED"
         states[state] += 1
         row.update({
             "repair_state": state,
