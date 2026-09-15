@@ -25,30 +25,73 @@ def _patch_limit(value: int | None) -> int:
     return value
 
 
+def _validate_relative_path(relative: str) -> str:
+    candidate = Path(relative)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        raise CodingWorkspaceError("ERROR_CODING_PATCH_PATH_OUTSIDE_REPOSITORY", f"Patch path escapes repository: {relative}")
+    if candidate.parts and candidate.parts[0] == ".git":
+        raise CodingWorkspaceError("ERROR_CODING_GIT_ADMIN_PATH_BLOCKED", f"Patch targets .git administrative path: {relative}")
+    if not candidate.parts:
+        raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", "Patch contains an empty repository path.")
+    return candidate.as_posix()
+
+
+def _prefixed_patch_path(token: str, expected_prefix: str) -> str:
+    if token == "/dev/null":
+        return ""
+    if not token.startswith(expected_prefix) or len(token) <= 2:
+        raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid repository path in patch header: {token}")
+    return _validate_relative_path(token[2:])
+
+
+def _single_header_path(line: str, prefix: str) -> str:
+    try:
+        parts = shlex.split(line)
+    except ValueError as exc:
+        raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid patch header: {line}") from exc
+    if len(parts) != 2 or parts[0] != prefix:
+        raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid patch header: {line}")
+    return parts[1]
+
+
 def _parse_diff_paths(patch: str) -> list[str]:
     paths: set[str] = set()
-    headers = 0
+    diff_headers = 0
     for line in patch.splitlines():
-        if not line.startswith("diff --git "):
+        if line.startswith("diff --git "):
+            diff_headers += 1
+            try:
+                parts = shlex.split(line)
+            except ValueError as exc:
+                raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid diff header: {line}") from exc
+            if len(parts) != 4 or parts[0:2] != ["diff", "--git"]:
+                raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid diff header: {line}")
+            for token, expected_prefix in ((parts[2], "a/"), (parts[3], "b/")):
+                relative = _prefixed_patch_path(token, expected_prefix)
+                if relative:
+                    paths.add(relative)
             continue
-        headers += 1
-        try:
-            parts = shlex.split(line)
-        except ValueError as exc:
-            raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid diff header: {line}") from exc
-        if len(parts) != 4 or parts[0:2] != ["diff", "--git"]:
-            raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid diff header: {line}")
-        for token, expected_prefix in ((parts[2], "a/"), (parts[3], "b/")):
-            if not token.startswith(expected_prefix) or len(token) <= 2:
-                raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid repository path in diff header: {token}")
-            relative = token[2:]
-            candidate = Path(relative)
-            if candidate.is_absolute() or ".." in candidate.parts:
-                raise CodingWorkspaceError("ERROR_CODING_PATCH_PATH_OUTSIDE_REPOSITORY", f"Patch path escapes repository: {relative}")
-            if candidate.parts and candidate.parts[0] == ".git":
-                raise CodingWorkspaceError("ERROR_CODING_GIT_ADMIN_PATH_BLOCKED", f"Patch targets .git administrative path: {relative}")
-            paths.add(candidate.as_posix())
-    if headers == 0 or not paths:
+        if line.startswith("--- "):
+            token = _single_header_path(line, "---")
+            relative = _prefixed_patch_path(token, "a/")
+            if relative:
+                paths.add(relative)
+            continue
+        if line.startswith("+++ "):
+            token = _single_header_path(line, "+++")
+            relative = _prefixed_patch_path(token, "b/")
+            if relative:
+                paths.add(relative)
+            continue
+        for prefix in ("rename from", "rename to", "copy from", "copy to"):
+            marker = f"{prefix} "
+            if line.startswith(marker):
+                relative = line[len(marker):]
+                if not relative:
+                    raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid patch path header: {line}")
+                paths.add(_validate_relative_path(relative))
+                break
+    if diff_headers == 0 or not paths:
         raise CodingWorkspaceError("ERROR_CODING_PATCH_FORMAT", "Patch must contain at least one 'diff --git' file header.")
     return sorted(paths)
 
@@ -144,13 +187,14 @@ def validate_patch_proposal(
         "warnings": (["CODING_PATCH_DIRTY_OVERLAP"] if dirty_overlap else []) + (["CODING_PATCH_NOT_APPLICABLE"] if not applicable else []),
         "limitations": [
             "proposal validation is read-only and never applies the patch",
+            "all diff/file/rename/copy headers contribute to the preserved patch candidate set",
             "path identity is repository-relative and does not prove semantic equivalence across renamed files",
             "preimage SHA-256 proves byte identity only",
             "future application must revalidate HEAD, dirty state, path boundaries, and preimage hashes at execution time",
         ],
         "falsification_criteria": [
             "reject patches without explicit diff --git path headers",
-            "reject traversal and .git administrative targets",
+            "reject traversal and .git administrative targets in any parsed patch path header",
             "reject patch payloads above the approved byte ceiling",
             "do not claim applicability when git apply --check rejects the proposal",
             "do not silently ignore dirty overlap with proposed target paths",
