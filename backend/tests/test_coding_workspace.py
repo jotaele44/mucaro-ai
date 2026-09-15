@@ -82,6 +82,16 @@ def test_repository_status_closes_clean_and_dirty_path_accounting(tmp_path: Path
     assert dirty["dirty_path_count"] == len(dirty["dirty_paths"])
 
 
+def test_non_repository_directory_fails_with_specific_state(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    ordinary = tmp_path / "ordinary"
+    ordinary.mkdir()
+
+    with pytest.raises(CodingWorkspaceError) as missing:
+        inspect_repository(ordinary, cfg=cfg)
+    assert missing.value.status == "ERROR_CODING_REPOSITORY_NOT_FOUND"
+
+
 def test_repository_file_read_preserves_exact_utf8_and_byte_hash(tmp_path: Path) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
@@ -111,7 +121,7 @@ def test_repository_file_read_does_not_synthesize_binary_text(tmp_path: Path) ->
     assert receipt["line_count"] is None
 
 
-def test_repository_file_read_rejects_path_escape_and_size_overflow(tmp_path: Path) -> None:
+def test_repository_file_read_rejects_path_escape_git_admin_and_size_overflow(tmp_path: Path) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
     (tmp_path / "outside.txt").write_text("outside", encoding="utf-8")
@@ -120,12 +130,16 @@ def test_repository_file_read_rejects_path_escape_and_size_overflow(tmp_path: Pa
         read_repository_file(repo, "../outside.txt", cfg=cfg)
     assert escape.value.status == "ERROR_CODING_FILE_OUTSIDE_REPOSITORY"
 
+    with pytest.raises(CodingWorkspaceError) as git_admin:
+        read_repository_file(repo, ".git/config", cfg=cfg)
+    assert git_admin.value.status == "ERROR_CODING_GIT_ADMIN_PATH_BLOCKED"
+
     with pytest.raises(CodingWorkspaceError) as oversized:
         read_repository_file(repo, "tracked.txt", cfg=cfg, max_bytes=2)
     assert oversized.value.status == "ERROR_CODING_FILE_TOO_LARGE"
 
 
-def test_repository_diff_reports_tracked_diff_and_untracked_residue_separately(tmp_path: Path) -> None:
+def test_repository_diff_reports_full_dirty_candidate_sets_and_untracked_residue(tmp_path: Path) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
     (repo / "tracked.txt").write_text("beta\n", encoding="utf-8")
@@ -136,7 +150,11 @@ def test_repository_diff_reports_tracked_diff_and_untracked_residue_separately(t
     assert receipt["status"] == "CODING_DIFF_OK"
     assert receipt["dirty_status"] == "DIRTY"
     assert receipt["changed_files"] == ["tracked.txt"]
+    assert receipt["staged_files"] == []
+    assert receipt["unstaged_files"] == ["tracked.txt"]
     assert receipt["untracked_files"] == ["untracked.txt"]
+    assert receipt["dirty_paths"] == ["tracked.txt", "untracked.txt"]
+    assert receipt["dirty_path_count"] == 2
     assert receipt["changed_file_count"] == 1
     assert receipt["untracked_file_count"] == 1
     assert "-alpha" in receipt["diff"]
