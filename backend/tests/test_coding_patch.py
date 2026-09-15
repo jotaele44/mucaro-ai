@@ -113,7 +113,7 @@ def test_patch_check_returns_rejected_receipt_when_git_apply_check_fails(tmp_pat
     assert (repo / "tracked.txt").read_text(encoding="utf-8") == "alpha\n"
 
 
-def test_patch_check_rejects_git_admin_traversal_format_and_size(tmp_path: Path) -> None:
+def test_patch_check_rejects_git_admin_traversal_hidden_header_targets_format_and_size(tmp_path: Path) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
 
@@ -126,6 +126,11 @@ def test_patch_check_rejects_git_admin_traversal_format_and_size(tmp_path: Path)
     with pytest.raises(CodingWorkspaceError) as blocked_traversal:
         validate_patch_proposal(repo, traversal, cfg=cfg)
     assert blocked_traversal.value.status == "ERROR_CODING_PATCH_PATH_OUTSIDE_REPOSITORY"
+
+    hidden_target = "diff --git a/tracked.txt b/tracked.txt\n--- a/tracked.txt\n+++ b/../outside.txt\n@@ -1 +1 @@\n-alpha\n+beta\n"
+    with pytest.raises(CodingWorkspaceError) as blocked_hidden_target:
+        validate_patch_proposal(repo, hidden_target, cfg=cfg)
+    assert blocked_hidden_target.value.status == "ERROR_CODING_PATCH_PATH_OUTSIDE_REPOSITORY"
 
     with pytest.raises(CodingWorkspaceError) as bad_format:
         validate_patch_proposal(repo, "--- a/tracked.txt\n+++ b/tracked.txt\n", cfg=cfg)
