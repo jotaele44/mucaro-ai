@@ -10,18 +10,18 @@
     {"id":"CODE-R06","class":"negative","gate":"invalid refs and oversized diffs fail closed"},
     {"id":"CODE-R07","class":"positive","gate":"patch proposal records Git-parsed target set, source candidates and preimages"},
     {"id":"CODE-R08","class":"negative","gate":"traversal, .git targets, ambiguous path encoding and oversized patches fail closed"},
-    {"id":"CODE-R09","class":"positive","gate":"coding container plan uses pinned image, explicit repo mount, read-only rootfs, dropped capabilities, no-new-privileges and network none"},
-    {"id":"CODE-R10","class":"negative","gate":"network-enabled coding containers and unpinned images fail closed"},
-    {"id":"CODE-R11","class":"positive","gate":"patch mutation revalidates HEAD, patch hash, candidate set and preimages before mutation"},
-    {"id":"CODE-R12","class":"negative","gate":"HEAD drift, patch drift, preimage drift and dirty overlap block mutation"},
-    {"id":"CODE-R13","class":"positive","gate":"required test/lint/type/build checks produce isolated receipts with closed PASS/FAIL arithmetic"},
-    {"id":"CODE-R14","class":"negative","gate":"required failed or unavailable checks fail the suite"},
+    {"id":"CODE-R09","class":"positive","gate":"coding container plan uses pinned image, explicit read-only repo mount, read-only rootfs, dropped capabilities, no-new-privileges and network none"},
+    {"id":"CODE-R10","class":"negative","gate":"network-enabled coding plans, writable repo mounts and unpinned images fail closed"},
+    {"id":"CODE-R11","class":"positive","gate":"approval-gated patch mutation revalidates HEAD, patch hash, candidate set and preimages before mutation and conserves HEAD"},
+    {"id":"CODE-R12","class":"negative","gate":"HEAD drift, patch drift, preimage drift, dirty overlap and unexpected new dirty paths block or roll back mutation"},
+    {"id":"CODE-R13","class":"provisional","gate":"test/lint/type/build/security/benchmark checks produce deterministic read-only isolated execution plans with closed planning arithmetic"},
+    {"id":"CODE-R14","class":"negative","gate":"required checks that cannot produce a current valid read-only plan block the suite plan; PLANNED is never promoted to PASS without execution evidence"},
     {"id":"CODE-R15","class":"positive","gate":"review findings bind to changed file, source SHA-256 and exact line evidence"},
     {"id":"CODE-R16","class":"negative","gate":"review findings against unchanged paths or invalid line ranges are rejected"},
-    {"id":"CODE-R17","class":"blocked","gate":"branch/commit/PR mutations require an authorized Git mutation surface and cannot be inferred from source presence"},
-    {"id":"CODE-R18","class":"blocked","gate":"live pinned coding container image and engine execution must be demonstrated before CODE-06/07 PASS"},
+    {"id":"CODE-R17","class":"blocked","gate":"branch/commit/PR mutations require an authorized Git lifecycle surface and cannot be inferred from source presence"},
+    {"id":"CODE-R18","class":"blocked","gate":"live pinned coding container image and engine execution must be demonstrated before CODE-07 PASS"},
     {"id":"CODE-R19","class":"blocked","gate":"hosted CI must admit executable jobs or independent trusted execution evidence must be frozen"},
     {"id":"CODE-R20","class":"certification","gate":"zero unresolved residue inside the declared coding scope before CODING CERTIFIED"}
   ],
-  "certification_rule": "Script success or merged source is insufficient; PASS requires executable evidence, frozen runtime/image identity, closed arithmetic, and zero unresolved residue inside scope."
+  "certification_rule": "Script success, valid plans, or merged source are insufficient; PASS requires applicable executable evidence, frozen runtime/image identity, closed arithmetic, and zero unresolved residue inside scope."
 }
