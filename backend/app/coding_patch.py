@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import shlex
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -36,73 +35,79 @@ def _validate_relative_path(relative: str) -> str:
     return candidate.as_posix()
 
 
-def _prefixed_patch_path(token: str, expected_prefix: str) -> str:
-    if token == "/dev/null":
-        return ""
-    if not token.startswith(expected_prefix) or len(token) <= 2:
-        raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid repository path in patch header: {token}")
-    return _validate_relative_path(token[2:])
-
-
-def _single_header_path(line: str, prefix: str) -> str:
+def _git_numstat_paths(repo_root: Path, patch_bytes: bytes) -> list[str]:
     try:
-        parts = shlex.split(line)
-    except ValueError as exc:
-        raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid patch header: {line}") from exc
-    if len(parts) != 2 or parts[0] != prefix:
-        raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid patch header: {line}")
-    return parts[1]
+        proc = subprocess.run(
+            ["git", "apply", "--numstat", "-z", "-"],
+            cwd=repo_root,
+            input=patch_bytes,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=30,
+        )
+    except FileNotFoundError as exc:
+        raise CodingWorkspaceError("ERROR_CODING_GIT_UNAVAILABLE", "git executable is not available.") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise CodingWorkspaceError("ERROR_CODING_GIT_TIMEOUT", "git apply --numstat timed out.") from exc
+    if proc.returncode != 0:
+        detail = proc.stderr.decode("utf-8", errors="replace").strip() or "git apply --numstat rejected the patch"
+        raise CodingWorkspaceError("ERROR_CODING_PATCH_FORMAT", detail)
 
-
-def _parse_diff_paths(patch: str) -> list[str]:
     paths: set[str] = set()
-    diff_headers = 0
-    for line in patch.splitlines():
-        if line.startswith("diff --git "):
-            diff_headers += 1
-            try:
-                parts = shlex.split(line)
-            except ValueError as exc:
-                raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid diff header: {line}") from exc
-            if len(parts) != 4 or parts[0:2] != ["diff", "--git"]:
-                raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid diff header: {line}")
-            for token, expected_prefix in ((parts[2], "a/"), (parts[3], "b/")):
-                relative = _prefixed_patch_path(token, expected_prefix)
-                if relative:
-                    paths.add(relative)
+    for record in proc.stdout.split(b"\0"):
+        if not record:
             continue
-        if line.startswith("--- "):
-            token = _single_header_path(line, "---")
-            relative = _prefixed_patch_path(token, "a/")
-            if relative:
-                paths.add(relative)
-            continue
-        if line.startswith("+++ "):
-            token = _single_header_path(line, "+++")
-            relative = _prefixed_patch_path(token, "b/")
-            if relative:
-                paths.add(relative)
-            continue
-        for prefix in ("rename from", "rename to", "copy from", "copy to"):
-            marker = f"{prefix} "
-            if line.startswith(marker):
-                relative = line[len(marker):]
-                if not relative:
-                    raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid patch path header: {line}")
-                paths.add(_validate_relative_path(relative))
-                break
-    if diff_headers == 0 or not paths:
-        raise CodingWorkspaceError("ERROR_CODING_PATCH_FORMAT", "Patch must contain at least one 'diff --git' file header.")
+        parts = record.split(b"\t", 2)
+        if len(parts) != 3 or not parts[2]:
+            raise CodingWorkspaceError("ERROR_CODING_PATCH_NUMSTAT_INVALID", "Git returned an invalid NUL-delimited numstat record.")
+        try:
+            relative = parts[2].decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise CodingWorkspaceError(
+                "ERROR_CODING_PATCH_PATH_ENCODING",
+                "Patch path is not valid UTF-8; exact candidate identity cannot be represented safely.",
+            ) from exc
+        paths.add(_validate_relative_path(relative))
+    if not paths:
+        raise CodingWorkspaceError("ERROR_CODING_PATCH_FORMAT", "Patch did not yield any Git numstat paths.")
     return sorted(paths)
 
 
-def _git_apply_check(repo_root: Path, patch: str) -> tuple[bool, str]:
+def _rename_copy_sources(patch: str) -> list[str]:
+    paths: set[str] = set()
+    for line in patch.splitlines():
+        for prefix in ("rename from", "rename to", "copy from", "copy to"):
+            marker = f"{prefix} "
+            if not line.startswith(marker):
+                continue
+            raw = line[len(marker):]
+            if not raw:
+                raise CodingWorkspaceError("ERROR_CODING_PATCH_HEADER_INVALID", f"Invalid patch path header: {line}")
+            if raw.startswith('"'):
+                raise CodingWorkspaceError(
+                    "ERROR_CODING_PATCH_QUOTED_PATH_UNRESOLVED",
+                    "Quoted rename/copy source paths are not normalized heuristically; preserve the patch for explicit adjudication.",
+                )
+            paths.add(_validate_relative_path(raw))
+            break
+    return sorted(paths)
+
+
+def _parse_diff_paths(repo_root: Path, patch: str, patch_bytes: bytes) -> list[str]:
+    if not any(line.startswith("diff --git ") for line in patch.splitlines()):
+        raise CodingWorkspaceError("ERROR_CODING_PATCH_FORMAT", "Patch must contain at least one 'diff --git' file header.")
+    paths = set(_git_numstat_paths(repo_root, patch_bytes))
+    paths.update(_rename_copy_sources(patch))
+    return sorted(paths)
+
+
+def _git_apply_check(repo_root: Path, patch_bytes: bytes) -> tuple[bool, str]:
     try:
         proc = subprocess.run(
             ["git", "apply", "--check", "--whitespace=error-all", "-"],
             cwd=repo_root,
-            input=patch,
-            text=True,
+            input=patch_bytes,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False,
@@ -112,7 +117,7 @@ def _git_apply_check(repo_root: Path, patch: str) -> tuple[bool, str]:
         raise CodingWorkspaceError("ERROR_CODING_GIT_UNAVAILABLE", "git executable is not available.") from exc
     except subprocess.TimeoutExpired as exc:
         raise CodingWorkspaceError("ERROR_CODING_GIT_TIMEOUT", "git apply --check timed out.") from exc
-    detail = (proc.stderr or proc.stdout or "").strip()
+    detail = proc.stderr.decode("utf-8", errors="replace").strip() or proc.stdout.decode("utf-8", errors="replace").strip()
     return proc.returncode == 0, detail
 
 
@@ -154,12 +159,12 @@ def validate_patch_proposal(
         )
 
     context = resolve_repository(repo_root, cfg)
-    paths = _parse_diff_paths(patch)
+    paths = _parse_diff_paths(context.repo_root, patch, patch_bytes)
     preimages = [_path_preimage(context.repo_root, path) for path in paths]
     state = inspect_repository(context.repo_root, cfg=cfg)
     dirty = set(state.get("dirty_paths") or [])
     dirty_overlap = sorted(dirty.intersection(paths))
-    applicable, apply_detail = _git_apply_check(context.repo_root, patch)
+    applicable, apply_detail = _git_apply_check(context.repo_root, patch_bytes)
 
     if not applicable:
         status = "CODING_PATCH_CHECK_REJECTED"
@@ -187,14 +192,16 @@ def validate_patch_proposal(
         "warnings": (["CODING_PATCH_DIRTY_OVERLAP"] if dirty_overlap else []) + (["CODING_PATCH_NOT_APPLICABLE"] if not applicable else []),
         "limitations": [
             "proposal validation is read-only and never applies the patch",
-            "all diff/file/rename/copy headers contribute to the preserved patch candidate set",
+            "effective target paths are parsed by Git through NUL-delimited numstat output rather than inferred from whitespace-sensitive headers",
+            "rename/copy source paths are preserved exactly when unquoted; genuinely quoted source headers fail closed for explicit adjudication",
             "path identity is repository-relative and does not prove semantic equivalence across renamed files",
             "preimage SHA-256 proves byte identity only",
             "future application must revalidate HEAD, dirty state, path boundaries, and preimage hashes at execution time",
         ],
         "falsification_criteria": [
-            "reject patches without explicit diff --git path headers",
-            "reject traversal and .git administrative targets in any parsed patch path header",
+            "reject patches without explicit diff --git headers or Git-parsable numstat paths",
+            "reject traversal and .git administrative targets from Git's effective path set or rename/copy source headers",
+            "reject non-UTF-8 effective target paths rather than normalize them heuristically",
             "reject patch payloads above the approved byte ceiling",
             "do not claim applicability when git apply --check rejects the proposal",
             "do not silently ignore dirty overlap with proposed target paths",
