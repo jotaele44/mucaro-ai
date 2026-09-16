@@ -1,5 +1,5 @@
 {
-  "schema_version": "MUCARO_CODING_REGRESSION/1.0",
+  "schema_version": "MUCARO_CODING_REGRESSION/1.1",
   "scope": "governed coding capability plane",
   "requirements": [
     {"id":"CODE-R01","class":"positive","gate":"repository discovery returns exact HEAD, branch and dirty candidate sets"},
@@ -10,18 +10,21 @@
     {"id":"CODE-R06","class":"negative","gate":"invalid refs and oversized diffs fail closed"},
     {"id":"CODE-R07","class":"positive","gate":"patch proposal records Git-parsed target set, source candidates and preimages"},
     {"id":"CODE-R08","class":"negative","gate":"traversal, .git targets, ambiguous path encoding and oversized patches fail closed"},
-    {"id":"CODE-R09","class":"positive","gate":"coding container plan uses pinned image, explicit read-only repo mount, read-only rootfs, dropped capabilities, no-new-privileges and network none"},
-    {"id":"CODE-R10","class":"negative","gate":"network-enabled coding plans, writable repo mounts and unpinned images fail closed"},
+    {"id":"CODE-R09","class":"positive","gate":"coding container uses immutable pinned image, read-only host source mount, ephemeral writable tmpfs workspace, read-only rootfs, dropped capabilities, no-new-privileges, non-root UID/GID, no IPC and network none"},
+    {"id":"CODE-R10","class":"negative","gate":"network-enabled coding plans, writable host-source mounts, implicit image pulls and unpinned images fail closed"},
     {"id":"CODE-R11","class":"positive","gate":"approval-gated patch mutation revalidates HEAD, patch hash, candidate set and preimages before mutation and conserves HEAD"},
     {"id":"CODE-R12","class":"negative","gate":"HEAD drift, patch drift, preimage drift, dirty overlap and unexpected new dirty paths block or roll back mutation"},
-    {"id":"CODE-R13","class":"provisional","gate":"test/lint/type/build/security/benchmark checks produce deterministic read-only isolated execution plans with closed planning arithmetic"},
-    {"id":"CODE-R14","class":"negative","gate":"required checks that cannot produce a current valid read-only plan block the suite plan; PLANNED is never promoted to PASS without execution evidence"},
+    {"id":"CODE-R13","class":"provisional","gate":"test/lint/type/build/security/benchmark checks produce terminal PASS/FAIL/BLOCKED execution receipts only through the isolated coding-container boundary"},
+    {"id":"CODE-R14","class":"negative","gate":"required nonzero checks prevent PASS; required container/image/isolation failures remain BLOCKED rather than being mislabeled as test failures"},
     {"id":"CODE-R15","class":"positive","gate":"review findings bind to changed file, source SHA-256 and exact line evidence"},
     {"id":"CODE-R16","class":"negative","gate":"review findings against unchanged paths or invalid line ranges are rejected"},
-    {"id":"CODE-R17","class":"blocked","gate":"branch/commit/PR mutations require an authorized Git lifecycle surface and cannot be inferred from source presence"},
-    {"id":"CODE-R18","class":"blocked","gate":"live pinned coding container image and engine execution must be demonstrated before CODE-07 PASS"},
-    {"id":"CODE-R19","class":"blocked","gate":"hosted CI must admit executable jobs or independent trusted execution evidence must be frozen"},
-    {"id":"CODE-R20","class":"certification","gate":"zero unresolved residue inside the declared coding scope before CODING CERTIFIED"}
+    {"id":"CODE-R17","class":"provisional","gate":"work-branch creation binds exact clean HEAD; commits require a non-protected branch, exact approved dirty set, no pre-existing staged state, exact parent and exact committed path set"},
+    {"id":"CODE-R18","class":"negative","gate":"protected branch mutation, stale HEAD, dirty-set drift, pre-staged state and failed commit postconditions block or roll back"},
+    {"id":"CODE-R19","class":"provisional","gate":"PR request artifact binds exact clean head branch, base branch, title/body and request SHA-256 without performing an unauthenticated network action"},
+    {"id":"CODE-R20","class":"blocked","gate":"live pinned coding image and container-engine execution must be demonstrated before CODE-06/CODE-07 PASS"},
+    {"id":"CODE-R21","class":"blocked","gate":"remote branch push and PR submission require an explicitly authenticated final-stage adapter with preserved request identity"},
+    {"id":"CODE-R22","class":"blocked","gate":"hosted CI must admit executable jobs or independent trusted execution evidence must be frozen"},
+    {"id":"CODE-R23","class":"certification","gate":"zero unresolved residue inside the declared coding scope before CODING CERTIFIED"}
   ],
-  "certification_rule": "Script success, valid plans, or merged source are insufficient; PASS requires applicable executable evidence, frozen runtime/image identity, closed arithmetic, and zero unresolved residue inside scope."
+  "certification_rule": "Merged source, valid plans, unit fixtures, or startup-failed CI are insufficient for certification; PASS requires applicable executable evidence, frozen runtime/image identity, closed arithmetic, and zero unresolved residue inside scope."
 }
