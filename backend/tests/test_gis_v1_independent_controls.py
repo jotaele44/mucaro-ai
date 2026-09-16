@@ -4,7 +4,8 @@ import json
 import math
 from pathlib import Path
 
-from pyproj import Geod, Transformer
+from geographiclib.geodesic import Geodesic
+from pyproj import Transformer
 from shapely.geometry import Polygon
 from shapely.validation import make_valid
 
@@ -24,9 +25,9 @@ def test_crs_controls_close_against_frozen_closed_form_values() -> None:
         assert abs(x-row["expected"]["x"]) <= tol; assert abs(y-row["expected"]["y"]) <= tol
 
 
-def test_geodesic_control_closes_against_frozen_geographiclib_value() -> None:
+def test_geodesic_control_closes_against_independent_geographiclib_engine() -> None:
     payload, rows = controls(); row = rows["GEOD-001"]; a=row["input"]["a"]; b=row["input"]["b"]
-    _, _, distance = Geod(ellps="WGS84").inv(a[0],a[1],b[0],b[1])
+    result = Geodesic.WGS84.Inverse(a[1], a[0], b[1], b[0]); distance = result["s12"]
     assert abs(distance-row["expected"]["distance_m"]) <= payload["tolerances"]["geodesic_distance_m"]
 
 
