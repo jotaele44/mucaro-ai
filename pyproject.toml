@@ -17,6 +17,7 @@ dependencies = [
     "shapely==2.1.2",
     "pyproj==3.7.2",
     "rasterio==1.4.3",
+    "geographiclib==2.1",
 ]
 
 [project.optional-dependencies]
