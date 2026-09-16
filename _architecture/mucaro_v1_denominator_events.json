@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "ff739b7c9a8ce7cb13fcbfeafe2ba7816c35a710",
+  "audit_head": "8c604dca3237b1b0b788617f839bf41f19df406c",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -65,7 +65,52 @@
       "to_state": "PROVISIONAL",
       "evidence_type": "MERGED_NONMUTATING_PATCH_RECEIPTS_WITH_EXECUTION_GATE_BLOCKED",
       "evidence": ["PR#18", "main@ff739b7c9a8ce7cb13fcbfeafe2ba7816c35a710", "GitHub Actions startup_failure before jobs"],
-      "reason": "Merged coding tools provide bounded diff receipts plus non-mutating patch SHA-256, parsed path candidate sets, byte preimages, dirty-overlap detection, traversal/.git rejection, and git apply --check; mutation/application and executed regressions remain outside this provisional scope."
+      "reason": "Merged coding tools provide bounded diff receipts plus non-mutating patch SHA-256, parsed path candidate sets, byte preimages, dirty-overlap detection, traversal/.git rejection, and git apply --check; executed regressions remain outside this provisional evidence scope."
+    },
+    {
+      "event_id": "evt-code06-mutation-runtime-provisional",
+      "requirement_id": "CODE-06",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_CONTROLLED_MUTATION_SOURCE_WITH_LIVE_RUNTIME_RESIDUE",
+      "evidence": ["main@8c604dca3237b1b0b788617f839bf41f19df406c", "backend/app/coding_mutation.py", "PR#28", "GitHub Actions startup_failure before jobs"],
+      "reason": "Controlled patch mutation revalidates HEAD, patch hash, candidate paths, preimages and dirty overlap with explicit rollback, while the isolated coding execution runtime still lacks live pinned-image execution evidence."
+    },
+    {
+      "event_id": "evt-code07-execution-receipts-provisional",
+      "requirement_id": "CODE-07",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_ISOLATED_EXECUTION_ADAPTER_WITH_ZERO_JOB_CI_BLOCKER",
+      "evidence": ["PR#28", "main@a6b047827794531c4af634583e7303ca752e8e22", "Actions run 35056318661 startup_failure with zero jobs"],
+      "reason": "Pinned-image, network-none, read-only-host-source, ephemeral-workspace execution receipts and terminal PASS/FAIL/BLOCKED check accounting are merged; no live trusted coding-image execution receipt has yet closed the gate."
+    },
+    {
+      "event_id": "evt-code08-review-evidence-provisional",
+      "requirement_id": "CODE-08",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_LINE_BOUND_REVIEW_SOURCE_WITH_EXECUTION_GATE_BLOCKED",
+      "evidence": ["main@8c604dca3237b1b0b788617f839bf41f19df406c", "backend/app/coding_review.py", "GitHub Actions startup_failure before jobs"],
+      "reason": "Code-review findings are source-hash and file/line bound with changed-path and line-range rejection, but the complete executed coding regression corpus remains blocked."
+    },
+    {
+      "event_id": "evt-code09-git-lifecycle-provisional",
+      "requirement_id": "CODE-09",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_LOCAL_GIT_LIFECYCLE_WITH_REMOTE_AUTH_RESIDUE",
+      "evidence": ["PR#29", "main@9b1b0bdde4aba74f0b5c913eaaec7f4540fa280d", "Actions run 35056533072 startup_failure with zero jobs"],
+      "reason": "Exact-head clean branch creation, approved-path commit transactions, rollback behavior and deterministic PR-request artifacts are merged; authenticated remote push/PR submission remains deliberately unprovisioned."
+    },
+    {
+      "event_id": "evt-code10-certification-corpus-provisional",
+      "requirement_id": "CODE-10",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_FAIL_CLOSED_CERTIFICATION_LEDGER_WITH_UNEXECUTED_CORPUS",
+      "evidence": ["PR#31", "main@8c604dca3237b1b0b788617f839bf41f19df406c", "Actions run 35056669333 startup_failure with zero jobs"],
+      "reason": "The coding regression manifest and fail-closed certification ledger enforce terminal evidence states, exact arithmetic and source/runtime/image identity closure; the representative corpus itself has not executed on a frozen trusted runtime."
     }
   ]
 }
