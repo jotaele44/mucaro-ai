@@ -11,16 +11,21 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
     report = audit_current_denominator_state(PROJECT_ROOT)
     assert report["status"] == "MUCARO_V1_DENOMINATOR_AUDIT_OK"
     assert report["historical_baseline"] == {"raw_completion_percent": 61.5, "weighted_completion_percent": 62.6}
-    assert report["current_overlay"]["raw_completion_percent"] == 66.0
-    assert report["current_overlay"]["weighted_completion_percent"] == 67.7
-    assert report["current_overlay"]["per_track"]["CODING"]["score_percent"] == 30.0
-    assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"OPEN": 5, "PASS": 1, "PROVISIONAL": 4}
-    assert len(report["applied_events"]) == 7
+    assert report["current_overlay"]["raw_completion_percent"] == 68.5
+    assert report["current_overlay"]["weighted_completion_percent"] == 70.2
+    assert report["current_overlay"]["per_track"]["CODING"]["score_percent"] == 55.0
+    assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"OPEN": 0, "PASS": 1, "PROVISIONAL": 9}
+    assert len(report["applied_events"]) == 12
     applied = {event["event_id"] for event in report["applied_events"]}
     assert {
         "evt-code03-repo-read-provisional",
         "evt-code04-dirty-state-provisional",
         "evt-code05-patch-receipts-provisional",
+        "evt-code06-mutation-runtime-provisional",
+        "evt-code07-check-execution-provisional",
+        "evt-code08-review-evidence-provisional",
+        "evt-code09-git-lifecycle-provisional",
+        "evt-code10-regression-corpus-provisional",
     }.issubset(applied)
 
 
