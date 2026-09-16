@@ -1,0 +1,23 @@
+{
+  "schema_version": "MUCARO_CODING_GIT_LIFECYCLE_SCOPE/1.0",
+  "scope": "credential-free branch/commit/PR lifecycle planning",
+  "state": "PROVISIONAL",
+  "implemented": [
+    "exact base HEAD binding",
+    "attached source branch requirement",
+    "protected and existing target branch rejection",
+    "staged path-set SHA-256 binding",
+    "exact binary staged-diff SHA-256 binding",
+    "bounded staged diff and commit-message inputs",
+    "commit-hook preservation",
+    "no-force/no-push/no-remote-mutation policy",
+    "deterministic PR head/base identity plan"
+  ],
+  "blocked": [
+    "approved local branch creation and commit execution transaction",
+    "authorized remote push",
+    "authorized PR creation/update",
+    "executed lifecycle regression evidence on trusted runtime"
+  ],
+  "certification_rule": "Plan validity does not prove branch, commit, push, or PR execution. CODE-09 cannot be PASS until authorized execution receipts close all lifecycle stages."
+}
