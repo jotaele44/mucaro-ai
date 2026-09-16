@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "ce9afb398224fc91f8a8f966357bde12804c290a",
+  "audit_head": "c57615fec09c6353059868325c7c43c20a98b2c6",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -111,6 +111,33 @@
       "evidence_type": "MERGED_CODING_REGRESSION_CORPUS_WITH_EXECUTION_GATE_BLOCKED",
       "evidence": ["PR#22", "main@9b1b0bdde4aba74f0b5c913eaaec7f4540fa280d", "_architecture/coding_regression_manifest.json", "GitHub Actions startup_failure before jobs"],
       "reason": "The coding regression manifest now enumerates positive, negative, provisional, blocked and certification gates across repository identity, patching, isolation, checks, review and Git lifecycle; the corpus is source-complete for its declared cases but not trusted-execution certified."
+    },
+    {
+      "event_id": "evt-ocr07-pdf-lineage-provisional",
+      "requirement_id": "OCR-07",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_PDF_RENDER_AND_PAGE_LINEAGE_SOURCE_WITH_LIVE_ENGINE_RESIDUE",
+      "evidence": ["PR#23", "backend/app/ocr_pdf.py", "GitHub Actions startup_failure before jobs"],
+      "reason": "PDF OCR source now binds original PDF bytes, declared page count, pdftoppm renderer identity/DPI, rendered page bytes and SHA-256, per-page Tesseract receipts, and page arithmetic; live renderer/Tesseract execution and representative corpus certification remain open."
+    },
+    {
+      "event_id": "evt-gis09-topology-vector-raster-provisional",
+      "requirement_id": "GIS-09",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_TOPOLOGY_VECTOR_RASTER_SOURCE_WITH_EXECUTION_RESIDUE",
+      "evidence": ["PR#15", "PR#25", "PR#26", "PR#37", "main@c57615fec09c6353059868325c7c43c20a98b2c6", "Actions run 35056990058 startup_failure with zero jobs"],
+      "reason": "Explicit topology repair plus bounded GeoJSON/GeoPackage/Shapefile manifests, GeoTIFF inspection/sampling/clipping, and vector-raster analytical receipts are merged with null/NODATA/unresolved accounting; live and broad-format regression certification remains open."
+    },
+    {
+      "event_id": "evt-gis10-crs-export-certification-provisional",
+      "requirement_id": "GIS-10",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_BROAD_CRS_AND_EXPORT_PROVENANCE_WITH_INDEPENDENT_ENGINE_RESIDUE",
+      "evidence": ["PR#16", "PR#17", "PR#27", "main@c57615fec09c6353059868325c7c43c20a98b2c6", "GitHub Actions startup_failure before jobs"],
+      "reason": "pyproj/PROJ arbitrary parseable CRS transformation, WGS84 ellipsoidal measurement, and map/export provenance receipts are merged; datum-grid breadth, vertical/time-dependent CRS cases, independent-engine parity, and visual certification remain unresolved."
     }
   ]
 }
