@@ -20,19 +20,19 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
         "lockstep_participant": True,
         "capabilities": {
             "model_runtime": {
-                "state": "PARTIAL",
+                "state": "CANDIDATE",
                 "contract": "model-runtime-contract/0.x",
-                "notes": "Current router supports mock and Anthropic; provider-neutral runtime remains open.",
+                "notes": "Mock and Anthropic adapters exist behind a common response contract. Deterministic routing-policy receipts now prevent implicit live-provider escalation; broader provider coverage and executed routing certification remain open.",
             },
             "agent_runtime": {
                 "state": "PARTIAL",
                 "contract": None,
-                "notes": "Planning/execution gate and conversations exist; durable workflow DAG orchestration remains open.",
+                "notes": "Planning/execution gates, conversations, tools, skills, local memory and coding lifecycle primitives exist; durable multi-step workflow DAG orchestration and crash-resume semantics remain open.",
             },
             "tool_runtime": {
                 "state": "AVAILABLE",
                 "contract": "mucaro-tool-runtime/local",
-                "notes": "Deny-by-default approval-gated local tool runtime.",
+                "notes": "Deny-by-default approval-gated local tool runtime with execution receipts.",
             },
             "skill_registry": {
                 "state": "CANDIDATE",
@@ -42,47 +42,52 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
             "skill_mount_runtime": {
                 "state": "CANDIDATE",
                 "contract": "skill-mount-manifest/1.0",
-                "notes": "Local mount, capability authorization, activation, execution, and ledger foundation.",
+                "notes": "Local mount, capability authorization, activation, execution, ledger and execution-routing foundation.",
             },
             "execution_router": {
-                "state": "ABSENT",
-                "contract": None,
-                "notes": "Distributed repo/container/service/federation-worker routing is not implemented.",
+                "state": "CANDIDATE",
+                "contract": "mucaro-execution-router/1.x",
+                "notes": "Policy-driven IN_PROCESS, LOCAL_WORKER and CONTAINER routing exists with pinned container bindings. Distributed service/federation-worker execution and trusted live container certification remain open.",
             },
             "cited_retrieval": {
                 "state": "AVAILABLE",
                 "contract": "mucaro-retrieval/local",
-                "notes": "Local cited retrieval with BM25, persistent TF-IDF, and semantic strategies.",
+                "notes": "Local cited retrieval with BM25, persistent TF-IDF, semantic/hybrid strategies, mixed-format regression fixtures, retrieval-quality receipts, and a real-world-corpus certification gate. A qualifying frozen real-world large corpus and production-scale stress proof remain open.",
+            },
+            "memory_context": {
+                "state": "CANDIDATE",
+                "contract": "mucaro-memory-selection/1.0",
+                "notes": "Operator-controlled local memory supports explicit enable/disable/delete/export. A deterministic selector now bounds prompt context, filters kinds, excludes disabled rows and deduplicates normalized content; richer durable provenance and conflict/version semantics remain open.",
             },
             "advanced_gis_processing": {
                 "state": "CANDIDATE",
                 "contract": "mucaro-gis-processing/0.x",
-                "notes": "Local GeoJSON inspection, point-in-polygon, comparison, limited EPSG:4326/EPSG:3857 reprojection, CSV point-to-GeoJSON, and bbox feature-filter receipts exist with CRS preservation, geometry state counts, coordinate dimensionality, topology-style equality, retained/excluded feature counts, vertex Hausdorff distance, vertex symmetric-difference, adapter, source-header, skipped-row, row-accounting, and output-hash evidence; robust topology, broader CRS/datum/grid-shift/axis-order support, planar overlay, geometry clipping, map export, broader spatial formats, raster/vector processing, and GIS eval corpus remain open.",
+                "notes": "Topology inspection/repair, spatial classification/join/overlay, pyproj CRS transformation, WGS84 ellipsoidal measurement, vector-format manifests, GeoTIFF inspection/sampling/clipping, map/export provenance, vector-raster analytical receipts and independent control fixtures are source-backed. Broad live regression, vertical/time-dependent CRS cases and rendered map certification remain open.",
             },
             "state_of_art_ocr_analysis": {
                 "state": "CANDIDATE",
                 "contract": "mucaro-ocr-analysis/0.x",
-                "notes": "Local image OCR receipts exist with source-image hashes, engine identity, raw/normalized/canonical text separation, confidence states, and source-coordinate spans. PDF/page rendering, layout calibration, handwriting/table/form support, optional provider policy, and broader OCR eval corpus remain open.",
+                "notes": "Image OCR receipts preserve source hashes, engine identity, raw/normalized/canonical text, confidence states and source-coordinate spans. PDF rendering/page lineage is source-backed; multi-column/table/form reconstruction, handwriting/difficult-scan coverage and a representative certification corpus remain open.",
             },
             "governed_web_browsing": {
                 "state": "CANDIDATE",
                 "contract": "mucaro-web-browsing/0.x",
-                "notes": "Approval-gated web.fetch can create byte-pinned snapshots, and web.fetch_session records operator-supplied multi-page source selection with replay receipts. Snapshots can be ingested and cited with HTML body/structure traces, PDF/non-text parser traces, immutable snapshot-only cache policy, redirect-target robots evidence, and explicit HTTP error-page citation policy; automated search/discovery, rendered-browser capture, and autonomous link-following remain open.",
+                "notes": "Approval-gated governed fetch, byte-pinned snapshots, robots/cache evidence, operator-supplied multi-page sessions and static-HTML link discovery are source-backed. Automated search authority, rendered/JavaScript browser interaction and autonomous bounded traversal/exhaustion accounting remain open.",
             },
             "coding_programming_expertise": {
-                "state": "ABSENT",
-                "contract": None,
-                "notes": "Governed code reading, patching, testing, and review output are planned as a future capability boundary.",
+                "state": "CANDIDATE",
+                "contract": "mucaro-coding/1.x",
+                "notes": "Governed repository discovery/read/diff, patch validation and controlled mutation, isolated coding-container execution receipts, line-bound review evidence, guarded branch/commit lifecycle, deterministic PR request artifacts and a fail-closed coding certification ledger are merged. Live pinned-runtime evidence, remote authenticated push/PR and zero-residue corpus execution remain open.",
             },
             "transparency_objectivity_governance": {
                 "state": "CANDIDATE",
                 "contract": "mucaro-evidence-governance/0.x",
-                "notes": "Cited retrieval, release receipts, and audits provide a foundation; cross-capability uncertainty and contradiction rules remain open.",
+                "notes": "Cited retrieval, provenance DAGs, runtime identities, release receipts, frozen denominators, append-only audit events and domain certification gates provide the governance substrate; current-head CI admission and complete cross-capability release closure remain open.",
             },
             "cross_repo_orchestration": {
                 "state": "ABSENT",
                 "contract": None,
-                "notes": "Intentionally deferred until federation contracts are available.",
+                "notes": "Intentionally deferred until federation contracts and authenticated remote execution boundaries are available.",
             },
         },
     }
