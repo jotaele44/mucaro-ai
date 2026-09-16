@@ -1,11 +1,13 @@
 # Coding governance queue
 
-Dependency order after this source increment:
+Dependency order after the merged execution and Git-lifecycle source increments:
 
-1. Close the stale coding capability-contract classification (`ABSENT` → bounded CANDIDATE) without changing frozen denominator membership.
-2. Provide a trusted execution surface for a pinned coding image with read-only source mount, network none, fixed resource ceilings, immutable image digest, and runtime/toolchain identity receipt.
-3. Execute test/lint/type/build/security/benchmark plans and freeze stdout/stderr, exit codes, command identity, image identity, exact repository HEAD, and dirty-state identity.
-4. Implement governed branch/commit/PR lifecycle with explicit branch base, expected HEAD, changed-path set, commit tree/hash evidence, and no destructive Git operations.
-5. Execute the complete coding regression manifest including negative gates and rollback tests.
+1. Close the stale coding capability-contract classification (`ABSENT` → bounded `CANDIDATE`) without changing frozen denominator membership.
+2. Freeze a real coding runtime identity: exact pinned coding image digest, Docker/Podman engine identity, toolchain versions, source HEAD, and coding regression manifest SHA-256.
+3. Execute the isolated positive/negative coding corpus on that frozen runtime, including host-source immutability, network denial, output ceilings, stale-plan rejection, patch rollback, branch rollback, commit rollback, review-line binding, and test/lint/type/build/security/benchmark receipts.
+4. Feed one terminal evidence row for every coding-regression gate into `coding_certification.py`; missing rows remain `UNRESOLVED`, and duplicate/unknown evidence fails closed.
+5. Enable authenticated remote push/PR submission only after the local branch/commit/PR request artifact gates pass; bind the remote action to the exact request SHA-256 and preserve the resulting remote receipt.
 6. Append denominator events only to the evidence level actually reached; do not rewrite the frozen V1 denominator.
-7. Issue coding certification only with zero unresolved residue inside the declared coding scope.
+7. Close the hosted-CI zero-job startup failure or freeze an independent trusted execution surface as the authoritative coding evidence plane.
+8. Issue `MUCARO AI CODING PLANE CERTIFIED` only when every coding gate is PASS, source/runtime/image identity is closed, and the certification ledger has zero residue.
+9. The product-level `MUCARO AI RELEASE-GRADE CERTIFIED` statement remains separately gated by all non-coding tracks and the final release certification pipeline.
