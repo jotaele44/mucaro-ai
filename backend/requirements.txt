@@ -7,3 +7,4 @@ pytest==9.0.2
 pypdf==6.4.1
 shapely==2.1.2
 pyproj==3.7.2
+rasterio==1.4.3
