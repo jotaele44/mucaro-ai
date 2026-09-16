@@ -2,29 +2,34 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
 from .container_runtime import ContainerRuntimeError, resolve_container_engine, validate_pinned_image
 
-CODING_CONTAINER_SCHEMA_VERSION = "mucaro-coding-container/1.0"
+CODING_CONTAINER_SCHEMA_VERSION = "mucaro-coding-container/1.1"
 DEFAULT_TIMEOUT_SECONDS = 120
 DEFAULT_MAX_OUTPUT_BYTES = 2 * 1024 * 1024
 DEFAULT_MEMORY_MB = 2048
 DEFAULT_CPUS = 2.0
 DEFAULT_PIDS_LIMIT = 256
+DEFAULT_WORKSPACE_MB = 1024
 MAX_COMMAND_PARTS = 64
 MAX_COMMAND_PART_BYTES = 4096
+CONTAINER_UID_GID = "65532:65532"
 
 
 class CodingContainerError(RuntimeError):
-    def __init__(self, status: str, detail: str) -> None:
+    def __init__(self, status: str, detail: str, *, receipt: dict[str, Any] | None = None) -> None:
         super().__init__(detail)
         self.status = status
         self.detail = detail
+        self.receipt = receipt
 
 
 @dataclass(frozen=True)
@@ -40,11 +45,12 @@ class CodingContainerPlan:
     memory_mb: int
     cpus: float
     pids_limit: int
+    workspace_mb: int
     engine: str
 
     @property
     def mount_mode(self) -> str:
-        return "read_only"
+        return "read_only_source_ephemeral_workspace"
 
     @property
     def network_allowed(self) -> bool:
@@ -68,6 +74,7 @@ class CodingContainerPlan:
                 "memory_mb": self.memory_mb,
                 "cpus": self.cpus,
                 "pids_limit": self.pids_limit,
+                "workspace_mb": self.workspace_mb,
                 "engine": self.engine,
             },
             sort_keys=True,
@@ -125,6 +132,7 @@ def build_coding_container_plan(
     memory_mb: int = DEFAULT_MEMORY_MB,
     cpus: float = DEFAULT_CPUS,
     pids_limit: int = DEFAULT_PIDS_LIMIT,
+    workspace_mb: int = DEFAULT_WORKSPACE_MB,
     engine: str | None = None,
 ) -> CodingContainerPlan:
     try:
@@ -156,24 +164,35 @@ def build_coding_container_plan(
         memory_mb=_positive_int(memory_mb, "memory_mb"),
         cpus=_positive_number(cpus, "cpus"),
         pids_limit=_positive_int(pids_limit, "pids_limit"),
+        workspace_mb=_positive_int(workspace_mb, "workspace_mb"),
         engine=engine_path,
     )
 
 
 def build_coding_container_command(plan: CodingContainerPlan) -> list[str]:
     _validate_mount_source(plan.repo_root)
+    bootstrap = (
+        "set -eu; "
+        "cp -a /workspace/source/. /workspace/repo/; "
+        "cd /workspace/repo; "
+        "exec \"$@\""
+    )
     return [
         plan.engine,
         "run",
         "--rm",
         "--interactive",
+        "--pull=never",
         "--read-only",
         "--cap-drop=ALL",
         "--security-opt=no-new-privileges",
         "--network=none",
+        "--ipc=none",
+        f"--user={CONTAINER_UID_GID}",
         "--workdir=/workspace/repo",
-        f"--mount=type=bind,src={plan.repo_root},dst=/workspace/repo,readonly",
+        f"--mount=type=bind,src={plan.repo_root},dst=/workspace/source,readonly",
         "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=256m",
+        f"--tmpfs=/workspace/repo:rw,nosuid,nodev,size={plan.workspace_mb}m",
         "--tmpfs=/workspace/out:rw,nosuid,nodev,size=256m",
         f"--memory={plan.memory_mb}m",
         f"--cpus={plan.cpus}",
@@ -183,7 +202,11 @@ def build_coding_container_command(plan: CodingContainerPlan) -> list[str]:
         "--env=XDG_CACHE_HOME=/tmp/cache",
         "--env=PYTHONDONTWRITEBYTECODE=1",
         "--env=NPM_CONFIG_CACHE=/tmp/npm-cache",
+        "--entrypoint=/bin/sh",
         plan.image,
+        "-c",
+        bootstrap,
+        "mucaro-coding",
         *plan.command,
     ]
 
@@ -207,19 +230,108 @@ def validate_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings =
         "current_head_sha": state.get("head_sha"),
         "planned_dirty_status": plan.dirty_status,
         "current_dirty_status": state.get("dirty_status"),
-        "repository_read_only": True,
+        "source_mount_read_only": True,
+        "workspace_ephemeral": True,
         "network_allowed": False,
         "command_argv": list(plan.command),
         "container_argv": build_coding_container_command(plan),
         "limitations": [
-            "this boundary plans and validates isolated coding execution; it does not launch arbitrary repository commands",
-            "writable repository mounts are intentionally unavailable in this boundary",
-            "live container image/engine execution remains separately uncertified",
+            "live execution requires an available Docker or Podman engine and the exact pinned coding image already present locally",
+            "the container works on an ephemeral copy; build artifacts are not exported by this execution boundary",
+            "the coding image contract must provide /bin/sh and cp",
         ],
         "falsification_criteria": [
             "reject unpinned image identity",
             "reject network-enabled plans",
             "treat HEAD or dirty-state drift as STALE before execution",
-            "never convert this read-only plan into a writable mount",
+            "never expose the host repository as writable inside the container",
+            "never pull an image implicitly at execution time",
         ],
     }
+
+
+def _output_receipt(raw: bytes, *, max_bytes: int) -> dict[str, Any]:
+    if len(raw) > max_bytes:
+        raise CodingContainerError(
+            "ERROR_CODING_CONTAINER_OUTPUT_TOO_LARGE",
+            f"container output exceeded {max_bytes} bytes",
+        )
+    return {
+        "byte_size": len(raw),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "text": raw.decode("utf-8", errors="replace"),
+    }
+
+
+def run_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = settings) -> dict[str, Any]:
+    before = validate_coding_container_plan(plan, cfg=cfg)
+    if before["status"] != "CODING_CONTAINER_PLAN_VALID":
+        raise CodingContainerError("ERROR_CODING_CONTAINER_PLAN_STALE", "repository state drifted before execution")
+
+    argv = build_coding_container_command(plan)
+    started = time.monotonic()
+    try:
+        proc = subprocess.run(
+            argv,
+            cwd=plan.repo_root,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=plan.timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise CodingContainerError("ERROR_CODING_CONTAINER_TIMEOUT", str(plan.timeout_seconds)) from exc
+    except OSError as exc:
+        raise CodingContainerError("ERROR_CODING_CONTAINER_START", str(exc)) from exc
+    duration_ms = max(0, int((time.monotonic() - started) * 1000))
+
+    stdout = _output_receipt(proc.stdout, max_bytes=plan.max_output_bytes)
+    stderr = _output_receipt(proc.stderr, max_bytes=plan.max_output_bytes)
+    after = validate_coding_container_plan(plan, cfg=cfg)
+    receipt: dict[str, Any] = {
+        "schema_version": CODING_CONTAINER_SCHEMA_VERSION,
+        "status": "CODING_CONTAINER_EXECUTED_PASS" if proc.returncode == 0 else "CODING_CONTAINER_EXECUTED_FAIL",
+        "execution_status": "PASS" if proc.returncode == 0 else "FAIL",
+        "plan_sha256": plan.plan_sha256,
+        "head_sha": plan.head_sha,
+        "dirty_status": plan.dirty_status,
+        "dirty_paths_sha256": plan.dirty_paths_sha256,
+        "image": plan.image,
+        "image_digest": plan.image.rsplit("@", 1)[1],
+        "engine": plan.engine,
+        "command_argv": list(plan.command),
+        "container_argv_sha256": hashlib.sha256(json.dumps(argv, separators=(",", ":")).encode("utf-8")).hexdigest(),
+        "exit_code": proc.returncode,
+        "duration_ms": duration_ms,
+        "stdout": stdout,
+        "stderr": stderr,
+        "source_mount_read_only": True,
+        "workspace_ephemeral": True,
+        "network_allowed": False,
+        "implicit_image_pull_allowed": False,
+        "non_root_uid_gid": CONTAINER_UID_GID,
+        "pre_execution_validation": before,
+        "post_execution_validation": after,
+        "invariants": {
+            "head_conserved": after["head_match"] is True,
+            "dirty_state_conserved": after["dirty_state_match"] is True,
+            "host_source_read_only": True,
+            "ephemeral_workspace": True,
+            "network_disabled": True,
+            "image_immutable": "@sha256:" in plan.image,
+        },
+    }
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(receipt, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+    if after["status"] != "CODING_CONTAINER_PLAN_VALID":
+        receipt["status"] = "CODING_CONTAINER_SOURCE_DRIFT"
+        receipt["execution_status"] = "INVALIDATED"
+        raise CodingContainerError(
+            "ERROR_CODING_CONTAINER_SOURCE_DRIFT",
+            "host repository state changed during isolated execution",
+            receipt=receipt,
+        )
+    return receipt

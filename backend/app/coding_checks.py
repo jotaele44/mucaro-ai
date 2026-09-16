@@ -6,10 +6,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .coding_container import CodingContainerError, build_coding_container_plan, validate_coding_container_plan
+from .coding_container import (
+    CodingContainerError,
+    build_coding_container_plan,
+    run_coding_container_plan,
+    validate_coding_container_plan,
+)
 from .config import Settings, settings
 
-CODING_CHECK_SUITE_SCHEMA_VERSION = "mucaro-coding-check-suite/1.0"
+CODING_CHECK_SUITE_SCHEMA_VERSION = "mucaro-coding-check-suite/1.1"
 ALLOWED_CHECK_KINDS = {"test", "lint", "type", "build", "security", "benchmark"}
 
 
@@ -32,6 +37,24 @@ class CodingCheck:
             raise CodingCheckError("ERROR_CODING_CHECK_DEFINITION", self.check_id or self.kind)
 
 
+def _validated_checks(checks: list[CodingCheck]) -> list[CodingCheck]:
+    if not checks:
+        raise CodingCheckError("ERROR_CODING_CHECKS_REQUIRED", "at least one check is required")
+    seen: set[str] = set()
+    for check in checks:
+        check.validate()
+        if check.check_id in seen:
+            raise CodingCheckError("ERROR_CODING_CHECK_DUPLICATE", check.check_id)
+        seen.add(check.check_id)
+    return checks
+
+
+def _receipt_hash(payload: dict[str, Any]) -> str:
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+
 def build_coding_check_suite_plan(
     repo_root: str | Path,
     *,
@@ -39,16 +62,10 @@ def build_coding_check_suite_plan(
     checks: list[CodingCheck],
     cfg: Settings = settings,
 ) -> dict[str, Any]:
-    if not checks:
-        raise CodingCheckError("ERROR_CODING_CHECKS_REQUIRED", "at least one check is required")
-    seen: set[str] = set()
+    checks = _validated_checks(checks)
     rows: list[dict[str, Any]] = []
     planning_failures: list[str] = []
     for check in checks:
-        check.validate()
-        if check.check_id in seen:
-            raise CodingCheckError("ERROR_CODING_CHECK_DUPLICATE", check.check_id)
-        seen.add(check.check_id)
         try:
             plan = build_coding_container_plan(
                 repo_root,
@@ -86,7 +103,7 @@ def build_coding_check_suite_plan(
                 "error_detail": exc.detail,
                 "image": image,
                 "network_allowed": False,
-                "mount_mode": "read_only",
+                "mount_mode": "read_only_source_ephemeral_workspace",
             }
         if check.required and not planned:
             planning_failures.append(check.check_id)
@@ -105,22 +122,112 @@ def build_coding_check_suite_plan(
         "checks": rows,
         "invariants": {
             "row_accounting_closed": len(rows) == sum(state_counts.values()),
-            "unique_check_ids": len(seen) == len(rows),
+            "unique_check_ids": len({row["check_id"] for row in rows}) == len(rows),
             "network_disabled_for_all": all(row.get("network_allowed") is False for row in rows),
-            "read_only_mount_for_all": all(row.get("mount_mode") == "read_only" for row in rows),
+            "isolated_mount_for_all": all(row.get("mount_mode") == "read_only_source_ephemeral_workspace" for row in rows),
             "no_execution_claimed": True,
         },
         "limitations": [
-            "this artifact plans test/lint/type/build/security/benchmark checks but does not execute them",
-            "PASS/FAIL execution receipts remain unavailable until an approved isolated execution adapter is connected",
             "a valid plan is not evidence that the declared command passes",
+            "live execution still depends on an available container engine and exact pinned coding image",
         ],
         "falsification_criteria": [
-            "block the suite plan when any required check cannot produce a current valid read-only plan",
+            "block the suite plan when any required check cannot produce a current valid isolated plan",
             "reject duplicate check identities",
-            "reject coding checks that request network access or writable repository mounts",
+            "reject coding checks that request network access or a writable host repository mount",
             "never translate PLANNED into PASS without executable evidence",
         ],
     }
-    payload["receipt_sha256"] = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    payload["receipt_sha256"] = _receipt_hash(payload)
+    return payload
+
+
+def execute_coding_check_suite(
+    repo_root: str | Path,
+    *,
+    image: str,
+    checks: list[CodingCheck],
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    checks = _validated_checks(checks)
+    rows: list[dict[str, Any]] = []
+    required_failures: list[str] = []
+    required_blocked: list[str] = []
+
+    for check in checks:
+        try:
+            plan = build_coding_container_plan(
+                repo_root,
+                image=image,
+                command=list(check.command),
+                cfg=cfg,
+                network_allowed=False,
+            )
+            receipt = run_coding_container_plan(plan, cfg=cfg)
+            passed = receipt.get("execution_status") == "PASS"
+            row = {
+                "check_id": check.check_id,
+                "kind": check.kind,
+                "command": list(check.command),
+                "required": check.required,
+                "state": "PASS" if passed else "FAIL",
+                "plan_sha256": plan.plan_sha256,
+                "execution_receipt": receipt,
+            }
+            if check.required and not passed:
+                required_failures.append(check.check_id)
+        except CodingContainerError as exc:
+            row = {
+                "check_id": check.check_id,
+                "kind": check.kind,
+                "command": list(check.command),
+                "required": check.required,
+                "state": "BLOCKED",
+                "error_status": exc.status,
+                "error_detail": exc.detail,
+                "execution_receipt": exc.receipt,
+            }
+            if check.required:
+                required_blocked.append(check.check_id)
+        rows.append(row)
+
+    state_counts = {state: sum(row["state"] == state for row in rows) for state in ("PASS", "FAIL", "BLOCKED")}
+    required_failure_count = len(required_failures)
+    required_blocked_count = len(required_blocked)
+    if required_blocked_count:
+        status = "CODING_CHECK_SUITE_EXECUTED_BLOCKED"
+        execution_status = "BLOCKED"
+    elif required_failure_count:
+        status = "CODING_CHECK_SUITE_EXECUTED_FAIL"
+        execution_status = "FAIL"
+    else:
+        status = "CODING_CHECK_SUITE_EXECUTED_PASS"
+        execution_status = "PASS"
+
+    payload = {
+        "schema_version": CODING_CHECK_SUITE_SCHEMA_VERSION,
+        "status": status,
+        "execution_status": execution_status,
+        "image": image,
+        "check_count": len(rows),
+        "state_counts": state_counts,
+        "required_failure_count": required_failure_count,
+        "required_failures": required_failures,
+        "required_blocked_count": required_blocked_count,
+        "required_blocked": required_blocked,
+        "checks": rows,
+        "invariants": {
+            "row_accounting_closed": len(rows) == sum(state_counts.values()),
+            "unique_check_ids": len({row["check_id"] for row in rows}) == len(rows),
+            "required_pass_closure": not required_failures and not required_blocked,
+            "every_row_has_terminal_state": all(row["state"] in {"PASS", "FAIL", "BLOCKED"} for row in rows),
+        },
+        "falsification_criteria": [
+            "any required nonzero command prevents suite PASS",
+            "any required infrastructure or isolation error prevents suite PASS",
+            "every PASS must contain an execution receipt from the isolated coding container boundary",
+            "optional failures remain visible and are never silently discarded",
+        ],
+    }
+    payload["receipt_sha256"] = _receipt_hash(payload)
     return payload
