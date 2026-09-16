@@ -1,0 +1,30 @@
+{
+  "schema_version": "MUCARO_OCR_V1_CORPUS/1.0",
+  "purpose": "Frozen bounded OCR calibration/certification denominator. Source manifestations and expected states are preserved separately; unsupported classes do not synthesize success.",
+  "case_count": 12,
+  "confidence_thresholds": {"low_below": 50.0, "high_at_or_above": 85.0, "scale": "0-100", "status": "PROVISIONAL_UNTIL_LABELED_EXECUTION"},
+  "cases": [
+    {"id":"OCRV1-01","class":"CLEAN_ENGLISH","language":"eng","expected_state":"SUPPORTED","required_evidence":["source_sha256","raw_text","normalized_text","span_accounting","bbox"]},
+    {"id":"OCRV1-02","class":"CLEAN_SPANISH","language":"spa","expected_state":"SUPPORTED","required_evidence":["source_sha256","raw_text","normalized_text","accent_preservation","span_accounting"]},
+    {"id":"OCRV1-03","class":"SPANISH_ACCENTS","language":"spa","expected_state":"SUPPORTED","required_evidence":["source_sha256","raw_text","exact_accent_tokens","normalization_delta"]},
+    {"id":"OCRV1-04","class":"NO_TEXT","language":"eng","expected_state":"NO_TEXT","required_evidence":["source_sha256","zero_span_state","no_silent_drop"]},
+    {"id":"OCRV1-05","class":"LOW_CONFIDENCE","language":"eng","expected_state":"REVIEW_REQUIRED","required_evidence":["source_sha256","confidence_states","unknown_distinct_from_low"]},
+    {"id":"OCRV1-06","class":"DEGRADED_SCAN","language":"eng","expected_state":"PROVISIONAL","required_evidence":["source_sha256","raw_text","confidence_states","error_ledger"]},
+    {"id":"OCRV1-07","class":"SKEW_ROTATION","language":"eng","expected_state":"PROVISIONAL","required_evidence":["source_sha256","orientation","raw_text","bbox"]},
+    {"id":"OCRV1-08","class":"MULTI_COLUMN","language":"eng","expected_state":"PROVISIONAL","required_evidence":["source_sha256","engine_layout_fields","derived_reading_order","span_accounting"]},
+    {"id":"OCRV1-09","class":"TABLE","language":"eng","expected_state":"UNSUPPORTED_SEMANTIC_TABLE","required_evidence":["source_sha256","raw_spans","no_semantic_cell_claim"]},
+    {"id":"OCRV1-10","class":"FORM","language":"eng","expected_state":"UNSUPPORTED_SEMANTIC_FORM","required_evidence":["source_sha256","raw_spans","no_field_binding_claim"]},
+    {"id":"OCRV1-11","class":"HANDWRITING","language":"eng","expected_state":"UNSUPPORTED_HANDWRITING","required_evidence":["source_sha256","explicit_unsupported_state","no_synthesized_text_claim"]},
+    {"id":"OCRV1-12","class":"MIXED_PRINT_HANDWRITING","language":"eng","expected_state":"UNSUPPORTED_MIXED_HANDWRITING","required_evidence":["source_sha256","print_evidence_separate","handwriting_residue_explicit"]}
+  ],
+  "invariants": [
+    "case_count == 12",
+    "case IDs unique",
+    "RAW expected text is never overwritten by normalized expected text",
+    "UNKNOWN confidence is distinct from LOW confidence",
+    "NO_TEXT is distinct from OCR engine failure",
+    "unsupported table/form/handwriting classes remain explicit",
+    "fixture bytes and SHA-256 are required before a case may contribute certification evidence"
+  ],
+  "certification_rule": "Manifest presence freezes the denominator only. OCR-03 through OCR-10 may promote only after case bytes, hashes, expected observations, execution receipts, arithmetic closure, and mismatch adjudication exist for the applicable cases."
+}
