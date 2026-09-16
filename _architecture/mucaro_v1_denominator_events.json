@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "ff739b7c9a8ce7cb13fcbfeafe2ba7816c35a710",
+  "audit_head": "ce9afb398224fc91f8a8f966357bde12804c290a",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -66,6 +66,51 @@
       "evidence_type": "MERGED_NONMUTATING_PATCH_RECEIPTS_WITH_EXECUTION_GATE_BLOCKED",
       "evidence": ["PR#18", "main@ff739b7c9a8ce7cb13fcbfeafe2ba7816c35a710", "GitHub Actions startup_failure before jobs"],
       "reason": "Merged coding tools provide bounded diff receipts plus non-mutating patch SHA-256, parsed path candidate sets, byte preimages, dirty-overlap detection, traversal/.git rejection, and git apply --check; mutation/application and executed regressions remain outside this provisional scope."
+    },
+    {
+      "event_id": "evt-code06-mutation-runtime-provisional",
+      "requirement_id": "CODE-06",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_TRANSACTIONAL_MUTATION_SOURCE_WITH_LIVE_RUNTIME_BLOCKED",
+      "evidence": ["PR#21", "PR#22", "main@34da0f2e77da592e3ab555e2fd38b3dfe26b9497", "GitHub Actions startup_failure before jobs"],
+      "reason": "Approval-gated patch mutation revalidates HEAD, patch identity, candidate paths and preimages, constrains dirty overlap, verifies postconditions, and attempts rollback on invariant failure; trusted live execution evidence remains blocked."
+    },
+    {
+      "event_id": "evt-code07-check-execution-provisional",
+      "requirement_id": "CODE-07",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_ISOLATED_EXECUTION_SOURCE_WITH_IMAGE_AND_CI_RESIDUE",
+      "evidence": ["main@a6b047827794531c4af634583e7303ca752e8e22", "GitHub Actions startup_failure before jobs"],
+      "reason": "Test/lint/type/build/security/benchmark checks now route through a pinned-image, non-root, network-disabled container with read-only host source, ephemeral writable workspace, terminal PASS/FAIL/BLOCKED receipts and source-state conservation; no trusted live image/engine execution receipt has yet been frozen."
+    },
+    {
+      "event_id": "evt-code08-review-evidence-provisional",
+      "requirement_id": "CODE-08",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_REVIEW_EVIDENCE_CONTRACT_WITH_EXECUTION_GATE_BLOCKED",
+      "evidence": ["PR#22", "main@34da0f2e77da592e3ab555e2fd38b3dfe26b9497", "GitHub Actions startup_failure before jobs"],
+      "reason": "Code-review evidence binds findings to changed files, source SHA-256 and exact line evidence with negative gates for unchanged paths and invalid ranges; executed regression evidence remains blocked."
+    },
+    {
+      "event_id": "evt-code09-git-lifecycle-provisional",
+      "requirement_id": "CODE-09",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_LOCAL_GIT_LIFECYCLE_WITH_REMOTE_AUTH_RESIDUE",
+      "evidence": ["main@9b1b0bdde4aba74f0b5c913eaaec7f4540fa280d", "main@ce9afb398224fc91f8a8f966357bde12804c290a", "GitHub Actions startup_failure before jobs"],
+      "reason": "Canonical coding lifecycle source provides guarded work-branch creation, approved-path commit transaction/postconditions/rollback and deterministic PR request artifacts; authenticated remote push/PR submission and trusted executed evidence remain final-stage residue."
+    },
+    {
+      "event_id": "evt-code10-regression-corpus-provisional",
+      "requirement_id": "CODE-10",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_CODING_REGRESSION_CORPUS_WITH_EXECUTION_GATE_BLOCKED",
+      "evidence": ["PR#22", "main@9b1b0bdde4aba74f0b5c913eaaec7f4540fa280d", "_architecture/coding_regression_manifest.json", "GitHub Actions startup_failure before jobs"],
+      "reason": "The coding regression manifest now enumerates positive, negative, provisional, blocked and certification gates across repository identity, patching, isolation, checks, review and Git lifecycle; the corpus is source-complete for its declared cases but not trusted-execution certified."
     }
   ]
 }
