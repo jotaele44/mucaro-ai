@@ -1,53 +1,43 @@
 # Mucaro V1 denominator audit events
 
-The frozen `_architecture/mucaro_v1_denominator.json` remains historical baseline evidence for `MUCARO_V1_DENOMINATOR/1.0` and is not rewritten as implementation progresses.
-
-Current-source promotions and regressions are recorded in `_architecture/mucaro_v1_denominator_events.json` and applied by `backend.app.denominator_audit`.
+The frozen `_architecture/mucaro_v1_denominator.json` remains historical baseline evidence for `MUCARO_V1_DENOMINATOR/1.0` and is not rewritten as implementation progresses. Current-source promotions/regressions live only in `_architecture/mucaro_v1_denominator_events.json` and are applied by `backend.app.denominator_audit`.
 
 ## Rules
 
-1. Every event must identify one existing frozen requirement ID.
-2. `from_state` must equal the state produced by the preceding denominator/event history.
+1. Every event identifies one frozen requirement ID and preserves denominator membership.
+2. `from_state` must equal the state produced by preceding history.
 3. Every event requires non-empty evidence and a reason.
-4. Event IDs must be unique.
-5. Events may promote or regress rows; evidence failure is allowed to move a row backward.
-6. Events never alter denominator membership.
-7. Historical exact-head evidence remains historical and does not certify later heads.
-8. `PASS` is not awarded where the merged source explicitly preserves unresolved certification residue.
+4. Event IDs are unique and append-only.
+5. Historical exact-head evidence remains historical; later heads require their own evidence.
+6. `PASS` is not awarded when material execution/certification residue remains.
+7. Hosted Actions `startup_failure` before jobs is BLOCKED infrastructure evidence, never test PASS and never code FAIL.
 
-## First source-backed overlay
+## Overlay history
 
-Audit head: `95996cfd1ae8baa0f8bec18548ed6812bee533cf`.
+- Historical frozen baseline: `61.5% raw / 62.6% weighted`.
+- First common-substrate overlay: `64.5% raw / 66.2% weighted` from BC-07, BC-08, BC-09 and PR-10 events.
+- Coding read-only overlay: `66.0% raw / 67.7% weighted` after CODE-03 through CODE-05 became PROVISIONAL.
+- Coding feature-plane overlay: `68.5% raw / 70.2% weighted` after CODE-06 through CODE-10 became PROVISIONAL. CODING is `55.0%` with `PASS=1 / PROVISIONAL=9 / OPEN=0`.
 
-Events:
+## OCR + GIS source overlay
 
-- `BC-07 OPEN → PASS`: capability policy engine merged in PR #6.
-- `BC-08 OPEN → PASS`: isolated local-worker runtime merged in PR #9.
-- `BC-09 OPEN → PROVISIONAL`: execution router and pinned container boundary merged in PRs #10/#11, while live image/engine execution remains uncertified.
-- `PR-10 OPEN → PROVISIONAL`: runtime/toolchain identity receipts merged in PR #8, while universal binding across all advanced-capability derivations remains open.
+Audit head: `c57615fec09c6353059868325c7c43c20a98b2c6`.
 
-Resulting overlay:
+Additional append-only events:
 
-- historical baseline: `61.5% raw / 62.6% weighted`
-- source-backed overlay at that audit head: `64.5% raw / 66.2% weighted`
+- `OCR-07 OPEN → PROVISIONAL`: PR #23 binds original PDF bytes and page count to pdftoppm renderer identity/DPI, page PNG hashes and per-page Tesseract OCR receipts. Live renderer/Tesseract execution, difficult-layout coverage and representative-corpus certification remain unresolved.
+- `GIS-09 OPEN → PROVISIONAL`: PR #15 topology repair, PR #25 vector-format manifests, PR #26 GeoTIFF receipts and PR #37 vector↔raster analysis now cover a bounded topology/vector/raster source plane. Broad live regression certification remains unresolved.
+- `GIS-10 OPEN → PROVISIONAL`: PR #16 pyproj/PROJ CRS transforms, PR #17 WGS84 ellipsoidal measurement and PR #27 map/export provenance materially establish the certification substrate, but datum-grid breadth, vertical/time-dependent CRS cases, independent-engine parity and rendered visual certification remain unresolved.
 
-## Coding read-only provisional overlay
+Resulting overlay arithmetic:
 
-Audit head: `ff739b7c9a8ce7cb13fcbfeafe2ba7816c35a710` (PR #18 squash merge).
+- current raw completion: `70.0%`
+- current weighted completion: `71.8%`
+- applied events: `15`
+- CODING: `55.0%` — `PASS=1 / PROVISIONAL=9`
+- GIS: `75.0%` — `PASS=5 / PROVISIONAL=5`
+- OCR: `45.0%` — `PASS=2 / PROVISIONAL=5 / OPEN=3`
 
-Additional events:
+WEB-08 remains OPEN: frozen-static-HTML anchor discovery from PR #24 is not equivalent to automated search/discovery authority. No event is recorded for that row yet.
 
-- `CODE-03 OPEN → PROVISIONAL`: approval-gated repository discovery, exact HEAD/branch state, bounded file reads, path boundaries and byte hashes are merged, but hosted regression execution is blocked before jobs start.
-- `CODE-04 OPEN → PROVISIONAL`: staged/unstaged/untracked candidate sets, explicit dirty state and patch dirty-overlap preservation are merged, while executed regressions remain blocked by hosted Actions startup failure.
-- `CODE-05 OPEN → PROVISIONAL`: bounded diff receipts and non-mutating patch SHA-256/path/preimage/applicability receipts are merged; patch mutation/application remains outside this scope and hosted tests have not executed.
-
-The GitHub Actions blocker is preserved as `BLOCKED`, not converted to a code `FAIL` and not used as PASS evidence. The frozen denominator file remains unchanged.
-
-Resulting overlay:
-
-- historical baseline: `61.5% raw / 62.6% weighted`
-- previous source-backed overlay: `64.5% raw / 66.2% weighted`
-- current source-backed overlay: `66.0% raw / 67.7% weighted`
-- CODING track: `30.0%` with `PASS=1`, `PROVISIONAL=4`, `OPEN=5`
-
-The overlay is an audit state, not a replacement denominator version and not a release certification claim.
+This overlay is an evidence-state audit, not a new denominator version, domain certification, or release certification claim.
