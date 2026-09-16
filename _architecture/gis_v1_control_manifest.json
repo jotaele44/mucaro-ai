@@ -1,0 +1,32 @@
+{
+  "schema_version": "MUCARO_GIS_V1_CONTROLS/1.0",
+  "scope": "Bounded independent controls for GIS-06 through GIS-10 adjudication",
+  "principles": [
+    "controls are frozen independently of Mucaro output receipts",
+    "analytic controls are preferred where exact closed-form expectations exist",
+    "independent engine controls must not call the Mucaro operation under test",
+    "vertical and time-dependent CRS operations are explicitly outside the certified V1 horizontal CRS subset"
+  ],
+  "tolerances": {
+    "web_mercator_m": 0.001,
+    "geodesic_distance_m": 0.01,
+    "area_units2": 1e-9,
+    "hausdorff_units": 1e-9,
+    "raster_value": 1e-12
+  },
+  "controls": [
+    {"id":"CRS-001","class":"CRS","input":{"lon":0.0,"lat":0.0,"source":"EPSG:4326","target":"EPSG:3857"},"expected":{"x":0.0,"y":0.0},"authority":"closed-form Web Mercator origin"},
+    {"id":"CRS-002","class":"CRS","input":{"lon":180.0,"lat":0.0,"source":"EPSG:4326","target":"EPSG:3857"},"expected":{"x":20037508.342789244,"y":0.0},"authority":"closed-form Web Mercator equatorial half-circumference"},
+    {"id":"GEOD-001","class":"GEODESIC","input":{"a":[0.0,0.0],"b":[1.0,0.0],"ellipsoid":"WGS84"},"expected":{"distance_m":111319.49079327357},"authority":"GeographicLib WGS84 inverse control"},
+    {"id":"TOPO-001","class":"TOPOLOGY","input":"self-crossing bowtie polygon","expected":{"initial_valid":false,"repair_valid":true},"authority":"analytic topology fixture"},
+    {"id":"OVERLAY-001","class":"OVERLAY","input":{"a_bbox":[0,0,2,2],"b_bbox":[1,1,3,3]},"expected":{"intersection_area":1.0,"union_area":7.0,"symmetric_difference_area":6.0},"authority":"analytic rectangle arithmetic"},
+    {"id":"RASTER-001","class":"RASTER","input":{"grid":[[0,2],[3,null]],"nodata":null},"expected":{"valid_count":3,"nodata_count":1,"zero_is_valid":true},"authority":"analytic 2x2 raster fixture"},
+    {"id":"VECTOR_RASTER-001","class":"VECTOR_RASTER","input":"cell-center polygon over zero-valued cell plus NODATA control polygon","expected":{"states":["INTERSECTS_VALID","NODATA_ONLY","NULL_EMPTY"],"zero_mean":0.0},"authority":"analytic cell-center fixture"}
+  ],
+  "explicit_nonclaims": [
+    "vertical CRS certification",
+    "time-dependent coordinate operation certification",
+    "fractional raster-cell coverage",
+    "all GIS formats or all CRS operations"
+  ]
+}
