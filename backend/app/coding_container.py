@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -10,7 +13,7 @@ from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_
 from .config import Settings, settings
 from .container_runtime import ContainerRuntimeError, resolve_container_engine, validate_pinned_image
 
-CODING_CONTAINER_SCHEMA_VERSION = "mucaro-coding-container/1.0"
+CODING_CONTAINER_SCHEMA_VERSION = "mucaro-coding-container/1.1"
 DEFAULT_TIMEOUT_SECONDS = 120
 DEFAULT_MAX_OUTPUT_BYTES = 2 * 1024 * 1024
 DEFAULT_MEMORY_MB = 2048
@@ -212,14 +215,104 @@ def validate_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings =
         "command_argv": list(plan.command),
         "container_argv": build_coding_container_command(plan),
         "limitations": [
-            "this boundary plans and validates isolated coding execution; it does not launch arbitrary repository commands",
+            "this boundary validates the exact repository state before isolated execution",
             "writable repository mounts are intentionally unavailable in this boundary",
-            "live container image/engine execution remains separately uncertified",
+            "a successful exit is evidence only for the declared command, image and repository manifestation",
         ],
         "falsification_criteria": [
             "reject unpinned image identity",
             "reject network-enabled plans",
             "treat HEAD or dirty-state drift as STALE before execution",
+            "invalidate execution evidence if repository state changes during the run",
             "never convert this read-only plan into a writable mount",
         ],
     }
+
+
+def _read_bounded(path: Path, max_bytes: int, stream: str) -> bytes:
+    size = path.stat().st_size
+    if size > max_bytes:
+        raise CodingContainerError(
+            "ERROR_CODING_CONTAINER_OUTPUT_TOO_LARGE",
+            f"{stream}={size} bytes exceeds ceiling {max_bytes}",
+        )
+    return path.read_bytes()
+
+
+def execute_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = settings) -> dict[str, object]:
+    preflight = validate_coding_container_plan(plan, cfg=cfg)
+    if preflight["status"] != "CODING_CONTAINER_PLAN_VALID":
+        raise CodingContainerError("ERROR_CODING_CONTAINER_PLAN_STALE", "repository state changed before execution")
+
+    container_argv = build_coding_container_command(plan)
+    started = time.monotonic()
+    with tempfile.TemporaryDirectory(prefix="mucaro-coding-exec-") as temp_dir:
+        temp = Path(temp_dir)
+        stdout_path = temp / "stdout.bin"
+        stderr_path = temp / "stderr.bin"
+        try:
+            with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
+                proc = subprocess.run(
+                    container_argv,
+                    cwd=plan.repo_root,
+                    stdin=subprocess.DEVNULL,
+                    stdout=stdout_file,
+                    stderr=stderr_file,
+                    timeout=plan.timeout_seconds,
+                    check=False,
+                )
+        except subprocess.TimeoutExpired as exc:
+            raise CodingContainerError("ERROR_CODING_CONTAINER_TIMEOUT", str(plan.timeout_seconds)) from exc
+        except OSError as exc:
+            raise CodingContainerError("ERROR_CODING_CONTAINER_START", str(exc)) from exc
+
+        stdout = _read_bounded(stdout_path, plan.max_output_bytes, "stdout")
+        stderr = _read_bounded(stderr_path, plan.max_output_bytes, "stderr")
+
+    postflight = validate_coding_container_plan(plan, cfg=cfg)
+    if postflight["status"] != "CODING_CONTAINER_PLAN_VALID":
+        raise CodingContainerError(
+            "ERROR_CODING_CONTAINER_REPOSITORY_DRIFT",
+            "repository HEAD or dirty-state manifestation changed during isolated execution",
+        )
+
+    payload = {
+        "schema_version": CODING_CONTAINER_SCHEMA_VERSION,
+        "status": "CODING_CONTAINER_EXECUTION_PASS" if proc.returncode == 0 else "CODING_CONTAINER_EXECUTION_FAIL",
+        "executed": True,
+        "passed": proc.returncode == 0,
+        "exit_code": proc.returncode,
+        "plan_sha256": plan.plan_sha256,
+        "repo_root": str(plan.repo_root),
+        "head_sha": plan.head_sha,
+        "dirty_status": plan.dirty_status,
+        "dirty_paths_sha256": plan.dirty_paths_sha256,
+        "image": plan.image,
+        "image_digest": plan.image.rsplit("@", 1)[1],
+        "engine": plan.engine,
+        "network_allowed": False,
+        "repository_read_only": True,
+        "rootfs_read_only": True,
+        "cap_drop_all": True,
+        "no_new_privileges": True,
+        "command_argv": list(plan.command),
+        "container_argv_sha256": hashlib.sha256(json.dumps(container_argv, separators=(",", ":")).encode("utf-8")).hexdigest(),
+        "duration_ms": int((time.monotonic() - started) * 1000),
+        "stdout_bytes": len(stdout),
+        "stderr_bytes": len(stderr),
+        "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
+        "stderr_sha256": hashlib.sha256(stderr).hexdigest(),
+        "stdout_text": stdout.decode("utf-8", errors="replace"),
+        "stderr_text": stderr.decode("utf-8", errors="replace"),
+        "preflight": preflight,
+        "postflight": postflight,
+        "limitations": [
+            "receipt proves only this command execution under the recorded image/runtime/repository manifestation",
+            "container image provenance must still be frozen independently from its immutable digest reference",
+            "host container-engine trust is outside this receipt unless separately certified",
+        ],
+    }
+    payload["receipt_sha256"] = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    return payload
