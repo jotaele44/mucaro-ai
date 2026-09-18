@@ -45,8 +45,9 @@ def test_kind_filter_and_item_limit_are_explicit() -> None:
 def test_character_limit_never_truncates_memory_silently() -> None:
     report = select_memory_context(items=rows(), max_items=10, max_chars=20)
 
-    assert report["selected_count"] == 0
-    assert report["selected_char_count"] == 0
+    assert report["selected_memory_ids"] == ["m4"]
+    assert report["selected_count"] == 1
+    assert report["selected_char_count"] == len("Preserve provenance.")
     assert any(row["reason"] == "MAX_CHARS" for row in report["excluded"])
     assert report["invariants"]["character_limit_honored"] is True
 
