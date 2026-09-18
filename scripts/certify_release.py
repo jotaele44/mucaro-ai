@@ -108,7 +108,15 @@ def gate_no_generated_tracked(files: list[Path]) -> Gate:
 def gate_command(name: str, cmd: list[str], *, cwd: Path = ROOT) -> Gate:
     proc = run(cmd, cwd=cwd, check=False)
     status = "PASS" if proc.returncode == 0 else "FAIL"
-    detail = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else f"returncode={proc.returncode}"
+    lines = proc.stdout.strip().splitlines()
+    if not lines:
+        detail = f"returncode={proc.returncode}"
+    elif status == "PASS":
+        detail = lines[-1]
+    else:
+        # Preserve a bounded diagnostic tail so CI failures identify the actual
+        # collection/test error instead of collapsing to pytest's summary line.
+        detail = " | ".join(lines[-20:])
     return Gate(name, status, detail)
 
 
