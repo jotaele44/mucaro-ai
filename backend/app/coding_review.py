@@ -100,3 +100,107 @@ def build_code_review_report(
             "reject review evidence that cannot bind to a current source SHA-256",
         ],
     }
+
+
+# Compatibility receipt surface retained for callers/tests that adopted the
+# earlier coding-review contract before the normalized report API landed.
+# The normalized report remains the canonical implementation.
+_COMPAT_ERROR_STATUS = {
+    "ERROR_CODING_REVIEW_UNCHANGED_PATH": "ERROR_CODING_REVIEW_PATH_NOT_CHANGED",
+    "ERROR_CODING_REVIEW_LINE_RANGE": "ERROR_CODING_REVIEW_LINE",
+}
+
+
+def build_code_review_receipt(
+    repo_root: str | Path,
+    findings: list[dict[str, Any]],
+    *,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    if not isinstance(findings, list):
+        raise CodingReviewError("ERROR_CODING_REVIEW_FINDINGS", "findings must be a list")
+
+    normalized_findings: list[dict[str, Any]] = []
+    compat_metadata: list[dict[str, Any]] = []
+    for index, finding in enumerate(findings):
+        if not isinstance(finding, dict):
+            raise CodingReviewError("ERROR_CODING_REVIEW_FINDING", f"findings[{index}] must be an object")
+        raw_severity = finding.get("severity")
+        severity = str(raw_severity or "").strip().upper()
+        line_start = finding.get("start_line", finding.get("line_start"))
+        line_end = finding.get("end_line", finding.get("line_end", line_start))
+        title = finding.get("title", finding.get("summary"))
+        detail = finding.get("detail", finding.get("evidence"))
+        falsification = finding.get("falsification")
+        normalized_findings.append(
+            {
+                "path": finding.get("path"),
+                "severity": severity,
+                "line_start": line_start,
+                "line_end": line_end,
+                "summary": title,
+                "evidence": detail,
+            }
+        )
+        compat_metadata.append(
+            {
+                "severity": str(raw_severity or severity).strip().lower(),
+                "title": title,
+                "detail": detail,
+                "falsification": falsification,
+            }
+        )
+
+    try:
+        report = build_code_review_report(repo_root, normalized_findings, cfg=cfg)
+    except CodingReviewError as exc:
+        mapped = _COMPAT_ERROR_STATUS.get(exc.status, exc.status)
+        raise CodingReviewError(mapped, exc.detail) from exc
+
+    metadata_by_key = {
+        (
+            normalized["path"],
+            normalized["severity"],
+            normalized["line_start"],
+            normalized["line_end"],
+        ): meta
+        for normalized, meta in zip(normalized_findings, compat_metadata)
+    }
+    severity_counts: dict[str, int] = {}
+    compatibility_findings: list[dict[str, Any]] = []
+    for finding in report["findings"]:
+        key = (
+            finding["path"],
+            finding["severity"],
+            finding["line_start"],
+            finding["line_end"],
+        )
+        meta = metadata_by_key.get(key, {})
+        severity_key = finding["severity"].lower()
+        severity_counts[severity_key] = severity_counts.get(severity_key, 0) + 1
+        compatibility_findings.append(
+            {
+                **finding,
+                "severity": severity_key,
+                "start_line": finding["line_start"],
+                "end_line": finding["line_end"],
+                "title": meta.get("title", finding["summary"]),
+                "detail": meta.get("detail", finding["evidence"]),
+                "falsification": meta.get("falsification"),
+                "evidence_excerpt": finding["excerpt"],
+            }
+        )
+
+    return {
+        **report,
+        "severity_counts": severity_counts,
+        "findings": compatibility_findings,
+        "invariants": {
+            **report["invariants"],
+            "severity_accounting_closed": sum(severity_counts.values()) == report["finding_count"],
+            "compatibility_line_binding_closed": all(
+                item["start_line"] == item["line_start"] and item["end_line"] == item["line_end"]
+                for item in compatibility_findings
+            ),
+        },
+    }
