@@ -41,7 +41,8 @@ def make_repo(root: Path) -> Path:
     git(repo, "config", "user.email", "mucaro-tests@example.invalid")
     git(repo, "config", "user.name", "Mucaro Tests")
     (repo / "app.py").write_text("def f():\n    return 1\n", encoding="utf-8")
-    git(repo, "add", "app.py")
+    (repo / "unchanged.py").write_text("x = 1\n", encoding="utf-8")
+    git(repo, "add", "app.py", "unchanged.py")
     git(repo, "commit", "-m", "initial")
     (repo / "app.py").write_text("def f():\n    value = 2\n    return value\n", encoding="utf-8")
     return repo
@@ -77,8 +78,6 @@ def test_review_receipt_binds_findings_to_changed_file_and_lines(tmp_path: Path)
 def test_review_rejects_unchanged_paths_and_invalid_ranges(tmp_path: Path) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
-    (repo / "unchanged.py").write_text("x = 1\n", encoding="utf-8")
-
     finding = {
         "severity": "high",
         "path": "unchanged.py",
