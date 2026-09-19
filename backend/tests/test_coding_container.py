@@ -236,3 +236,16 @@ def test_command_resource_mount_and_output_limits_fail_closed(tmp_path: Path, mo
     with pytest.raises(CodingContainerError) as output:
         run_coding_container_plan(plan, cfg=cfg)
     assert output.value.status == "ERROR_CODING_CONTAINER_OUTPUT_TOO_LARGE"
+
+
+def test_exact_local_image_id_is_immutable_coding_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    fake_engine(monkeypatch)
+    local_id = "sha256:" + "b" * 64
+
+    plan = build_coding_container_plan(repo, image=local_id, command=["python", "--version"], cfg=cfg)
+    argv = build_coding_container_command(plan)
+
+    assert plan.image == local_id
+    assert local_id in argv
