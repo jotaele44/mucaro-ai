@@ -1,0 +1,83 @@
+{
+  "schema_version": "WEB08_LIVE_SEARCH_EVAL/1.0",
+  "requirement_id": "WEB-08",
+  "denominator_state": "OPEN",
+  "source_state": "SOURCE_IMPLEMENTED",
+  "promotion_requires": "QUALIFYING_LIVE_CREDENTIALED_EXECUTION",
+  "provider_scope": "BRAVE_SEARCH_API",
+  "cases": [
+    {
+      "id": "WEB08-01",
+      "class": "LIVE_POSITIVE",
+      "expected": "PASS",
+      "requirements": [
+        "credential_present",
+        "http_success",
+        "provider_identity",
+        "query_hash",
+        "result_count_positive",
+        "result_urls_preserved",
+        "result_rank_preserved",
+        "receipt_hash"
+      ]
+    },
+    {
+      "id": "WEB08-02",
+      "class": "CREDENTIAL_MISSING",
+      "expected": "BLOCKED",
+      "requirements": [
+        "credential_absent",
+        "no_network_request",
+        "terminal_blocked_state"
+      ]
+    },
+    {
+      "id": "WEB08-03",
+      "class": "EMPTY_RESULTS",
+      "expected": "PASS",
+      "requirements": [
+        "http_success",
+        "result_count_zero",
+        "zero_not_source_absence",
+        "receipt_hash"
+      ]
+    },
+    {
+      "id": "WEB08-04",
+      "class": "PROVIDER_HTTP_FAILURE",
+      "expected": "FAIL",
+      "requirements": [
+        "http_failure_preserved",
+        "no_synthetic_results"
+      ]
+    },
+    {
+      "id": "WEB08-05",
+      "class": "RESPONSE_TOO_LARGE",
+      "expected": "FAIL",
+      "requirements": [
+        "size_limit_enforced",
+        "no_partial_result_promotion"
+      ]
+    },
+    {
+      "id": "WEB08-06",
+      "class": "MALFORMED_RESPONSE",
+      "expected": "FAIL",
+      "requirements": [
+        "parse_failure_preserved",
+        "no_synthetic_results"
+      ]
+    }
+  ],
+  "invariants": [
+    "case ids unique",
+    "terminal case count equals denominator count",
+    "returned result count equals preserved result rows",
+    "rank/order is preserved whole-row",
+    "duplicate URLs are not silently collapsed unless explicitly classified",
+    "zero results remain distinct from source absence",
+    "credential missing is BLOCKED, not FAIL",
+    "no case promotes WEB-08 without live credentialed evidence"
+  ]
+}
