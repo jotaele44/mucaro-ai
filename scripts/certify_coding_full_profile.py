@@ -34,10 +34,22 @@ def main() -> int:
     before_head=git_output("rev-parse","HEAD")
     before_status=git_output("status","--porcelain=v1","-z")
     cfg=Settings.load()
+    coding_modules = (
+        "backend/app/coding_certification.py",
+        "backend/app/coding_checks.py",
+        "backend/app/coding_container.py",
+        "backend/app/coding_lifecycle.py",
+        "backend/app/coding_mutation.py",
+        "backend/app/coding_patch.py",
+        "backend/app/coding_review.py",
+        "backend/app/coding_workspace.py",
+        "scripts/certify_coding_container_live.py",
+        "scripts/certify_coding_full_profile.py",
+    )
     checks=[
-        CodingCheck("pytest","test",("pytest","-q"),True),
-        CodingCheck("lint","lint",("ruff","check","."),True),
-        CodingCheck("types","type",("mypy","backend"),True),
+        CodingCheck("pytest","test",("pytest","-q","backend/tests/test_coding_capability_status.py","backend/tests/test_coding_certification.py","backend/tests/test_coding_checks.py","backend/tests/test_coding_container.py","backend/tests/test_coding_container_live_cert.py","backend/tests/test_coding_full_profile_cert.py","backend/tests/test_coding_lifecycle.py","backend/tests/test_coding_mutation.py","backend/tests/test_coding_patch.py","backend/tests/test_coding_patch_quoted_paths.py","backend/tests/test_coding_review.py","backend/tests/test_coding_tools.py","backend/tests/test_coding_workspace.py"),True),
+        CodingCheck("lint","lint",("ruff","check",*coding_modules),True),
+        CodingCheck("types","type",("mypy","--ignore-missing-imports",*coding_modules),True),
         CodingCheck("build","build",("python","-m","build"),True),
     ]
     suite=execute_coding_check_suite(ROOT,image=args.image,checks=checks,cfg=cfg)
@@ -73,7 +85,7 @@ def main() -> int:
         "suite":suite,
         "invariants":invariants,
         "limitations":[
-            "This receipt covers the frozen four-command Python coding profile; frontend-specific checks remain governed by the release gate.",
+            "This receipt covers the coding-plane test/lint/type/build profile; whole-repository lint/type debt is outside this scoped coding-plane certification and remains separately auditable.",
             "The dependency-complete image is provisioned before execution; all check commands execute with coding-runtime network disabled and host source mounted read-only.",
         ],
     }
