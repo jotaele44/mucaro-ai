@@ -19,6 +19,7 @@ from .web_browsing import (
     fetch_web_browse_session,
     fetch_web_snapshot,
 )
+from .web_search import WebSearchError, search_web_brave
 from .workspaces import list_workspace_profiles
 
 TOOL_CALLS_NAME = "tool_calls.json"
@@ -181,6 +182,26 @@ def _web_fetch_session(arguments: dict[str, Any], cfg: Settings) -> dict[str, An
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
+def _web_search(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    query = arguments.get("query")
+    if not isinstance(query, str) or not query.strip():
+        raise ToolRuntimeError("ERROR_WEB_SEARCH_QUERY_REQUIRED", "web.search requires a non-empty query string.")
+    try:
+        return search_web_brave(
+            query,
+            cfg=cfg,
+            count=arguments.get("count", 10),
+            offset=arguments.get("offset", 0),
+            country=arguments.get("country", "US"),
+            search_lang=arguments.get("search_lang", "en"),
+            safesearch=arguments.get("safesearch", "moderate"),
+            freshness=arguments.get("freshness"),
+            allow_live_search=arguments.get("allow_live_search") is True,
+        )
+    except WebSearchError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
 TOOL_REGISTRY: dict[str, ToolDefinition] = {
     "source_library.status": ToolDefinition(
         name="source_library.status",
@@ -244,6 +265,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_coding_patch_apply,
+    ),
+    "web.search": ToolDefinition(
+        name="web.search",
+        description="Run an explicitly approved live web search and save a credential-free search receipt; result snippets are discovery evidence, not cited page evidence.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_web_search,
     ),
     "web.fetch": ToolDefinition(
         name="web.fetch",
