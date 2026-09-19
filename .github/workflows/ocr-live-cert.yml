@@ -1,0 +1,51 @@
+name: OCR Live Runtime Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/app/ocr_analysis.py"
+      - "backend/app/ocr_layout.py"
+      - "backend/app/ocr_pdf.py"
+      - "scripts/certify_ocr_live_runtime.py"
+      - "backend/tests/test_ocr_live_runtime_cert.py"
+      - ".github/workflows/ocr-live-cert.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/ocr_analysis.py"
+      - "backend/app/ocr_layout.py"
+      - "backend/app/ocr_pdf.py"
+      - "scripts/certify_ocr_live_runtime.py"
+      - ".github/workflows/ocr-live-cert.yml"
+
+jobs:
+  certify-ocr-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install system OCR engines
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa poppler-utils fonts-dejavu-core
+      - name: Install Mucaro and fixture generator
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip install "Pillow==11.3.0"
+      - name: Run OCR source regressions
+        run: python -m pytest backend/tests/test_ocr_analysis.py backend/tests/test_ocr_layout.py backend/tests/test_ocr_pdf.py backend/tests/test_ocr_live_runtime_cert.py -q
+      - name: Execute live OCR runtime certification
+        env:
+          MUCARO_OCR_LIVE_RECEIPT: ${{ runner.temp }}/mucaro-ocr-live-runtime.json
+        run: python scripts/certify_ocr_live_runtime.py --output "$MUCARO_OCR_LIVE_RECEIPT"
+      - name: Upload OCR runtime evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: ocr-live-runtime-${{ github.sha }}
+          path: ${{ runner.temp }}/mucaro-ocr-live-runtime.json
+          archive: false
