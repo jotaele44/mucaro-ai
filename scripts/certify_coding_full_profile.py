@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -19,7 +18,7 @@ STATUS_FAILED = "CODING_FULL_PROFILE_CERT_FAILED"
 
 
 def git_output(*args: str) -> str:
-    proc = subprocess.run(["git", *args], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    proc = subprocess.run(["git", *args], cwd=ROOT, text=True, capture_output=True, check=False)
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip())
     return proc.stdout.strip()
