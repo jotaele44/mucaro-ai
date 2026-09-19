@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "477bf5d0dcf5a705f70646e9e50fb72e3ff2a88c",
+  "audit_head": "bd17fa6e7bea44bbf2dddb895ecc1074043a7967",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -231,6 +231,22 @@
         "Playwright Chromium 140.0.7339.16; live https://example.com/ HTTP 200; DOM and PNG screenshot SHA-256 receipts"
       ],
       "reason": "Live Playwright/Chromium execution, public-URL policy, engine identity, final URL, DOM hash, screenshot hash, PNG evidence and non-citation-ready safeguards are executed and frozen. WEB-09 remains broader than this scope because authenticated browsing, click/form automation, downloads/uploads and arbitrary JavaScript interaction are not yet certified."
+    },
+    {
+      "event_id": "evt-code07-full-profile-pass",
+      "requirement_id": "CODE-07",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "MERGED_ISOLATED_TEST_LINT_TYPE_BUILD_PROFILE_WITH_HOSTED_EXECUTION",
+      "evidence": [
+        "PR#71",
+        "main@af3cf28d54eebd0152e6a80259e7c36a801deffc",
+        "GitHub Actions CI run 35430951380 conclusion=success",
+        "artifact#10580757491 digest=sha256:782a46980529814233ba082942904e5e5be7564c05c7c5892b5efeaea59e6a1f",
+        "artifact#10580747437 digest=sha256:9402eeb6995090c9e27258308a4fa94990188aa60705e715a9a2329d29c039df",
+        "coding-plane pytest + Ruff + Mypy + python -m build executed inside non-root network-disabled read-only-host isolated runtime"
+      ],
+      "reason": "The merged current-main replay executed the required coding-plane test, lint, type and build checks successfully inside the governed isolated coding container and preserved exact source/image/runtime receipts. Whole-repository lint/type debt remains outside this frozen CODE-07 scope and does not invalidate the executed coding-plane requirement."
     }
   ]
 }
