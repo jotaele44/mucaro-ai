@@ -44,6 +44,8 @@ def main() -> int:
         "backend/app/coding_workspace.py",
         "scripts/certify_coding_container_live.py",
         "scripts/certify_coding_full_profile.py",
+        "scripts/certify_coding_mutation_live.py",
+        "scripts/coding_mutation_probe_inner.py",
     )
     checks=[
         CodingCheck("pytest","test",("pytest","-q","backend/tests/test_coding_capability_status.py","backend/tests/test_coding_certification.py","backend/tests/test_coding_checks.py","backend/tests/test_coding_container.py","backend/tests/test_coding_container_live_cert.py","backend/tests/test_coding_full_profile_cert.py","backend/tests/test_coding_lifecycle.py","backend/tests/test_coding_mutation.py","backend/tests/test_coding_patch.py","backend/tests/test_coding_patch_quoted_paths.py","backend/tests/test_coding_review.py","backend/tests/test_coding_tools.py","backend/tests/test_coding_workspace.py"),True),
