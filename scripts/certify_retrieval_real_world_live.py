@@ -152,6 +152,7 @@ def main() -> int:
         and len(chunks) > 0
         and acquisition["all_hosts_allowed"] is True
     )
+    missed = [row for row in eval_rows if not row["hit"]]
     summary = {
         "schema_version": "mucaro-rt09-live-cert/1.0",
         "status": STATUS_OK if ok else STATUS_FAILED,
@@ -159,6 +160,7 @@ def main() -> int:
         "counts": certification.get("counts"),
         "chunk_count": len(chunks),
         "evaluation_hit_rate": evaluation["hit_rate"],
+        "missed_queries": missed,
         "manifest_sha256": manifest_sha,
         "certification_report_sha256": certification.get("report_sha256"),
         "limitations": [
