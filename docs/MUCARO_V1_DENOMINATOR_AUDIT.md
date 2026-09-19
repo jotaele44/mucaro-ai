@@ -99,3 +99,23 @@ Resulting overlay arithmetic:
 - CODING: `65.0%` — `PASS=3 / PROVISIONAL=7`
 
 This remains an evidence-state overlay, not coding-domain or release certification.
+
+
+## OCR-07 live PDF rendering/page-lineage PASS
+
+Audit head: `1a7f950606acc7ef441cd9424c39fc05afe1247e`.
+
+- `OCR-07 PROVISIONAL → PASS`: PR #80 merged the current-main live OCR runtime lane.
+- Normal CI run `35460847002` and dedicated OCR runtime run `35460846947` both completed successfully.
+- Artifact `10589823508` digest `sha256:123a58aaf7f3481c3973ea8d26bcac8dedc8dcbb0cc9dadc869af853e0a6857f` preserves the machine-readable runtime receipt.
+- Real `pdftoppm` rendering, per-page Tesseract OCR, source/render/report SHA-256 lineage and page-count closure directly satisfy frozen OCR-07.
+- OCR-03/04/05/06 remain PROVISIONAL; OCR-08/09/10 remain OPEN.
+
+Resulting overlay arithmetic:
+
+- current raw completion: `73.5%`
+- current weighted completion: `75.0%`
+- applied events: `21`
+- OCR: `50.0%` — `PASS=3 / PROVISIONAL=4 / OPEN=3`
+
+This remains an evidence-state overlay, not OCR-domain or release certification.
