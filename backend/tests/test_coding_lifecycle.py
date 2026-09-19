@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import backend.app.coding_lifecycle as lifecycle
 from backend.app.coding_lifecycle import (
     CodingLifecycleError,
     build_pull_request_request,
@@ -154,16 +155,29 @@ def test_commit_rejects_dirty_set_drift_and_prestaged_state(tmp_path: Path) -> N
     assert staged.value.status == "ERROR_CODING_COMMIT_PRESTAGED_STATE"
 
 
-def test_failed_commit_rolls_index_back_and_preserves_worktree(tmp_path: Path) -> None:
+def test_failed_commit_rolls_index_back_and_preserves_worktree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)
     base = head(repo)
     create_work_branch_transaction(repo, branch_name="feature/demo", expected_head_sha=base, cfg=cfg)
     (repo / "tracked.txt").write_text("beta\n", encoding="utf-8")
 
-    hook = repo / ".git" / "hooks" / "pre-commit"
-    hook.write_text("#!/bin/sh\nexit 9\n", encoding="utf-8")
-    hook.chmod(hook.stat().st_mode | stat.S_IXUSR)
+    original_git = lifecycle._git
+
+    def fail_commit(repo_root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        if args and args[0] == "commit":
+            return subprocess.CompletedProcess(
+                ["git", *args],
+                9,
+                stdout="",
+                stderr="deterministic commit failure",
+            )
+        return original_git(repo_root, *args)
+
+    monkeypatch.setattr(lifecycle, "_git", fail_commit)
 
     with pytest.raises(CodingLifecycleError) as exc:
         commit_approved_changes(
