@@ -19,6 +19,7 @@ from .web_browsing import (
     fetch_web_browse_session,
     fetch_web_snapshot,
 )
+from .web_render import WebRenderError, render_web_page
 from .web_search import WebSearchError, search_web_brave
 from .workspaces import list_workspace_profiles
 
@@ -182,6 +183,22 @@ def _web_fetch_session(arguments: dict[str, Any], cfg: Settings) -> dict[str, An
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
+def _web_render(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    url = arguments.get("url")
+    if not isinstance(url, str) or not url.strip():
+        raise ToolRuntimeError("ERROR_WEB_RENDER_URL_REQUIRED", "web.render requires a non-empty url string.")
+    try:
+        return render_web_page(
+            url,
+            cfg=cfg,
+            allow_rendered_browser=arguments.get("allow_rendered_browser") is True,
+            timeout_ms=arguments.get("timeout_ms", 20_000),
+            max_dom_bytes=arguments.get("max_dom_bytes", 2_000_000),
+        )
+    except WebRenderError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
 def _web_search(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     query = arguments.get("query")
     if not isinstance(query, str) or not query.strip():
@@ -265,6 +282,13 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_coding_patch_apply,
+    ),
+    "web.render": ToolDefinition(
+        name="web.render",
+        description="Render one explicitly approved public HTTP(S) page in an optional headless browser and save DOM/screenshot provenance; rendered output is not citation-ready by default.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_web_render,
     ),
     "web.search": ToolDefinition(
         name="web.search",
