@@ -13,10 +13,11 @@ import rasterio
 from rasterio.transform import from_origin
 
 from .config import Settings
-from .gis_crs import reproject_geojson_crs
 from .gis_corpus import DEFAULT_REAL_GIS_CORPUS_MANIFEST, validate_real_gis_corpus
+from .gis_crs import reproject_geojson_crs
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
+from .gis_hydrology import derive_raster_d8_flow
 from .gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -75,6 +76,7 @@ VALID_OPERATIONS = {
     "raster_resample",
     "raster_terrain",
     "raster_hillshade",
+    "raster_d8_flow",
     "corpus_validate",
     "map_export",
 }
@@ -408,6 +410,15 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             elevation_units=str(parameters.get("elevation_units") or ""),
             azimuth_degrees=parameters.get("azimuth_degrees", 315.0),
             altitude_degrees=parameters.get("altitude_degrees", 45.0),
+            cfg=cfg,
+        )
+    if operation == "raster_d8_flow":
+        return derive_raster_d8_flow(
+            paths["raster"],
+            band=int(parameters.get("band", 1)),
+            elevation_units=str(parameters.get("elevation_units") or ""),
+            elevation_tolerance_m=parameters.get("elevation_tolerance_m", 0.0),
+            gradient_tie_tolerance=parameters.get("gradient_tie_tolerance", 1e-12),
             cfg=cfg,
         )
     if operation == "corpus_validate":

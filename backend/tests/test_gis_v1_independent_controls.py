@@ -107,9 +107,63 @@ def test_overlay_control_closes_analytic_arithmetic() -> None:
     )
 
 
+def test_d8_monotonic_plane_control_closes_without_mucaro_engine() -> None:
+    _, rows = controls()
+    row = rows["HYDRO-001"]
+    grid = row["input"]["grid"]
+    height = len(grid)
+    width = len(grid[0])
+    accumulation = {(r, c): 1.0 for r in range(height) for c in range(width)}
+    downstream = {}
+    for r in range(1, height - 1):
+        for c in range(1, width - 1):
+            gradients = {
+                "E": grid[r][c] - grid[r][c + 1],
+                "W": grid[r][c] - grid[r][c - 1],
+                "N": grid[r][c] - grid[r - 1][c],
+                "S": grid[r][c] - grid[r + 1][c],
+            }
+            maximum = max(gradients.values())
+            winners = [name for name, value in gradients.items() if value == maximum and value > 0]
+            assert winners == ["E"]
+            downstream[(r, c)] = (r, c + 1)
+    for source in sorted(downstream, key=lambda cell: grid[cell[0]][cell[1]], reverse=True):
+        accumulation[downstream[source]] += accumulation[source]
+    terminal_cells = [cell for cell in accumulation if cell not in downstream]
+    expected = row["expected"]
+    assert len(downstream) == expected["flow_edge_count"] == expected["east_flow_count"]
+    assert (height - 2) * (width - 2) == expected["complete_neighborhood_count"]
+    assert height * width - len(downstream) == expected["boundary_terminal_count"]
+    assert sum(accumulation[cell] for cell in terminal_cells) == expected["terminal_accumulation_total"]
+    assert max(accumulation.values()) == expected["maximum_accumulation"]
+
+
+def test_d8_tie_control_preserves_all_top_candidates_without_routing() -> None:
+    _, rows = controls()
+    row = rows["HYDRO-002"]
+    grid = row["input"]["grid"]
+    center = grid[1][1]
+    candidates = {
+        "E": (1, center - grid[1][2]),
+        "S": (4, center - grid[2][1]),
+        "W": (16, center - grid[1][0]),
+        "N": (64, center - grid[0][1]),
+    }
+    maximum = max(drop for _, drop in candidates.values())
+    winners = [name for name, (_, drop) in candidates.items() if drop == maximum and drop > 0]
+    bitmask = sum(candidates[name][0] for name in winners)
+    expected = row["expected"]
+    assert winners == expected["top_candidate_directions"]
+    assert bitmask == expected["candidate_bitmask"]
+    assert expected["tie_unresolved_count"] == 1
+    assert expected["flow_edge_count"] == 0
+    assert expected["terminal_accumulation_total"] == 9.0
+
+
 def test_control_manifest_has_no_unbounded_claims() -> None:
     payload, _ = controls()
     assert "vertical CRS certification" in payload["explicit_nonclaims"]
     assert "time-dependent coordinate operation certification" in payload["explicit_nonclaims"]
     assert "unbounded antimeridian, polar, or large-geometry certification" in payload["explicit_nonclaims"]
-    assert len(payload["controls"]) == 12
+    assert "depression filling, breaching, flat resolution, watershed delineation, stream extraction, runoff, flood, groundwater, or hydraulic modeling" in payload["explicit_nonclaims"]
+    assert len(payload["controls"]) == 14

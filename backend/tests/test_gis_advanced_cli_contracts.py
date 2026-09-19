@@ -15,10 +15,11 @@ from backend.app.capability_contracts import (
 )
 from backend.app.cli import main
 from backend.app.config import Settings
-from backend.app.gis_crs import reproject_geojson_crs
 from backend.app.gis_corpus import DEFAULT_REAL_GIS_CORPUS_MANIFEST, validate_real_gis_corpus
+from backend.app.gis_crs import reproject_geojson_crs
 from backend.app.gis_export import create_map_export_manifest
 from backend.app.gis_geodesy import measure_geojson_ellipsoidal
+from backend.app.gis_hydrology import derive_raster_d8_flow
 from backend.app.gis_raster import (
     clip_raster_bbox,
     derive_raster_hillshade,
@@ -30,7 +31,6 @@ from backend.app.gis_raster import (
 from backend.app.gis_topology_repair import repair_geojson_topology
 from backend.app.gis_vector_formats import inspect_vector_format
 from backend.app.gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
-
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -376,6 +376,24 @@ def test_advanced_raster_and_export_cli_commands_emit_governed_receipts(tmp_path
     assert "fully_lit_cell_count=9" in output
     assert "hillshade_range_bounded=True" in output
 
+    assert main(
+        [
+            "gis",
+            "derive-d8-flow",
+            str(terrain_raster),
+            "--elevation-units",
+            "meters",
+            "--format",
+            "text",
+        ],
+        cfg=cfg,
+    ) == 0
+    output = capsys.readouterr().out
+    assert "GIS_RASTER_D8_OK" in output
+    assert "unique_flow_cell_count=9" in output
+    assert "terminal_accumulation_cell_count_total=25.0" in output
+    assert "terminal_contribution_accounting_closed=True" in output
+
     rendered = tmp_path / "map.png"
     rendered.write_bytes(b"rendered-map")
     assert main(
@@ -432,6 +450,12 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
     rendered = tmp_path / "map.png"
     rendered.write_bytes(b"rendered-map")
 
+    d8_report = derive_raster_d8_flow(
+        terrain_raster,
+        elevation_units="meters",
+        cfg=cfg,
+    )
+
     reports = [
         reproject_geojson_crs(point, target_crs="EPSG:32620", cfg=cfg),
         repair_geojson_topology(bowtie, cfg=cfg),
@@ -451,6 +475,7 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
             altitude_degrees=45,
             cfg=cfg,
         ),
+        d8_report,
         create_map_export_manifest(
             cfg=cfg,
             output_path=rendered,
@@ -540,6 +565,30 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
     assert "hillshade.terrain_source_identity" in {
         check["name"] for check in result["failed_checks"]
     }
+
+    tampered_d8_terminal_total = copy.deepcopy(d8_report)
+    tampered_d8_terminal_total["flow_accounting"]["terminal_accumulation_cell_count_total"] += 1.0
+    result = validate_gis_report_contract(tampered_d8_terminal_total)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "d8.terminal_contribution" in {check["name"] for check in result["failed_checks"]}
+
+    tampered_d8_states = copy.deepcopy(d8_report)
+    tampered_d8_states["state_counts"]["FLOW_UNIQUE"] += 1
+    result = validate_gis_report_contract(tampered_d8_states)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "d8.state_accounting" in {check["name"] for check in result["failed_checks"]}
+
+    malformed_d8_bands = copy.deepcopy(d8_report)
+    malformed_d8_bands["output"]["bands"] = [None, None, None, None]
+    result = validate_gis_report_contract(malformed_d8_bands)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "d8.output_bands" in {check["name"] for check in result["failed_checks"]}
+
+    unsafe_d8_tie_policy = copy.deepcopy(d8_report)
+    unsafe_d8_tie_policy["parameters"]["tie_policy"] = "FIRST_MATCH"
+    result = validate_gis_report_contract(unsafe_d8_tie_policy)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "d8.tie_policy" in {check["name"] for check in result["failed_checks"]}
 
 
 def test_real_corpus_cli_and_contract_share_one_receipt_boundary(tmp_path: Path, capsys) -> None:

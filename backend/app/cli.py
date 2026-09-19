@@ -42,6 +42,7 @@ from .gis_crs import reproject_geojson_crs
 from .gis_corpus import validate_real_gis_corpus
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
+from .gis_hydrology import derive_raster_d8_flow
 from .gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -769,6 +770,33 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gis_derive_hillshade.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_derive_hillshade.set_defaults(handler=run_gis_derive_hillshade)
+
+    gis_derive_d8_flow = gis_subcommands.add_parser(
+        "derive-d8-flow",
+        help="Derive bounded D8 direction, accumulation, contributing area, and explicit terminal states.",
+    )
+    gis_derive_d8_flow.add_argument("raster_path", help="Path to a local projected elevation raster.")
+    gis_derive_d8_flow.add_argument("--band", type=int, default=1, help="One-based elevation band index.")
+    gis_derive_d8_flow.add_argument(
+        "--elevation-units",
+        choices=["meters"],
+        required=True,
+        help="Explicit vertical units for the selected elevation band.",
+    )
+    gis_derive_d8_flow.add_argument(
+        "--elevation-tolerance-m",
+        type=float,
+        default=0.0,
+        help="Non-negative elevation difference treated as level, in metres.",
+    )
+    gis_derive_d8_flow.add_argument(
+        "--gradient-tie-tolerance",
+        type=float,
+        default=1e-12,
+        help="Non-negative absolute tolerance for tied top descent gradients.",
+    )
+    gis_derive_d8_flow.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_derive_d8_flow.set_defaults(handler=run_gis_derive_d8_flow)
 
     gis_validate_corpus = gis_subcommands.add_parser(
         "validate-corpus",
@@ -2151,6 +2179,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_RASTER_RESAMPLE_OK",
         "GIS_RASTER_TERRAIN_OK",
         "GIS_RASTER_HILLSHADE_OK",
+        "GIS_RASTER_D8_OK",
+        "GIS_RASTER_D8_WARN",
         "GIS_VECTOR_RASTER_OK",
         "GIS_VECTOR_RASTER_WARN",
         "GIS_ZONAL_STATS_OK",
@@ -2247,6 +2277,14 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "illumination_model",
                 "output_scale",
                 "nodata_policy",
+                "elevation_tolerance_m",
+                "gradient_tie_tolerance",
+                "direction_convention",
+                "boundary_policy",
+                "sink_policy",
+                "flat_policy",
+                "tie_policy",
+                "accumulation_policy",
             ):
                 if key in parameters:
                     print(f"{key}={parameters.get(key)}")
@@ -2387,6 +2425,15 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "illumination_accounting_closed",
                 "hillshade_range_bounded",
                 "terrain_validity_mask_preserved",
+                "state_accounting_closed",
+                "flow_edge_accounting_closed",
+                "terminal_state_accounting_closed",
+                "direction_state_accounting_closed",
+                "terminal_contribution_accounting_closed",
+                "terminal_area_accounting_closed",
+                "strict_descent_edges",
+                "accumulation_range_bounded",
+                "contributing_area_matches_cell_area",
                 "provenance_complete",
                 "layer_count",
                 "all_layer_hashes_present",
@@ -2411,6 +2458,10 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         hillshade_accounting = payload.get("hillshade_accounting")
         if isinstance(hillshade_accounting, dict):
             for key, value in hillshade_accounting.items():
+                print(f"{key}={value}")
+        flow_accounting = payload.get("flow_accounting")
+        if isinstance(flow_accounting, dict):
+            for key, value in flow_accounting.items():
                 print(f"{key}={value}")
         manifest = payload.get("manifest")
         if isinstance(manifest, dict):
@@ -2938,6 +2989,21 @@ def run_gis_derive_hillshade(args: argparse.Namespace, cfg: Settings) -> int:
             elevation_units=args.elevation_units,
             azimuth_degrees=args.azimuth,
             altitude_degrees=args.altitude,
+            cfg=cfg,
+        ),
+    )
+
+
+def run_gis_derive_d8_flow(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.raster_path, cfg)
+    return _run_gis_report(
+        args,
+        lambda: derive_raster_d8_flow(
+            path,
+            band=args.band,
+            elevation_units=args.elevation_units,
+            elevation_tolerance_m=args.elevation_tolerance_m,
+            gradient_tie_tolerance=args.gradient_tie_tolerance,
             cfg=cfg,
         ),
     )
