@@ -1,0 +1,41 @@
+name: Coding Review Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/app/coding_review.py"
+      - "backend/tests/test_coding_review.py"
+      - "scripts/certify_coding_review_live.py"
+      - "backend/tests/test_coding_review_live_cert.py"
+      - ".github/workflows/coding-review-cert.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/coding_review.py"
+      - "scripts/certify_coding_review_live.py"
+      - ".github/workflows/coding-review-cert.yml"
+
+jobs:
+  certify-code-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install Mucaro
+        run: python -m pip install -e ".[dev]"
+      - name: Run coding-review regressions
+        run: python -m pytest backend/tests/test_coding_review.py backend/tests/test_coding_review_live_cert.py -q
+      - name: Execute live coding-review certification
+        env:
+          MUCARO_CODE_REVIEW_RECEIPT: ${{ runner.temp }}/mucaro-coding-review-live.json
+        run: python scripts/certify_coding_review_live.py --output "$MUCARO_CODE_REVIEW_RECEIPT"
+      - name: Upload coding-review evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: coding-review-live-${{ github.sha }}
+          path: ${{ runner.temp }}/mucaro-coding-review-live.json
+          archive: false
