@@ -68,6 +68,17 @@ jobs:
           name: coding-full-profile-${{ github.sha }}
           path: ${{ runner.temp }}/mucaro-coding-full-profile.json
           archive: false
+      - name: Certify live sandboxed coding mutation
+        env:
+          MUCARO_CODING_MUTATION_IMAGE: ${{ steps.coding_full_image.outputs.image }}
+          MUCARO_CODING_MUTATION_RECEIPT: ${{ runner.temp }}/mucaro-coding-mutation-live.json
+        run: python scripts/certify_coding_mutation_live.py --image "$MUCARO_CODING_MUTATION_IMAGE" --output "$MUCARO_CODING_MUTATION_RECEIPT"
+      - name: Upload live coding-mutation receipt
+        uses: actions/upload-artifact@v7
+        with:
+          name: coding-mutation-live-${{ github.sha }}
+          path: ${{ runner.temp }}/mucaro-coding-mutation-live.json
+          archive: false
       - name: Write hosted CI evidence receipt
         env:
           MUCARO_CI_RECEIPT: ${{ runner.temp }}/mucaro-hosted-ci-evidence.json
