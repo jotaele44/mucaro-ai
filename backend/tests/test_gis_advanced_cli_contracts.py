@@ -16,12 +16,16 @@ from backend.app.capability_contracts import (
 from backend.app.cli import main
 from backend.app.config import Settings
 from backend.app.gis_crs import reproject_geojson_crs
+from backend.app.gis_corpus import DEFAULT_REAL_GIS_CORPUS_MANIFEST, validate_real_gis_corpus
 from backend.app.gis_export import create_map_export_manifest
 from backend.app.gis_geodesy import measure_geojson_ellipsoidal
-from backend.app.gis_raster import clip_raster_bbox, inspect_raster, sample_raster
+from backend.app.gis_raster import clip_raster_bbox, inspect_raster, resample_raster, sample_raster
 from backend.app.gis_topology_repair import repair_geojson_topology
 from backend.app.gis_vector_formats import inspect_vector_format
-from backend.app.gis_vector_raster import analyze_vector_raster_intersection
+from backend.app.gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
+
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def make_settings(tmp_path: Path) -> Settings:
@@ -203,6 +207,33 @@ def test_advanced_raster_and_export_cli_commands_emit_governed_receipts(tmp_path
     assert "INTERSECTS_VALID=1" in output
     assert "NODATA_ONLY=1" in output
 
+    assert main(["gis", "zonal-stats", str(vector), str(raster), "--format", "text"], cfg=cfg) == 0
+    output = capsys.readouterr().out
+    assert "GIS_ZONAL_STATS_OK" in output
+    assert "cell_accounting_closed=True" in output
+    assert "INTERSECTS_VALID=1" in output
+
+    assert main(
+        [
+            "gis",
+            "resample-raster",
+            str(raster),
+            "--width",
+            "4",
+            "--height",
+            "4",
+            "--method",
+            "nearest",
+            "--format",
+            "text",
+        ],
+        cfg=cfg,
+    ) == 0
+    output = capsys.readouterr().out
+    assert "GIS_RASTER_RESAMPLE_OK" in output
+    assert "dimensions_exact=True" in output
+    assert "nodata_definition_preserved=True" in output
+
     rendered = tmp_path / "map.png"
     rendered.write_bytes(b"rendered-map")
     assert main(
@@ -267,6 +298,8 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
         sample_raster(raster, [(0.5, 1.5)], cfg=cfg),
         clip_raster_bbox(raster, (0, 1, 1, 2), cfg=cfg),
         analyze_vector_raster_intersection(vector, raster, cfg=cfg),
+        compute_zonal_statistics(vector, raster, cfg=cfg),
+        resample_raster(raster, width=4, height=4, method="bilinear", cfg=cfg),
         create_map_export_manifest(
             cfg=cfg,
             output_path=rendered,
@@ -297,3 +330,35 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
     assert "crs_engine.parameters.pipeline_definition" in {
         check["name"] for check in result["failed_checks"]
     }
+
+    tampered_zonal = copy.deepcopy(reports[8])
+    tampered_zonal["features"][0]["covered_cell_count"] = 99
+    result = validate_gis_report_contract(tampered_zonal)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "vector_raster.cell_accounting" in {check["name"] for check in result["failed_checks"]}
+
+
+def test_real_corpus_cli_and_contract_share_one_receipt_boundary(tmp_path: Path, capsys) -> None:
+    cfg = make_settings(tmp_path)
+    cfg = Settings(
+        project_root=ROOT,
+        data_dir=cfg.data_dir,
+        input_dir=cfg.input_dir,
+        processed_dir=cfg.processed_dir,
+        export_dir=cfg.export_dir,
+        index_dir=cfg.index_dir,
+        sqlite_path=cfg.sqlite_path,
+        default_model_provider="mock",
+        default_model_name="mock",
+    )
+
+    assert main(["gis", "validate-corpus", str(DEFAULT_REAL_GIS_CORPUS_MANIFEST), "--format", "text"], cfg=cfg) == 0
+    output = capsys.readouterr().out
+    assert "GIS_CORPUS_VALIDATION_OK" in output
+    assert "asset_count=2" in output
+    assert "features=3 crs=EPSG:4326" in output
+    assert "features=30 crs=EPSG:4326" in output
+
+    report = validate_real_gis_corpus(DEFAULT_REAL_GIS_CORPUS_MANIFEST, cfg=cfg)
+    result = validate_gis_report_contract(report)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]

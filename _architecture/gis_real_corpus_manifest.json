@@ -1,0 +1,68 @@
+{
+  "schema_version": "mucaro_gis_real_corpus_v1",
+  "corpus_id": "mucaro-gis-authoritative-vector-corpus-2026-09-19",
+  "snapshot_policy": "Immutable committed bytes; refresh requires a new manifest identity and explicit diff adjudication.",
+  "assets": [
+    {
+      "asset_id": "census-tigerweb-pr-municipios-bounded",
+      "path": "backend/tests/fixtures/gis_corpus/census_tigerweb_pr_municipios.geojson",
+      "authority": "United States Census Bureau TIGERweb State_County MapServer layer 5",
+      "service": "TIGERweb State_County",
+      "layer_id": 5,
+      "source_url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/5/query",
+      "query": {
+        "where": "GEOID IN ('72097','72127','72001')",
+        "outFields": "STATE,COUNTY,BASENAME,GEOID,AREALAND,AREAWATER",
+        "outSR": 4326,
+        "returnGeometry": true,
+        "f": "geojson"
+      },
+      "retrieval_utc": "2026-09-19T21:23:57.625605Z",
+      "sha256": "db3ed3de8ae942b56abd9c06f2c1f120be22be3414e9d09d98b03551fc906407",
+      "bytes": 296070,
+      "media_type": "application/geo+json",
+      "declared_crs": "EPSG:4326",
+      "crs_evidence": "outSR=4326 query parameter and GeoJSON output contract",
+      "stable_id_path": "properties.GEOID",
+      "expected_feature_count": 3,
+      "expected_geometry_counts": {"Polygon": 2, "MultiPolygon": 1},
+      "expected_coordinate_dimension_counts": {"XY": 3},
+      "required_property_fields": ["STATE", "COUNTY", "BASENAME", "GEOID", "AREALAND", "AREAWATER"]
+    },
+    {
+      "asset_id": "usgs-pr-earthquakes-fixed-window",
+      "path": "backend/tests/fixtures/gis_corpus/usgs_pr_earthquakes_2020-01-06_2020-01-08.geojson",
+      "authority": "United States Geological Survey Earthquake Hazards Program",
+      "service": "FDSN Event Web Service",
+      "source_url": "https://earthquake.usgs.gov/fdsnws/event/1/query",
+      "query": {
+        "format": "geojson",
+        "starttime": "2020-01-06T00:00:00Z",
+        "endtime": "2020-01-08T00:00:00Z",
+        "minlatitude": 17.0,
+        "maxlatitude": 19.0,
+        "minlongitude": -68.0,
+        "maxlongitude": -65.0,
+        "minmagnitude": 4.0,
+        "orderby": "time-asc"
+      },
+      "retrieval_utc": "2026-09-19T21:21:49.097874Z",
+      "source_generated_utc": "2026-09-19T21:21:49Z",
+      "sha256": "a7c40c01dbf935f63239e6466c0572b9e486f7a2d78972dbdc222947cbcf5901",
+      "bytes": 23142,
+      "media_type": "application/geo+json",
+      "declared_crs": "EPSG:4326",
+      "crs_evidence": "USGS GeoJSON summary format and longitude/latitude/depth coordinate contract",
+      "stable_id_path": "id",
+      "expected_feature_count": 30,
+      "expected_geometry_counts": {"Point": 30},
+      "expected_coordinate_dimension_counts": {"XYZ": 30},
+      "required_property_fields": ["mag", "place", "time", "updated", "url", "detail", "status", "type"]
+    }
+  ],
+  "limitations": [
+    "The Census snapshot is a deliberate three-feature subset and is not the full 78-municipio denominator.",
+    "The USGS snapshot is bounded by a fixed time, magnitude, and geographic query and is not an earthquake completeness claim.",
+    "Neither source establishes semantic equivalence with future mutable service responses."
+  ]
+}

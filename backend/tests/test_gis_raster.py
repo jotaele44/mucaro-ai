@@ -9,7 +9,7 @@ from rasterio.transform import from_origin
 
 from backend.app.config import Settings
 from backend.app.gis_processing import GISProcessingError
-from backend.app.gis_raster import clip_raster_bbox, inspect_raster, sample_raster
+from backend.app.gis_raster import clip_raster_bbox, inspect_raster, resample_raster, sample_raster
 
 
 def make_settings(tmp_path: Path) -> Settings:
@@ -75,3 +75,89 @@ def test_raster_operations_fail_closed_on_missing_or_malformed_inputs(tmp_path: 
     with pytest.raises(GISProcessingError) as exc:
         clip_raster_bbox(source, (0, 0, float("inf"), 1), cfg=cfg)
     assert exc.value.status == "ERROR_GIS_RASTER_BBOX"
+
+
+def test_resample_raster_preserves_governed_grid_metadata(tmp_path: Path) -> None:
+    report = resample_raster(
+        make_raster(tmp_path / "resample.tif"),
+        width=4,
+        height=4,
+        method="nearest",
+        cfg=make_settings(tmp_path),
+    )
+
+    assert report["status"] == "GIS_RASTER_RESAMPLE_OK"
+    assert report["output"]["width"] == 4
+    assert report["output"]["height"] == 4
+    assert report["source"]["bounds"] == report["output"]["bounds"]
+    assert report["source"]["nodata_values"] == report["output"]["nodata_values"]
+    assert report["source"]["bands"][0] == {
+        "band": 1,
+        "valid_cell_count": 3,
+        "nodata_cell_count": 1,
+        "zero_cell_count": 0,
+    }
+    assert report["output"]["bands"][0] == {
+        "band": 1,
+        "valid_cell_count": 12,
+        "nodata_cell_count": 4,
+        "zero_cell_count": 0,
+    }
+    assert all(report["invariants"].values())
+    assert not Path(report["output"]["path"]).with_suffix(".tmp.tif").exists()
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected_status"),
+    [
+        ({"width": 0, "height": 2, "method": "nearest"}, "ERROR_GIS_RASTER_RESAMPLE_DIMENSIONS"),
+        ({"width": 2, "height": 2, "method": "cubic"}, "ERROR_GIS_RASTER_RESAMPLE_METHOD"),
+    ],
+)
+def test_resample_raster_rejects_ungoverned_parameters(tmp_path: Path, kwargs: dict[str, object], expected_status: str) -> None:
+    with pytest.raises(GISProcessingError) as exc:
+        resample_raster(make_raster(tmp_path / f"{expected_status}.tif"), cfg=make_settings(tmp_path), **kwargs)
+    assert exc.value.status == expected_status
+
+
+def test_resample_raster_limits_total_values_across_bands(tmp_path: Path) -> None:
+    source = tmp_path / "two-band.tif"
+    data = np.array([[[1, 2], [3, -9999]], [[4, 5], [6, -9999]]], dtype="int16")
+    with rasterio.open(
+        source,
+        "w",
+        driver="GTiff",
+        width=2,
+        height=2,
+        count=2,
+        dtype="int16",
+        crs="EPSG:4326",
+        transform=from_origin(-67, 19, 1, 1),
+        nodata=-9999,
+    ) as target:
+        target.write(data)
+
+    with pytest.raises(GISProcessingError) as exc:
+        resample_raster(source, width=5001, height=5000, method="nearest", cfg=make_settings(tmp_path))
+    assert exc.value.status == "ERROR_GIS_RASTER_RESAMPLE_DIMENSIONS"
+
+
+def test_resample_raster_requires_declared_crs(tmp_path: Path) -> None:
+    source = tmp_path / "missing-crs.tif"
+    with rasterio.open(
+        source,
+        "w",
+        driver="GTiff",
+        width=2,
+        height=2,
+        count=1,
+        dtype="int16",
+        transform=from_origin(-67, 19, 1, 1),
+        nodata=-9999,
+    ) as target:
+        target.write(np.array([[1, 2], [3, -9999]], dtype="int16"), 1)
+
+    with pytest.raises(GISProcessingError) as exc:
+        resample_raster(source, width=4, height=4, method="nearest", cfg=make_settings(tmp_path))
+    assert exc.value.status == "ERROR_GIS_RASTER_RESAMPLE_CRS"
+    assert not list((tmp_path / "data" / "exports" / "gis_reports").glob("*.tmp.tif"))

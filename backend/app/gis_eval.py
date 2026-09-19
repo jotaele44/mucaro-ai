@@ -14,6 +14,7 @@ from rasterio.transform import from_origin
 
 from .config import Settings
 from .gis_crs import reproject_geojson_crs
+from .gis_corpus import DEFAULT_REAL_GIS_CORPUS_MANIFEST, validate_real_gis_corpus
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
 from .gis_processing import (
@@ -28,10 +29,10 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
-from .gis_raster import clip_raster_bbox, inspect_raster, sample_raster
+from .gis_raster import clip_raster_bbox, inspect_raster, resample_raster, sample_raster
 from .gis_topology_repair import repair_geojson_topology
 from .gis_vector_formats import inspect_vector_format
-from .gis_vector_raster import analyze_vector_raster_intersection
+from .gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
 from .release_receipts import write_release_receipt
 from .utils import utc_now
 
@@ -63,6 +64,9 @@ VALID_OPERATIONS = {
     "raster_sample",
     "raster_clip",
     "vector_raster",
+    "zonal_stats",
+    "raster_resample",
+    "corpus_validate",
     "map_export",
 }
 
@@ -366,6 +370,34 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             cfg=cfg,
             band=int(parameters.get("band", 1)),
         )
+    if operation == "zonal_stats":
+        return compute_zonal_statistics(
+            paths["vector"],
+            paths["raster"],
+            cfg=cfg,
+            band=int(parameters.get("band", 1)),
+        )
+    if operation == "raster_resample":
+        return resample_raster(
+            paths["raster"],
+            width=int(parameters.get("width", 0)),
+            height=int(parameters.get("height", 0)),
+            method=str(parameters.get("method") or "nearest"),
+            cfg=cfg,
+        )
+    if operation == "corpus_validate":
+        corpus_cfg = Settings(
+            project_root=ROOT,
+            data_dir=cfg.data_dir,
+            input_dir=cfg.input_dir,
+            processed_dir=cfg.processed_dir,
+            export_dir=cfg.export_dir,
+            index_dir=cfg.index_dir,
+            sqlite_path=cfg.sqlite_path,
+            default_model_provider="mock",
+            default_model_name="mock",
+        )
+        return validate_real_gis_corpus(DEFAULT_REAL_GIS_CORPUS_MANIFEST, cfg=corpus_cfg)
     if operation == "map_export":
         layer_names = parameters.get("layer_inputs", ["layer"])
         layer_crs = parameters.get("layer_crs", {})

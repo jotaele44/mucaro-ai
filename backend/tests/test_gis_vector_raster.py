@@ -8,7 +8,7 @@ from rasterio.transform import from_origin
 
 from backend.app.config import Settings
 from backend.app.gis_processing import GISProcessingError
-from backend.app.gis_vector_raster import analyze_vector_raster_intersection
+from backend.app.gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
 
 
 def make_settings(tmp_path: Path) -> Settings:
@@ -143,3 +143,28 @@ def test_dimensional_and_non_object_features_remain_explicit_unresolved(tmp_path
     assert report["features"][-2]["warnings"] == ["GIS_VECTOR_RASTER_DIMENSION_UNSUPPORTED"]
     assert report["features"][-1]["warnings"] == ["ERROR_GIS_VECTOR_RASTER_FEATURE"]
     assert report["invariants"]["feature_accounting_closed"] is True
+
+
+def test_zonal_statistics_close_numeric_and_nodata_accounting(tmp_path: Path) -> None:
+    vector = make_vector(tmp_path / "zones.geojson")
+    payload = json.loads(vector.read_text(encoding="utf-8"))
+    payload["features"][0]["geometry"] = {
+        "type": "Polygon",
+        "coordinates": [[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]],
+    }
+    vector.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = compute_zonal_statistics(vector, make_raster(tmp_path / "values.tif"), cfg=make_settings(tmp_path))
+
+    row = report["features"][0]
+    assert report["status"] == "GIS_ZONAL_STATS_OK"
+    assert row["covered_cell_count"] == 4
+    assert row["valid_cell_count"] == 3
+    assert row["nodata_cell_count"] == 1
+    assert row["zero_cell_count"] == 1
+    assert row["sum"] == 5.0
+    assert row["mean"] == pytest.approx(5 / 3)
+    assert row["median"] == 2.0
+    assert row["population_standard_deviation"] == pytest.approx(1.247219128924647)
+    assert row["cell_accounting_closed"] is True
+    assert report["invariants"]["cell_accounting_closed"] is True

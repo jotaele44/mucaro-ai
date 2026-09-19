@@ -71,6 +71,9 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis sample-raster RASTER_PATH --point X Y` | Sample explicit coordinates in the raster CRS while separating values, NODATA, and outside states | 0 | 2 |
 | `mucaro gis clip-raster-bbox RASTER_PATH --min-x X --min-y Y --max-x X --max-y Y` | Transactionally clip a raster bbox and hash the derived artifact | 0 | 2 |
 | `mucaro gis vector-raster VECTOR_PATH RASTER_PATH` | Summarize raster cells covered by GeoJSON features with exact-CRS and NODATA controls | 0 | 2 |
+| `mucaro gis zonal-stats VECTOR_PATH RASTER_PATH` | Compute cell-center zonal count/sum/min/max/mean/median/population-standard-deviation receipts with zero/NODATA separation | 0 | 2 |
+| `mucaro gis resample-raster RASTER_PATH --width N --height N --method METHOD` | Transactionally resample to explicit dimensions while preserving extent, CRS, band count, and NODATA declarations | 0 | 2 |
+| `mucaro gis validate-corpus MANIFEST_PATH` | Validate frozen authoritative GIS corpus bytes, provenance, schema, stable IDs, and geometries | 0 | 2 |
 | `mucaro gis map-export-manifest OUTPUT_PATH --layer PATH CRS ...` | Bind an existing map/export artifact to renderer identity, extent, CRS, and source-layer hashes | 0 | 2 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
@@ -223,12 +226,21 @@ accuracy remain environment-dependent, and vertical or time-dependent CRS
 certification is outside the V1 claim.
 
 `inspect-vector`, `inspect-raster`, `sample-raster`,
-`clip-raster-bbox`, and `vector-raster` expose the bounded V1
+`clip-raster-bbox`, `vector-raster`, `zonal-stats`, `resample-raster`, and
+`validate-corpus` expose the bounded V1
 vector/raster plane. GeoPackage inspection is metadata-first; Shapefile
 identity includes sidecar manifestations; raster sampling requires coordinates
 already in the raster CRS; clipping does not reproject; vector-raster analysis
-requires exact declared CRS agreement and uses cell-center inclusion. Numeric
-zero, NODATA, outside, null/empty, and unresolved states remain distinct.
+requires exact declared CRS agreement and uses cell-center inclusion. Zonal
+statistics add count, sum, minimum, maximum, mean, median, and population
+standard deviation without treating NODATA as zero. Resampling is bounded to
+nearest and bilinear methods, writes transactionally, and preserves the source
+extent, CRS, band count, and NODATA declaration; it does not claim pixel-level
+semantic equivalence. The committed real-corpus manifest freezes a bounded
+Census TIGERweb polygon subset and fixed-window USGS earthquake points by raw
+bytes, query provenance, retrieval UTC, schema, stable IDs, and geometry
+accounting. It is not an exhaustive source denominator or a real-raster corpus.
+Numeric zero, NODATA, outside, null/empty, and unresolved states remain distinct.
 
 `mucaro gis map-export-manifest` does not render a map. It binds an existing
 non-empty artifact to its output hash, extent, CRS, renderer name/version, and
@@ -400,8 +412,12 @@ approved and audited.
 | `GIS_RASTER_INSPECT_OK` | raster inspection completed with dimension and band accounting |
 | `GIS_RASTER_SAMPLE_OK` | raster sampling completed with sampled/NODATA/outside accounting |
 | `GIS_RASTER_CLIP_OK` | raster bbox clipping completed with source/output hashes and preserved CRS |
+| `GIS_RASTER_RESAMPLE_OK` | raster resampling completed with exact dimensions and preserved extent, CRS, band count, and NODATA declaration |
 | `GIS_VECTOR_RASTER_OK` | vector-raster cell-center analysis completed with exact CRS and feature accounting |
 | `GIS_VECTOR_RASTER_WARN` | vector-raster analysis completed while retaining unresolved features |
+| `GIS_ZONAL_STATS_OK` | cell-center zonal statistics completed with feature/cell accounting and no unresolved features |
+| `GIS_ZONAL_STATS_WARN` | zonal statistics completed while retaining unresolved features |
+| `GIS_CORPUS_VALIDATION_OK` | frozen authoritative GIS corpus bytes, provenance, schema, IDs, and geometries validated |
 | `GIS_MAP_EXPORT_MANIFEST_OK` | map/export artifact provenance was bound to renderer, extent, CRS, and layer hashes |
 | `GIS_EVAL_OK` | GIS fixture manifest validation and every configured spatial case passed |
 | `GIS_EVAL_FAILED` | GIS fixture validation failed or one or more spatial cases regressed |
@@ -458,11 +474,31 @@ approved and audited.
 | `ERROR_GIS_RASTER_CLIP_OUTSIDE` | raster clipping bbox does not intersect the raster extent |
 | `ERROR_GIS_RASTER_CLIP_EMPTY` | raster clipping resolved to an empty pixel window |
 | `ERROR_GIS_RASTER_CLIP` | raster clipping failed before transactional output publication |
+| `ERROR_GIS_RASTER_RESAMPLE_DIMENSIONS` | raster resampling received non-positive or excessive output dimensions |
+| `ERROR_GIS_RASTER_RESAMPLE_METHOD` | raster resampling received a method outside nearest or bilinear |
+| `ERROR_GIS_RASTER_RESAMPLE_CRS` | raster resampling received a source without a declared CRS |
+| `ERROR_GIS_RASTER_RESAMPLE` | raster resampling or output verification failed before a governed receipt was returned |
 | `ERROR_GIS_VECTOR_RASTER_NOT_FOUND` | vector-raster analysis could not find both inputs |
 | `ERROR_GIS_VECTOR_RASTER_VECTOR` | vector-raster analysis received malformed GeoJSON |
 | `ERROR_GIS_VECTOR_RASTER_RASTER` | vector-raster analysis could not open the raster |
 | `ERROR_GIS_VECTOR_RASTER_CRS_MISMATCH` | vector and raster CRS are absent or do not match exactly |
 | `ERROR_GIS_VECTOR_RASTER_BAND` | requested raster band is outside the available one-based range |
+| `ERROR_GIS_CORPUS_MANIFEST_NOT_FOUND` | GIS corpus manifest path does not exist |
+| `ERROR_GIS_CORPUS_MANIFEST` | GIS corpus manifest is malformed or violates the supported schema |
+| `ERROR_GIS_CORPUS_PATH` | GIS corpus asset path escapes the configured project root |
+| `ERROR_GIS_CORPUS_ASSET_NOT_FOUND` | GIS corpus asset is absent |
+| `ERROR_GIS_CORPUS_HASH` | GIS corpus asset bytes or SHA-256 differ from the frozen manifest |
+| `ERROR_GIS_CORPUS_GEOJSON` | GIS corpus asset is not a GeoJSON FeatureCollection |
+| `ERROR_GIS_CORPUS_SOURCE_RESPONSE` | GIS corpus asset contains a source-service error response |
+| `ERROR_GIS_CORPUS_COUNT` | GIS corpus feature count differs from the frozen manifest |
+| `ERROR_GIS_CORPUS_ID` | GIS corpus feature lacks its declared stable ID |
+| `ERROR_GIS_CORPUS_DUPLICATE_ID` | GIS corpus stable IDs are not unique |
+| `ERROR_GIS_CORPUS_SCHEMA` | GIS corpus feature lacks required source properties |
+| `ERROR_GIS_CORPUS_FEATURE` | GIS corpus contains a malformed feature row |
+| `ERROR_GIS_CORPUS_GEOMETRY` | GIS corpus geometry is malformed, empty, or invalid |
+| `ERROR_GIS_CORPUS_GEOMETRY_COUNTS` | GIS corpus geometry-type accounting differs from the frozen manifest |
+| `ERROR_GIS_CORPUS_DIMENSIONS` | GIS corpus XY/XYZ/XYZM feature accounting differs from the frozen manifest |
+| `ERROR_GIS_CORPUS_PROVENANCE` | GIS corpus authority, URL, retrieval UTC, or declared CRS evidence is absent |
 | `ERROR_GIS_EXPORT_NOT_FOUND` | map/export artifact path does not exist |
 | `ERROR_GIS_EXPORT_EMPTY` | map/export artifact exists but contains no bytes |
 | `ERROR_GIS_EXPORT_EXTENT` | map/export extent is malformed, non-finite, inverted, or zero-area |
@@ -542,6 +578,9 @@ mucaro gis inspect-raster data/input/elevation.tif --format text
 mucaro gis sample-raster data/input/elevation.tif --point -66.1 18.4 --format text
 mucaro gis clip-raster-bbox data/input/elevation.tif --min-x -67 --min-y 17 --max-x -65 --max-y 19 --format text
 mucaro gis vector-raster data/input/zones.geojson data/input/elevation.tif --band 1 --format text
+mucaro gis zonal-stats data/input/zones.geojson data/input/elevation.tif --band 1 --format text
+mucaro gis resample-raster data/input/elevation.tif --width 1024 --height 1024 --method bilinear --format text
+mucaro gis validate-corpus _architecture/gis_real_corpus_manifest.json --format text
 mucaro gis map-export-manifest data/exports/map.png --layer data/input/zones.geojson EPSG:4326 --extent -67 17 -65 19 --output-crs EPSG:4326 --renderer qgis --renderer-version 3.40 --format text
 mucaro certify retrieval-quality --format text
 mucaro certify answer-trace-quality --format text
