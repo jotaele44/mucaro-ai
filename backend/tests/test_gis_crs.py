@@ -38,7 +38,13 @@ def test_pyproj_reprojection_records_pipeline_and_axis_policy(tmp_path: Path) ->
     assert report["status"] == "GIS_CRS_REPROJECT_OK"
     assert report["parameters"]["always_xy"] is True
     assert report["parameters"]["transformer_definition_sha256"]
+    assert not report["parameters"]["transformer_definition"].lower().startswith("unavailable until")
+    assert report["parameters"]["available_candidate_count"] >= 1
+    assert report["parameters"]["selected_candidate_index"] == 0
+    assert report["parameters"]["pyproj_version"]
+    assert report["parameters"]["proj_version"]
     assert report["invariants"]["feature_row_conservation"] is True
+    assert report["invariants"]["transform_pipeline_frozen"] is True
     assert report["output"]["crs"] == "EPSG:32161"
 
 

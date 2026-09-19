@@ -5,7 +5,10 @@ import sqlite3
 import struct
 from pathlib import Path
 
+import pytest
+
 from backend.app.config import Settings
+from backend.app.gis_processing import GISProcessingError
 from backend.app.gis_vector_formats import inspect_vector_format
 
 
@@ -60,3 +63,13 @@ def test_shapefile_sidecars_are_independent_manifestations(tmp_path: Path) -> No
     assert report["manifest"]["shape_type_code"] == 1
     assert report["manifest"]["sidecars"][".prj"]["present"] is True
     assert report["manifest"]["sidecars"][".prj"]["sha256"]
+
+
+def test_malformed_geojson_fails_with_stable_vector_status(tmp_path: Path) -> None:
+    path = tmp_path / "bad.geojson"
+    path.write_text("{not-json", encoding="utf-8")
+
+    with pytest.raises(GISProcessingError) as exc:
+        inspect_vector_format(path, cfg=cfg(tmp_path))
+
+    assert exc.value.status == "ERROR_GIS_VECTOR_GEOJSON"

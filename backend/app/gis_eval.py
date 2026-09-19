@@ -8,7 +8,14 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+import rasterio
+from rasterio.transform import from_origin
+
 from .config import Settings
+from .gis_crs import reproject_geojson_crs
+from .gis_export import create_map_export_manifest
+from .gis_geodesy import measure_geojson_ellipsoidal
 from .gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -21,6 +28,10 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
+from .gis_raster import clip_raster_bbox, inspect_raster, sample_raster
+from .gis_topology_repair import repair_geojson_topology
+from .gis_vector_formats import inspect_vector_format
+from .gis_vector_raster import analyze_vector_raster_intersection
 from .release_receipts import write_release_receipt
 from .utils import utc_now
 
@@ -34,7 +45,26 @@ GIS_QUALITY_FAILED = "GIS_QUALITY_CERT_FAILED"
 GIS_QUALITY_PROFILE = "v0.1.23-local-release"
 GIS_QUALITY_RECEIPT_TYPE = "gis_quality"
 
-VALID_OPERATIONS = {"inspect", "point_in_polygon", "compare", "overlay", "reproject", "csv_points", "bbox_filter", "clip_bbox", "measure"}
+VALID_OPERATIONS = {
+    "inspect",
+    "point_in_polygon",
+    "compare",
+    "overlay",
+    "reproject",
+    "reproject_crs",
+    "csv_points",
+    "bbox_filter",
+    "clip_bbox",
+    "measure",
+    "measure_ellipsoidal",
+    "repair_topology",
+    "vector_format",
+    "raster_inspect",
+    "raster_sample",
+    "raster_clip",
+    "vector_raster",
+    "map_export",
+}
 
 
 def current_git_head(root: Path) -> str:
@@ -92,6 +122,46 @@ def _write_csv(path: Path, payload: dict[str, Any]) -> Path:
             if not isinstance(row, dict):
                 raise ValueError(f"{path.name} CSV row must be an object")
             writer.writerow({field: row.get(field, "") for field in fieldnames})
+    return path
+
+
+def _write_raster(path: Path, payload: dict[str, Any]) -> Path:
+    bands = payload.get("bands")
+    if not isinstance(bands, list) or not bands:
+        raise ValueError(f"{path.name} raster input must include a non-empty bands array")
+    dtype = str(payload.get("dtype") or "float64")
+    try:
+        values = np.asarray(bands, dtype=dtype)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{path.name} raster values do not match dtype {dtype}") from exc
+    if values.ndim != 3 or values.shape[1] <= 0 or values.shape[2] <= 0:
+        raise ValueError(f"{path.name} raster bands must be a rectangular count x height x width array")
+    origin = payload.get("origin", [0.0, float(values.shape[1]), 1.0, 1.0])
+    if not isinstance(origin, list) or len(origin) != 4:
+        raise ValueError(f"{path.name} raster origin must be [west,north,xsize,ysize]")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(
+        path,
+        "w",
+        driver=str(payload.get("driver") or "GTiff"),
+        width=int(values.shape[2]),
+        height=int(values.shape[1]),
+        count=int(values.shape[0]),
+        dtype=dtype,
+        crs=payload.get("crs"),
+        transform=from_origin(*[float(value) for value in origin]),
+        nodata=payload.get("nodata"),
+    ) as target:
+        target.write(values)
+    return path
+
+
+def _write_raw(path: Path, payload: dict[str, Any]) -> Path:
+    text = payload.get("text")
+    if not isinstance(text, str) or not text:
+        raise ValueError(f"{path.name} raw input must include non-empty text")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
     return path
 
 
@@ -170,8 +240,13 @@ def _materialize_inputs(case: dict[str, Any], input_root: Path) -> dict[str, Pat
     for name, payload in inputs.items():
         if not isinstance(payload, dict):
             raise ValueError(f"{case_id}.{name} input must be an object")
-        if payload.get("format") == "csv":
+        input_format = payload.get("format")
+        if input_format == "csv":
             materialized[name] = _write_csv(input_root / f"{case_id}_{name}.csv", payload)
+        elif input_format == "raster":
+            materialized[name] = _write_raster(input_root / f"{case_id}_{name}.tif", payload)
+        elif input_format == "raw":
+            materialized[name] = _write_raw(input_root / f"{case_id}_{name}.bin", payload)
         else:
             materialized[name] = _write_geojson(input_root / f"{case_id}_{name}.geojson", payload)
     return materialized
@@ -209,6 +284,13 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
         )
     if operation == "reproject":
         return reproject_geojson(
+            paths["geojson"],
+            cfg=cfg,
+            target_crs=str(parameters.get("target_crs") or ""),
+            source_crs=parameters.get("source_crs"),
+        )
+    if operation == "reproject_crs":
+        return reproject_geojson_crs(
             paths["geojson"],
             cfg=cfg,
             target_crs=str(parameters.get("target_crs") or ""),
@@ -258,6 +340,53 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             cfg=cfg,
             coordinate_units=str(coordinate_units),
             measurement_mode=str(measurement_mode),
+        )
+    if operation == "measure_ellipsoidal":
+        return measure_geojson_ellipsoidal(paths["geojson"], cfg=cfg)
+    if operation == "repair_topology":
+        return repair_geojson_topology(paths["geojson"], cfg=cfg)
+    if operation == "vector_format":
+        return inspect_vector_format(paths["vector"], cfg=cfg)
+    if operation == "raster_inspect":
+        return inspect_raster(paths["raster"], cfg=cfg)
+    if operation == "raster_sample":
+        points = parameters.get("points")
+        if not isinstance(points, list):
+            raise ValueError("raster_sample parameters.points must be an array")
+        return sample_raster(paths["raster"], [tuple(point) for point in points], cfg=cfg)
+    if operation == "raster_clip":
+        bbox = parameters.get("bbox")
+        if not isinstance(bbox, list) or len(bbox) != 4:
+            raise ValueError("raster_clip parameters.bbox must be a four-number array")
+        return clip_raster_bbox(paths["raster"], tuple(bbox), cfg=cfg)
+    if operation == "vector_raster":
+        return analyze_vector_raster_intersection(
+            paths["vector"],
+            paths["raster"],
+            cfg=cfg,
+            band=int(parameters.get("band", 1)),
+        )
+    if operation == "map_export":
+        layer_names = parameters.get("layer_inputs", ["layer"])
+        layer_crs = parameters.get("layer_crs", {})
+        if not isinstance(layer_names, list) or not all(isinstance(name, str) and name in paths for name in layer_names):
+            raise ValueError("map_export parameters.layer_inputs must name materialized inputs")
+        if not isinstance(layer_crs, dict):
+            raise ValueError("map_export parameters.layer_crs must be an object")
+        extent = parameters.get("extent")
+        if not isinstance(extent, list):
+            raise ValueError("map_export parameters.extent must be an array")
+        return create_map_export_manifest(
+            cfg=cfg,
+            output_path=paths["output"],
+            layers=[
+                {"path": str(paths[name]), "crs": layer_crs.get(name), "name": name, "role": "source"}
+                for name in layer_names
+            ],
+            extent=extent,
+            output_crs=str(parameters.get("output_crs") or ""),
+            renderer=str(parameters.get("renderer") or ""),
+            renderer_version=str(parameters.get("renderer_version") or ""),
         )
     raise ValueError(f"Unsupported GIS eval operation: {operation}")
 

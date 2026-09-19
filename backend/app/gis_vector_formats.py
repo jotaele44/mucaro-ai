@@ -24,7 +24,10 @@ def _report(cfg: Any, report: dict[str, Any]) -> dict[str, Any]:
 
 
 def _inspect_geojson(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise GISProcessingError("ERROR_GIS_VECTOR_GEOJSON", f"GeoJSON could not be read: {exc}") from exc
     if not isinstance(payload, dict) or payload.get("type") != "FeatureCollection" or not isinstance(payload.get("features"), list):
         raise GISProcessingError("ERROR_GIS_VECTOR_GEOJSON", "GeoJSON input must be a FeatureCollection.")
     features = payload["features"]
@@ -44,10 +47,9 @@ def _inspect_geojson(path: Path) -> dict[str, Any]:
 
 def _inspect_gpkg(path: Path) -> dict[str, Any]:
     try:
-        connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-        rows = connection.execute("SELECT table_name, data_type, identifier, srs_id FROM gpkg_contents ORDER BY table_name").fetchall()
-        geometry_rows = connection.execute("SELECT table_name, column_name, geometry_type_name, srs_id, z, m FROM gpkg_geometry_columns ORDER BY table_name, column_name").fetchall()
-        connection.close()
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
+            rows = connection.execute("SELECT table_name, data_type, identifier, srs_id FROM gpkg_contents ORDER BY table_name").fetchall()
+            geometry_rows = connection.execute("SELECT table_name, column_name, geometry_type_name, srs_id, z, m FROM gpkg_geometry_columns ORDER BY table_name, column_name").fetchall()
     except sqlite3.Error as exc:
         raise GISProcessingError("ERROR_GIS_VECTOR_GPKG", f"GeoPackage metadata could not be read: {exc}") from exc
     return {"contents": [{"table_name": r[0], "data_type": r[1], "identifier": r[2], "srs_id": r[3]} for r in rows], "geometry_columns": [{"table_name": r[0], "column_name": r[1], "geometry_type": r[2], "srs_id": r[3], "z": r[4], "m": r[5]} for r in geometry_rows], "feature_table_count": sum(1 for r in rows if r[1] == "features")}

@@ -12,13 +12,32 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 18,
-        "passed": 18,
+        "cases": 35,
+        "passed": 35,
         "failed": 0,
-        "positive_cases": 12,
-        "negative_cases": 6,
-        "operations": 9,
-        "operation_names": ["bbox_filter", "clip_bbox", "compare", "csv_points", "inspect", "measure", "overlay", "point_in_polygon", "reproject"],
+        "positive_cases": 22,
+        "negative_cases": 13,
+        "operations": 18,
+        "operation_names": [
+            "bbox_filter",
+            "clip_bbox",
+            "compare",
+            "csv_points",
+            "inspect",
+            "map_export",
+            "measure",
+            "measure_ellipsoidal",
+            "overlay",
+            "point_in_polygon",
+            "raster_clip",
+            "raster_inspect",
+            "raster_sample",
+            "repair_topology",
+            "reproject",
+            "reproject_crs",
+            "vector_format",
+            "vector_raster",
+        ],
     }
     by_id = {case["case_id"]: case for case in report["cases"]}
     assert by_id["inspect_dimensionality"]["observed_status"] == "GIS_INSPECT_WARN"
@@ -62,6 +81,21 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["measure_units_required_fails_closed"]["observed_status"] == "ERROR_GIS_MEASURE_UNITS_REQUIRED"
     assert by_id["reproject_invalid_latitude_fails_closed"]["case_type"] == "negative"
     assert by_id["reproject_invalid_latitude_fails_closed"]["observed_status"] == "ERROR_GIS_REPROJECT_INVALID_COORDINATES"
+    assert by_id["reproject_crs_wgs84_to_pr_state_plane"]["observed_status"] == "GIS_CRS_REPROJECT_OK"
+    assert by_id["reproject_crs_m_coordinates_fail_closed"]["observed_status"] == "ERROR_GIS_CRS_M_UNSUPPORTED"
+    assert by_id["repair_topology_bowtie_explicit"]["observed_status"] == "GIS_TOPOLOGY_REPAIR_OK"
+    assert by_id["repair_topology_z_remains_unresolved"]["observed_status"] == "GIS_TOPOLOGY_REPAIR_WARN"
+    assert by_id["measure_ellipsoidal_wgs84_line"]["observed_status"] == "GIS_ELLIPSOIDAL_OK"
+    assert by_id["measure_ellipsoidal_non_wgs84_fails_closed"]["observed_status"] == "ERROR_GIS_GEOD_CRS"
+    assert by_id["vector_format_geojson_manifest"]["observed_status"] == "GIS_VECTOR_FORMAT_OK"
+    assert by_id["raster_inspect_nodata_accounting"]["observed_status"] == "GIS_RASTER_INSPECT_OK"
+    assert by_id["raster_sample_distinct_states"]["observed_status"] == "GIS_RASTER_SAMPLE_OK"
+    assert by_id["raster_clip_bbox_writes_hashed_output"]["observed_status"] == "GIS_RASTER_CLIP_OK"
+    assert by_id["raster_clip_outside_fails_closed"]["observed_status"] == "ERROR_GIS_RASTER_CLIP_OUTSIDE"
+    assert by_id["vector_raster_preserves_zero_nodata_null"]["observed_status"] == "GIS_VECTOR_RASTER_OK"
+    assert by_id["vector_raster_crs_mismatch_fails_closed"]["observed_status"] == "ERROR_GIS_VECTOR_RASTER_CRS_MISMATCH"
+    assert by_id["map_export_binds_renderer_and_layers"]["observed_status"] == "GIS_MAP_EXPORT_MANIFEST_OK"
+    assert by_id["map_export_invalid_extent_fails_closed"]["observed_status"] == "ERROR_GIS_EXPORT_EXTENT"
 
 
 def test_gis_eval_fails_when_expected_invariant_does_not_match(tmp_path: Path):

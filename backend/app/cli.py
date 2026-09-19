@@ -38,6 +38,9 @@ from .conversations import (
 )
 from .db import list_payloads
 from .execution_gate import analyze_task
+from .gis_crs import reproject_geojson_crs
+from .gis_export import create_map_export_manifest
+from .gis_geodesy import measure_geojson_ellipsoidal
 from .gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -50,6 +53,10 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
+from .gis_raster import clip_raster_bbox, inspect_raster, sample_raster
+from .gis_topology_repair import repair_geojson_topology
+from .gis_vector_formats import inspect_vector_format
+from .gis_vector_raster import analyze_vector_raster_intersection
 from .gis_eval import (
     DEFAULT_GIS_EVAL_FIXTURE,
     GIS_EVAL_OK,
@@ -544,6 +551,16 @@ def build_parser() -> argparse.ArgumentParser:
     gis_reproject.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_reproject.set_defaults(handler=run_gis_reproject)
 
+    gis_reproject_crs = gis_subcommands.add_parser(
+        "reproject-crs",
+        help="Reproject GeoJSON with pyproj/PROJ and freeze the selected transformation pipeline.",
+    )
+    gis_reproject_crs.add_argument("geojson_path", help="Path to a GeoJSON FeatureCollection.")
+    gis_reproject_crs.add_argument("--target-crs", required=True, help="Any CRS identifier parseable by pyproj/PROJ.")
+    gis_reproject_crs.add_argument("--source-crs", help="Optional operator override for the source CRS.")
+    gis_reproject_crs.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_reproject_crs.set_defaults(handler=run_gis_reproject_crs)
+
     gis_csv_points = gis_subcommands.add_parser(
         "csv-points",
         help="Convert CSV longitude/latitude rows into GeoJSON point features and write a GIS receipt.",
@@ -610,6 +627,97 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gis_measure.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_measure.set_defaults(handler=run_gis_measure)
+
+    gis_repair_topology = gis_subcommands.add_parser(
+        "repair-topology",
+        help="Explicitly repair invalid planar XY GeoJSON topology with before/after geometry hashes.",
+    )
+    gis_repair_topology.add_argument("geojson_path", help="Path to a GeoJSON FeatureCollection.")
+    gis_repair_topology.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_repair_topology.set_defaults(handler=run_gis_repair_topology)
+
+    gis_measure_ellipsoidal = gis_subcommands.add_parser(
+        "measure-ellipsoidal",
+        help="Measure EPSG:4326 GeoJSON on the WGS84 ellipsoid with pyproj Geod.",
+    )
+    gis_measure_ellipsoidal.add_argument("geojson_path", help="Path to an EPSG:4326 GeoJSON FeatureCollection.")
+    gis_measure_ellipsoidal.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_measure_ellipsoidal.set_defaults(handler=run_gis_measure_ellipsoidal)
+
+    gis_inspect_vector = gis_subcommands.add_parser(
+        "inspect-vector",
+        help="Inspect a GeoJSON, GeoPackage, or Shapefile source manifestation without inferring cross-format identity.",
+    )
+    gis_inspect_vector.add_argument("vector_path", help="Path to a supported vector source.")
+    gis_inspect_vector.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_inspect_vector.set_defaults(handler=run_gis_inspect_vector)
+
+    gis_inspect_raster = gis_subcommands.add_parser(
+        "inspect-raster",
+        help="Inspect a rasterio-readable local raster with band and NODATA accounting.",
+    )
+    gis_inspect_raster.add_argument("raster_path", help="Path to a local raster source.")
+    gis_inspect_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_inspect_raster.set_defaults(handler=run_gis_inspect_raster)
+
+    gis_sample_raster = gis_subcommands.add_parser(
+        "sample-raster",
+        help="Sample raster values at explicit coordinates already expressed in the raster CRS.",
+    )
+    gis_sample_raster.add_argument("raster_path", help="Path to a local raster source.")
+    gis_sample_raster.add_argument(
+        "--point",
+        action="append",
+        nargs=2,
+        type=float,
+        metavar=("X", "Y"),
+        required=True,
+        help="Coordinate pair in the raster CRS; repeat for multiple points.",
+    )
+    gis_sample_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_sample_raster.set_defaults(handler=run_gis_sample_raster)
+
+    gis_clip_raster = gis_subcommands.add_parser(
+        "clip-raster-bbox",
+        help="Clip a raster to an axis-aligned bounding box in the raster CRS.",
+    )
+    gis_clip_raster.add_argument("raster_path", help="Path to a local raster source.")
+    gis_clip_raster.add_argument("--min-x", type=float, required=True, help="Minimum X coordinate.")
+    gis_clip_raster.add_argument("--min-y", type=float, required=True, help="Minimum Y coordinate.")
+    gis_clip_raster.add_argument("--max-x", type=float, required=True, help="Maximum X coordinate.")
+    gis_clip_raster.add_argument("--max-y", type=float, required=True, help="Maximum Y coordinate.")
+    gis_clip_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_clip_raster.set_defaults(handler=run_gis_clip_raster)
+
+    gis_vector_raster = gis_subcommands.add_parser(
+        "vector-raster",
+        help="Summarize raster cells covered by GeoJSON features using explicit cell-center inclusion.",
+    )
+    gis_vector_raster.add_argument("vector_path", help="Path to a GeoJSON FeatureCollection.")
+    gis_vector_raster.add_argument("raster_path", help="Path to a local raster source.")
+    gis_vector_raster.add_argument("--band", type=int, default=1, help="One-based raster band index.")
+    gis_vector_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_vector_raster.set_defaults(handler=run_gis_vector_raster)
+
+    gis_map_export = gis_subcommands.add_parser(
+        "map-export-manifest",
+        help="Bind an existing rendered map/export artifact to its renderer, extent, CRS, and source layers.",
+    )
+    gis_map_export.add_argument("output_path", help="Path to the existing rendered artifact.")
+    gis_map_export.add_argument(
+        "--layer",
+        action="append",
+        nargs=2,
+        metavar=("PATH", "CRS"),
+        required=True,
+        help="Bound source layer path and declared CRS; repeat for multiple layers.",
+    )
+    gis_map_export.add_argument("--extent", nargs=4, type=float, metavar=("MIN_X", "MIN_Y", "MAX_X", "MAX_Y"), required=True)
+    gis_map_export.add_argument("--output-crs", required=True, help="Declared CRS of the rendered output.")
+    gis_map_export.add_argument("--renderer", required=True, help="Renderer name.")
+    gis_map_export.add_argument("--renderer-version", required=True, help="Renderer version.")
+    gis_map_export.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_map_export.set_defaults(handler=run_gis_map_export_manifest)
 
     ocr = subcommands.add_parser("ocr", help="Run local OCR analysis with source-image receipts.")
     ocr_subcommands = ocr.add_subparsers(dest="ocr_command", required=True)
@@ -1951,6 +2059,18 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_CLIP_BBOX_WARN",
         "GIS_MEASURE_OK",
         "GIS_MEASURE_WARN",
+        "GIS_CRS_REPROJECT_OK",
+        "GIS_TOPOLOGY_REPAIR_OK",
+        "GIS_TOPOLOGY_REPAIR_WARN",
+        "GIS_ELLIPSOIDAL_OK",
+        "GIS_ELLIPSOIDAL_WARN",
+        "GIS_VECTOR_FORMAT_OK",
+        "GIS_RASTER_INSPECT_OK",
+        "GIS_RASTER_SAMPLE_OK",
+        "GIS_RASTER_CLIP_OK",
+        "GIS_VECTOR_RASTER_OK",
+        "GIS_VECTOR_RASTER_WARN",
+        "GIS_MAP_EXPORT_MANIFEST_OK",
     }:
         print(status)
         print(f"operation={payload.get('operation')}")
@@ -1971,6 +2091,18 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 print(f"crs={source.get('crs')}")
             if "crs_status" in source:
                 print(f"crs_status={source.get('crs_status')}")
+            if "format" in source:
+                print(f"source_format={source.get('format')}")
+            if "bytes" in source:
+                print(f"source_bytes={source.get('bytes')}")
+        for source_name in ("vector_source", "raster_source"):
+            named_source = payload.get(source_name)
+            if isinstance(named_source, dict):
+                print(f"{source_name}_sha256={named_source.get('sha256')}")
+                if "crs" in named_source:
+                    print(f"{source_name}_crs={named_source.get('crs')}")
+                if "feature_count" in named_source:
+                    print(f"{source_name}_feature_count={named_source.get('feature_count')}")
         if payload.get("join_cardinality"):
             print(f"join_cardinality={payload.get('join_cardinality')}")
         if payload.get("match_on"):
@@ -1989,6 +2121,18 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "mode",
                 "bbox",
                 "overlay_operation",
+                "source_crs",
+                "target_crs",
+                "always_xy",
+                "axis_order_policy",
+                "transformer_definition_sha256",
+                "accuracy",
+                "ellipsoid",
+                "band",
+                "cell_inclusion_rule",
+                "implicit_reprojection",
+                "requested_bbox",
+                "effective_bbox",
             ):
                 if key in parameters:
                     print(f"{key}={parameters.get(key)}")
@@ -2072,6 +2216,28 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "total_hole_count",
                 "total_area",
                 "total_length",
+                "source_crs_parseable",
+                "target_crs_parseable",
+                "axis_order_explicit",
+                "transform_pipeline_frozen",
+                "output_accounting_closed",
+                "repair_is_explicit",
+                "total_area_m2",
+                "total_length_m",
+                "source_hash_present",
+                "format_supported",
+                "band_accounting_closed",
+                "dimensions_positive",
+                "point_accounting_closed",
+                "source_and_output_hash_present",
+                "feature_accounting_closed",
+                "crs_exactly_matched",
+                "nodata_separate_from_zero",
+                "no_implicit_reprojection",
+                "layer_count",
+                "all_layer_hashes_present",
+                "output_hash_present",
+                "renderer_identity_present",
             ):
                 if key in invariants:
                     print(f"{key}={invariants.get(key)}")
@@ -2084,6 +2250,18 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         if isinstance(state_counts, dict):
             for state, count in state_counts.items():
                 print(f"{state}={count}")
+        manifest = payload.get("manifest")
+        if isinstance(manifest, dict):
+            for key in ("driver", "width", "height", "band_count", "crs", "feature_count", "feature_table_count", "shape_type_code"):
+                if key in manifest:
+                    print(f"manifest_{key}={manifest.get(key)}")
+        renderer = payload.get("renderer")
+        if isinstance(renderer, dict):
+            print(f"renderer={renderer.get('name')}")
+            print(f"renderer_version={renderer.get('version')}")
+        layers = payload.get("layers")
+        if isinstance(layers, list):
+            print(f"bound_layer_count={len(layers)}")
         warnings = payload.get("warnings")
         if warnings:
             print("warnings=" + ",".join(str(warning) for warning in warnings))
@@ -2492,6 +2670,95 @@ def run_gis_measure(args: argparse.Namespace, cfg: Settings) -> int:
         return 2
     emit_payload(result, args.format)
     return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def _resolve_project_path(value: str, cfg: Settings) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else cfg.project_root / path
+
+
+def _run_gis_report(args: argparse.Namespace, operation: Any) -> int:
+    try:
+        result = operation()
+    except GISProcessingError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_gis_reproject_crs(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.geojson_path, cfg)
+    return _run_gis_report(
+        args,
+        lambda: reproject_geojson_crs(path, target_crs=args.target_crs, cfg=cfg, source_crs=args.source_crs),
+    )
+
+
+def run_gis_repair_topology(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.geojson_path, cfg)
+    return _run_gis_report(args, lambda: repair_geojson_topology(path, cfg=cfg))
+
+
+def run_gis_measure_ellipsoidal(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.geojson_path, cfg)
+    return _run_gis_report(args, lambda: measure_geojson_ellipsoidal(path, cfg=cfg))
+
+
+def run_gis_inspect_vector(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.vector_path, cfg)
+    return _run_gis_report(args, lambda: inspect_vector_format(path, cfg=cfg))
+
+
+def run_gis_inspect_raster(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.raster_path, cfg)
+    return _run_gis_report(args, lambda: inspect_raster(path, cfg=cfg))
+
+
+def run_gis_sample_raster(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.raster_path, cfg)
+    points = [(float(point[0]), float(point[1])) for point in args.point]
+    return _run_gis_report(args, lambda: sample_raster(path, points, cfg=cfg))
+
+
+def run_gis_clip_raster(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.raster_path, cfg)
+    bbox = (args.min_x, args.min_y, args.max_x, args.max_y)
+    return _run_gis_report(args, lambda: clip_raster_bbox(path, bbox, cfg=cfg))
+
+
+def run_gis_vector_raster(args: argparse.Namespace, cfg: Settings) -> int:
+    vector_path = _resolve_project_path(args.vector_path, cfg)
+    raster_path = _resolve_project_path(args.raster_path, cfg)
+    return _run_gis_report(
+        args,
+        lambda: analyze_vector_raster_intersection(vector_path, raster_path, cfg=cfg, band=args.band),
+    )
+
+
+def run_gis_map_export_manifest(args: argparse.Namespace, cfg: Settings) -> int:
+    output_path = _resolve_project_path(args.output_path, cfg)
+    layers = [
+        {
+            "path": str(_resolve_project_path(path_value, cfg)),
+            "crs": crs,
+            "name": Path(path_value).name,
+            "role": "source",
+        }
+        for path_value, crs in args.layer
+    ]
+    return _run_gis_report(
+        args,
+        lambda: create_map_export_manifest(
+            cfg=cfg,
+            output_path=output_path,
+            layers=layers,
+            extent=list(args.extent),
+            output_crs=args.output_crs,
+            renderer=args.renderer,
+            renderer_version=args.renderer_version,
+        ),
+    )
 
 
 def run_ocr_analyze(args: argparse.Namespace, cfg: Settings) -> int:
