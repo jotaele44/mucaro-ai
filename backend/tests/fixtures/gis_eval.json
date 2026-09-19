@@ -1,9 +1,9 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 35,
-    "operation_count": 18,
-    "negative_case_count": 13
+    "case_count": 40,
+    "operation_count": 21,
+    "negative_case_count": 15
   },
   "cases": [
     {
@@ -2039,6 +2039,150 @@
       "expect_error": true,
       "expected_status": "ERROR_GIS_VECTOR_RASTER_CRS_MISMATCH",
       "expected_warnings": []
+    },
+    {
+      "case_id": "zonal_stats_close_numeric_nodata_and_zero_accounting",
+      "operation": "zonal_stats",
+      "parameters": {"band": 1},
+      "inputs": {
+        "vector": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "zone-all", "geometry": {"type": "Polygon", "coordinates": [[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]]}, "properties": {}}
+          ]
+        },
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expected_status": "GIS_ZONAL_STATS_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "feature_accounting_closed": true,
+        "cell_accounting_closed": true,
+        "crs_exactly_matched": true,
+        "nodata_separate_from_zero": true,
+        "no_implicit_reprojection": true
+      },
+      "expected_fields": {
+        "features.0.feature_id": "zone-all",
+        "features.0.covered_cell_count": 4,
+        "features.0.valid_cell_count": 3,
+        "features.0.nodata_cell_count": 1,
+        "features.0.zero_cell_count": 1,
+        "features.0.sum": 5.0,
+        "features.0.median": 2.0,
+        "features.0.cell_accounting_closed": true
+      }
+    },
+    {
+      "case_id": "zonal_stats_invalid_band_fails_closed",
+      "operation": "zonal_stats",
+      "parameters": {"band": 2},
+      "inputs": {
+        "vector": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": []
+        },
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_VECTOR_RASTER_BAND",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "raster_resample_preserves_grid_contract",
+      "operation": "raster_resample",
+      "parameters": {"width": 4, "height": 4, "method": "nearest"},
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expected_status": "GIS_RASTER_RESAMPLE_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "source_and_output_hash_present": true,
+        "dimensions_exact": true,
+        "crs_preserved": true,
+        "bounds_preserved": true,
+        "band_count_preserved": true,
+        "nodata_definition_preserved": true,
+        "nodata_accounting_recorded": true,
+        "transactional_output_published": true
+      },
+      "expected_fields": {
+        "parameters.method": "nearest",
+        "output.width": 4,
+        "output.height": 4,
+        "output.crs": "EPSG:4326",
+        "output.bounds": [0.0, 0.0, 2.0, 2.0],
+        "output.nodata_values.0": -9999.0
+      }
+    },
+    {
+      "case_id": "raster_resample_invalid_dimensions_fail_closed",
+      "operation": "raster_resample",
+      "parameters": {"width": 0, "height": 4, "method": "nearest"},
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_RASTER_RESAMPLE_DIMENSIONS",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "real_corpus_bytes_schema_ids_and_geometry_validate",
+      "operation": "corpus_validate",
+      "inputs": {},
+      "expected_status": "GIS_CORPUS_VALIDATION_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "asset_accounting_closed": true,
+        "all_asset_hashes_matched": true,
+        "all_feature_counts_matched": true,
+        "all_stable_ids_present_and_unique": true,
+        "all_geometries_valid": true,
+        "all_coordinate_dimensions_accounted": true,
+        "provenance_complete": true
+      },
+      "expected_fields": {
+        "assets.0.feature_count": 3,
+        "assets.0.geometry_counts.Polygon": 2,
+        "assets.0.geometry_counts.MultiPolygon": 1,
+        "assets.0.coordinate_dimension_counts.XY": 3,
+        "assets.1.feature_count": 30,
+        "assets.1.geometry_counts.Point": 30,
+        "assets.1.coordinate_dimension_counts.XYZ": 30,
+        "assets.1.features_with_z": 30,
+        "assets.1.features_with_m": 0
+      }
     },
     {
       "case_id": "map_export_binds_renderer_and_layers",

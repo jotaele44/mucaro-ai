@@ -174,12 +174,26 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             "point_accounting_closed",
             "source_and_output_hash_present",
             "feature_accounting_closed",
+            "cell_accounting_closed",
             "crs_exactly_matched",
             "nodata_separate_from_zero",
             "no_implicit_reprojection",
             "all_layer_hashes_present",
             "output_hash_present",
             "renderer_identity_present",
+            "dimensions_exact",
+            "bounds_preserved",
+            "band_count_preserved",
+            "nodata_definition_preserved",
+            "nodata_accounting_recorded",
+            "transactional_output_published",
+            "asset_accounting_closed",
+            "all_asset_hashes_matched",
+            "all_feature_counts_matched",
+            "all_stable_ids_present_and_unique",
+            "all_geometries_valid",
+            "all_coordinate_dimensions_accounted",
+            "provenance_complete",
         ):
             if key in invariants:
                 checks.append(_contract_check(f"invariants.{key}", invariants.get(key) is True, f"{key} must be true when asserted"))
@@ -469,7 +483,7 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 _contract_check("raster_clip.output_bytes", isinstance(_dotted(report, "output.bytes"), int) and _dotted(report, "output.bytes") > 0, "clipped raster output bytes must be positive"),
             ]
         )
-    elif operation == "analyze_vector_raster_intersection":
+    elif operation in {"analyze_vector_raster_intersection", "compute_zonal_statistics"}:
         features = report.get("features")
         state_counts = report.get("state_counts")
         source_count = _dotted(report, "vector_source.feature_count")
@@ -485,6 +499,72 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
         if isinstance(features, list) and isinstance(state_counts, dict):
             state_total = sum(state_counts.get(state, -1) for state in ("INTERSECTS_VALID", "NODATA_ONLY", "OUTSIDE_OR_NO_CELL_CENTER", "NULL_EMPTY", "UNRESOLVED"))
             checks.append(_contract_check("vector_raster.accounting", isinstance(source_count, int) and source_count == len(features) == state_total, "vector-raster state counts must close to source features"))
+            checks.append(
+                _contract_check(
+                    "vector_raster.cell_accounting",
+                    all(
+                        isinstance(feature, dict)
+                        and feature.get("cell_accounting_closed") is True
+                        and feature.get("covered_cell_count")
+                        == feature.get("valid_cell_count", -1) + feature.get("nodata_cell_count", -1)
+                        and isinstance(feature.get("zero_cell_count"), int)
+                        and feature.get("zero_cell_count", -1) <= feature.get("valid_cell_count", -1)
+                        for feature in features
+                    ),
+                    "every vector-raster row must close covered = valid + NODATA and bound zero counts",
+                )
+            )
+            if operation == "compute_zonal_statistics":
+                for index, feature in enumerate(features):
+                    if isinstance(feature, dict) and feature.get("state") == "INTERSECTS_VALID":
+                        checks.extend(
+                            [
+                                _contract_check(f"zonal_stats.features.{index}.sum", _is_number(feature.get("sum")), "valid zonal rows must record a numeric sum"),
+                                _contract_check(f"zonal_stats.features.{index}.median", _is_number(feature.get("median")), "valid zonal rows must record a numeric median"),
+                                _contract_check(f"zonal_stats.features.{index}.population_standard_deviation", _is_number(feature.get("population_standard_deviation")), "valid zonal rows must record a numeric population standard deviation"),
+                            ]
+                        )
+    elif operation == "resample_raster":
+        checks.extend(
+            [
+                _contract_check("raster_resample.method", _dotted(report, "parameters.method") in {"nearest", "bilinear"}, "resampling method must be bounded"),
+                _contract_check("raster_resample.requested_width", isinstance(_dotted(report, "parameters.width"), int) and _dotted(report, "parameters.width") > 0, "requested width must be positive"),
+                _contract_check("raster_resample.requested_height", isinstance(_dotted(report, "parameters.height"), int) and _dotted(report, "parameters.height") > 0, "requested height must be positive"),
+                _contract_check("raster_resample.output_hash", bool(_dotted(report, "output.sha256")), "resampled raster output hash is required"),
+                _contract_check("raster_resample.output_width", _dotted(report, "output.width") == _dotted(report, "parameters.width"), "output width must match the explicit request"),
+                _contract_check("raster_resample.output_height", _dotted(report, "output.height") == _dotted(report, "parameters.height"), "output height must match the explicit request"),
+                _contract_check("raster_resample.crs", _dotted(report, "source.crs") == _dotted(report, "output.crs"), "source and output CRS must match"),
+                _contract_check("raster_resample.bounds", _dotted(report, "source.bounds") == _dotted(report, "output.bounds"), "source and output bounds must match"),
+                _contract_check("raster_resample.band_count", _dotted(report, "source.band_count") == _dotted(report, "output.band_count"), "source and output band counts must match"),
+                _contract_check("raster_resample.nodata", _dotted(report, "source.nodata_values") == _dotted(report, "output.nodata_values"), "source and output NODATA declarations must match"),
+                _contract_check("raster_resample.source_bands", isinstance(_dotted(report, "source.bands"), list) and len(_dotted(report, "source.bands")) == _dotted(report, "source.band_count"), "source band value accounting is required"),
+                _contract_check("raster_resample.output_bands", isinstance(_dotted(report, "output.bands"), list) and len(_dotted(report, "output.bands")) == _dotted(report, "output.band_count"), "output band value accounting is required"),
+            ]
+        )
+    elif operation == "validate_real_gis_corpus":
+        assets = report.get("assets")
+        checks.append(_contract_check("gis_corpus.assets", isinstance(assets, list) and bool(assets), "real GIS corpus report must include assets"))
+        if isinstance(assets, list):
+            for index, asset in enumerate(assets):
+                dimension_counts = asset.get("coordinate_dimension_counts") if isinstance(asset, dict) else None
+                checks.extend(
+                    [
+                        _contract_check(f"gis_corpus.assets.{index}.sha256", isinstance(asset, dict) and bool(asset.get("sha256")), "corpus asset hash is required"),
+                        _contract_check(f"gis_corpus.assets.{index}.bytes", isinstance(asset, dict) and isinstance(asset.get("bytes"), int) and asset["bytes"] > 0, "corpus asset bytes must be positive"),
+                        _contract_check(f"gis_corpus.assets.{index}.authority", isinstance(asset, dict) and bool(asset.get("authority")), "corpus authority is required"),
+                        _contract_check(f"gis_corpus.assets.{index}.retrieval_utc", isinstance(asset, dict) and bool(asset.get("retrieval_utc")), "corpus retrieval UTC is required"),
+                        _contract_check(f"gis_corpus.assets.{index}.crs", isinstance(asset, dict) and bool(asset.get("declared_crs")), "corpus declared CRS is required"),
+                        _contract_check(f"gis_corpus.assets.{index}.stable_ids", isinstance(asset, dict) and asset.get("stable_id_unique") is True, "corpus stable IDs must be unique"),
+                        _contract_check(f"gis_corpus.assets.{index}.geometries", isinstance(asset, dict) and asset.get("geometry_valid_count") == asset.get("feature_count"), "all corpus geometries must be valid"),
+                        _contract_check(
+                            f"gis_corpus.assets.{index}.dimensions",
+                            isinstance(dimension_counts, dict)
+                            and all(isinstance(value, int) and value >= 0 for value in dimension_counts.values())
+                            and sum(dimension_counts.values()) == asset.get("feature_count"),
+                            "corpus coordinate dimensions must close to feature count",
+                        ),
+                    ]
+                )
     elif operation == "create_map_export_manifest":
         layers = report.get("layers")
         checks.extend(
@@ -788,6 +868,15 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "vector_source_sha256",
                 "raster_source_sha256",
                 "cell_inclusion_rule",
+                "zonal_statistic",
+                "zero_cell_count",
+                "resampling_method",
+                "output_width",
+                "output_height",
+                "corpus_asset_sha256",
+                "corpus_authority",
+                "corpus_retrieval_utc",
+                "corpus_stable_id_path",
                 "renderer_name",
                 "renderer_version",
                 "bound_layer_sha256",
@@ -820,6 +909,9 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "ellipsoidal WGS84 measurement records pyproj Geod identity, meter units, per-feature state, and row accounting",
                 "vector and raster manifests preserve source format, CRS manifestations, bands, dimensions, NODATA, and source hashes",
                 "vector-raster analysis requires exact CRS agreement, separates NODATA from zero, and closes feature states",
+                "zonal statistics close covered, valid, NODATA, and zero-cell accounting before reporting numeric summaries",
+                "raster resampling preserves extent, CRS, band count, and NODATA declarations while recording a new output hash",
+                "authoritative corpus fixtures preserve immutable bytes, query provenance, schema, stable IDs, geometry types, and validity",
                 "map/export provenance binds output hash, extent, CRS, renderer identity, and every declared source-layer hash",
             ),
             positive_regression_gates=(
@@ -839,6 +931,9 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "pyproj Geod fixture records WGS84 ellipsoidal distance and area receipts",
                 "GeoJSON vector-format and GeoTIFF raster fixtures preserve source manifestations and NODATA accounting",
                 "vector-raster fixture preserves valid zero, NODATA-only, and NULL/EMPTY as distinct states",
+                "zonal-statistics fixture records count, sum, minimum, maximum, mean, median, population standard deviation, zero, and NODATA states",
+                "raster-resampling fixture preserves the requested dimensions, extent, CRS, band count, and NODATA declaration",
+                "frozen Census TIGERweb and USGS snapshots validate exact bytes, authority, retrieval UTC, stable IDs, schemas, and geometry accounting",
                 "GIS report contract validator accepts real saved measurement receipts and rejects weak provenance or false accounting",
                 "GIS eval manifest runs positive and negative fixtures through the supported CLI boundary",
                 "map export fixture preserves renderer identity plus source and derived layer hashes",
@@ -858,6 +953,9 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "ellipsoidal measurement fails closed for non-EPSG:4326 sources",
                 "raster clipping fails closed on invalid or nonintersecting extents",
                 "vector-raster analysis fails closed on absent or mismatched CRS and invalid bands",
+                "zonal statistics fail closed on invalid bands and retain malformed, dimensional, invalid, and NULL/EMPTY feature states",
+                "raster resampling fails closed on unsupported methods, absent CRS, invalid dimensions, or excessive output-cell requests",
+                "real-corpus validation fails closed on byte drift, path escape, duplicate IDs, schema drift, count mismatch, or invalid geometry",
                 "map/export provenance fails closed on empty artifacts, invalid extents, missing layer CRS, or absent renderer identity",
                 "GIS report contract validation fails when warning status, source hashes, CRS, or asserted accounting are missing or inconsistent",
                 "ambiguous nearest-neighbor match remains UNRESOLVED",
@@ -875,8 +973,8 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "topology policy and overlay operations extend beyond explicit planar make_valid and the current Polygon/MultiPolygon boundary",
                 "datum-grid availability, vertical CRS, time-dependent operations, and broader axis-order cases are independently certified",
                 "ellipsoidal antimeridian, polar, hole-orientation, and large-geometry edge cases close against a broader independent corpus",
-                "broader vector/raster formats, resampling, zonal statistics, remote sensing, terrain, hydrology, bathymetry, and temporal GIS are receipt-backed",
-                "rendered-map visual correctness and a larger real spatial corpus are independently certified",
+                "broader vector/raster formats, fractional zonal coverage, additional resampling kernels, remote sensing, terrain, hydrology, bathymetry, and temporal GIS are receipt-backed",
+                "rendered-map visual correctness, real raster sources, and a larger and more diverse real spatial corpus are independently certified",
             ),
         ),
         CapabilityContract(

@@ -283,18 +283,20 @@ Observed success markers:
   operations, explicit Shapely topology repair, pyproj/PROJ horizontal CRS
   transformation with always-XY and pipeline identity, WGS84 ellipsoidal
   measurement, GeoJSON/GeoPackage/Shapefile manifestation inspection, GeoTIFF
-  inspection/sampling/transactional clipping, exact-CRS vector-raster
-  cell-center analysis, and renderer/layer-bound map-export provenance.
-  `mucaro eval gis` runs 35 committed cases across 18 operations, including
-  13 fail-closed negative cases for CRS, dimensions, formats, raster extents,
-  vector-raster mismatch, and export identity. `mucaro capabilities
+  inspection/sampling/transactional clipping/resampling, exact-CRS
+  vector-raster cell-center zonal analysis, frozen Census TIGERweb and USGS
+  vector snapshots, and renderer/layer-bound map-export provenance. `mucaro
+  eval gis` runs 40 committed cases across 21 operations, including 15
+  fail-closed negative cases for CRS, dimensions, formats, raster extents,
+  vector-raster mismatch, resampling, and export identity. `mucaro capabilities
   validate-gis-report` checks the corresponding saved receipts for source and
   output hashes, warning consistency, CRS policy, NODATA separation,
   per-feature states, renderer/layer binding, and arithmetic closure.
   Full GIS maturity remains open until datum-grid availability,
   vertical/time-dependent CRS, antimeridian/polar and large-geometry
   adjudication, dimension-preserving mutation, broader topology/overlay policy,
-  independent rendered-map validation, larger real spatial corpora, additional
+  fractional zonal coverage, independent rendered-map validation, real raster
+  sources, larger and more diverse real spatial corpora, additional
   vector/raster formats and algorithms, remote sensing, terrain, hydrology,
   bathymetry, and temporal GIS are proven.
   State-of-the-art OCR

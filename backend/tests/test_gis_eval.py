@@ -12,16 +12,17 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 35,
-        "passed": 35,
+        "cases": 40,
+        "passed": 40,
         "failed": 0,
-        "positive_cases": 22,
-        "negative_cases": 13,
-        "operations": 18,
+        "positive_cases": 25,
+        "negative_cases": 15,
+        "operations": 21,
         "operation_names": [
             "bbox_filter",
             "clip_bbox",
             "compare",
+            "corpus_validate",
             "csv_points",
             "inspect",
             "map_export",
@@ -31,12 +32,14 @@ def test_gis_eval_default_fixture_covers_core_operations():
             "point_in_polygon",
             "raster_clip",
             "raster_inspect",
+            "raster_resample",
             "raster_sample",
             "repair_topology",
             "reproject",
             "reproject_crs",
             "vector_format",
             "vector_raster",
+            "zonal_stats",
         ],
     }
     by_id = {case["case_id"]: case for case in report["cases"]}
@@ -94,6 +97,11 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["raster_clip_outside_fails_closed"]["observed_status"] == "ERROR_GIS_RASTER_CLIP_OUTSIDE"
     assert by_id["vector_raster_preserves_zero_nodata_null"]["observed_status"] == "GIS_VECTOR_RASTER_OK"
     assert by_id["vector_raster_crs_mismatch_fails_closed"]["observed_status"] == "ERROR_GIS_VECTOR_RASTER_CRS_MISMATCH"
+    assert by_id["zonal_stats_close_numeric_nodata_and_zero_accounting"]["observed_status"] == "GIS_ZONAL_STATS_OK"
+    assert by_id["zonal_stats_invalid_band_fails_closed"]["observed_status"] == "ERROR_GIS_VECTOR_RASTER_BAND"
+    assert by_id["raster_resample_preserves_grid_contract"]["observed_status"] == "GIS_RASTER_RESAMPLE_OK"
+    assert by_id["raster_resample_invalid_dimensions_fail_closed"]["observed_status"] == "ERROR_GIS_RASTER_RESAMPLE_DIMENSIONS"
+    assert by_id["real_corpus_bytes_schema_ids_and_geometry_validate"]["observed_status"] == "GIS_CORPUS_VALIDATION_OK"
     assert by_id["map_export_binds_renderer_and_layers"]["observed_status"] == "GIS_MAP_EXPORT_MANIFEST_OK"
     assert by_id["map_export_invalid_extent_fails_closed"]["observed_status"] == "ERROR_GIS_EXPORT_EXTENT"
 

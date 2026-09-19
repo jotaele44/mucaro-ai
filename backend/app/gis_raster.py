@@ -10,9 +10,11 @@ from .utils import stable_id, utc_now, write_json
 
 try:
     import rasterio
+    from rasterio.enums import Resampling
     from rasterio.windows import from_bounds
 except ImportError:  # pragma: no cover
     rasterio = None
+    Resampling = None
     from_bounds = None
 
 
@@ -36,6 +38,23 @@ def _write_report(cfg: Any, report: dict[str, Any]) -> dict[str, Any]:
     path = cfg.export_dir / "gis_reports" / f"{report['report_id']}.json"
     write_json(path, report)
     return {**report, "report_path": str(path), "report_sha256": _sha256(path)}
+
+
+def _band_value_receipts(dataset: Any) -> list[dict[str, Any]]:
+    receipts: list[dict[str, Any]] = []
+    for band in range(1, dataset.count + 1):
+        values = dataset.read(band, masked=True)
+        compressed = values.compressed()
+        valid_count = int(values.count())
+        receipts.append(
+            {
+                "band": band,
+                "valid_cell_count": valid_count,
+                "nodata_cell_count": int(values.size - valid_count),
+                "zero_cell_count": int((compressed == 0).sum()),
+            }
+        )
+    return receipts
 
 
 def inspect_raster(path: Path, *, cfg: Any) -> dict[str, Any]:
@@ -132,3 +151,160 @@ def clip_raster_bbox(path: Path, bbox: tuple[float, float, float, float], *, cfg
         raise GISProcessingError("ERROR_GIS_RASTER_CLIP", f"Raster could not be clipped: {exc}") from exc
     output_sha = _sha256(output_path)
     return _write_report(cfg, {"schema_version": GIS_REPORT_SCHEMA_VERSION, "report_id": report_id, "status": "GIS_RASTER_CLIP_OK", "operation": "clip_raster_bbox", "created_at": created_at, "source": {"path": str(source), "sha256": source_sha}, "parameters": {"requested_bbox": [minx, miny, maxx, maxy], "effective_bbox": list(overlap)}, "output": {"path": str(output_path), "sha256": output_sha, "crs": crs, "bytes": output_path.stat().st_size}, "invariants": {"source_and_output_hash_present": bool(source_sha and output_sha), "crs_preserved": True}, "warnings": [], "limitations": ["Clip is axis-aligned in the raster CRS and does not reproject."], "falsification_criteria": ["reject if output SHA-256 changes", "reject if CRS is not preserved"]})
+
+
+def resample_raster(
+    path: Path,
+    *,
+    width: int,
+    height: int,
+    method: str,
+    cfg: Any,
+) -> dict[str, Any]:
+    _require_rasterio(); cfg.ensure_dirs(); source = _resolve_raster_source(path); source_sha = _sha256(source)
+    if (
+        not isinstance(width, int)
+        or isinstance(width, bool)
+        or not isinstance(height, int)
+        or isinstance(height, bool)
+        or width <= 0
+        or height <= 0
+        or width * height > 50_000_000
+    ):
+        raise GISProcessingError(
+            "ERROR_GIS_RASTER_RESAMPLE_DIMENSIONS",
+            "Resample width and height must be positive integers with at most 50,000,000 output cells per band.",
+        )
+    normalized_method = str(method).lower()
+    methods = {"nearest": Resampling.nearest, "bilinear": Resampling.bilinear}
+    if normalized_method not in methods:
+        raise GISProcessingError(
+            "ERROR_GIS_RASTER_RESAMPLE_METHOD",
+            "Resampling method must be one of: nearest, bilinear.",
+        )
+
+    created_at = utc_now()
+    report_id = stable_id("gisreport", "raster_resample", source_sha, str(width), str(height), normalized_method, created_at)
+    output_path = cfg.export_dir / "gis_reports" / f"{report_id}.tif"
+    temporary_output_path = output_path.with_suffix(".tmp.tif")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with rasterio.open(source) as dataset:
+            if dataset.crs is None:
+                raise GISProcessingError(
+                    "ERROR_GIS_RASTER_RESAMPLE_CRS",
+                    "A declared raster CRS is required to certify resampling provenance.",
+                )
+            source_transform = dataset.transform
+            source_bounds = list(dataset.bounds)
+            source_crs = dataset.crs.to_string()
+            source_nodata = list(dataset.nodatavals)
+            source_width = dataset.width
+            source_height = dataset.height
+            source_count = dataset.count
+            if width * height * source_count > 50_000_000:
+                raise GISProcessingError(
+                    "ERROR_GIS_RASTER_RESAMPLE_DIMENSIONS",
+                    "Requested dimensions exceed the 50,000,000 output-value limit after band accounting.",
+                )
+            source_bands = _band_value_receipts(dataset)
+            data = dataset.read(
+                out_shape=(dataset.count, height, width),
+                resampling=methods[normalized_method],
+            )
+            output_transform = dataset.transform @ dataset.transform.scale(
+                dataset.width / width,
+                dataset.height / height,
+            )
+            profile = dataset.profile.copy()
+            profile.update(width=width, height=height, transform=output_transform, tiled=False)
+            profile.pop("blockxsize", None)
+            profile.pop("blockysize", None)
+            with rasterio.open(temporary_output_path, "w", **profile) as target:
+                target.write(data)
+        temporary_output_path.replace(output_path)
+    except GISProcessingError:
+        temporary_output_path.unlink(missing_ok=True)
+        raise
+    except Exception as exc:
+        temporary_output_path.unlink(missing_ok=True)
+        raise GISProcessingError("ERROR_GIS_RASTER_RESAMPLE", f"Raster could not be resampled: {exc}") from exc
+
+    try:
+        with rasterio.open(output_path) as output:
+            output_bounds = list(output.bounds)
+            output_crs = output.crs.to_string() if output.crs else None
+            output_nodata = list(output.nodatavals)
+            output_count = output.count
+            output_width = output.width
+            output_height = output.height
+            output_dtypes = list(output.dtypes)
+            output_transform_values = list(output.transform)[:6]
+            output_bands = _band_value_receipts(output)
+    except Exception as exc:
+        output_path.unlink(missing_ok=True)
+        raise GISProcessingError("ERROR_GIS_RASTER_RESAMPLE", f"Resampled raster could not be verified: {exc}") from exc
+
+    output_sha = _sha256(output_path)
+    bounds_preserved = all(abs(left - right) <= 1e-9 for left, right in zip(source_bounds, output_bounds, strict=True))
+    report = {
+        "schema_version": GIS_REPORT_SCHEMA_VERSION,
+        "report_id": report_id,
+        "status": "GIS_RASTER_RESAMPLE_OK",
+        "operation": "resample_raster",
+        "created_at": created_at,
+        "source": {
+            "path": str(source),
+            "sha256": source_sha,
+            "bytes": source.stat().st_size,
+            "crs": source_crs,
+            "width": source_width,
+            "height": source_height,
+            "band_count": source_count,
+            "transform": list(source_transform)[:6],
+            "bounds": source_bounds,
+            "nodata_values": source_nodata,
+            "bands": source_bands,
+        },
+        "parameters": {"width": width, "height": height, "method": normalized_method},
+        "output": {
+            "path": str(output_path),
+            "sha256": output_sha,
+            "bytes": output_path.stat().st_size,
+            "crs": output_crs,
+            "width": output_width,
+            "height": output_height,
+            "band_count": output_count,
+            "dtypes": output_dtypes,
+            "transform": output_transform_values,
+            "bounds": output_bounds,
+            "nodata_values": output_nodata,
+            "bands": output_bands,
+        },
+        "invariants": {
+            "source_and_output_hash_present": bool(source_sha and output_sha),
+            "dimensions_exact": output_width == width and output_height == height,
+            "crs_preserved": output_crs == source_crs,
+            "bounds_preserved": bounds_preserved,
+            "band_count_preserved": output_count == source_count,
+            "nodata_definition_preserved": output_nodata == source_nodata,
+            "nodata_accounting_recorded": all(
+                row["valid_cell_count"] + row["nodata_cell_count"] == output_width * output_height
+                and row["zero_cell_count"] <= row["valid_cell_count"]
+                for row in output_bands
+            ),
+            "transactional_output_published": output_path.exists() and not temporary_output_path.exists(),
+        },
+        "warnings": [],
+        "limitations": [
+            "Resampling is bounded to nearest-neighbor and bilinear methods over the source raster's existing extent and CRS.",
+            "Resampling changes the grid manifestation and does not establish semantic equivalence with the source pixels.",
+            "Bilinear interpolation may create values not present in the source; NODATA remains a distinct declared state.",
+        ],
+        "falsification_criteria": [
+            "reject if output dimensions differ from the explicit request",
+            "reject if CRS, extent, band count, or NODATA declaration changes",
+            "reject if the output hash is absent or the temporary artifact remains",
+        ],
+    }
+    return _write_report(cfg, report)

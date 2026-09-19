@@ -39,6 +39,7 @@ from .conversations import (
 from .db import list_payloads
 from .execution_gate import analyze_task
 from .gis_crs import reproject_geojson_crs
+from .gis_corpus import validate_real_gis_corpus
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
 from .gis_processing import (
@@ -53,10 +54,10 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
-from .gis_raster import clip_raster_bbox, inspect_raster, sample_raster
+from .gis_raster import clip_raster_bbox, inspect_raster, resample_raster, sample_raster
 from .gis_topology_repair import repair_geojson_topology
 from .gis_vector_formats import inspect_vector_format
-from .gis_vector_raster import analyze_vector_raster_intersection
+from .gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
 from .gis_eval import (
     DEFAULT_GIS_EVAL_FIXTURE,
     GIS_EVAL_OK,
@@ -698,6 +699,35 @@ def build_parser() -> argparse.ArgumentParser:
     gis_vector_raster.add_argument("--band", type=int, default=1, help="One-based raster band index.")
     gis_vector_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_vector_raster.set_defaults(handler=run_gis_vector_raster)
+
+    gis_zonal_stats = gis_subcommands.add_parser(
+        "zonal-stats",
+        help="Compute bounded per-feature raster statistics using explicit cell-center inclusion.",
+    )
+    gis_zonal_stats.add_argument("vector_path", help="Path to a GeoJSON FeatureCollection.")
+    gis_zonal_stats.add_argument("raster_path", help="Path to a local raster source.")
+    gis_zonal_stats.add_argument("--band", type=int, default=1, help="One-based raster band index.")
+    gis_zonal_stats.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_zonal_stats.set_defaults(handler=run_gis_zonal_stats)
+
+    gis_resample_raster = gis_subcommands.add_parser(
+        "resample-raster",
+        help="Transactionally resample a raster to explicit dimensions while preserving extent, CRS, and NODATA metadata.",
+    )
+    gis_resample_raster.add_argument("raster_path", help="Path to a local raster source.")
+    gis_resample_raster.add_argument("--width", type=int, required=True, help="Positive output pixel width.")
+    gis_resample_raster.add_argument("--height", type=int, required=True, help="Positive output pixel height.")
+    gis_resample_raster.add_argument("--method", choices=["nearest", "bilinear"], default="nearest", help="Bounded resampling method.")
+    gis_resample_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_resample_raster.set_defaults(handler=run_gis_resample_raster)
+
+    gis_validate_corpus = gis_subcommands.add_parser(
+        "validate-corpus",
+        help="Validate frozen authoritative GIS corpus bytes, provenance, schema, IDs, and geometries.",
+    )
+    gis_validate_corpus.add_argument("manifest_path", help="Path to a mucaro_gis_real_corpus_v1 manifest.")
+    gis_validate_corpus.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_validate_corpus.set_defaults(handler=run_gis_validate_corpus)
 
     gis_map_export = gis_subcommands.add_parser(
         "map-export-manifest",
@@ -2069,8 +2099,12 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_RASTER_INSPECT_OK",
         "GIS_RASTER_SAMPLE_OK",
         "GIS_RASTER_CLIP_OK",
+        "GIS_RASTER_RESAMPLE_OK",
         "GIS_VECTOR_RASTER_OK",
         "GIS_VECTOR_RASTER_WARN",
+        "GIS_ZONAL_STATS_OK",
+        "GIS_ZONAL_STATS_WARN",
+        "GIS_CORPUS_VALIDATION_OK",
         "GIS_MAP_EXPORT_MANIFEST_OK",
     }:
         print(status)
@@ -2104,6 +2138,15 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                     print(f"{source_name}_crs={named_source.get('crs')}")
                 if "feature_count" in named_source:
                     print(f"{source_name}_feature_count={named_source.get('feature_count')}")
+        assets = payload.get("assets")
+        if isinstance(assets, list):
+            print(f"asset_count={len(assets)}")
+            for asset in assets:
+                if isinstance(asset, dict):
+                    print(
+                        f"asset={asset.get('asset_id')} sha256={asset.get('sha256')} "
+                        f"features={asset.get('feature_count')} crs={asset.get('declared_crs')}"
+                    )
         if payload.get("join_cardinality"):
             print(f"join_cardinality={payload.get('join_cardinality')}")
         if payload.get("match_on"):
@@ -2134,6 +2177,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "implicit_reprojection",
                 "requested_bbox",
                 "effective_bbox",
+                "width",
+                "height",
+                "method",
             ):
                 if key in parameters:
                     print(f"{key}={parameters.get(key)}")
@@ -2142,6 +2188,10 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"output_path={output.get('path')}")
             print(f"output_sha256={output.get('sha256')}")
             print(f"output_crs={output.get('crs')}")
+            if "width" in output:
+                print(f"output_width={output.get('width')}")
+            if "height" in output:
+                print(f"output_height={output.get('height')}")
         invariants = payload.get("invariants")
         if isinstance(invariants, dict):
             for key in (
@@ -2232,9 +2282,23 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "point_accounting_closed",
                 "source_and_output_hash_present",
                 "feature_accounting_closed",
+                "cell_accounting_closed",
                 "crs_exactly_matched",
                 "nodata_separate_from_zero",
                 "no_implicit_reprojection",
+                "dimensions_exact",
+                "bounds_preserved",
+                "band_count_preserved",
+                "nodata_definition_preserved",
+                "nodata_accounting_recorded",
+                "transactional_output_published",
+                "asset_accounting_closed",
+                "all_asset_hashes_matched",
+                "all_feature_counts_matched",
+                "all_stable_ids_present_and_unique",
+                "all_geometries_valid",
+                "all_coordinate_dimensions_accounted",
+                "provenance_complete",
                 "layer_count",
                 "all_layer_hashes_present",
                 "output_hash_present",
@@ -2735,6 +2799,28 @@ def run_gis_vector_raster(args: argparse.Namespace, cfg: Settings) -> int:
         args,
         lambda: analyze_vector_raster_intersection(vector_path, raster_path, cfg=cfg, band=args.band),
     )
+
+
+def run_gis_zonal_stats(args: argparse.Namespace, cfg: Settings) -> int:
+    vector_path = _resolve_project_path(args.vector_path, cfg)
+    raster_path = _resolve_project_path(args.raster_path, cfg)
+    return _run_gis_report(
+        args,
+        lambda: compute_zonal_statistics(vector_path, raster_path, cfg=cfg, band=args.band),
+    )
+
+
+def run_gis_resample_raster(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.raster_path, cfg)
+    return _run_gis_report(
+        args,
+        lambda: resample_raster(path, width=args.width, height=args.height, method=args.method, cfg=cfg),
+    )
+
+
+def run_gis_validate_corpus(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.manifest_path, cfg)
+    return _run_gis_report(args, lambda: validate_real_gis_corpus(path, cfg=cfg))
 
 
 def run_gis_map_export_manifest(args: argparse.Namespace, cfg: Settings) -> int:

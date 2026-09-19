@@ -12,8 +12,9 @@ This matrix freezes the V1 GIS claim boundary. Capability outside this matrix is
 | CRS | explicit horizontal pyproj/PROJ transformations with always-XY policy and pipeline identity | vertical/time-dependent CRS not V1-certified |
 | Measurement | planar measurements and WGS84 ellipsoidal distance/area | independent control tolerance required |
 | Vector formats | GeoJSON plus GeoPackage/Shapefile source-manifest inspection | lossless cross-format conversion parity not claimed |
-| Raster | rasterio-readable local raster inspection; GeoTIFF fixture; point sample; bbox clip | NODATA != zero; no implicit reprojection |
-| Vector-raster | GeoJSON geometry to raster cell-center analytical intersection | no fractional pixel coverage |
+| Raster | rasterio-readable local raster inspection; GeoTIFF fixture; point sample; bbox clip; transactional nearest/bilinear resampling to explicit dimensions | NODATA != zero; no implicit reprojection; no semantic equivalence claim after resampling |
+| Vector-raster | GeoJSON geometry to raster cell-center analytical intersection and zonal count/sum/min/max/mean/median/population-standard-deviation receipts | no fractional pixel coverage |
+| Real vector corpus | byte-frozen bounded Census TIGERweb municipio polygons and USGS earthquake points with authority/query/retrieval/hash/schema/stable-ID/geometry checks | not exhaustive; not a real-raster corpus; mutable service responses are not canonical identity |
 | Map/export | output hash + CRS/extent + renderer identity + bound layer hashes | provenance != visual correctness |
 
 ## Terminal/residue states
