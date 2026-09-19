@@ -11,17 +11,17 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
     report = audit_current_denominator_state(PROJECT_ROOT)
     assert report["status"] == "MUCARO_V1_DENOMINATOR_AUDIT_OK"
     assert report["historical_baseline"] == {"raw_completion_percent": 61.5, "weighted_completion_percent": 62.6}
-    assert report["current_overlay"]["raw_completion_percent"] == 73.0
-    assert report["current_overlay"]["weighted_completion_percent"] == 74.6
+    assert report["current_overlay"]["raw_completion_percent"] == 73.5
+    assert report["current_overlay"]["weighted_completion_percent"] == 75.0
     assert report["current_overlay"]["per_track"]["CODING"]["score_percent"] == 65.0
     assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"PASS": 3, "PROVISIONAL": 7}
     assert report["current_overlay"]["per_track"]["GIS"]["score_percent"] == 75.0
     assert report["current_overlay"]["per_track"]["GIS"]["state_counts"] == {"PASS": 5, "PROVISIONAL": 5}
-    assert report["current_overlay"]["per_track"]["OCR"]["score_percent"] == 45.0
-    assert report["current_overlay"]["per_track"]["OCR"]["state_counts"] == {"OPEN": 3, "PASS": 2, "PROVISIONAL": 5}
+    assert report["current_overlay"]["per_track"]["OCR"]["score_percent"] == 50.0
+    assert report["current_overlay"]["per_track"]["OCR"]["state_counts"] == {"OPEN": 3, "PASS": 3, "PROVISIONAL": 4}
     assert report["current_overlay"]["per_track"]["BROWSING"]["score_percent"] == 65.0
     assert report["current_overlay"]["per_track"]["BROWSING"]["state_counts"] == {"OPEN": 1, "PASS": 4, "PROVISIONAL": 5}
-    assert len(report["applied_events"]) == 20
+    assert len(report["applied_events"]) == 21
     applied = {event["event_id"] for event in report["applied_events"]}
     assert {
         "evt-code03-repo-read-provisional",
@@ -35,6 +35,7 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
         "evt-code06-live-mutation-pass",
         "evt-code07-full-profile-pass",
         "evt-ocr07-pdf-lineage-provisional",
+        "evt-ocr07-live-pdf-pass",
         "evt-gis09-topology-vector-raster-provisional",
         "evt-gis10-crs-export-certification-provisional",
         "evt-web10-bounded-traversal-provisional",
