@@ -32,6 +32,7 @@ jobs:
           RT09_OUT: ${{ runner.temp }}/rt09
         run: python scripts/certify_retrieval_real_world_live.py --output-dir "$RT09_OUT"
       - name: Upload frozen RT09 evidence
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: rt09-real-world-corpus-${{ github.sha }}
