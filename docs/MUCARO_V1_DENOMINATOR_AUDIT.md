@@ -119,3 +119,23 @@ Resulting overlay arithmetic:
 - OCR: `50.0%` — `PASS=3 / PROVISIONAL=4 / OPEN=3`
 
 This remains an evidence-state overlay, not OCR-domain or release certification.
+
+
+## CODE-08 live review-evidence PASS
+
+Audit head: `a08b0a0cf575c8b6889a43c8c91ec086155984a5`.
+
+- `CODE-08 PROVISIONAL → PASS`: PR #83 merged the dedicated code-review certification lane.
+- Normal CI run `35461226140` and Coding Review Certification run `35461226187` both completed successfully.
+- Artifact `10589729427` digest `sha256:fa7853ceae339846ceccbfa43fe0d5ea6c50454dbf5ea49364d4bf8fc432c1b2` preserves exact file/line review evidence.
+- Positive evidence binds changed path, source SHA-256, exact line range, excerpt and excerpt SHA-256; negative gates reject unchanged paths and invalid ranges while preserving HEAD.
+- CODE-09 remote lifecycle and CODE-10 zero-residue coding certification remain PROVISIONAL.
+
+Resulting overlay arithmetic:
+
+- current raw completion: `74.0%`
+- current weighted completion: `75.5%`
+- applied events: `22`
+- CODING: `70.0%` — `PASS=4 / PROVISIONAL=6`
+
+This remains an evidence-state overlay, not coding-domain or release certification.
