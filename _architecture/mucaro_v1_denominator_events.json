@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "477bf5d0dcf5a705f70646e9e50fb72e3ff2a88c",
+  "audit_head": "5641e60bc676876125a049f74a4afe62a48eea0f",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -231,6 +231,20 @@
         "Playwright Chromium 140.0.7339.16; live https://example.com/ HTTP 200; DOM and PNG screenshot SHA-256 receipts"
       ],
       "reason": "Live Playwright/Chromium execution, public-URL policy, engine identity, final URL, DOM hash, screenshot hash, PNG evidence and non-citation-ready safeguards are executed and frozen. WEB-09 remains broader than this scope because authenticated browsing, click/form automation, downloads/uploads and arbitrary JavaScript interaction are not yet certified."
+    },
+    {
+      "event_id": "evt-gov07-current-head-ci-pass",
+      "requirement_id": "GOV-07",
+      "from_state": "BLOCKED",
+      "to_state": "PASS",
+      "evidence_type": "EXACT_HEAD_PUSH_CI_WITH_EXECUTED_SUCCESSFUL_JOB",
+      "evidence": [
+        "main@5641e60bc676876125a049f74a4afe62a48eea0f",
+        "GitHub Actions CI run 35431466526 event=push conclusion=success",
+        "job 105866735369 validate conclusion=success",
+        "hosted CI evidence receipt uploaded in job step 17"
+      ],
+      "reason": "Exact current main HEAD was admitted to hosted push CI, created and executed a validate job, and completed successfully. This closes GOV-07 independently of startup-probe and protected-release requirements."
     }
   ]
 }
