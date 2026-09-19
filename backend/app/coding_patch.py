@@ -41,8 +41,7 @@ def _git_numstat_paths(repo_root: Path, patch_bytes: bytes) -> list[str]:
             ["git", "apply", "--numstat", "-z", "-"],
             cwd=repo_root,
             input=patch_bytes,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             check=False,
             timeout=30,
         )
@@ -108,8 +107,7 @@ def _git_apply_check(repo_root: Path, patch_bytes: bytes) -> tuple[bool, str]:
             ["git", "apply", "--check", "--whitespace=error-all", "-"],
             cwd=repo_root,
             input=patch_bytes,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             check=False,
             timeout=30,
         )

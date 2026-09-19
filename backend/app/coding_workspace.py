@@ -38,8 +38,7 @@ def _git_process(repo_root: Path, args: list[str], *, timeout_seconds: int = 20)
             ["git", *args],
             cwd=repo_root,
             text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             check=False,
             timeout=timeout_seconds,
         )
