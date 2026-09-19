@@ -1,0 +1,46 @@
+name: Web Render Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/app/web_render.py"
+      - "backend/tests/test_web_render.py"
+      - "scripts/certify_web_render_live.py"
+      - "backend/tests/test_web_render_live_cert.py"
+      - ".github/workflows/web-render-cert.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/web_render.py"
+      - "scripts/certify_web_render_live.py"
+      - ".github/workflows/web-render-cert.yml"
+
+jobs:
+  certify-rendered-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install Mucaro and Playwright
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip install "playwright==1.55.0"
+          python -m playwright install --with-deps chromium
+      - name: Run rendered-browser source regressions
+        run: python -m pytest backend/tests/test_web_render.py backend/tests/test_web_render_live_cert.py -q
+      - name: Execute live rendered-browser certification
+        env:
+          MUCARO_WEB_RENDER_RECEIPT: ${{ runner.temp }}/mucaro-web-render-live.json
+        run: python scripts/certify_web_render_live.py --url "https://example.com/" --output "$MUCARO_WEB_RENDER_RECEIPT"
+      - name: Upload rendered-browser evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-render-live-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/mucaro-web-render-live.json
+            data/exports/web_renders/*.json
+            data/exports/web_renders/*.png
