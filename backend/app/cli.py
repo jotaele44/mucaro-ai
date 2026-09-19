@@ -3442,26 +3442,44 @@ def _expected_handoff_path(root: Path, directory: Path, prefix: str, head_sha: s
     return root / directory / f"{prefix}-{head_prefix}.json"
 
 
-def _remote_branch_check(cfg: Settings, branch: str | None, head_sha: str | None) -> dict[str, Any]:
+def _remote_branch_check(
+    cfg: Settings,
+    branch: str | None,
+    head_sha: str | None,
+    *,
+    upstream: str | None = None,
+) -> dict[str, Any]:
     if not branch:
         return _certification_gate("remote_branch_binding", "WARN", "branch unavailable")
     if not head_sha:
         return _certification_gate("remote_branch_binding", "WARN", "head SHA unavailable")
-    ok, output = _git_output(cfg, ["ls-remote", "origin", f"refs/heads/{branch}"])
+    remote_name = "origin"
+    remote_branch = branch
+    if upstream:
+        normalized_upstream = upstream.removeprefix("refs/remotes/")
+        if "/" not in normalized_upstream:
+            return _certification_gate(
+                "remote_branch_binding",
+                "WARN",
+                f"upstream ref is not remote-qualified: {upstream}",
+            )
+        remote_name, remote_branch = normalized_upstream.split("/", 1)
+    remote_ref = f"refs/heads/{remote_branch}"
+    ok, output = _git_output(cfg, ["ls-remote", remote_name, remote_ref])
     if not ok:
         return _certification_gate("remote_branch_binding", "WARN", output or "remote branch lookup failed")
     remote_sha = None
     for line in output.splitlines():
         parts = line.split()
-        if len(parts) == 2 and parts[1] == f"refs/heads/{branch}":
+        if len(parts) == 2 and parts[1] == remote_ref:
             remote_sha = parts[0]
             break
     if not remote_sha:
-        return _certification_gate("remote_branch_binding", "FAIL", f"origin/{branch} not found")
+        return _certification_gate("remote_branch_binding", "FAIL", f"{remote_name}/{remote_branch} not found")
     return _certification_gate(
         "remote_branch_binding",
         "PASS" if remote_sha == head_sha else "FAIL",
-        f"origin/{branch}={remote_sha} head={head_sha}",
+        f"{remote_name}/{remote_branch}={remote_sha} head={head_sha}",
     )
 
 
@@ -3537,7 +3555,8 @@ def build_release_dashboard_report(
             probe_workflow_name=probe_workflow,
         )
 
-    remote_branch = _remote_branch_check(cfg, branch, head_sha)
+    upstream = git_payload.get("upstream") if isinstance(git_payload.get("upstream"), str) else None
+    remote_branch = _remote_branch_check(cfg, branch, head_sha, upstream=upstream)
     governed_state = _release_state_row(release_state, "GOVERNED_RELEASE_READY")
     github_state = _release_state_row(release_state, "GITHUB_GOVERNANCE_OPEN")
     receipt_expected_count = len(expected_receipt_types)
