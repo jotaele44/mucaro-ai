@@ -11,17 +11,17 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
     report = audit_current_denominator_state(PROJECT_ROOT)
     assert report["status"] == "MUCARO_V1_DENOMINATOR_AUDIT_OK"
     assert report["historical_baseline"] == {"raw_completion_percent": 61.5, "weighted_completion_percent": 62.6}
-    assert report["current_overlay"]["raw_completion_percent"] == 71.0
-    assert report["current_overlay"]["weighted_completion_percent"] == 72.8
-    assert report["current_overlay"]["per_track"]["CODING"]["score_percent"] == 55.0
-    assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"PASS": 1, "PROVISIONAL": 9}
+    assert report["current_overlay"]["raw_completion_percent"] == 71.5
+    assert report["current_overlay"]["weighted_completion_percent"] == 73.3
+    assert report["current_overlay"]["per_track"]["CODING"]["score_percent"] == 60.0
+    assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"PASS": 2, "PROVISIONAL": 8}
     assert report["current_overlay"]["per_track"]["GIS"]["score_percent"] == 75.0
     assert report["current_overlay"]["per_track"]["GIS"]["state_counts"] == {"PASS": 5, "PROVISIONAL": 5}
     assert report["current_overlay"]["per_track"]["OCR"]["score_percent"] == 45.0
     assert report["current_overlay"]["per_track"]["OCR"]["state_counts"] == {"OPEN": 3, "PASS": 2, "PROVISIONAL": 5}
     assert report["current_overlay"]["per_track"]["BROWSING"]["score_percent"] == 65.0
     assert report["current_overlay"]["per_track"]["BROWSING"]["state_counts"] == {"OPEN": 1, "PASS": 4, "PROVISIONAL": 5}
-    assert len(report["applied_events"]) == 17
+    assert len(report["applied_events"]) == 18
     applied = {event["event_id"] for event in report["applied_events"]}
     assert {
         "evt-code03-repo-read-provisional",
@@ -32,6 +32,7 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
         "evt-code08-review-evidence-provisional",
         "evt-code09-git-lifecycle-provisional",
         "evt-code10-regression-corpus-provisional",
+        "evt-code07-full-profile-pass",
         "evt-ocr07-pdf-lineage-provisional",
         "evt-gis09-topology-vector-raster-provisional",
         "evt-gis10-crs-export-certification-provisional",
