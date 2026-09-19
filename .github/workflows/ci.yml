@@ -45,6 +45,29 @@ jobs:
           name: coding-container-live-${{ github.sha }}
           path: ${{ runner.temp }}/mucaro-coding-container-live.json
           archive: false
+      - name: Build dependency-complete coding image
+        id: coding_full_image
+        run: |
+          BASE_IMAGE="$(docker image inspect python:3.11-slim --format '{{index .RepoDigests 0}}')"
+          test -n "$BASE_IMAGE"
+          docker build --build-arg BASE_IMAGE="$BASE_IMAGE" -f docker/coding.Dockerfile -t "mucaro-coding-full:${GITHUB_SHA}" .
+          IMAGE_ID="$(docker image inspect "mucaro-coding-full:${GITHUB_SHA}" --format '{{.Id}}')"
+          case "$IMAGE_ID" in
+            sha256:????????????????????????????????????????????????????????????????) ;;
+            *) echo "invalid immutable image id: $IMAGE_ID" >&2; exit 2 ;;
+          esac
+          echo "image=$IMAGE_ID" >> "$GITHUB_OUTPUT"
+      - name: Certify full coding test lint type build profile
+        env:
+          MUCARO_CODING_FULL_IMAGE: ${{ steps.coding_full_image.outputs.image }}
+          MUCARO_CODING_FULL_RECEIPT: ${{ runner.temp }}/mucaro-coding-full-profile.json
+        run: python scripts/certify_coding_full_profile.py --image "$MUCARO_CODING_FULL_IMAGE" --output "$MUCARO_CODING_FULL_RECEIPT"
+      - name: Upload full coding-profile receipt
+        uses: actions/upload-artifact@v7
+        with:
+          name: coding-full-profile-${{ github.sha }}
+          path: ${{ runner.temp }}/mucaro-coding-full-profile.json
+          archive: false
       - name: Write hosted CI evidence receipt
         env:
           MUCARO_CI_RECEIPT: ${{ runner.temp }}/mucaro-hosted-ci-evidence.json
