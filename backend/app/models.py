@@ -12,6 +12,8 @@ class AskRequest(BaseModel):
     model_provider: str | None = None
     model_name: str | None = None
     allow_mock_fallback: bool = False
+    allow_live: bool = False
+    require_offline: bool = False
 
 
 class ConversationCreateRequest(BaseModel):
