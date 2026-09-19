@@ -23,11 +23,11 @@ the canonical repo.
 Mucaro AI has crossed the prototype-promotion line. The local product surface
 now includes a real CLI, local-first retrieval, source-lineage ingestion,
 cited answers, explicit memory controls, an approval-gated tool runtime,
-release receipts, package artifacts, fresh-clone certification, and a local GUI
-foundation. The GUI foundation is not the active product-completion vector:
-expanded conversation/workspace UI work is intentionally reserved for the final
-phase after backend capability, provenance, packaging, and governance gates are
-stronger.
+release receipts, package artifacts, fresh-clone certification, and a
+conversation-first local GUI. The GUI now exposes Chat as the canonical primary
+surface with dedicated Sources, Directory Access, Memory, Planning, and Settings
+workspaces; rendered desktop/mobile/accessibility proof remains a certification
+task rather than an unimplemented source feature.
 
 The finish line is no longer "make the repo exist." The finish line is to make
 the repo repeatedly prove its behavior from a clean clone through ingestion,
@@ -100,16 +100,16 @@ byte-pinned proof layer for a particular commit. Verify them with
 
 | Gap | State | Next proof |
 |---|---|---|
-| Hosted GitHub Actions | OPEN | Hosted `CI` and `CI Startup Probe` have failed before jobs on current release-candidate heads; inspect Actions settings, billing/minutes, runner availability, and repository/account policy |
+| Hosted GitHub Actions | OPEN | Hosted CI is again admitting and executing jobs, and exact-SHA CI evidence artifact generation is merged; final release-grade proof still requires a retrievable receipt bound to the exact current `main` head plus required branch/tag governance |
 | Private branch protection | OPEN | GitHub API currently reports a plan gate for private-repo branch protection; prove protection after plan/visibility changes or keep the release scope local |
-| Larger real-corpus retrieval | OPEN | Add non-fixture corpus snapshots with frozen manifests, source counts, source-format coverage, and repeatable eval thresholds |
+| Larger real-corpus retrieval | OPEN | The deterministic real-world corpus materializer and exact-denominator certification gate are merged; supply qualifying nonsynthetic source bytes/provenance plus a bound evaluation receipt and production-scale stress evidence |
 | Advanced GIS processing | OPEN | Local GeoJSON inspection with Shapely planar topology state, point-in-polygon, geometry comparison with Polygon/MultiPolygon planar overlay metrics, matched Polygon/MultiPolygon overlay output receipts, limited EPSG:4326/EPSG:3857 reprojection receipts, CSV point-to-GeoJSON conversion with row-accounting receipts, bbox feature-filter receipts, bbox geometry-clip receipts, planar area/length measurement receipts, bounded EPSG:4326 spherical geodesic measurement receipts, and a committed `mucaro eval gis` fixture manifest exist; add robust topology repair/operation support, ellipsoidal/geodesic GIS-engine validation, broader CRS/datum/grid-shift/axis-order support, broader overlay/clipping operations beyond matched polygon pairs and bbox clipping, independent planar overlay validation, map/export provenance, broader spatial formats, raster/vector processing, and a larger spatial eval corpus |
 | State-of-the-art OCR analysis | OPEN | Local image OCR receipt candidate exists through `mucaro ocr analyze`, and saved image OCR receipts can be checked with `mucaro capabilities validate-ocr-report`; add PDF/page rendering, layout calibration, document/table/form/handwriting fixtures, confidence thresholds, optional provider privacy gates, and broader OCR eval corpus |
-| Governed web browsing | OPEN | Candidate fetch/snapshot/citation path, operator-supplied multi-page session receipts, robots/cache metadata, redirect-target robots evidence, HTML body/structure traces, PDF/non-text parser traces, immutable snapshot-only cache policy, and explicit HTTP error-page citation policy exist; add automated search/discovery controls, rendered-browser capture policy, and gated autonomous link-following before certification |
-| Coding/programming expertise | OPEN | Define read/patch/test/review action boundary, sandbox policy, diff receipts, and code-quality eval fixtures |
+| Governed web browsing | OPEN | Governed fetch/session evidence, static discovery, bounded autonomous traversal, credential-last search, and a rendered-browser evidence adapter are merged; execute credentialed search and frozen live Playwright/Chromium corpora before WEB-08/09 promotion |
+| Coding/programming expertise | OPEN | Read/diff/patch/review/Git lifecycle, isolated container source, check-suite receipts, and coding certification ledger are merged; close live pinned-container execution and execute the frozen coding regression corpus before certification |
 | Transparency/objectivity across capabilities | OPEN | Initial GIS and OCR report validation exists for saved advanced GIS and local image OCR receipts; expand executable validators so provenance, uncertainty, limitations, contradictory evidence handling, falsification criteria, warning states, and arithmetic closure are enforced across browsing, retrieval, and coding outputs |
-| Final-phase GUI/operator workspace | OPEN | Keep GUI expansion deferred until backend capability contracts, CLI workflows, provenance, retrieval, OCR/GIS/web/coding gates, packaging, and hosted governance can support it without hiding uncertainty |
-| Production packaging | OPEN | Source-bound local macOS Application bundle can be built and verified with `mucaro package macos-app`; convert this into a portable signed installer with embedded runtime, no-setup reinstall, upgrade, and rollback guarantees |
+| Final-phase GUI/operator workspace | OPEN | Conversation-first GUI source is merged; execute rendered desktop/mobile/accessibility and representative-workflow QA, then add only nonduplicative specialized map/table/code/artifact surfaces justified by operator workflows |
+| Production packaging | OPEN | Embedded portable runtime, transactional install/reinstall/rollback, fail-closed release-grade matrix, and macOS signing/clean-machine verification commands are source-backed; actual clean-machine execution and signed/notarized distribution receipts remain external blockers |
 | Sustained workflow validation | OPEN | Run end-to-end operator workflows across ingest, ask, trace review, memory, tools, receipts, and recovery paths |
 
 ## Development Vector

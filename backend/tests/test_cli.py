@@ -873,7 +873,8 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert by_id["source_artifact_packaging"]["status"] == "PASS"
     assert by_id["github_release_governance"]["status"] == "OPEN"
     assert by_id["final_phase_gui_operator_workspace"]["status"] == "OPEN"
-    assert "deferred" in by_id["final_phase_gui_operator_workspace"]["evidence"]
+    assert "canonical default workspace" in by_id["final_phase_gui_operator_workspace"]["evidence"]
+    assert "Rendered desktop/mobile/accessibility certification" in by_id["final_phase_gui_operator_workspace"]["gap"]
     assert payload["next_recommended_vector"] == "advanced_gis_processing"
 
     assert main(["audit", "product", "--strict", "--format", "text"], cfg=cfg) == 2
