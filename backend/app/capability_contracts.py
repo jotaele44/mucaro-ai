@@ -353,6 +353,21 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
         features = report.get("features")
         source_count = _dotted(report, "source.feature_count")
         output_count = _dotted(report, "output.feature_count")
+        candidate_inventory = _dotted(report, "parameters.candidate_inventory")
+        unavailable_inventory = _dotted(report, "parameters.unavailable_operation_inventory")
+        selected_index = _dotted(report, "parameters.selected_candidate_index")
+        selected_candidate = (
+            candidate_inventory[selected_index]
+            if isinstance(candidate_inventory, list)
+            and isinstance(selected_index, int)
+            and 0 <= selected_index < len(candidate_inventory)
+            else None
+        )
+        skipped_candidates = candidate_inventory[:selected_index] if isinstance(selected_candidate, dict) else []
+        skipped_network_candidate = any(
+            isinstance(candidate, dict) and candidate.get("requires_network_download") is True
+            for candidate in skipped_candidates
+        )
         checks.extend(
             [
                 _contract_check("crs_engine.parameters.adapter", _dotted(report, "parameters.adapter") == "pyproj_transformer_group_always_xy_v1", "CRS engine reports must name the pyproj TransformerGroup always-XY adapter"),
@@ -360,24 +375,55 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 _contract_check("crs_engine.parameters.target_crs", bool(_dotted(report, "parameters.target_crs")), "resolved target CRS is required"),
                 _contract_check("crs_engine.parameters.always_xy", _dotted(report, "parameters.always_xy") is True, "CRS axis order must be explicit"),
                 _contract_check("crs_engine.parameters.axis_order_policy", _dotted(report, "parameters.axis_order_policy") == "traditional_gis_xy", "traditional GIS XY policy must be recorded"),
+                _contract_check("crs_engine.parameters.network_policy", _dotted(report, "parameters.network_policy") == "offline_only", "CRS network policy must fail closed to offline-only"),
+                _contract_check("crs_engine.parameters.proj_network_enabled", isinstance(_dotted(report, "parameters.proj_network_enabled"), bool), "ambient PROJ network state must be recorded"),
                 _contract_check("crs_engine.parameters.pyproj_version", bool(_dotted(report, "parameters.pyproj_version")), "pyproj version is required"),
                 _contract_check("crs_engine.parameters.proj_version", bool(_dotted(report, "parameters.proj_version")), "PROJ version is required"),
                 _contract_check("crs_engine.parameters.candidates", isinstance(_dotted(report, "parameters.available_candidate_count"), int) and _dotted(report, "parameters.available_candidate_count") >= 1, "at least one available transformation candidate is required"),
                 _contract_check("crs_engine.parameters.unavailable_candidates", isinstance(_dotted(report, "parameters.unavailable_candidate_count"), int) and _dotted(report, "parameters.unavailable_candidate_count") >= 0, "unavailable transformation candidates must be counted"),
-                _contract_check("crs_engine.parameters.selected_candidate", _dotted(report, "parameters.selected_candidate_index") == 0, "the selected transformation candidate index is required"),
+                _contract_check("crs_engine.parameters.candidate_inventory", isinstance(candidate_inventory, list) and len(candidate_inventory) == _dotted(report, "parameters.available_candidate_count"), "all available transformation candidates must be inventoried"),
+                _contract_check("crs_engine.parameters.unavailable_inventory", isinstance(unavailable_inventory, list) and len(unavailable_inventory) == _dotted(report, "parameters.unavailable_candidate_count"), "all unavailable transformation operations must be inventoried"),
+                _contract_check("crs_engine.parameters.selected_candidate", isinstance(selected_candidate, dict), "selected transformation candidate must resolve into the candidate inventory"),
+                _contract_check("crs_engine.parameters.selected_candidate_index", isinstance(selected_candidate, dict) and selected_candidate.get("index") == selected_index, "selected candidate index must match its inventory row"),
+                _contract_check("crs_engine.parameters.selected_candidate_offline", isinstance(selected_candidate, dict) and selected_candidate.get("offline_capable") is True and selected_candidate.get("requires_network_download") is False and selected_candidate.get("grid_provenance_frozen") is True, "selected transformation candidate must be offline-capable with frozen grid provenance"),
+                _contract_check("crs_engine.parameters.selected_grid_count", isinstance(selected_candidate, dict) and _dotted(report, "parameters.selected_candidate_grid_count") == len(selected_candidate.get("grids", [])), "selected grid count must close to the candidate inventory"),
                 _contract_check("crs_engine.parameters.best_available", isinstance(_dotted(report, "parameters.best_available"), bool), "best-operation availability must be explicit"),
                 _contract_check("crs_engine.parameters.engine_warnings", isinstance(_dotted(report, "parameters.engine_warnings"), list), "captured PROJ engine warnings must be an array"),
                 _contract_check("crs_engine.parameters.pipeline_definition", bool(_dotted(report, "parameters.transformer_definition")) and not str(_dotted(report, "parameters.transformer_definition")).lower().startswith("unavailable until"), "selected transformer definition must be resolved"),
                 _contract_check("crs_engine.parameters.pipeline_hash", bool(_dotted(report, "parameters.transformer_definition_sha256")), "selected transformer definition hash is required"),
                 _contract_check("crs_engine.best_available_warning", _dotted(report, "parameters.best_available") is True or "GIS_CRS_BEST_OPERATION_UNAVAILABLE" in (report.get("warnings") or []), "unavailable best operations must produce an explicit warning"),
-                _contract_check("crs_engine.warning_status", _dotted(report, "parameters.best_available") is True or report.get("status") == "GIS_CRS_REPROJECT_WARN", "fallback operations must downgrade report status"),
+                _contract_check("crs_engine.offline_fallback_warning", not isinstance(selected_index, int) or selected_index == 0 or "GIS_CRS_OFFLINE_CANDIDATE_FALLBACK" in (report.get("warnings") or []), "offline candidate fallback must produce an explicit warning"),
+                _contract_check("crs_engine.network_grid_warning", not skipped_network_candidate or "GIS_CRS_NETWORK_GRID_SKIPPED" in (report.get("warnings") or []), "skipped network-grid candidates must produce an explicit warning"),
+                _contract_check("crs_engine.warning_status", (_dotted(report, "parameters.best_available") is True and selected_index == 0) or report.get("status") == "GIS_CRS_REPROJECT_WARN", "fallback operations must downgrade report status"),
                 _contract_check("crs_engine.source_crs_matches", _dotted(report, "source.crs") == _dotted(report, "parameters.source_crs"), "source CRS must match resolved transform source"),
                 _contract_check("crs_engine.output_crs_matches", _dotted(report, "output.crs") == _dotted(report, "parameters.target_crs"), "output CRS must match transform target"),
                 _contract_check("crs_engine.output_hash", bool(_dotted(report, "output.sha256")), "transformed output hash is required"),
                 _contract_check("crs_engine.features_array", isinstance(features, list), "per-feature transform receipts are required"),
                 _contract_check("crs_engine.feature_conservation", _dotted(report, "invariants.feature_row_conservation") is True, "feature rows must be conserved"),
+                _contract_check("crs_engine.offline_policy_satisfied", _dotted(report, "invariants.offline_policy_satisfied") is True, "offline-only selection invariant must pass"),
+                _contract_check("crs_engine.grid_inventory_complete", _dotted(report, "invariants.grid_inventory_complete") is True, "candidate grid metadata must be complete"),
             ]
         )
+        if isinstance(candidate_inventory, list):
+            candidate_grids = [
+                grid
+                for candidate in candidate_inventory
+                if isinstance(candidate, dict) and isinstance(candidate.get("grids"), list)
+                for grid in candidate["grids"]
+            ]
+            unavailable_grids = [
+                grid
+                for operation in unavailable_inventory
+                if isinstance(operation, dict) and isinstance(operation.get("grids"), list)
+                for grid in operation["grids"]
+            ] if isinstance(unavailable_inventory, list) else []
+            all_grid_rows = [*candidate_grids, *unavailable_grids]
+            checks.extend(
+                [
+                    _contract_check("crs_engine.grid_rows", all(isinstance(grid, dict) and isinstance(grid.get("requires_network_download"), bool) and isinstance(grid.get("available_without_network"), bool) and isinstance(grid.get("provenance_frozen"), bool) for grid in all_grid_rows), "all available and unavailable grid rows must expose offline availability and provenance state"),
+                    _contract_check("crs_engine.local_grid_hashes", all(not grid.get("local_file_available") or (isinstance(grid.get("local_bytes"), int) and grid.get("local_bytes") > 0 and bool(grid.get("local_sha256"))) for grid in all_grid_rows), "available local grids must be frozen by byte count and SHA-256"),
+                ]
+            )
         if isinstance(features, list):
             checks.append(
                 _contract_check(
@@ -417,23 +463,45 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
     elif operation == "measure_geojson_ellipsoidal":
         measurements = report.get("measurements")
         state_counts = report.get("state_counts")
+        edge_condition_counts = report.get("edge_condition_counts")
         source_count = _dotted(report, "source.feature_count")
+        edge_conditions = {"ANTIMERIDIAN_CROSSING", "NEAR_NORTH_POLE", "NEAR_SOUTH_POLE", "TOUCHES_POLE"}
         checks.extend(
             [
                 _contract_check("ellipsoidal.parameters.adapter", _dotted(report, "parameters.adapter") == "pyproj_geod_wgs84_v1", "ellipsoidal reports must name pyproj Geod"),
                 _contract_check("ellipsoidal.parameters.ellipsoid", _dotted(report, "parameters.ellipsoid") == "WGS84", "WGS84 ellipsoid must be explicit"),
                 _contract_check("ellipsoidal.parameters.area_units", _dotted(report, "parameters.area_units") == "meters^2", "ellipsoidal area units must be meters^2"),
                 _contract_check("ellipsoidal.parameters.length_units", _dotted(report, "parameters.length_units") == "meters", "ellipsoidal length units must be meters"),
+                _contract_check("ellipsoidal.parameters.coordinate_validation", _dotted(report, "parameters.coordinate_validation_policy") == "finite_wgs84_lonlat_bounds", "ellipsoidal coordinate validation policy must be explicit"),
+                _contract_check("ellipsoidal.parameters.antimeridian_threshold", _dotted(report, "parameters.antimeridian_delta_degrees") == 180.0, "antimeridian classification threshold must be explicit"),
+                _contract_check("ellipsoidal.parameters.polar_threshold", _dotted(report, "parameters.polar_latitude_degrees") == 85.0, "polar classification threshold must be explicit"),
+                _contract_check("ellipsoidal.parameters.ring_area_policy", _dotted(report, "parameters.ring_area_policy") == "absolute_outer_minus_absolute_holes", "polygon ring area policy must be explicit"),
                 _contract_check("ellipsoidal.source_crs", str(_dotted(report, "source.crs") or "").upper() == "EPSG:4326", "ellipsoidal inputs must be EPSG:4326"),
                 _contract_check("ellipsoidal.measurements_array", isinstance(measurements, list), "per-feature ellipsoidal measurements are required"),
                 _contract_check("ellipsoidal.state_counts", isinstance(state_counts, dict), "ellipsoidal state counts are required"),
+                _contract_check("ellipsoidal.edge_condition_counts", isinstance(edge_condition_counts, dict) and set(edge_condition_counts) == edge_conditions and all(isinstance(count, int) and count >= 0 for count in edge_condition_counts.values()), "all supported edge-condition counts are required"),
                 _contract_check("ellipsoidal.total_area", _is_number(_dotted(report, "invariants.total_area_m2")), "ellipsoidal total area must be numeric"),
                 _contract_check("ellipsoidal.total_length", _is_number(_dotted(report, "invariants.total_length_m")), "ellipsoidal total length must be numeric"),
+                _contract_check("ellipsoidal.edge_accounting_invariant", _dotted(report, "invariants.edge_condition_accounting_closed") is True, "edge-condition accounting invariant must pass"),
             ]
         )
         if isinstance(measurements, list) and isinstance(state_counts, dict):
             state_total = sum(state_counts.get(state, -1) for state in ("MEASURED", "NULL_EMPTY", "UNRESOLVED"))
-            checks.append(_contract_check("ellipsoidal.row_accounting", isinstance(source_count, int) and source_count == len(measurements) == state_total, "ellipsoidal state and receipt rows must close to source count"))
+            rows_with_edges = [row for row in measurements if isinstance(row, dict) and row.get("edge_conditions")]
+            checks.extend(
+                [
+                    _contract_check("ellipsoidal.row_accounting", isinstance(source_count, int) and source_count == len(measurements) == state_total, "ellipsoidal state and receipt rows must close to source count"),
+                    _contract_check("ellipsoidal.edge_rows", all(isinstance(row, dict) and isinstance(row.get("edge_conditions"), list) and set(row["edge_conditions"]) <= edge_conditions for row in measurements), "every ellipsoidal row must expose only supported edge conditions"),
+                    _contract_check("ellipsoidal.features_with_edges", _dotted(report, "invariants.features_with_edge_conditions") == len(rows_with_edges), "features-with-edge-conditions count must close to measurement rows"),
+                    _contract_check("ellipsoidal.edge_warning", not rows_with_edges or "GIS_ELLIPSOIDAL_EDGE_CONDITIONS_PRESENT" in (report.get("warnings") or []), "classified edge conditions must produce an explicit warning"),
+                    _contract_check("ellipsoidal.unresolved_warning", state_counts.get("UNRESOLVED") == 0 or "GIS_ELLIPSOIDAL_UNRESOLVED" in (report.get("warnings") or []), "unresolved measurements must produce an explicit warning"),
+                    _contract_check("ellipsoidal.warning_status", not rows_with_edges and state_counts.get("UNRESOLVED") == 0 or report.get("status") == "GIS_ELLIPSOIDAL_WARN", "edge conditions or unresolved rows must downgrade report status"),
+                ]
+            )
+            if isinstance(edge_condition_counts, dict):
+                for condition in sorted(edge_conditions):
+                    observed_count = sum(condition in row.get("edge_conditions", []) for row in measurements if isinstance(row, dict))
+                    checks.append(_contract_check(f"ellipsoidal.edge_count.{condition}", edge_condition_counts.get(condition) == observed_count, "edge-condition count must match per-feature rows"))
     elif operation == "inspect_vector_format":
         source_format = _dotted(report, "source.format")
         manifest = report.get("manifest")
@@ -971,8 +1039,8 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
             ),
             unavailable_until=(
                 "topology policy and overlay operations extend beyond explicit planar make_valid and the current Polygon/MultiPolygon boundary",
-                "datum-grid availability, vertical CRS, time-dependent operations, and broader axis-order cases are independently certified",
-                "ellipsoidal antimeridian, polar, hole-orientation, and large-geometry edge cases close against a broader independent corpus",
+                "independently frozen local datum-grid transformations, vertical CRS, time-dependent operations, and broader axis-order cases are certified",
+                "ellipsoidal hole-orientation and large-geometry edge cases close beyond the bounded antimeridian and polar control corpus",
                 "broader vector/raster formats, fractional zonal coverage, additional resampling kernels, remote sensing, terrain, hydrology, bathymetry, and temporal GIS are receipt-backed",
                 "rendered-map visual correctness, real raster sources, and a larger and more diverse real spatial corpus are independently certified",
             ),

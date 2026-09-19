@@ -1488,8 +1488,8 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 40
-    assert payload["counts"]["passed"] == 40
+    assert payload["counts"]["cases"] == 45
+    assert payload["counts"]["passed"] == 45
     assert payload["counts"]["failed"] == 0
     assert payload["counts"]["operations"] == 21
     assert payload["counts"]["negative_cases"] == 15
@@ -1514,6 +1514,9 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert "PASS csv_points csv_points_skip_invalid_rows" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
     assert "PASS reproject_crs reproject_crs_wgs84_to_utm20n" in text_output
+    assert "PASS measure_ellipsoidal measure_ellipsoidal_antimeridian_line" in text_output
+    assert "PASS measure_ellipsoidal measure_ellipsoidal_polar_cap_polygon" in text_output
+    assert "PASS measure_ellipsoidal measure_ellipsoidal_invalid_latitude_is_unresolved" in text_output
     assert "PASS repair_topology repair_topology_bowtie_explicit" in text_output
     assert "PASS raster_sample raster_sample_distinct_states" in text_output
     assert "PASS vector_raster vector_raster_preserves_zero_nodata_null" in text_output
@@ -1570,7 +1573,7 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
-    assert "eval_case_count=40" in text_output
+    assert "eval_case_count=45" in text_output
     assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
     assert "PASS clip_bbox clip_bbox_polygon_point_and_residue" in text_output
     assert "PASS clip_bbox clip_bbox_invalid_bbox_fails_closed" in text_output

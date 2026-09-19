@@ -27,7 +27,23 @@ def make_settings(tmp_path: Path) -> Settings:
 
 
 def write_fc(path: Path, crs: str, coordinates: list[float]) -> Path:
-    path.write_text(json.dumps({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":crs}},"features":[{"type":"Feature","id":"p","properties":{},"geometry":{"type":"Point","coordinates":coordinates}}]}), encoding="utf-8")
+    path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "crs": {"type": "name", "properties": {"name": crs}},
+                "features": [
+                    {
+                        "type": "Feature",
+                        "id": "p",
+                        "properties": {},
+                        "geometry": {"type": "Point", "coordinates": coordinates},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     return path
 
 
@@ -35,20 +51,34 @@ def test_pyproj_reprojection_records_pipeline_and_axis_policy(tmp_path: Path) ->
     cfg = make_settings(tmp_path)
     source = write_fc(tmp_path / "pr.geojson", "EPSG:4326", [-66.0, 18.2])
     report = reproject_geojson_crs(source, target_crs="EPSG:32161", cfg=cfg)
-    expected_status = "GIS_CRS_REPROJECT_OK" if report["parameters"]["best_available"] else "GIS_CRS_REPROJECT_WARN"
+    parameters = report["parameters"]
+    selected_index = parameters["selected_candidate_index"]
+    selected = parameters["candidate_inventory"][selected_index]
+    expected_status = "GIS_CRS_REPROJECT_WARN" if report["warnings"] else "GIS_CRS_REPROJECT_OK"
     assert report["status"] == expected_status
-    if not report["parameters"]["best_available"]:
+    if not parameters["best_available"]:
         assert "GIS_CRS_BEST_OPERATION_UNAVAILABLE" in report["warnings"]
-    assert report["parameters"]["always_xy"] is True
-    assert report["parameters"]["transformer_definition_sha256"]
-    assert not report["parameters"]["transformer_definition"].lower().startswith("unavailable until")
-    assert report["parameters"]["available_candidate_count"] >= 1
-    assert report["parameters"]["unavailable_candidate_count"] >= 0
-    assert report["parameters"]["selected_candidate_index"] == 0
-    assert report["parameters"]["pyproj_version"]
-    assert report["parameters"]["proj_version"]
+    if selected_index > 0:
+        assert "GIS_CRS_OFFLINE_CANDIDATE_FALLBACK" in report["warnings"]
+    if any(
+        candidate["requires_network_download"]
+        for candidate in parameters["candidate_inventory"][:selected_index]
+    ):
+        assert "GIS_CRS_NETWORK_GRID_SKIPPED" in report["warnings"]
+    assert parameters["always_xy"] is True
+    assert parameters["network_policy"] == "offline_only"
+    assert selected["offline_capable"] is True
+    assert selected["requires_network_download"] is False
+    assert selected["grid_provenance_frozen"] is True
+    assert parameters["transformer_definition_sha256"]
+    assert not parameters["transformer_definition"].lower().startswith("unavailable until")
+    assert parameters["available_candidate_count"] >= 1
+    assert parameters["unavailable_candidate_count"] >= 0
+    assert parameters["pyproj_version"]
+    assert parameters["proj_version"]
     assert report["invariants"]["feature_row_conservation"] is True
     assert report["invariants"]["transform_pipeline_frozen"] is True
+    assert report["invariants"]["offline_policy_satisfied"] is True
     assert report["output"]["crs"] == "EPSG:32161"
 
 

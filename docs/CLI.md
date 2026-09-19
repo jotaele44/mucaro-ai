@@ -213,17 +213,23 @@ polygon area uses local shoelace math with interior rings subtracted. Geodesic
 mode remains the compatibility spherical adapter. Use `mucaro gis
 measure-ellipsoidal GEOJSON_PATH` for WGS84 `pyproj.Geod` distance, perimeter,
 and area receipts. The ellipsoidal command still requires EPSG:4326 and does
-not claim antimeridian, polar, ring-orientation, or large-geometry corpus
-certification.
+classify antimeridian crossings, coordinates at or beyond +/-85 degrees, and
+pole contact. Frozen line and polygon controls cover bounded antimeridian and
+polar cases; ring-orientation and general large-geometry corpus certification
+remain open.
 
 `mucaro gis reproject-crs GEOJSON_PATH --target-crs CRS` is the broader
 horizontal CRS adapter. It accepts CRS identifiers parseable by pyproj/PROJ,
 forces `always_xy=True`, records the source and target CRS, axis-order policy,
 transformer description/definition and definition hash, reported accuracy,
-output hash, and per-feature state. Z is passed through without vertical
-transformation and is warned; M fails closed. Grid availability and transform
-accuracy remain environment-dependent, and vertical or time-dependent CRS
-certification is outside the V1 claim.
+output hash, and per-feature state. The default network policy is
+`offline_only`: every available and unavailable PROJ candidate is inventoried,
+remote-only grids are skipped, and selected local grids are frozen by byte
+count and SHA-256. A lower-accuracy offline candidate therefore produces an
+explicit warning rather than silently downloading a grid. Z is passed through
+without vertical transformation and is warned; M fails closed. Independently
+frozen local datum-grid transformations, broader axis-order coverage, and
+vertical or time-dependent CRS certification remain outside the V1 claim.
 
 `inspect-vector`, `inspect-raster`, `sample-raster`,
 `clip-raster-bbox`, `vector-raster`, `zonal-stats`, `resample-raster`, and
@@ -887,7 +893,11 @@ geometry comparison with planar overlay area differences, limited EPSG:4326 to
 EPSG:3857 reprojection, CSV point conversion with explicit
 invalid-row skipping, bbox filtering with null-residue accounting, fail-closed
 invalid bbox extents, bbox clipping with null and dimensional residue
-accounting, and fail-closed invalid Web Mercator latitude handling.
+accounting, fail-closed invalid Web Mercator latitude handling, offline-only
+PROJ candidate/grid selection, explicit EPSG axis-order controls, bounded WGS84
+antimeridian and polar line/polygon controls, and unresolved invalid
+longitude/latitude residue. The current committed denominator is 45 cases
+across 21 operations, including 15 fail-closed negative cases.
 It returns `GIS_EVAL_OK` only when the fixture and every case pass;
 `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives automation a hard
 regression signal.

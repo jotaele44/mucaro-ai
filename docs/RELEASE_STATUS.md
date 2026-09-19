@@ -286,15 +286,20 @@ Observed success markers:
   inspection/sampling/transactional clipping/resampling, exact-CRS
   vector-raster cell-center zonal analysis, frozen Census TIGERweb and USGS
   vector snapshots, and renderer/layer-bound map-export provenance. `mucaro
-  eval gis` runs 40 committed cases across 21 operations, including 15
+  eval gis` runs 45 committed cases across 21 operations, including 15
   fail-closed negative cases for CRS, dimensions, formats, raster extents,
-  vector-raster mismatch, resampling, and export identity. `mucaro capabilities
+  vector-raster mismatch, resampling, and export identity, plus bounded
+  always-XY axis-order and antimeridian/polar line/polygon controls. The CRS
+  engine now inventories all PROJ candidates and grids, rejects unfrozen
+  network-grid dependencies by default, and hashes selected local grid bytes.
+  `mucaro capabilities
   validate-gis-report` checks the corresponding saved receipts for source and
   output hashes, warning consistency, CRS policy, NODATA separation,
   per-feature states, renderer/layer binding, and arithmetic closure.
-  Full GIS maturity remains open until datum-grid availability,
-  vertical/time-dependent CRS, antimeridian/polar and large-geometry
-  adjudication, dimension-preserving mutation, broader topology/overlay policy,
+  Full GIS maturity remains open until independently frozen local datum-grid
+  transformations, vertical/time-dependent CRS, broader axis-order and
+  large-geometry adjudication beyond the bounded controls, dimension-preserving
+  mutation, broader topology/overlay policy,
   fractional zonal coverage, independent rendered-map validation, real raster
   sources, larger and more diverse real spatial corpora, additional
   vector/raster formats and algorithms, remote sensing, terrain, hydrology,
