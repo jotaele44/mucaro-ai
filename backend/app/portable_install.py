@@ -174,6 +174,7 @@ def rollback_portable_macos_app(
 
     backup_manifest, backup_manifest_path = _portable_manifest(backup)
     backup_head = str(backup_manifest.get("head_sha") or "")
+    backup_manifest_sha256 = _sha256(backup_manifest_path)
     _verify(backup, backup_head or None)
 
     displaced = install_root / f".{install_name}.rollback-displaced"
@@ -206,7 +207,7 @@ def rollback_portable_macos_app(
         },
         "restored_from": {
             "head_sha": backup_head,
-            "manifest_sha256": _sha256(backup_manifest_path) if backup_manifest_path.exists() else None,
+            "manifest_sha256": backup_manifest_sha256,
         },
         "invariants": {
             "restored_head_matches_backup": installed_manifest.get("head_sha") == backup_head,
