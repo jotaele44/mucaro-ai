@@ -189,3 +189,67 @@ def test_tool_runtime_audits_failed_web_fetch(tmp_path: Path):
     events = list_tool_audit_events(cfg)["events"]
     assert events[-1]["event"] == "TOOL_CALL_FAILED"
     assert events[-1]["result_status"] == "ERROR_WEB_PRIVATE_HOST_BLOCKED"
+
+
+
+def test_tool_runtime_executes_governed_live_web_search(monkeypatch, tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    calls = []
+
+    def fake_search(query, **kwargs):
+        calls.append((query, kwargs))
+        return {
+            "status": "WEB_SEARCH_OK",
+            "search_id": "websearch_test",
+            "receipt_path": str(tmp_path / "search.json"),
+            "receipt_sha256": "abc123",
+        }
+
+    monkeypatch.setattr("backend.app.tools.search_web_brave", fake_search)
+    requested = request_tool_call(
+        "web.search",
+        {
+            "query": "Puerto Rico hydrology",
+            "count": 5,
+            "country": "PR",
+            "search_lang": "en",
+            "allow_live_search": True,
+        },
+        cfg=cfg,
+        requested_by="test",
+    )
+    tool_call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
+
+    executed = run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
+
+    assert executed["status"] == "TOOL_CALL_EXECUTED"
+    assert executed["result"]["status"] == "WEB_SEARCH_OK"
+    assert calls[0][0] == "Puerto Rico hydrology"
+    assert calls[0][1]["count"] == 5
+    assert calls[0][1]["country"] == "PR"
+    assert calls[0][1]["allow_live_search"] is True
+
+
+def test_tool_runtime_web_search_stays_fail_closed_without_live_permission(monkeypatch, tmp_path: Path):
+    cfg = make_settings(tmp_path)
+
+    def fake_search(query, **kwargs):
+        if kwargs.get("allow_live_search") is not True:
+            from backend.app.web_search import WebSearchError
+            raise WebSearchError("ERROR_WEB_SEARCH_LIVE_NOT_ALLOWED", "explicit permission required")
+        return {"status": "WEB_SEARCH_OK"}
+
+    monkeypatch.setattr("backend.app.tools.search_web_brave", fake_search)
+    requested = request_tool_call(
+        "web.search",
+        {"query": "Puerto Rico hydrology"},
+        cfg=cfg,
+        requested_by="test",
+    )
+    tool_call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
+
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
+    assert exc.value.status == "ERROR_WEB_SEARCH_LIVE_NOT_ALLOWED"
