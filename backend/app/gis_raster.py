@@ -76,6 +76,7 @@ def clip_raster_bbox(path: Path, bbox: tuple[float, float, float, float], *, cfg
         raise GISProcessingError("ERROR_GIS_RASTER_BBOX", "Raster clip bbox must have positive width and height.")
     created_at = utc_now(); report_id = stable_id("gisreport", "raster_clip", source_sha, str(bbox), created_at)
     output_path = cfg.export_dir / "gis_reports" / f"{report_id}.tif"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(source) as dataset:
         overlap = (max(minx, dataset.bounds.left), max(miny, dataset.bounds.bottom), min(maxx, dataset.bounds.right), min(maxy, dataset.bounds.top))
         if overlap[0] >= overlap[2] or overlap[1] >= overlap[3]:

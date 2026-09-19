@@ -108,7 +108,13 @@ def gate_no_generated_tracked(files: list[Path]) -> Gate:
 def gate_command(name: str, cmd: list[str], *, cwd: Path = ROOT) -> Gate:
     proc = run(cmd, cwd=cwd, check=False)
     status = "PASS" if proc.returncode == 0 else "FAIL"
-    detail = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else f"returncode={proc.returncode}"
+    lines = proc.stdout.strip().splitlines()
+    if not lines:
+        detail = f"returncode={proc.returncode}"
+    elif status == "PASS":
+        detail = lines[-1]
+    else:
+        detail = " | ".join(lines[-80:])
     return Gate(name, status, detail)
 
 

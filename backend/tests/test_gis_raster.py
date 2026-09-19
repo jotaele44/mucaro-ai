@@ -13,7 +13,17 @@ from backend.app.gis_raster import clip_raster_bbox, inspect_raster, sample_rast
 
 
 def make_settings(tmp_path: Path) -> Settings:
-    cfg = Settings(project_root=tmp_path); cfg.ensure_dirs(); return cfg
+    cfg = Settings(
+        project_root=tmp_path,
+        data_dir=tmp_path / "data",
+        input_dir=tmp_path / "data" / "input",
+        processed_dir=tmp_path / "data" / "processed",
+        export_dir=tmp_path / "data" / "exports",
+        index_dir=tmp_path / "data" / "indexes",
+        sqlite_path=tmp_path / "data" / "processed" / "test.sqlite3",
+        default_model_provider="mock",
+        default_model_name="mock",
+    ); cfg.ensure_dirs(); return cfg
 
 
 def make_raster(path: Path) -> Path:

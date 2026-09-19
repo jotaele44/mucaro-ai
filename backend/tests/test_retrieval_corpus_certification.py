@@ -72,7 +72,8 @@ def test_ready_only_with_real_world_identity_threshold_and_eval_closure(tmp_path
     assert report["status"] == "RETRIEVAL_REAL_WORLD_CORPUS_CERT_READY"
     assert report["certification_ready"] is True
     assert report["residue_count"] == 0
-    assert report["counts"] == {"sources": 2, "queries": 2, "formats": 2, "total_bytes": 68}
+    expected_bytes = (tmp_path / "a.txt").stat().st_size + (tmp_path / "b.html").stat().st_size
+    assert report["counts"] == {"sources": 2, "queries": 2, "formats": 2, "total_bytes": expected_bytes}
     assert all(report["invariants"].values())
     assert report["allowed_denominator_event"] == "RT-09 OPEN->PROVISIONAL"
     assert len(report["report_sha256"]) == 64

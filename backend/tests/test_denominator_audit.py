@@ -14,7 +14,7 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
     assert report["current_overlay"]["raw_completion_percent"] == 70.0
     assert report["current_overlay"]["weighted_completion_percent"] == 71.8
     assert report["current_overlay"]["per_track"]["CODING"]["score_percent"] == 55.0
-    assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"OPEN": 0, "PASS": 1, "PROVISIONAL": 9}
+    assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"PASS": 1, "PROVISIONAL": 9}
     assert report["current_overlay"]["per_track"]["GIS"]["score_percent"] == 75.0
     assert report["current_overlay"]["per_track"]["GIS"]["state_counts"] == {"PASS": 5, "PROVISIONAL": 5}
     assert report["current_overlay"]["per_track"]["OCR"]["score_percent"] == 45.0
