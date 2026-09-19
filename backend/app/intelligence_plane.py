@@ -52,7 +52,7 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
             "cited_retrieval": {
                 "state": "AVAILABLE",
                 "contract": "mucaro-retrieval/local",
-                "notes": "Local cited retrieval with BM25, persistent TF-IDF, semantic/hybrid strategies, mixed-format regression fixtures, retrieval-quality receipts, and a real-world-corpus certification gate. A qualifying frozen real-world large corpus and production-scale stress proof remain open.",
+                "notes": "Local cited retrieval with BM25, persistent TF-IDF, semantic/hybrid strategies, mixed-format regression fixtures, retrieval-quality receipts, an exact-denominator real-world-corpus certification gate, and a deterministic real-world corpus materializer. Qualifying nonsynthetic source bytes/provenance, bound evaluation evidence and production-scale stress proof remain open.",
             },
             "memory_context": {
                 "state": "CANDIDATE",
@@ -67,12 +67,12 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
             "state_of_art_ocr_analysis": {
                 "state": "CANDIDATE",
                 "contract": "mucaro-ocr-analysis/0.x",
-                "notes": "Image OCR receipts preserve source hashes, engine identity, raw/normalized/canonical text, confidence states and source-coordinate spans. PDF rendering/page lineage is source-backed; multi-column/table/form reconstruction, handwriting/difficult-scan coverage and a representative certification corpus remain open.",
+                "notes": "Image OCR receipts preserve source hashes, engine identity, raw/normalized/canonical text, confidence states and source-coordinate spans; PDF rendering/page lineage, layout/confidence receipts, a frozen 12-case denominator, and an exact-byte corpus evidence ledger are source-backed. Table/form/handwriting support, difficult-scan accuracy and real executed corpus evidence remain open.",
             },
             "governed_web_browsing": {
                 "state": "CANDIDATE",
                 "contract": "mucaro-web-browsing/0.x",
-                "notes": "Approval-gated governed fetch, byte-pinned snapshots, robots/cache evidence, operator-supplied multi-page sessions and static-HTML link discovery are source-backed. Automated search authority, rendered/JavaScript browser interaction and autonomous bounded traversal/exhaustion accounting remain open.",
+                "notes": "Approval-gated governed fetch/sessions, byte-pinned snapshots, robots/cache evidence, static-HTML discovery, bounded autonomous traversal, credential-last web search, and rendered-browser DOM/screenshot receipts are source-backed. WEB-08/09 remain unpromoted until credentialed search and live Playwright/Chromium corpus evidence close.",
             },
             "coding_programming_expertise": {
                 "state": "CANDIDATE",
@@ -82,7 +82,7 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
             "transparency_objectivity_governance": {
                 "state": "CANDIDATE",
                 "contract": "mucaro-evidence-governance/0.x",
-                "notes": "Cited retrieval, provenance DAGs, runtime identities, release receipts, frozen denominators, append-only audit events and domain certification gates provide the governance substrate; current-head CI admission and complete cross-capability release closure remain open.",
+                "notes": "Cited retrieval, provenance DAGs, runtime identities, release receipts, frozen denominators, append-only audit events, exact-SHA hosted-CI artifact generation and a fail-closed release-grade matrix provide the governance substrate; exact-current-main external evidence and complete cross-capability release closure remain open.",
             },
             "cross_repo_orchestration": {
                 "state": "ABSENT",
