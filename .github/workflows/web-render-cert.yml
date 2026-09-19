@@ -44,4 +44,3 @@ jobs:
             ${{ runner.temp }}/mucaro-web-render-live.json
             data/exports/web_renders/*.json
             data/exports/web_renders/*.png
-          archive: false
