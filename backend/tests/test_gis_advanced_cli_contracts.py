@@ -127,6 +127,82 @@ def test_advanced_vector_cli_commands_emit_governed_receipts(tmp_path: Path, cap
     assert "manifest_feature_count=1" in output
 
 
+def test_crs_grid_candidates_are_inventoried_and_selected_offline(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    point = write_geojson(
+        tmp_path / "puerto-rico.geojson",
+        [{"type": "Feature", "id": "point", "properties": {}, "geometry": {"type": "Point", "coordinates": [-66, 18.2]}}],
+    )
+
+    report = reproject_geojson_crs(point, target_crs="EPSG:32161", cfg=cfg)
+    parameters = report["parameters"]
+    candidates = parameters["candidate_inventory"]
+    selected = candidates[parameters["selected_candidate_index"]]
+    all_grid_rows = [
+        grid
+        for candidate in candidates
+        for grid in candidate["grids"]
+    ] + [
+        grid
+        for operation in parameters["unavailable_operation_inventory"]
+        for grid in operation["grids"]
+    ]
+
+    assert parameters["network_policy"] == "offline_only"
+    assert selected["offline_capable"] is True
+    assert selected["requires_network_download"] is False
+    assert selected["grid_provenance_frozen"] is True
+    assert report["invariants"]["offline_policy_satisfied"] is True
+    assert report["invariants"]["grid_inventory_complete"] is True
+    assert "us_noaa_pvhpgn.tif" in {row["short_name"] for row in all_grid_rows}
+    assert all(not grid["requires_network_download"] for grid in selected["grids"])
+    assert all(grid["provenance_frozen"] for grid in selected["grids"])
+    assert all(
+        not grid["local_file_available"] or (grid["local_bytes"] > 0 and len(grid["local_sha256"]) == 64)
+        for grid in all_grid_rows
+    )
+    if parameters["selected_candidate_index"] > 0:
+        assert "GIS_CRS_OFFLINE_CANDIDATE_FALLBACK" in report["warnings"]
+        assert report["status"] == "GIS_CRS_REPROJECT_WARN"
+
+    contract = validate_gis_report_contract(report)
+    assert contract["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, contract["failed_checks"]
+
+
+def test_ellipsoidal_edge_conditions_and_invalid_coordinates_close_accounting(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    source = write_geojson(
+        tmp_path / "geodesic-edges.geojson",
+        [
+            {"type": "Feature", "id": "antimeridian-line", "properties": {}, "geometry": {"type": "LineString", "coordinates": [[179, 0], [-179, 0]]}},
+            {"type": "Feature", "id": "polar-line", "properties": {}, "geometry": {"type": "LineString", "coordinates": [[0, 89], [90, 89]]}},
+            {"type": "Feature", "id": "antimeridian-polygon", "properties": {}, "geometry": {"type": "Polygon", "coordinates": [[[179, 10], [-179, 10], [-179, -10], [179, -10], [179, 10]]]}},
+            {"type": "Feature", "id": "invalid-latitude", "properties": {}, "geometry": {"type": "LineString", "coordinates": [[0, 0], [0, 91]]}},
+        ],
+    )
+
+    report = measure_geojson_ellipsoidal(source, cfg=cfg)
+    rows = {row["feature_id"]: row for row in report["measurements"]}
+    assert report["status"] == "GIS_ELLIPSOIDAL_WARN"
+    assert report["warnings"] == ["GIS_ELLIPSOIDAL_EDGE_CONDITIONS_PRESENT", "GIS_ELLIPSOIDAL_UNRESOLVED"]
+    assert report["state_counts"] == {"MEASURED": 3, "NULL_EMPTY": 0, "UNRESOLVED": 1}
+    assert report["edge_condition_counts"] == {
+        "ANTIMERIDIAN_CROSSING": 2,
+        "NEAR_NORTH_POLE": 1,
+        "NEAR_SOUTH_POLE": 0,
+        "TOUCHES_POLE": 0,
+    }
+    assert rows["antimeridian-line"]["edge_conditions"] == ["ANTIMERIDIAN_CROSSING"]
+    assert rows["polar-line"]["edge_conditions"] == ["NEAR_NORTH_POLE"]
+    assert rows["invalid-latitude"]["state"] == "UNRESOLVED"
+    assert rows["invalid-latitude"]["warnings"] == ["ERROR_GIS_GEOD_COORDINATES"]
+    assert report["invariants"]["row_accounting_closed"] is True
+    assert report["invariants"]["edge_condition_accounting_closed"] is True
+
+    contract = validate_gis_report_contract(report)
+    assert contract["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, contract["failed_checks"]
+
+
 def test_advanced_raster_and_export_cli_commands_emit_governed_receipts(tmp_path: Path, capsys) -> None:
     cfg = make_settings(tmp_path)
     raster = write_raster(tmp_path / "grid.tif")
@@ -328,6 +404,25 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
     result = validate_gis_report_contract(unresolved_pipeline)
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
     assert "crs_engine.parameters.pipeline_definition" in {
+        check["name"] for check in result["failed_checks"]
+    }
+
+    network_dependent_selection = copy.deepcopy(reports[0])
+    selected_index = network_dependent_selection["parameters"]["selected_candidate_index"]
+    network_dependent_selection["parameters"]["candidate_inventory"][selected_index][
+        "requires_network_download"
+    ] = True
+    result = validate_gis_report_contract(network_dependent_selection)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "crs_engine.parameters.selected_candidate_offline" in {
+        check["name"] for check in result["failed_checks"]
+    }
+
+    tampered_edge_count = copy.deepcopy(reports[2])
+    tampered_edge_count["edge_condition_counts"]["ANTIMERIDIAN_CROSSING"] = 1
+    result = validate_gis_report_contract(tampered_edge_count)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "ellipsoidal.edge_count.ANTIMERIDIAN_CROSSING" in {
         check["name"] for check in result["failed_checks"]
     }
 

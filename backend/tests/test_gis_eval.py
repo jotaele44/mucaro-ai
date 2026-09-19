@@ -12,10 +12,10 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 40,
-        "passed": 40,
+        "cases": 45,
+        "passed": 45,
         "failed": 0,
-        "positive_cases": 25,
+        "positive_cases": 30,
         "negative_cases": 15,
         "operations": 21,
         "operation_names": [
@@ -63,6 +63,13 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["overlay_invalid_operation_fails_closed"]["case_type"] == "negative"
     assert by_id["overlay_invalid_operation_fails_closed"]["observed_status"] == "ERROR_GIS_OVERLAY_OPERATION"
     assert by_id["reproject_wgs84_to_webmercator"]["observed_status"] == "GIS_REPROJECT_OK"
+    assert by_id["measure_ellipsoidal_antimeridian_line"]["observed_status"] == "GIS_ELLIPSOIDAL_WARN"
+    assert by_id["measure_ellipsoidal_polar_cap_polygon"]["observed_warnings"] == [
+        "GIS_ELLIPSOIDAL_EDGE_CONDITIONS_PRESENT"
+    ]
+    assert by_id["measure_ellipsoidal_invalid_latitude_is_unresolved"]["observed_warnings"] == [
+        "GIS_ELLIPSOIDAL_UNRESOLVED"
+    ]
     assert by_id["csv_points_skip_invalid_rows"]["observed_status"] == "GIS_CSV_POINTS_WARN"
     assert by_id["csv_points_skip_invalid_rows"]["observed_warnings"] == ["GIS_CSV_INVALID_ROWS_SKIPPED"]
     assert by_id["bbox_filter_intersects_with_null_residue"]["observed_status"] == "GIS_BBOX_FILTER_WARN"

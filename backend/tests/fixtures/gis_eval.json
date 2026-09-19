@@ -1,7 +1,7 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 40,
+    "case_count": 45,
     "operation_count": 21,
     "negative_case_count": 15
   },
@@ -2241,6 +2241,91 @@
       "expect_error": true,
       "expected_status": "ERROR_GIS_EXPORT_EXTENT",
       "expected_warnings": []
+    },
+    {
+      "case_id": "measure_ellipsoidal_antimeridian_line",
+      "operation": "measure_ellipsoidal",
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "antimeridian-line", "properties": {}, "geometry": {"type": "LineString", "coordinates": [[179, 0], [-179, 0]]}}
+          ]
+        }
+      },
+      "expected_status": "GIS_ELLIPSOIDAL_WARN",
+      "expected_warnings": ["GIS_ELLIPSOIDAL_EDGE_CONDITIONS_PRESENT"],
+      "expected_invariants": {"row_accounting_closed": true, "edge_condition_accounting_closed": true, "features_with_edge_conditions": 1},
+      "expected_fields": {"state_counts.MEASURED": 1, "edge_condition_counts.ANTIMERIDIAN_CROSSING": 1, "measurements.0.state": "MEASURED", "measurements.0.edge_conditions": ["ANTIMERIDIAN_CROSSING"]}
+    },
+    {
+      "case_id": "measure_ellipsoidal_polar_line",
+      "operation": "measure_ellipsoidal",
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "polar-line", "properties": {}, "geometry": {"type": "LineString", "coordinates": [[0, 89], [90, 89]]}}
+          ]
+        }
+      },
+      "expected_status": "GIS_ELLIPSOIDAL_WARN",
+      "expected_warnings": ["GIS_ELLIPSOIDAL_EDGE_CONDITIONS_PRESENT"],
+      "expected_invariants": {"row_accounting_closed": true, "edge_condition_accounting_closed": true, "features_with_edge_conditions": 1},
+      "expected_fields": {"state_counts.MEASURED": 1, "edge_condition_counts.NEAR_NORTH_POLE": 1, "measurements.0.state": "MEASURED", "measurements.0.edge_conditions": ["NEAR_NORTH_POLE"]}
+    },
+    {
+      "case_id": "measure_ellipsoidal_antimeridian_polygon",
+      "operation": "measure_ellipsoidal",
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "antimeridian-polygon", "properties": {}, "geometry": {"type": "Polygon", "coordinates": [[[179, 10], [-179, 10], [-179, -10], [179, -10], [179, 10]]]}}
+          ]
+        }
+      },
+      "expected_status": "GIS_ELLIPSOIDAL_WARN",
+      "expected_warnings": ["GIS_ELLIPSOIDAL_EDGE_CONDITIONS_PRESENT"],
+      "expected_invariants": {"row_accounting_closed": true, "edge_condition_accounting_closed": true, "features_with_edge_conditions": 1},
+      "expected_fields": {"state_counts.MEASURED": 1, "edge_condition_counts.ANTIMERIDIAN_CROSSING": 1, "measurements.0.state": "MEASURED", "measurements.0.edge_conditions": ["ANTIMERIDIAN_CROSSING"]}
+    },
+    {
+      "case_id": "measure_ellipsoidal_polar_cap_polygon",
+      "operation": "measure_ellipsoidal",
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "polar-cap", "properties": {}, "geometry": {"type": "Polygon", "coordinates": [[[-135, 85], [-45, 85], [45, 85], [135, 85], [-135, 85]]]}}
+          ]
+        }
+      },
+      "expected_status": "GIS_ELLIPSOIDAL_WARN",
+      "expected_warnings": ["GIS_ELLIPSOIDAL_EDGE_CONDITIONS_PRESENT"],
+      "expected_invariants": {"row_accounting_closed": true, "edge_condition_accounting_closed": true, "features_with_edge_conditions": 1},
+      "expected_fields": {"state_counts.MEASURED": 1, "edge_condition_counts.ANTIMERIDIAN_CROSSING": 1, "edge_condition_counts.NEAR_NORTH_POLE": 1, "measurements.0.state": "MEASURED", "measurements.0.edge_conditions": ["ANTIMERIDIAN_CROSSING", "NEAR_NORTH_POLE"]}
+    },
+    {
+      "case_id": "measure_ellipsoidal_invalid_latitude_is_unresolved",
+      "operation": "measure_ellipsoidal",
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "invalid-latitude", "properties": {}, "geometry": {"type": "LineString", "coordinates": [[0, 0], [0, 91]]}}
+          ]
+        }
+      },
+      "expected_status": "GIS_ELLIPSOIDAL_WARN",
+      "expected_warnings": ["GIS_ELLIPSOIDAL_UNRESOLVED"],
+      "expected_invariants": {"row_accounting_closed": true, "edge_condition_accounting_closed": true, "features_with_edge_conditions": 0},
+      "expected_fields": {"state_counts.UNRESOLVED": 1, "measurements.0.state": "UNRESOLVED", "measurements.0.edge_conditions": [], "measurements.0.warnings": ["ERROR_GIS_GEOD_COORDINATES"]}
     }
   ]
 }
