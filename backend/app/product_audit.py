@@ -16,10 +16,11 @@ OBJECTIVE = (
     "production-quality packaging. Capabilities must include advanced GIS "
     "processing, state-of-the-art OCR analysis, powerful web browsing "
     "abilities, coding and programming expertise, all governed by maximum "
-    "transparency and objectivity. The desktop launcher and source-bound "
-    "macOS Application wrapper are local operator surfaces, while expanded "
-    "GUI/workspace development remains a final-phase goal after backend, CLI, "
-    "provenance, capability, packaging, and hosted-governance gates are stronger."
+    "transparency and objectivity. The conversation-first GUI, source-bound "
+    "launcher, portable embedded-runtime packaging, transactional install/rollback "
+    "and fail-closed release-grade matrix now exist as candidate operator/release "
+    "surfaces; external corpus, device, signing, clean-machine and live-runtime "
+    "evidence remains required before release-grade certification."
 )
 
 
@@ -179,7 +180,7 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Assistant can safely use tools beyond retrieval-backed answering.",
             _status_from_files(cfg, [("backend", "app", "tools.py")]),
             "backend/app/tools.py with allowlisted tools, explicit approvals, execution gates, and audit events",
-            "The allowlist includes read-only inspection tools plus approval-gated web.fetch and web.fetch_session tools that write local snapshot and browsing-session evidence; broader action tools remain future scoped work.",
+            "The allowlist includes read-only inspection plus approval-gated governed fetch/session, web search, rendered-browser, coding workspace and controlled coding lifecycle tools; live provider/runtime evidence remains separately gated.",
             "Add narrowly scoped write/action tools only with per-tool policies and stronger UX review.",
         ),
         ProductRequirement(
@@ -206,17 +207,17 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Assistant has powerful web browsing abilities governed by provenance, safety, and citation controls.",
             "OPEN",
             "web.fetch is an approval-gated tool that enforces URL policy and writes byte-pinned snapshots plus a local snapshot ledger; web.fetch_session adds operator-supplied multi-page source selection with replay receipts. Web snapshots can be ingested as citeable local sources with URL, retrieval UTC, hash metadata, cache/robots metadata, redirect-target robots evidence, HTML body/structure traces, PDF page traces, non-text parser classification, immutable snapshot-only cache policy, and explicit HTTP error-page citation policy.",
-            "Snapshot fetch, session receipts, ledgering, citation wiring, web citation fixtures, response cache metadata, robots enforcement, redirect-target robots fixtures, HTML/PDF/non-text parser traces, immutable snapshot-only cache policy, and HTTP error-page citation fixtures exist, but automated search/discovery, rendered-browser capture, and autonomous link-following policies remain open.",
-            "Add automated search/discovery controls, rendered-browser capture policy, and gated autonomous link-following only after source-selection safeguards exist.",
+            "Governed fetch/session evidence, static discovery, bounded autonomous traversal, credential-last search, and a rendered-browser evidence adapter are source-backed. Live credentialed search evidence and a frozen Playwright/Chromium execution corpus remain open, and rendered observations are not citation-ready by default.",
+            "Execute and freeze credentialed search plus rendered-browser corpora before promoting WEB-08/09; preserve the existing citation/source-selection boundaries.",
         ),
         ProductRequirement(
             "coding_programming_expertise",
             "capability_expansion",
             "Assistant can perform coding and programming work with transparent patches, tests, and repository safety boundaries.",
             "OPEN",
-            "backend/app/capability_contracts.py defines coding workspace, dirty-state, diff, test, and review-output requirements.",
-            "No codebase indexing policy, patch proposal format, test-selection contract, sandbox policy, or code-review evidence gate is implemented.",
-            "Define a coding capability boundary for read/patch/test actions, diff receipts, failure preservation, and objective review output.",
+            "Governed repository read/discovery, exact dirty-state accounting, Git-native patch identity, controlled patch mutation with rollback, isolated coding-container plans/execution receipts, test/lint/type/build suite contracts, line-bound review evidence, guarded local Git lifecycle, deterministic PR request artifacts, and a fail-closed regression certification ledger are merged.",
+            "Live pinned-image container execution and complete executed coding-regression closure remain material evidence gaps; authenticated remote push/PR remains a credential-last action.",
+            "Use live isolated-container receipts and the frozen coding regression manifest to close executed evidence without weakening the host-write, network, identity, or approval boundaries.",
         ),
         ProductRequirement(
             "transparency_objectivity_governance",
@@ -267,8 +268,8 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
                 ],
             ),
             "mucaro package status/build, mucaro package macos-app, docs/PACKAGING_POLICY.md, and the release package_artifact gate",
-            "A source-bound local macOS .app wrapper can launch this checkout, but portable signed installer, embedded runtime, upgrade, and rollback remain open.",
-            "Keep generated artifact receipts bound to exact Git HEAD before any governed release tag; promote the source-bound app wrapper toward a portable installer only after the runtime and rollback contract are explicit.",
+            "Source artifacts, a source-bound app wrapper, an embedded portable-runtime bundle, and transactional install/reinstall/rollback are source-backed. Clean-machine execution and signed/notarized distribution evidence remain open.",
+            "Keep every distribution receipt exact-head bound; execute the clean-machine and signing/notarization verifiers on real macOS release hosts before any release-grade promotion.",
         ),
         ProductRequirement(
             "github_release_governance",
@@ -276,17 +277,17 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Governed releases require current-head hosted CI, protected branch policy, and tag binding.",
             "OPEN",
             "mucaro certify status --include-github and mucaro certify github-actions",
-            "Hosted GitHub Actions startup currently fails before jobs and branch protection is not enforced; tag binding is verified by the release-state and GitHub governance commands.",
-            "Repair hosted Actions startup, enable branch protection after CI is healthy, then require current-head GitHub governance before promoting a governed release.",
+            "Hosted Actions is again admitting and executing release jobs; exact-SHA hosted-CI evidence artifact generation is merged. Final release-grade proof still requires a retrievable receipt bound to the exact current main head, plus any required branch-protection/tag policy evidence.",
+            "Require current-head hosted-CI artifact evidence and preserve branch/tag governance as separate release gates; do not reuse stale PR-head receipts for main.",
         ),
         ProductRequirement(
             "final_phase_gui_operator_workspace",
             "assistant_surface",
-            "Expanded GUI/operator workspace remains the last product phase, after backend and CLI certification gates are stronger.",
+            "Conversation-first GUI/operator workspace is implemented as the primary local interaction surface.",
             "OPEN",
-            "The existing desktop launcher, source-bound macOS Application wrapper, and frontend smoke path are present, but expanded GUI work is explicitly deferred; CLI remains the certification boundary.",
-            "The final conversation-first work feed, specialized workspaces, synchronized maps/tables/code/artifacts, and GUI proof that grants, evidence, memory, tools, and run history work together are not yet implemented.",
-            "Do not expand GUI behavior until backend capability contracts, provenance, retrieval, OCR/GIS/web/coding gates, packaging, and hosted-governance evidence have been advanced.",
+            "Chat is the canonical default workspace with separate Sources, Directory Access, Memory, Planning and Settings destinations; answer evidence/cited chunks/validation remain inspectable and duplicate directory-permission controls were removed.",
+            "Rendered desktop/mobile/accessibility certification and richer synchronized map/table/code/artifact workspaces remain open; source presence alone is not visual/device proof.",
+            "Run rendered desktop and mobile accessibility regressions against representative workflows before promoting the GUI/operator requirement.",
         ),
     ]
 
