@@ -5,6 +5,10 @@ WORKDIR /opt/mucaro-build
 COPY pyproject.toml ./
 COPY backend ./backend
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN python -m pip install --no-cache-dir ".[dev]" ruff mypy build \
     && mkdir -p /wheelhouse \
     && python -m pip download --no-cache-dir "setuptools>=69" wheel -d /wheelhouse \
