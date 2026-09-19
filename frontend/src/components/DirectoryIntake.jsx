@@ -46,10 +46,6 @@ export function DirectoryIntake({ onIngested }) {
     }
   }
 
-  async function requestAccess() {
-    await checkAccess();
-  }
-
   async function grantAccess({ ingestAfterGrant = false } = {}) {
     const target = pendingGrant?.path || path;
     if (!target.trim()) return;
@@ -133,7 +129,6 @@ export function DirectoryIntake({ onIngested }) {
       </div>
       <div className="button-row">
         <button onClick={checkAccess} disabled={!canIngest}>Check Access</button>
-        <button onClick={requestAccess} disabled={!canIngest}>Request Access</button>
         <button onClick={() => ingestDirectory()} disabled={!canIngest}>Ingest Path</button>
       </div>
       {error && <div className="notice error">{error}</div>}
