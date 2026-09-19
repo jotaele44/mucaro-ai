@@ -80,3 +80,24 @@ Resulting overlay arithmetic:
 - BROWSING: `65.0%` — `PASS=4 / PROVISIONAL=5 / OPEN=1`
 
 This remains a provisional evidence-state overlay, not browsing-domain or release certification.
+
+
+## CODE-07 executed coding quality overlay
+
+Audit head: `bd17fa6e7bea44bbf2dddb895ecc1074043a7967`.
+
+- `CODE-07 PROVISIONAL → PASS`: PR #71 merged the current-main replay of the isolated coding quality profile.
+- GitHub Actions CI run `35430951380` completed successfully.
+- Full-profile artifact `10580757491` has digest `sha256:782a46980529814233ba082942904e5e5be7564c05c7c5892b5efeaea59e6a1f`.
+- Live-container artifact `10580747437` has digest `sha256:9402eeb6995090c9e27258308a4fa94990188aa60705e715a9a2329d29c039df`.
+- Coding-plane pytest, Ruff, Mypy and package build all executed in the non-root, network-disabled, read-only-host isolated runtime.
+- This PASS is scoped to frozen CODE-07. It does not promote CODE-06 mutation, CODE-08 review, CODE-09 lifecycle, CODE-10 regression corpus, or whole-repository lint/type debt.
+
+Resulting overlay arithmetic:
+
+- current raw completion: `71.5%`
+- current weighted completion: `73.3%`
+- applied events: `18`
+- CODING: `60.0%` — `PASS=2 / PROVISIONAL=8`
+
+This remains an evidence-state overlay, not coding-domain or release certification.
