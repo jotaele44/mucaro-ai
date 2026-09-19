@@ -100,3 +100,61 @@ def build_code_review_report(
             "reject review evidence that cannot bind to a current source SHA-256",
         ],
     }
+
+
+def build_code_review_receipt(
+    repo_root: str | Path,
+    findings: list[dict[str, Any]],
+    *,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Backward-compatible review receipt adapter over the canonical report contract."""
+    normalized: list[dict[str, Any]] = []
+    for index, finding in enumerate(findings):
+        if not isinstance(finding, dict):
+            raise CodingReviewError("ERROR_CODING_REVIEW_FINDING", f"findings[{index}] must be an object")
+        severity = finding.get("severity")
+        mapped_severity = str(severity).upper() if isinstance(severity, str) else severity
+        normalized.append(
+            {
+                "path": finding.get("path"),
+                "severity": mapped_severity,
+                "line_start": finding.get("start_line", finding.get("line_start")),
+                "line_end": finding.get("end_line", finding.get("line_end", finding.get("start_line", finding.get("line_start")))),
+                "summary": finding.get("title", finding.get("summary")),
+                "evidence": finding.get("detail", finding.get("evidence")),
+            }
+        )
+    try:
+        report = build_code_review_report(repo_root, normalized, cfg=cfg)
+    except CodingReviewError as exc:
+        legacy_status = {
+            "ERROR_CODING_REVIEW_UNCHANGED_PATH": "ERROR_CODING_REVIEW_PATH_NOT_CHANGED",
+            "ERROR_CODING_REVIEW_LINE_RANGE": "ERROR_CODING_REVIEW_LINE",
+        }.get(exc.status, exc.status)
+        if legacy_status == exc.status:
+            raise
+        raise CodingReviewError(legacy_status, exc.detail) from exc
+
+    severity_counts: dict[str, int] = {}
+    adapted_findings: list[dict[str, Any]] = []
+    for source, item in zip(findings, report["findings"]):
+        legacy_severity = str(item["severity"]).lower()
+        severity_counts[legacy_severity] = severity_counts.get(legacy_severity, 0) + 1
+        adapted_findings.append(
+            {
+                **item,
+                "severity": legacy_severity,
+                "start_line": item["line_start"],
+                "end_line": item["line_end"],
+                "title": source.get("title", item["summary"]),
+                "detail": source.get("detail", item["evidence"]),
+                "falsification": source.get("falsification"),
+                "evidence_excerpt": item["excerpt"],
+            }
+        )
+    return {
+        **report,
+        "severity_counts": severity_counts,
+        "findings": adapted_findings,
+    }
