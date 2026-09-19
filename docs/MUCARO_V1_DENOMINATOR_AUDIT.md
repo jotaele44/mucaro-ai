@@ -41,3 +41,22 @@ Resulting overlay arithmetic:
 WEB-08 remains OPEN: frozen-static-HTML anchor discovery from PR #24 is not equivalent to automated search/discovery authority. No event is recorded for that row yet.
 
 This overlay is an evidence-state audit, not a new denominator version, domain certification, or release certification claim.
+
+
+## WEB-10 bounded traversal overlay
+
+Audit head: `4cc0433cb1f06648ddd8be62e1c5326228a0f68e`.
+
+- `WEB-10 OPEN → PROVISIONAL`: PR #49 merged deterministic bounded static-HTML traversal and GitHub Actions run `35415105947` completed successfully.
+- The scope preserves page/depth/link ceilings plus duplicate, deferred, cross-host and fetch-failure residue.
+- `BOUNDED_EXHAUSTED` applies only to the declared static-anchor queue. It does not claim rendered-JavaScript, search-engine, sitemap, API, site-wide or internet-wide exhaustion.
+- WEB-08 automated search/discovery and WEB-09 rendered/JavaScript interaction remain OPEN.
+
+Resulting overlay arithmetic:
+
+- current raw completion: `70.5%`
+- current weighted completion: `72.3%`
+- applied events: `16`
+- BROWSING: `60.0%` — `PASS=4 / PROVISIONAL=4 / OPEN=2`
+
+This remains an evidence-state overlay, not browsing-domain or release certification.
