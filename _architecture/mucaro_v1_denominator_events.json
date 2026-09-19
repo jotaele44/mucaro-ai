@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "a08b0a0cf575c8b6889a43c8c91ec086155984a5",
+  "audit_head": "704715d4554f5e9e76aef3b31950181928abcacb",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -308,6 +308,20 @@
         "changed-path binding + exact line/excerpt binding + source/excerpt SHA-256 + unchanged-path rejection + invalid-range rejection + HEAD conservation"
       ],
       "reason": "Frozen CODE-08 requires code-review evidence with file and line binding. The merged dedicated certification executes positive and negative review cases against a real temporary Git repository and freezes exact source/excerpt identities. Deleted-file and binary/non-UTF8 adapters remain limitations outside this frozen row's current text-review scope."
+    },
+    {
+      "event_id": "evt-gov08-startup-probe-pass",
+      "requirement_id": "GOV-08",
+      "from_state": "BLOCKED",
+      "to_state": "PASS",
+      "evidence_type": "EXACT_HEAD_WORKFLOW_DISPATCH_STARTUP_PROBE_WITH_EXECUTED_SUCCESSFUL_JOB",
+      "evidence": [
+        "main@704715d4554f5e9e76aef3b31950181928abcacb",
+        "GitHub Actions CI Startup Probe run 35468817153 event=workflow_dispatch conclusion=success",
+        "startup-probe job 105965928142 conclusion=success",
+        "step Confirm runner startup emitted CI_STARTUP_PROBE_OK"
+      ],
+      "reason": "The dedicated CI Startup Probe was manually dispatched against exact current main HEAD, created its startup-probe job, acquired a hosted runner, executed the runner-startup assertion, and completed successfully. This closes GOV-08 independently of branch protection and governed-release requirements."
     }
   ]
 }
