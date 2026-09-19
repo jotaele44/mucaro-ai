@@ -89,6 +89,11 @@ from .packaging import (
     verify_distribution_manifest,
     verify_release_artifact,
 )
+from .portable_runtime import (
+    PortableRuntimeError,
+    build_portable_macos_app,
+    verify_portable_macos_app,
+)
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -818,6 +823,18 @@ def build_parser() -> argparse.ArgumentParser:
     package_macos_app.add_argument("--python-executable", help="Python executable to embed in the app launcher.")
     package_macos_app.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     package_macos_app.set_defaults(handler=run_package_macos_app)
+
+    package_portable_app = package_subcommands.add_parser(
+        "portable-macos-app",
+        help="Build or verify a macOS app containing a relocatable embedded runtime payload.",
+    )
+    package_portable_app.add_argument("--runtime-dir", type=Path, help="Prevalidated relocatable runtime tree to embed.")
+    package_portable_app.add_argument("--runtime-python", default="bin/python3", help="Runtime-relative Python executable path.")
+    package_portable_app.add_argument("--output-dir", type=Path, default=None, help="Directory where the portable app should be built.")
+    package_portable_app.add_argument("--verify", type=Path, help="Verify an existing portable .app bundle instead of building one.")
+    package_portable_app.add_argument("--expected-head", help="Optional exact Git head expected in the portable manifest.")
+    package_portable_app.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    package_portable_app.set_defaults(handler=run_package_portable_macos_app)
 
     package_distribution_manifest = package_subcommands.add_parser(
         "distribution-manifest",
@@ -2745,6 +2762,28 @@ def run_package_macos_app(args: argparse.Namespace, cfg: Settings) -> int:
     )
     emit_payload(report, args.format)
     return 0 if report["status"] == "MACOS_APP_BUNDLE_READY" else 2
+
+
+def run_package_portable_macos_app(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        if args.verify is not None:
+            report = verify_portable_macos_app(args.verify, expected_head=args.expected_head)
+        else:
+            if args.runtime_dir is None:
+                emit_error("ERROR_PORTABLE_RUNTIME_REQUIRED", "--runtime-dir is required when building.", args.format)
+                return 2
+            output_dir = args.output_dir or (cfg.export_dir / "portable_apps")
+            report = build_portable_macos_app(
+                cfg.project_root,
+                args.runtime_dir,
+                output_dir=output_dir,
+                runtime_python=args.runtime_python,
+            )
+    except PortableRuntimeError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(report, args.format)
+    return 0 if report["status"] == "PORTABLE_APP_VERIFIED" else 2
 
 
 def run_package_distribution_manifest(args: argparse.Namespace, cfg: Settings) -> int:
