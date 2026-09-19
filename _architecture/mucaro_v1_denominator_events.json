@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "22b7e557e7583f14cd79caaf3d7634526199dfd9",
+  "audit_head": "1a7f950606acc7ef441cd9424c39fc05afe1247e",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -276,6 +276,22 @@
         "coding-plane pytest + Ruff + Mypy + python -m build executed inside non-root network-disabled read-only-host isolated runtime"
       ],
       "reason": "The merged current-main coding quality profile executed the frozen coding-plane test, lint, type and build checks successfully with exact image/runtime/source receipts. Whole-repository lint/type debt remains outside frozen CODE-07 scope."
+    },
+    {
+      "event_id": "evt-ocr07-live-pdf-pass",
+      "requirement_id": "OCR-07",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "MERGED_LIVE_PDF_RENDER_AND_PAGE_LINEAGE_WITH_TESSERACT_RUNTIME",
+      "evidence": [
+        "PR#80",
+        "main@1a7f950606acc7ef441cd9424c39fc05afe1247e",
+        "GitHub Actions CI run 35460847002 conclusion=success",
+        "GitHub Actions OCR Live Runtime Certification run 35460846947 conclusion=success",
+        "artifact#10589823508 digest=sha256:123a58aaf7f3481c3973ea8d26bcac8dedc8dcbb0cc9dadc869af853e0a6857f",
+        "real pdftoppm render + per-page Tesseract OCR + source/render/report SHA-256 lineage + page-count closure"
+      ],
+      "reason": "The frozen OCR-07 scope is PDF page rendering and page lineage. The merged runtime lane executed real pdftoppm rendering and per-page OCR with exact source/render/report hashes and closed page arithmetic. Representative-corpus, table/form, handwriting/difficult-scan and broader confidence/multilingual coverage remain separate rows."
     }
   ]
 }
