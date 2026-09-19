@@ -221,7 +221,9 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("--strategy", choices=sorted(RETRIEVAL_STRATEGIES), default="hybrid", help="Retrieval strategy to use.")
     ask.add_argument("--provider", choices=model_provider_names(), help="Model provider override.")
     ask.add_argument("--model", help="Model name override.")
-    ask.add_argument("--allow-mock-fallback", action="store_true", help="Permit mock fallback when a live provider is unavailable.")
+    ask.add_argument("--allow-mock-fallback", action="store_true", help="Permit explicit offline mock fallback when the selected route is unavailable.")
+    ask.add_argument("--allow-live", action="store_true", help="Explicitly allow a live model provider route.")
+    ask.add_argument("--require-offline", action="store_true", help="Require an offline model route.")
     ask.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     ask.add_argument("--no-persist", action="store_true", help="Do not write the run to SQLite.")
     ask.set_defaults(handler=run_ask)
@@ -656,7 +658,9 @@ def build_parser() -> argparse.ArgumentParser:
     conversations_ask.add_argument("--strategy", choices=sorted(RETRIEVAL_STRATEGIES), default="hybrid", help="Retrieval strategy to use.")
     conversations_ask.add_argument("--provider", choices=model_provider_names(), help="Model provider override.")
     conversations_ask.add_argument("--model", help="Model name override.")
-    conversations_ask.add_argument("--allow-mock-fallback", action="store_true", help="Permit mock fallback when a live provider is unavailable.")
+    conversations_ask.add_argument("--allow-mock-fallback", action="store_true", help="Permit explicit offline mock fallback when the selected route is unavailable.")
+    conversations_ask.add_argument("--allow-live", action="store_true", help="Explicitly allow a live model provider route.")
+    conversations_ask.add_argument("--require-offline", action="store_true", help="Require an offline model route.")
     conversations_ask.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     conversations_ask.set_defaults(handler=run_conversations_ask)
 
@@ -2264,6 +2268,8 @@ def run_ask(args: argparse.Namespace, cfg: Settings) -> int:
         model_provider=args.provider,
         model_name=args.model,
         allow_mock_fallback=args.allow_mock_fallback,
+        allow_live=args.allow_live,
+        require_offline=args.require_offline,
         cfg=cfg,
         persist=not args.no_persist,
     )
@@ -6991,6 +6997,8 @@ def run_conversations_ask(args: argparse.Namespace, cfg: Settings) -> int:
         model_provider=args.provider,
         model_name=args.model,
         allow_mock_fallback=args.allow_mock_fallback,
+        allow_live=args.allow_live,
+        require_offline=args.require_offline,
         conversation_context=build_conversation_context(conversation),
         cfg=cfg,
     )
