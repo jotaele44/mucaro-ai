@@ -60,3 +60,23 @@ Resulting overlay arithmetic:
 - BROWSING: `60.0%` — `PASS=4 / PROVISIONAL=4 / OPEN=2`
 
 This remains an evidence-state overlay, not browsing-domain or release certification.
+
+
+## WEB-09 live rendered-browser overlay
+
+Audit head: `477bf5d0dcf5a705f70646e9e50fb72e3ff2a88c`.
+
+- `WEB-09 OPEN → PROVISIONAL`: PR #69 merged a governed rendered-browser adapter plus dedicated live Playwright/Chromium execution.
+- Web Render Certification run `35430709543` completed successfully and preserved artifact `10580238368` with digest `sha256:c65c2b47d76ac69f2c62a7377d552062581c0011ef67af94ae575d358542d238`.
+- The executed render used Playwright Chromium `140.0.7339.16`, reached `https://example.com/` with HTTP 200, and preserved exact DOM and PNG screenshot hashes.
+- Rendered observations remain explicitly non-citation-ready by default.
+- The frozen WEB-09 requirement remains broader than this execution: authenticated browsing, click/form automation, downloads/uploads and arbitrary JavaScript interaction are not certified. Therefore PASS is not authorized.
+
+Resulting overlay arithmetic:
+
+- current raw completion: `71.0%`
+- current weighted completion: `72.8%`
+- applied events: `17`
+- BROWSING: `65.0%` — `PASS=4 / PROVISIONAL=5 / OPEN=1`
+
+This remains a provisional evidence-state overlay, not browsing-domain or release certification.
