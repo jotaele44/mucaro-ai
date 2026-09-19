@@ -7,8 +7,9 @@ from .config import Settings, settings
 from .db import init_db, upsert_payload
 from .exports import export_answer_trace
 from .ingestion import get_chunks
-from .memory import active_memory_context
+from .memory_policy import MemorySelectionError, select_memory_context
 from .model_router import ModelProviderError, generate_answer
+from .model_routing_policy import ModelRoutingError, plan_model_route
 from .retrieval import retrieve
 from .utils import stable_id, utc_now
 
@@ -25,6 +26,8 @@ def answer_question(
     model_provider: str | None = None,
     model_name: str | None = None,
     allow_mock_fallback: bool = False,
+    allow_live: bool = False,
+    require_offline: bool = False,
     conversation_context: list[dict[str, Any]] | None = None,
     memory_context: list[dict[str, Any]] | None = None,
     cfg: Settings = settings,
@@ -46,14 +49,72 @@ def answer_question(
     if retrieval["status"].startswith("ERROR_"):
         return retrieval
     retrieved = retrieval["retrieved_chunks"]
-    selected_memory_context = memory_context if memory_context is not None else active_memory_context(cfg)
+    try:
+        memory_selection = select_memory_context(cfg, items=memory_context)
+    except MemorySelectionError as exc:
+        return {
+            "status": exc.status,
+            "query": normalized_query,
+            "retrieved_chunks": retrieved,
+            "detail": exc.detail,
+        }
+    selected_memory_context = memory_selection["selected"]
+
+    preferred_provider = model_provider or cfg.default_model_provider
+    try:
+        model_route = plan_model_route(
+            task_type="cited_qa",
+            preferred_provider=preferred_provider,
+            preferred_model=model_name,
+            allow_live=allow_live,
+            require_offline=require_offline,
+            require_citations=True,
+        )
+    except ModelRoutingError as exc:
+        if not allow_mock_fallback:
+            return {
+                "status": exc.status,
+                "query": normalized_query,
+                "retrieved_chunks": retrieved,
+                "detail": exc.detail,
+            }
+        model_route = plan_model_route(
+            task_type="cited_qa",
+            preferred_provider="mock",
+            allowed_providers=["mock"],
+            allow_live=False,
+            require_offline=True,
+            require_citations=True,
+        )
+        model_route["fallback_reason"] = exc.status
+
+    if model_route["status"] != "MODEL_ROUTE_READY":
+        if allow_mock_fallback and model_route.get("selected_provider") != "mock":
+            model_route = plan_model_route(
+                task_type="cited_qa",
+                preferred_provider="mock",
+                allowed_providers=["mock"],
+                allow_live=False,
+                require_offline=True,
+                require_citations=True,
+            )
+            model_route["fallback_reason"] = "PRIMARY_ROUTE_BLOCKED"
+        else:
+            return {
+                "status": "ERROR_MODEL_ROUTE_BLOCKED",
+                "query": normalized_query,
+                "retrieved_chunks": retrieved,
+                "detail": model_route.get("selection_reason"),
+                "model_route": model_route,
+            }
+
     try:
         model = generate_answer(
             normalized_query,
             retrieved,
-            model_provider=model_provider,
-            model_name=model_name,
-            allow_mock_fallback=allow_mock_fallback,
+            model_provider=model_route["selected_provider"],
+            model_name=model_route["selected_model"],
+            allow_mock_fallback=False,
             conversation_context=conversation_context or [],
             memory_context=selected_memory_context,
         )
@@ -63,6 +124,7 @@ def answer_question(
             "query": normalized_query,
             "retrieved_chunks": retrieved,
             "detail": exc.detail,
+            "model_route": model_route,
         }
     retrieved_ids = [chunk["chunk_id"] for chunk in retrieved]
     cited_ids = model.get("cited_chunk_ids", [])
@@ -76,11 +138,16 @@ def answer_question(
         "prompt_template_id": "default_cited_rag_with_history_v1" if conversation_context else "default_cited_rag_v1",
         "conversation_context_turn_count": len(conversation_context or []),
         "memory_context_count": len(selected_memory_context),
+        "memory_selection_sha256": memory_selection["selection_sha256"],
+        "memory_excluded_count": memory_selection["excluded_count"],
         "memory_ids": [
             str(item.get("memory_id"))
             for item in selected_memory_context
             if item.get("memory_id")
         ],
+        "model_route_sha256": model_route["route_sha256"],
+        "model_route_selection_reason": model_route.get("selection_reason"),
+        "model_route_fallback_reason": model_route.get("fallback_reason"),
         "retrieval_strategy": retrieved[0].get("retrieval_strategy", "unknown") if retrieved else "none",
         "retrieved_chunk_ids": retrieved_ids,
         "cited_chunk_ids": cited_ids,
