@@ -9,7 +9,14 @@ from rasterio.transform import Affine, from_origin
 
 from backend.app.config import Settings
 from backend.app.gis_processing import GISProcessingError
-from backend.app.gis_raster import clip_raster_bbox, derive_raster_terrain, inspect_raster, resample_raster, sample_raster
+from backend.app.gis_raster import (
+    clip_raster_bbox,
+    derive_raster_hillshade,
+    derive_raster_terrain,
+    inspect_raster,
+    resample_raster,
+    sample_raster,
+)
 
 
 def make_settings(tmp_path: Path) -> Settings:
@@ -254,6 +261,126 @@ def test_derive_terrain_excludes_nodata_neighborhoods_and_flat_aspect(tmp_path: 
     assert flat_report["terrain_accounting"]["aspect_valid_cell_count"] == 0
     assert flat_report["output"]["bands"][0]["zero_cell_count"] == 9
     assert flat_report["output"]["bands"][1]["nodata_cell_count"] == 25
+
+
+def test_derive_hillshade_binds_terrain_lineage_and_illumination_direction(tmp_path: Path) -> None:
+    data = np.tile(np.arange(5, dtype="float32"), (5, 1))
+    source = make_terrain_raster(tmp_path / "east-rising-hillshade.tif", data)
+    west_light = derive_raster_hillshade(
+        source,
+        elevation_units="meters",
+        azimuth_degrees=270,
+        altitude_degrees=45,
+        cfg=make_settings(tmp_path),
+    )
+
+    assert west_light["status"] == "GIS_RASTER_HILLSHADE_OK"
+    assert west_light["parameters"]["azimuth_degrees_clockwise_from_north"] == 270.0
+    assert west_light["terrain_lineage"]["output_sha256"]
+    assert west_light["hillshade_accounting"] == {
+        "total_cell_count": 25,
+        "valid_cell_count": 9,
+        "nodata_cell_count": 16,
+        "flat_cell_count": 0,
+        "shadow_cell_count": 0,
+        "illuminated_cell_count": 9,
+        "fully_lit_cell_count": 9,
+    }
+    assert west_light["output"]["bands"][0]["minimum"] == pytest.approx(255.0)
+    assert west_light["output"]["bands"][0]["maximum"] == pytest.approx(255.0)
+    assert all(west_light["invariants"].values())
+
+    with rasterio.open(west_light["output"]["path"]) as output:
+        assert output.count == 1
+        assert output.dtypes == ("float32",)
+        assert output.nodatavals == (-9999.0,)
+        assert output.descriptions == ("hillshade_0_255",)
+        assert int(output.read(1, masked=True).count()) == 9
+
+    east_light = derive_raster_hillshade(
+        source,
+        elevation_units="meters",
+        azimuth_degrees=90,
+        altitude_degrees=45,
+        cfg=make_settings(tmp_path),
+    )
+    assert east_light["hillshade_accounting"]["shadow_cell_count"] == 9
+    assert east_light["output"]["bands"][0]["maximum"] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_derive_hillshade_preserves_flat_and_nodata_states(tmp_path: Path) -> None:
+    flat = np.ones((5, 5), dtype="float32")
+    flat_report = derive_raster_hillshade(
+        make_terrain_raster(tmp_path / "flat-hillshade.tif", flat),
+        elevation_units="meters",
+        azimuth_degrees=315,
+        altitude_degrees=30,
+        cfg=make_settings(tmp_path),
+    )
+    assert flat_report["hillshade_accounting"]["flat_cell_count"] == 9
+    assert flat_report["hillshade_accounting"]["valid_cell_count"] == 9
+    assert flat_report["output"]["bands"][0]["minimum"] == pytest.approx(127.5)
+    assert flat_report["output"]["bands"][0]["nodata_cell_count"] == 16
+
+    nodata = np.tile(np.arange(7, dtype="float32"), (7, 1))
+    nodata[3, 3] = -9999.0
+    nodata_report = derive_raster_hillshade(
+        make_terrain_raster(tmp_path / "nodata-hillshade.tif", nodata),
+        elevation_units="meters",
+        cfg=make_settings(tmp_path),
+    )
+    assert nodata_report["hillshade_accounting"]["valid_cell_count"] == 16
+    assert nodata_report["hillshade_accounting"]["nodata_cell_count"] == 33
+    assert nodata_report["invariants"]["terrain_validity_mask_preserved"] is True
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected_status"),
+    [
+        ({"azimuth_degrees": -1}, "ERROR_GIS_HILLSHADE_AZIMUTH"),
+        ({"azimuth_degrees": 360}, "ERROR_GIS_HILLSHADE_AZIMUTH"),
+        ({"azimuth_degrees": float("nan")}, "ERROR_GIS_HILLSHADE_AZIMUTH"),
+        ({"altitude_degrees": 0}, "ERROR_GIS_HILLSHADE_ALTITUDE"),
+        ({"altitude_degrees": 91}, "ERROR_GIS_HILLSHADE_ALTITUDE"),
+        ({"altitude_degrees": float("inf")}, "ERROR_GIS_HILLSHADE_ALTITUDE"),
+    ],
+)
+def test_derive_hillshade_rejects_invalid_illumination_before_writing_artifacts(
+    tmp_path: Path,
+    kwargs: dict[str, float],
+    expected_status: str,
+) -> None:
+    source = make_terrain_raster(
+        tmp_path / f"{expected_status}.tif",
+        np.ones((5, 5), dtype="float32"),
+    )
+    with pytest.raises(GISProcessingError) as exc:
+        derive_raster_hillshade(
+            source,
+            elevation_units="meters",
+            cfg=make_settings(tmp_path),
+            **kwargs,
+        )
+    assert exc.value.status == expected_status
+    report_dir = tmp_path / "data" / "exports" / "gis_reports"
+    assert not list(report_dir.glob("*"))
+
+
+def test_derive_hillshade_fails_closed_when_no_valid_neighborhood_exists(tmp_path: Path) -> None:
+    source = make_terrain_raster(
+        tmp_path / "all-nodata.tif",
+        np.full((5, 5), -9999.0, dtype="float32"),
+    )
+    cfg = make_settings(tmp_path)
+
+    with pytest.raises(GISProcessingError) as exc:
+        derive_raster_hillshade(source, elevation_units="meters", cfg=cfg)
+
+    assert exc.value.status == "ERROR_GIS_HILLSHADE_EMPTY"
+    report_dir = tmp_path / "data" / "exports" / "gis_reports"
+    assert len(list(report_dir.glob("*.json"))) == 1
+    assert len(list(report_dir.glob("*.tif"))) == 1
+    assert not list(report_dir.glob("*.tmp.tif"))
 
 
 @pytest.mark.parametrize(

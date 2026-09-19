@@ -1,9 +1,9 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 48,
-    "operation_count": 22,
-    "negative_case_count": 17
+    "case_count": 52,
+    "operation_count": 23,
+    "negative_case_count": 20
   },
   "cases": [
     {
@@ -2439,6 +2439,133 @@
       },
       "expect_error": true,
       "expected_status": "ERROR_GIS_TERRAIN_BAND",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "raster_hillshade_west_light_east_rising_plane",
+      "operation": "raster_hillshade",
+      "parameters": {
+        "band": 1,
+        "elevation_units": "meters",
+        "azimuth_degrees": 270,
+        "altitude_degrees": 45
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [
+            [
+              [0, 1, 2, 3, 4],
+              [0, 1, 2, 3, 4],
+              [0, 1, 2, 3, 4],
+              [0, 1, 2, 3, 4],
+              [0, 1, 2, 3, 4]
+            ]
+          ]
+        }
+      },
+      "expected_status": "GIS_RASTER_HILLSHADE_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "terrain_lineage_hashes_present": true,
+        "terrain_source_identity_bound": true,
+        "dimensions_preserved": true,
+        "crs_preserved": true,
+        "transform_preserved": true,
+        "bounds_preserved": true,
+        "output_band_count_exact": true,
+        "output_semantics_exact": true,
+        "cell_accounting_closed": true,
+        "illumination_accounting_closed": true,
+        "hillshade_range_bounded": true,
+        "terrain_validity_mask_preserved": true,
+        "transactional_output_published": true
+      },
+      "expected_fields": {
+        "parameters.adapter": "terrain_slope_aspect_cosine_v1",
+        "parameters.azimuth_degrees_clockwise_from_north": 270.0,
+        "parameters.altitude_degrees_above_horizon": 45.0,
+        "hillshade_accounting.total_cell_count": 25,
+        "hillshade_accounting.valid_cell_count": 9,
+        "hillshade_accounting.nodata_cell_count": 16,
+        "hillshade_accounting.shadow_cell_count": 0,
+        "hillshade_accounting.fully_lit_cell_count": 9,
+        "output.band_count": 1,
+        "output.bands.0.minimum": 255.0,
+        "output.bands.0.maximum": 255.0
+      }
+    },
+    {
+      "case_id": "raster_hillshade_invalid_azimuth_fails_closed",
+      "operation": "raster_hillshade",
+      "parameters": {
+        "band": 1,
+        "elevation_units": "meters",
+        "azimuth_degrees": 360,
+        "altitude_degrees": 45
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [[[0, 1, 2], [0, 1, 2], [0, 1, 2]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_HILLSHADE_AZIMUTH",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "raster_hillshade_invalid_altitude_fails_closed",
+      "operation": "raster_hillshade",
+      "parameters": {
+        "band": 1,
+        "elevation_units": "meters",
+        "azimuth_degrees": 315,
+        "altitude_degrees": 0
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [[[0, 1, 2], [0, 1, 2], [0, 1, 2]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_HILLSHADE_ALTITUDE",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "raster_hillshade_all_nodata_fails_closed",
+      "operation": "raster_hillshade",
+      "parameters": {
+        "band": 1,
+        "elevation_units": "meters",
+        "azimuth_degrees": 315,
+        "altitude_degrees": 45
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [[[-9999, -9999, -9999], [-9999, -9999, -9999], [-9999, -9999, -9999]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_HILLSHADE_EMPTY",
       "expected_warnings": []
     }
   ]

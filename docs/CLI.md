@@ -74,6 +74,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis zonal-stats VECTOR_PATH RASTER_PATH` | Compute cell-center zonal count/sum/min/max/mean/median/population-standard-deviation receipts with zero/NODATA separation | 0 | 2 |
 | `mucaro gis resample-raster RASTER_PATH --width N --height N --method METHOD` | Transactionally resample to explicit dimensions while preserving extent, CRS, band count, and NODATA declarations | 0 | 2 |
 | `mucaro gis derive-terrain RASTER_PATH --elevation-units meters` | Derive two-band slope/aspect output from a projected metre elevation grid with complete 3x3-neighborhood accounting | 0 | 2 |
+| `mucaro gis derive-hillshade RASTER_PATH --elevation-units meters` | Derive terrain-lineage-bound 0..255 hillshade with explicit azimuth/altitude and zero/NODATA separation | 0 | 2 |
 | `mucaro gis validate-corpus MANIFEST_PATH` | Validate frozen authoritative GIS corpus bytes, provenance, explicit asset types, vector identities/geometries, and raster grids/value accounting | 0 | 2 |
 | `mucaro gis map-export-manifest OUTPUT_PATH --layer PATH CRS ...` | Bind an existing map/export artifact to renderer identity, extent, CRS, and source-layer hashes | 0 | 2 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
@@ -234,7 +235,7 @@ vertical or time-dependent CRS certification remain outside the V1 claim.
 
 `inspect-vector`, `inspect-raster`, `sample-raster`,
 `clip-raster-bbox`, `vector-raster`, `zonal-stats`, `resample-raster`,
-`derive-terrain`, and `validate-corpus` expose the bounded V1
+`derive-terrain`, `derive-hillshade`, and `validate-corpus` expose the bounded V1
 vector/raster plane. GeoPackage inspection is metadata-first; Shapefile
 identity includes sidecar manifestations; raster sampling requires coordinates
 already in the raster CRS; clipping does not reproject; vector-raster analysis
@@ -251,8 +252,12 @@ including the exact export query, response headers, byte identity, embedded
 projected CRS, grid, NODATA, and band-value statistics. Terrain derivation
 requires explicit metre elevation units and a projected metre CRS, outputs
 slope and clockwise-from-north aspect, and emits values only for complete valid
-3x3 neighborhoods; flat-cell aspect is NODATA. The real corpus and terrain
-operation remain bounded and do not establish broad raster, remote-sensing,
+3x3 neighborhoods; flat-cell aspect is NODATA. Hillshade binds that exact
+terrain report and raster hash, requires explicit light azimuth and altitude,
+and writes float32 values from 0 through 255 so a zero-valued shadow remains
+distinct from -9999 NODATA. It is a bounded direct-light visualization model,
+not measured radiance or cast-shadow analysis. The real corpus and terrain
+operations remain bounded and do not establish broad raster, remote-sensing,
 hydrology, or bathymetry readiness.
 Numeric zero, NODATA, outside, null/empty, and unresolved states remain distinct.
 
@@ -498,6 +503,11 @@ approved and audited.
 | `ERROR_GIS_TERRAIN_TRANSFORM` | terrain derivation received a rotated, sheared, or zero-resolution grid |
 | `ERROR_GIS_TERRAIN_DIMENSIONS` | terrain derivation received a grid smaller than 3x3 or larger than the bounded cell limit |
 | `ERROR_GIS_TERRAIN` | terrain derivation or output verification failed before transactional publication |
+| `ERROR_GIS_HILLSHADE_AZIMUTH` | hillshade azimuth is not finite or falls outside `[0,360)` |
+| `ERROR_GIS_HILLSHADE_ALTITUDE` | hillshade altitude is not finite or falls outside `(0,90]` |
+| `ERROR_GIS_HILLSHADE_TERRAIN` | the intermediate slope/aspect manifestation violates the certified terrain semantics |
+| `ERROR_GIS_HILLSHADE_EMPTY` | no complete valid terrain neighborhood exists from which to derive hillshade |
+| `ERROR_GIS_HILLSHADE` | hillshade derivation or output verification failed before transactional publication |
 | `ERROR_GIS_VECTOR_RASTER_NOT_FOUND` | vector-raster analysis could not find both inputs |
 | `ERROR_GIS_VECTOR_RASTER_VECTOR` | vector-raster analysis received malformed GeoJSON |
 | `ERROR_GIS_VECTOR_RASTER_RASTER` | vector-raster analysis could not open the raster |
@@ -608,6 +618,7 @@ mucaro gis vector-raster data/input/zones.geojson data/input/elevation.tif --ban
 mucaro gis zonal-stats data/input/zones.geojson data/input/elevation.tif --band 1 --format text
 mucaro gis resample-raster data/input/elevation.tif --width 1024 --height 1024 --method bilinear --format text
 mucaro gis derive-terrain data/input/elevation-utm.tif --band 1 --elevation-units meters --format text
+mucaro gis derive-hillshade data/input/elevation-utm.tif --band 1 --elevation-units meters --azimuth 315 --altitude 45 --format text
 mucaro gis validate-corpus _architecture/gis_real_corpus_manifest.json --format text
 mucaro gis map-export-manifest data/exports/map.png --layer data/input/zones.geojson EPSG:4326 --extent -67 17 -65 19 --output-crs EPSG:4326 --renderer qgis --renderer-version 3.40 --format text
 mucaro certify retrieval-quality --format text
@@ -918,9 +929,10 @@ invalid bbox extents, bbox clipping with null and dimensional residue
 accounting, fail-closed invalid Web Mercator latitude handling, offline-only
 PROJ candidate/grid selection, explicit EPSG axis-order controls, bounded WGS84
 antimeridian and polar line/polygon controls, and unresolved invalid
-longitude/latitude residue, a frozen real USGS 3DEP raster manifestation, and
-bounded projected-metre slope/aspect controls. The current committed denominator
-is 48 cases across 22 operations, including 17 fail-closed negative cases.
+longitude/latitude residue, a frozen real USGS 3DEP raster manifestation,
+bounded projected-metre slope/aspect controls, and terrain-lineage-bound
+hillshade. The current committed denominator is 52 cases across 23 operations,
+including 20 fail-closed negative cases.
 It returns `GIS_EVAL_OK` only when the fixture and every case pass;
 `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives automation a hard
 regression signal.

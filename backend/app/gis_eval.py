@@ -29,7 +29,14 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
-from .gis_raster import clip_raster_bbox, derive_raster_terrain, inspect_raster, resample_raster, sample_raster
+from .gis_raster import (
+    clip_raster_bbox,
+    derive_raster_hillshade,
+    derive_raster_terrain,
+    inspect_raster,
+    resample_raster,
+    sample_raster,
+)
 from .gis_topology_repair import repair_geojson_topology
 from .gis_vector_formats import inspect_vector_format
 from .gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
@@ -67,6 +74,7 @@ VALID_OPERATIONS = {
     "zonal_stats",
     "raster_resample",
     "raster_terrain",
+    "raster_hillshade",
     "corpus_validate",
     "map_export",
 }
@@ -391,6 +399,15 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             paths["raster"],
             band=int(parameters.get("band", 1)),
             elevation_units=str(parameters.get("elevation_units") or ""),
+            cfg=cfg,
+        )
+    if operation == "raster_hillshade":
+        return derive_raster_hillshade(
+            paths["raster"],
+            band=int(parameters.get("band", 1)),
+            elevation_units=str(parameters.get("elevation_units") or ""),
+            azimuth_degrees=parameters.get("azimuth_degrees", 315.0),
+            altitude_degrees=parameters.get("altitude_degrees", 45.0),
             cfg=cfg,
         )
     if operation == "corpus_validate":
