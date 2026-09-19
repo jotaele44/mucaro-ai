@@ -29,7 +29,7 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
-from .gis_raster import clip_raster_bbox, inspect_raster, resample_raster, sample_raster
+from .gis_raster import clip_raster_bbox, derive_raster_terrain, inspect_raster, resample_raster, sample_raster
 from .gis_topology_repair import repair_geojson_topology
 from .gis_vector_formats import inspect_vector_format
 from .gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
@@ -66,6 +66,7 @@ VALID_OPERATIONS = {
     "vector_raster",
     "zonal_stats",
     "raster_resample",
+    "raster_terrain",
     "corpus_validate",
     "map_export",
 }
@@ -383,6 +384,13 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             width=int(parameters.get("width", 0)),
             height=int(parameters.get("height", 0)),
             method=str(parameters.get("method") or "nearest"),
+            cfg=cfg,
+        )
+    if operation == "raster_terrain":
+        return derive_raster_terrain(
+            paths["raster"],
+            band=int(parameters.get("band", 1)),
+            elevation_units=str(parameters.get("elevation_units") or ""),
             cfg=cfg,
         )
     if operation == "corpus_validate":

@@ -188,11 +188,26 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             "nodata_accounting_recorded",
             "transactional_output_published",
             "asset_accounting_closed",
+            "asset_type_accounting_closed",
             "all_asset_hashes_matched",
             "all_feature_counts_matched",
             "all_stable_ids_present_and_unique",
             "all_geometries_valid",
             "all_coordinate_dimensions_accounted",
+            "all_raster_grids_matched",
+            "all_raster_band_values_accounted",
+            "projected_crs_required",
+            "horizontal_units_metre",
+            "vertical_units_metre",
+            "axis_aligned_transform",
+            "dimensions_preserved",
+            "transform_preserved",
+            "output_band_count_exact",
+            "source_cell_accounting_closed",
+            "slope_cell_accounting_closed",
+            "aspect_cell_accounting_closed",
+            "neighborhood_accounting_closed",
+            "flat_aspect_accounting_closed",
             "provenance_complete",
         ):
             if key in invariants:
@@ -609,30 +624,127 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 _contract_check("raster_resample.output_bands", isinstance(_dotted(report, "output.bands"), list) and len(_dotted(report, "output.bands")) == _dotted(report, "output.band_count"), "output band value accounting is required"),
             ]
         )
+    elif operation == "derive_raster_terrain":
+        accounting = report.get("terrain_accounting")
+        output_bands = _dotted(report, "output.bands")
+        output_band_receipts_valid = (
+            isinstance(output_bands, list)
+            and len(output_bands) == 2
+            and all(isinstance(row, dict) for row in output_bands)
+        )
+        checks.extend(
+            [
+                _contract_check("terrain.adapter", _dotted(report, "parameters.adapter") == "numpy_gradient_3x3_complete_neighborhood_v1", "terrain adapter identity must be frozen"),
+                _contract_check("terrain.band", isinstance(_dotted(report, "parameters.band"), int) and _dotted(report, "parameters.band") >= 1, "terrain band must be one-based"),
+                _contract_check("terrain.elevation_units", _dotted(report, "parameters.elevation_units") == "meters", "terrain elevation units must be explicitly meters"),
+                _contract_check("terrain.horizontal_units", _dotted(report, "parameters.horizontal_units") == "meters" and _dotted(report, "parameters.horizontal_unit_factor") == 1.0, "terrain horizontal units must resolve to metres"),
+                _contract_check("terrain.neighborhood_policy", _dotted(report, "parameters.neighborhood_policy") == "complete_3x3", "terrain neighborhood policy must be complete 3x3"),
+                _contract_check("terrain.flat_aspect_policy", _dotted(report, "parameters.flat_aspect_policy") == "NODATA", "flat-cell aspect policy must be NODATA"),
+                _contract_check("terrain.output_hash", bool(_dotted(report, "output.sha256")), "terrain output hash is required"),
+                _contract_check("terrain.crs", _dotted(report, "source.crs") == _dotted(report, "output.crs"), "terrain source and output CRS must match"),
+                _contract_check("terrain.transform", _dotted(report, "source.transform") == _dotted(report, "output.transform"), "terrain source and output transforms must match"),
+                _contract_check("terrain.bounds", _dotted(report, "source.bounds") == _dotted(report, "output.bounds"), "terrain source and output bounds must match"),
+                _contract_check("terrain.width", _dotted(report, "source.width") == _dotted(report, "output.width"), "terrain source and output widths must match"),
+                _contract_check("terrain.height", _dotted(report, "source.height") == _dotted(report, "output.height"), "terrain source and output heights must match"),
+                _contract_check("terrain.output_band_count", _dotted(report, "output.band_count") == 2, "terrain output must contain slope and aspect bands"),
+                _contract_check("terrain.output_dtypes", _dotted(report, "output.dtypes") == ["float32", "float32"], "terrain output bands must be float32"),
+                _contract_check("terrain.output_nodata", _dotted(report, "output.nodata_values") == [-9999.0, -9999.0], "terrain output NODATA declaration must be frozen"),
+                _contract_check("terrain.output_descriptions", _dotted(report, "output.descriptions") == ["slope_degrees", "aspect_degrees_clockwise_from_north"], "terrain output band descriptions must be frozen"),
+                _contract_check("terrain.output_bands", output_band_receipts_valid, "terrain output band receipts are required"),
+                _contract_check("terrain.accounting", isinstance(accounting, dict), "terrain accounting is required"),
+            ]
+        )
+        if isinstance(accounting, dict) and output_band_receipts_valid:
+            total = accounting.get("total_cell_count")
+            neighborhood_valid = accounting.get("neighborhood_valid_cell_count")
+            neighborhood_excluded = accounting.get("neighborhood_excluded_cell_count")
+            flat = accounting.get("flat_cell_count")
+            checks.extend(
+                [
+                    _contract_check("terrain.source_accounting", isinstance(total, int) and accounting.get("source_valid_cell_count", -1) + accounting.get("source_nodata_cell_count", -1) == total, "terrain source valid and NODATA counts must close"),
+                    _contract_check("terrain.neighborhood_accounting", all(isinstance(value, int) for value in (total, neighborhood_valid, neighborhood_excluded)) and neighborhood_valid + neighborhood_excluded == total, "terrain neighborhood valid and excluded counts must close"),
+                    _contract_check("terrain.slope_accounting", isinstance(total, int) and isinstance(neighborhood_valid, int) and output_bands[0].get("valid_cell_count") == neighborhood_valid and output_bands[0].get("valid_cell_count", -1) + output_bands[0].get("nodata_cell_count", -1) == total, "slope accounting must close to complete neighborhoods"),
+                    _contract_check("terrain.aspect_accounting", all(isinstance(value, int) for value in (total, neighborhood_valid, flat)) and output_bands[1].get("valid_cell_count", -1) + flat == neighborhood_valid and output_bands[1].get("valid_cell_count", -1) + output_bands[1].get("nodata_cell_count", -1) == total, "aspect accounting must separate flat cells from complete neighborhoods"),
+                ]
+            )
     elif operation == "validate_real_gis_corpus":
         assets = report.get("assets")
-        checks.append(_contract_check("gis_corpus.assets", isinstance(assets, list) and bool(assets), "real GIS corpus report must include assets"))
+        asset_type_counts = report.get("asset_type_counts")
+        checks.extend(
+            [
+                _contract_check("gis_corpus.assets", isinstance(assets, list) and bool(assets), "real GIS corpus report must include assets"),
+                _contract_check("gis_corpus.asset_type_counts", isinstance(asset_type_counts, dict), "real GIS corpus report must include asset-type counts"),
+            ]
+        )
         if isinstance(assets, list):
+            observed_asset_type_counts = {
+                asset_type: sum(isinstance(asset, dict) and asset.get("asset_type") == asset_type for asset in assets)
+                for asset_type in ("geojson", "raster")
+            }
+            checks.append(
+                _contract_check(
+                    "gis_corpus.asset_type_accounting",
+                    asset_type_counts == observed_asset_type_counts,
+                    "corpus asset-type counts must close to receipt rows",
+                )
+            )
             for index, asset in enumerate(assets):
-                dimension_counts = asset.get("coordinate_dimension_counts") if isinstance(asset, dict) else None
+                asset_type = asset.get("asset_type") if isinstance(asset, dict) else None
                 checks.extend(
                     [
                         _contract_check(f"gis_corpus.assets.{index}.sha256", isinstance(asset, dict) and bool(asset.get("sha256")), "corpus asset hash is required"),
                         _contract_check(f"gis_corpus.assets.{index}.bytes", isinstance(asset, dict) and isinstance(asset.get("bytes"), int) and asset["bytes"] > 0, "corpus asset bytes must be positive"),
                         _contract_check(f"gis_corpus.assets.{index}.authority", isinstance(asset, dict) and bool(asset.get("authority")), "corpus authority is required"),
+                        _contract_check(f"gis_corpus.assets.{index}.source_url", isinstance(asset, dict) and bool(asset.get("source_url")), "corpus source URL is required"),
+                        _contract_check(f"gis_corpus.assets.{index}.query", isinstance(asset, dict) and isinstance(asset.get("query"), dict) and bool(asset.get("query")), "corpus source query is required"),
                         _contract_check(f"gis_corpus.assets.{index}.retrieval_utc", isinstance(asset, dict) and bool(asset.get("retrieval_utc")), "corpus retrieval UTC is required"),
                         _contract_check(f"gis_corpus.assets.{index}.crs", isinstance(asset, dict) and bool(asset.get("declared_crs")), "corpus declared CRS is required"),
-                        _contract_check(f"gis_corpus.assets.{index}.stable_ids", isinstance(asset, dict) and asset.get("stable_id_unique") is True, "corpus stable IDs must be unique"),
-                        _contract_check(f"gis_corpus.assets.{index}.geometries", isinstance(asset, dict) and asset.get("geometry_valid_count") == asset.get("feature_count"), "all corpus geometries must be valid"),
-                        _contract_check(
-                            f"gis_corpus.assets.{index}.dimensions",
-                            isinstance(dimension_counts, dict)
-                            and all(isinstance(value, int) and value >= 0 for value in dimension_counts.values())
-                            and sum(dimension_counts.values()) == asset.get("feature_count"),
-                            "corpus coordinate dimensions must close to feature count",
-                        ),
+                        _contract_check(f"gis_corpus.assets.{index}.asset_type", asset_type in {"geojson", "raster"}, "corpus asset type must be explicit and supported"),
                     ]
                 )
+                if asset_type == "geojson":
+                    dimension_counts = asset.get("coordinate_dimension_counts")
+                    checks.extend(
+                        [
+                            _contract_check(f"gis_corpus.assets.{index}.stable_ids", asset.get("stable_id_unique") is True, "GeoJSON corpus stable IDs must be unique"),
+                            _contract_check(f"gis_corpus.assets.{index}.geometries", asset.get("geometry_valid_count") == asset.get("feature_count"), "all GeoJSON corpus geometries must be valid"),
+                            _contract_check(
+                                f"gis_corpus.assets.{index}.dimensions",
+                                isinstance(dimension_counts, dict)
+                                and all(isinstance(value, int) and value >= 0 for value in dimension_counts.values())
+                                and sum(dimension_counts.values()) == asset.get("feature_count"),
+                                "GeoJSON corpus coordinate dimensions must close to feature count",
+                            ),
+                        ]
+                    )
+                elif asset_type == "raster":
+                    bands = asset.get("bands")
+                    cell_count = asset.get("grid_cell_count")
+                    checks.extend(
+                        [
+                            _contract_check(f"gis_corpus.assets.{index}.embedded_crs", asset.get("embedded_crs") == asset.get("declared_crs"), "raster embedded and declared CRS must match"),
+                            _contract_check(f"gis_corpus.assets.{index}.grid", isinstance(asset.get("width"), int) and isinstance(asset.get("height"), int) and asset.get("width", 0) * asset.get("height", 0) == cell_count, "raster grid dimensions must close to cell count"),
+                            _contract_check(f"gis_corpus.assets.{index}.bands", isinstance(bands, list) and len(bands) == asset.get("band_count"), "raster band receipts must close to band count"),
+                            _contract_check(
+                                f"gis_corpus.assets.{index}.band_accounting",
+                                asset.get("band_accounting_closed") is True
+                                and isinstance(bands, list)
+                                and all(
+                                    isinstance(row, dict)
+                                    and isinstance(row.get("valid_cell_count"), int)
+                                    and isinstance(row.get("nodata_cell_count"), int)
+                                    and row.get("valid_cell_count", -1) + row.get("nodata_cell_count", -1) == cell_count
+                                    and isinstance(row.get("zero_cell_count"), int)
+                                    and row.get("zero_cell_count", -1) <= row.get("valid_cell_count", -1)
+                                    for row in bands
+                                ),
+                                "raster valid, NODATA, and zero accounting must close",
+                            ),
+                            _contract_check(f"gis_corpus.assets.{index}.elevation_units", asset.get("elevation_units") == "meters" and bool(asset.get("elevation_units_evidence")), "raster elevation units and evidence must be frozen"),
+                            _contract_check(f"gis_corpus.assets.{index}.manifestation", bool(asset.get("source_manifestation")), "raster source manifestation classification is required"),
+                            _contract_check(f"gis_corpus.assets.{index}.response_headers", isinstance(asset.get("response_headers"), dict) and bool(asset.get("response_headers")), "raster export response headers are required"),
+                        ]
+                    )
     elif operation == "create_map_export_manifest":
         layers = report.get("layers")
         checks.extend(
@@ -979,7 +1091,8 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "vector-raster analysis requires exact CRS agreement, separates NODATA from zero, and closes feature states",
                 "zonal statistics close covered, valid, NODATA, and zero-cell accounting before reporting numeric summaries",
                 "raster resampling preserves extent, CRS, band count, and NODATA declarations while recording a new output hash",
-                "authoritative corpus fixtures preserve immutable bytes, query provenance, schema, stable IDs, geometry types, and validity",
+                "authoritative corpus fixtures preserve immutable bytes, query provenance, explicit asset types, vector schema/identity/geometry, and raster grid/value accounting",
+                "terrain derivation requires projected horizontal metres and explicit vertical metres, preserves grid identity, and separates complete neighborhoods, NODATA, and flat aspect",
                 "map/export provenance binds output hash, extent, CRS, renderer identity, and every declared source-layer hash",
             ),
             positive_regression_gates=(
@@ -1001,7 +1114,8 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "vector-raster fixture preserves valid zero, NODATA-only, and NULL/EMPTY as distinct states",
                 "zonal-statistics fixture records count, sum, minimum, maximum, mean, median, population standard deviation, zero, and NODATA states",
                 "raster-resampling fixture preserves the requested dimensions, extent, CRS, band count, and NODATA declaration",
-                "frozen Census TIGERweb and USGS snapshots validate exact bytes, authority, retrieval UTC, stable IDs, schemas, and geometry accounting",
+                "frozen Census TIGERweb, USGS earthquake, and USGS 3DEP raster manifestations validate exact bytes, authority, retrieval UTC, type-specific schema, and accounting",
+                "analytic terrain fixture proves slope/aspect orientation and complete-neighborhood accounting on a projected metre grid",
                 "GIS report contract validator accepts real saved measurement receipts and rejects weak provenance or false accounting",
                 "GIS eval manifest runs positive and negative fixtures through the supported CLI boundary",
                 "map export fixture preserves renderer identity plus source and derived layer hashes",
@@ -1023,7 +1137,8 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "vector-raster analysis fails closed on absent or mismatched CRS and invalid bands",
                 "zonal statistics fail closed on invalid bands and retain malformed, dimensional, invalid, and NULL/EMPTY feature states",
                 "raster resampling fails closed on unsupported methods, absent CRS, invalid dimensions, or excessive output-cell requests",
-                "real-corpus validation fails closed on byte drift, path escape, duplicate IDs, schema drift, count mismatch, or invalid geometry",
+                "terrain derivation fails closed on geographic/non-metre/rotated grids, invalid bands, and grids outside the bounded dimensions",
+                "real-corpus validation fails closed on byte drift, path escape, unknown asset type, vector ID/schema/geometry drift, or raster grid/value drift",
                 "map/export provenance fails closed on empty artifacts, invalid extents, missing layer CRS, or absent renderer identity",
                 "GIS report contract validation fails when warning status, source hashes, CRS, or asserted accounting are missing or inconsistent",
                 "ambiguous nearest-neighbor match remains UNRESOLVED",
@@ -1041,8 +1156,8 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "topology policy and overlay operations extend beyond explicit planar make_valid and the current Polygon/MultiPolygon boundary",
                 "independently frozen local datum-grid transformations, vertical CRS, time-dependent operations, and broader axis-order cases are certified",
                 "ellipsoidal hole-orientation and large-geometry edge cases close beyond the bounded antimeridian and polar control corpus",
-                "broader vector/raster formats, fractional zonal coverage, additional resampling kernels, remote sensing, terrain, hydrology, bathymetry, and temporal GIS are receipt-backed",
-                "rendered-map visual correctness, real raster sources, and a larger and more diverse real spatial corpus are independently certified",
+                "broader vector/raster formats, fractional zonal coverage, additional resampling kernels, remote sensing, broader terrain algorithms, hydrology, bathymetry, and temporal GIS are receipt-backed",
+                "rendered-map visual correctness and larger, more diverse real vector/raster corpora are independently certified",
             ),
         ),
         CapabilityContract(

@@ -73,7 +73,8 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis vector-raster VECTOR_PATH RASTER_PATH` | Summarize raster cells covered by GeoJSON features with exact-CRS and NODATA controls | 0 | 2 |
 | `mucaro gis zonal-stats VECTOR_PATH RASTER_PATH` | Compute cell-center zonal count/sum/min/max/mean/median/population-standard-deviation receipts with zero/NODATA separation | 0 | 2 |
 | `mucaro gis resample-raster RASTER_PATH --width N --height N --method METHOD` | Transactionally resample to explicit dimensions while preserving extent, CRS, band count, and NODATA declarations | 0 | 2 |
-| `mucaro gis validate-corpus MANIFEST_PATH` | Validate frozen authoritative GIS corpus bytes, provenance, schema, stable IDs, and geometries | 0 | 2 |
+| `mucaro gis derive-terrain RASTER_PATH --elevation-units meters` | Derive two-band slope/aspect output from a projected metre elevation grid with complete 3x3-neighborhood accounting | 0 | 2 |
+| `mucaro gis validate-corpus MANIFEST_PATH` | Validate frozen authoritative GIS corpus bytes, provenance, explicit asset types, vector identities/geometries, and raster grids/value accounting | 0 | 2 |
 | `mucaro gis map-export-manifest OUTPUT_PATH --layer PATH CRS ...` | Bind an existing map/export artifact to renderer identity, extent, CRS, and source-layer hashes | 0 | 2 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
@@ -232,8 +233,8 @@ frozen local datum-grid transformations, broader axis-order coverage, and
 vertical or time-dependent CRS certification remain outside the V1 claim.
 
 `inspect-vector`, `inspect-raster`, `sample-raster`,
-`clip-raster-bbox`, `vector-raster`, `zonal-stats`, `resample-raster`, and
-`validate-corpus` expose the bounded V1
+`clip-raster-bbox`, `vector-raster`, `zonal-stats`, `resample-raster`,
+`derive-terrain`, and `validate-corpus` expose the bounded V1
 vector/raster plane. GeoPackage inspection is metadata-first; Shapefile
 identity includes sidecar manifestations; raster sampling requires coordinates
 already in the raster CRS; clipping does not reproject; vector-raster analysis
@@ -245,7 +246,14 @@ extent, CRS, band count, and NODATA declaration; it does not claim pixel-level
 semantic equivalence. The committed real-corpus manifest freezes a bounded
 Census TIGERweb polygon subset and fixed-window USGS earthquake points by raw
 bytes, query provenance, retrieval UTC, schema, stable IDs, and geometry
-accounting. It is not an exhaustive source denominator or a real-raster corpus.
+accounting. It also freezes one USGS 3DEP dynamic-service TIFF manifestation,
+including the exact export query, response headers, byte identity, embedded
+projected CRS, grid, NODATA, and band-value statistics. Terrain derivation
+requires explicit metre elevation units and a projected metre CRS, outputs
+slope and clockwise-from-north aspect, and emits values only for complete valid
+3x3 neighborhoods; flat-cell aspect is NODATA. The real corpus and terrain
+operation remain bounded and do not establish broad raster, remote-sensing,
+hydrology, or bathymetry readiness.
 Numeric zero, NODATA, outside, null/empty, and unresolved states remain distinct.
 
 `mucaro gis map-export-manifest` does not render a map. It binds an existing
@@ -484,6 +492,12 @@ approved and audited.
 | `ERROR_GIS_RASTER_RESAMPLE_METHOD` | raster resampling received a method outside nearest or bilinear |
 | `ERROR_GIS_RASTER_RESAMPLE_CRS` | raster resampling received a source without a declared CRS |
 | `ERROR_GIS_RASTER_RESAMPLE` | raster resampling or output verification failed before a governed receipt was returned |
+| `ERROR_GIS_TERRAIN_BAND` | terrain derivation received an invalid one-based elevation band |
+| `ERROR_GIS_TERRAIN_CRS` | terrain derivation received a missing, geographic, or unresolvable projected CRS |
+| `ERROR_GIS_TERRAIN_UNITS` | terrain derivation did not receive explicit metre vertical units or a projected one-metre horizontal unit |
+| `ERROR_GIS_TERRAIN_TRANSFORM` | terrain derivation received a rotated, sheared, or zero-resolution grid |
+| `ERROR_GIS_TERRAIN_DIMENSIONS` | terrain derivation received a grid smaller than 3x3 or larger than the bounded cell limit |
+| `ERROR_GIS_TERRAIN` | terrain derivation or output verification failed before transactional publication |
 | `ERROR_GIS_VECTOR_RASTER_NOT_FOUND` | vector-raster analysis could not find both inputs |
 | `ERROR_GIS_VECTOR_RASTER_VECTOR` | vector-raster analysis received malformed GeoJSON |
 | `ERROR_GIS_VECTOR_RASTER_RASTER` | vector-raster analysis could not open the raster |
@@ -494,6 +508,7 @@ approved and audited.
 | `ERROR_GIS_CORPUS_PATH` | GIS corpus asset path escapes the configured project root |
 | `ERROR_GIS_CORPUS_ASSET_NOT_FOUND` | GIS corpus asset is absent |
 | `ERROR_GIS_CORPUS_HASH` | GIS corpus asset bytes or SHA-256 differ from the frozen manifest |
+| `ERROR_GIS_CORPUS_ASSET_TYPE` | GIS corpus asset type is absent or outside the explicit GeoJSON/raster registry |
 | `ERROR_GIS_CORPUS_GEOJSON` | GIS corpus asset is not a GeoJSON FeatureCollection |
 | `ERROR_GIS_CORPUS_SOURCE_RESPONSE` | GIS corpus asset contains a source-service error response |
 | `ERROR_GIS_CORPUS_COUNT` | GIS corpus feature count differs from the frozen manifest |
@@ -504,6 +519,12 @@ approved and audited.
 | `ERROR_GIS_CORPUS_GEOMETRY` | GIS corpus geometry is malformed, empty, or invalid |
 | `ERROR_GIS_CORPUS_GEOMETRY_COUNTS` | GIS corpus geometry-type accounting differs from the frozen manifest |
 | `ERROR_GIS_CORPUS_DIMENSIONS` | GIS corpus XY/XYZ/XYZM feature accounting differs from the frozen manifest |
+| `ERROR_GIS_CORPUS_RASTER_ENGINE` | rasterio is unavailable for raster corpus validation |
+| `ERROR_GIS_CORPUS_RASTER` | GIS corpus raster could not be opened or inspected |
+| `ERROR_GIS_CORPUS_RASTER_METADATA` | GIS corpus raster driver, grid, transform, bounds, dtype, or NODATA differs from the frozen manifest |
+| `ERROR_GIS_CORPUS_RASTER_CRS` | GIS corpus raster embedded CRS differs from the frozen declaration |
+| `ERROR_GIS_CORPUS_RASTER_BANDS` | GIS corpus raster per-band value accounting or statistics differ from the frozen manifest |
+| `ERROR_GIS_CORPUS_RASTER_UNITS` | GIS corpus elevation raster lacks frozen metre units or authoritative unit evidence |
 | `ERROR_GIS_CORPUS_PROVENANCE` | GIS corpus authority, URL, retrieval UTC, or declared CRS evidence is absent |
 | `ERROR_GIS_EXPORT_NOT_FOUND` | map/export artifact path does not exist |
 | `ERROR_GIS_EXPORT_EMPTY` | map/export artifact exists but contains no bytes |
@@ -586,6 +607,7 @@ mucaro gis clip-raster-bbox data/input/elevation.tif --min-x -67 --min-y 17 --ma
 mucaro gis vector-raster data/input/zones.geojson data/input/elevation.tif --band 1 --format text
 mucaro gis zonal-stats data/input/zones.geojson data/input/elevation.tif --band 1 --format text
 mucaro gis resample-raster data/input/elevation.tif --width 1024 --height 1024 --method bilinear --format text
+mucaro gis derive-terrain data/input/elevation-utm.tif --band 1 --elevation-units meters --format text
 mucaro gis validate-corpus _architecture/gis_real_corpus_manifest.json --format text
 mucaro gis map-export-manifest data/exports/map.png --layer data/input/zones.geojson EPSG:4326 --extent -67 17 -65 19 --output-crs EPSG:4326 --renderer qgis --renderer-version 3.40 --format text
 mucaro certify retrieval-quality --format text
@@ -896,8 +918,9 @@ invalid bbox extents, bbox clipping with null and dimensional residue
 accounting, fail-closed invalid Web Mercator latitude handling, offline-only
 PROJ candidate/grid selection, explicit EPSG axis-order controls, bounded WGS84
 antimeridian and polar line/polygon controls, and unresolved invalid
-longitude/latitude residue. The current committed denominator is 45 cases
-across 21 operations, including 15 fail-closed negative cases.
+longitude/latitude residue, a frozen real USGS 3DEP raster manifestation, and
+bounded projected-metre slope/aspect controls. The current committed denominator
+is 48 cases across 22 operations, including 17 fail-closed negative cases.
 It returns `GIS_EVAL_OK` only when the fixture and every case pass;
 `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives automation a hard
 regression signal.

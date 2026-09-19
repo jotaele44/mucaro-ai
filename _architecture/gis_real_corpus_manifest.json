@@ -1,10 +1,11 @@
 {
   "schema_version": "mucaro_gis_real_corpus_v1",
-  "corpus_id": "mucaro-gis-authoritative-vector-corpus-2026-09-19",
+  "corpus_id": "mucaro-gis-authoritative-vector-raster-corpus-2026-09-19",
   "snapshot_policy": "Immutable committed bytes; refresh requires a new manifest identity and explicit diff adjudication.",
   "assets": [
     {
       "asset_id": "census-tigerweb-pr-municipios-bounded",
+      "asset_type": "geojson",
       "path": "backend/tests/fixtures/gis_corpus/census_tigerweb_pr_municipios.geojson",
       "authority": "United States Census Bureau TIGERweb State_County MapServer layer 5",
       "service": "TIGERweb State_County",
@@ -31,6 +32,7 @@
     },
     {
       "asset_id": "usgs-pr-earthquakes-fixed-window",
+      "asset_type": "geojson",
       "path": "backend/tests/fixtures/gis_corpus/usgs_pr_earthquakes_2020-01-06_2020-01-08.geojson",
       "authority": "United States Geological Survey Earthquake Hazards Program",
       "service": "FDSN Event Web Service",
@@ -58,11 +60,65 @@
       "expected_geometry_counts": {"Point": 30},
       "expected_coordinate_dimension_counts": {"XYZ": 30},
       "required_property_fields": ["mag", "place", "time", "updated", "url", "detail", "status", "type"]
+    },
+    {
+      "asset_id": "usgs-3dep-pr-elevation-export-utm20n-64x64",
+      "asset_type": "raster",
+      "path": "backend/tests/fixtures/gis_corpus/usgs_3dep_pr_elevation_utm20n_64x64.tif",
+      "authority": "United States Geological Survey 3D Elevation Program (3DEP), The National Map",
+      "service": "3DEP Elevation ImageServer exportImage",
+      "source_url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage",
+      "query": {
+        "bbox": "-66.07,18.20,-66.05,18.22",
+        "bboxSR": 4326,
+        "imageSR": 32620,
+        "size": "64,64",
+        "adjustAspectRatio": false,
+        "format": "tiff",
+        "pixelType": "F32",
+        "interpolation": "RSP_BilinearInterpolation",
+        "f": "image"
+      },
+      "retrieval_utc": "2026-09-19T22:32:28Z",
+      "response_headers": {
+        "content_type": "image/tiff",
+        "content_length": 66656,
+        "etag": "\"d5ef1001\""
+      },
+      "sha256": "9cc3ba603944b5e6e1a9251082338c1f94783ca376480d19237a3ad4ef789415",
+      "bytes": 66656,
+      "media_type": "image/tiff",
+      "declared_crs": "EPSG:32620",
+      "crs_evidence": "imageSR=32620 export parameter and embedded GeoTIFF CRS",
+      "elevation_units": "meters",
+      "elevation_units_evidence": "https://pubs.usgs.gov/tm/11b9/tm11B9.pdf",
+      "source_manifestation": "Dynamic ImageServer export reprojected to EPSG:32620 and bilinearly resampled by the service; not native source-tile byte identity.",
+      "expected_driver": "GTiff",
+      "expected_width": 64,
+      "expected_height": 64,
+      "expected_band_count": 1,
+      "expected_dtypes": ["float32"],
+      "expected_nodata_values": [null],
+      "expected_bounds": [175244.1625509783, 2014996.9525085485, 177398.3489611448, 2017247.6509691933],
+      "expected_transform": [33.65916265885153, 0.0, 175244.1625509783, 0.0, -35.16716344757515, 2017247.6509691933],
+      "expected_bands": [
+        {
+          "band": 1,
+          "valid_cell_count": 4096,
+          "nodata_cell_count": 0,
+          "zero_cell_count": 0,
+          "minimum": 84.7558364868164,
+          "maximum": 350.67626953125,
+          "mean": 138.13104248046875
+        }
+      ]
     }
   ],
   "limitations": [
     "The Census snapshot is a deliberate three-feature subset and is not the full 78-municipio denominator.",
     "The USGS snapshot is bounded by a fixed time, magnitude, and geographic query and is not an earthquake completeness claim.",
-    "Neither source establishes semantic equivalence with future mutable service responses."
+    "No frozen source establishes semantic equivalence with future mutable service responses.",
+    "The 3DEP raster is a bounded dynamic-service export, not a native source tile; the server reprojected and bilinearly resampled it to the requested grid.",
+    "The frozen raster proves one small real-data terrain input only; it does not establish national-scale raster, hydrology, bathymetry, or remote-sensing readiness."
   ]
 }

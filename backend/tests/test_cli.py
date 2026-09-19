@@ -1488,16 +1488,16 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 45
-    assert payload["counts"]["passed"] == 45
+    assert payload["counts"]["cases"] == 48
+    assert payload["counts"]["passed"] == 48
     assert payload["counts"]["failed"] == 0
-    assert payload["counts"]["operations"] == 21
-    assert payload["counts"]["negative_cases"] == 15
+    assert payload["counts"]["operations"] == 22
+    assert payload["counts"]["negative_cases"] == 17
 
     assert main(["eval", "gis", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_EVAL_OK" in text_output
-    assert "operation_count=21" in text_output
+    assert "operation_count=22" in text_output
     assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
     assert "PASS bbox_filter bbox_filter_invalid_bbox_fails_closed" in text_output
     assert "PASS clip_bbox clip_bbox_polygon_point_and_residue" in text_output
@@ -1517,6 +1517,8 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert "PASS measure_ellipsoidal measure_ellipsoidal_antimeridian_line" in text_output
     assert "PASS measure_ellipsoidal measure_ellipsoidal_polar_cap_polygon" in text_output
     assert "PASS measure_ellipsoidal measure_ellipsoidal_invalid_latitude_is_unresolved" in text_output
+    assert "PASS raster_terrain raster_terrain_east_rising_plane" in text_output
+    assert "PASS raster_terrain raster_terrain_geographic_crs_fails_closed" in text_output
     assert "PASS repair_topology repair_topology_bowtie_explicit" in text_output
     assert "PASS raster_sample raster_sample_distinct_states" in text_output
     assert "PASS vector_raster vector_raster_preserves_zero_nodata_null" in text_output
@@ -1573,7 +1575,7 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
-    assert "eval_case_count=45" in text_output
+    assert "eval_case_count=48" in text_output
     assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
     assert "PASS clip_bbox clip_bbox_polygon_point_and_residue" in text_output
     assert "PASS clip_bbox clip_bbox_invalid_bbox_fails_closed" in text_output

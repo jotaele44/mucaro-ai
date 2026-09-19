@@ -43,11 +43,12 @@ def copy_corpus_project(project_root: Path) -> tuple[Path, dict]:
     return manifest_path, manifest
 
 
-def test_real_gis_corpus_manifest_closes_authority_and_geometry_accounting(tmp_path: Path) -> None:
+def test_real_gis_corpus_manifest_closes_vector_and_raster_accounting(tmp_path: Path) -> None:
     report = validate_real_gis_corpus(MANIFEST, cfg=make_settings(ROOT, tmp_path))
 
     assert report["status"] == "GIS_CORPUS_VALIDATION_OK"
-    assert len(report["assets"]) == 2
+    assert len(report["assets"]) == 3
+    assert report["asset_type_counts"] == {"geojson": 2, "raster": 1}
     assert report["assets"][0]["feature_count"] == 3
     assert report["assets"][0]["geometry_counts"] == {"Polygon": 2, "MultiPolygon": 1}
     assert report["assets"][0]["coordinate_dimension_counts"] == {"XY": 3}
@@ -56,6 +57,18 @@ def test_real_gis_corpus_manifest_closes_authority_and_geometry_accounting(tmp_p
     assert report["assets"][1]["coordinate_dimension_counts"] == {"XYZ": 30}
     assert report["assets"][1]["features_with_z"] == 30
     assert report["assets"][1]["features_with_m"] == 0
+    assert report["assets"][2]["asset_type"] == "raster"
+    assert report["assets"][2]["embedded_crs"] == "EPSG:32620"
+    assert report["assets"][2]["width"] == 64
+    assert report["assets"][2]["height"] == 64
+    assert report["assets"][2]["band_count"] == 1
+    assert report["assets"][2]["grid_cell_count"] == 4096
+    assert report["assets"][2]["query"]["adjustAspectRatio"] is False
+    assert report["assets"][2]["response_headers"]["etag"] == '"d5ef1001"'
+    assert report["assets"][2]["bands"][0]["valid_cell_count"] == 4096
+    assert report["assets"][2]["bands"][0]["minimum"] == pytest.approx(84.7558364868164)
+    assert report["assets"][2]["bands"][0]["maximum"] == pytest.approx(350.67626953125)
+    assert report["assets"][2]["bands"][0]["mean"] == pytest.approx(138.13104248046875)
     assert all(report["invariants"].values())
 
 
@@ -79,3 +92,36 @@ def test_real_gis_corpus_rejects_dimension_manifest_drift(tmp_path: Path) -> Non
     with pytest.raises(GISProcessingError) as exc:
         validate_real_gis_corpus(manifest_path, cfg=make_settings(project_root, tmp_path / "runtime"))
     assert exc.value.status == "ERROR_GIS_CORPUS_DIMENSIONS"
+
+
+def test_real_gis_corpus_rejects_raster_grid_manifest_drift(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    manifest_path, manifest = copy_corpus_project(project_root)
+    manifest["assets"][2]["expected_width"] = 65
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(GISProcessingError) as exc:
+        validate_real_gis_corpus(manifest_path, cfg=make_settings(project_root, tmp_path / "runtime"))
+    assert exc.value.status == "ERROR_GIS_CORPUS_RASTER_METADATA"
+
+
+def test_real_gis_corpus_rejects_raster_response_length_drift(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    manifest_path, manifest = copy_corpus_project(project_root)
+    manifest["assets"][2]["response_headers"]["content_length"] = 1
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(GISProcessingError) as exc:
+        validate_real_gis_corpus(manifest_path, cfg=make_settings(project_root, tmp_path / "runtime"))
+    assert exc.value.status == "ERROR_GIS_CORPUS_RASTER_METADATA"
+
+
+def test_real_gis_corpus_rejects_unknown_asset_type(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    manifest_path, manifest = copy_corpus_project(project_root)
+    manifest["assets"][2]["asset_type"] = "filename_inferred"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(GISProcessingError) as exc:
+        validate_real_gis_corpus(manifest_path, cfg=make_settings(project_root, tmp_path / "runtime"))
+    assert exc.value.status == "ERROR_GIS_CORPUS_ASSET_TYPE"
