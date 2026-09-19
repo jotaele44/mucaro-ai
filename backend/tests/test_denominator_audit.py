@@ -11,8 +11,8 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
     report = audit_current_denominator_state(PROJECT_ROOT)
     assert report["status"] == "MUCARO_V1_DENOMINATOR_AUDIT_OK"
     assert report["historical_baseline"] == {"raw_completion_percent": 61.5, "weighted_completion_percent": 62.6}
-    assert report["current_overlay"]["raw_completion_percent"] == 74.0
-    assert report["current_overlay"]["weighted_completion_percent"] == 75.5
+    assert report["current_overlay"]["raw_completion_percent"] == 75.0
+    assert report["current_overlay"]["weighted_completion_percent"] == 76.3
     assert report["current_overlay"]["per_track"]["CODING"]["score_percent"] == 70.0
     assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"PASS": 4, "PROVISIONAL": 6}
     assert report["current_overlay"]["per_track"]["GIS"]["score_percent"] == 75.0
@@ -21,7 +21,7 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
     assert report["current_overlay"]["per_track"]["OCR"]["state_counts"] == {"OPEN": 3, "PASS": 3, "PROVISIONAL": 4}
     assert report["current_overlay"]["per_track"]["BROWSING"]["score_percent"] == 65.0
     assert report["current_overlay"]["per_track"]["BROWSING"]["state_counts"] == {"OPEN": 1, "PASS": 4, "PROVISIONAL": 5}
-    assert len(report["applied_events"]) == 22
+    assert len(report["applied_events"]) == 23
     applied = {event["event_id"] for event in report["applied_events"]}
     assert {
         "evt-code03-repo-read-provisional",
@@ -42,6 +42,7 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
         "evt-web10-bounded-traversal-provisional",
         "evt-web09-live-render-provisional",
         "evt-gov07-current-head-ci-pass",
+        "evt-gov08-startup-probe-pass",
     }.issubset(applied)
 
 

@@ -2639,7 +2639,7 @@ def test_cli_release_dashboard_summarizes_current_handoff_artifacts(tmp_path: Pa
 
     def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
         if args == ["git", "branch", "--show-current"]:
-            return True, "main"
+            return True, "post-merge-local-branch"
         if args == ["git", "rev-parse", "HEAD"]:
             return True, head_sha
         if args == ["git", "status", "--short"]:
