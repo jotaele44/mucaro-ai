@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "1a7f950606acc7ef441cd9424c39fc05afe1247e",
+  "audit_head": "a08b0a0cf575c8b6889a43c8c91ec086155984a5",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -292,6 +292,22 @@
         "real pdftoppm rasterization + per-page Tesseract OCR + source/page/render/report SHA-256 lineage + page-count closure"
       ],
       "reason": "The frozen OCR-07 requirement is specifically PDF page rendering and page lineage. The merged current-main OCR lane executed real pdftoppm rendering and per-page Tesseract OCR, preserved exact source/render/report hashes and closed page arithmetic under both dedicated OCR certification and normal CI. Synthetic calibration inputs are sufficient for this execution/lineage requirement but do not promote OCR-08/09/10 or representative accuracy claims."
+    },
+    {
+      "event_id": "evt-code08-live-review-pass",
+      "requirement_id": "CODE-08",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "MERGED_LIVE_CODE_REVIEW_FILE_LINE_EVIDENCE_WITH_NEGATIVE_GATES",
+      "evidence": [
+        "PR#83",
+        "main@a08b0a0cf575c8b6889a43c8c91ec086155984a5",
+        "GitHub Actions CI run 35461226140 conclusion=success",
+        "GitHub Actions Coding Review Certification run 35461226187 conclusion=success",
+        "artifact#10589729427 digest=sha256:fa7853ceae339846ceccbfa43fe0d5ea6c50454dbf5ea49364d4bf8fc432c1b2",
+        "changed-path binding + exact line/excerpt binding + source/excerpt SHA-256 + unchanged-path rejection + invalid-range rejection + HEAD conservation"
+      ],
+      "reason": "Frozen CODE-08 requires code-review evidence with file and line binding. The merged dedicated certification executes positive and negative review cases against a real temporary Git repository and freezes exact source/excerpt identities. Deleted-file and binary/non-UTF8 adapters remain limitations outside this frozen row's current text-review scope."
     }
   ]
 }
