@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 
+import backend.app.coding_mutation as mutation
 from backend.app.coding_mutation import CodingMutationError, apply_patch_transaction
 from backend.app.coding_patch import validate_patch_proposal
 from backend.app.config import Settings
@@ -26,7 +27,7 @@ def _patch(old: str, new: str) -> str:
 
 def main() -> int:
     parser=argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["apply","preimage-drift"], required=True)
+    parser.add_argument("--mode", choices=["apply","preimage-drift","rollback"], required=True)
     args=parser.parse_args()
 
     cfg=Settings.load()
@@ -53,6 +54,45 @@ def main() -> int:
             print(json.dumps(payload,sort_keys=True))
             return 0 if payload["expected_rejection"] else 2
         print(json.dumps({"mode":args.mode,"status":"UNEXPECTED_APPLY","expected_rejection":False},sort_keys=True))
+        return 2
+
+    if args.mode=="rollback":
+        original_inspect=mutation.inspect_repository
+        calls=0
+
+        def inject_unexpected_dirty(*inspect_args, **inspect_kwargs):
+            nonlocal calls
+            calls += 1
+            state=original_inspect(*inspect_args, **inspect_kwargs)
+            if calls == 2:
+                altered=dict(state)
+                altered["dirty_paths"]=sorted(set(state.get("dirty_paths") or []) | {"unexpected.txt"})
+                altered["dirty_status"]="DIRTY"
+                return altered
+            return state
+
+        mutation.inspect_repository=inject_unexpected_dirty
+        try:
+            apply_patch_transaction(
+                repo,patch,
+                expected_head_sha=head,
+                expected_patch_sha256=patch_sha,
+                expected_preimages=preimages,
+                cfg=cfg,
+            )
+        except CodingMutationError as exc:
+            payload={
+                "mode":args.mode,
+                "status":exc.status,
+                "expected_rollback":exc.status=="CODING_MUTATION_ROLLED_BACK",
+                "postimage":PROBE.read_text(encoding="utf-8"),
+                "receipt":exc.receipt,
+            }
+            print(json.dumps(payload,sort_keys=True))
+            return 0 if payload["expected_rollback"] and payload["postimage"]=="alpha\n" else 2
+        finally:
+            mutation.inspect_repository=original_inspect
+        print(json.dumps({"mode":args.mode,"status":"UNEXPECTED_SUCCESS","expected_rollback":False},sort_keys=True))
         return 2
 
     receipt=apply_patch_transaction(
