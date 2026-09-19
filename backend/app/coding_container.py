@@ -102,13 +102,7 @@ def _validate_coding_image(image: str) -> str:
     """Accept registry digests or exact local Docker/Podman image IDs for coding only."""
     if isinstance(image, str) and LOCAL_IMAGE_ID_PATTERN.fullmatch(image):
         return image
-    try:
-        return validate_pinned_image(image)
-    except ContainerRuntimeError as exc:
-        raise CodingContainerError(
-            "ERROR_CODING_CONTAINER_IMAGE_NOT_IMMUTABLE",
-            "coding image must use immutable name@sha256:<digest> or exact local sha256:<image-id> form",
-        ) from exc
+    return validate_pinned_image(image)
 
 
 def _validate_command(command: Sequence[str]) -> tuple[str, ...]:
