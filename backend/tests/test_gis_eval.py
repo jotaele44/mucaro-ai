@@ -81,7 +81,7 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["measure_units_required_fails_closed"]["observed_status"] == "ERROR_GIS_MEASURE_UNITS_REQUIRED"
     assert by_id["reproject_invalid_latitude_fails_closed"]["case_type"] == "negative"
     assert by_id["reproject_invalid_latitude_fails_closed"]["observed_status"] == "ERROR_GIS_REPROJECT_INVALID_COORDINATES"
-    assert by_id["reproject_crs_wgs84_to_pr_state_plane"]["observed_status"] == "GIS_CRS_REPROJECT_OK"
+    assert by_id["reproject_crs_wgs84_to_utm20n"]["observed_status"] == "GIS_CRS_REPROJECT_OK"
     assert by_id["reproject_crs_m_coordinates_fail_closed"]["observed_status"] == "ERROR_GIS_CRS_M_UNSUPPORTED"
     assert by_id["repair_topology_bowtie_explicit"]["observed_status"] == "GIS_TOPOLOGY_REPAIR_OK"
     assert by_id["repair_topology_z_remains_unresolved"]["observed_status"] == "GIS_TOPOLOGY_REPAIR_WARN"

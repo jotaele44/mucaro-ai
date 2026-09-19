@@ -2060,6 +2060,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_MEASURE_OK",
         "GIS_MEASURE_WARN",
         "GIS_CRS_REPROJECT_OK",
+        "GIS_CRS_REPROJECT_WARN",
         "GIS_TOPOLOGY_REPAIR_OK",
         "GIS_TOPOLOGY_REPAIR_WARN",
         "GIS_ELLIPSOIDAL_OK",

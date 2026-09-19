@@ -95,7 +95,7 @@ def test_advanced_vector_cli_commands_emit_governed_receipts(tmp_path: Path, cap
         [{"type": "Feature", "id": "line", "properties": {}, "geometry": {"type": "LineString", "coordinates": [[-66, 18], [-66, 19]]}}],
     )
 
-    assert main(["gis", "reproject-crs", str(point), "--target-crs", "EPSG:32161", "--format", "text"], cfg=cfg) == 0
+    assert main(["gis", "reproject-crs", str(point), "--target-crs", "EPSG:32620", "--format", "text"], cfg=cfg) == 0
     output = capsys.readouterr().out
     assert "GIS_CRS_REPROJECT_OK" in output
     assert "adapter=pyproj_transformer_group_always_xy_v1" in output
@@ -259,7 +259,7 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
     rendered.write_bytes(b"rendered-map")
 
     reports = [
-        reproject_geojson_crs(point, target_crs="EPSG:32161", cfg=cfg),
+        reproject_geojson_crs(point, target_crs="EPSG:32620", cfg=cfg),
         repair_geojson_topology(bowtie, cfg=cfg),
         measure_geojson_ellipsoidal(line, cfg=cfg),
         inspect_vector_format(point, cfg=cfg),

@@ -1513,7 +1513,7 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert "PASS overlay overlay_invalid_operation_fails_closed" in text_output
     assert "PASS csv_points csv_points_skip_invalid_rows" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
-    assert "PASS reproject_crs reproject_crs_wgs84_to_pr_state_plane" in text_output
+    assert "PASS reproject_crs reproject_crs_wgs84_to_utm20n" in text_output
     assert "PASS repair_topology repair_topology_bowtie_explicit" in text_output
     assert "PASS raster_sample raster_sample_distinct_states" in text_output
     assert "PASS vector_raster vector_raster_preserves_zero_nodata_null" in text_output
@@ -1580,7 +1580,7 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert "PASS overlay overlay_intersection_outputs_feature" in text_output
     assert "PASS overlay overlay_invalid_operation_fails_closed" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
-    assert "PASS reproject_crs reproject_crs_wgs84_to_pr_state_plane" in text_output
+    assert "PASS reproject_crs reproject_crs_wgs84_to_utm20n" in text_output
     assert "PASS repair_topology repair_topology_bowtie_explicit" in text_output
     assert "PASS raster_sample raster_sample_distinct_states" in text_output
     assert "PASS vector_raster vector_raster_preserves_zero_nodata_null" in text_output

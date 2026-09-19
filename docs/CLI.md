@@ -391,6 +391,7 @@ approved and audited.
 | `GIS_MEASURE_OK` | GeoJSON planar or geodesic measurement completed with feature accounting closed and no residue warnings |
 | `GIS_MEASURE_WARN` | GeoJSON planar or geodesic measurement completed while recording null, invalid, unsupported, coordinate, or malformed polygon-hole residue |
 | `GIS_CRS_REPROJECT_OK` | pyproj/PROJ reprojection completed with explicit always-XY policy, frozen transformer identity, output hash, and feature conservation |
+| `GIS_CRS_REPROJECT_WARN` | Reprojection completed with a frozen fallback operation or another explicit CRS warning; inspect `best_available`, engine warnings, and report warnings before relying on material accuracy |
 | `GIS_TOPOLOGY_REPAIR_OK` | explicit planar XY topology repair completed with before/after geometry hashes and closed accounting |
 | `GIS_TOPOLOGY_REPAIR_WARN` | topology repair completed while retaining unresolved or unsupported geometry residue |
 | `GIS_ELLIPSOIDAL_OK` | WGS84 ellipsoidal measurement completed with per-feature and aggregate meter-unit receipts |

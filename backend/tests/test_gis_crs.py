@@ -35,11 +35,15 @@ def test_pyproj_reprojection_records_pipeline_and_axis_policy(tmp_path: Path) ->
     cfg = make_settings(tmp_path)
     source = write_fc(tmp_path / "pr.geojson", "EPSG:4326", [-66.0, 18.2])
     report = reproject_geojson_crs(source, target_crs="EPSG:32161", cfg=cfg)
-    assert report["status"] == "GIS_CRS_REPROJECT_OK"
+    expected_status = "GIS_CRS_REPROJECT_OK" if report["parameters"]["best_available"] else "GIS_CRS_REPROJECT_WARN"
+    assert report["status"] == expected_status
+    if not report["parameters"]["best_available"]:
+        assert "GIS_CRS_BEST_OPERATION_UNAVAILABLE" in report["warnings"]
     assert report["parameters"]["always_xy"] is True
     assert report["parameters"]["transformer_definition_sha256"]
     assert not report["parameters"]["transformer_definition"].lower().startswith("unavailable until")
     assert report["parameters"]["available_candidate_count"] >= 1
+    assert report["parameters"]["unavailable_candidate_count"] >= 0
     assert report["parameters"]["selected_candidate_index"] == 0
     assert report["parameters"]["pyproj_version"]
     assert report["parameters"]["proj_version"]

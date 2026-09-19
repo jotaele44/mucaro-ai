@@ -83,6 +83,8 @@ def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settin
     report_warnings = []
     if not transformer_group.best_available:
         report_warnings.append("GIS_CRS_BEST_OPERATION_UNAVAILABLE")
+    if any(row.get("has_z") for row in receipts):
+        report_warnings.append("GIS_CRS_Z_PASSTHROUGH_UNTRANSFORMED")
     report = {
         "schema_version": GIS_REPORT_SCHEMA_VERSION,
         "report_id": report_id,
@@ -123,7 +125,7 @@ def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settin
             "axis_order_explicit": True,
             "transform_pipeline_frozen": bool(pipeline) and not pipeline.lower().startswith("unavailable until"),
         },
-        "warnings": report_warnings + (["GIS_CRS_Z_PASSTHROUGH_UNTRANSFORMED"] if any(row.get("has_z") for row in receipts) else []),
+        "warnings": report_warnings,
         "limitations": [
             "XY coordinates are transformed with pyproj/PROJ using always_xy=True",
             "Z values are preserved but not vertically transformed",

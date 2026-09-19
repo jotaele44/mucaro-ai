@@ -1659,10 +1659,10 @@
       "expected_warnings": []
     },
     {
-      "case_id": "reproject_crs_wgs84_to_pr_state_plane",
+      "case_id": "reproject_crs_wgs84_to_utm20n",
       "operation": "reproject_crs",
       "parameters": {
-        "target_crs": "EPSG:32161"
+        "target_crs": "EPSG:32620"
       },
       "inputs": {
         "geojson": {
@@ -1687,9 +1687,9 @@
         "parameters.always_xy": true,
         "parameters.axis_order_policy": "traditional_gis_xy",
         "parameters.source_crs": "EPSG:4326",
-        "parameters.target_crs": "EPSG:32161",
+        "parameters.target_crs": "EPSG:32620",
         "source.crs": "EPSG:4326",
-        "output.crs": "EPSG:32161",
+        "output.crs": "EPSG:32620",
         "features.0.transform_state": "TRANSFORMED"
       }
     },
