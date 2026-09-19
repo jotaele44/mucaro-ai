@@ -80,3 +80,23 @@ Resulting overlay arithmetic:
 - BROWSING: `65.0%` — `PASS=4 / PROVISIONAL=5 / OPEN=1`
 
 This remains a provisional evidence-state overlay, not browsing-domain or release certification.
+
+
+## CODE-06 + CODE-07 executed coding overlay
+
+Audit head: `22b7e557e7583f14cd79caaf3d7634526199dfd9`.
+
+- `CODE-07 PROVISIONAL → PASS`: PR #71 merged the exact current-main isolated coding quality profile. CI run `35430951380` passed; full-profile artifact `10580757491` digest `sha256:782a46980529814233ba082942904e5e5be7564c05c7c5892b5efeaea59e6a1f`; live-container artifact `10580747437` digest `sha256:9402eeb6995090c9e27258308a4fa94990188aa60705e715a9a2329d29c039df`.
+- `CODE-06 PROVISIONAL → PASS`: PR #74 merged live sandboxed mutation/rollback execution. CI run `35431347821` passed; mutation artifact `10580902996` digest `sha256:9f712677a566f040744403cc2f42a287b0f233d22bd067c6791cf34aa19ba3dc`.
+- CODE-06 evidence includes approved patch application, preimage-drift rejection, deterministic postcondition failure, real Git reverse-apply rollback, host-byte conservation, network denial and read-only host source.
+- These events do not promote CODE-08/09/10, remote authenticated Git, or whole-repository quality debt.
+
+Resulting overlay arithmetic:
+
+- current raw completion: `73.0%`
+- current weighted completion: `74.6%`
+- applied events: `20`
+- CODING: `65.0%` — `PASS=3 / PROVISIONAL=7`
+- GOVERNANCE remains `60.0%` after the already-recorded GOV-07 PASS.
+
+This remains an evidence-state overlay, not coding-domain or release certification.
