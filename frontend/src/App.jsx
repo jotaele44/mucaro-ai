@@ -27,6 +27,7 @@ function App() {
   const [query, setQuery] = useState("How does source lineage work?");
   const [status, setStatus] = useState("Idle");
   const [error, setError] = useState(null);
+  const [view, setView] = useState("chat");
 
   async function refresh() {
     setHealth(await api.health());
@@ -250,237 +251,191 @@ function App() {
   const validationFlags = answer?.validation_flags || [];
   const hasNoSourceAnswer = answer?.status === "ERROR_NO_SOURCES";
 
+  const navItems = [
+    ["chat", "Chat"],
+    ["sources", "Sources"],
+    ["access", "Directory Access"],
+    ["memory", "Memory"],
+    ["planning", "Planning"],
+    ["settings", "Settings"],
+  ];
+
   return (
-    <main>
-      <aside>
-        <h1>Mucaro AI</h1>
-        <nav>
-          <a>Mission Control</a>
-          <a>Planning Gate</a>
-          <a>File Intake</a>
-          <a>Directory Access</a>
-          <a>Memory</a>
-          <a>Chat Sessions</a>
-          <a>Source Manifest</a>
-          <a>RAG Chat</a>
-          <a>Citation Inspector</a>
-          <a>Export Center</a>
+    <main className="app-shell">
+      <aside className="app-nav">
+        <div className="brand-block">
+          <h1>Mucaro AI</h1>
+          <p>Local-first evidence workbench</p>
+        </div>
+        <nav aria-label="Primary workspace">
+          {navItems.map(([id, label]) => (
+            <button
+              key={id}
+              className={view === id ? "nav-button active" : "nav-button"}
+              onClick={() => setView(id)}
+              aria-current={view === id ? "page" : undefined}
+            >
+              {label}
+            </button>
+          ))}
         </nav>
+        <div className="nav-health">
+          <span className="status-dot" aria-hidden="true" />
+          <div><strong>{health ? health.status : "offline"}</strong><small>{status}</small></div>
+        </div>
       </aside>
+
       <section className="workspace">
-        <header>
-          <div><strong>Status:</strong> {status}</div>
-          <div><strong>Backend:</strong> {health ? health.status : "offline"}</div>
-          <div><strong>Provider:</strong> {health ? health.model_provider : "unknown"}</div>
-          <div><strong>Auth:</strong> {config?.auth?.status || "unknown"}</div>
+        <header className="workspace-header">
+          <div>
+            <span className="eyebrow">Workspace</span>
+            <h2>{navItems.find(([id]) => id === view)?.[1]}</h2>
+          </div>
+          <div className="header-facts">
+            <span>Provider <strong>{health ? health.model_provider : "unknown"}</strong></span>
+            <span>Auth <strong>{config?.auth?.status || "unknown"}</strong></span>
+            <span>Index <strong>{indexStatus?.status || "unknown"}</strong></span>
+          </div>
         </header>
         {error && <div className="notice error">{error}</div>}
-        <PlanningGate />
-        <section className="panel">
-          <h2>File Intake</h2>
-          <input type="file" onChange={upload} />
-          {sources.length === 0 && <p className="hint">No sources ingested yet. Add a document or media file before asking source-grounded questions.</p>}
-        </section>
-        <DirectoryIntake onIngested={refresh} />
-        <section className="panel">
-          <div className="panel-header">
-            <h2>Memory</h2>
-            <a className="export-link" href={`${api.baseUrl}/memory/export`}>Export JSON</a>
-          </div>
-          <div className="memory-form">
-            <select value={memoryKind} onChange={(event) => setMemoryKind(event.target.value)}>
-              <option value="preference">preference</option>
-              <option value="profile">profile</option>
-              <option value="instruction">instruction</option>
-              <option value="fact">fact</option>
-            </select>
-            <input
-              value={memoryContent}
-              onChange={(event) => setMemoryContent(event.target.value)}
-              placeholder="Save an explicit preference or profile fact"
-            />
-            <button onClick={rememberPreference} disabled={!memoryContent.trim()}>Remember</button>
-          </div>
-          {memory.length === 0 && <p className="hint">No saved memory items.</p>}
-          <div className="memory-list">
-            {memory.map((item) => (
-              <article className={item.enabled ? "memory-item" : "memory-item disabled"} key={item.memory_id}>
-                <div>
-                  <strong>{item.kind}</strong>
-                  <p>{item.content}</p>
-                  <small>{item.memory_id}</small>
-                </div>
-                <div className="button-row">
-                  <button className="secondary" onClick={() => toggleMemory(item)}>{item.enabled ? "Disable" : "Enable"}</button>
-                  <button className="secondary" onClick={() => deleteMemory(item)}>Delete</button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-        <section className="panel">
-          <div className="panel-header">
-            <h2>Workspace Profile</h2>
-            <button onClick={saveCurrentWorkspace}>Save Profile</button>
-          </div>
-          <dl>
-            <div><dt>Active</dt><dd>{config?.workspace_profile || "default"}</dd></div>
-            <div><dt>Project Root</dt><dd>{config?.project_root || "unknown"}</dd></div>
-            <div><dt>Data Dir</dt><dd>{config?.data_dir || "unknown"}</dd></div>
-            <div><dt>Profiles</dt><dd>{workspaces.map((workspace) => workspace.name).join(", ") || "none"}</dd></div>
-          </dl>
-          <div className="token-row">
-            <label>
-              Operator Token
-              <input
-                value={operatorToken}
-                onChange={(event) => setOperatorToken(event.target.value)}
-                type="password"
-                placeholder={config?.auth?.auth_required ? "Required for mutating actions" : "Optional"}
-              />
-            </label>
-            <button onClick={saveOperatorToken}>Use Token</button>
-          </div>
-        </section>
-        <section className="panel">
-          <div className="panel-header">
-            <h2>Source Manifest</h2>
-            <div className="button-row">
-              <span className="badge">{indexStatus?.status || "INDEX_UNKNOWN"}</span>
-              <button onClick={reindex}>Reindex</button>
-              <button className="secondary" onClick={removeSelectedSource} disabled={!selectedSource}>Delete Source</button>
+
+        {view === "chat" && (
+          <section className="panel conversation-workspace">
+            <div className="panel-header">
+              <div>
+                <span className="eyebrow">Primary surface</span>
+                <h2>Conversation</h2>
+              </div>
+              <button onClick={newChat}>New Chat</button>
             </div>
-          </div>
-          <table>
-            <thead><tr><th>Source</th><th>File</th><th>Status</th><th>Chunks</th><th>Parser</th></tr></thead>
-            <tbody>{sources.map((s) => (
-              <tr key={s.source_id} onClick={() => setSelectedSourceId(s.source_id)} className={selectedSource?.source_id === s.source_id ? "selected-row" : ""}>
-                <td>{s.source_id}</td>
-                <td>{s.file_name}</td>
-                <td>{s.lineage_status}</td>
-                <td>{s.chunk_count}</td>
-                <td>{s.parser}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-          {selectedSource && (
-            <div className="source-detail">
-              <h3>{selectedSource.file_name}</h3>
-              <dl>
-                <div><dt>SHA256</dt><dd>{selectedSource.source_sha256}</dd></div>
-                <div><dt>Bytes</dt><dd>{selectedSource.bytes ?? "unknown"}</dd></div>
-                <div><dt>Parse</dt><dd>{selectedSource.parse_status || "unknown"}</dd></div>
-                <div><dt>Warnings</dt><dd>{(selectedSource.warnings || []).join(", ") || "none"}</dd></div>
-                <div><dt>Path</dt><dd>{selectedSource.source_path || "unknown"}</dd></div>
-              </dl>
-            </div>
-          )}
-        </section>
-        <section className="panel">
-          <div className="panel-header">
-            <h2>RAG Chat</h2>
-            <button onClick={newChat}>New Chat</button>
-          </div>
-          {runSummary && (
-            <div className="summary-strip">
-              <span>Runs: {runSummary.run_count}</span>
-              <span>Cited OK: {runSummary.citation_ok}</span>
-              <span>Latest: {runSummary.latest_run_id || "none"}</span>
-            </div>
-          )}
-          <div className="chat-layout">
-            <section className="chat-list">
-              <h3>Chat Sessions</h3>
-              <input
-                className="compact-input"
-                value={chatFilter}
-                onChange={(event) => setChatFilter(event.target.value)}
-                placeholder="Search chats"
-              />
-              {conversations.length === 0 && <p className="hint">No saved chats yet.</p>}
-              {conversations.length > 0 && filteredConversations.length === 0 && <p className="hint">No chats match the filter.</p>}
-              {filteredConversations.map((conversation) => (
-                <button
-                  className={activeConversation?.conversation_id === conversation.conversation_id ? "chat-tab active" : "chat-tab"}
-                  key={conversation.conversation_id}
-                  onClick={() => selectConversation(conversation.conversation_id)}
-                >
-                  <span>{conversation.title}</span>
-                  <small>{conversation.turn_count} turns</small>
-                </button>
-              ))}
-            </section>
-            <section className="chat-surface">
-              {activeConversation && (
-                <div className="chat-management">
-                  <input
-                    value={renameTitle}
-                    onChange={(event) => setRenameTitle(event.target.value)}
-                    placeholder="Chat title"
-                  />
-                  <button onClick={renameActiveConversation}>Rename</button>
-                  <button className="secondary" onClick={deleteActiveConversation}>Delete</button>
-                </div>
-              )}
-              {activeConversation && (
-                <div className="turn-list">
-                  {(activeConversation.turns || []).map((turn) => (
-                    <article className={`turn ${turn.role}`} key={turn.turn_id}>
-                      <strong>{turn.role}</strong>
-                      <p>{turn.content}</p>
-                    </article>
-                  ))}
-                </div>
-              )}
-              <label className="inline-control">
-                Retrieval
-                <select value={retrievalStrategy} onChange={(e) => setRetrievalStrategy(e.target.value)}>
-                  <option value="hybrid">hybrid</option>
-                  <option value="semantic">semantic</option>
-                  <option value="persistent">persistent</option>
-                  <option value="bm25">bm25</option>
-                  <option value="vector">vector</option>
-                  <option value="lexical">lexical</option>
-                </select>
-              </label>
-              <input value={query} onChange={(e) => setQuery(e.target.value)} />
-              <button onClick={ask}>Ask with citations</button>
-              {hasNoSourceAnswer && <div className="notice">No sources are available yet. Ingest a file first, then ask again.</div>}
-              {answer?.status === "ERROR_NO_RETRIEVAL_CONTEXT" && <div className="notice">No matching context was found. Try a broader query, switch retrieval strategy, or reindex sources.</div>}
-            </section>
-          </div>
-          {answer && !answer.status && (
-            <div className="answer-grid">
-              <section>
-                <h3>Answer</h3>
-                <p>{answer.answer}</p>
-                <dl>
-                  <div><dt>Run</dt><dd>{answer.run_id}</dd></div>
-                  <div><dt>Model</dt><dd>{answer.model_provider} / {answer.model_name}</dd></div>
-                  <div><dt>Retrieval</dt><dd>{answer.retrieval_strategy || "unknown"}</dd></div>
-                  <div><dt>History Turns</dt><dd>{answer.conversation_context_turn_count ?? 0}</dd></div>
-                  <div><dt>Confidence</dt><dd>{answer.confidence}</dd></div>
-                </dl>
-                {answer.run_id && <a className="export-link" href={`${api.baseUrl}/exports/${answer.run_id}`}>Open JSON export</a>}
-              </section>
-              <section>
-                <h3>Cited Chunks</h3>
-                {citedChunks.length === 0 && <p className="hint">No cited chunks were returned.</p>}
-                {citedChunks.map((chunk) => (
-                  <article className="chunk" key={chunk.chunk_id}>
-                    <strong>{chunk.chunk_id}</strong>
-                    <small>{chunk.source_id}</small>
-                    <p>{chunk.text}</p>
-                  </article>
+            {runSummary && (
+              <div className="summary-strip">
+                <span>Runs: {runSummary.run_count}</span>
+                <span>Cited OK: {runSummary.citation_ok}</span>
+                <span>Latest: {runSummary.latest_run_id || "none"}</span>
+              </div>
+            )}
+            <div className="chat-layout">
+              <section className="chat-list">
+                <h3>Sessions</h3>
+                <input className="compact-input" value={chatFilter} onChange={(event) => setChatFilter(event.target.value)} placeholder="Search chats" />
+                {conversations.length === 0 && <p className="hint">No saved chats yet.</p>}
+                {conversations.length > 0 && filteredConversations.length === 0 && <p className="hint">No chats match the filter.</p>}
+                {filteredConversations.map((conversation) => (
+                  <button className={activeConversation?.conversation_id === conversation.conversation_id ? "chat-tab active" : "chat-tab"} key={conversation.conversation_id} onClick={() => selectConversation(conversation.conversation_id)}>
+                    <span>{conversation.title}</span>
+                    <small>{conversation.turn_count} turns</small>
+                  </button>
                 ))}
               </section>
-              <section>
-                <h3>Validation Flags</h3>
-                <ul>{validationFlags.length ? validationFlags.map((flag) => <li key={flag}>{flag}</li>) : <li>OK</li>}</ul>
+              <section className="chat-surface">
+                {activeConversation && (
+                  <div className="chat-management">
+                    <input value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} placeholder="Chat title" aria-label="Chat title" />
+                    <button onClick={renameActiveConversation}>Rename</button>
+                    <button className="secondary" onClick={deleteActiveConversation}>Delete</button>
+                  </div>
+                )}
+                {activeConversation && (
+                  <div className="turn-list">
+                    {(activeConversation.turns || []).map((turn) => (
+                      <article className={`turn ${turn.role}`} key={turn.turn_id}>
+                        <strong>{turn.role}</strong>
+                        <p>{turn.content}</p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+                <div className="composer">
+                  <label className="inline-control">
+                    Retrieval
+                    <select value={retrievalStrategy} onChange={(event) => setRetrievalStrategy(event.target.value)}>
+                      <option value="hybrid">hybrid</option><option value="semantic">semantic</option><option value="persistent">persistent</option>
+                      <option value="bm25">bm25</option><option value="vector">vector</option><option value="lexical">lexical</option>
+                    </select>
+                  </label>
+                  <textarea value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Question" />
+                  <button onClick={ask}>Ask with citations</button>
+                </div>
+                {hasNoSourceAnswer && <div className="notice">No sources are available. Add them in the Sources workspace.</div>}
+                {answer?.status === "ERROR_NO_RETRIEVAL_CONTEXT" && <div className="notice">No matching context was found. Broaden the query, switch retrieval strategy, or reindex in Sources.</div>}
               </section>
             </div>
-          )}
-        </section>
+            {answer && !answer.status && (
+              <div className="evidence-drawer">
+                <section>
+                  <h3>Answer evidence</h3>
+                  <p className="answer-copy">{answer.answer}</p>
+                  <dl>
+                    <div><dt>Run</dt><dd>{answer.run_id}</dd></div>
+                    <div><dt>Model</dt><dd>{answer.model_provider} / {answer.model_name}</dd></div>
+                    <div><dt>Retrieval</dt><dd>{answer.retrieval_strategy || "unknown"}</dd></div>
+                    <div><dt>Confidence</dt><dd>{answer.confidence}</dd></div>
+                  </dl>
+                  {answer.run_id && <a className="export-link" href={`${api.baseUrl}/exports/${answer.run_id}`}>Open JSON trace</a>}
+                </section>
+                <section>
+                  <h3>Cited chunks</h3>
+                  {citedChunks.length === 0 && <p className="hint">No cited chunks were returned.</p>}
+                  {citedChunks.map((chunk) => <article className="chunk" key={chunk.chunk_id}><strong>{chunk.chunk_id}</strong><small>{chunk.source_id}</small><p>{chunk.text}</p></article>)}
+                </section>
+                <section>
+                  <h3>Validation</h3>
+                  <ul>{validationFlags.length ? validationFlags.map((flag) => <li key={flag}>{flag}</li>) : <li>OK</li>}</ul>
+                </section>
+              </div>
+            )}
+          </section>
+        )}
+
+        {view === "sources" && (
+          <>
+            <section className="panel">
+              <div className="panel-header"><h2>File Intake</h2><span className="badge">{sources.length} sources</span></div>
+              <input type="file" onChange={upload} />
+              {sources.length === 0 && <p className="hint">No sources ingested yet.</p>}
+            </section>
+            <section className="panel">
+              <div className="panel-header">
+                <h2>Source Manifest</h2>
+                <div className="button-row"><button onClick={reindex}>Reindex</button><button className="secondary" onClick={removeSelectedSource} disabled={!selectedSource}>Delete Source</button></div>
+              </div>
+              <div className="table-scroll">
+                <table><thead><tr><th>Source</th><th>File</th><th>Status</th><th>Chunks</th><th>Parser</th></tr></thead>
+                <tbody>{sources.map((source) => <tr key={source.source_id} onClick={() => setSelectedSourceId(source.source_id)} className={selectedSource?.source_id === source.source_id ? "selected-row" : ""}><td>{source.source_id}</td><td>{source.file_name}</td><td>{source.lineage_status}</td><td>{source.chunk_count}</td><td>{source.parser}</td></tr>)}</tbody></table>
+              </div>
+              {selectedSource && <div className="source-detail"><h3>{selectedSource.file_name}</h3><dl><div><dt>SHA256</dt><dd>{selectedSource.source_sha256}</dd></div><div><dt>Bytes</dt><dd>{selectedSource.bytes ?? "unknown"}</dd></div><div><dt>Parse</dt><dd>{selectedSource.parse_status || "unknown"}</dd></div><div><dt>Warnings</dt><dd>{(selectedSource.warnings || []).join(", ") || "none"}</dd></div><div><dt>Path</dt><dd>{selectedSource.source_path || "unknown"}</dd></div></dl></div>}
+            </section>
+          </>
+        )}
+
+        {view === "access" && <DirectoryIntake onIngested={refresh} />}
+
+        {view === "memory" && (
+          <section className="panel">
+            <div className="panel-header"><h2>Memory</h2><a className="export-link" href={`${api.baseUrl}/memory/export`}>Export JSON</a></div>
+            <p className="hint">Memory supplies bounded preference/profile context and is never treated as cited source evidence.</p>
+            <div className="memory-form">
+              <select value={memoryKind} onChange={(event) => setMemoryKind(event.target.value)}><option value="preference">preference</option><option value="profile">profile</option><option value="instruction">instruction</option><option value="fact">fact</option></select>
+              <input value={memoryContent} onChange={(event) => setMemoryContent(event.target.value)} placeholder="Save explicit context" />
+              <button onClick={rememberPreference} disabled={!memoryContent.trim()}>Remember</button>
+            </div>
+            <div className="memory-list">
+              {memory.length === 0 && <p className="hint">No saved memory items.</p>}
+              {memory.map((item) => <article className={item.enabled ? "memory-item" : "memory-item disabled"} key={item.memory_id}><div><strong>{item.kind}</strong><p>{item.content}</p><small>{item.memory_id}</small></div><div className="button-row"><button className="secondary" onClick={() => toggleMemory(item)}>{item.enabled ? "Disable" : "Enable"}</button><button className="secondary" onClick={() => deleteMemory(item)}>Delete</button></div></article>)}
+            </div>
+          </section>
+        )}
+
+        {view === "planning" && <PlanningGate />}
+
+        {view === "settings" && (
+          <section className="panel">
+            <div className="panel-header"><h2>Workspace & Security</h2><button onClick={saveCurrentWorkspace}>Save Profile</button></div>
+            <dl><div><dt>Active</dt><dd>{config?.workspace_profile || "default"}</dd></div><div><dt>Project Root</dt><dd>{config?.project_root || "unknown"}</dd></div><div><dt>Data Dir</dt><dd>{config?.data_dir || "unknown"}</dd></div><div><dt>Profiles</dt><dd>{workspaces.map((workspace) => workspace.name).join(", ") || "none"}</dd></div></dl>
+            <div className="token-row"><label>Operator Token<input value={operatorToken} onChange={(event) => setOperatorToken(event.target.value)} type="password" placeholder={config?.auth?.auth_required ? "Required for mutating actions" : "Optional"} /></label><button onClick={saveOperatorToken}>Use Token</button></div>
+          </section>
+        )}
       </section>
     </main>
   );
