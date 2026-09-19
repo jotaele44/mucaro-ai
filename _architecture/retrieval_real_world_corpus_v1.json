@@ -327,7 +327,7 @@
     },
     {
       "query_id": "rt09-q15",
-      "query": "MIME Part Two Media Types RFC 2046",
+      "query": "RFC 2046 Freed Borenstein Multipurpose Internet Mail Extensions MIME Part Two Media Types",
       "expected_source_ids": [
         "rfc2046"
       ],
