@@ -27,6 +27,24 @@ jobs:
         working-directory: frontend
       - name: Certify release gates
         run: python scripts/certify_release.py
+      - name: Provision immutable coding probe image
+        id: coding_image
+        run: |
+          docker pull python:3.11-slim
+          IMAGE="$(docker image inspect python:3.11-slim --format '{{index .RepoDigests 0}}')"
+          test -n "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+      - name: Certify live isolated coding container
+        env:
+          MUCARO_CODING_IMAGE: ${{ steps.coding_image.outputs.image }}
+          MUCARO_CODING_RECEIPT: ${{ runner.temp }}/mucaro-coding-container-live.json
+        run: python scripts/certify_coding_container_live.py --image "$MUCARO_CODING_IMAGE" --output "$MUCARO_CODING_RECEIPT"
+      - name: Upload live coding-container receipt
+        uses: actions/upload-artifact@v7
+        with:
+          name: coding-container-live-${{ github.sha }}
+          path: ${{ runner.temp }}/mucaro-coding-container-live.json
+          archive: false
       - name: Write hosted CI evidence receipt
         env:
           MUCARO_CI_RECEIPT: ${{ runner.temp }}/mucaro-hosted-ci-evidence.json
