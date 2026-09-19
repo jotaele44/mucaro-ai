@@ -128,11 +128,30 @@ def main(argv: list[str] | None = None) -> int:
         ("representative_operator_workflow", [sys.executable, "scripts/certify_operator_workflow.py"]),
         ("retrieval_benchmark", [sys.executable, "scripts/certify_retrieval_quality.py"]),
         ("gis_benchmark", [sys.executable, "scripts/certify_gis_quality.py"]),
-        ("security_profile", [sys.executable, "scripts/mucaro.py", "security", "status", "--host", "127.0.0.1", "--format", "json"]),
     ]
     for name, command in commands:
         gate, _ = run_gate(name, command)
         gates.append(gate)
+
+    security_cmd = [sys.executable, "scripts/mucaro.py", "security", "status", "--host", "127.0.0.1", "--format", "json"]
+    security_process_gate, security_stdout = run_gate("security_profile_command", security_cmd)
+    if security_process_gate.status != "PASS":
+        gates.append(Gate("security_profile", "FAIL", security_process_gate.detail, security_cmd))
+    else:
+        security_payload, security_parse_error = parse_json_stdout("security_profile_json", security_stdout)
+        if security_parse_error:
+            gates.append(Gate("security_profile", "FAIL", security_parse_error.detail, security_cmd))
+        elif security_payload.get("production_ready") is True and security_payload.get("status") == "SECURITY_OK":
+            gates.append(Gate("security_profile", "PASS", "production_ready=true SECURITY_OK", security_cmd))
+        else:
+            gates.append(
+                Gate(
+                    "security_profile",
+                    "BLOCKED",
+                    f"production_ready={security_payload.get('production_ready')} status={security_payload.get('status')}",
+                    security_cmd,
+                )
+            )
 
     package_gate, package_stdout = run_gate(
         "package_build",
