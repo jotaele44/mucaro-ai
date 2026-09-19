@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import time
 from dataclasses import dataclass
@@ -11,6 +12,8 @@ from typing import Any, Sequence
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
 from .container_runtime import ContainerRuntimeError, resolve_container_engine, validate_pinned_image
+
+LOCAL_IMAGE_ID_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 CODING_CONTAINER_SCHEMA_VERSION = "mucaro-coding-container/1.1"
 DEFAULT_TIMEOUT_SECONDS = 120
@@ -95,6 +98,19 @@ def _positive_number(value: float, label: str) -> float:
     return float(value)
 
 
+def _validate_coding_image(image: str) -> str:
+    """Accept registry digests or exact local Docker/Podman image IDs for coding only."""
+    if isinstance(image, str) and LOCAL_IMAGE_ID_PATTERN.fullmatch(image):
+        return image
+    try:
+        return validate_pinned_image(image)
+    except ContainerRuntimeError as exc:
+        raise CodingContainerError(
+            "ERROR_CODING_CONTAINER_IMAGE_NOT_IMMUTABLE",
+            "coding image must use immutable name@sha256:<digest> or exact local sha256:<image-id> form",
+        ) from exc
+
+
 def _validate_command(command: Sequence[str]) -> tuple[str, ...]:
     if not isinstance(command, (list, tuple)) or not command or len(command) > MAX_COMMAND_PARTS:
         raise CodingContainerError("ERROR_CODING_CONTAINER_COMMAND", "command must be a non-empty bounded argv array")
@@ -142,7 +158,7 @@ def build_coding_container_plan(
         raise CodingContainerError(exc.status, exc.detail) from exc
     _validate_mount_source(context.repo_root)
     try:
-        pinned = validate_pinned_image(image)
+        pinned = _validate_coding_image(image)
         engine_path = resolve_container_engine(engine)
     except ContainerRuntimeError as exc:
         raise CodingContainerError(exc.status, exc.detail) from exc
@@ -298,7 +314,8 @@ def run_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = sett
         "dirty_status": plan.dirty_status,
         "dirty_paths_sha256": plan.dirty_paths_sha256,
         "image": plan.image,
-        "image_digest": plan.image.rsplit("@", 1)[1],
+        "image_digest": plan.image.rsplit("@", 1)[-1],
+        "image_identity_kind": "local_image_id" if LOCAL_IMAGE_ID_PATTERN.fullmatch(plan.image) else "registry_digest",
         "engine": plan.engine,
         "command_argv": list(plan.command),
         "container_argv_sha256": hashlib.sha256(json.dumps(argv, separators=(",", ":")).encode("utf-8")).hexdigest(),
@@ -319,7 +336,7 @@ def run_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = sett
             "host_source_read_only": True,
             "ephemeral_workspace": True,
             "network_disabled": True,
-            "image_immutable": "@sha256:" in plan.image,
+            "image_immutable": bool("@sha256:" in plan.image or LOCAL_IMAGE_ID_PATTERN.fullmatch(plan.image)),
         },
     }
     receipt["receipt_sha256"] = hashlib.sha256(
