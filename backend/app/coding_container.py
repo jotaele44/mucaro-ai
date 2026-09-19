@@ -5,9 +5,10 @@ import json
 import re
 import subprocess
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
@@ -201,9 +202,9 @@ def build_coding_container_command(plan: CodingContainerPlan) -> list[str]:
         f"--user={CONTAINER_UID_GID}",
         "--workdir=/workspace/repo",
         f"--mount=type=bind,src={plan.repo_root},dst=/workspace/source,readonly",
-        f"--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=256m,uid=65532,gid=65532,mode=1777",
+        "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=256m,uid=65532,gid=65532,mode=1777",
         f"--tmpfs=/workspace/repo:rw,nosuid,nodev,size={plan.workspace_mb}m,uid=65532,gid=65532,mode=0755",
-        f"--tmpfs=/workspace/out:rw,nosuid,nodev,size=256m,uid=65532,gid=65532,mode=0755",
+        "--tmpfs=/workspace/out:rw,nosuid,nodev,size=256m,uid=65532,gid=65532,mode=0755",
         f"--memory={plan.memory_mb}m",
         f"--cpus={plan.cpus}",
         f"--pids-limit={plan.pids_limit}",
@@ -285,8 +286,7 @@ def run_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = sett
             argv,
             cwd=plan.repo_root,
             stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             timeout=plan.timeout_seconds,
             check=False,
         )
