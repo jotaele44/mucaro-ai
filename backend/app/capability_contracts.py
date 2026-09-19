@@ -667,6 +667,69 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                     _contract_check("terrain.aspect_accounting", all(isinstance(value, int) for value in (total, neighborhood_valid, flat)) and output_bands[1].get("valid_cell_count", -1) + flat == neighborhood_valid and output_bands[1].get("valid_cell_count", -1) + output_bands[1].get("nodata_cell_count", -1) == total, "aspect accounting must separate flat cells from complete neighborhoods"),
                 ]
             )
+    elif operation == "derive_raster_hillshade":
+        accounting = report.get("hillshade_accounting")
+        output_bands = _dotted(report, "output.bands")
+        output_band = output_bands[0] if isinstance(output_bands, list) and len(output_bands) == 1 else None
+        azimuth = _dotted(report, "parameters.azimuth_degrees_clockwise_from_north")
+        altitude = _dotted(report, "parameters.altitude_degrees_above_horizon")
+        azimuth_valid = (
+            isinstance(azimuth, (int, float))
+            and not isinstance(azimuth, bool)
+            and 0.0 <= azimuth < 360.0
+        )
+        altitude_valid = (
+            isinstance(altitude, (int, float))
+            and not isinstance(altitude, bool)
+            and 0.0 < altitude <= 90.0
+        )
+        checks.extend(
+            [
+                _contract_check("hillshade.adapter", _dotted(report, "parameters.adapter") == "terrain_slope_aspect_cosine_v1", "hillshade adapter identity must be frozen"),
+                _contract_check("hillshade.band", isinstance(_dotted(report, "parameters.band"), int) and _dotted(report, "parameters.band") >= 1, "hillshade band must be one-based"),
+                _contract_check("hillshade.elevation_units", _dotted(report, "parameters.elevation_units") == "meters", "hillshade elevation units must be explicitly meters"),
+                _contract_check("hillshade.azimuth", azimuth_valid, "hillshade azimuth must be within [0,360)"),
+                _contract_check("hillshade.altitude", altitude_valid, "hillshade altitude must be within (0,90]"),
+                _contract_check("hillshade.model", _dotted(report, "parameters.illumination_model") == "lambertian_direct_light_clamped", "hillshade illumination model must be frozen"),
+                _contract_check("hillshade.scale", _dotted(report, "parameters.output_scale") == [0.0, 255.0], "hillshade output scale must be 0..255"),
+                _contract_check("hillshade.neighborhood_policy", _dotted(report, "parameters.neighborhood_policy") == "complete_3x3", "hillshade must preserve complete 3x3 terrain neighborhoods"),
+                _contract_check("hillshade.terrain_report_hash", bool(_dotted(report, "terrain_lineage.report_sha256")), "hillshade terrain report hash is required"),
+                _contract_check("hillshade.terrain_output_hash", bool(_dotted(report, "terrain_lineage.output_sha256")), "hillshade terrain output hash is required"),
+                _contract_check("hillshade.terrain_source_identity", _dotted(report, "terrain_lineage.source_sha256") == _dotted(report, "source.sha256"), "hillshade terrain lineage must bind the original source hash"),
+                _contract_check("hillshade.terrain_adapter", _dotted(report, "terrain_lineage.adapter") == "numpy_gradient_3x3_complete_neighborhood_v1", "hillshade must bind the certified terrain adapter"),
+                _contract_check("hillshade.flat_policy", _dotted(report, "terrain_lineage.flat_aspect_policy") == "NODATA", "hillshade must bind the terrain flat-aspect policy"),
+                _contract_check("hillshade.output_hash", bool(_dotted(report, "output.sha256")), "hillshade output hash is required"),
+                _contract_check("hillshade.crs", _dotted(report, "source.crs") == _dotted(report, "output.crs"), "hillshade source and output CRS must match"),
+                _contract_check("hillshade.transform", _dotted(report, "source.transform") == _dotted(report, "output.transform"), "hillshade source and output transforms must match"),
+                _contract_check("hillshade.bounds", _dotted(report, "source.bounds") == _dotted(report, "output.bounds"), "hillshade source and output bounds must match"),
+                _contract_check("hillshade.width", _dotted(report, "source.width") == _dotted(report, "output.width"), "hillshade source and output widths must match"),
+                _contract_check("hillshade.height", _dotted(report, "source.height") == _dotted(report, "output.height"), "hillshade source and output heights must match"),
+                _contract_check("hillshade.output_band_count", _dotted(report, "output.band_count") == 1, "hillshade output must contain one band"),
+                _contract_check("hillshade.output_dtypes", _dotted(report, "output.dtypes") == ["float32"], "hillshade output band must be float32"),
+                _contract_check("hillshade.output_nodata", _dotted(report, "output.nodata_values") == [-9999.0], "hillshade output NODATA declaration must be frozen"),
+                _contract_check("hillshade.output_descriptions", _dotted(report, "output.descriptions") == ["hillshade_0_255"], "hillshade output band description must be frozen"),
+                _contract_check("hillshade.output_bands", isinstance(output_band, dict), "hillshade output band receipt is required"),
+                _contract_check("hillshade.accounting", isinstance(accounting, dict), "hillshade accounting is required"),
+            ]
+        )
+        if isinstance(accounting, dict) and isinstance(output_band, dict):
+            total = accounting.get("total_cell_count")
+            valid = accounting.get("valid_cell_count")
+            nodata = accounting.get("nodata_cell_count")
+            shadow = accounting.get("shadow_cell_count")
+            illuminated = accounting.get("illuminated_cell_count")
+            fully_lit = accounting.get("fully_lit_cell_count")
+            minimum = output_band.get("minimum")
+            maximum = output_band.get("maximum")
+            checks.extend(
+                [
+                    _contract_check("hillshade.cell_accounting", all(isinstance(value, int) for value in (total, valid, nodata)) and valid + nodata == total, "hillshade valid and NODATA counts must close"),
+                    _contract_check("hillshade.illumination_accounting", all(isinstance(value, int) for value in (valid, shadow, illuminated)) and shadow + illuminated == valid, "hillshade shadow and illuminated counts must close"),
+                    _contract_check("hillshade.fully_lit_accounting", all(isinstance(value, int) for value in (valid, fully_lit)) and 0 <= fully_lit <= valid, "hillshade fully-lit count must be bounded by valid cells"),
+                    _contract_check("hillshade.band_accounting", output_band.get("valid_cell_count") == valid and output_band.get("nodata_cell_count") == nodata, "hillshade band accounting must match report accounting"),
+                    _contract_check("hillshade.range", isinstance(minimum, (int, float)) and isinstance(maximum, (int, float)) and 0.0 <= minimum <= maximum <= 255.0, "hillshade output values must remain within 0..255"),
+                ]
+            )
     elif operation == "validate_real_gis_corpus":
         assets = report.get("assets")
         asset_type_counts = report.get("asset_type_counts")
@@ -1068,6 +1131,11 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "planar_overlay_symmetric_difference_area_total",
                 "hausdorff_vertex_distance",
                 "vertex_symmetric_difference_count",
+                "illumination_azimuth_degrees_clockwise_from_north",
+                "illumination_altitude_degrees_above_horizon",
+                "terrain_lineage_report_sha256",
+                "terrain_lineage_output_sha256",
+                "terrain_lineage_source_sha256",
             ),
             invariants=(
                 "row conservation or explicit retained/excluded counts",
@@ -1093,6 +1161,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "raster resampling preserves extent, CRS, band count, and NODATA declarations while recording a new output hash",
                 "authoritative corpus fixtures preserve immutable bytes, query provenance, explicit asset types, vector schema/identity/geometry, and raster grid/value accounting",
                 "terrain derivation requires projected horizontal metres and explicit vertical metres, preserves grid identity, and separates complete neighborhoods, NODATA, and flat aspect",
+                "hillshade binds the exact terrain report and raster hashes, explicit sun azimuth/altitude, 0..255 value range, and valid/NODATA/shadow accounting",
                 "map/export provenance binds output hash, extent, CRS, renderer identity, and every declared source-layer hash",
             ),
             positive_regression_gates=(
@@ -1116,6 +1185,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "raster-resampling fixture preserves the requested dimensions, extent, CRS, band count, and NODATA declaration",
                 "frozen Census TIGERweb, USGS earthquake, and USGS 3DEP raster manifestations validate exact bytes, authority, retrieval UTC, type-specific schema, and accounting",
                 "analytic terrain fixture proves slope/aspect orientation and complete-neighborhood accounting on a projected metre grid",
+                "analytic hillshade fixture proves light-direction semantics, terrain lineage, 0..255 bounds, and zero-shadow versus NODATA separation",
                 "GIS report contract validator accepts real saved measurement receipts and rejects weak provenance or false accounting",
                 "GIS eval manifest runs positive and negative fixtures through the supported CLI boundary",
                 "map export fixture preserves renderer identity plus source and derived layer hashes",
@@ -1138,6 +1208,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "zonal statistics fail closed on invalid bands and retain malformed, dimensional, invalid, and NULL/EMPTY feature states",
                 "raster resampling fails closed on unsupported methods, absent CRS, invalid dimensions, or excessive output-cell requests",
                 "terrain derivation fails closed on geographic/non-metre/rotated grids, invalid bands, and grids outside the bounded dimensions",
+                "hillshade fails closed on invalid azimuth or altitude, absent valid terrain neighborhoods, and terrain lineage that violates slope/aspect mask semantics",
                 "real-corpus validation fails closed on byte drift, path escape, unknown asset type, vector ID/schema/geometry drift, or raster grid/value drift",
                 "map/export provenance fails closed on empty artifacts, invalid extents, missing layer CRS, or absent renderer identity",
                 "GIS report contract validation fails when warning status, source hashes, CRS, or asserted accounting are missing or inconsistent",

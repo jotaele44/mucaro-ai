@@ -54,7 +54,14 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
-from .gis_raster import clip_raster_bbox, derive_raster_terrain, inspect_raster, resample_raster, sample_raster
+from .gis_raster import (
+    clip_raster_bbox,
+    derive_raster_hillshade,
+    derive_raster_terrain,
+    inspect_raster,
+    resample_raster,
+    sample_raster,
+)
 from .gis_topology_repair import repair_geojson_topology
 from .gis_vector_formats import inspect_vector_format
 from .gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
@@ -735,6 +742,33 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gis_derive_terrain.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_derive_terrain.set_defaults(handler=run_gis_derive_terrain)
+
+    gis_derive_hillshade = gis_subcommands.add_parser(
+        "derive-hillshade",
+        help="Derive bounded 0..255 hillshade from certified slope/aspect terrain lineage.",
+    )
+    gis_derive_hillshade.add_argument("raster_path", help="Path to a local projected elevation raster.")
+    gis_derive_hillshade.add_argument("--band", type=int, default=1, help="One-based elevation band index.")
+    gis_derive_hillshade.add_argument(
+        "--elevation-units",
+        choices=["meters"],
+        required=True,
+        help="Explicit vertical units for the selected elevation band.",
+    )
+    gis_derive_hillshade.add_argument(
+        "--azimuth",
+        type=float,
+        default=315.0,
+        help="Light-source azimuth in degrees clockwise from north, in [0,360).",
+    )
+    gis_derive_hillshade.add_argument(
+        "--altitude",
+        type=float,
+        default=45.0,
+        help="Light-source altitude in degrees above the horizon, in (0,90].",
+    )
+    gis_derive_hillshade.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_derive_hillshade.set_defaults(handler=run_gis_derive_hillshade)
 
     gis_validate_corpus = gis_subcommands.add_parser(
         "validate-corpus",
@@ -2116,6 +2150,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_RASTER_CLIP_OK",
         "GIS_RASTER_RESAMPLE_OK",
         "GIS_RASTER_TERRAIN_OK",
+        "GIS_RASTER_HILLSHADE_OK",
         "GIS_VECTOR_RASTER_OK",
         "GIS_VECTOR_RASTER_WARN",
         "GIS_ZONAL_STATS_OK",
@@ -2207,6 +2242,11 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "aspect_units",
                 "flat_aspect_policy",
                 "neighborhood_policy",
+                "azimuth_degrees_clockwise_from_north",
+                "altitude_degrees_above_horizon",
+                "illumination_model",
+                "output_scale",
+                "nodata_policy",
             ):
                 if key in parameters:
                     print(f"{key}={parameters.get(key)}")
@@ -2340,6 +2380,13 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "aspect_cell_accounting_closed",
                 "neighborhood_accounting_closed",
                 "flat_aspect_accounting_closed",
+                "terrain_lineage_hashes_present",
+                "terrain_source_identity_bound",
+                "output_semantics_exact",
+                "cell_accounting_closed",
+                "illumination_accounting_closed",
+                "hillshade_range_bounded",
+                "terrain_validity_mask_preserved",
                 "provenance_complete",
                 "layer_count",
                 "all_layer_hashes_present",
@@ -2360,6 +2407,10 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         terrain_accounting = payload.get("terrain_accounting")
         if isinstance(terrain_accounting, dict):
             for key, value in terrain_accounting.items():
+                print(f"{key}={value}")
+        hillshade_accounting = payload.get("hillshade_accounting")
+        if isinstance(hillshade_accounting, dict):
+            for key, value in hillshade_accounting.items():
                 print(f"{key}={value}")
         manifest = payload.get("manifest")
         if isinstance(manifest, dict):
@@ -2872,6 +2923,21 @@ def run_gis_derive_terrain(args: argparse.Namespace, cfg: Settings) -> int:
             path,
             band=args.band,
             elevation_units=args.elevation_units,
+            cfg=cfg,
+        ),
+    )
+
+
+def run_gis_derive_hillshade(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.raster_path, cfg)
+    return _run_gis_report(
+        args,
+        lambda: derive_raster_hillshade(
+            path,
+            band=args.band,
+            elevation_units=args.elevation_units,
+            azimuth_degrees=args.azimuth,
+            altitude_degrees=args.altitude,
             cfg=cfg,
         ),
     )

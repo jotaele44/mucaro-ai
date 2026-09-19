@@ -19,7 +19,14 @@ from backend.app.gis_crs import reproject_geojson_crs
 from backend.app.gis_corpus import DEFAULT_REAL_GIS_CORPUS_MANIFEST, validate_real_gis_corpus
 from backend.app.gis_export import create_map_export_manifest
 from backend.app.gis_geodesy import measure_geojson_ellipsoidal
-from backend.app.gis_raster import clip_raster_bbox, derive_raster_terrain, inspect_raster, resample_raster, sample_raster
+from backend.app.gis_raster import (
+    clip_raster_bbox,
+    derive_raster_hillshade,
+    derive_raster_terrain,
+    inspect_raster,
+    resample_raster,
+    sample_raster,
+)
 from backend.app.gis_topology_repair import repair_geojson_topology
 from backend.app.gis_vector_formats import inspect_vector_format
 from backend.app.gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
@@ -347,6 +354,28 @@ def test_advanced_raster_and_export_cli_commands_emit_governed_receipts(tmp_path
     assert "flat_aspect_accounting_closed=True" in output
     assert "output_band_count_exact=True" in output
 
+    assert main(
+        [
+            "gis",
+            "derive-hillshade",
+            str(terrain_raster),
+            "--elevation-units",
+            "meters",
+            "--azimuth",
+            "270",
+            "--altitude",
+            "45",
+            "--format",
+            "text",
+        ],
+        cfg=cfg,
+    ) == 0
+    output = capsys.readouterr().out
+    assert "GIS_RASTER_HILLSHADE_OK" in output
+    assert "valid_cell_count=9" in output
+    assert "fully_lit_cell_count=9" in output
+    assert "hillshade_range_bounded=True" in output
+
     rendered = tmp_path / "map.png"
     rendered.write_bytes(b"rendered-map")
     assert main(
@@ -415,6 +444,13 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
         compute_zonal_statistics(vector, raster, cfg=cfg),
         resample_raster(raster, width=4, height=4, method="bilinear", cfg=cfg),
         derive_raster_terrain(terrain_raster, elevation_units="meters", cfg=cfg),
+        derive_raster_hillshade(
+            terrain_raster,
+            elevation_units="meters",
+            azimuth_degrees=270,
+            altitude_degrees=45,
+            cfg=cfg,
+        ),
         create_map_export_manifest(
             cfg=cfg,
             output_path=rendered,
@@ -482,6 +518,28 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
     result = validate_gis_report_contract(malformed_terrain_bands)
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
     assert "terrain.output_bands" in {check["name"] for check in result["failed_checks"]}
+
+    tampered_hillshade = copy.deepcopy(reports[11])
+    tampered_hillshade["hillshade_accounting"]["shadow_cell_count"] = 99
+    result = validate_gis_report_contract(tampered_hillshade)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "hillshade.illumination_accounting" in {
+        check["name"] for check in result["failed_checks"]
+    }
+
+    malformed_hillshade_bands = copy.deepcopy(reports[11])
+    malformed_hillshade_bands["output"]["bands"] = [None]
+    result = validate_gis_report_contract(malformed_hillshade_bands)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "hillshade.output_bands" in {check["name"] for check in result["failed_checks"]}
+
+    mismatched_hillshade_source = copy.deepcopy(reports[11])
+    mismatched_hillshade_source["terrain_lineage"]["source_sha256"] = "0" * 64
+    result = validate_gis_report_contract(mismatched_hillshade_source)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "hillshade.terrain_source_identity" in {
+        check["name"] for check in result["failed_checks"]
+    }
 
 
 def test_real_corpus_cli_and_contract_share_one_receipt_boundary(tmp_path: Path, capsys) -> None:

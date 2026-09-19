@@ -580,3 +580,305 @@ def derive_raster_terrain(
         ],
     }
     return _write_report(cfg, report)
+
+
+def _hillshade_parameter(
+    value: Any,
+    *,
+    name: str,
+    minimum: float,
+    maximum: float,
+    minimum_inclusive: bool,
+) -> float:
+    status = f"ERROR_GIS_HILLSHADE_{name.upper()}"
+    if isinstance(value, bool):
+        raise GISProcessingError(status, f"Hillshade {name} must be a finite number.")
+    try:
+        normalized = float(value)
+    except (TypeError, ValueError) as exc:
+        raise GISProcessingError(status, f"Hillshade {name} must be a finite number.") from exc
+    minimum_valid = normalized >= minimum if minimum_inclusive else normalized > minimum
+    if not math.isfinite(normalized) or not minimum_valid or normalized > maximum:
+        lower_bound = "inclusive" if minimum_inclusive else "exclusive"
+        raise GISProcessingError(
+            status,
+            f"Hillshade {name} must be finite and within {minimum} ({lower_bound}) to {maximum} (inclusive).",
+        )
+    return normalized
+
+
+def derive_raster_hillshade(
+    path: Path,
+    *,
+    band: int = 1,
+    elevation_units: str,
+    azimuth_degrees: float = 315.0,
+    altitude_degrees: float = 45.0,
+    cfg: Any,
+) -> dict[str, Any]:
+    _require_rasterio()
+    cfg.ensure_dirs()
+    azimuth = _hillshade_parameter(
+        azimuth_degrees,
+        name="azimuth",
+        minimum=0.0,
+        maximum=360.0,
+        minimum_inclusive=True,
+    )
+    if azimuth == 360.0:
+        raise GISProcessingError(
+            "ERROR_GIS_HILLSHADE_AZIMUTH",
+            "Hillshade azimuth must be greater than or equal to 0 and less than 360 degrees.",
+        )
+    altitude = _hillshade_parameter(
+        altitude_degrees,
+        name="altitude",
+        minimum=0.0,
+        maximum=90.0,
+        minimum_inclusive=False,
+    )
+
+    terrain_report = derive_raster_terrain(
+        path,
+        band=band,
+        elevation_units=elevation_units,
+        cfg=cfg,
+    )
+    source_sha = str(terrain_report["source"]["sha256"])
+    terrain_path = Path(str(terrain_report["output"]["path"]))
+    created_at = utc_now()
+    report_id = stable_id(
+        "gisreport",
+        "raster_hillshade",
+        source_sha,
+        str(band),
+        elevation_units,
+        str(azimuth),
+        str(altitude),
+        created_at,
+    )
+    output_path = cfg.export_dir / "gis_reports" / f"{report_id}.tif"
+    temporary_output_path = output_path.with_suffix(".tmp.tif")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_nodata = -9999.0
+
+    try:
+        with rasterio.open(terrain_path) as terrain:
+            if terrain.count != 2 or terrain.descriptions != (
+                "slope_degrees",
+                "aspect_degrees_clockwise_from_north",
+            ):
+                raise GISProcessingError(
+                    "ERROR_GIS_HILLSHADE_TERRAIN",
+                    "Hillshade requires the certified two-band slope/aspect terrain manifestation.",
+                )
+            slope = terrain.read(1, masked=True)
+            aspect = terrain.read(2, masked=True)
+            slope_data = np.asarray(slope.data, dtype="float64")
+            aspect_data = np.asarray(aspect.data, dtype="float64")
+            slope_valid = ~np.ma.getmaskarray(slope) & np.isfinite(slope_data)
+            aspect_valid = ~np.ma.getmaskarray(aspect) & np.isfinite(aspect_data)
+            flat_mask = slope_valid & ~aspect_valid & np.isclose(
+                slope_data,
+                0.0,
+                rtol=0.0,
+                atol=1e-6,
+            )
+            unexpected_aspect_state = (aspect_valid & ~slope_valid) | (
+                slope_valid & ~aspect_valid & ~flat_mask
+            )
+            if bool(unexpected_aspect_state.any()):
+                raise GISProcessingError(
+                    "ERROR_GIS_HILLSHADE_TERRAIN",
+                    "Slope/aspect masks do not match the certified flat-aspect policy.",
+                )
+            terrain_accounting = terrain_report["terrain_accounting"]
+            slope_valid_count = int(slope_valid.sum())
+            aspect_valid_count = int(aspect_valid.sum())
+            flat_cell_count = int(flat_mask.sum())
+            if slope_valid_count == 0:
+                raise GISProcessingError(
+                    "ERROR_GIS_HILLSHADE_EMPTY",
+                    "Hillshade requires at least one complete valid terrain neighborhood.",
+                )
+            if (
+                slope_valid_count != terrain_accounting["slope_valid_cell_count"]
+                or aspect_valid_count != terrain_accounting["aspect_valid_cell_count"]
+                or flat_cell_count != terrain_accounting["flat_cell_count"]
+            ):
+                raise GISProcessingError(
+                    "ERROR_GIS_HILLSHADE_TERRAIN",
+                    "Slope/aspect masks do not match the bound terrain receipt accounting.",
+                )
+            if bool(((slope_data[slope_valid] < 0.0) | (slope_data[slope_valid] > 90.0)).any()):
+                raise GISProcessingError(
+                    "ERROR_GIS_HILLSHADE_TERRAIN",
+                    "Slope values must remain within 0 through 90 degrees.",
+                )
+            if bool(((aspect_data[aspect_valid] < 0.0) | (aspect_data[aspect_valid] >= 360.0)).any()):
+                raise GISProcessingError(
+                    "ERROR_GIS_HILLSHADE_TERRAIN",
+                    "Aspect values must remain within 0 inclusive through 360 exclusive degrees.",
+                )
+
+            slope_radians = np.radians(slope_data)
+            aspect_radians = np.radians(np.where(aspect_valid, aspect_data, 0.0))
+            azimuth_radians = math.radians(azimuth)
+            zenith_radians = math.radians(90.0 - altitude)
+            cosine_incidence = (
+                math.cos(zenith_radians) * np.cos(slope_radians)
+                + math.sin(zenith_radians)
+                * np.sin(slope_radians)
+                * np.cos(azimuth_radians - aspect_radians)
+            )
+            hillshade_values = np.full(slope_data.shape, output_nodata, dtype="float32")
+            hillshade_values[slope_valid] = (
+                255.0 * np.clip(cosine_incidence[slope_valid], 0.0, 1.0)
+            ).astype("float32")
+
+            profile = terrain.profile.copy()
+            profile.update(count=1, dtype="float32", nodata=output_nodata, tiled=False)
+            profile.pop("blockxsize", None)
+            profile.pop("blockysize", None)
+            with rasterio.open(temporary_output_path, "w", **profile) as target:
+                target.write(hillshade_values, 1)
+                target.set_band_description(1, "hillshade_0_255")
+                target.update_tags(
+                    hillshade_adapter="terrain_slope_aspect_cosine_v1",
+                    azimuth_degrees_clockwise_from_north=str(azimuth),
+                    altitude_degrees_above_horizon=str(altitude),
+                    source_sha256=source_sha,
+                    terrain_sha256=str(terrain_report["output"]["sha256"]),
+                )
+            output_crs = terrain.crs.to_string() if terrain.crs else None
+            output_transform = list(terrain.transform)[:6]
+            output_bounds = list(terrain.bounds)
+            output_width = terrain.width
+            output_height = terrain.height
+        temporary_output_path.replace(output_path)
+    except GISProcessingError:
+        temporary_output_path.unlink(missing_ok=True)
+        raise
+    except Exception as exc:
+        temporary_output_path.unlink(missing_ok=True)
+        raise GISProcessingError("ERROR_GIS_HILLSHADE", f"Hillshade raster could not be derived: {exc}") from exc
+
+    try:
+        with rasterio.open(output_path) as output:
+            verified_crs = output.crs.to_string() if output.crs else None
+            verified_transform = list(output.transform)[:6]
+            verified_bounds = list(output.bounds)
+            output_band_count = output.count
+            output_dtypes = list(output.dtypes)
+            output_nodata_values = list(output.nodatavals)
+            output_descriptions = list(output.descriptions)
+    except Exception as exc:
+        output_path.unlink(missing_ok=True)
+        raise GISProcessingError("ERROR_GIS_HILLSHADE", f"Derived hillshade raster could not be verified: {exc}") from exc
+
+    hillshade_receipt = _terrain_band_receipt(
+        hillshade_values,
+        slope_valid,
+        band=1,
+        name="hillshade_0_255",
+    )
+    valid_values = hillshade_values[slope_valid]
+    total_cells = output_width * output_height
+    valid_cell_count = int(slope_valid.sum())
+    nodata_cell_count = total_cells - valid_cell_count
+    shadow_cell_count = int(np.isclose(valid_values, 0.0, rtol=0.0, atol=1e-6).sum())
+    fully_lit_cell_count = int(np.isclose(valid_values, 255.0, rtol=0.0, atol=1e-5).sum())
+    output_sha = _sha256(output_path)
+    source = terrain_report["source"]
+    report = {
+        "schema_version": GIS_REPORT_SCHEMA_VERSION,
+        "report_id": report_id,
+        "status": "GIS_RASTER_HILLSHADE_OK",
+        "operation": "derive_raster_hillshade",
+        "created_at": created_at,
+        "source": source,
+        "parameters": {
+            "adapter": "terrain_slope_aspect_cosine_v1",
+            "band": band,
+            "elevation_units": elevation_units,
+            "azimuth_degrees_clockwise_from_north": azimuth,
+            "altitude_degrees_above_horizon": altitude,
+            "illumination_model": "lambertian_direct_light_clamped",
+            "output_scale": [0.0, 255.0],
+            "neighborhood_policy": "complete_3x3",
+            "nodata_policy": "preserve_terrain_neighborhood_mask",
+        },
+        "terrain_lineage": {
+            "report_id": terrain_report["report_id"],
+            "report_path": terrain_report["report_path"],
+            "report_sha256": terrain_report["report_sha256"],
+            "source_sha256": terrain_report["source"]["sha256"],
+            "output_path": str(terrain_path),
+            "output_sha256": terrain_report["output"]["sha256"],
+            "adapter": terrain_report["parameters"]["adapter"],
+            "flat_aspect_policy": terrain_report["parameters"]["flat_aspect_policy"],
+        },
+        "output": {
+            "path": str(output_path),
+            "sha256": output_sha,
+            "bytes": output_path.stat().st_size,
+            "crs": verified_crs,
+            "width": output_width,
+            "height": output_height,
+            "band_count": output_band_count,
+            "dtypes": output_dtypes,
+            "nodata_values": output_nodata_values,
+            "descriptions": output_descriptions,
+            "transform": verified_transform,
+            "bounds": verified_bounds,
+            "bands": [hillshade_receipt],
+        },
+        "hillshade_accounting": {
+            "total_cell_count": total_cells,
+            "valid_cell_count": valid_cell_count,
+            "nodata_cell_count": nodata_cell_count,
+            "flat_cell_count": flat_cell_count,
+            "shadow_cell_count": shadow_cell_count,
+            "illuminated_cell_count": valid_cell_count - shadow_cell_count,
+            "fully_lit_cell_count": fully_lit_cell_count,
+        },
+        "invariants": {
+            "source_and_output_hash_present": bool(source_sha and output_sha),
+            "terrain_lineage_hashes_present": bool(
+                terrain_report["report_sha256"] and terrain_report["output"]["sha256"]
+            ),
+            "terrain_source_identity_bound": terrain_report["source"]["sha256"] == source_sha,
+            "dimensions_preserved": output_width == source["width"] and output_height == source["height"],
+            "crs_preserved": verified_crs == source["crs"] == output_crs,
+            "transform_preserved": verified_transform == source["transform"] == output_transform,
+            "bounds_preserved": verified_bounds == source["bounds"] == output_bounds,
+            "output_band_count_exact": output_band_count == 1,
+            "output_semantics_exact": output_descriptions == ["hillshade_0_255"],
+            "cell_accounting_closed": valid_cell_count + nodata_cell_count == total_cells,
+            "illumination_accounting_closed": shadow_cell_count + (valid_cell_count - shadow_cell_count)
+            == valid_cell_count,
+            "hillshade_range_bounded": bool(
+                valid_cell_count
+                and float(valid_values.min()) >= 0.0
+                and float(valid_values.max()) <= 255.0
+            ),
+            "terrain_validity_mask_preserved": valid_cell_count
+            == terrain_report["terrain_accounting"]["slope_valid_cell_count"],
+            "transactional_output_published": output_path.exists() and not temporary_output_path.exists(),
+        },
+        "warnings": [],
+        "limitations": [
+            "Hillshade is derived from the certified slope/aspect manifestation and inherits its projected-metre, vertical-metre, axis-aligned, and complete-neighborhood limits.",
+            "The bounded illumination model uses direct Lambertian light only; it does not model cast shadows, ambient light, atmospheric effects, or multi-directional shading.",
+            "The 0..255 values remain float32 so zero-valued shadow stays distinct from -9999 NODATA.",
+            "Hillshade is a visualization derivative and must not be interpreted as elevation, slope, land cover, or measured radiance.",
+        ],
+        "falsification_criteria": [
+            "reject azimuth outside [0,360) or altitude outside (0,90]",
+            "reject if certified terrain lineage hashes or source identity are absent",
+            "reject if the terrain slope/aspect mask violates the flat-aspect policy",
+            "reject if output values leave 0..255 or valid/NODATA arithmetic does not close",
+            "reject if CRS, transform, bounds, dimensions, band semantics, or transactional publication differ",
+        ],
+    }
+    return _write_report(cfg, report)
