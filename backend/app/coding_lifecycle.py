@@ -31,8 +31,7 @@ def _git(repo_root: Path, *args: str, timeout: int = 30) -> subprocess.Completed
             ["git", *args],
             cwd=repo_root,
             text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             check=False,
             timeout=timeout,
         )
@@ -132,15 +131,16 @@ def create_work_branch_transaction(
     if after["head_sha"] != expected_head_sha or after["branch"] != branch_name or after["dirty_status"] != "CLEAN":
         rollback_args = ("switch", original_branch) if original_branch != "DETACHED" else ("switch", "--detach", expected_head_sha)
         rollback = _git(context.repo_root, *rollback_args)
+        rollback_status = "CODING_BRANCH_ROLLED_BACK" if rollback.returncode == 0 else "CODING_BRANCH_ROLLBACK_FAILED"
         receipt = {
             "schema_version": CODING_LIFECYCLE_SCHEMA_VERSION,
-            "status": "CODING_BRANCH_ROLLED_BACK" if rollback.returncode == 0 else "CODING_BRANCH_ROLLBACK_FAILED",
+            "status": rollback_status,
             "requested_branch": branch_name,
             "expected_head_sha": expected_head_sha,
             "observed_after": after,
             "rollback_exit_code": rollback.returncode,
         }
-        raise CodingLifecycleError(receipt["status"], "branch postconditions failed", receipt=receipt)
+        raise CodingLifecycleError(rollback_status, "branch postconditions failed", receipt=receipt)
 
     payload = {
         "schema_version": CODING_LIFECYCLE_SCHEMA_VERSION,
