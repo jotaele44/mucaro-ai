@@ -80,3 +80,22 @@ Resulting overlay arithmetic:
 - BROWSING: `65.0%` — `PASS=4 / PROVISIONAL=5 / OPEN=1`
 
 This remains a provisional evidence-state overlay, not browsing-domain or release certification.
+
+
+## GOV-07 + executed coding reconciliation
+
+Audit base head: `22b7e557e7583f14cd79caaf3d7634526199dfd9`.
+
+- Existing `GOV-07 BLOCKED → PASS` event is included in current arithmetic from exact-main hosted push CI evidence.
+- `CODE-06 PROVISIONAL → PASS`: PR #74 merged live sandboxed mutation evidence. CI run `35431347821` passed; mutation artifact `10580902996` digest `sha256:9f712677a566f040744403cc2f42a287b0f233d22bd067c6791cf34aa19ba3dc` preserves approved apply, preimage-drift rejection, reverse-apply rollback, network-disabled execution and host-byte conservation.
+- `CODE-07 PROVISIONAL → PASS`: PR #71 merged the isolated coding quality profile. CI run `35430951380` passed; full-profile artifact `10580757491` digest `sha256:782a46980529814233ba082942904e5e5be7564c05c7c5892b5efeaea59e6a1f` and live-container artifact `10580747437` digest `sha256:9402eeb6995090c9e27258308a4fa94990188aa60705e715a9a2329d29c039df` bind the executed coding-plane pytest/Ruff/Mypy/build profile.
+- CODE-08 review, CODE-09 remote lifecycle and CODE-10 full regression/certification closure remain PROVISIONAL.
+
+Resulting overlay arithmetic:
+
+- current raw completion: `73.0%`
+- current weighted completion: `74.6%`
+- applied events: `20`
+- CODING: `65.0%` — `PASS=3 / PROVISIONAL=7`
+
+This remains an evidence-state overlay, not coding-domain or release certification.

@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "4d7c84640a4d52cc104b72062469e377a5e4ba2b",
+  "audit_head": "22b7e557e7583f14cd79caaf3d7634526199dfd9",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -245,6 +245,37 @@
         "hosted CI evidence receipt uploaded in job step 17"
       ],
       "reason": "Exact main HEAD 5641e60 was admitted to hosted push CI, created and executed a validate job, and completed successfully. This closes GOV-07 independently of startup-probe and protected-release requirements."
+    },
+    {
+      "event_id": "evt-code06-live-mutation-pass",
+      "requirement_id": "CODE-06",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "MERGED_LIVE_SANDBOXED_MUTATION_WITH_ROLLBACK_AND_HOST_CONSERVATION",
+      "evidence": [
+        "PR#74",
+        "main@5641e60bc676876125a049f74a4afe62a48eea0f",
+        "GitHub Actions CI run 35431347821 conclusion=success",
+        "artifact#10580902996 digest=sha256:9f712677a566f040744403cc2f42a287b0f233d22bd067c6791cf34aa19ba3dc",
+        "approved patch apply + preimage-drift rejection + reverse-apply rollback + network-disabled execution + host-byte conservation"
+      ],
+      "reason": "The merged live mutation lane executed the governed sandboxed mutation transaction and deterministic negative/rollback cases inside the isolated coding runtime, preserved host source bytes, and froze exact evidence. Authenticated remote Git actions remain outside frozen CODE-06 scope."
+    },
+    {
+      "event_id": "evt-code07-full-profile-pass",
+      "requirement_id": "CODE-07",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "MERGED_ISOLATED_TEST_LINT_TYPE_BUILD_PROFILE_WITH_HOSTED_EXECUTION",
+      "evidence": [
+        "PR#71",
+        "main@af3cf28d54eebd0152e6a80259e7c36a801deffc",
+        "GitHub Actions CI run 35430951380 conclusion=success",
+        "artifact#10580757491 digest=sha256:782a46980529814233ba082942904e5e5be7564c05c7c5892b5efeaea59e6a1f",
+        "artifact#10580747437 digest=sha256:9402eeb6995090c9e27258308a4fa94990188aa60705e715a9a2329d29c039df",
+        "coding-plane pytest + Ruff + Mypy + python -m build executed inside non-root network-disabled read-only-host isolated runtime"
+      ],
+      "reason": "The merged current-main coding quality profile executed the frozen coding-plane test, lint, type and build checks successfully with exact image/runtime/source receipts. Whole-repository lint/type debt remains outside frozen CODE-07 scope."
     }
   ]
 }
