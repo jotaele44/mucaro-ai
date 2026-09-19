@@ -19,7 +19,7 @@ from backend.app.gis_crs import reproject_geojson_crs
 from backend.app.gis_corpus import DEFAULT_REAL_GIS_CORPUS_MANIFEST, validate_real_gis_corpus
 from backend.app.gis_export import create_map_export_manifest
 from backend.app.gis_geodesy import measure_geojson_ellipsoidal
-from backend.app.gis_raster import clip_raster_bbox, inspect_raster, resample_raster, sample_raster
+from backend.app.gis_raster import clip_raster_bbox, derive_raster_terrain, inspect_raster, resample_raster, sample_raster
 from backend.app.gis_topology_repair import repair_geojson_topology
 from backend.app.gis_vector_formats import inspect_vector_format
 from backend.app.gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
@@ -71,6 +71,24 @@ def write_raster(path: Path, *, crs: str = "EPSG:4326") -> Path:
         dtype="int16",
         crs=crs,
         transform=from_origin(0, 2, 1, 1),
+        nodata=-9999,
+    ) as target:
+        target.write(data, 1)
+    return path
+
+
+def write_terrain_raster(path: Path) -> Path:
+    data = np.tile(np.arange(5, dtype="float32"), (5, 1))
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        width=5,
+        height=5,
+        count=1,
+        dtype="float32",
+        crs="EPSG:32620",
+        transform=from_origin(500000, 2000000, 1, 1),
         nodata=-9999,
     ) as target:
         target.write(data, 1)
@@ -206,6 +224,7 @@ def test_ellipsoidal_edge_conditions_and_invalid_coordinates_close_accounting(tm
 def test_advanced_raster_and_export_cli_commands_emit_governed_receipts(tmp_path: Path, capsys) -> None:
     cfg = make_settings(tmp_path)
     raster = write_raster(tmp_path / "grid.tif")
+    terrain_raster = write_terrain_raster(tmp_path / "terrain.tif")
     vector = write_geojson(
         tmp_path / "cells.geojson",
         [
@@ -310,6 +329,24 @@ def test_advanced_raster_and_export_cli_commands_emit_governed_receipts(tmp_path
     assert "dimensions_exact=True" in output
     assert "nodata_definition_preserved=True" in output
 
+    assert main(
+        [
+            "gis",
+            "derive-terrain",
+            str(terrain_raster),
+            "--elevation-units",
+            "meters",
+            "--format",
+            "text",
+        ],
+        cfg=cfg,
+    ) == 0
+    output = capsys.readouterr().out
+    assert "GIS_RASTER_TERRAIN_OK" in output
+    assert "neighborhood_valid_cell_count=9" in output
+    assert "flat_aspect_accounting_closed=True" in output
+    assert "output_band_count_exact=True" in output
+
     rendered = tmp_path / "map.png"
     rendered.write_bytes(b"rendered-map")
     assert main(
@@ -358,6 +395,7 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
         [{"type": "Feature", "id": "line", "properties": {}, "geometry": {"type": "LineString", "coordinates": [[-66, 18], [-66, 19]]}}],
     )
     raster = write_raster(tmp_path / "grid.tif")
+    terrain_raster = write_terrain_raster(tmp_path / "terrain.tif")
     vector = write_geojson(
         tmp_path / "cell.geojson",
         [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[0, 1], [1, 1], [1, 2], [0, 2], [0, 1]]]}, "properties": {}}],
@@ -376,6 +414,7 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
         analyze_vector_raster_intersection(vector, raster, cfg=cfg),
         compute_zonal_statistics(vector, raster, cfg=cfg),
         resample_raster(raster, width=4, height=4, method="bilinear", cfg=cfg),
+        derive_raster_terrain(terrain_raster, elevation_units="meters", cfg=cfg),
         create_map_export_manifest(
             cfg=cfg,
             output_path=rendered,
@@ -432,6 +471,18 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
     assert "vector_raster.cell_accounting" in {check["name"] for check in result["failed_checks"]}
 
+    tampered_terrain = copy.deepcopy(reports[10])
+    tampered_terrain["terrain_accounting"]["flat_cell_count"] = 1
+    result = validate_gis_report_contract(tampered_terrain)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "terrain.aspect_accounting" in {check["name"] for check in result["failed_checks"]}
+
+    malformed_terrain_bands = copy.deepcopy(reports[10])
+    malformed_terrain_bands["output"]["bands"] = [None, None]
+    result = validate_gis_report_contract(malformed_terrain_bands)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "terrain.output_bands" in {check["name"] for check in result["failed_checks"]}
+
 
 def test_real_corpus_cli_and_contract_share_one_receipt_boundary(tmp_path: Path, capsys) -> None:
     cfg = make_settings(tmp_path)
@@ -450,10 +501,19 @@ def test_real_corpus_cli_and_contract_share_one_receipt_boundary(tmp_path: Path,
     assert main(["gis", "validate-corpus", str(DEFAULT_REAL_GIS_CORPUS_MANIFEST), "--format", "text"], cfg=cfg) == 0
     output = capsys.readouterr().out
     assert "GIS_CORPUS_VALIDATION_OK" in output
-    assert "asset_count=2" in output
-    assert "features=3 crs=EPSG:4326" in output
-    assert "features=30 crs=EPSG:4326" in output
+    assert "asset_count=3" in output
+    assert "type=geojson features=3" in output
+    assert "type=geojson features=30" in output
+    assert "type=raster features=None grid=64x64 crs=EPSG:32620" in output
 
     report = validate_real_gis_corpus(DEFAULT_REAL_GIS_CORPUS_MANIFEST, cfg=cfg)
     result = validate_gis_report_contract(report)
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
+
+    tampered = copy.deepcopy(report)
+    tampered["assets"][2]["bands"][0]["valid_cell_count"] = 4095
+    result = validate_gis_report_contract(tampered)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "gis_corpus.assets.2.band_accounting" in {
+        check["name"] for check in result["failed_checks"]
+    }

@@ -54,7 +54,7 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
-from .gis_raster import clip_raster_bbox, inspect_raster, resample_raster, sample_raster
+from .gis_raster import clip_raster_bbox, derive_raster_terrain, inspect_raster, resample_raster, sample_raster
 from .gis_topology_repair import repair_geojson_topology
 from .gis_vector_formats import inspect_vector_format
 from .gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
@@ -720,6 +720,21 @@ def build_parser() -> argparse.ArgumentParser:
     gis_resample_raster.add_argument("--method", choices=["nearest", "bilinear"], default="nearest", help="Bounded resampling method.")
     gis_resample_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_resample_raster.set_defaults(handler=run_gis_resample_raster)
+
+    gis_derive_terrain = gis_subcommands.add_parser(
+        "derive-terrain",
+        help="Derive slope and aspect from a projected metre elevation raster using complete 3x3 neighborhoods.",
+    )
+    gis_derive_terrain.add_argument("raster_path", help="Path to a local projected elevation raster.")
+    gis_derive_terrain.add_argument("--band", type=int, default=1, help="One-based elevation band index.")
+    gis_derive_terrain.add_argument(
+        "--elevation-units",
+        choices=["meters"],
+        required=True,
+        help="Explicit vertical units for the selected elevation band.",
+    )
+    gis_derive_terrain.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_derive_terrain.set_defaults(handler=run_gis_derive_terrain)
 
     gis_validate_corpus = gis_subcommands.add_parser(
         "validate-corpus",
@@ -2100,6 +2115,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_RASTER_SAMPLE_OK",
         "GIS_RASTER_CLIP_OK",
         "GIS_RASTER_RESAMPLE_OK",
+        "GIS_RASTER_TERRAIN_OK",
         "GIS_VECTOR_RASTER_OK",
         "GIS_VECTOR_RASTER_WARN",
         "GIS_ZONAL_STATS_OK",
@@ -2145,7 +2161,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 if isinstance(asset, dict):
                     print(
                         f"asset={asset.get('asset_id')} sha256={asset.get('sha256')} "
-                        f"features={asset.get('feature_count')} crs={asset.get('declared_crs')}"
+                        f"type={asset.get('asset_type')} "
+                        f"features={asset.get('feature_count')} grid={asset.get('width')}x{asset.get('height')} "
+                        f"crs={asset.get('declared_crs')}"
                     )
         if payload.get("join_cardinality"):
             print(f"join_cardinality={payload.get('join_cardinality')}")
@@ -2180,6 +2198,15 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "width",
                 "height",
                 "method",
+                "elevation_units",
+                "horizontal_units",
+                "horizontal_unit_factor",
+                "x_resolution",
+                "y_resolution",
+                "slope_units",
+                "aspect_units",
+                "flat_aspect_policy",
+                "neighborhood_policy",
             ):
                 if key in parameters:
                     print(f"{key}={parameters.get(key)}")
@@ -2298,6 +2325,21 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "all_stable_ids_present_and_unique",
                 "all_geometries_valid",
                 "all_coordinate_dimensions_accounted",
+                "asset_type_accounting_closed",
+                "all_raster_grids_matched",
+                "all_raster_band_values_accounted",
+                "projected_crs_required",
+                "horizontal_units_metre",
+                "vertical_units_metre",
+                "axis_aligned_transform",
+                "dimensions_preserved",
+                "transform_preserved",
+                "output_band_count_exact",
+                "source_cell_accounting_closed",
+                "slope_cell_accounting_closed",
+                "aspect_cell_accounting_closed",
+                "neighborhood_accounting_closed",
+                "flat_aspect_accounting_closed",
                 "provenance_complete",
                 "layer_count",
                 "all_layer_hashes_present",
@@ -2315,6 +2357,10 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         if isinstance(state_counts, dict):
             for state, count in state_counts.items():
                 print(f"{state}={count}")
+        terrain_accounting = payload.get("terrain_accounting")
+        if isinstance(terrain_accounting, dict):
+            for key, value in terrain_accounting.items():
+                print(f"{key}={value}")
         manifest = payload.get("manifest")
         if isinstance(manifest, dict):
             for key in ("driver", "width", "height", "band_count", "crs", "feature_count", "feature_table_count", "shape_type_code"):
@@ -2815,6 +2861,19 @@ def run_gis_resample_raster(args: argparse.Namespace, cfg: Settings) -> int:
     return _run_gis_report(
         args,
         lambda: resample_raster(path, width=args.width, height=args.height, method=args.method, cfg=cfg),
+    )
+
+
+def run_gis_derive_terrain(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.raster_path, cfg)
+    return _run_gis_report(
+        args,
+        lambda: derive_raster_terrain(
+            path,
+            band=args.band,
+            elevation_units=args.elevation_units,
+            cfg=cfg,
+        ),
     )
 
 

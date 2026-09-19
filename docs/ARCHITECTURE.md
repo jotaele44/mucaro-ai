@@ -110,15 +110,16 @@ Advanced capabilities are introduced as bounded adapters beneath the same
 permission, provenance, and audit model as the rest of the app. The bounded GIS
 candidate now routes GeoJSON operations, explicit topology repair, horizontal
 CRS transformation, ellipsoidal measurement, vector/raster manifestations,
-raster sampling/clipping, vector-raster analysis, and map-export provenance
-through shared CLI, eval, and saved-report contract surfaces. Receipts live
+raster sampling/clipping, a frozen real-raster corpus manifestation,
+projected-metre slope/aspect derivation, vector-raster analysis, and map-export
+provenance through shared CLI, eval, and saved-report contract surfaces. Receipts live
 under `data/exports/gis_reports` and preserve source/output hashes, CRS,
 dimensional and NODATA residue, per-feature states, and accounting invariants.
 
 This is not full advanced GIS certification. Broader CRS grids and vertical or
 time-dependent operations, dimension-preserving mutation, topology/overlay
-policy, independent visual validation, larger real corpora, remote sensing,
-terrain, hydrology, bathymetry, and temporal GIS remain open product
+policy, independent visual validation, larger real vector/raster corpora,
+remote sensing, broader terrain algorithms, hydrology, bathymetry, and temporal GIS remain open product
 requirements.
 
 ## Packaging layer
