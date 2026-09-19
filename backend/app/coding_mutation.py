@@ -31,8 +31,7 @@ def _git_apply(repo_root: Path, patch_bytes: bytes, *, reverse: bool = False) ->
             argv,
             cwd=repo_root,
             input=patch_bytes,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             check=False,
             timeout=30,
         )
