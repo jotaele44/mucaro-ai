@@ -7,8 +7,6 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageDraw, ImageFont
-
 from backend.app.config import Settings
 from backend.app.ocr_analysis import analyze_image_ocr
 from backend.app.ocr_layout import calibrate_confidence, derive_layout_receipt
@@ -34,7 +32,8 @@ def _settings(root: Path) -> Settings:
     return cfg
 
 
-def _font(size: int) -> ImageFont.FreeTypeFont:
+def _font(size: int) -> Any:
+    from PIL import ImageFont
     candidates = [
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
         Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"),
@@ -46,6 +45,8 @@ def _font(size: int) -> ImageFont.FreeTypeFont:
 
 
 def _text_image(path: Path, lines: list[str], *, font_size: int = 54) -> None:
+    from PIL import Image, ImageDraw
+
     image = Image.new("RGB", (1800, 900), "white")
     draw = ImageDraw.Draw(image)
     font = _font(font_size)
@@ -57,10 +58,14 @@ def _text_image(path: Path, lines: list[str], *, font_size: int = 54) -> None:
 
 
 def _blank_image(path: Path) -> None:
+    from PIL import Image
+
     Image.new("RGB", (1200, 700), "white").save(path, format="PNG")
 
 
 def _pdf_from_png(image_path: Path, pdf_path: Path) -> None:
+    from PIL import Image
+
     with Image.open(image_path) as image:
         image.convert("RGB").save(pdf_path, "PDF", resolution=150.0)
 
