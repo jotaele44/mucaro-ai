@@ -27,3 +27,46 @@ jobs:
         working-directory: frontend
       - name: Certify release gates
         run: python scripts/certify_release.py
+      - name: Write hosted CI evidence receipt
+        env:
+          MUCARO_CI_RECEIPT: ${{ runner.temp }}/mucaro-hosted-ci-evidence.json
+          MUCARO_CI_SHA: ${{ github.sha }}
+          MUCARO_CI_RUN_ID: ${{ github.run_id }}
+          MUCARO_CI_RUN_ATTEMPT: ${{ github.run_attempt }}
+          MUCARO_CI_EVENT: ${{ github.event_name }}
+          MUCARO_CI_REF: ${{ github.ref }}
+          MUCARO_CI_REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["MUCARO_CI_RECEIPT"])
+          payload = {
+              "schema_version": "mucaro-external-release-evidence/1.0",
+              "head_sha": os.environ["MUCARO_CI_SHA"],
+              "evidence": {
+                  "ci_admitted": True,
+                  "ci_passed": True,
+                  "jobs_executed": True,
+              },
+              "github": {
+                  "repository": os.environ["MUCARO_CI_REPOSITORY"],
+                  "run_id": os.environ["MUCARO_CI_RUN_ID"],
+                  "run_attempt": os.environ["MUCARO_CI_RUN_ATTEMPT"],
+                  "event_name": os.environ["MUCARO_CI_EVENT"],
+                  "ref": os.environ["MUCARO_CI_REF"],
+                  "job": "validate",
+              },
+              "basis": "receipt emitted only after scripts/certify_release.py exits successfully in the admitted hosted validate job",
+          }
+          path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(path)
+          PY
+      - name: Upload hosted CI evidence receipt
+        uses: actions/upload-artifact@v7
+        with:
+          name: hosted-ci-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/mucaro-hosted-ci-evidence.json
+          archive: false
