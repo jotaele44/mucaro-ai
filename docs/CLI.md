@@ -59,10 +59,19 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
 | `mucaro gis overlay LEFT_PATH RIGHT_PATH` | Overlay matched polygon GeoJSON features and write a derived-output receipt | 0 | 2 |
 | `mucaro gis reproject GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON between supported local CRS pairs and write a transformation receipt | 0 | 2 |
+| `mucaro gis reproject-crs GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON through pyproj/PROJ with explicit axis policy and frozen transformer identity | 0 | 2 |
 | `mucaro gis csv-points CSV_PATH --lat-column LAT --lon-column LON` | Convert CSV coordinate rows into GeoJSON point features and write a row-accounted GIS receipt | 0 | 2 |
 | `mucaro gis filter-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Filter whole GeoJSON features by bbox extent and write retained/excluded accounting | 0 | 2 |
 | `mucaro gis clip-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Clip GeoJSON geometries to a bbox and write clipped/unchanged/excluded accounting | 0 | 2 |
 | `mucaro gis measure GEOJSON_PATH` | Measure GeoJSON feature area/length with planar or EPSG:4326 geodesic receipts | 0 | 2 |
+| `mucaro gis repair-topology GEOJSON_PATH` | Explicitly repair planar XY topology with before/after geometry hashes and retained/excluded accounting | 0 | 2 |
+| `mucaro gis measure-ellipsoidal GEOJSON_PATH` | Measure EPSG:4326 features on the WGS84 ellipsoid with pyproj Geod | 0 | 2 |
+| `mucaro gis inspect-vector VECTOR_PATH` | Inspect GeoJSON, GeoPackage, or Shapefile source manifestations without inferring cross-format identity | 0 | 2 |
+| `mucaro gis inspect-raster RASTER_PATH` | Inspect raster dimensions, CRS, bands, dtypes, and NODATA accounting | 0 | 2 |
+| `mucaro gis sample-raster RASTER_PATH --point X Y` | Sample explicit coordinates in the raster CRS while separating values, NODATA, and outside states | 0 | 2 |
+| `mucaro gis clip-raster-bbox RASTER_PATH --min-x X --min-y Y --max-x X --max-y Y` | Transactionally clip a raster bbox and hash the derived artifact | 0 | 2 |
+| `mucaro gis vector-raster VECTOR_PATH RASTER_PATH` | Summarize raster cells covered by GeoJSON features with exact-CRS and NODATA controls | 0 | 2 |
+| `mucaro gis map-export-manifest OUTPUT_PATH --layer PATH CRS ...` | Bind an existing map/export artifact to renderer identity, extent, CRS, and source-layer hashes | 0 | 2 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
@@ -140,6 +149,13 @@ geometry, and topology that is only valid after ignoring Z. M coordinates remain
 unresolved because the local Shapely adapter cannot prove M-dimensional topology.
 The command does not repair invalid topology or transform geometries.
 
+`mucaro gis repair-topology GEOJSON_PATH` is the separate, explicit mutation
+boundary. It uses Shapely `make_valid` only for planar XY geometries, writes
+source and output geometry hashes per feature, and preserves
+`UNCHANGED_VALID`, `REPAIRED`, `NULL_EMPTY`, `UNRESOLVED`, and
+`UNSUPPORTED` as distinct states. Z/M geometries are not flattened; they
+remain unresolved. Inspection never invokes repair implicitly.
+
 `mucaro gis filter-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y`
 retains whole GeoJSON features whose coordinate extent intersects the query
 bbox. Use `--mode within` when a feature's entire bbox must fit inside the
@@ -178,9 +194,8 @@ output, records per-feature `RETAINED_CLIPPED`, `RETAINED_UNCHANGED`,
 records source/output coordinate counts, and closes retained/excluded/clipped
 accounting. Z and M dimensions are not flattened; they are recorded as
 unresolved residue until a dimension-preserving clipping adapter is added.
-Repair of invalid topology, broader clipping/overlay operation support,
-raster/vector engines, independent planar overlay validation, and ellipsoidal
-GIS-engine validation remain future GIS work.
+Broader clipping/overlay operation support, dimension-preserving mutation, and
+independent planar overlay validation remain future GIS work.
 
 `mucaro gis measure GEOJSON_PATH` measures Point, MultiPoint, LineString,
 MultiLineString, Polygon, and MultiPolygon features. The default
@@ -192,9 +207,33 @@ per-feature measurement state, bbox, coordinate count, polygon hole count,
 aggregate area, aggregate length, null/invalid/unsupported geometry residue,
 adapter identity, measurement mode, units, and row-accounting closure. Planar
 polygon area uses local shoelace math with interior rings subtracted. Geodesic
-mode is not a full ellipsoidal GIS-engine measurement and does not perform
-robust overlay, clipping, datum transformation, antimeridian topology repair,
-or polar-area adjudication.
+mode remains the compatibility spherical adapter. Use `mucaro gis
+measure-ellipsoidal GEOJSON_PATH` for WGS84 `pyproj.Geod` distance, perimeter,
+and area receipts. The ellipsoidal command still requires EPSG:4326 and does
+not claim antimeridian, polar, ring-orientation, or large-geometry corpus
+certification.
+
+`mucaro gis reproject-crs GEOJSON_PATH --target-crs CRS` is the broader
+horizontal CRS adapter. It accepts CRS identifiers parseable by pyproj/PROJ,
+forces `always_xy=True`, records the source and target CRS, axis-order policy,
+transformer description/definition and definition hash, reported accuracy,
+output hash, and per-feature state. Z is passed through without vertical
+transformation and is warned; M fails closed. Grid availability and transform
+accuracy remain environment-dependent, and vertical or time-dependent CRS
+certification is outside the V1 claim.
+
+`inspect-vector`, `inspect-raster`, `sample-raster`,
+`clip-raster-bbox`, and `vector-raster` expose the bounded V1
+vector/raster plane. GeoPackage inspection is metadata-first; Shapefile
+identity includes sidecar manifestations; raster sampling requires coordinates
+already in the raster CRS; clipping does not reproject; vector-raster analysis
+requires exact declared CRS agreement and uses cell-center inclusion. Numeric
+zero, NODATA, outside, null/empty, and unresolved states remain distinct.
+
+`mucaro gis map-export-manifest` does not render a map. It binds an existing
+non-empty artifact to its output hash, extent, CRS, renderer name/version, and
+one or more source-layer hashes plus declared CRS. This proves artifact
+provenance, not visual correctness.
 
 OCR analysis is intentionally separate from ingestion. `mucaro ocr analyze
 IMAGE_PATH` runs a local Tesseract engine against one image, preserves the
@@ -351,6 +390,19 @@ approved and audited.
 | `GIS_CLIP_BBOX_WARN` | GeoJSON bbox clipping completed while recording empty output, null/empty, or unresolved dimensional/topology exclusions |
 | `GIS_MEASURE_OK` | GeoJSON planar or geodesic measurement completed with feature accounting closed and no residue warnings |
 | `GIS_MEASURE_WARN` | GeoJSON planar or geodesic measurement completed while recording null, invalid, unsupported, coordinate, or malformed polygon-hole residue |
+| `GIS_CRS_REPROJECT_OK` | pyproj/PROJ reprojection completed with explicit always-XY policy, frozen transformer identity, output hash, and feature conservation |
+| `GIS_CRS_REPROJECT_WARN` | Reprojection completed with a frozen fallback operation or another explicit CRS warning; inspect `best_available`, engine warnings, and report warnings before relying on material accuracy |
+| `GIS_TOPOLOGY_REPAIR_OK` | explicit planar XY topology repair completed with before/after geometry hashes and closed accounting |
+| `GIS_TOPOLOGY_REPAIR_WARN` | topology repair completed while retaining unresolved or unsupported geometry residue |
+| `GIS_ELLIPSOIDAL_OK` | WGS84 ellipsoidal measurement completed with per-feature and aggregate meter-unit receipts |
+| `GIS_ELLIPSOIDAL_WARN` | ellipsoidal measurement completed while retaining unresolved feature residue |
+| `GIS_VECTOR_FORMAT_OK` | supported vector source manifestation inspection completed |
+| `GIS_RASTER_INSPECT_OK` | raster inspection completed with dimension and band accounting |
+| `GIS_RASTER_SAMPLE_OK` | raster sampling completed with sampled/NODATA/outside accounting |
+| `GIS_RASTER_CLIP_OK` | raster bbox clipping completed with source/output hashes and preserved CRS |
+| `GIS_VECTOR_RASTER_OK` | vector-raster cell-center analysis completed with exact CRS and feature accounting |
+| `GIS_VECTOR_RASTER_WARN` | vector-raster analysis completed while retaining unresolved features |
+| `GIS_MAP_EXPORT_MANIFEST_OK` | map/export artifact provenance was bound to renderer, extent, CRS, and layer hashes |
 | `GIS_EVAL_OK` | GIS fixture manifest validation and every configured spatial case passed |
 | `GIS_EVAL_FAILED` | GIS fixture validation failed or one or more spatial cases regressed |
 | `GIS_QUALITY_CERT_OK` | exact-head GIS fixture-quality certification wrote a release receipt |
@@ -382,6 +434,41 @@ approved and audited.
 | `ERROR_GIS_REPROJECT_INVALID_COORDINATES` | GIS reprojection found non-finite, malformed, or out-of-domain coordinates |
 | `ERROR_GIS_REPROJECT_UNSUPPORTED_GEOMETRY` | GIS reprojection received an unsupported geometry object or type |
 | `ERROR_GIS_REPROJECT_FEATURES_NOT_OBJECTS` | GIS reprojection found a non-object member in the feature array |
+| `ERROR_GIS_CRS_UNSUPPORTED` | pyproj/PROJ could not parse or construct the requested CRS transformation |
+| `ERROR_GIS_CRS_FEATURES` | pyproj/PROJ reprojection found malformed feature rows |
+| `ERROR_GIS_CRS_GEOMETRY` | pyproj/PROJ reprojection found an unsupported geometry object |
+| `ERROR_GIS_CRS_M_UNSUPPORTED` | pyproj/PROJ reprojection found M coordinates without an explicit semantic transformation policy |
+| `ERROR_GIS_CRS_TRANSFORM` | pyproj/PROJ failed while executing the selected transform |
+| `ERROR_GIS_REPAIR_FEATURES` | topology repair found malformed feature rows |
+| `ERROR_GIS_GEOD_CRS` | ellipsoidal measurement received a source CRS other than EPSG:4326 |
+| `ERROR_GIS_GEOD_FEATURES` | ellipsoidal measurement found malformed feature rows |
+| `ERROR_GIS_GEOD_GEOMETRY` | ellipsoidal measurement found malformed geometry coordinates |
+| `ERROR_GIS_GEOD_UNSUPPORTED` | ellipsoidal measurement received an unsupported geometry type |
+| `ERROR_GIS_VECTOR_NOT_FOUND` | vector source path does not exist |
+| `ERROR_GIS_VECTOR_FORMAT` | vector source extension is outside the bounded supported set |
+| `ERROR_GIS_VECTOR_GEOJSON` | GeoJSON vector manifestation is malformed |
+| `ERROR_GIS_VECTOR_GPKG` | GeoPackage metadata could not be read |
+| `ERROR_GIS_VECTOR_SHP` | Shapefile header is truncated or invalid |
+| `ERROR_GIS_RASTER_ENGINE_UNAVAILABLE` | rasterio is unavailable |
+| `ERROR_GIS_RASTER_NOT_FOUND` | raster source path does not exist |
+| `ERROR_GIS_RASTER_OPEN` | raster source could not be opened or inspected |
+| `ERROR_GIS_RASTER_POINTS` | raster sampling received no points or malformed/non-finite coordinates |
+| `ERROR_GIS_RASTER_SAMPLE` | raster sampling failed in the raster engine |
+| `ERROR_GIS_RASTER_BBOX` | raster clipping received malformed, non-finite, or inverted bounds |
+| `ERROR_GIS_RASTER_CLIP_OUTSIDE` | raster clipping bbox does not intersect the raster extent |
+| `ERROR_GIS_RASTER_CLIP_EMPTY` | raster clipping resolved to an empty pixel window |
+| `ERROR_GIS_RASTER_CLIP` | raster clipping failed before transactional output publication |
+| `ERROR_GIS_VECTOR_RASTER_NOT_FOUND` | vector-raster analysis could not find both inputs |
+| `ERROR_GIS_VECTOR_RASTER_VECTOR` | vector-raster analysis received malformed GeoJSON |
+| `ERROR_GIS_VECTOR_RASTER_RASTER` | vector-raster analysis could not open the raster |
+| `ERROR_GIS_VECTOR_RASTER_CRS_MISMATCH` | vector and raster CRS are absent or do not match exactly |
+| `ERROR_GIS_VECTOR_RASTER_BAND` | requested raster band is outside the available one-based range |
+| `ERROR_GIS_EXPORT_NOT_FOUND` | map/export artifact path does not exist |
+| `ERROR_GIS_EXPORT_EMPTY` | map/export artifact exists but contains no bytes |
+| `ERROR_GIS_EXPORT_EXTENT` | map/export extent is malformed, non-finite, inverted, or zero-area |
+| `ERROR_GIS_EXPORT_IDENTITY` | output CRS or renderer identity/version is absent |
+| `ERROR_GIS_EXPORT_LAYER` | bound layer metadata or source path is malformed |
+| `ERROR_GIS_EXPORT_LAYER_CRS` | a bound source layer is missing its declared CRS |
 | `ERROR_GIS_CSV_DELIMITER_INVALID` | CSV point conversion received a delimiter that is not exactly one character |
 | `ERROR_GIS_CSV_CRS_INVALID` | CSV point conversion received an empty CRS value |
 | `ERROR_GIS_CSV_ENCODING` | CSV point conversion received bytes that are not valid UTF-8 |
@@ -447,6 +534,15 @@ mucaro eval answer-trace --format text
 mucaro eval gis --format text
 mucaro gis inspect data/input/example.geojson --format text
 mucaro gis point-in-polygon data/input/points.geojson data/input/polygons.geojson --format text
+mucaro gis reproject-crs data/input/example.geojson --target-crs EPSG:32161 --format text
+mucaro gis repair-topology data/input/example.geojson --format text
+mucaro gis measure-ellipsoidal data/input/example.geojson --format text
+mucaro gis inspect-vector data/input/example.gpkg --format text
+mucaro gis inspect-raster data/input/elevation.tif --format text
+mucaro gis sample-raster data/input/elevation.tif --point -66.1 18.4 --format text
+mucaro gis clip-raster-bbox data/input/elevation.tif --min-x -67 --min-y 17 --max-x -65 --max-y 19 --format text
+mucaro gis vector-raster data/input/zones.geojson data/input/elevation.tif --band 1 --format text
+mucaro gis map-export-manifest data/exports/map.png --layer data/input/zones.geojson EPSG:4326 --extent -67 17 -65 19 --output-crs EPSG:4326 --renderer qgis --renderer-version 3.40 --format text
 mucaro certify retrieval-quality --format text
 mucaro certify answer-trace-quality --format text
 mucaro certify gis-quality --format text

@@ -38,6 +38,11 @@ def test_capability_contracts_cover_expanded_scope_without_overclaiming():
     assert "crs" in contracts["advanced_gis_processing"]["provenance_fields"]
     assert "clip_adapter" in contracts["advanced_gis_processing"]["provenance_fields"]
     assert "overlay_adapter" in contracts["advanced_gis_processing"]["provenance_fields"]
+    assert "transformer_definition_sha256" in contracts["advanced_gis_processing"]["provenance_fields"]
+    assert "repair_adapter" in contracts["advanced_gis_processing"]["provenance_fields"]
+    assert "ellipsoidal_adapter" in contracts["advanced_gis_processing"]["provenance_fields"]
+    assert "raster_source_sha256" in contracts["advanced_gis_processing"]["provenance_fields"]
+    assert "bound_layer_sha256" in contracts["advanced_gis_processing"]["provenance_fields"]
     assert contracts["advanced_gis_processing"]["implementation_status"] == "CANDIDATE"
     assert "ocr_engine" in contracts["state_of_art_ocr_analysis"]["provenance_fields"]
     assert contracts["state_of_art_ocr_analysis"]["implementation_status"] == "CANDIDATE"

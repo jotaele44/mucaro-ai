@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import hashlib
-import json
+import warnings as python_warnings
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from pyproj import CRS, Transformer
+from pyproj import CRS, Transformer, __version__ as pyproj_version, proj_version_str
 from pyproj.exceptions import ProjError
+from pyproj.transformer import TransformerGroup
 
 from .config import Settings, settings
 from .gis_processing import GISProcessingError, GIS_REPORT_SCHEMA_VERSION, _coordinate_dimension_summary, _feature_id, _load_geojson, _write_geojson_output, _write_report
 from .utils import stable_id, utc_now
 
-CRS_ADAPTER = "pyproj_transformer_always_xy_v1"
+CRS_ADAPTER = "pyproj_transformer_group_always_xy_v1"
 
 
 def _transform_coordinates(value: Any, transformer: Transformer) -> Any:
@@ -32,9 +33,18 @@ def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settin
     try:
         source_obj = CRS.from_user_input(source_name)
         target_obj = CRS.from_user_input(target_crs)
-        transformer = Transformer.from_crs(source_obj, target_obj, always_xy=True)
+        with python_warnings.catch_warnings(record=True) as caught_warnings:
+            python_warnings.simplefilter("always")
+            transformer_group = TransformerGroup(source_obj, target_obj, always_xy=True)
+        if not transformer_group.transformers:
+            raise GISProcessingError("ERROR_GIS_CRS_PIPELINE_UNRESOLVED", "PROJ did not provide an available transformation pipeline.")
+        transformer = transformer_group.transformers[0]
     except (ProjError, ValueError) as exc:
         raise GISProcessingError("ERROR_GIS_CRS_UNSUPPORTED", str(exc)) from exc
+    pipeline = transformer.definition or transformer.description
+    if not pipeline or pipeline.lower().startswith("unavailable until"):
+        raise GISProcessingError("ERROR_GIS_CRS_PIPELINE_UNRESOLVED", "The selected PROJ transformation pipeline could not be frozen.")
+    pipeline_sha256 = hashlib.sha256(pipeline.encode("utf-8")).hexdigest()
     raw_features = source.payload.get("features")
     if not isinstance(raw_features, list) or not all(isinstance(feature, dict) for feature in raw_features):
         raise GISProcessingError("ERROR_GIS_CRS_FEATURES", "All GeoJSON features must be objects.")
@@ -70,12 +80,15 @@ def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settin
     output_payload["features"] = output_features
     output_payload["crs"] = {"type": "name", "properties": {"name": target_obj.to_string()}}
     output = _write_geojson_output(cfg, report_id, output_payload)
-    pipeline = transformer.definition or transformer.description
-    pipeline_sha256 = hashlib.sha256(pipeline.encode("utf-8")).hexdigest()
+    report_warnings = []
+    if not transformer_group.best_available:
+        report_warnings.append("GIS_CRS_BEST_OPERATION_UNAVAILABLE")
+    if any(row.get("has_z") for row in receipts):
+        report_warnings.append("GIS_CRS_Z_PASSTHROUGH_UNTRANSFORMED")
     report = {
         "schema_version": GIS_REPORT_SCHEMA_VERSION,
         "report_id": report_id,
-        "status": "GIS_CRS_REPROJECT_OK",
+        "status": "GIS_CRS_REPROJECT_WARN" if report_warnings else "GIS_CRS_REPROJECT_OK",
         "operation": "reproject_geojson_crs",
         "created_at": created_at,
         "parameters": {
@@ -84,12 +97,25 @@ def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settin
             "target_crs": target_obj.to_string(),
             "always_xy": True,
             "axis_order_policy": "traditional_gis_xy",
+            "pyproj_version": pyproj_version,
+            "proj_version": proj_version_str,
+            "available_candidate_count": len(transformer_group.transformers),
+            "unavailable_candidate_count": len(transformer_group.unavailable_operations),
+            "selected_candidate_index": 0,
+            "best_available": transformer_group.best_available,
+            "engine_warnings": [str(item.message) for item in caught_warnings],
             "transformer_description": transformer.description,
             "transformer_definition": pipeline,
             "transformer_definition_sha256": pipeline_sha256,
             "accuracy": transformer.accuracy,
         },
-        "source": {"path": str(path), "sha256": source.sha256, "declared_crs": source.crs, "feature_count": len(raw_features)},
+        "source": {
+            "path": str(path),
+            "sha256": source.sha256,
+            "crs": source_obj.to_string(),
+            "declared_crs": source.crs,
+            "feature_count": len(raw_features),
+        },
         "output": {"path": output["path"], "sha256": output["sha256"], "crs": target_obj.to_string(), "feature_count": len(output_features)},
         "features": receipts,
         "invariants": {
@@ -97,9 +123,9 @@ def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settin
             "source_crs_parseable": True,
             "target_crs_parseable": True,
             "axis_order_explicit": True,
-            "transform_pipeline_frozen": bool(pipeline),
+            "transform_pipeline_frozen": bool(pipeline) and not pipeline.lower().startswith("unavailable until"),
         },
-        "warnings": ["GIS_CRS_Z_PASSTHROUGH_UNTRANSFORMED"] if any(row.get("has_z") for row in receipts) else [],
+        "warnings": report_warnings,
         "limitations": [
             "XY coordinates are transformed with pyproj/PROJ using always_xy=True",
             "Z values are preserved but not vertically transformed",

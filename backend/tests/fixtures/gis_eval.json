@@ -1,9 +1,9 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 18,
-    "operation_count": 9,
-    "negative_case_count": 6
+    "case_count": 35,
+    "operation_count": 18,
+    "negative_case_count": 13
   },
   "cases": [
     {
@@ -1656,6 +1656,446 @@
       },
       "expect_error": true,
       "expected_status": "ERROR_GIS_REPROJECT_INVALID_COORDINATES",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "reproject_crs_wgs84_to_utm20n",
+      "operation": "reproject_crs",
+      "parameters": {
+        "target_crs": "EPSG:32620"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "point", "properties": {}, "geometry": {"type": "Point", "coordinates": [-66.0, 18.2]}}
+          ]
+        }
+      },
+      "expected_status": "GIS_CRS_REPROJECT_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "feature_row_conservation": true,
+        "source_crs_parseable": true,
+        "target_crs_parseable": true,
+        "axis_order_explicit": true,
+        "transform_pipeline_frozen": true
+      },
+      "expected_fields": {
+        "parameters.adapter": "pyproj_transformer_group_always_xy_v1",
+        "parameters.always_xy": true,
+        "parameters.axis_order_policy": "traditional_gis_xy",
+        "parameters.source_crs": "EPSG:4326",
+        "parameters.target_crs": "EPSG:32620",
+        "source.crs": "EPSG:4326",
+        "output.crs": "EPSG:32620",
+        "features.0.transform_state": "TRANSFORMED"
+      }
+    },
+    {
+      "case_id": "reproject_crs_m_coordinates_fail_closed",
+      "operation": "reproject_crs",
+      "parameters": {
+        "target_crs": "EPSG:3857"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "m", "properties": {}, "geometry": {"type": "Point", "coordinates": [-66.0, 18.2, 5.0, 9.0]}}
+          ]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_CRS_M_UNSUPPORTED",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "reproject_crs_invalid_target_fails_closed",
+      "operation": "reproject_crs",
+      "parameters": {
+        "target_crs": "EPSG:NOTREAL"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": []
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_CRS_UNSUPPORTED",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "repair_topology_bowtie_explicit",
+      "operation": "repair_topology",
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {
+              "type": "Feature",
+              "id": "bowtie",
+              "properties": {},
+              "geometry": {"type": "Polygon", "coordinates": [[[0, 0], [2, 2], [0, 2], [2, 0], [0, 0]]]}
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_TOPOLOGY_REPAIR_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "input_feature_count": 1,
+        "output_feature_count": 1,
+        "row_accounting_closed": true,
+        "output_accounting_closed": true,
+        "repair_is_explicit": true
+      },
+      "expected_fields": {
+        "parameters.adapter": "shapely_make_valid_v1",
+        "parameters.mode": "explicit_planar_xy",
+        "state_counts.REPAIRED": 1,
+        "features.0.repair_state": "REPAIRED",
+        "output.feature_count": 1
+      }
+    },
+    {
+      "case_id": "repair_topology_z_remains_unresolved",
+      "operation": "repair_topology",
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {
+              "type": "Feature",
+              "id": "z",
+              "properties": {},
+              "geometry": {"type": "Polygon", "coordinates": [[[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 0, 1]]]}
+            }
+          ]
+        }
+      },
+      "expected_status": "GIS_TOPOLOGY_REPAIR_WARN",
+      "expected_warnings": ["GIS_REPAIR_UNRESOLVED"],
+      "expected_invariants": {
+        "input_feature_count": 1,
+        "output_feature_count": 0,
+        "row_accounting_closed": true,
+        "output_accounting_closed": true,
+        "repair_is_explicit": true
+      },
+      "expected_fields": {
+        "state_counts.UNRESOLVED": 1,
+        "features.0.repair_state": "UNRESOLVED",
+        "features.0.warnings.0": "GIS_REPAIR_COORDINATE_DIMENSION_UNSUPPORTED",
+        "output.feature_count": 0
+      }
+    },
+    {
+      "case_id": "measure_ellipsoidal_wgs84_line",
+      "operation": "measure_ellipsoidal",
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "line", "properties": {}, "geometry": {"type": "LineString", "coordinates": [[-66, 18], [-66, 19]]}}
+          ]
+        }
+      },
+      "expected_status": "GIS_ELLIPSOIDAL_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "row_accounting_closed": true,
+        "total_area_m2": 0.0
+      },
+      "expected_fields": {
+        "parameters.adapter": "pyproj_geod_wgs84_v1",
+        "parameters.ellipsoid": "WGS84",
+        "source.crs": "EPSG:4326",
+        "state_counts.MEASURED": 1,
+        "measurements.0.state": "MEASURED"
+      }
+    },
+    {
+      "case_id": "measure_ellipsoidal_non_wgs84_fails_closed",
+      "operation": "measure_ellipsoidal",
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:3857"}},
+          "features": []
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_GEOD_CRS",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "vector_format_geojson_manifest",
+      "operation": "vector_format",
+      "inputs": {
+        "vector": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "point", "properties": {}, "geometry": {"type": "Point", "coordinates": [-66, 18]}}
+          ]
+        }
+      },
+      "expected_status": "GIS_VECTOR_FORMAT_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "source_hash_present": true,
+        "format_supported": true
+      },
+      "expected_fields": {
+        "source.format": "GEOJSON",
+        "manifest.feature_count": 1,
+        "manifest.geometry_types.Point": 1,
+        "manifest.coordinate_dimensions.XY": 1
+      }
+    },
+    {
+      "case_id": "vector_format_unsupported_fails_closed",
+      "operation": "vector_format",
+      "inputs": {
+        "vector": {"format": "raw", "text": "not a supported vector format"}
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_VECTOR_FORMAT",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "raster_inspect_nodata_accounting",
+      "operation": "raster_inspect",
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expected_status": "GIS_RASTER_INSPECT_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "band_accounting_closed": true,
+        "dimensions_positive": true
+      },
+      "expected_fields": {
+        "manifest.driver": "GTiff",
+        "manifest.width": 2,
+        "manifest.height": 2,
+        "manifest.band_count": 1,
+        "manifest.crs": "EPSG:4326",
+        "manifest.bands.0.valid_cell_count": 3,
+        "manifest.bands.0.nodata_cell_count": 1
+      }
+    },
+    {
+      "case_id": "raster_sample_distinct_states",
+      "operation": "raster_sample",
+      "parameters": {
+        "points": [[0.5, 1.5], [1.5, 0.5], [5, 5]]
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expected_status": "GIS_RASTER_SAMPLE_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "point_accounting_closed": true
+      },
+      "expected_fields": {
+        "source.crs": "EPSG:4326",
+        "state_counts.SAMPLED": 1,
+        "state_counts.NODATA": 1,
+        "state_counts.OUTSIDE": 1,
+        "samples.0.values.0": 0.0
+      }
+    },
+    {
+      "case_id": "raster_clip_bbox_writes_hashed_output",
+      "operation": "raster_clip",
+      "parameters": {
+        "bbox": [0, 1, 1, 2]
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expected_status": "GIS_RASTER_CLIP_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "source_and_output_hash_present": true,
+        "crs_preserved": true
+      },
+      "expected_fields": {
+        "parameters.requested_bbox": [0.0, 1.0, 1.0, 2.0],
+        "output.crs": "EPSG:4326"
+      }
+    },
+    {
+      "case_id": "raster_clip_outside_fails_closed",
+      "operation": "raster_clip",
+      "parameters": {
+        "bbox": [10, 10, 11, 11]
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_RASTER_CLIP_OUTSIDE",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "vector_raster_preserves_zero_nodata_null",
+      "operation": "vector_raster",
+      "parameters": {
+        "band": 1
+      },
+      "inputs": {
+        "vector": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[0, 1], [1, 1], [1, 2], [0, 2], [0, 1]]]}, "properties": {}},
+            {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[1, 0], [2, 0], [2, 1], [1, 1], [1, 0]]]}, "properties": {}},
+            {"type": "Feature", "geometry": null, "properties": {}}
+          ]
+        },
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expected_status": "GIS_VECTOR_RASTER_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "feature_accounting_closed": true,
+        "crs_exactly_matched": true,
+        "nodata_separate_from_zero": true,
+        "no_implicit_reprojection": true
+      },
+      "expected_fields": {
+        "state_counts.INTERSECTS_VALID": 1,
+        "state_counts.NODATA_ONLY": 1,
+        "state_counts.NULL_EMPTY": 1,
+        "features.0.mean": 0.0,
+        "features.1.state": "NODATA_ONLY",
+        "features.2.state": "NULL_EMPTY"
+      }
+    },
+    {
+      "case_id": "vector_raster_crs_mismatch_fails_closed",
+      "operation": "vector_raster",
+      "inputs": {
+        "vector": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:3857"}},
+          "features": []
+        },
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_VECTOR_RASTER_CRS_MISMATCH",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "map_export_binds_renderer_and_layers",
+      "operation": "map_export",
+      "parameters": {
+        "layer_inputs": ["layer"],
+        "layer_crs": {"layer": "EPSG:4326"},
+        "extent": [0, 0, 1, 1],
+        "output_crs": "EPSG:4326",
+        "renderer": "fixture-renderer",
+        "renderer_version": "1.0"
+      },
+      "inputs": {
+        "output": {"format": "raw", "text": "rendered-map-artifact"},
+        "layer": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": []
+        }
+      },
+      "expected_status": "GIS_MAP_EXPORT_MANIFEST_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "layer_count": 1,
+        "all_layer_hashes_present": true,
+        "output_hash_present": true,
+        "renderer_identity_present": true
+      },
+      "expected_fields": {
+        "output.crs": "EPSG:4326",
+        "output.extent": [0.0, 0.0, 1.0, 1.0],
+        "renderer.name": "fixture-renderer",
+        "renderer.version": "1.0",
+        "layers.0.declared_crs": "EPSG:4326"
+      }
+    },
+    {
+      "case_id": "map_export_invalid_extent_fails_closed",
+      "operation": "map_export",
+      "parameters": {
+        "layer_inputs": ["layer"],
+        "layer_crs": {"layer": "EPSG:4326"},
+        "extent": [0, 0, 0, 1],
+        "output_crs": "EPSG:4326",
+        "renderer": "fixture-renderer",
+        "renderer_version": "1.0"
+      },
+      "inputs": {
+        "output": {"format": "raw", "text": "rendered-map-artifact"},
+        "layer": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": []
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_EXPORT_EXTENT",
       "expected_warnings": []
     }
   ]

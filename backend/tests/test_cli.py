@@ -1488,16 +1488,16 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 18
-    assert payload["counts"]["passed"] == 18
+    assert payload["counts"]["cases"] == 35
+    assert payload["counts"]["passed"] == 35
     assert payload["counts"]["failed"] == 0
-    assert payload["counts"]["operations"] == 9
-    assert payload["counts"]["negative_cases"] == 6
+    assert payload["counts"]["operations"] == 18
+    assert payload["counts"]["negative_cases"] == 13
 
     assert main(["eval", "gis", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_EVAL_OK" in text_output
-    assert "operation_count=9" in text_output
+    assert "operation_count=18" in text_output
     assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
     assert "PASS bbox_filter bbox_filter_invalid_bbox_fails_closed" in text_output
     assert "PASS clip_bbox clip_bbox_polygon_point_and_residue" in text_output
@@ -1513,6 +1513,11 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert "PASS overlay overlay_invalid_operation_fails_closed" in text_output
     assert "PASS csv_points csv_points_skip_invalid_rows" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
+    assert "PASS reproject_crs reproject_crs_wgs84_to_utm20n" in text_output
+    assert "PASS repair_topology repair_topology_bowtie_explicit" in text_output
+    assert "PASS raster_sample raster_sample_distinct_states" in text_output
+    assert "PASS vector_raster vector_raster_preserves_zero_nodata_null" in text_output
+    assert "PASS map_export map_export_binds_renderer_and_layers" in text_output
 
 
 def test_cli_certify_answer_trace_quality_writes_exact_head_receipt(tmp_path: Path, capsys):
@@ -1562,7 +1567,7 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
-    assert "eval_case_count=18" in text_output
+    assert "eval_case_count=35" in text_output
     assert "PASS bbox_filter bbox_filter_intersects_with_null_residue" in text_output
     assert "PASS clip_bbox clip_bbox_polygon_point_and_residue" in text_output
     assert "PASS clip_bbox clip_bbox_invalid_bbox_fails_closed" in text_output
@@ -1575,6 +1580,11 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert "PASS overlay overlay_intersection_outputs_feature" in text_output
     assert "PASS overlay overlay_invalid_operation_fails_closed" in text_output
     assert "PASS reproject reproject_invalid_latitude_fails_closed" in text_output
+    assert "PASS reproject_crs reproject_crs_wgs84_to_utm20n" in text_output
+    assert "PASS repair_topology repair_topology_bowtie_explicit" in text_output
+    assert "PASS raster_sample raster_sample_distinct_states" in text_output
+    assert "PASS vector_raster vector_raster_preserves_zero_nodata_null" in text_output
+    assert "PASS map_export map_export_binds_renderer_and_layers" in text_output
 
 
 def write_package_fixture(root: Path, *, frontend_version: str = "0.1.23", lock_version: str | None = None) -> None:

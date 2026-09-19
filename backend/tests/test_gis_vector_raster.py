@@ -123,3 +123,23 @@ def test_malformed_geometry_remains_explicit_unresolved(tmp_path: Path) -> None:
     assert report["state_counts"]["UNRESOLVED"] == 1
     assert report["warnings"] == ["GIS_VECTOR_RASTER_UNRESOLVED_FEATURES"]
     assert report["invariants"]["feature_accounting_closed"] is True
+
+
+def test_dimensional_and_non_object_features_remain_explicit_unresolved(tmp_path: Path) -> None:
+    vector = make_vector(tmp_path / "v.geojson")
+    payload = json.loads(vector.read_text(encoding="utf-8"))
+    payload["features"].extend(
+        [
+            {"type": "Feature", "geometry": {"type": "Point", "coordinates": [0.5, 1.5, 3]}, "properties": {}},
+            "not-a-feature",
+        ]
+    )
+    vector.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = analyze_vector_raster_intersection(vector, make_raster(tmp_path / "r.tif"), cfg=make_settings(tmp_path))
+
+    assert report["status"] == "GIS_VECTOR_RASTER_WARN"
+    assert report["state_counts"]["UNRESOLVED"] == 2
+    assert report["features"][-2]["warnings"] == ["GIS_VECTOR_RASTER_DIMENSION_UNSUPPORTED"]
+    assert report["features"][-1]["warnings"] == ["ERROR_GIS_VECTOR_RASTER_FEATURE"]
+    assert report["invariants"]["feature_accounting_closed"] is True

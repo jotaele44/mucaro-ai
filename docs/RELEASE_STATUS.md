@@ -279,31 +279,24 @@ Observed success markers:
   by local smoke evidence, but GUI expansion is not the active development
   vector until backend, CLI, provenance, capability, packaging, and hosted
   governance gates are stronger.
-  Advanced GIS now has narrow local GeoJSON inspection with Shapely planar topology state, point-in-polygon,
-  geometry comparison with Polygon/MultiPolygon planar overlay metrics, matched
-  Polygon/MultiPolygon overlay output receipts, limited EPSG:4326/EPSG:3857 reprojection, CSV
-  point-to-GeoJSON conversion, bbox feature filtering, bbox geometry clipping,
-  planar area/length measurement receipts, and bounded EPSG:4326 spherical geodesic measurement
-  receipts plus a committed `mucaro eval gis` fixture
-  harness covering dimensionality, invalid topology inspection, join multiplication, topology equality,
-  planar overlay area difference, reprojection, CSV header/skipped-row/row-accounting evidence, bbox
-  retained/excluded accounting, bbox clipped/unchanged/unresolved accounting,
-  standalone overlay output hashes and pair-state accounting,
-  measurement units, polygon-hole area
-  subtraction, line length, null measurement residue, geodesic meter units,
-  fail-closed geodesic CRS mismatch, fail-closed invalid bbox extents,
-  fail-closed empty measurement units, fail-closed invalid coordinates, and
-  fail-closed invalid overlay operations.
-  `mucaro capabilities validate-gis-report` is the first
-  executable capability-output validator: it checks saved GIS report schema,
-  source/input hashes, CRS where present, warning consistency, asserted
-	  conservation invariants, inspect topology fields, standalone overlay fields, bbox filter/clip fields, and planar/geodesic measurement fields.
-  Full GIS maturity remains open until robust topology repair/operation support, ellipsoidal
-  GIS-engine geodesic validation, broader CRS/datum/grid-shift/axis-order
-  support, broader overlay/clipping operations beyond matched polygon pairs and
-  bbox clipping, independent planar overlay validation, broader spatial format
-  adapters, raster/vector processing, map/export provenance, and a broader GIS
-  eval corpus are proven.
+  Advanced GIS now has a shared CLI/eval/contract boundary for bounded GeoJSON
+  operations, explicit Shapely topology repair, pyproj/PROJ horizontal CRS
+  transformation with always-XY and pipeline identity, WGS84 ellipsoidal
+  measurement, GeoJSON/GeoPackage/Shapefile manifestation inspection, GeoTIFF
+  inspection/sampling/transactional clipping, exact-CRS vector-raster
+  cell-center analysis, and renderer/layer-bound map-export provenance.
+  `mucaro eval gis` runs 35 committed cases across 18 operations, including
+  13 fail-closed negative cases for CRS, dimensions, formats, raster extents,
+  vector-raster mismatch, and export identity. `mucaro capabilities
+  validate-gis-report` checks the corresponding saved receipts for source and
+  output hashes, warning consistency, CRS policy, NODATA separation,
+  per-feature states, renderer/layer binding, and arithmetic closure.
+  Full GIS maturity remains open until datum-grid availability,
+  vertical/time-dependent CRS, antimeridian/polar and large-geometry
+  adjudication, dimension-preserving mutation, broader topology/overlay policy,
+  independent rendered-map validation, larger real spatial corpora, additional
+  vector/raster formats and algorithms, remote sensing, terrain, hydrology,
+  bathymetry, and temporal GIS are proven.
   State-of-the-art OCR
   remains open, but a narrow local image OCR receipt candidate now preserves
   source-image hashes, Tesseract engine identity, raw/normalized/canonical text,

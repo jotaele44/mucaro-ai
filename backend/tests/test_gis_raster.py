@@ -54,3 +54,24 @@ def test_clip_hashes_output_and_rejects_nonoverlap(tmp_path: Path) -> None:
     with pytest.raises(GISProcessingError) as exc:
         clip_raster_bbox(source, (0, 0, 1, 1), cfg=cfg)
     assert exc.value.status == "ERROR_GIS_RASTER_CLIP_OUTSIDE"
+
+
+def test_raster_operations_fail_closed_on_missing_or_malformed_inputs(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    source = make_raster(tmp_path / "d.tif")
+
+    with pytest.raises(GISProcessingError) as exc:
+        sample_raster(tmp_path / "missing.tif", [(0, 0)], cfg=cfg)
+    assert exc.value.status == "ERROR_GIS_RASTER_NOT_FOUND"
+
+    with pytest.raises(GISProcessingError) as exc:
+        sample_raster(source, [], cfg=cfg)
+    assert exc.value.status == "ERROR_GIS_RASTER_POINTS"
+
+    with pytest.raises(GISProcessingError) as exc:
+        sample_raster(source, [(float("nan"), 18)], cfg=cfg)
+    assert exc.value.status == "ERROR_GIS_RASTER_POINTS"
+
+    with pytest.raises(GISProcessingError) as exc:
+        clip_raster_bbox(source, (0, 0, float("inf"), 1), cfg=cfg)
+    assert exc.value.status == "ERROR_GIS_RASTER_BBOX"

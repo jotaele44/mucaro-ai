@@ -9,7 +9,7 @@ import rasterio
 from rasterio.features import geometry_mask
 from shapely.geometry import shape
 
-from .gis_processing import GISProcessingError, GIS_REPORT_SCHEMA_VERSION
+from .gis_processing import GISProcessingError, GIS_REPORT_SCHEMA_VERSION, _coordinate_dimension_summary
 from .utils import stable_id, utc_now, write_json
 
 
@@ -27,7 +27,7 @@ def analyze_vector_raster_intersection(
     cfg.ensure_dirs()
     vector = vector_path.expanduser().resolve()
     raster = raster_path.expanduser().resolve()
-    if not vector.exists() or not raster.exists():
+    if not vector.exists() or not vector.is_file() or not raster.exists() or not raster.is_file():
         raise GISProcessingError("ERROR_GIS_VECTOR_RASTER_NOT_FOUND", "Vector and raster inputs must both exist.")
 
     try:
@@ -56,17 +56,27 @@ def analyze_vector_raster_intersection(
         data = dataset.read(band, masked=True)
         rows: list[dict[str, Any]] = []
         for index, feature in enumerate(payload["features"]):
-            geometry = feature.get("geometry") if isinstance(feature, dict) else None
+            if not isinstance(feature, dict):
+                rows.append({"feature_index": index, "state": "UNRESOLVED", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0, "warnings": ["ERROR_GIS_VECTOR_RASTER_FEATURE"]})
+                continue
+            geometry = feature.get("geometry")
             if geometry is None:
-                rows.append({"feature_index": index, "state": "NULL_EMPTY", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0})
+                rows.append({"feature_index": index, "state": "NULL_EMPTY", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0, "warnings": []})
+                continue
+            dimensions = _coordinate_dimension_summary(geometry if isinstance(geometry, dict) else None)
+            if dimensions["has_z"] or dimensions["has_m"]:
+                rows.append({"feature_index": index, "state": "UNRESOLVED", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0, "warnings": ["GIS_VECTOR_RASTER_DIMENSION_UNSUPPORTED"]})
                 continue
             try:
                 geom = shape(geometry)
             except Exception:
-                rows.append({"feature_index": index, "state": "UNRESOLVED", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0})
+                rows.append({"feature_index": index, "state": "UNRESOLVED", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0, "warnings": ["ERROR_GIS_VECTOR_RASTER_GEOMETRY"]})
                 continue
             if geom.is_empty:
-                rows.append({"feature_index": index, "state": "NULL_EMPTY", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0})
+                rows.append({"feature_index": index, "state": "NULL_EMPTY", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0, "warnings": []})
+                continue
+            if not geom.is_valid:
+                rows.append({"feature_index": index, "state": "UNRESOLVED", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0, "warnings": ["ERROR_GIS_VECTOR_RASTER_TOPOLOGY"]})
                 continue
             try:
                 mask = geometry_mask(
@@ -77,11 +87,11 @@ def analyze_vector_raster_intersection(
                     all_touched=False,
                 )
             except Exception:
-                rows.append({"feature_index": index, "state": "UNRESOLVED", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0})
+                rows.append({"feature_index": index, "state": "UNRESOLVED", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0, "warnings": ["ERROR_GIS_VECTOR_RASTER_MASK"]})
                 continue
             covered = int(mask.sum())
             if covered == 0:
-                rows.append({"feature_index": index, "state": "OUTSIDE_OR_NO_CELL_CENTER", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0})
+                rows.append({"feature_index": index, "state": "OUTSIDE_OR_NO_CELL_CENTER", "covered_cell_count": 0, "valid_cell_count": 0, "nodata_cell_count": 0, "warnings": []})
                 continue
             masked_values = data[mask]
             valid = int(masked_values.count())
@@ -97,6 +107,7 @@ def analyze_vector_raster_intersection(
                     "minimum": min(values) if values else None,
                     "maximum": max(values) if values else None,
                     "mean": sum(values) / len(values) if values else None,
+                    "warnings": [],
                 }
             )
 
