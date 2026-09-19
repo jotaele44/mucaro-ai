@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "4cc0433cb1f06648ddd8be62e1c5326228a0f68e",
+  "audit_head": "477bf5d0dcf5a705f70646e9e50fb72e3ff2a88c",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -215,6 +215,22 @@
         "GitHub Actions run 35415105947 conclusion=success"
       ],
       "reason": "Bounded autonomous static-HTML link following now preserves page/depth/link ceilings, duplicate/deferred/cross-host/fetch-failure residue and exhaustion accounting under hosted regression execution; automated search and rendered/JavaScript browser coverage remain outside WEB-10 scope and WEB-08/WEB-09 remain OPEN."
+    },
+    {
+      "event_id": "evt-web09-live-render-provisional",
+      "requirement_id": "WEB-09",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_LIVE_PLAYWRIGHT_CHROMIUM_RENDER_WITH_INTERACTION_SCOPE_RESIDUE",
+      "evidence": [
+        "PR#69",
+        "main@477bf5d0dcf5a705f70646e9e50fb72e3ff2a88c",
+        "GitHub Actions Web Render Certification run 35430709543 conclusion=success",
+        "GitHub Actions CI run 35430709553 conclusion=success",
+        "artifact#10580238368 digest=sha256:c65c2b47d76ac69f2c62a7377d552062581c0011ef67af94ae575d358542d238",
+        "Playwright Chromium 140.0.7339.16; live https://example.com/ HTTP 200; DOM and PNG screenshot SHA-256 receipts"
+      ],
+      "reason": "Live Playwright/Chromium execution, public-URL policy, engine identity, final URL, DOM hash, screenshot hash, PNG evidence and non-citation-ready safeguards are executed and frozen. WEB-09 remains broader than this scope because authenticated browsing, click/form automation, downloads/uploads and arbitrary JavaScript interaction are not yet certified."
     }
   ]
 }
