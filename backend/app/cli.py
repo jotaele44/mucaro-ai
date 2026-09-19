@@ -94,6 +94,11 @@ from .portable_runtime import (
     build_portable_macos_app,
     verify_portable_macos_app,
 )
+from .portable_install import (
+    PortableInstallError,
+    install_portable_macos_app,
+    rollback_portable_macos_app,
+)
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -839,6 +844,17 @@ def build_parser() -> argparse.ArgumentParser:
     package_portable_app.add_argument("--expected-head", help="Optional exact Git head expected in the portable manifest.")
     package_portable_app.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     package_portable_app.set_defaults(handler=run_package_portable_macos_app)
+
+    package_portable_install = package_subcommands.add_parser(
+        "portable-install",
+        help="Install/reinstall or rollback a verified portable macOS app transactionally.",
+    )
+    package_portable_install.add_argument("action", choices=["install", "rollback"], help="Installation transaction to perform.")
+    package_portable_install.add_argument("--source-app", type=Path, help="Verified portable app to install or reinstall.")
+    package_portable_install.add_argument("--install-root", type=Path, required=True, help="Destination application directory.")
+    package_portable_install.add_argument("--install-name", default="Mucaro AI.app", help="Installed application bundle name.")
+    package_portable_install.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    package_portable_install.set_defaults(handler=run_package_portable_install)
 
     package_distribution_manifest = package_subcommands.add_parser(
         "distribution-manifest",
@@ -2790,6 +2806,30 @@ def run_package_portable_macos_app(args: argparse.Namespace, cfg: Settings) -> i
         return 2
     emit_payload(report, args.format)
     return 0 if report["status"] == "PORTABLE_APP_VERIFIED" else 2
+
+
+def run_package_portable_install(args: argparse.Namespace, cfg: Settings) -> int:
+    del cfg
+    try:
+        if args.action == "rollback":
+            report = rollback_portable_macos_app(
+                install_root=args.install_root,
+                install_name=args.install_name,
+            )
+        else:
+            if args.source_app is None:
+                emit_error("ERROR_PORTABLE_INSTALL_SOURCE_REQUIRED", "--source-app is required for install.", args.format)
+                return 2
+            report = install_portable_macos_app(
+                args.source_app,
+                install_root=args.install_root,
+                install_name=args.install_name,
+            )
+    except PortableInstallError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(report, args.format)
+    return 0 if report["status"] in {"PORTABLE_INSTALL_OK", "PORTABLE_ROLLBACK_OK"} else 2
 
 
 def run_package_distribution_manifest(args: argparse.Namespace, cfg: Settings) -> int:
