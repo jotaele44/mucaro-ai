@@ -38,6 +38,7 @@ def main() -> int:
 
     positive=_run(args.image,"apply",cfg)
     negative=_run(args.image,"preimage-drift",cfg)
+    rollback=_run(args.image,"rollback",cfg)
 
     after=PROBE.read_bytes()
     after_sha=hashlib.sha256(after).hexdigest()
@@ -47,9 +48,13 @@ def main() -> int:
         "positive_postimage_beta":positive["payload"].get("postimage")=="beta\n",
         "negative_container_pass":negative["execution"].get("execution_status")=="PASS",
         "preimage_drift_rejected":negative["payload"].get("expected_rejection") is True,
+        "rollback_container_pass":rollback["execution"].get("execution_status")=="PASS",
+        "rollback_executed":rollback["payload"].get("expected_rollback") is True,
+        "rollback_restored_preimage":rollback["payload"].get("postimage")=="alpha\n",
         "host_fixture_unchanged":before_sha==after_sha and after==before,
         "positive_network_disabled":positive["execution"].get("invariants",{}).get("network_disabled") is True,
         "negative_network_disabled":negative["execution"].get("invariants",{}).get("network_disabled") is True,
+        "rollback_network_disabled":rollback["execution"].get("invariants",{}).get("network_disabled") is True,
         "host_source_read_only":positive["execution"].get("invariants",{}).get("host_source_read_only") is True,
     }
     result={
@@ -60,10 +65,11 @@ def main() -> int:
         "host_probe_sha256_after":after_sha,
         "positive":positive,
         "negative":negative,
+        "rollback":rollback,
         "invariants":invariants,
         "limitations":[
-            "This live probe proves positive mutation and preimage-drift rejection in the ephemeral isolated coding workspace.",
-            "It does not by itself prove every rollback path or authenticated remote Git action.",
+            "This live probe proves positive mutation, preimage-drift rejection and one deterministic reverse-apply rollback path in the ephemeral isolated coding workspace.",
+            "It does not by itself prove every possible rollback/concurrency failure or authenticated remote Git action.",
             "The host checkout is never writable inside the coding container.",
         ],
     }
