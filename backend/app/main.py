@@ -248,6 +248,8 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             model_provider=req.model_provider,
             model_name=req.model_name,
             allow_mock_fallback=req.allow_mock_fallback,
+            allow_live=req.allow_live,
+            require_offline=req.require_offline,
             cfg=cfg,
         )
 
@@ -299,6 +301,8 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             model_provider=req.model_provider,
             model_name=req.model_name,
             allow_mock_fallback=req.allow_mock_fallback,
+            allow_live=req.allow_live,
+            require_offline=req.require_offline,
             conversation_context=conversation_context,
             cfg=cfg,
         )
