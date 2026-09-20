@@ -1624,6 +1624,9 @@ mucaro = "backend.app.cli:main"
     for relative in [
         "docs/APPLE_APP_STORE_SECURITY.md",
         "_architecture/macos_app_store_security_profile.json",
+        "_architecture/schemas/macos-app-store-candidate-receipt.schema.json",
+        "_architecture/schemas/macos-app-store-vulnerability-scan.schema.json",
+        "_architecture/schemas/macos-app-store-malware-scan.schema.json",
         "packaging/macos/MucaroAI-AppStore.entitlements",
         "packaging/macos/PrivacyInfo.xcprivacy",
     ]:

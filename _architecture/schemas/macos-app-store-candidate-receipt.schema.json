@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.ai/schemas/macos-app-store-candidate-receipt.schema.json",
+  "title": "Mucaro Mac App Store candidate receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scope",
+    "build_profile",
+    "bundle_identifier",
+    "source_bound",
+    "runtime_origin",
+    "source_head_sha",
+    "security_evidence"
+  ],
+  "properties": {
+    "schema_version": {"const": "mucaro_mac_app_store_candidate_receipt_v1"},
+    "scope": {"const": "self_contained_mac_app_store_candidate"},
+    "build_profile": {"const": "mac_app_store"},
+    "bundle_identifier": {"type": "string", "minLength": 3},
+    "source_bound": {"const": false},
+    "runtime_origin": {"const": "embedded"},
+    "source_head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "security_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sbom", "vulnerability_scan", "malware_scan"],
+      "properties": {
+        "sbom": {"$ref": "#/$defs/evidenceReference"},
+        "vulnerability_scan": {"$ref": "#/$defs/evidenceReference"},
+        "malware_scan": {"$ref": "#/$defs/evidenceReference"}
+      }
+    }
+  },
+  "$defs": {
+    "evidenceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relative_path", "sha256"],
+      "properties": {
+        "relative_path": {"type": "string", "pattern": "^Contents/"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

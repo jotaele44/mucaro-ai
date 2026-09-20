@@ -53,6 +53,29 @@ A local candidate must satisfy all of the following:
 - remain bound to locked dependencies, release SBOM, malware/vulnerability
   scans, regression tests, and exact-build hashes.
 
+### Candidate supply-chain evidence
+
+The signed candidate must carry three regular JSON files under
+`Contents/Resources/Security`: a CycloneDX SBOM, a vulnerability-scan receipt,
+and a malware-scan receipt. Their exact paths and SHA-256 values are recorded in
+`mucaro-app-store-receipt.json`, so substitution or reuse of different evidence
+fails the local audit and the bundle signature seals the resulting files.
+
+The vulnerability and malware receipts must bind to the same source commit,
+bundle identifier, application version, and executable SHA-256 as the audited
+candidate. Scanner identity, scanner version, vulnerability-database or malware
+signature update time, scan time, and closed result counts are mandatory. Scans
+older than the profile's 72-hour limit fail. Vulnerability severity counts must
+close arithmetically, and the Store candidate permits no critical, high, or
+known patchable vulnerability and no malware detection or scan error.
+
+The versioned receipt contracts live under `_architecture/schemas`. These gates
+prove only the supplied evidence and exact candidate binding. They do not prove
+that an unknown vulnerability or undetectable malicious payload cannot exist,
+and they do not replace Apple's processing or review.
+Evidence is size-bounded before parsing: 50 MiB for the SBOM and 10 MiB for
+each scanner receipt under the current profile.
+
 ## Coding and local-server boundary
 
 The standard Store profile denies downloaded executable code, unreviewed

@@ -997,11 +997,15 @@ inputs, `PACKAGE_WARN` for incomplete distribution readiness, and
 
 Use `mucaro package app-store-audit --format text` to validate the tracked Mac
 App Store security profile, least-privilege entitlement template, privacy
-manifest template, bundle-path policy, explicit nonclaims, and Apple-controlled
+manifest template, candidate/scan JSON Schemas, bundle-path policy, explicit
+nonclaims, and Apple-controlled
 external gates. Add `--app /path/to/Mucaro\ AI.app` on macOS to inspect one
 candidate's bundle metadata, containment, App Transport Security posture,
 self-contained candidate receipt, code signature, exact entitlements, and
-embedded provisioning profile. A passing local candidate is reported only as
+embedded provisioning profile. The candidate must also contain a CycloneDX
+SBOM and fresh vulnerability and malware receipts whose hashes and build
+identity match its signed receipt and executable. A passing local candidate is
+reported only as
 `MAC_APP_STORE_CANDIDATE_PROVISIONAL`; it is not App Store Connect processing
 or Apple App Review evidence. `--strict` intentionally exits `2` until those
 external gates are certified for the exact submitted build.
