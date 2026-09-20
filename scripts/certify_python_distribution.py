@@ -31,7 +31,63 @@ REQUIRED_SDIST_MEMBERS = [
 
 def run(cmd: list[str], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
     print("RUN", " ".join(cmd))
-    return subprocess.run(cmd, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=check)
+    process = subprocess.run(cmd, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
+    if check and process.returncode != 0:
+        if process.stdout:
+            print(process.stdout, file=sys.stderr)
+        raise subprocess.CalledProcessError(process.returncode, cmd, output=process.stdout)
+    return process
+
+
+def certify_installed_wheel(
+    *,
+    install_python: Path,
+    install_mucaro: Path,
+    install_env: Path,
+    wheel: Path,
+    workdir: Path,
+    expected: dict[str, str],
+) -> dict[str, object]:
+    install_process = run(
+        [
+            str(install_python),
+            "-m",
+            "pip",
+            "install",
+            "--force-reinstall",
+            "--no-cache-dir",
+            str(wheel),
+        ],
+        cwd=workdir,
+    )
+    entrypoint_executable = install_mucaro.is_file() and bool(install_mucaro.stat().st_mode & 0o111)
+    if not entrypoint_executable:
+        bin_members = sorted(path.name for path in install_mucaro.parent.iterdir()) if install_mucaro.parent.is_dir() else []
+        output_tail = str(install_process.stdout or "")[-4096:].replace("\n", "\\n")
+        raise FileNotFoundError(
+            f"installed console script missing or non-executable: {install_mucaro}; "
+            f"bin_members={','.join(bin_members) or 'none'}; pip_output_tail={output_tail or 'none'}"
+        )
+    run([str(install_mucaro), "--version"], cwd=workdir)
+    run([str(install_mucaro), "--help"], cwd=workdir)
+    import_check = (
+        "import importlib.metadata, pathlib, sys; "
+        "import backend.app.cli, backend.app.packaging; "
+        "module_path=pathlib.Path(backend.app.cli.__file__).resolve(); "
+        "prefix=pathlib.Path(sys.prefix).resolve(); "
+        "module_path.relative_to(prefix); "
+        f"assert importlib.metadata.version({expected['name']!r}) == {expected['version']!r}; "
+        "print(f'ISOLATED_WHEEL_IMPORT_OK module={module_path} prefix={prefix}')"
+    )
+    import_process = run([str(install_python), "-c", import_check], cwd=workdir)
+    return {
+        "working_directory_scope": "temporary_directory_outside_source_checkout",
+        "force_reinstall": True,
+        "pip_cache_disabled": True,
+        "entrypoint": str(install_mucaro.relative_to(install_env)),
+        "module_origin_check": "backend.app.cli resolves under isolated sys.prefix",
+        "import_output": str(import_process.stdout or "").strip(),
+    }
 
 
 def sha256_file(path: Path) -> str:
@@ -248,11 +304,15 @@ def main() -> int:
         run([sys.executable, "-m", "venv", str(install_env)], cwd=ROOT)
         install_python = install_env / "bin" / "python"
         install_mucaro = install_env / "bin" / "mucaro"
-        run([str(install_python), "-m", "pip", "install", "--upgrade", "pip"], cwd=ROOT)
-        run([str(install_python), "-m", "pip", "install", str(wheel)], cwd=ROOT)
-        run([str(install_mucaro), "--version"], cwd=ROOT)
-        run([str(install_mucaro), "--help"], cwd=ROOT)
-        run([str(install_python), "-c", "import backend.app.cli; import backend.app.packaging"], cwd=ROOT)
+        run([str(install_python), "-m", "pip", "install", "--upgrade", "pip"], cwd=temp_root)
+        installation = certify_installed_wheel(
+            install_python=install_python,
+            install_mucaro=install_mucaro,
+            install_env=install_env,
+            wheel=wheel,
+            workdir=temp_root,
+            expected=expected,
+        )
 
         receipt = write_release_receipt(
             ROOT,
@@ -267,6 +327,7 @@ def main() -> int:
                 "sdist": manifest["sdist"],
                 "wheel_verification": wheel_verification,
                 "sdist_verification": sdist_verification,
+                "installation": installation,
                 "kept": args.keep,
                 "checks": [
                     "clean_worktree",
@@ -279,9 +340,10 @@ def main() -> int:
                     "python_dist_manifest",
                     "install_env",
                     "pip_install_wheel",
+                    "pip_force_reinstall_no_cache",
                     "mucaro_version",
                     "mucaro_help",
-                    "package_imports",
+                    "isolated_package_imports_under_sys_prefix",
                 ],
             },
         )

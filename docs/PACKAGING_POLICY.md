@@ -75,9 +75,11 @@ distribution layer. It builds both wheel and sdist artifacts under
 distribution artifact, verifies wheel `METADATA` name/version and console-script
 entry point, verifies required sdist source members, writes a Python
 distribution manifest, installs the built wheel into a separate clean virtual
-environment, verifies the installed `mucaro` entry point, and imports installed
-package modules. A passing run writes a `PYTHON_DIST_CERT_OK` receipt for the
-current Git `HEAD`.
+environment from a temporary working directory outside the source checkout,
+forces an uncached wheel installation, verifies the installed executable
+`mucaro` entry point, and proves imported package modules resolve under the
+isolated environment's `sys.prefix` rather than the repository. A passing run
+writes a `PYTHON_DIST_CERT_OK` receipt for the current Git `HEAD`.
 
 `mucaro package distribution-manifest --save` validates that the exact current
 Git `HEAD` has all required local release receipts: `local_release`,
