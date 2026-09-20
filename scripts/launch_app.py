@@ -87,6 +87,7 @@ def start_backend(port: int) -> subprocess.Popen:
         sys.executable,
         "-s",
         "-P",
+        "-B",
         "-m",
         "uvicorn",
         BACKEND_APP,

@@ -281,7 +281,14 @@ def main(argv: list[str] | None = None) -> int:
                 "clean_machine_macos",
                 args.clean_machine_receipt,
                 expected_head=head,
-                required_true=("install", "launch", "representative_workflow", "reinstall", "rollback"),
+                required_true=(
+                    "install",
+                    "launch",
+                    "representative_workflow",
+                    "post_launch_bundle_immutable",
+                    "reinstall",
+                    "rollback",
+                ),
             ),
             external_gate(
                 "signed_notarized_installer",
