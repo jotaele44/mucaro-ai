@@ -79,6 +79,20 @@ def _git_head(root: Path) -> str:
     return proc.stdout.strip()
 
 
+def _require_tracked_files_at_head(root: Path) -> None:
+    proc = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise PortableRuntimeError("ERROR_PORTABLE_GIT_STATUS", proc.stderr.strip())
+    if proc.stdout.strip():
+        raise PortableRuntimeError("ERROR_PORTABLE_WORKTREE_DIRTY", proc.stdout.strip())
+
+
 def _safe_relative(value: str) -> Path:
     parsed = PurePosixPath(value)
     if parsed.is_absolute() or ".." in parsed.parts or not parsed.parts:
@@ -92,6 +106,7 @@ def build_portable_macos_app(
     *,
     output_dir: Path,
     runtime_python: str = DEFAULT_RUNTIME_PYTHON,
+    runtime_provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     root = root.resolve()
     runtime_dir = runtime_dir.resolve()
@@ -113,6 +128,7 @@ def build_portable_macos_app(
             "ERROR_PORTABLE_FRONTEND_DIST",
             "frontend/dist/index.html is required before portable packaging",
         )
+    _require_tracked_files_at_head(root)
 
     app_path = output_dir / PORTABLE_APP_NAME
     if app_path.exists():
@@ -151,6 +167,10 @@ APP_ROOT="${RESOURCES}/app"
 PYTHON_EXECUTABLE="${RESOURCES}/runtime/bin/python3"
 cd "${APP_ROOT}"
 export PYTHONPATH="${APP_ROOT}:${APP_ROOT}/backend"
+unset PYTHONHOME PYTHONINSPECT PYTHONSTARTUP
+export PYTHONNOUSERSITE=1
+export PYTHONSAFEPATH=1
+export PYTHONDONTWRITEBYTECODE=1
 exec "${PYTHON_EXECUTABLE}" scripts/launch_app.py "$@"
 """
     launcher_path.write_text(launcher, encoding="utf-8")
@@ -183,6 +203,7 @@ exec "${PYTHON_EXECUTABLE}" scripts/launch_app.py "$@"
             "source_member_count": len(runtime_source_rows),
             "member_count": len(runtime_rows),
             "members": runtime_rows,
+            "provenance": runtime_provenance,
         },
         "application": {
             "tracked_source_count": len(copied_tracked),
@@ -243,6 +264,11 @@ def verify_portable_macos_app(app_path: Path, *, expected_head: str | None = Non
     launcher_text = launcher_path.read_text(encoding="utf-8") if launcher_path.is_file() else ""
     check("bundle_relative_launcher", "RESOURCES=" in launcher_text and "runtime/bin/python3" in launcher_text, "launcher resolves embedded resources relative to itself")
     check("launcher_no_source_root", payload["launcher"].get("source_bound_absolute_paths") is False, "manifest declares no source-bound absolute path")
+    check(
+        "launcher_disables_host_user_site",
+        "PYTHONNOUSERSITE=1" in launcher_text and "PYTHONSAFEPATH=1" in launcher_text,
+        "launcher excludes host user-site packages and unsafe implicit paths",
+    )
 
     for section_name in ("runtime", "application"):
         base = resources / ("runtime" if section_name == "runtime" else "app")
@@ -252,6 +278,17 @@ def verify_portable_macos_app(app_path: Path, *, expected_head: str | None = Non
             f"{section_name}_member_manifest",
             expected_rows == actual_rows,
             f"expected={len(expected_rows)} actual={len(actual_rows)}",
+        )
+
+    runtime_provenance = payload["runtime"].get("provenance")
+    if runtime_provenance is not None:
+        provenance_path = resources / "runtime" / "runtime-provenance.json"
+        check(
+            "runtime_provenance_receipt",
+            provenance_path.is_file()
+            and runtime_provenance.get("receipt_sha256") == _sha256(provenance_path)
+            and runtime_provenance.get("status") == "PORTABLE_RUNTIME_VERIFIED",
+            str(provenance_path),
         )
 
     failed = [row for row in checks if row["status"] != "PASS"]

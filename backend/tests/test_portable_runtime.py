@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import subprocess
 from pathlib import Path
 
@@ -55,6 +56,8 @@ def test_portable_bundle_is_bundle_relative_and_hash_verified(tmp_path: Path) ->
     launcher = (app / "Contents" / "MacOS" / "mucaro-ai").read_text(encoding="utf-8")
     assert str(root) not in launcher
     assert "${RESOURCES}/runtime/bin/python3" in launcher
+    assert "PYTHONNOUSERSITE=1" in launcher
+    assert "PYTHONSAFEPATH=1" in launcher
     assert verify_portable_macos_app(app)["status"] == "PORTABLE_APP_VERIFIED"
 
 
@@ -78,3 +81,37 @@ def test_runtime_python_must_be_executable(tmp_path: Path) -> None:
     with pytest.raises(PortableRuntimeError) as exc:
         build_portable_macos_app(root, runtime, output_dir=root / "out")
     assert exc.value.status == "ERROR_PORTABLE_RUNTIME_PYTHON"
+
+
+def test_portable_bundle_rejects_tracked_worktree_changes(tmp_path: Path) -> None:
+    root, runtime = fixture_project(tmp_path)
+    (root / "backend" / "marker.py").write_text("VALUE = 2\n", encoding="utf-8")
+
+    with pytest.raises(PortableRuntimeError) as exc:
+        build_portable_macos_app(root, runtime, output_dir=root / "out")
+
+    assert exc.value.status == "ERROR_PORTABLE_WORKTREE_DIRTY"
+
+
+def test_portable_bundle_binds_runtime_provenance_receipt(tmp_path: Path) -> None:
+    root, runtime = fixture_project(tmp_path)
+    receipt = runtime / "runtime-provenance.json"
+    receipt.write_text('{"status":"PORTABLE_RUNTIME_SOURCE_READY"}\n', encoding="utf-8")
+    receipt_sha256 = hashlib.sha256(receipt.read_bytes()).hexdigest()
+
+    report = build_portable_macos_app(
+        root,
+        runtime,
+        output_dir=root / "out",
+        runtime_provenance={
+            "receipt_sha256": receipt_sha256,
+            "status": "PORTABLE_RUNTIME_VERIFIED",
+        },
+    )
+    assert report["status"] == "PORTABLE_APP_VERIFIED"
+
+    embedded_receipt = Path(report["app_path"]) / "Contents/Resources/runtime/runtime-provenance.json"
+    embedded_receipt.write_text('{"status":"TAMPERED"}\n', encoding="utf-8")
+    tampered = verify_portable_macos_app(Path(report["app_path"]))
+    assert tampered["status"] == "PORTABLE_APP_VERIFY_FAILED"
+    assert "runtime_provenance_receipt" in tampered["failed_checks"]
