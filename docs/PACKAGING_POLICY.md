@@ -125,10 +125,15 @@ an incomplete or different runtime cannot be silently overwritten.
 
 Portable application assembly rejects tracked working-tree changes before it
 copies source files. Its launcher disables host user-site packages and unsafe
-implicit Python paths. These controls prove the materialized runtime and
-bundle-relative source artifact only. Current coverage is x86_64 macOS; arm64,
-universal-binary construction, clean-machine execution, signing, notarization,
-App Sandbox behavior, and App Store processing remain separate gates.
+implicit Python paths, prevents bytecode writes, and keeps mutable data outside
+the application bundle under the user's Application Support directory. The
+portable verifier hashes every runtime and application member, and macOS launch
+certification repeats that verification after launch and a representative
+workflow. These controls prove the materialized runtime and bundle-relative
+source artifact only. Current coverage is x86_64 macOS; arm64, universal-binary
+construction, independently witnessed clean-machine execution, signing,
+notarization, App Sandbox behavior, and App Store processing remain separate
+gates.
 
 ## Release Gates
 

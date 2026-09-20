@@ -165,13 +165,15 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 RESOURCES="$(cd "${HERE}/../Resources" && pwd)"
 APP_ROOT="${RESOURCES}/app"
 PYTHON_EXECUTABLE="${RESOURCES}/runtime/bin/python3"
+: "${HOME:?HOME is required to select the Mucaro AI data directory}"
 cd "${APP_ROOT}"
 export PYTHONPATH="${APP_ROOT}:${APP_ROOT}/backend"
+export MUCARO_AI_DATA_DIR="${MUCARO_AI_DATA_DIR:-${HOME}/Library/Application Support/Mucaro AI}"
 unset PYTHONHOME PYTHONINSPECT PYTHONSTARTUP
 export PYTHONNOUSERSITE=1
 export PYTHONSAFEPATH=1
 export PYTHONDONTWRITEBYTECODE=1
-exec "${PYTHON_EXECUTABLE}" -E -s -P scripts/launch_app.py "$@"
+exec "${PYTHON_EXECUTABLE}" -E -s -P -B scripts/launch_app.py "$@"
 """
     launcher_path.write_text(launcher, encoding="utf-8")
     launcher_path.chmod(launcher_path.stat().st_mode | 0o755)
@@ -268,8 +270,15 @@ def verify_portable_macos_app(app_path: Path, *, expected_head: str | None = Non
         "launcher_disables_host_user_site",
         "PYTHONNOUSERSITE=1" in launcher_text
         and "PYTHONSAFEPATH=1" in launcher_text
-        and '"${PYTHON_EXECUTABLE}" -E -s -P' in launcher_text,
+        and '"${PYTHON_EXECUTABLE}" -E -s -P -B' in launcher_text,
         "launcher excludes host user-site packages and unsafe implicit paths",
+    )
+    check(
+        "launcher_preserves_bundle_immutability",
+        "MUCARO_AI_DATA_DIR" in launcher_text
+        and "/Library/Application Support/Mucaro AI" in launcher_text
+        and '"${PYTHON_EXECUTABLE}" -E -s -P -B' in launcher_text,
+        "launcher directs mutable data outside the bundle and disables bytecode writes",
     )
 
     for section_name in ("runtime", "application"):

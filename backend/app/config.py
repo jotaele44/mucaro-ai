@@ -34,6 +34,24 @@ def find_project_root() -> Path:
     return Path.cwd().resolve()
 
 
+def find_data_dir(project_root: Path) -> Path:
+    env_data_dir = os.getenv("MUCARO_AI_DATA_DIR")
+    if not env_data_dir:
+        return project_root / "data"
+    data_dir = Path(env_data_dir).expanduser()
+    if not data_dir.is_absolute():
+        raise ValueError("MUCARO_AI_DATA_DIR must be an absolute path")
+    return data_dir.resolve()
+
+
+def path_is_within(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
 @dataclass(frozen=True)
 class Settings:
     project_root: Path
@@ -56,7 +74,13 @@ class Settings:
     @classmethod
     def load(cls) -> "Settings":
         root = find_project_root()
-        data_dir = root / "data"
+        data_dir = find_data_dir(root)
+        distribution_channel = (
+            os.getenv("MUCARO_AI_DISTRIBUTION_CHANNEL", DEFAULT_DISTRIBUTION_CHANNEL).strip().lower()
+            or DEFAULT_DISTRIBUTION_CHANNEL
+        )
+        if distribution_channel == "mac_app_store" and path_is_within(data_dir, root):
+            raise ValueError("mac_app_store data directory must be outside the application bundle")
         max_upload_bytes = parse_positive_int(os.getenv("MUCARO_AI_MAX_UPLOAD_BYTES"), DEFAULT_MAX_UPLOAD_BYTES)
         cors_origins = tuple(
             origin.strip()
@@ -79,10 +103,7 @@ class Settings:
             workspace_profile=os.getenv("MUCARO_AI_WORKSPACE_PROFILE", "default"),
             deployment_profile=os.getenv("MUCARO_AI_DEPLOYMENT_PROFILE", "local").strip().lower() or "local",
             allow_public_bind=parse_bool(os.getenv("MUCARO_AI_ALLOW_PUBLIC_BIND"), False),
-            distribution_channel=(
-                os.getenv("MUCARO_AI_DISTRIBUTION_CHANNEL", DEFAULT_DISTRIBUTION_CHANNEL).strip().lower()
-                or DEFAULT_DISTRIBUTION_CHANNEL
-            ),
+            distribution_channel=distribution_channel,
         )
 
     def ensure_dirs(self) -> None:

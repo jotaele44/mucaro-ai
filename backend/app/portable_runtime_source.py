@@ -353,7 +353,7 @@ print(json.dumps({
 }, sort_keys=True))
 """
     proc = _run(
-        [str(runtime_python), "-s", "-P", "-c", script],
+        [str(runtime_python), "-s", "-P", "-B", "-c", script],
         input_text=json.dumps(
             {
                 "imports": manifest["required_imports"],
@@ -450,6 +450,7 @@ def _install_locked_dependencies(runtime_dir: Path, manifest: dict[str, Any]) ->
         str(runtime_python),
         "-s",
         "-P",
+        "-B",
         "-m",
         "pip",
         "--isolated",
@@ -472,7 +473,7 @@ def _install_locked_dependencies(runtime_dir: Path, manifest: dict[str, Any]) ->
     if generated_scripts.is_dir():
         removed_scripts = sorted(path.name for path in generated_scripts.iterdir())
         shutil.rmtree(generated_scripts)
-    check = _run([str(runtime_python), "-s", "-P", "-m", "pip", "--isolated", "check"])
+    check = _run([str(runtime_python), "-s", "-P", "-B", "-m", "pip", "--isolated", "check"])
     if check.returncode != 0:
         raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_DEPENDENCY_CHECK", check.stdout[-65536:])
     return {

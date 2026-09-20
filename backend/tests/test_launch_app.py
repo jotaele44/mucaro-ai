@@ -54,7 +54,7 @@ def test_backend_process_uses_isolated_path_flags(monkeypatch):
     monkeypatch.setattr(launch_app.subprocess, "Popen", fake_popen)
     launch_app.start_backend(8123)
 
-    assert observed["command"][1:3] == ["-s", "-P"]
+    assert observed["command"][1:4] == ["-s", "-P", "-B"]
     assert observed["env"]["PYTHONNOUSERSITE"] == "1"
     assert observed["env"]["PYTHONSAFEPATH"] == "1"
 

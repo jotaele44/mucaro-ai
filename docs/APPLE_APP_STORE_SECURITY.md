@@ -99,7 +99,20 @@ members, duplicate destinations, escaping links, byte/count drift, dependency
 drift, missing imports, and host user-site discovery fail closed.
 
 The portable launcher sets `PYTHONNOUSERSITE=1` and `PYTHONSAFEPATH=1`, clears
-host Python startup/home controls, and uses only the bundle-relative runtime.
+host Python startup/home controls, passes `-B` to every supported embedded
+Python entry point, and uses only the bundle-relative runtime. Mutable user data
+is directed to `~/Library/Application Support/Mucaro AI` by default rather than
+`Contents/Resources/app/data`; an explicit override must be absolute. The
+`mac_app_store` profile rejects any configured data directory inside the
+application bundle.
+
+Portable launch certification re-hashes the installed runtime and application
+trees after the health and representative-workflow checks. Any new bytecode,
+database, or other bundle member makes `post_launch_bundle_immutable=false` and
+blocks the receipt. This is local evidence that the tested launch path preserves
+the unsigned bundle; the final code signature remains the authoritative seal
+for a signed candidate.
+
 The runtime remains an x86_64 direct-distribution input. It is not yet a
 universal Store runtime, a signed candidate, or proof that all embedded native
 libraries satisfy App Sandbox and App Review requirements.
