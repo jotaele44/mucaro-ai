@@ -8,12 +8,13 @@ version = "0.1.23"
 description = "Local-first planning-gated LLM lab with source-lineage RAG and CLI workflows."
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi==0.128.2",
+    "fastapi==0.141.1",
+    "starlette==1.6.0",
     "uvicorn==0.48.0",
     "pydantic==2.13.4",
-    "python-multipart==0.0.29",
+    "python-multipart==0.0.32",
     "jsonschema==4.26.0",
-    "pypdf==6.4.1",
+    "pypdf==6.19.0",
     "shapely==2.1.2",
     "pyproj==3.7.2",
     "rasterio==1.4.3",
@@ -26,7 +27,8 @@ anthropic = [
 ]
 dev = [
     "httpx==0.28.1",
-    "pytest==9.0.2",
+    "pip-audit==2.10.1",
+    "pytest==9.1.1",
 ]
 
 [project.scripts]

@@ -8,9 +8,9 @@ from backend.app.container_runtime import (
     ContainerRuntimeError,
     build_container_command,
     get_container_binding,
+    run_container_worker,
     validate_pinned_image,
 )
-
 
 PINNED = "ghcr.io/jotaele44/mucaro-worker@sha256:" + "a" * 64
 
@@ -71,3 +71,15 @@ def test_network_mode_requires_explicit_allowance() -> None:
         pids_limit=64,
     )
     assert "--network=bridge" in command
+
+
+def test_container_worker_is_disabled_for_app_store_distribution(tmp_path) -> None:
+    with pytest.raises(ContainerRuntimeError) as exc:
+        run_container_worker(
+            project_root=tmp_path,
+            skill_id="test/container",
+            image=PINNED,
+            distribution_channel="mac_app_store",
+        )
+
+    assert exc.value.status == "ERROR_DISTRIBUTION_RUNTIME_POLICY"

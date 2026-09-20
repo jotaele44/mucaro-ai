@@ -7,7 +7,6 @@ import pytest
 
 from backend.app.local_worker import LocalWorkerError, run_local_worker
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -57,3 +56,14 @@ def test_local_worker_requires_positive_limits() -> None:
             timeout_seconds=0,
         )
     assert exc.value.status == "ERROR_LOCAL_WORKER_LIMIT"
+
+
+def test_local_worker_is_disabled_for_app_store_distribution() -> None:
+    with pytest.raises(LocalWorkerError) as exc:
+        run_local_worker(
+            project_root=PROJECT_ROOT,
+            skill_id="mucaro/local-worker-health",
+            distribution_channel="mac_app_store",
+        )
+
+    assert exc.value.status == "ERROR_DISTRIBUTION_RUNTIME_POLICY"

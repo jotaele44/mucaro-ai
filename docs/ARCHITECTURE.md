@@ -77,6 +77,12 @@ Startup security is fail-closed for production mode.
 when auth is disabled, and blocks non-loopback CLI serving unless
 `MUCARO_AI_ALLOW_PUBLIC_BIND=1` is set.
 
+`MUCARO_AI_DISTRIBUTION_CHANNEL=mac_app_store` adds a separate runtime boundary.
+It requires production mode and loopback binding, permits only explicitly
+reviewed in-process skills, and rejects governed subprocess, local-worker, container, service, and federation
+worker capabilities. Enforcement occurs during skill activation, route
+execution, and direct worker/container entry points.
+
 The `/security` API route and `mucaro security status` expose the same checks.
 These checks are readiness gates for single-operator deployment posture; true
 multi-tenant account isolation remains outside this local-first product scope.

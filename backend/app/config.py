@@ -6,6 +6,7 @@ from pathlib import Path
 
 DEFAULT_CORS_ORIGINS = ("http://127.0.0.1:5173", "http://localhost:5173")
 DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+DEFAULT_DISTRIBUTION_CHANNEL = "local"
 
 
 def parse_positive_int(value: str | None, default: int) -> int:
@@ -50,6 +51,7 @@ class Settings:
     workspace_profile: str = "default"
     deployment_profile: str = "local"
     allow_public_bind: bool = False
+    distribution_channel: str = DEFAULT_DISTRIBUTION_CHANNEL
 
     @classmethod
     def load(cls) -> "Settings":
@@ -77,6 +79,10 @@ class Settings:
             workspace_profile=os.getenv("MUCARO_AI_WORKSPACE_PROFILE", "default"),
             deployment_profile=os.getenv("MUCARO_AI_DEPLOYMENT_PROFILE", "local").strip().lower() or "local",
             allow_public_bind=parse_bool(os.getenv("MUCARO_AI_ALLOW_PUBLIC_BIND"), False),
+            distribution_channel=(
+                os.getenv("MUCARO_AI_DISTRIBUTION_CHANNEL", DEFAULT_DISTRIBUTION_CHANNEL).strip().lower()
+                or DEFAULT_DISTRIBUTION_CHANNEL
+            ),
         )
 
     def ensure_dirs(self) -> None:

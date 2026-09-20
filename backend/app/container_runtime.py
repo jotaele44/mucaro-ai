@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
+
 CONTAINER_PROTOCOL = "mucaro-container-worker/1.0"
 CONTAINER_BINDING_SCHEMA_VERSION = "mucaro-container-binding/1.0"
 PINNED_IMAGE_PATTERN = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
@@ -128,7 +130,17 @@ def run_container_worker(
     cpus: float = DEFAULT_CPUS,
     pids_limit: int = DEFAULT_PIDS_LIMIT,
     engine: str | None = None,
+    distribution_channel: str = "local",
 ) -> dict[str, Any]:
+    try:
+        require_distribution_runtime_authorized(
+            distribution_channel=distribution_channel,
+            runtime="CONTAINER",
+            granted_capabilities={"runtime.container"},
+            skill_id=skill_id,
+        )
+    except DistributionPolicyError as exc:
+        raise ContainerRuntimeError(exc.status, exc.detail) from exc
     validate_pinned_image(image)
     if timeout_seconds <= 0 or max_output_bytes <= 0:
         raise ContainerRuntimeError("ERROR_CONTAINER_LIMIT", "container limits must be positive")

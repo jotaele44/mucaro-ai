@@ -92,6 +92,7 @@ Copy `.env.example` to `.env` and fill only what you need.
 - `MUCARO_AI_OPERATOR_TOKEN`: optional local operator token required for mutating API actions when set.
 - `MUCARO_AI_WORKSPACE_PROFILE`: runtime workspace profile name. Default is `default`.
 - `MUCARO_AI_DEPLOYMENT_PROFILE`: `local` or `production`. Production mode requires a strong operator token and explicit CORS origins.
+- `MUCARO_AI_DISTRIBUTION_CHANNEL`: `local` or `mac_app_store`. The Store channel requires production mode, loopback binding, and disables subprocess, local-worker, and container execution.
 - `MUCARO_AI_ALLOW_PUBLIC_BIND=1`: explicitly permits non-loopback binding in local mode.
 
 ## Run backend
@@ -305,6 +306,13 @@ Production security is opt-in and fail-closed. Set
 `MUCARO_AI_OPERATOR_TOKEN`, and explicit `MUCARO_AI_CORS_ORIGINS` before broader
 network exposure. Local mode blocks non-loopback `mucaro serve --host` values
 unless `MUCARO_AI_ALLOW_PUBLIC_BIND=1` is set.
+
+The App Store runtime boundary is separately fail-closed. Set
+`MUCARO_AI_DISTRIBUTION_CHANNEL=mac_app_store` only with the production profile.
+That channel rejects public binding, allows only explicitly reviewed in-process
+skills, and disables governed subprocess, local-worker, and container execution
+before process creation. This source control does not make
+the local browser wrapper a Store candidate or replace Apple signing and review.
 
 Live Anthropic mode is explicit:
 

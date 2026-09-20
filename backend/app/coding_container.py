@@ -13,6 +13,7 @@ from typing import Any
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
 from .container_runtime import ContainerRuntimeError, resolve_container_engine, validate_pinned_image
+from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
 
 LOCAL_IMAGE_ID_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 
@@ -146,6 +147,14 @@ def build_coding_container_plan(
     workspace_mb: int = DEFAULT_WORKSPACE_MB,
     engine: str | None = None,
 ) -> CodingContainerPlan:
+    try:
+        require_distribution_runtime_authorized(
+            distribution_channel=cfg.distribution_channel,
+            runtime="CONTAINER",
+            granted_capabilities={"runtime.container", "subprocess.execute"},
+        )
+    except DistributionPolicyError as exc:
+        raise CodingContainerError(exc.status, exc.detail) from exc
     try:
         context = resolve_repository(repo_root, cfg)
         state = inspect_repository(context.repo_root, cfg=cfg)

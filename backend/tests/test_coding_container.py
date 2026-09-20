@@ -101,6 +101,21 @@ def test_network_enablement_and_unpinned_images_fail_closed(tmp_path: Path, monk
     assert image.value.status == "ERROR_CONTAINER_IMAGE_NOT_PINNED"
 
 
+def test_coding_container_is_disabled_for_app_store_distribution(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    cfg = Settings(**{**cfg.__dict__, "distribution_channel": "mac_app_store"})
+
+    with pytest.raises(CodingContainerError) as exc:
+        build_coding_container_plan(
+            tmp_path / "repo-does-not-need-to-exist",
+            image=PINNED,
+            command=["pytest"],
+            cfg=cfg,
+        )
+
+    assert exc.value.status == "ERROR_DISTRIBUTION_RUNTIME_POLICY"
+
+
 def test_dirty_candidate_drift_makes_plan_stale(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = make_settings(tmp_path)
     repo = make_repo(tmp_path)

@@ -51,7 +51,8 @@ A local candidate must satisfy all of the following:
 - keep private-content network transmission behind explicit user permission and
   disclose the applicable data behavior accurately;
 - remain bound to locked dependencies, release SBOM, malware/vulnerability
-  scans, regression tests, and exact-build hashes.
+  scans, zero-finding Python/npm release audits, regression tests, and
+  exact-build hashes.
 
 ### Candidate supply-chain evidence
 
@@ -79,10 +80,14 @@ each scanner receipt under the current profile.
 ## Coding and local-server boundary
 
 The standard Store profile denies downloaded executable code, unreviewed
-plug-ins, and arbitrary shell access. Mucaro's broader coding engine may not be
-enabled in the Store build until its behavior is shown to comply with Apple's
-executable-code rules for the app's reviewed purpose. User-authored or generated
-source is not automatically exempt.
+plug-ins, arbitrary shell access, and user-code execution. Set
+`MUCARO_AI_DISTRIBUTION_CHANNEL=mac_app_store` with the production deployment
+profile to enforce that boundary. Only explicitly reviewed in-process skills
+are allowlisted. Skill activation, route execution, direct
+local-worker calls, and container entry points reject subprocess, worker,
+container, service, and federation-worker capabilities before process creation.
+Bounded in-process operations remain available. User-authored or generated
+source is not automatically exempt and is disabled in this profile.
 
 The current GUI launcher starts a loopback HTTP server. The minimal entitlement
 template intentionally omits `com.apple.security.network.server`. Before GUI

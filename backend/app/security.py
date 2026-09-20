@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from .config import Settings, settings
+from .distribution_policy import (
+    MAC_APP_STORE_DISTRIBUTION_CHANNEL,
+    SUPPORTED_DISTRIBUTION_CHANNELS,
+)
 
 SUPPORTED_DEPLOYMENT_PROFILES = {"local", "production"}
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
@@ -37,6 +41,25 @@ def build_security_report(cfg: Settings = settings, *, bind_host: str | None = N
             profile,
         )
     )
+    distribution_channel = cfg.distribution_channel
+    checks.append(
+        _check(
+            "distribution_channel",
+            "PASS" if distribution_channel in SUPPORTED_DISTRIBUTION_CHANNELS else "FAIL",
+            distribution_channel,
+        )
+    )
+    checks.append(
+        _check(
+            "app_store_production_profile",
+            (
+                "PASS"
+                if distribution_channel != MAC_APP_STORE_DISTRIBUTION_CHANNEL or profile == "production"
+                else "FAIL"
+            ),
+            "production required" if distribution_channel == MAC_APP_STORE_DISTRIBUTION_CHANNEL else "not applicable",
+        )
+    )
 
     token_length = len(cfg.operator_token or "")
     if profile == "production":
@@ -62,7 +85,10 @@ def build_security_report(cfg: Settings = settings, *, bind_host: str | None = N
     )
 
     public_bind = _is_public_host(bind_host)
-    if public_bind and profile == "local" and not cfg.allow_public_bind:
+    if public_bind and distribution_channel == MAC_APP_STORE_DISTRIBUTION_CHANNEL:
+        bind_status = "FAIL"
+        bind_detail = f"{bind_host} is forbidden for Mac App Store distribution"
+    elif public_bind and profile == "local" and not cfg.allow_public_bind:
         bind_status = "FAIL"
         bind_detail = f"{bind_host} requires MUCARO_AI_ALLOW_PUBLIC_BIND=1 or production profile"
     else:
@@ -76,6 +102,7 @@ def build_security_report(cfg: Settings = settings, *, bind_host: str | None = N
     return {
         "status": status,
         "deployment_profile": profile,
+        "distribution_channel": distribution_channel,
         "production_ready": profile == "production" and status == "SECURITY_OK",
         "public_bind_allowed": bool(cfg.allow_public_bind),
         "checks": checks,
@@ -88,6 +115,10 @@ def _recommendations(profile: str, failed: list[dict[str, str]], warned: list[di
     recommendations = []
     if profile not in SUPPORTED_DEPLOYMENT_PROFILES:
         recommendations.append("Set MUCARO_AI_DEPLOYMENT_PROFILE to local or production.")
+    if "distribution_channel" in names:
+        recommendations.append("Set MUCARO_AI_DISTRIBUTION_CHANNEL to local or mac_app_store.")
+    if "app_store_production_profile" in names:
+        recommendations.append("Use MUCARO_AI_DEPLOYMENT_PROFILE=production for the Mac App Store channel.")
     if "operator_token" in names:
         recommendations.append("Set MUCARO_AI_OPERATOR_TOKEN to a high-entropy value before production exposure.")
     if "cors_origins" in names:

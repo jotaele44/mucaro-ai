@@ -5,6 +5,7 @@ from typing import Any, Callable
 from .capability_policy import RUNTIME_CAPABILITY
 from .config import Settings
 from .container_runtime import ContainerRuntimeError, get_container_binding, run_container_worker
+from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
 from .local_worker import run_local_worker
 
 ROUTER_SCHEMA_VERSION = "mucaro-execution-router/1.0"
@@ -45,6 +46,15 @@ def execute_routed(
     policy_decision: dict[str, Any],
 ) -> dict[str, Any]:
     route = select_execution_route(runtime, policy_decision)
+    try:
+        require_distribution_runtime_authorized(
+            distribution_channel=cfg.distribution_channel,
+            runtime=route,
+            granted_capabilities=policy_decision.get("granted", []),
+            skill_id=skill_id,
+        )
+    except DistributionPolicyError as exc:
+        raise ExecutionRouterError(exc.status, exc.detail) from exc
     if route == "IN_PROCESS":
         result = handler(arguments, cfg)
         return {
@@ -63,6 +73,7 @@ def execute_routed(
             skill_id=skill_id,
             arguments=arguments,
             network_allowed="network.public_http" in granted,
+            distribution_channel=cfg.distribution_channel,
         )
         return {
             "route": route,
@@ -81,6 +92,7 @@ def execute_routed(
             image=binding.image,
             arguments=arguments,
             network_allowed="network.public_http" in granted,
+            distribution_channel=cfg.distribution_channel,
         )
         receipt = {**container, "binding": binding.as_dict()}
         return {

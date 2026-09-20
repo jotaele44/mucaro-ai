@@ -6,8 +6,9 @@ import os
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from .capability_policy import CapabilityPolicy, RUNTIME_CAPABILITY, evaluate_capabilities
+from .capability_policy import RUNTIME_CAPABILITY, CapabilityPolicy, evaluate_capabilities
 from .config import Settings, settings
+from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
 from .execution_router import ExecutionRouterError, execute_routed, select_execution_route
 from .runtime_identity import build_runtime_identity
 from .utils import read_json, stable_id, utc_now, write_json
@@ -240,6 +241,15 @@ def activate_skill(
             "ERROR_SKILL_CAPABILITY_NOT_AUTHORIZED",
             "; ".join(decision.reasons) or skill_id,
         )
+    try:
+        require_distribution_runtime_authorized(
+            distribution_channel=cfg.distribution_channel,
+            runtime=skill.runtime,
+            granted_capabilities=decision.granted,
+            skill_id=skill.skill_id,
+        )
+    except DistributionPolicyError as exc:
+        raise SkillRuntimeError(exc.status, exc.detail) from exc
 
     mounts = _load_mounts(cfg)
     matches = [(index, item) for index, item in enumerate(mounts) if item.get("skill_id") == skill_id]
