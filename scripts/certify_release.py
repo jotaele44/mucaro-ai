@@ -288,6 +288,18 @@ def main() -> int:
     gates.append(gate_package_artifact_verification(package_artifact))
     gates.extend(
         [
+            gate_command(
+                "python_audit",
+                [
+                    sys.executable,
+                    "-m",
+                    "pip_audit",
+                    "-r",
+                    "backend/requirements.txt",
+                    "--progress-spinner",
+                    "off",
+                ],
+            ),
             gate_npm_audit(),
             gate_frontend_build(),
         ]

@@ -51,7 +51,8 @@ A local candidate must satisfy all of the following:
 - keep private-content network transmission behind explicit user permission and
   disclose the applicable data behavior accurately;
 - remain bound to locked dependencies, release SBOM, malware/vulnerability
-  scans, regression tests, and exact-build hashes.
+  scans, zero-finding Python/npm release audits, regression tests, and
+  exact-build hashes.
 
 ### Candidate supply-chain evidence
 

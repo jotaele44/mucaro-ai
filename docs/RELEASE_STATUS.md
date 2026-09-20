@@ -279,6 +279,10 @@ Observed success markers:
   source-backed denial of subprocess, worker, container, service, and federation
   execution while retaining only bounded in-process operations; loopback-server
   architecture and native security-scoped file access remain open.
+- `scripts/certify_release.py` now fails closed on the pinned Python dependency
+  graph through PyPA `pip-audit`, in addition to the existing npm audit. Direct
+  and transitive web/upload/PDF dependencies must have zero known findings for
+  the release receipt to pass.
 - `mucaro audit product` now uses the expanded governed-release objective. The
   current scope reports `16 PASS`, `7 OPEN`, `0 BLOCKED`, and `69.6%`
   readiness: the existing local assistant capabilities and source-artifact
