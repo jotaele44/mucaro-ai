@@ -14,6 +14,11 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
+from .distribution_policy import (
+    MAC_APP_STORE_DISTRIBUTION_CHANNEL,
+    evaluate_distribution_runtime_policy,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE_SCHEMA_VERSION = "mucaro_macos_app_store_security_profile_v1"
 PROFILE_PATH = Path("_architecture") / "macos_app_store_security_profile.json"
@@ -367,11 +372,49 @@ def _validate_source_profile(root: Path, profile: dict[str, Any]) -> tuple[list[
         isinstance(runtime_policy, dict)
         and runtime_policy.get("downloaded_executable_code") == "DENY"
         and runtime_policy.get("unreviewed_plugins") == "DENY"
-        and runtime_policy.get("arbitrary_shell") == "DISABLED_IN_APP_STORE_PROFILE"
+        and runtime_policy.get("arbitrary_shell") == "DENY"
+        and runtime_policy.get("user_code_execution") == "DENY"
         and runtime_policy.get("filesystem_access") == "USER_SELECTED_OR_CONTAINER_ONLY"
         and runtime_policy.get("persistent_external_file_access") == "SECURITY_SCOPED_BOOKMARK_REQUIRED"
     )
     checks.append(_check("runtime_policy", "PASS" if runtime_policy_valid else "FAIL", "Store runtime restrictions must fail closed"))
+    runtime_enforcement = {
+        "in_process": evaluate_distribution_runtime_policy(
+            distribution_channel=MAC_APP_STORE_DISTRIBUTION_CHANNEL,
+            runtime="IN_PROCESS",
+            granted_capabilities={"runtime.in_process"},
+            skill_id="mucaro/intelligence-plane-health",
+        ),
+        "subprocess": evaluate_distribution_runtime_policy(
+            distribution_channel=MAC_APP_STORE_DISTRIBUTION_CHANNEL,
+            runtime="IN_PROCESS",
+            granted_capabilities={"runtime.in_process", "subprocess.execute"},
+            skill_id="mucaro/intelligence-plane-health",
+        ),
+        "local_worker": evaluate_distribution_runtime_policy(
+            distribution_channel=MAC_APP_STORE_DISTRIBUTION_CHANNEL,
+            runtime="LOCAL_WORKER",
+            granted_capabilities={"runtime.local_worker"},
+            skill_id="mucaro/local-worker-health",
+        ),
+        "container": evaluate_distribution_runtime_policy(
+            distribution_channel=MAC_APP_STORE_DISTRIBUTION_CHANNEL,
+            runtime="CONTAINER",
+            granted_capabilities={"runtime.container"},
+            skill_id="mucaro/coding",
+        ),
+    }
+    runtime_enforcement_valid = (
+        runtime_enforcement["in_process"].authorized
+        and all(not runtime_enforcement[name].authorized for name in ("subprocess", "local_worker", "container"))
+    )
+    checks.append(
+        _check(
+            "runtime_policy_enforcement",
+            "PASS" if runtime_enforcement_valid else "FAIL",
+            "reviewed in-process allowlist plus subprocess, local-worker, and container denials",
+        )
+    )
 
     nonclaims = profile.get("explicit_nonclaims")
     nonclaim_rows = nonclaims if isinstance(nonclaims, list) else []
@@ -979,7 +1022,7 @@ def build_macos_app_store_readiness(
         "next_steps": [
             "replace the source-bound local wrapper with a self-contained App Store build target",
             "implement native user-selected file access and security-scoped bookmark lifecycle",
-            "resolve coding execution and loopback server compatibility before enabling those capabilities in the Store profile",
+            "keep coding execution disabled in the Store profile and resolve the loopback server architecture",
             "complete privacy and third-party SDK data inventory before freezing PrivacyInfo.xcprivacy",
             "generate exact-candidate SBOM, vulnerability, and malware evidence within the configured freshness window",
             "audit the exact signed candidate with this command before App Store Connect upload",

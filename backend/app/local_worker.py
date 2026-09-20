@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
+
 LOCAL_WORKER_PROTOCOL = "mucaro-local-worker/1.0"
 DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024
@@ -72,7 +74,17 @@ def run_local_worker(
     max_memory_mb: int = DEFAULT_MAX_MEMORY_MB,
     max_cpu_seconds: int = DEFAULT_MAX_CPU_SECONDS,
     network_allowed: bool = False,
+    distribution_channel: str = "local",
 ) -> dict[str, Any]:
+    try:
+        require_distribution_runtime_authorized(
+            distribution_channel=distribution_channel,
+            runtime="LOCAL_WORKER",
+            granted_capabilities={"runtime.local_worker"},
+            skill_id=skill_id,
+        )
+    except DistributionPolicyError as exc:
+        raise LocalWorkerError(exc.status, exc.detail) from exc
     if timeout_seconds <= 0 or max_output_bytes <= 0 or max_memory_mb <= 0 or max_cpu_seconds <= 0:
         raise LocalWorkerError("ERROR_LOCAL_WORKER_LIMIT", "worker limits must be positive")
     request = {

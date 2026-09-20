@@ -1131,7 +1131,9 @@ Use `mucaro security status` to inspect whether the app is safe for the chosen
 runtime posture. Local mode is loopback-oriented. Non-loopback `mucaro serve
 --host` values fail unless `MUCARO_AI_ALLOW_PUBLIC_BIND=1` is set. Production
 mode requires a high-entropy `MUCARO_AI_OPERATOR_TOKEN` and explicit
-`MUCARO_AI_CORS_ORIGINS`.
+`MUCARO_AI_CORS_ORIGINS`. `MUCARO_AI_DISTRIBUTION_CHANNEL=mac_app_store`
+requires production mode, keeps binding on loopback, and rejects subprocess,
+local-worker, and container execution before process creation.
 
 ```bash
 mucaro security status --host 127.0.0.1 --format text
@@ -1139,6 +1141,11 @@ MUCARO_AI_DEPLOYMENT_PROFILE=production \
 MUCARO_AI_OPERATOR_TOKEN="replace-with-a-long-random-token" \
 MUCARO_AI_CORS_ORIGINS="https://mucaro.example" \
 mucaro security status --format json
+
+MUCARO_AI_DISTRIBUTION_CHANNEL=mac_app_store \
+MUCARO_AI_DEPLOYMENT_PROFILE=production \
+MUCARO_AI_OPERATOR_TOKEN="replace-with-a-long-random-token" \
+mucaro security status --host 127.0.0.1 --format json
 ```
 
 ## Tool Runtime

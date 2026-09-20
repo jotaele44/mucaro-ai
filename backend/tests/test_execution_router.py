@@ -74,3 +74,21 @@ def test_router_fails_closed_when_container_skill_has_no_binding(tmp_path: Path)
             policy_decision=decision,
         )
     assert exc.value.status == "ERROR_CONTAINER_BINDING_MISSING"
+
+
+def test_app_store_channel_rejects_worker_route_before_spawn(tmp_path: Path) -> None:
+    decision = _decision("runtime.local_worker")
+    cfg = make_settings(tmp_path)
+    cfg = Settings(**{**cfg.__dict__, "distribution_channel": "mac_app_store"})
+
+    with pytest.raises(ExecutionRouterError) as exc:
+        execute_routed(
+            runtime="LOCAL_WORKER",
+            skill_id="mucaro/local-worker-health",
+            handler=lambda arguments, settings: {"status": "SHOULD_NOT_RUN"},
+            arguments={},
+            cfg=cfg,
+            policy_decision=decision,
+        )
+
+    assert exc.value.status == "ERROR_DISTRIBUTION_RUNTIME_POLICY"

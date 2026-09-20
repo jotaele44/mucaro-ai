@@ -273,7 +273,7 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
                 ],
             ),
             "mucaro package status/build/macos-app/app-store-audit, packaging policies, and the release package_artifact gate",
-            "Source artifacts, a source-bound local wrapper, an embedded portable-runtime bundle, transactional install/reinstall/rollback, and a fail-closed Mac App Store source/candidate audit are source-backed. Clean-machine direct distribution and Apple-controlled Store evidence remain open.",
+            "Source artifacts, a source-bound local wrapper, an embedded portable-runtime bundle, transactional install/reinstall/rollback, a fail-closed Mac App Store source/candidate audit, and Store-channel executable-runtime denial are source-backed. Clean-machine direct distribution and Apple-controlled Store evidence remain open.",
             "Keep every distribution receipt exact-head bound; execute clean-machine direct-distribution checks and the Store candidate audit on real signed artifacts, then preserve App Store Connect and App Review as external exact-build gates.",
         ),
         ProductRequirement(
@@ -399,7 +399,7 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
             "Release packaging certification",
             ("source_artifact_packaging",),
             "Source-artifact packaging, local macOS wrappers, portable-runtime/install controls, and the fail-closed Mac App Store policy/candidate auditor are part of the product audit and release-state path.",
-            "Real clean-machine direct-distribution evidence and a self-contained sandboxed Store build with resolved coding/server architecture, final privacy inventory, Mac App Distribution provisioning, upload processing, and Apple review are still open.",
+            "Real clean-machine direct-distribution evidence and a self-contained sandboxed Store build with resolved loopback-server architecture, native file access, final privacy inventory, Mac App Distribution provisioning, upload processing, and Apple review are still open. Coding execution is disabled in the Store channel rather than accepted as review-compliant.",
             "Keep source artifacts, app checks, distribution checks, and receipts exact-head bound; never promote local Store audit success beyond provisional without Apple evidence for the exact submitted build.",
         ),
         ProductRoadmapStage(

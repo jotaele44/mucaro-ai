@@ -28,6 +28,11 @@ def make_settings(root: Path) -> Settings:
     )
 
 
+def make_app_store_settings(root: Path) -> Settings:
+    cfg = make_settings(root)
+    return Settings(**{**cfg.__dict__, "distribution_channel": "mac_app_store"})
+
+
 def test_registered_skill_has_stable_digest_and_contract_metadata():
     payload = list_skills()
     assert payload["status"] == "SKILLS_OK"
@@ -77,6 +82,35 @@ def test_skill_must_mount_then_activate_before_execution(tmp_path: Path):
     assert len(mounts) == 1
     assert len(executions) == 1
     assert executions[0]["skill_digest"] == mounts[0]["digest"]
+
+
+def test_app_store_channel_allows_only_reviewed_in_process_skill(monkeypatch, tmp_path: Path):
+    from backend.app import skill_runtime
+
+    cfg = make_app_store_settings(tmp_path)
+    reviewed = "mucaro/intelligence-plane-health"
+    mount_skill(reviewed, cfg=cfg)
+    assert activate_skill(reviewed, cfg=cfg)["status"] == "SKILL_ACTIVATED"
+
+    unreviewed = SkillDefinition(
+        skill_id="third-party/unreviewed",
+        version="1.0.0",
+        description="Synthetic unreviewed in-process skill.",
+        runtime="IN_PROCESS",
+        capabilities=(),
+        input_schema="test.input/1",
+        output_schema="test.output/1",
+        handler=lambda arguments, settings: {"status": "SHOULD_NOT_RUN"},
+    )
+    monkeypatch.setitem(skill_runtime.SKILL_REGISTRY, unreviewed.skill_id, unreviewed)
+    mount_skill(unreviewed.skill_id, cfg=cfg)
+
+    try:
+        activate_skill(unreviewed.skill_id, cfg=cfg)
+    except SkillRuntimeError as exc:
+        assert exc.status == "ERROR_DISTRIBUTION_RUNTIME_POLICY"
+    else:
+        raise AssertionError("expected unreviewed App Store skill denial")
 
 
 def test_mount_is_idempotent_for_same_digest(tmp_path: Path):
