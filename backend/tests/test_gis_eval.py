@@ -12,12 +12,12 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 57,
-        "passed": 57,
+        "cases": 62,
+        "passed": 62,
         "failed": 0,
-        "positive_cases": 34,
-        "negative_cases": 23,
-        "operations": 24,
+        "positive_cases": 37,
+        "negative_cases": 25,
+        "operations": 25,
         "operation_names": [
             "bbox_filter",
             "clip_bbox",
@@ -32,6 +32,7 @@ def test_gis_eval_default_fixture_covers_core_operations():
             "point_in_polygon",
             "raster_clip",
             "raster_d8_flow",
+            "raster_depression_fill",
             "raster_hillshade",
             "raster_inspect",
             "raster_resample",
@@ -80,6 +81,11 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["raster_hillshade_invalid_azimuth_fails_closed"]["observed_status"] == "ERROR_GIS_HILLSHADE_AZIMUTH"
     assert by_id["raster_hillshade_invalid_altitude_fails_closed"]["observed_status"] == "ERROR_GIS_HILLSHADE_ALTITUDE"
     assert by_id["raster_hillshade_all_nodata_fails_closed"]["observed_status"] == "ERROR_GIS_HILLSHADE_EMPTY"
+    assert by_id["raster_depression_fill_enclosed_bowl_closes_volume"]["observed_status"] == "GIS_RASTER_DEPRESSION_FILL_OK"
+    assert by_id["raster_depression_fill_monotonic_surface_unchanged"]["observed_status"] == "GIS_RASTER_DEPRESSION_FILL_OK"
+    assert by_id["raster_depression_fill_nodata_adjacency_is_outlet"]["observed_status"] == "GIS_RASTER_DEPRESSION_FILL_OK"
+    assert by_id["raster_depression_fill_depth_limit_fails_closed"]["observed_status"] == "ERROR_GIS_DEPRESSION_FILL_LIMIT"
+    assert by_id["raster_depression_fill_geographic_crs_fails_closed"]["observed_status"] == "ERROR_GIS_DEPRESSION_FILL_CRS"
     assert by_id["raster_d8_east_descent_closes_terminal_contributions"]["observed_status"] == "GIS_RASTER_D8_OK"
     assert by_id["raster_d8_tied_candidates_remain_unresolved"]["observed_status"] == "GIS_RASTER_D8_WARN"
     assert by_id["raster_d8_geographic_crs_fails_closed"]["observed_status"] == "ERROR_GIS_D8_CRS"

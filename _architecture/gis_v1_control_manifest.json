@@ -30,7 +30,9 @@
     {"id":"RASTER-001","class":"RASTER","input":{"grid":[[0,2],[3,null]],"nodata":null},"expected":{"valid_count":3,"nodata_count":1,"zero_is_valid":true},"authority":"analytic 2x2 raster fixture"},
     {"id":"VECTOR_RASTER-001","class":"VECTOR_RASTER","input":"cell-center polygon over zero-valued cell plus NODATA control polygon","expected":{"states":["INTERSECTS_VALID","NODATA_ONLY","NULL_EMPTY"],"zero_mean":0.0},"authority":"analytic cell-center fixture"},
     {"id":"HYDRO-001","class":"D8_HYDROLOGY","input":{"grid":[[4,3,2,1,0],[4,3,2,1,0],[4,3,2,1,0],[4,3,2,1,0],[4,3,2,1,0]],"cell_size_m":1.0,"boundary_policy":"terminal"},"expected":{"complete_neighborhood_count":9,"boundary_terminal_count":16,"east_flow_count":9,"flow_edge_count":9,"terminal_accumulation_total":25.0,"maximum_accumulation":4.0},"authority":"closed-form monotonic east-descent D8 control"},
-    {"id":"HYDRO-002","class":"D8_HYDROLOGY_TIE","input":{"grid":[[20,20,20],[20,10,9],[20,9,20]],"cell_size_m":1.0},"expected":{"top_candidate_directions":["E","S"],"candidate_bitmask":5,"tie_unresolved_count":1,"flow_edge_count":0,"terminal_accumulation_total":9.0},"authority":"closed-form equal-gradient E/S tie control"}
+    {"id":"HYDRO-002","class":"D8_HYDROLOGY_TIE","input":{"grid":[[20,20,20],[20,10,9],[20,9,20]],"cell_size_m":1.0},"expected":{"top_candidate_directions":["E","S"],"candidate_bitmask":5,"tie_unresolved_count":1,"flow_edge_count":0,"terminal_accumulation_total":9.0},"authority":"closed-form equal-gradient E/S tie control"},
+    {"id":"HYDRO-003","class":"DEPRESSION_CONDITIONING","input":{"grid":[[10,10,10,10,10],[10,1,1,1,10],[10,1,0,1,5],[10,1,1,1,10],[10,10,10,10,10]],"cell_size_m":1.0,"outlet_policy":"raster_edge_and_nodata_adjacency","maximum_fill_depth_m":5.0},"expected":{"spill_elevation_m":5.0,"outlet_seed_count":16,"raised_cell_count":9,"unchanged_cell_count":16,"maximum_fill_depth_m":5.0,"total_fill_depth_m":37.0,"fill_volume_cubic_metres":37.0},"authority":"closed-form enclosed-bowl spill and volume arithmetic"},
+    {"id":"HYDRO-004","class":"DEPRESSION_CONDITIONING_NODATA_OUTLET","input":{"grid":[[10,10,10,10,10],[10,1,1,1,10],[10,0,null,1,10],[10,1,1,1,10],[10,10,10,10,10]],"outlet_policy":"raster_edge_and_nodata_adjacency"},"expected":{"nodata_coordinate":[2,2],"nodata_adjacent_outlet_count":8,"representative_outlet_coordinate":[2,1],"representative_outlet_elevation_m":0.0},"authority":"analytic 8-neighbour NODATA-adjacency control"}
   ],
   "explicit_nonclaims": [
     "vertical CRS certification",
@@ -38,7 +40,8 @@
     "fractional raster-cell coverage",
     "all GIS formats or all CRS operations",
     "unbounded antimeridian, polar, or large-geometry certification",
-    "depression filling, breaching, flat resolution, watershed delineation, stream extraction, runoff, flood, groundwater, or hydraulic modeling",
-    "hydrology on geographic, non-metre, rotated, sheared, NODATA-incomplete, or grids larger than the declared bounded implementation"
+    "unbounded depression conditioning, depression breaching, flat routing, watershed delineation, stream extraction, runoff, flood, groundwater, or hydraulic modeling",
+    "D8 hydrology on geographic, non-metre, rotated, sheared, NODATA-incomplete, or grids larger than the declared bounded implementation",
+    "depression conditioning on geographic, non-metre, rotated, sheared, undersized, outlet-free, or grids larger than the declared bounded implementation"
   ]
 }

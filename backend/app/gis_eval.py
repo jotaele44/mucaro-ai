@@ -17,7 +17,7 @@ from .gis_corpus import DEFAULT_REAL_GIS_CORPUS_MANIFEST, validate_real_gis_corp
 from .gis_crs import reproject_geojson_crs
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
-from .gis_hydrology import derive_raster_d8_flow
+from .gis_hydrology import condition_raster_depressions, derive_raster_d8_flow
 from .gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -77,6 +77,7 @@ VALID_OPERATIONS = {
     "raster_terrain",
     "raster_hillshade",
     "raster_d8_flow",
+    "raster_depression_fill",
     "corpus_validate",
     "map_export",
 }
@@ -419,6 +420,14 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             elevation_units=str(parameters.get("elevation_units") or ""),
             elevation_tolerance_m=parameters.get("elevation_tolerance_m", 0.0),
             gradient_tie_tolerance=parameters.get("gradient_tie_tolerance", 1e-12),
+            cfg=cfg,
+        )
+    if operation == "raster_depression_fill":
+        return condition_raster_depressions(
+            paths["raster"],
+            band=int(parameters.get("band", 1)),
+            elevation_units=str(parameters.get("elevation_units") or ""),
+            maximum_fill_depth_m=parameters.get("maximum_fill_depth_m"),
             cfg=cfg,
         )
     if operation == "corpus_validate":

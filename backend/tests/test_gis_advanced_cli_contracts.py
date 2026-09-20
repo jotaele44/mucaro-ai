@@ -19,7 +19,7 @@ from backend.app.gis_corpus import DEFAULT_REAL_GIS_CORPUS_MANIFEST, validate_re
 from backend.app.gis_crs import reproject_geojson_crs
 from backend.app.gis_export import create_map_export_manifest
 from backend.app.gis_geodesy import measure_geojson_ellipsoidal
-from backend.app.gis_hydrology import derive_raster_d8_flow
+from backend.app.gis_hydrology import condition_raster_depressions, derive_raster_d8_flow
 from backend.app.gis_raster import (
     clip_raster_bbox,
     derive_raster_hillshade,
@@ -94,6 +94,33 @@ def write_terrain_raster(path: Path) -> Path:
         height=5,
         count=1,
         dtype="float32",
+        crs="EPSG:32620",
+        transform=from_origin(500000, 2000000, 1, 1),
+        nodata=-9999,
+    ) as target:
+        target.write(data, 1)
+    return path
+
+
+def write_depression_raster(path: Path) -> Path:
+    data = np.array(
+        [
+            [10, 10, 10, 10, 10],
+            [10, 1, 1, 1, 10],
+            [10, 1, 0, 1, 5],
+            [10, 1, 1, 1, 10],
+            [10, 10, 10, 10, 10],
+        ],
+        dtype="float64",
+    )
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        width=5,
+        height=5,
+        count=1,
+        dtype="float64",
         crs="EPSG:32620",
         transform=from_origin(500000, 2000000, 1, 1),
         nodata=-9999,
@@ -232,6 +259,7 @@ def test_advanced_raster_and_export_cli_commands_emit_governed_receipts(tmp_path
     cfg = make_settings(tmp_path)
     raster = write_raster(tmp_path / "grid.tif")
     terrain_raster = write_terrain_raster(tmp_path / "terrain.tif")
+    depression_raster = write_depression_raster(tmp_path / "depression.tif")
     vector = write_geojson(
         tmp_path / "cells.geojson",
         [
@@ -394,6 +422,28 @@ def test_advanced_raster_and_export_cli_commands_emit_governed_receipts(tmp_path
     assert "terminal_accumulation_cell_count_total=25.0" in output
     assert "terminal_contribution_accounting_closed=True" in output
 
+    assert main(
+        [
+            "gis",
+            "condition-depressions",
+            str(depression_raster),
+            "--elevation-units",
+            "meters",
+            "--maximum-fill-depth-m",
+            "10",
+            "--format",
+            "text",
+        ],
+        cfg=cfg,
+    ) == 0
+    output = capsys.readouterr().out
+    assert "GIS_RASTER_DEPRESSION_FILL_OK" in output
+    assert "maximum_fill_depth_m=10.0" in output
+    assert "raised_cell_count=9" in output
+    assert "fill_volume_cubic_metres=37.0" in output
+    assert "outlet_seeds_unchanged=True" in output
+    assert "maximum_fill_depth_within_limit=True" in output
+
     rendered = tmp_path / "map.png"
     rendered.write_bytes(b"rendered-map")
     assert main(
@@ -443,6 +493,7 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
     )
     raster = write_raster(tmp_path / "grid.tif")
     terrain_raster = write_terrain_raster(tmp_path / "terrain.tif")
+    depression_raster = write_depression_raster(tmp_path / "depression.tif")
     vector = write_geojson(
         tmp_path / "cell.geojson",
         [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[0, 1], [1, 1], [1, 2], [0, 2], [0, 1]]]}, "properties": {}}],
@@ -453,6 +504,12 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
     d8_report = derive_raster_d8_flow(
         terrain_raster,
         elevation_units="meters",
+        cfg=cfg,
+    )
+    depression_report = condition_raster_depressions(
+        depression_raster,
+        elevation_units="meters",
+        maximum_fill_depth_m=10,
         cfg=cfg,
     )
 
@@ -476,6 +533,7 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
             cfg=cfg,
         ),
         d8_report,
+        depression_report,
         create_map_export_manifest(
             cfg=cfg,
             output_path=rendered,
@@ -589,6 +647,22 @@ def test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
     result = validate_gis_report_contract(unsafe_d8_tie_policy)
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
     assert "d8.tie_policy" in {check["name"] for check in result["failed_checks"]}
+
+    tampered_fill_volume = copy.deepcopy(depression_report)
+    tampered_fill_volume["depression_fill_accounting"]["fill_volume_cubic_metres"] += 1.0
+    result = validate_gis_report_contract(tampered_fill_volume)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "depression_fill.volume_accounting" in {
+        check["name"] for check in result["failed_checks"]
+    }
+
+    unsafe_fill_policy = copy.deepcopy(depression_report)
+    unsafe_fill_policy["parameters"]["breach_policy"] = "LOWEST_BARRIER"
+    result = validate_gis_report_contract(unsafe_fill_policy)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "depression_fill.breach_policy" in {
+        check["name"] for check in result["failed_checks"]
+    }
 
 
 def test_real_corpus_cli_and_contract_share_one_receipt_boundary(tmp_path: Path, capsys) -> None:

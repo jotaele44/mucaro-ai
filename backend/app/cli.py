@@ -42,7 +42,7 @@ from .gis_crs import reproject_geojson_crs
 from .gis_corpus import validate_real_gis_corpus
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
-from .gis_hydrology import derive_raster_d8_flow
+from .gis_hydrology import condition_raster_depressions, derive_raster_d8_flow
 from .gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -771,6 +771,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gis_derive_hillshade.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_derive_hillshade.set_defaults(handler=run_gis_derive_hillshade)
+
+    gis_condition_depressions = gis_subcommands.add_parser(
+        "condition-depressions",
+        help="Fill bounded enclosed raster depressions to their lowest reachable spill elevation.",
+    )
+    gis_condition_depressions.add_argument("raster_path", help="Path to a local projected elevation raster.")
+    gis_condition_depressions.add_argument("--band", type=int, default=1, help="One-based elevation band index.")
+    gis_condition_depressions.add_argument(
+        "--elevation-units",
+        choices=["meters"],
+        required=True,
+        help="Explicit vertical units for the selected elevation band.",
+    )
+    gis_condition_depressions.add_argument(
+        "--maximum-fill-depth-m",
+        type=float,
+        required=True,
+        help="Fail closed when any cell would need a larger fill depth in metres.",
+    )
+    gis_condition_depressions.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format.",
+    )
+    gis_condition_depressions.set_defaults(handler=run_gis_condition_depressions)
 
     gis_derive_d8_flow = gis_subcommands.add_parser(
         "derive-d8-flow",
@@ -2234,6 +2260,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_RASTER_RESAMPLE_OK",
         "GIS_RASTER_TERRAIN_OK",
         "GIS_RASTER_HILLSHADE_OK",
+        "GIS_RASTER_DEPRESSION_FILL_OK",
         "GIS_RASTER_D8_OK",
         "GIS_RASTER_D8_WARN",
         "GIS_VECTOR_RASTER_OK",
@@ -2323,6 +2350,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "horizontal_unit_factor",
                 "x_resolution",
                 "y_resolution",
+                "cell_area_square_metres",
+                "maximum_fill_depth_m",
+                "connectivity",
                 "slope_units",
                 "aspect_units",
                 "flat_aspect_policy",
@@ -2336,6 +2366,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "gradient_tie_tolerance",
                 "direction_convention",
                 "boundary_policy",
+                "fill_policy",
+                "breach_policy",
                 "sink_policy",
                 "flat_policy",
                 "tie_policy",
@@ -2469,6 +2501,16 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "transform_preserved",
                 "output_band_count_exact",
                 "source_cell_accounting_closed",
+                "seed_accounting_closed",
+                "processed_accounting_closed",
+                "change_accounting_closed",
+                "nodata_preserved",
+                "outlet_seeds_unchanged",
+                "elevations_never_lowered",
+                "fill_depth_matches_elevation_delta",
+                "fill_depth_nonnegative",
+                "maximum_fill_depth_within_limit",
+                "fill_volume_accounting_closed",
                 "slope_cell_accounting_closed",
                 "aspect_cell_accounting_closed",
                 "neighborhood_accounting_closed",
@@ -2513,6 +2555,10 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         hillshade_accounting = payload.get("hillshade_accounting")
         if isinstance(hillshade_accounting, dict):
             for key, value in hillshade_accounting.items():
+                print(f"{key}={value}")
+        depression_fill_accounting = payload.get("depression_fill_accounting")
+        if isinstance(depression_fill_accounting, dict):
+            for key, value in depression_fill_accounting.items():
                 print(f"{key}={value}")
         flow_accounting = payload.get("flow_accounting")
         if isinstance(flow_accounting, dict):
@@ -3044,6 +3090,20 @@ def run_gis_derive_hillshade(args: argparse.Namespace, cfg: Settings) -> int:
             elevation_units=args.elevation_units,
             azimuth_degrees=args.azimuth,
             altitude_degrees=args.altitude,
+            cfg=cfg,
+        ),
+    )
+
+
+def run_gis_condition_depressions(args: argparse.Namespace, cfg: Settings) -> int:
+    path = _resolve_project_path(args.raster_path, cfg)
+    return _run_gis_report(
+        args,
+        lambda: condition_raster_depressions(
+            path,
+            band=args.band,
+            elevation_units=args.elevation_units,
+            maximum_fill_depth_m=args.maximum_fill_depth_m,
             cfg=cfg,
         ),
     )

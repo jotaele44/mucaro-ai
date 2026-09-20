@@ -2569,6 +2569,198 @@
       "expected_warnings": []
     },
     {
+      "case_id": "raster_depression_fill_enclosed_bowl_closes_volume",
+      "operation": "raster_depression_fill",
+      "parameters": {
+        "band": 1,
+        "elevation_units": "meters",
+        "maximum_fill_depth_m": 5
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [
+            [
+              [10, 10, 10, 10, 10],
+              [10, 1, 1, 1, 10],
+              [10, 1, 0, 1, 5],
+              [10, 1, 1, 1, 10],
+              [10, 10, 10, 10, 10]
+            ]
+          ]
+        }
+      },
+      "expected_status": "GIS_RASTER_DEPRESSION_FILL_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "source_cell_accounting_closed": true,
+        "seed_accounting_closed": true,
+        "processed_accounting_closed": true,
+        "change_accounting_closed": true,
+        "nodata_preserved": true,
+        "outlet_seeds_unchanged": true,
+        "elevations_never_lowered": true,
+        "fill_depth_matches_elevation_delta": true,
+        "fill_depth_nonnegative": true,
+        "maximum_fill_depth_within_limit": true,
+        "fill_volume_accounting_closed": true,
+        "transactional_output_published": true
+      },
+      "expected_fields": {
+        "parameters.adapter": "priority_flood_8_connected_open_boundary_v1",
+        "parameters.boundary_policy": "raster_edge_and_nodata_adjacency_are_outlets",
+        "parameters.flat_policy": "preserve_spill_elevation_no_epsilon_gradient",
+        "depression_fill_accounting.outlet_seed_cell_count": 16,
+        "depression_fill_accounting.raised_cell_count": 9,
+        "depression_fill_accounting.unchanged_cell_count": 16,
+        "depression_fill_accounting.depression_component_count": 1,
+        "depression_fill_accounting.maximum_fill_depth_m": 5.0,
+        "depression_fill_accounting.total_fill_depth_m": 37.0,
+        "depression_fill_accounting.fill_volume_cubic_metres": 37.0,
+        "output.band_count": 2,
+        "output.bands.1.minimum": 0.0,
+        "output.bands.1.maximum": 5.0
+      }
+    },
+    {
+      "case_id": "raster_depression_fill_monotonic_surface_unchanged",
+      "operation": "raster_depression_fill",
+      "parameters": {
+        "band": 1,
+        "elevation_units": "meters",
+        "maximum_fill_depth_m": 0
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [
+            [
+              [4, 3, 2, 1, 0],
+              [4, 3, 2, 1, 0],
+              [4, 3, 2, 1, 0],
+              [4, 3, 2, 1, 0],
+              [4, 3, 2, 1, 0]
+            ]
+          ]
+        }
+      },
+      "expected_status": "GIS_RASTER_DEPRESSION_FILL_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "outlet_seeds_unchanged": true,
+        "elevations_never_lowered": true,
+        "fill_volume_accounting_closed": true
+      },
+      "expected_fields": {
+        "depression_fill_accounting.raised_cell_count": 0,
+        "depression_fill_accounting.unchanged_cell_count": 25,
+        "depression_fill_accounting.depression_component_count": 0,
+        "depression_fill_accounting.maximum_fill_depth_m": 0.0,
+        "depression_fill_accounting.fill_volume_cubic_metres": 0.0
+      }
+    },
+    {
+      "case_id": "raster_depression_fill_nodata_adjacency_is_outlet",
+      "operation": "raster_depression_fill",
+      "parameters": {
+        "band": 1,
+        "elevation_units": "meters",
+        "maximum_fill_depth_m": 0
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [
+            [
+              [10, 10, 10, 10, 10],
+              [10, 10, 10, 10, 10],
+              [10, 0, -9999, 10, 10],
+              [10, 10, 10, 10, 10],
+              [10, 10, 10, 10, 10]
+            ]
+          ]
+        }
+      },
+      "expected_status": "GIS_RASTER_DEPRESSION_FILL_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "nodata_preserved": true,
+        "outlet_seeds_unchanged": true,
+        "fill_depth_nonnegative": true
+      },
+      "expected_fields": {
+        "source.valid_cell_count": 24,
+        "source.nodata_cell_count": 1,
+        "depression_fill_accounting.outlet_seed_cell_count": 24,
+        "depression_fill_accounting.raised_cell_count": 0,
+        "depression_fill_accounting.maximum_fill_depth_m": 0.0
+      }
+    },
+    {
+      "case_id": "raster_depression_fill_depth_limit_fails_closed",
+      "operation": "raster_depression_fill",
+      "parameters": {
+        "band": 1,
+        "elevation_units": "meters",
+        "maximum_fill_depth_m": 9
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [
+            [
+              [10, 10, 10, 10, 10],
+              [10, 0, 0, 0, 10],
+              [10, 0, 0, 0, 10],
+              [10, 0, 0, 0, 10],
+              [10, 10, 10, 10, 10]
+            ]
+          ]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_DEPRESSION_FILL_LIMIT",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "raster_depression_fill_geographic_crs_fails_closed",
+      "operation": "raster_depression_fill",
+      "parameters": {
+        "band": 1,
+        "elevation_units": "meters",
+        "maximum_fill_depth_m": 10
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [-67, 19, 0.01, 0.01],
+          "bands": [[[10, 10, 10], [10, 0, 10], [10, 10, 10]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_DEPRESSION_FILL_CRS",
+      "expected_warnings": []
+    },
+    {
       "case_id": "raster_d8_east_descent_closes_terminal_contributions",
       "operation": "raster_d8_flow",
       "parameters": {

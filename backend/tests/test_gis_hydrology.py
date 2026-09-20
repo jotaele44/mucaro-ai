@@ -11,6 +11,7 @@ from backend.app.config import Settings
 from backend.app.gis_hydrology import (
     D8_DIRECTION_CODEBOOK,
     D8_STATE_CODEBOOK,
+    condition_raster_depressions,
     derive_raster_d8_flow,
 )
 from backend.app.gis_processing import GISProcessingError
@@ -57,6 +58,149 @@ def write_elevation(
     ) as target:
         target.write(data, 1)
     return path
+
+
+def test_priority_flood_fills_enclosed_bowl_and_closes_volume(tmp_path: Path) -> None:
+    data = np.full((5, 5), 10.0, dtype="float32")
+    data[1:4, 1:4] = 1.0
+    data[2, 2] = 0.0
+    data[2, 4] = 5.0
+    report = condition_raster_depressions(
+        write_elevation(tmp_path / "bowl-with-outlet.tif", data),
+        elevation_units="meters",
+        maximum_fill_depth_m=5.0,
+        cfg=make_settings(tmp_path),
+    )
+
+    assert report["status"] == "GIS_RASTER_DEPRESSION_FILL_OK"
+    assert report["depression_fill_accounting"] == {
+        "total_cell_count": 25,
+        "source_valid_cell_count": 25,
+        "source_nodata_cell_count": 0,
+        "outlet_seed_cell_count": 16,
+        "interior_nonseed_cell_count": 9,
+        "processed_valid_cell_count": 25,
+        "raised_cell_count": 9,
+        "unchanged_cell_count": 16,
+        "depression_component_count": 1,
+        "maximum_fill_depth_m": 5.0,
+        "total_fill_depth_m": 37.0,
+        "fill_volume_cubic_metres": 37.0,
+    }
+    assert all(report["invariants"].values())
+    with rasterio.open(report["output"]["path"]) as output:
+        assert output.count == 2
+        assert output.descriptions == (
+            "conditioned_elevation_meters",
+            "depression_fill_depth_meters",
+        )
+        assert output.read(1)[2, 2] == 5.0
+        assert output.read(2)[2, 2] == 5.0
+        assert output.read(1)[2, 4] == 5.0
+        assert output.read(2)[2, 4] == 0.0
+
+
+def test_priority_flood_preserves_monotonic_surface(tmp_path: Path) -> None:
+    data = np.tile(np.arange(4, -1, -1, dtype="float32"), (5, 1))
+    report = condition_raster_depressions(
+        write_elevation(tmp_path / "monotonic.tif", data),
+        elevation_units="meters",
+        maximum_fill_depth_m=0.0,
+        cfg=make_settings(tmp_path),
+    )
+
+    accounting = report["depression_fill_accounting"]
+    assert accounting["raised_cell_count"] == 0
+    assert accounting["unchanged_cell_count"] == 25
+    assert accounting["depression_component_count"] == 0
+    assert accounting["maximum_fill_depth_m"] == 0.0
+    assert accounting["fill_volume_cubic_metres"] == 0.0
+
+
+def test_priority_flood_treats_nodata_adjacency_as_outlet(tmp_path: Path) -> None:
+    data = np.full((5, 5), 10.0, dtype="float32")
+    data[2, 2] = -9999.0
+    data[2, 1] = 0.0
+    report = condition_raster_depressions(
+        write_elevation(tmp_path / "nodata-outlet.tif", data),
+        elevation_units="meters",
+        maximum_fill_depth_m=0.0,
+        cfg=make_settings(tmp_path),
+    )
+
+    assert report["source"]["nodata_cell_count"] == 1
+    assert report["depression_fill_accounting"]["raised_cell_count"] == 0
+    with rasterio.open(report["output"]["path"]) as output:
+        assert output.read(1, masked=True).mask[2, 2]
+        assert output.read(1)[2, 1] == 0.0
+
+
+def test_priority_flood_rejects_fill_above_explicit_limit(tmp_path: Path) -> None:
+    data = np.full((5, 5), 10.0, dtype="float32")
+    data[1:4, 1:4] = 0.0
+    cfg = make_settings(tmp_path)
+
+    with pytest.raises(GISProcessingError) as exc:
+        condition_raster_depressions(
+            write_elevation(tmp_path / "deep-bowl.tif", data),
+            elevation_units="meters",
+            maximum_fill_depth_m=9.0,
+            cfg=cfg,
+        )
+    assert exc.value.status == "ERROR_GIS_DEPRESSION_FILL_LIMIT"
+    assert not list((cfg.export_dir / "gis_reports").glob("*.tif"))
+
+
+@pytest.mark.parametrize(
+    ("factory_kwargs", "condition_kwargs", "expected_status"),
+    [
+        ({"crs": "EPSG:4326"}, {}, "ERROR_GIS_DEPRESSION_FILL_CRS"),
+        ({"crs": "EPSG:2263"}, {}, "ERROR_GIS_DEPRESSION_FILL_UNITS"),
+        (
+            {"transform": Affine(1, 0.1, 500000, 0, -1, 2000000)},
+            {},
+            "ERROR_GIS_DEPRESSION_FILL_TRANSFORM",
+        ),
+        ({}, {"band": 2}, "ERROR_GIS_DEPRESSION_FILL_BAND"),
+        ({}, {"elevation_units": "feet"}, "ERROR_GIS_DEPRESSION_FILL_UNITS"),
+        ({}, {"maximum_fill_depth_m": -1}, "ERROR_GIS_DEPRESSION_FILL_LIMIT"),
+        ({}, {"maximum_fill_depth_m": float("nan")}, "ERROR_GIS_DEPRESSION_FILL_LIMIT"),
+    ],
+)
+def test_priority_flood_rejects_unsafe_grid_and_parameters(
+    tmp_path: Path,
+    factory_kwargs: dict[str, object],
+    condition_kwargs: dict[str, object],
+    expected_status: str,
+) -> None:
+    source = write_elevation(
+        tmp_path / f"{expected_status}.tif",
+        np.tile(np.arange(4, -1, -1, dtype="float32"), (5, 1)),
+        **factory_kwargs,
+    )
+    parameters = {
+        "elevation_units": "meters",
+        "maximum_fill_depth_m": 10.0,
+        **condition_kwargs,
+    }
+    with pytest.raises(GISProcessingError) as exc:
+        condition_raster_depressions(source, cfg=make_settings(tmp_path), **parameters)
+    assert exc.value.status == expected_status
+
+
+def test_priority_flood_executes_against_frozen_usgs_3dep_manifestation(tmp_path: Path) -> None:
+    report = condition_raster_depressions(
+        REAL_RASTER,
+        elevation_units="meters",
+        maximum_fill_depth_m=1000.0,
+        cfg=make_settings(tmp_path),
+    )
+
+    assert report["source"]["sha256"] == "9cc3ba603944b5e6e1a9251082338c1f94783ca376480d19237a3ad4ef789415"
+    assert report["source"]["valid_cell_count"] == 4096
+    assert report["depression_fill_accounting"]["processed_valid_cell_count"] == 4096
+    assert report["invariants"]["fill_volume_accounting_closed"] is True
+    assert report["output"]["sha256"]
 
 
 def test_d8_routes_east_and_closes_terminal_accumulation(tmp_path: Path) -> None:

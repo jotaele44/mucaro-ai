@@ -112,7 +112,8 @@ candidate now routes GeoJSON operations, explicit topology repair, horizontal
 CRS transformation, ellipsoidal measurement, vector/raster manifestations,
 raster sampling/clipping, a frozen real-raster corpus manifestation,
 projected-metre slope/aspect derivation, terrain-lineage-bound hillshade,
-bounded D8 direction/accumulation with explicit terminal ambiguity,
+bounded priority-flood depression conditioning with explicit outlet and
+maximum-depth policy, bounded D8 direction/accumulation with explicit terminal ambiguity,
 vector-raster analysis, and map-export
 provenance through shared CLI, eval, and saved-report contract surfaces. Receipts live
 under `data/exports/gis_reports` and preserve source/output hashes, CRS,
@@ -122,7 +123,7 @@ This is not full advanced GIS certification. Broader CRS grids and vertical or
 time-dependent operations, dimension-preserving mutation, topology/overlay
 policy, independent visual validation, larger real vector/raster corpora,
 remote sensing, terrain algorithms beyond bounded slope/aspect/hillshade,
-hydrology beyond bounded unconditioned D8, bathymetry, and temporal GIS remain open product
+hydrology beyond bounded priority-flood conditioning and D8, bathymetry, and temporal GIS remain open product
 requirements.
 
 ## Packaging layer
