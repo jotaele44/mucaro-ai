@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/agent_checkpoint.schema.json",
+  "title": "Mucaro Agent Checkpoint 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "checkpoint_id",
+    "session_id",
+    "run_id",
+    "objective",
+    "state",
+    "created_at",
+    "updated_at",
+    "source_sha",
+    "sequence",
+    "completed_steps",
+    "pending_steps",
+    "contradictions",
+    "pause_reason"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mucaro-agent-checkpoint/1.0"
+    },
+    "checkpoint_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "PLANNING",
+        "READY_FOR_APPROVAL",
+        "EXECUTING",
+        "PAUSED_PROVIDER",
+        "PAUSED_RESOURCE",
+        "BLOCKED_PERMISSION",
+        "BLOCKED_EXTERNAL",
+        "FAILED",
+        "COMPLETED"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updated_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "completed_steps": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pending_steps": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "contradictions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pause_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "provider": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}
