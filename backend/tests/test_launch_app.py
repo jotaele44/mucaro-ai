@@ -414,6 +414,73 @@ def test_python_distribution_verifies_sdist_members(tmp_path):
     assert result["missing_members"] == []
 
 
+def test_python_distribution_install_verification_is_isolated(tmp_path, monkeypatch):
+    install_env = tmp_path / "install-env"
+    install_python = install_env / "bin" / "python"
+    install_mucaro = install_env / "bin" / "mucaro"
+    install_mucaro.parent.mkdir(parents=True)
+    install_mucaro.write_text("#!/bin/sh\n", encoding="utf-8")
+    install_mucaro.chmod(0o755)
+    wheel = tmp_path / "mucaro_ai-0.1.23-py3-none-any.whl"
+    wheel.write_bytes(b"wheel")
+    workdir = tmp_path / "isolated-workdir"
+    workdir.mkdir()
+    calls = []
+
+    def fake_run(command, *, cwd, check=True):
+        calls.append((command, cwd, check))
+        output = "ISOLATED_WHEEL_IMPORT_OK" if command[1:2] == ["-c"] else "installed"
+        return subprocess.CompletedProcess(command, 0, stdout=output)
+
+    monkeypatch.setattr(certify_python_distribution, "run", fake_run)
+
+    result = certify_python_distribution.certify_installed_wheel(
+        install_python=install_python,
+        install_mucaro=install_mucaro,
+        install_env=install_env,
+        wheel=wheel,
+        workdir=workdir,
+        expected={"name": "mucaro-ai", "version": "0.1.23", "requires_python": ">=3.11"},
+    )
+
+    assert all(cwd == workdir for _, cwd, _ in calls)
+    assert "--force-reinstall" in calls[0][0]
+    assert "--no-cache-dir" in calls[0][0]
+    assert "module_path.relative_to(prefix)" in calls[-1][0][-1]
+    assert result["entrypoint"] == "bin/mucaro"
+    assert result["module_origin_check"] == "backend.app.cli resolves under isolated sys.prefix"
+
+
+def test_python_distribution_install_verification_requires_console_script(tmp_path, monkeypatch):
+    install_env = tmp_path / "install-env"
+    install_python = install_env / "bin" / "python"
+    install_mucaro = install_env / "bin" / "mucaro"
+    install_mucaro.parent.mkdir(parents=True)
+    (install_mucaro.parent / "python").write_text("", encoding="utf-8")
+    wheel = tmp_path / "mucaro_ai-0.1.23-py3-none-any.whl"
+    wheel.write_bytes(b"wheel")
+
+    monkeypatch.setattr(
+        certify_python_distribution,
+        "run",
+        lambda command, *, cwd, check=True: subprocess.CompletedProcess(command, 0, stdout="pip install output"),
+    )
+
+    with pytest.raises(FileNotFoundError) as exc:
+        certify_python_distribution.certify_installed_wheel(
+            install_python=install_python,
+            install_mucaro=install_mucaro,
+            install_env=install_env,
+            wheel=wheel,
+            workdir=tmp_path,
+            expected={"name": "mucaro-ai", "version": "0.1.23", "requires_python": ">=3.11"},
+        )
+
+    assert "installed console script missing or non-executable" in str(exc.value)
+    assert "bin_members=python" in str(exc.value)
+    assert "pip_output_tail=pip install output" in str(exc.value)
+
+
 def test_launch_app_reports_missing_frontend_deps(tmp_path, monkeypatch):
     frontend = tmp_path / "frontend"
     frontend.mkdir()
