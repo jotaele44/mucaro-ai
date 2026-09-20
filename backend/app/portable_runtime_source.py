@@ -353,7 +353,7 @@ print(json.dumps({
 }, sort_keys=True))
 """
     proc = _run(
-        [str(runtime_python), "-c", script],
+        [str(runtime_python), "-s", "-P", "-c", script],
         input_text=json.dumps(
             {
                 "imports": manifest["required_imports"],
@@ -448,6 +448,8 @@ def _install_locked_dependencies(runtime_dir: Path, manifest: dict[str, Any]) ->
     site_packages = runtime_dir / "lib" / f"python{major_minor}" / "site-packages"
     command = [
         str(runtime_python),
+        "-s",
+        "-P",
         "-m",
         "pip",
         "--isolated",
@@ -470,7 +472,7 @@ def _install_locked_dependencies(runtime_dir: Path, manifest: dict[str, Any]) ->
     if generated_scripts.is_dir():
         removed_scripts = sorted(path.name for path in generated_scripts.iterdir())
         shutil.rmtree(generated_scripts)
-    check = _run([str(runtime_python), "-m", "pip", "--isolated", "check"])
+    check = _run([str(runtime_python), "-s", "-P", "-m", "pip", "--isolated", "check"])
     if check.returncode != 0:
         raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_DEPENDENCY_CHECK", check.stdout[-65536:])
     return {
@@ -596,7 +598,7 @@ def materialize_portable_runtime(
                 "archive_types_limited_to_files_and_symlinks": True,
                 "captured_staging_path_absent": True,
                 "dependency_hashes_required": True,
-                "host_user_site_disabled": True,
+                "verification_environment_disables_host_user_site": True,
                 "runtime_symlinks_remaining": 0,
                 "source_archive_hash_verified": True,
                 "source_archive_size_verified": True,
