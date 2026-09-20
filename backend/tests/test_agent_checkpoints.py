@@ -12,7 +12,17 @@ SHA = "a" * 40
 
 
 def make_settings(root: Path) -> Settings:
-    return Settings(project_root=root, data_dir=root / "data", sqlite_path=root / "data" / "mucaro.db")
+    return Settings(
+        project_root=root,
+        data_dir=root / "data",
+        input_dir=root / "data" / "input",
+        processed_dir=root / "data" / "processed",
+        export_dir=root / "data" / "exports",
+        index_dir=root / "data" / "indexes",
+        sqlite_path=root / "data" / "processed" / "test.sqlite3",
+        default_model_provider="mock",
+        default_model_name="mock",
+    )
 
 
 def test_checkpoint_persists_and_resumes_after_new_read(tmp_path: Path) -> None:
