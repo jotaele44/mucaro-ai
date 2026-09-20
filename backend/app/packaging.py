@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from .macos_app_store import build_macos_app_store_readiness
 from .release_receipts import load_release_receipt, receipt_path
 
 
@@ -34,6 +35,10 @@ REQUIRED_PACKAGE_INPUTS = [
     "scripts/certify_source_artifact.py",
     "scripts/certify_python_distribution.py",
     "docs/PACKAGING_POLICY.md",
+    "docs/APPLE_APP_STORE_SECURITY.md",
+    "_architecture/macos_app_store_security_profile.json",
+    "packaging/macos/MucaroAI-AppStore.entitlements",
+    "packaging/macos/PrivacyInfo.xcprivacy",
     "frontend/package.json",
     "frontend/package-lock.json",
 ]
@@ -524,8 +529,18 @@ def build_package_status(root: Path = ROOT) -> dict[str, Any]:
             "source ZIP plus JSON manifest under data/exports/packages; signed installer deferred",
         )
     )
+    app_store_readiness = build_macos_app_store_readiness(root)
+    app_store_status = str(app_store_readiness.get("status"))
+    checks.append(
+        _check(
+            "mac_app_store_security_profile",
+            "FAIL" if app_store_status == "MAC_APP_STORE_READINESS_FAIL" else "WARN",
+            app_store_status,
+        )
+    )
     blockers = [
         "Hosted GitHub Actions startup is unresolved; governed release tags still require hosted CI success.",
+        "Mac App Store signing, provisioning, upload processing, and Apple App Review remain external gates.",
     ]
     checks.append(_check("hosted_release_gate", "WARN", blockers[0]))
 
@@ -544,6 +559,7 @@ def build_package_status(root: Path = ROOT) -> dict[str, Any]:
             "python3 scripts/package_desktop.py --self-test",
             "python3 scripts/package_desktop.py --build-app",
             "PYTHONPATH=.:backend python3 scripts/mucaro.py package macos-app --format text",
+            "PYTHONPATH=.:backend python3 scripts/mucaro.py package app-store-audit --strict --format text",
             "PYTHONPATH=.:backend python3 scripts/mucaro.py package build --format text",
             "PYTHONPATH=.:backend python3 scripts/mucaro.py package verify MANIFEST_PATH --require-current-head --format text",
             "python3 scripts/certify_python_distribution.py",

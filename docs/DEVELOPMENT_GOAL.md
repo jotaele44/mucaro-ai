@@ -57,7 +57,7 @@ limits.
 | Transparency/objectivity | FACT/INFERENCE/ASSUMPTION/UNKNOWN separation, limitations, contradiction handling, falsification criteria, and reproducible verification hooks |
 | GUI/operator workflow | Final-phase clean prompt-and-response surface, efficient task execution, synchronized work feed, specialized workspaces, and isolated proof that permission grants, ingestion, retrieval, answer traces, memory controls, run history, and approved tools work together after backend/CLI gates are strong enough to expose |
 | Fresh clone | Exact-ref clone, install, CLI help, release check, launcher self-test, and desktop smoke certification |
-| Packaging | Source artifact manifest, archive SHA-256, member hashes, Python wheel/sdist receipts, source-bound macOS Application bundle, local distribution handoff manifest, and package status gate |
+| Packaging | Source artifact manifest, archive SHA-256, member hashes, Python wheel/sdist receipts, source-bound local macOS Application bundle, local distribution handoff manifest, package status gate, and a separate fail-closed Mac App Store policy/candidate audit with sandbox, privacy, entitlement, provisioning, and external-review boundaries |
 | Hosted governance | Current-head hosted CI, startup probe, branch-protection visibility, tag binding, and clear external blocker classification |
 
 ## Current Baseline
@@ -109,7 +109,7 @@ byte-pinned proof layer for a particular commit. Verify them with
 | Coding/programming expertise | OPEN | Read/diff/patch/review/Git lifecycle, isolated container source, check-suite receipts, and coding certification ledger are merged; close live pinned-container execution and execute the frozen coding regression corpus before certification |
 | Transparency/objectivity across capabilities | OPEN | Initial GIS and OCR report validation exists for saved advanced GIS and local image OCR receipts; expand executable validators so provenance, uncertainty, limitations, contradictory evidence handling, falsification criteria, warning states, and arithmetic closure are enforced across browsing, retrieval, and coding outputs |
 | Final-phase GUI/operator workspace | OPEN | Conversation-first GUI source is merged; execute rendered desktop/mobile/accessibility and representative-workflow QA, then add only nonduplicative specialized map/table/code/artifact surfaces justified by operator workflows |
-| Production packaging | OPEN | Embedded portable runtime, transactional install/reinstall/rollback, fail-closed release-grade matrix, and macOS signing/clean-machine verification commands are source-backed; actual clean-machine execution and signed/notarized distribution receipts remain external blockers |
+| Production packaging | OPEN | Embedded portable runtime, transactional install/reinstall/rollback, fail-closed release-grade matrix, macOS signing/clean-machine verification commands, and a machine-readable Mac App Store security profile plus candidate auditor are source-backed. Direct-distribution clean-machine/signing/notarization evidence remains external; the Store lane additionally requires a self-contained sandboxed build, native security-scoped file access, coding/loopback architecture resolution, final privacy inventory, Mac App Distribution signing/provisioning, App Store Connect processing, and Apple App Review. |
 | Sustained workflow validation | OPEN | Run end-to-end operator workflows across ingest, ask, trace review, memory, tools, receipts, and recovery paths |
 
 ## Development Vector

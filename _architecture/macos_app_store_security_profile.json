@@ -1,0 +1,87 @@
+{
+  "schema_version": "mucaro_macos_app_store_security_profile_v1",
+  "profile_id": "mac_app_store",
+  "current_state": "OPEN",
+  "expected_bundle_identifier": "ai.mucaro.app",
+  "required_entitlements": {
+    "com.apple.security.app-sandbox": true,
+    "com.apple.security.files.user-selected.read-write": true,
+    "com.apple.security.files.bookmarks.app-scope": true,
+    "com.apple.security.network.client": true
+  },
+  "conditionally_allowed_entitlements": [
+    "com.apple.application-identifier",
+    "com.apple.developer.team-identifier",
+    "com.apple.security.application-groups",
+    "keychain-access-groups"
+  ],
+  "forbidden_entitlements": [
+    "com.apple.security.get-task-allow",
+    "com.apple.security.cs.allow-jit",
+    "com.apple.security.cs.allow-unsigned-executable-memory",
+    "com.apple.security.cs.disable-executable-page-protection",
+    "com.apple.security.cs.disable-library-validation",
+    "com.apple.security.files.user-selected.executable",
+    "com.apple.security.temporary-exception.apple-events",
+    "com.apple.security.temporary-exception.files.absolute-path.read-only",
+    "com.apple.security.temporary-exception.files.absolute-path.read-write",
+    "com.apple.security.temporary-exception.mach-lookup.global-name"
+  ],
+  "bundle_requirements": {
+    "privacy_manifest_relative_path": "Contents/Resources/PrivacyInfo.xcprivacy",
+    "provisioning_profile_relative_path": "Contents/embedded.provisionprofile",
+    "candidate_receipt_relative_path": "Contents/Resources/mucaro-app-store-receipt.json",
+    "required_info_plist_keys": [
+      "CFBundleIdentifier",
+      "CFBundleName",
+      "CFBundleExecutable",
+      "CFBundlePackageType",
+      "CFBundleShortVersionString",
+      "CFBundleVersion",
+      "LSMinimumSystemVersion",
+      "NSHumanReadableCopyright"
+    ],
+    "reject_source_bound_wrapper": true,
+    "reject_escaping_symlinks": true,
+    "reject_arbitrary_transport_loads": true
+  },
+  "runtime_policy": {
+    "downloaded_executable_code": "DENY",
+    "unreviewed_plugins": "DENY",
+    "arbitrary_shell": "DISABLED_IN_APP_STORE_PROFILE",
+    "user_code_execution": "OPEN_REVIEW_REQUIRED",
+    "loopback_network_server": "OPEN_ARCHITECTURE_REVIEW_REQUIRED",
+    "private_content_external_transmission": "EXPLICIT_PERMISSION_REQUIRED",
+    "filesystem_access": "USER_SELECTED_OR_CONTAINER_ONLY",
+    "persistent_external_file_access": "SECURITY_SCOPED_BOOKMARK_REQUIRED"
+  },
+  "gates": [
+    {"id": "MAS-POLICY-001", "state": "PASS", "title": "Machine-readable App Store security profile", "evidence": "_architecture/macos_app_store_security_profile.json"},
+    {"id": "MAS-SANDBOX-001", "state": "OPEN", "title": "Signed App Sandbox entitlement", "evidence": "requires candidate bundle codesign evidence"},
+    {"id": "MAS-BUNDLE-001", "state": "OPEN", "title": "Self-contained application bundle", "evidence": "current local wrapper remains source-bound and is not a Store candidate"},
+    {"id": "MAS-FILES-001", "state": "OPEN", "title": "User-selected file access and security-scoped bookmarks", "evidence": "native file-selection and persisted-bookmark implementation remains future GUI work"},
+    {"id": "MAS-CODE-001", "state": "OPEN", "title": "App Review-compliant coding execution profile", "evidence": "arbitrary shell and downloaded executable behavior must be disabled or independently accepted for the Store profile"},
+    {"id": "MAS-NETWORK-001", "state": "OPEN", "title": "Least-privilege network architecture", "evidence": "outbound permission policy exists; loopback server architecture requires redesign or explicit entitlement justification"},
+    {"id": "MAS-PRIVACY-001", "state": "OPEN", "title": "Privacy manifest and App Store disclosures", "evidence": "baseline manifest exists; final data and third-party SDK inventory remains open"},
+    {"id": "MAS-SUPPLY-CHAIN-001", "state": "OPEN", "title": "Dependency, SBOM, malware, and vulnerability evidence", "evidence": "locked dependencies and local audits exist; release SBOM and signed-bundle scans remain open"},
+    {"id": "MAS-SIGNING-001", "state": "BLOCKED", "title": "Mac App Distribution signing and provisioning", "evidence": "requires operator-controlled Apple Developer identity and App Store provisioning profile"},
+    {"id": "MAS-UPLOAD-001", "state": "BLOCKED", "title": "App Store Connect validation and processing", "evidence": "requires App Store Connect authorization and uploaded candidate"},
+    {"id": "MAS-REVIEW-001", "state": "BLOCKED", "title": "Apple App Review acceptance", "evidence": "requires Apple review of the exact submitted build and metadata"}
+  ],
+  "apple_references": [
+    "https://developer.apple.com/documentation/xcode/configuring-the-macos-app-sandbox",
+    "https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox",
+    "https://developer.apple.com/documentation/bundleresources/privacy-manifest-files",
+    "https://developer.apple.com/documentation/xcode/preparing-your-app-for-distribution",
+    "https://developer.apple.com/app-store/review/guidelines/",
+    "https://developer.apple.com/help/account/provisioning-profiles/create-an-app-store-provisioning-profile",
+    "https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds"
+  ],
+  "explicit_nonclaims": [
+    "this profile is not a signed Mac App Distribution artifact",
+    "this profile is not App Store Connect upload or processing evidence",
+    "this profile is not Apple App Review acceptance",
+    "Developer ID notarization evidence does not prove Mac App Store readiness",
+    "a local source-bound or portable wrapper is not a Mac App Store candidate"
+  ]
+}

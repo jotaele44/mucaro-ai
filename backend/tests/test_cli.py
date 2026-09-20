@@ -1620,6 +1620,16 @@ mucaro = "backend.app.cli:main"
     )
     (root / "README.md").write_text("# Mucaro AI\n", encoding="utf-8")
     (root / "docs" / "PACKAGING_POLICY.md").write_text("# Packaging Policy\n", encoding="utf-8")
+    source_root = Path(__file__).resolve().parents[2]
+    for relative in [
+        "docs/APPLE_APP_STORE_SECURITY.md",
+        "_architecture/macos_app_store_security_profile.json",
+        "packaging/macos/MucaroAI-AppStore.entitlements",
+        "packaging/macos/PrivacyInfo.xcprivacy",
+    ]:
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((source_root / relative).read_bytes())
     for path in [
         "scripts/mucaro.py",
         "scripts/launch_app.py",
@@ -1671,6 +1681,7 @@ def test_cli_package_status_reports_packaging_readiness(tmp_path: Path, capsys):
     assert checks["macos_app_bundle"]["status"] == "WARN"
     assert checks["release_artifact_policy"]["status"] == "PASS"
     assert checks["distribution_policy"]["status"] == "PASS"
+    assert checks["mac_app_store_security_profile"]["status"] == "WARN"
     assert checks["hosted_release_gate"]["status"] == "WARN"
 
     assert main(["package", "status", "--strict", "--format", "text"], cfg=cfg) == 2
@@ -1678,6 +1689,23 @@ def test_cli_package_status_reports_packaging_readiness(tmp_path: Path, capsys):
     assert "PACKAGE_WARN" in text_output
     assert "PASS cli_entrypoint backend.app.cli:main" in text_output
     assert "WARN hosted_release_gate" in text_output
+
+
+def test_cli_app_store_audit_reports_open_and_strict_exit(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+
+    assert main(["package", "app-store-audit", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "MAC_APP_STORE_READINESS_OPEN"
+    assert payload["counts"]["fail"] == 0
+    assert {gate["state"] for gate in payload["external_gates"]} == {"BLOCKED"}
+
+    assert main(["package", "app-store-audit", "--strict", "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "MAC_APP_STORE_READINESS_OPEN" in text_output
+    assert "OPEN candidate_bundle" in text_output
+    assert "external_gate=BLOCKED:MAS-REVIEW-001:Apple App Review acceptance" in text_output
 
 
 def test_cli_package_macos_app_builds_and_verifies_bundle(tmp_path: Path, capsys):
