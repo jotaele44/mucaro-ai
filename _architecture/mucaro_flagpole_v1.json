@@ -1,0 +1,307 @@
+{
+  "schema": "mucaro-flagpole-denominator/1.0",
+  "baseline_main_sha": "f8fb2e9fbf6ed2675b3ff4f3eb51e858d394c586",
+  "frozen_date": "2026-09-20",
+  "states": [
+    "IMPLEMENTED",
+    "PARTIAL",
+    "ABSENT",
+    "UNVERIFIED"
+  ],
+  "certification_states": [
+    "PASS",
+    "FAIL",
+    "OPEN",
+    "BLOCKED",
+    "PROVISIONAL",
+    "AUDIT_ONLY",
+    "NONCANONICAL",
+    "CANDIDATE_NOT_IDENTITY",
+    "UNRESOLVED",
+    "SUPERSEDED"
+  ],
+  "invariants": [
+    "mucaro_not_model_provider",
+    "capability_not_tool_presence",
+    "session_context_run_separate",
+    "planning_not_execution_authority",
+    "discovery_not_identity",
+    "compaction_not_deletion",
+    "parallel_conflicts_preserved",
+    "provider_failure_not_session_failure",
+    "script_success_not_certification",
+    "unknown_not_inferred_pass",
+    "reuse_passed_artifacts_absent_falsifier",
+    "exact_sha_receipts"
+  ],
+  "domains": [
+    {
+      "id": "V00",
+      "name": "flagpole_freeze",
+      "required": true,
+      "depends_on": [],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V01",
+      "name": "baseline_inventory",
+      "required": true,
+      "depends_on": [
+        "V00"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V02",
+      "name": "core_state",
+      "required": true,
+      "depends_on": [
+        "V01"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V03",
+      "name": "context_engine",
+      "required": true,
+      "depends_on": [
+        "V02"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V04",
+      "name": "model_abstraction",
+      "required": true,
+      "depends_on": [
+        "V01"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V05",
+      "name": "tool_runtime",
+      "required": true,
+      "depends_on": [
+        "V01"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V06",
+      "name": "permission_engine",
+      "required": true,
+      "depends_on": [
+        "V05"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V07",
+      "name": "agent_runtime",
+      "required": true,
+      "depends_on": [
+        "V02",
+        "V03",
+        "V04",
+        "V05",
+        "V06"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V08",
+      "name": "autopilot",
+      "required": true,
+      "depends_on": [
+        "V07"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V09",
+      "name": "skills",
+      "required": true,
+      "depends_on": [
+        "V05",
+        "V06"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V10",
+      "name": "mcp_connectors",
+      "required": true,
+      "depends_on": [
+        "V09"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V11",
+      "name": "subagents",
+      "required": true,
+      "depends_on": [
+        "V07",
+        "V09"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V12",
+      "name": "parallel_fleet",
+      "required": true,
+      "depends_on": [
+        "V11"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V13",
+      "name": "git_github",
+      "required": true,
+      "depends_on": [
+        "V05",
+        "V06",
+        "V07"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V14",
+      "name": "research_engine",
+      "required": true,
+      "depends_on": [
+        "V03",
+        "V05",
+        "V06"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V15",
+      "name": "local_corpus_rag",
+      "required": true,
+      "depends_on": [
+        "V03"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V16",
+      "name": "gis",
+      "required": true,
+      "depends_on": [
+        "V05",
+        "V15"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V17",
+      "name": "memory",
+      "required": true,
+      "depends_on": [
+        "V02",
+        "V03"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V18",
+      "name": "provenance",
+      "required": true,
+      "depends_on": [
+        "V02",
+        "V05"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V19",
+      "name": "validation",
+      "required": true,
+      "depends_on": [
+        "V07",
+        "V18"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V20",
+      "name": "certification",
+      "required": true,
+      "depends_on": [
+        "V18",
+        "V19"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V21",
+      "name": "ux_surfaces",
+      "required": true,
+      "depends_on": [
+        "V07",
+        "V20"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V22",
+      "name": "packaging_distribution",
+      "required": true,
+      "depends_on": [
+        "V19",
+        "V20",
+        "V21"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    },
+    {
+      "id": "V23",
+      "name": "flagpole_torture_test",
+      "required": true,
+      "depends_on": [
+        "V08",
+        "V10",
+        "V12",
+        "V13",
+        "V14",
+        "V15",
+        "V16",
+        "V17",
+        "V18",
+        "V19",
+        "V20",
+        "V21",
+        "V22"
+      ],
+      "implementation_state": "UNVERIFIED",
+      "certification_state": "OPEN"
+    }
+  ]
+}

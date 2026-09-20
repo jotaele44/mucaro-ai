@@ -72,3 +72,20 @@ def test_allowlist_and_constraint_conflicts_fail_closed() -> None:
     with pytest.raises(ModelRoutingError) as unknown:
         plan_model_route(task_type="unknown")
     assert unknown.value.status == "ERROR_MODEL_ROUTING_TASK"
+
+
+def test_live_provider_is_never_implicit_fallback_when_offline_provider_is_unready(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MUCARO_AI_LIVE_MODE", "1")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr("backend.app.model_router.importlib.util.find_spec", lambda name: object())
+
+    # Restricting the allowlist to a live provider is still not permission to use it.
+    report = plan_model_route(
+        task_type="analysis",
+        allowed_providers=["anthropic"],
+        allow_live=False,
+    )
+
+    assert report["status"] == "MODEL_ROUTE_BLOCKED"
+    assert report["selected_provider"] is None
+    assert report["invariants"]["no_implicit_live_escalation"] is True

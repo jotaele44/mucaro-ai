@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/context_state.schema.json",
+  "title": "Mucaro Context State 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "context_state_id",
+    "conversation_id",
+    "created_at",
+    "raw_turn_count",
+    "historical_turn_count",
+    "recent_turn_count",
+    "recent_context",
+    "compacted_summary",
+    "compacted_turn_refs",
+    "raw_turn_ids",
+    "coverage",
+    "policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mucaro-context-state/1.0"
+    },
+    "context_state_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "conversation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "raw_turn_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "historical_turn_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "recent_turn_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "recent_context": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "compacted_summary": {
+      "type": "string"
+    },
+    "compacted_turn_refs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "raw_turn_ids": {
+      "type": "array"
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "represented_historical_turns",
+        "total_historical_turns",
+        "ratio"
+      ],
+      "properties": {
+        "represented_historical_turns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_historical_turns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "policy": {
+      "type": "object"
+    }
+  }
+}

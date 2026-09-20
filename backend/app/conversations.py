@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .config import Settings, settings
+from .context_state import build_context_state, build_model_context
 from .db import delete_payload, init_db, list_payloads, upsert_payload
 from .utils import stable_id, utc_now
 
@@ -83,27 +84,13 @@ def delete_conversation(conversation_id: str, cfg: Settings = settings) -> dict[
 
 
 def build_conversation_context(conversation: dict[str, Any]) -> list[dict[str, Any]]:
-    selected: list[dict[str, Any]] = []
-    remaining = MAX_CONTEXT_CHARS
-    for turn in reversed(conversation.get("turns", [])[-MAX_CONTEXT_TURNS:]):
-        content = " ".join(str(turn.get("content", "")).split())
-        if not content:
-            continue
-        clipped = content[:remaining]
-        if not clipped:
-            break
-        selected.append(
-            {
-                "role": turn.get("role", "unknown"),
-                "content": clipped,
-                "status": turn.get("status", ""),
-                "run_id": turn.get("run_id"),
-            }
-        )
-        remaining -= len(clipped)
-        if remaining <= 0:
-            break
-    return list(reversed(selected))
+    """Build bounded model context without mutating or deleting canonical turns."""
+    state = build_context_state(
+        conversation,
+        recent_turn_limit=MAX_CONTEXT_TURNS,
+        recent_char_limit=MAX_CONTEXT_CHARS,
+    )
+    return build_model_context(state)
 
 
 def append_answer_turn(

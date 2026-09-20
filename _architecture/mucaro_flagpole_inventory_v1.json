@@ -1,0 +1,128 @@
+{
+  "schema": "mucaro-flagpole-inventory/1.0",
+  "source_sha": "f8fb2e9fbf6ed2675b3ff4f3eb51e858d394c586",
+  "scope": "GitHub default-branch source inspection; runtime-independent",
+  "generated_date": "2026-09-20",
+  "evidence_classes": {
+    "CHAT_EXECUTABLE": "GitHub source/API evidence inspectable or mutable in chat",
+    "LOCAL_RUNTIME_REQUIRED": "requires execution on a trusted local/hosted runtime"
+  },
+  "observations": [
+    {
+      "id": "INV-STATE-001",
+      "class": "CHAT_EXECUTABLE",
+      "fact": "Conversations persist as JSON payloads in SQLite table conversations.",
+      "evidence": [
+        "backend/app/db.py",
+        "backend/app/conversations.py"
+      ]
+    },
+    {
+      "id": "INV-CONTEXT-001",
+      "class": "CHAT_EXECUTABLE",
+      "fact": "Conversation prompt context is limited to the latest 8 turns and 2400 characters.",
+      "evidence": [
+        "backend/app/conversations.py"
+      ]
+    },
+    {
+      "id": "INV-RUN-001",
+      "class": "CHAT_EXECUTABLE",
+      "fact": "Answer traces persist independently in runs; conversation deletion does not imply run deletion.",
+      "evidence": [
+        "docs/ARCHITECTURE.md",
+        "backend/app/db.py"
+      ]
+    },
+    {
+      "id": "INV-AGENT-001",
+      "class": "CHAT_EXECUTABLE",
+      "fact": "Intelligence Plane descriptor classifies agent_runtime PARTIAL and states durable workflow DAG/crash-resume semantics remain open.",
+      "evidence": [
+        "backend/app/intelligence_plane.py"
+      ]
+    },
+    {
+      "id": "INV-MODEL-001",
+      "class": "CHAT_EXECUTABLE",
+      "fact": "Provider-neutral model contracts/routing exist with mock and Anthropic adapters; broader provider coverage remains open.",
+      "evidence": [
+        "backend/app/model_router.py",
+        "backend/app/model_routing_policy.py",
+        "backend/app/intelligence_plane.py"
+      ]
+    },
+    {
+      "id": "INV-SKILL-001",
+      "class": "CHAT_EXECUTABLE",
+      "fact": "Skill registry/mount/runtime and execution routing foundations exist.",
+      "evidence": [
+        "backend/app/skill_runtime.py",
+        "backend/app/intelligence_plane.py"
+      ]
+    },
+    {
+      "id": "INV-MCP-001",
+      "class": "CHAT_EXECUTABLE",
+      "fact": "MCP adapter is queued rather than implemented.",
+      "evidence": [
+        "docs/PHASE2_QUEUE.md"
+      ]
+    },
+    {
+      "id": "INV-DAG-001",
+      "class": "CHAT_EXECUTABLE",
+      "fact": "Agent/workflow DAG runtime with restart/resume is queued.",
+      "evidence": [
+        "docs/PHASE2_QUEUE.md"
+      ]
+    },
+    {
+      "id": "INV-CROSSREPO-001",
+      "class": "CHAT_EXECUTABLE",
+      "fact": "Cross-repo orchestration is explicitly ABSENT/deferred.",
+      "evidence": [
+        "backend/app/intelligence_plane.py"
+      ]
+    },
+    {
+      "id": "INV-CODING-001",
+      "class": "CHAT_EXECUTABLE",
+      "fact": "Governed coding primitives exist but live pinned-runtime, remote authenticated push/PR and zero-residue corpus execution remain open.",
+      "evidence": [
+        "backend/app/intelligence_plane.py",
+        "docs/CODING_GOVERNANCE_BLOCKERS.md"
+      ]
+    },
+    {
+      "id": "INV-CI-001",
+      "class": "CHAT_EXECUTABLE",
+      "fact": "PR #101 CI run 35525590753 admitted a validate job; installation steps completed and release certification was in progress at observation time.",
+      "evidence": [
+        "GitHub Actions run 35525590753"
+      ]
+    },
+    {
+      "id": "INV-LOCAL-001",
+      "class": "LOCAL_RUNTIME_REQUIRED",
+      "fact": "Crash recovery, long-session compaction behavior, local filesystem/process behavior, live containers, clean-machine packaging and seven-repo end-to-end execution require runtime evidence.",
+      "evidence": []
+    }
+  ],
+  "contradictions": [
+    {
+      "id": "CONTRA-001",
+      "type": "CLASS",
+      "a": "Older artifacts may label coding_programming_expertise ABSENT.",
+      "b": "Current Intelligence Plane descriptor labels it CANDIDATE with substantial source-backed primitives.",
+      "adjudication": "Preserve historical classification; current flagpole matrix uses PARTIAL until executed evidence closes."
+    },
+    {
+      "id": "CONTRA-002",
+      "type": "SCOPE",
+      "a": "tool_runtime is AVAILABLE in Intelligence Plane descriptor.",
+      "b": "V05 flagpole is PARTIAL.",
+      "adjudication": "No contradiction after scope separation: local tool runtime availability does not prove complete flagpole tool denominator."
+    }
+  ]
+}

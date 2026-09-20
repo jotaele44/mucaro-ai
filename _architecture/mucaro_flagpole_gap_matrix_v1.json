@@ -1,0 +1,221 @@
+{
+  "schema": "mucaro-flagpole-gap-matrix/1.0",
+  "baseline_main_sha": "f8fb2e9fbf6ed2675b3ff4f3eb51e858d394c586",
+  "audit_scope": "GitHub default-branch source evidence plus flagpole branch V00 artifacts; no local runtime claims",
+  "generated_date": "2026-09-20",
+  "caveat": "Implementation state is source-evidence classification, not runtime certification.",
+  "domains": [
+    {
+      "id": "V00",
+      "state": "IMPLEMENTED",
+      "evidence": [
+        "docs/MUCARO_FLAGPOLE_V1.md",
+        "_architecture/mucaro_flagpole_v1.json",
+        "docs/DEVELOPMENT_GOAL.md"
+      ],
+      "gap": "Runtime/schema validation of new denominator remains downstream V19/V20."
+    },
+    {
+      "id": "V01",
+      "state": "PARTIAL",
+      "evidence": [
+        "docs/DEVELOPMENT_GOAL.md",
+        "docs/PHASE2_QUEUE.md",
+        "docs/INTELLIGENCE_PLANE_GAP_MODEL.md",
+        "docs/RELEASE_STATUS.md"
+      ],
+      "gap": "Need exhaustive machine-generated repository inventory bound to exact SHA."
+    },
+    {
+      "id": "V02",
+      "state": "PARTIAL",
+      "evidence": [
+        "backend/app/conversations.py",
+        "backend/app/models.py"
+      ],
+      "gap": "Durable conversations exist; checkpoint/crash-recovery implementation was not found in bounded code search."
+    },
+    {
+      "id": "V03",
+      "state": "PARTIAL",
+      "evidence": [
+        "backend/app/conversations.py: MAX_CONTEXT_TURNS=8, MAX_CONTEXT_CHARS=2400",
+        "backend/app/model_router.py"
+      ],
+      "gap": "Bounded context exists; canonical-state-preserving automatic compaction/re-hydration not evidenced."
+    },
+    {
+      "id": "V04",
+      "state": "PARTIAL",
+      "evidence": [
+        "backend/app/model_router.py",
+        "backend/app/model_routing_policy.py",
+        "schemas/model_runtime.schema.json"
+      ],
+      "gap": "Provider-neutral routing contract exists; broader providers/failover and provider-outage pause semantics require proof."
+    },
+    {
+      "id": "V05",
+      "state": "PARTIAL",
+      "evidence": [
+        "backend/app/skill_runtime.py",
+        "backend/app/execution_router.py",
+        "backend/app/local_worker.py",
+        "backend/app/container_runtime.py"
+      ],
+      "gap": "Execution adapters exist; full flagpole tool denominator and live execution remain incompletely certified."
+    },
+    {
+      "id": "V06",
+      "state": "PARTIAL",
+      "evidence": [
+        "backend/app/skill_runtime.py",
+        "backend/app/distribution_policy.py",
+        "docs/ARCHITECTURE.md"
+      ],
+      "gap": "Fail-closed capability/distribution controls exist; full permission taxonomy and adversarial certification remain open."
+    },
+    {
+      "id": "V07",
+      "state": "PARTIAL",
+      "evidence": [
+        "docs/INTELLIGENCE_PLANE_GAP_MODEL.md"
+      ],
+      "gap": "Repository gap model itself classifies agent runtime PARTIAL; durable objective-plan-execute-observe-replan-checkpoint-resume closure remains."
+    },
+    {
+      "id": "V08",
+      "state": "UNVERIFIED",
+      "evidence": [],
+      "gap": "No bounded source evidence yet establishes long-horizon autopilot continuation, loop detection, budgets, and exhaust-vector stopping as one runtime."
+    },
+    {
+      "id": "V09",
+      "state": "PARTIAL",
+      "evidence": [
+        "backend/app/skill_runtime.py",
+        "schemas/federation_skill.schema.json",
+        "schemas/skill_mount.schema.json"
+      ],
+      "gap": "Skill identity/mount/execute candidates exist; flagpole certification metadata and full regressions remain."
+    },
+    {
+      "id": "V10",
+      "state": "ABSENT",
+      "evidence": [
+        "docs/PHASE2_QUEUE.md: MCP adapter queued"
+      ],
+      "gap": "Implement MCP adapter beneath Skill Fabric authority model."
+    },
+    {
+      "id": "V11",
+      "state": "ABSENT",
+      "evidence": [],
+      "gap": "No subagent implementation found in bounded default-branch code search."
+    },
+    {
+      "id": "V12",
+      "state": "UNVERIFIED",
+      "evidence": [
+        "docs/PHASE2_QUEUE.md"
+      ],
+      "gap": "Federation execution concepts exist, but controlled parallel/fleet DAG execution and conflict reconciliation are not yet evidenced."
+    },
+    {
+      "id": "V13",
+      "state": "PARTIAL",
+      "evidence": [
+        "docs/CODING_GOVERNANCE_BLOCKERS.md"
+      ],
+      "gap": "Read/diff/patch/review/Git evidence exists; governed branch/commit/PR mutation lifecycle remains OPEN."
+    },
+    {
+      "id": "V14",
+      "state": "PARTIAL",
+      "evidence": [
+        "docs/DEVELOPMENT_GOAL.md",
+        "docs/MUCARO_V1_DENOMINATOR_AUDIT.md"
+      ],
+      "gap": "Governed fetch/static traversal/rendered adapter exist; automated search and frozen live rendered-browser corpus remain open."
+    },
+    {
+      "id": "V15",
+      "state": "PARTIAL",
+      "evidence": [
+        "README.md",
+        "docs/DEVELOPMENT_GOAL.md"
+      ],
+      "gap": "Local RAG and retrieval certification exist; larger nonsynthetic real-corpus and production-scale stress evidence remain OPEN."
+    },
+    {
+      "id": "V16",
+      "state": "PARTIAL",
+      "evidence": [
+        "docs/DEVELOPMENT_GOAL.md"
+      ],
+      "gap": "Large bounded GIS surface exists; additional datum/vertical/time CRS, broader topology, remote sensing, bathymetry and temporal GIS remain OPEN."
+    },
+    {
+      "id": "V17",
+      "state": "IMPLEMENTED",
+      "evidence": [
+        "README.md",
+        "docs/DEVELOPMENT_GOAL.md"
+      ],
+      "gap": "Explicit opt-in memory controls are source-backed; flagpole cross-session/canonical-decision stress proof remains V19 work."
+    },
+    {
+      "id": "V18",
+      "state": "PARTIAL",
+      "evidence": [
+        "schemas/runtime_identity.schema.json",
+        "docs/DEVELOPMENT_GOAL.md"
+      ],
+      "gap": "Runtime/source/release provenance exists; complete model/tool/artifact lineage across flagpole workflows requires closure."
+    },
+    {
+      "id": "V19",
+      "state": "PARTIAL",
+      "evidence": [
+        "scripts/certify_release.py",
+        "backend/tests/",
+        "docs/DEVELOPMENT_GOAL.md"
+      ],
+      "gap": "Extensive tests/certification exist; new flagpole longevity/recovery/multi-agent/adversarial fixtures are missing."
+    },
+    {
+      "id": "V20",
+      "state": "PARTIAL",
+      "evidence": [
+        "scripts/certify_release.py",
+        "docs/CERTIFICATION.md",
+        "docs/DEVELOPMENT_GOAL.md"
+      ],
+      "gap": "Exact-head receipt architecture exists; umbrella flagpole certification command/receipt is not yet implemented."
+    },
+    {
+      "id": "V21",
+      "state": "PARTIAL",
+      "evidence": [
+        "frontend/src/App.jsx",
+        "docs/DEVELOPMENT_GOAL.md"
+      ],
+      "gap": "Conversation-first GUI exists; rendered desktop/mobile/accessibility and flagpole agent/session/certification surfaces remain OPEN."
+    },
+    {
+      "id": "V22",
+      "state": "PARTIAL",
+      "evidence": [
+        "docs/PACKAGING_POLICY.md",
+        "docs/DEVELOPMENT_GOAL.md"
+      ],
+      "gap": "Packaging and Store policy are source-backed; clean-machine/signing/notarization and Store external evidence remain OPEN."
+    },
+    {
+      "id": "V23",
+      "state": "ABSENT",
+      "evidence": [],
+      "gap": "Seven-repository end-to-end flagpole torture test has not been implemented/executed."
+    }
+  ]
+}
