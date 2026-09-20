@@ -86,6 +86,7 @@ from .ingestion import (
     ingest_web_snapshot,
     reindex_sources,
 )
+from .macos_app_store import build_macos_app_store_readiness
 from .memory import (
     MemoryError,
     delete_memory_item,
@@ -1048,6 +1049,19 @@ def build_parser() -> argparse.ArgumentParser:
     package_macos_app.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     package_macos_app.set_defaults(handler=run_package_macos_app)
 
+    package_app_store_audit = package_subcommands.add_parser(
+        "app-store-audit",
+        help="Audit the Mac App Store security profile or one signed candidate bundle.",
+    )
+    package_app_store_audit.add_argument("--app", type=Path, help="Optional signed .app candidate to inspect.")
+    package_app_store_audit.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    package_app_store_audit.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit nonzero until external App Store signing, upload, and review gates are certified.",
+    )
+    package_app_store_audit.set_defaults(handler=run_package_app_store_audit)
+
     package_portable_app = package_subcommands.add_parser(
         "portable-macos-app",
         help="Build or verify a macOS app containing a relocatable embedded runtime payload.",
@@ -1769,6 +1783,47 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"{check.get('status')} {check.get('name')} {detail}")
         for command in payload.get("next_commands", []):
             print(f"command={command}")
+    elif status in {
+        "MAC_APP_STORE_READINESS_FAIL",
+        "MAC_APP_STORE_READINESS_OPEN",
+        "MAC_APP_STORE_CANDIDATE_PROVISIONAL",
+    }:
+        print(f"schema_version={payload.get('schema_version')}")
+        print(f"project_root={payload.get('project_root')}")
+        print(f"profile_path={payload.get('profile_path')}")
+        print(f"profile_state={payload.get('profile_state')}")
+        print(f"candidate_scope={payload.get('candidate_scope')}")
+        counts = payload.get("counts", {})
+        if isinstance(counts, dict):
+            print(
+                "counts="
+                f"pass:{counts.get('pass')} "
+                f"open:{counts.get('open')} "
+                f"blocked:{counts.get('blocked')} "
+                f"fail:{counts.get('fail')} "
+                f"total:{counts.get('total')}"
+            )
+        for check in payload.get("checks", []):
+            if isinstance(check, dict):
+                detail = str(check.get("detail")).replace("\n", "\\n")
+                print(f"{check.get('status')} {check.get('name')} {detail}")
+        for gate in payload.get("external_gates", []):
+            if isinstance(gate, dict):
+                print(f"external_gate={gate.get('state')}:{gate.get('id')}:{gate.get('title')}")
+        external_gate_counts = payload.get("external_gate_counts", {})
+        if isinstance(external_gate_counts, dict):
+            print(
+                "external_gate_counts="
+                f"pass:{external_gate_counts.get('pass')} "
+                f"open:{external_gate_counts.get('open')} "
+                f"blocked:{external_gate_counts.get('blocked')} "
+                f"fail:{external_gate_counts.get('fail')} "
+                f"total:{external_gate_counts.get('total')}"
+            )
+        for nonclaim in payload.get("explicit_nonclaims", []):
+            print(f"nonclaim={nonclaim}")
+        for step in payload.get("next_steps", []):
+            print(f"next_step={step}")
     elif status in {"ADVANCED_CAPABILITY_CONTRACTS_READY", "ADVANCED_CAPABILITY_CONTRACTS_FAILED"}:
         print(f"schema_version={payload.get('schema_version')}")
         print(f"contract_count={payload.get('contract_count')}")
@@ -3329,6 +3384,16 @@ def run_package_macos_app(args: argparse.Namespace, cfg: Settings) -> int:
     )
     emit_payload(report, args.format)
     return 0 if report["status"] == "MACOS_APP_BUNDLE_READY" else 2
+
+
+def run_package_app_store_audit(args: argparse.Namespace, cfg: Settings) -> int:
+    report = build_macos_app_store_readiness(cfg.project_root, app_path=args.app)
+    emit_payload(report, args.format)
+    if report["status"] == "MAC_APP_STORE_READINESS_FAIL":
+        return 2
+    if args.strict:
+        return 2
+    return 0
 
 
 def run_package_portable_macos_app(args: argparse.Namespace, cfg: Settings) -> int:

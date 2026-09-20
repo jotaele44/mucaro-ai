@@ -108,6 +108,31 @@ Before a governed release tag, the operator must have:
 - hosted GitHub Actions success for the exact pushed SHA
 - branch protection and tag binding reviewed for the release scope
 
+## Mac App Store Lane
+
+The Mac App Store is a separate distribution lane from both the source release
+and Developer ID notarization. Run the source-policy audit with:
+
+```bash
+PYTHONPATH=.:backend python3 scripts/mucaro.py package app-store-audit --strict --format text
+```
+
+The tracked policy, entitlement template, and privacy template live in
+`_architecture/macos_app_store_security_profile.json` and `packaging/macos`.
+The audit fails closed on malformed policy, path traversal, missing bundle
+metadata, arbitrary transport loads, escaping symlinks, source-bound wrappers,
+missing self-containment receipts, dangerous or undeclared entitlements,
+invalid signatures, expired or mismatched provisioning profiles, debug
+profiles, and development or Developer ID provisioning profiles.
+
+When supplied a signed `.app`, the local audit can report only
+`MAC_APP_STORE_CANDIDATE_PROVISIONAL`. Mac App Distribution credentials,
+App Store Connect processing, privacy/export declarations, and Apple App Review
+for the exact uploaded build remain external evidence gates. Developer ID
+notarization belongs to the direct-distribution lane and is not accepted as Mac
+App Store proof. The full boundary is defined in
+`docs/APPLE_APP_STORE_SECURITY.md`.
+
 ## Deferred Distribution Layers
 
 `PYTHON_DIST_CERT_OK` is a production-packaging readiness signal for the Python
@@ -115,6 +140,7 @@ wheel/sdist layer. It is not a hosted governance substitute and does not by
 itself authorize a governed release tag while hosted GitHub Actions remains
 open.
 
-The current policy does not claim a signed installer, notarized macOS app,
-Windows installer, Linux package, PyPI publication, or auto-update channel.
-Those are future distribution layers and must be certified separately.
+The current policy does not claim a signed installer, notarized macOS app, Mac
+App Store acceptance, Windows installer, Linux package, PyPI publication, or
+auto-update channel. Those are future distribution layers and must be
+certified separately.

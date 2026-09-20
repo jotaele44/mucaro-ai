@@ -269,8 +269,13 @@ Observed success markers:
 - `mucaro package status` currently reports `PACKAGE_WARN`: required package
   inputs, Python/frontend version consistency, CLI entrypoint, launcher
   entrypoint, desktop package manifest, generated outputs, source-bound macOS
-  app-wrapper path, release artifact policy, and distribution policy pass;
-  hosted GitHub Actions startup remains open.
+  app-wrapper path, release artifact policy, distribution policy, and the
+  machine-readable Mac App Store source security profile pass. The Store lane
+  remains explicitly open because the current wrapper is source-bound and no
+  signed self-contained Store candidate has been supplied; Mac App
+  Distribution provisioning, App Store Connect processing, and Apple App
+  Review remain blocked external gates. Hosted GitHub Actions startup remains
+  a separate governance gate.
 - `mucaro audit product` now uses the expanded governed-release objective. The
   current scope reports `16 PASS`, `7 OPEN`, `0 BLOCKED`, and `69.6%`
   readiness: the existing local assistant capabilities and source-artifact

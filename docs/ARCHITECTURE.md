@@ -140,6 +140,17 @@ tracked-source ZIP plus JSON manifest under `data/exports/packages`. The builder
 refuses dirty worktrees unless explicitly overridden, records the exact Git
 `HEAD`, and hashes both the archive and each tracked source member.
 
+The Mac App Store lane is modeled separately in
+`_architecture/macos_app_store_security_profile.json`. `mucaro package
+app-store-audit` validates the source policy and can inspect a supplied signed
+bundle's self-containment receipt, Info.plist, privacy manifest, symlink
+boundary, code signature, exact entitlements, and embedded provisioning
+profile. Local success is only provisional: signing identity ownership, App
+Store Connect processing, and Apple App Review remain external exact-build
+gates. The current source-bound browser launcher is retained for local
+development and is rejected as a Store candidate; GUI expansion remains the
+final development phase.
+
 ## Conversation layer
 
 Conversations are local SQLite-backed chat sessions. The `/conversations` API creates and lists sessions; `PATCH /conversations/{conversation_id}` renames sessions; `DELETE /conversations/{conversation_id}` removes a session record; `/conversations/{conversation_id}/ask` routes through the same cited RAG service as `/ask`, passes recent turns as bounded conversation context, and appends the user turn plus assistant answer to the selected session.

@@ -105,6 +105,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro package build` | Build the governed source ZIP and artifact manifest | 0 | 2 |
 | `mucaro package verify MANIFEST` | Verify a governed source ZIP against its artifact manifest | 0 | 2 |
 | `mucaro package macos-app` | Build or verify the double-clickable local macOS Application bundle | 0 | 2 |
+| `mucaro package app-store-audit` | Audit the Mac App Store source policy or one signed candidate bundle | 0 for valid open/provisional state | 2 on failure, or always with `--strict` until external Store gates close |
 | `mucaro package distribution-manifest` | Build or verify the local distribution handoff manifest | 0 | 2 |
 | `mucaro sources ingest-web-snapshot SNAPSHOT_PATH` | Ingest one governed web snapshot as a citeable local source | 0 | 2 |
 | `mucaro tools list` | List locally allowlisted tools | 0 | 2 |
@@ -994,6 +995,17 @@ known distribution blockers. It reports `PACKAGE_FAIL` for broken required
 inputs, `PACKAGE_WARN` for incomplete distribution readiness, and
 `PACKAGE_READY` only when no packaging warnings remain.
 
+Use `mucaro package app-store-audit --format text` to validate the tracked Mac
+App Store security profile, least-privilege entitlement template, privacy
+manifest template, bundle-path policy, explicit nonclaims, and Apple-controlled
+external gates. Add `--app /path/to/Mucaro\ AI.app` on macOS to inspect one
+candidate's bundle metadata, containment, App Transport Security posture,
+self-contained candidate receipt, code signature, exact entitlements, and
+embedded provisioning profile. A passing local candidate is reported only as
+`MAC_APP_STORE_CANDIDATE_PROVISIONAL`; it is not App Store Connect processing
+or Apple App Review evidence. `--strict` intentionally exits `2` until those
+external gates are certified for the exact submitted build.
+
 Use `mucaro package build` to create the current governed release artifact: a
 tracked-source ZIP plus JSON manifest under `data/exports/packages`. The command
 refuses dirty worktrees by default, records the exact Git `HEAD`, and includes
@@ -1015,7 +1027,8 @@ starts the local backend and opens the browser UI. Use `mucaro package
 macos-app --verify data/exports/desktop_apps/Mucaro\ AI.app --format text` to
 verify the bundle structure, executable bit, Info.plist binding, receipt, and
 launcher target. This is not yet a portable signed installer with embedded
-runtime, reinstall, upgrade, and rollback guarantees.
+runtime, reinstall, upgrade, and rollback guarantees, and it is explicitly not
+a Mac App Store candidate.
 
 Use `mucaro package distribution-manifest --save` after exact-head release,
 fresh-clone, source-artifact, Python-distribution, answer-trace-quality,

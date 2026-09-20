@@ -19,8 +19,10 @@ OBJECTIVE = (
     "transparency and objectivity. The conversation-first GUI, source-bound "
     "launcher, portable embedded-runtime packaging, transactional install/rollback "
     "and fail-closed release-grade matrix now exist as candidate operator/release "
-    "surfaces; external corpus, device, signing, clean-machine and live-runtime "
-    "evidence remains required before release-grade certification."
+    "surfaces; the Mac App Store security policy and candidate auditor are "
+    "source-backed, while external corpus, device, signing, provisioning, "
+    "clean-machine, App Store review, and live-runtime evidence remains required "
+    "before release-grade certification."
 )
 
 
@@ -263,13 +265,16 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
                 cfg,
                 [
                     ("backend", "app", "packaging.py"),
+                    ("backend", "app", "macos_app_store.py"),
                     ("docs", "PACKAGING_POLICY.md"),
+                    ("docs", "APPLE_APP_STORE_SECURITY.md"),
+                    ("_architecture", "macos_app_store_security_profile.json"),
                     ("scripts", "certify_release.py"),
                 ],
             ),
-            "mucaro package status/build, mucaro package macos-app, docs/PACKAGING_POLICY.md, and the release package_artifact gate",
-            "Source artifacts, a source-bound app wrapper, an embedded portable-runtime bundle, and transactional install/reinstall/rollback are source-backed. Clean-machine execution and signed/notarized distribution evidence remain open.",
-            "Keep every distribution receipt exact-head bound; execute the clean-machine and signing/notarization verifiers on real macOS release hosts before any release-grade promotion.",
+            "mucaro package status/build/macos-app/app-store-audit, packaging policies, and the release package_artifact gate",
+            "Source artifacts, a source-bound local wrapper, an embedded portable-runtime bundle, transactional install/reinstall/rollback, and a fail-closed Mac App Store source/candidate audit are source-backed. Clean-machine direct distribution and Apple-controlled Store evidence remain open.",
+            "Keep every distribution receipt exact-head bound; execute clean-machine direct-distribution checks and the Store candidate audit on real signed artifacts, then preserve App Store Connect and App Review as external exact-build gates.",
         ),
         ProductRequirement(
             "github_release_governance",
@@ -393,9 +398,9 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
             "release_packaging_certification",
             "Release packaging certification",
             ("source_artifact_packaging",),
-            "Source-artifact packaging and a source-bound local macOS Application wrapper are part of the product audit and release-state receipt path.",
-            "Portable signed installer, embedded runtime, no-setup reinstall, upgrade, and rollback are still open.",
-            "Keep source artifacts, app-wrapper checks, distribution checks, and receipts exact-head bound before release tags.",
+            "Source-artifact packaging, local macOS wrappers, portable-runtime/install controls, and the fail-closed Mac App Store policy/candidate auditor are part of the product audit and release-state path.",
+            "Real clean-machine direct-distribution evidence and a self-contained sandboxed Store build with resolved coding/server architecture, final privacy inventory, Mac App Distribution provisioning, upload processing, and Apple review are still open.",
+            "Keep source artifacts, app checks, distribution checks, and receipts exact-head bound; never promote local Store audit success beyond provisional without Apple evidence for the exact submitted build.",
         ),
         ProductRoadmapStage(
             "hosted_release_governance",
