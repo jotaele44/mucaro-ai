@@ -20,6 +20,27 @@ Notarization is part of the direct-distribution lane. Apple states that Store
 submission already includes equivalent security checks, so a notarization
 receipt is not accepted as proof of Mac App Store readiness.
 
+## Current safeguard matrix
+
+| Control | State | Evidence boundary |
+|---|---|---|
+| Embedded Python provenance and dependency hashes | `PASS` | Exact x86_64 runtime source, lock, tree hash, import probe, and zero-known-vulnerability audit |
+| Host Python isolation | `PASS` | `-E -s -P -B`, sanitized child environment, and host user-site exclusion |
+| Mutable-data separation | `PASS` | External Application Support default, absolute override requirement, and Store-profile bundle-path rejection |
+| Post-launch bundle immutability | `PASS` | Real smoke launch followed by exact runtime/application member-manifest verification |
+| Local backend regression suite | `PASS` | Full repository-declared backend suite for the exact source head |
+| arm64 or universal runtime | `OPEN` | Current governed runtime is x86_64 only |
+| App Sandbox execution | `OPEN` | Entitlement template and static audit exist; a signed sandboxed candidate has not executed |
+| Loopback server entitlement decision | `OPEN` | Requires an in-process/IPC replacement or a documented server-entitlement threat model |
+| Final privacy inventory and disclosure | `OPEN` | Must be regenerated for the final feature and third-party dependency set |
+| Mac App Distribution signature and provisioning | `BLOCKED` | Requires Apple Developer credentials and an exact candidate |
+| App Store Connect processing and App Review | `BLOCKED` | Requires Apple acceptance evidence for the exact submitted build and metadata |
+
+The five local `PASS` rows above are bounded safeguards, not equivalence to an
+Apple-reviewed Store build. Any source, dependency, entitlement, architecture,
+or privacy-inventory change invalidates the affected evidence and requires a
+new exact-head candidate and receipts.
+
 ## Binding local gates
 
 The machine-readable profile is
