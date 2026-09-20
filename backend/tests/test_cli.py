@@ -1488,11 +1488,11 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 62
-    assert payload["counts"]["passed"] == 62
+    assert payload["counts"]["cases"] == 64
+    assert payload["counts"]["passed"] == 64
     assert payload["counts"]["failed"] == 0
     assert payload["counts"]["operations"] == 25
-    assert payload["counts"]["negative_cases"] == 25
+    assert payload["counts"]["negative_cases"] == 26
 
     assert main(["eval", "gis", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
@@ -1578,7 +1578,7 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
-    assert "eval_case_count=62" in text_output
+    assert "eval_case_count=64" in text_output
     assert "PASS raster_depression_fill raster_depression_fill_enclosed_bowl_closes_volume" in text_output
     assert "PASS raster_hillshade raster_hillshade_west_light_east_rising_plane" in text_output
     assert "PASS raster_d8_flow raster_d8_east_descent_closes_terminal_contributions" in text_output

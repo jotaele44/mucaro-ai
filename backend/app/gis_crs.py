@@ -1,21 +1,236 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import warnings as python_warnings
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from pyproj import CRS, Transformer, __version__ as pyproj_version, network, proj_version_str
+from pyproj import CRS, Transformer, network, proj_version_str
+from pyproj import __version__ as pyproj_version
 from pyproj.exceptions import ProjError
 from pyproj.transformer import TransformerGroup
 
 from .config import Settings, settings
-from .gis_processing import GISProcessingError, GIS_REPORT_SCHEMA_VERSION, _coordinate_dimension_summary, _feature_id, _load_geojson, _write_geojson_output, _write_report
+from .gis_processing import (
+    GIS_REPORT_SCHEMA_VERSION,
+    GISProcessingError,
+    _coordinate_dimension_summary,
+    _feature_id,
+    _load_geojson,
+    _write_geojson_output,
+    _write_report,
+)
 from .utils import sha256_file, stable_id, utc_now
 
 CRS_ADAPTER = "pyproj_transformer_group_always_xy_v1"
+CRS_GOVERNED_GRID_ADAPTER = "pyproj_governed_local_grid_always_xy_v1"
 CRS_NETWORK_POLICY = "offline_only"
+GOVERNED_GRID_MANIFEST_SCHEMA_VERSION = "mucaro_gis_grid_manifest_v1"
+GOVERNED_GRID_MANIFEST_SHA256 = "869e31ea30f1be6477c04899a384ddcac0beb6ded811d8dcad8d62050f140c2f"
+GOVERNED_GRID_ROOT = Path(__file__).resolve().parent / "gis_grids"
+GOVERNED_GRID_ID = "us_noaa_pvhpgn"
+GOVERNED_GRID_FILENAME = "us_noaa_pvhpgn.tif"
+GOVERNED_GRID_BYTES = 3644
+GOVERNED_GRID_SHA256 = "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d"
+GOVERNED_GRID_SOURCE_CRS = "EPSG:4326"
+GOVERNED_GRID_TARGET_CRS = "EPSG:32161"
+GOVERNED_GRID_ACCURACY_METRES = 2.0
+GOVERNED_GRID_OPERATION_NAME = (
+    "Inverse of NAD83 to WGS 84 (35) + SPCS83 Puerto Rico & Virgin Islands zone (meter)"
+)
+GOVERNED_GRID_PIPELINE_TEMPLATE = (
+    "proj=pipeline "
+    "step proj=unitconvert xy_in=deg xy_out=rad "
+    "step inv proj=hgridshift grids={grid} "
+    "step proj=lcc lat_0=17.8333333333333 lon_0=-66.4333333333333 "
+    "lat_1=18.4333333333333 lat_2=18.0333333333333 "
+    "x_0=200000 y_0=200000 ellps=GRS80"
+)
+
+
+def _governed_grid_error(status: str, detail: str) -> GISProcessingError:
+    return GISProcessingError(status, detail)
+
+
+def _load_governed_grid_transform(
+    source_obj: CRS,
+    target_obj: CRS,
+    *,
+    grid_root: Path | None = None,
+) -> dict[str, Any] | None:
+    if source_obj.to_epsg() != 4326 or target_obj.to_epsg() != 32161:
+        return None
+
+    root = (grid_root or GOVERNED_GRID_ROOT).expanduser().resolve()
+    manifest_path = root / "manifest.json"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_MANIFEST_MISSING",
+            "The governed local datum-grid manifest is absent or is not a regular file.",
+        )
+    manifest_sha256 = sha256_file(manifest_path)
+    if manifest_sha256 != GOVERNED_GRID_MANIFEST_SHA256:
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_MANIFEST_HASH_MISMATCH",
+            "The governed local datum-grid manifest does not match the source-bound SHA-256.",
+        )
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_MANIFEST_INVALID",
+            "The governed local datum-grid manifest is not valid UTF-8 JSON.",
+        ) from exc
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("schema_version") != GOVERNED_GRID_MANIFEST_SCHEMA_VERSION
+        or manifest.get("network_policy") != CRS_NETWORK_POLICY
+        or not isinstance(manifest.get("grids"), list)
+    ):
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_MANIFEST_INVALID",
+            "The governed local datum-grid manifest schema or network policy is invalid.",
+        )
+    matching_rows = [
+        row
+        for row in manifest["grids"]
+        if isinstance(row, dict) and row.get("grid_id") == GOVERNED_GRID_ID
+    ]
+    if len(matching_rows) != 1:
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_MANIFEST_INVALID",
+            "The governed local datum-grid manifest must contain exactly one bound grid row.",
+        )
+    grid = matching_rows[0]
+    allowed_operation = grid.get("allowed_operation")
+    expected_fields = {
+        "filename": GOVERNED_GRID_FILENAME,
+        "bytes": GOVERNED_GRID_BYTES,
+        "sha256": GOVERNED_GRID_SHA256,
+        "source_crs": "EPSG:4269",
+        "target_crs": "EPSG:4152",
+    }
+    if any(grid.get(key) != value for key, value in expected_fields.items()) or not isinstance(allowed_operation, dict):
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_MANIFEST_INVALID",
+            "The governed local datum-grid manifest does not match its source-bound grid policy.",
+        )
+    if (
+        allowed_operation.get("source_crs") != GOVERNED_GRID_SOURCE_CRS
+        or allowed_operation.get("target_crs") != GOVERNED_GRID_TARGET_CRS
+        or allowed_operation.get("operation_name") != GOVERNED_GRID_OPERATION_NAME
+        or allowed_operation.get("accuracy_metres") != GOVERNED_GRID_ACCURACY_METRES
+    ):
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_OPERATION_MISMATCH",
+            "The governed local datum-grid is not authorized for the requested CRS operation.",
+        )
+
+    filename = str(grid["filename"])
+    if Path(filename).name != filename or "/" in filename or "\\" in filename:
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_PATH_INVALID",
+            "The governed local datum-grid filename must be a single relative path component.",
+        )
+    grid_candidate = root / filename
+    if grid_candidate.is_symlink():
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_PATH_INVALID",
+            "The governed local datum-grid file must not be a symbolic link.",
+        )
+    grid_path = grid_candidate.resolve()
+    try:
+        grid_path.relative_to(root)
+    except ValueError as exc:
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_PATH_INVALID",
+            "The governed local datum-grid path escapes its package directory.",
+        ) from exc
+    if not grid_path.is_file():
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_MISSING",
+            "The governed local datum-grid file is absent or is not a regular file.",
+        )
+    local_bytes = grid_path.stat().st_size
+    if local_bytes != GOVERNED_GRID_BYTES:
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_SIZE_MISMATCH",
+            "The governed local datum-grid byte count does not match the source-bound manifest.",
+        )
+    local_sha256 = sha256_file(grid_path)
+    if local_sha256 != GOVERNED_GRID_SHA256:
+        raise _governed_grid_error(
+            "ERROR_GIS_CRS_GRID_HASH_MISMATCH",
+            "The governed local datum-grid SHA-256 does not match the source-bound manifest.",
+        )
+
+    canonical_pipeline = GOVERNED_GRID_PIPELINE_TEMPLATE.format(grid=GOVERNED_GRID_FILENAME)
+    execution_pipeline = GOVERNED_GRID_PIPELINE_TEMPLATE.format(grid=json.dumps(grid_path.as_posix()))
+    transformer = Transformer.from_pipeline(execution_pipeline)
+    source = grid.get("source") if isinstance(grid.get("source"), dict) else {}
+    license_row = grid.get("license") if isinstance(grid.get("license"), dict) else {}
+    grid_receipt = {
+        "grid_id": GOVERNED_GRID_ID,
+        "short_name": GOVERNED_GRID_FILENAME,
+        "full_name": str(grid_path),
+        "package_name": "mucaro-ai-governed-grid",
+        "url": source.get("proj_cdn_url"),
+        "direct_download": True,
+        "open_license": license_row.get("classification") == "PUBLIC_DOMAIN",
+        "license_classification": license_row.get("classification"),
+        "license_evidence_url": license_row.get("evidence_url"),
+        "source_authority": source.get("authority"),
+        "source_commit_sha": source.get("file_commit_sha"),
+        "source_pinned_url": source.get("pinned_file_url"),
+        "manifest_path": str(manifest_path),
+        "manifest_sha256": manifest_sha256,
+        "manifest_retrieval_utc": manifest.get("retrieval_utc"),
+        "proj_available": True,
+        "local_file_available": True,
+        "local_bytes": local_bytes,
+        "local_sha256": local_sha256,
+        "requires_network_download": False,
+        "available_without_network": True,
+        "provenance_frozen": True,
+    }
+    candidate = {
+        "index": 0,
+        "description": GOVERNED_GRID_OPERATION_NAME,
+        "definition_sha256": hashlib.sha256(canonical_pipeline.encode("utf-8")).hexdigest(),
+        "accuracy": GOVERNED_GRID_ACCURACY_METRES,
+        "grids": [grid_receipt],
+        "grid_metadata_complete": True,
+        "requires_network_download": False,
+        "grid_provenance_frozen": True,
+        "offline_capable": True,
+        "selection_policy": "exact_source_bound_governed_grid",
+    }
+    return {
+        "transformer": transformer,
+        "adapter": CRS_GOVERNED_GRID_ADAPTER,
+        "canonical_pipeline": canonical_pipeline,
+        "execution_pipeline_sha256": hashlib.sha256(execution_pipeline.encode("utf-8")).hexdigest(),
+        "candidate": candidate,
+        "manifest": {
+            "schema_version": manifest["schema_version"],
+            "path": str(manifest_path),
+            "sha256": manifest_sha256,
+            "retrieval_utc": manifest.get("retrieval_utc"),
+            "grid_id": GOVERNED_GRID_ID,
+            "grid_sha256": local_sha256,
+            "grid_bytes": local_bytes,
+            "source_crs": GOVERNED_GRID_SOURCE_CRS,
+            "target_crs": GOVERNED_GRID_TARGET_CRS,
+            "operation_authority": allowed_operation.get("operation_authority"),
+            "accuracy_metres": GOVERNED_GRID_ACCURACY_METRES,
+            "area_of_use": allowed_operation.get("area_of_use"),
+            "bounds": allowed_operation.get("bounds"),
+            "network_access_performed": False,
+            "independent_engine_validation": "OPEN",
+        },
+    }
 
 
 def _grid_receipt(grid: Any) -> dict[str, Any]:
@@ -94,42 +309,71 @@ def _transform_coordinates(value: Any, transformer: Transformer) -> Any:
     raise GISProcessingError("ERROR_GIS_CRS_INVALID_COORDINATES", "Geometry contains a non-position coordinate value.")
 
 
-def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settings, source_crs: str | None = None) -> dict[str, Any]:
+def reproject_geojson_crs(
+    path: Path,
+    *,
+    target_crs: str,
+    cfg: Settings = settings,
+    source_crs: str | None = None,
+    _grid_root: Path | None = None,
+) -> dict[str, Any]:
     cfg.ensure_dirs()
     source = _load_geojson(path)
     source_name = source_crs or source.crs
     try:
         source_obj = CRS.from_user_input(source_name)
         target_obj = CRS.from_user_input(target_crs)
-        with python_warnings.catch_warnings(record=True) as caught_warnings:
-            python_warnings.simplefilter("always")
-            transformer_group = TransformerGroup(source_obj, target_obj, always_xy=True)
-        if not transformer_group.transformers:
-            raise GISProcessingError(
-                "ERROR_GIS_CRS_PIPELINE_UNRESOLVED",
-                "PROJ did not provide an available transformation pipeline.",
+        governed = _load_governed_grid_transform(source_obj, target_obj, grid_root=_grid_root)
+        if governed is not None:
+            transformer = governed["transformer"]
+            adapter = governed["adapter"]
+            candidate_receipts = [governed["candidate"]]
+            selected_candidate_index = 0
+            unavailable_operation_receipts: list[dict[str, Any]] = []
+            engine_warnings: list[str] = []
+            best_available = True
+            pipeline = governed["canonical_pipeline"]
+            execution_pipeline_sha256 = governed["execution_pipeline_sha256"]
+            governed_grid_receipt: dict[str, Any] | None = governed["manifest"]
+            transformer_description = GOVERNED_GRID_OPERATION_NAME
+            transformer_accuracy = GOVERNED_GRID_ACCURACY_METRES
+        else:
+            with python_warnings.catch_warnings(record=True) as caught_warnings:
+                python_warnings.simplefilter("always")
+                transformer_group = TransformerGroup(source_obj, target_obj, always_xy=True)
+            if not transformer_group.transformers:
+                raise GISProcessingError(
+                    "ERROR_GIS_CRS_PIPELINE_UNRESOLVED",
+                    "PROJ did not provide an available transformation pipeline.",
+                )
+            candidate_receipts = [
+                _candidate_receipt(index, candidate)
+                for index, candidate in enumerate(transformer_group.transformers)
+            ]
+            selected_candidate_index = next(
+                (row["index"] for row in candidate_receipts if row["offline_capable"]),
+                None,
             )
-        candidate_receipts = [
-            _candidate_receipt(index, candidate)
-            for index, candidate in enumerate(transformer_group.transformers)
-        ]
-        selected_candidate_index = next(
-            (row["index"] for row in candidate_receipts if row["offline_capable"]),
-            None,
-        )
-        if selected_candidate_index is None:
-            raise GISProcessingError(
-                "ERROR_GIS_CRS_NETWORK_PERMISSION_REQUIRED",
-                "PROJ did not provide a transformation candidate whose grid dependencies are available as frozen local files.",
-            )
-        transformer = transformer_group.transformers[selected_candidate_index]
-        unavailable_operation_receipts = [
-            _unavailable_operation_receipt(index, operation)
-            for index, operation in enumerate(transformer_group.unavailable_operations)
-        ]
+            if selected_candidate_index is None:
+                raise GISProcessingError(
+                    "ERROR_GIS_CRS_NETWORK_PERMISSION_REQUIRED",
+                    "PROJ did not provide a transformation candidate whose grid dependencies are available as frozen local files.",
+                )
+            transformer = transformer_group.transformers[selected_candidate_index]
+            unavailable_operation_receipts = [
+                _unavailable_operation_receipt(index, operation)
+                for index, operation in enumerate(transformer_group.unavailable_operations)
+            ]
+            adapter = CRS_ADAPTER
+            engine_warnings = [str(item.message) for item in caught_warnings]
+            best_available = transformer_group.best_available
+            pipeline = transformer.definition or transformer.description
+            execution_pipeline_sha256 = None
+            governed_grid_receipt = None
+            transformer_description = transformer.description
+            transformer_accuracy = transformer.accuracy
     except (ProjError, ValueError) as exc:
         raise GISProcessingError("ERROR_GIS_CRS_UNSUPPORTED", str(exc)) from exc
-    pipeline = transformer.definition or transformer.description
     if not pipeline or pipeline.lower().startswith("unavailable until"):
         raise GISProcessingError(
             "ERROR_GIS_CRS_PIPELINE_UNRESOLVED",
@@ -192,7 +436,7 @@ def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settin
     output_payload["crs"] = {"type": "name", "properties": {"name": target_obj.to_string()}}
     output = _write_geojson_output(cfg, report_id, output_payload)
     report_warnings = []
-    if not transformer_group.best_available:
+    if not best_available:
         report_warnings.append("GIS_CRS_BEST_OPERATION_UNAVAILABLE")
     if selected_candidate_index > 0:
         report_warnings.append("GIS_CRS_OFFLINE_CANDIDATE_FALLBACK")
@@ -210,7 +454,7 @@ def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settin
         "operation": "reproject_geojson_crs",
         "created_at": created_at,
         "parameters": {
-            "adapter": CRS_ADAPTER,
+            "adapter": adapter,
             "source_crs": source_obj.to_string(),
             "target_crs": target_obj.to_string(),
             "always_xy": True,
@@ -219,8 +463,8 @@ def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settin
             "proj_network_enabled": network.is_network_enabled(),
             "pyproj_version": pyproj_version,
             "proj_version": proj_version_str,
-            "available_candidate_count": len(transformer_group.transformers),
-            "unavailable_candidate_count": len(transformer_group.unavailable_operations),
+            "available_candidate_count": len(candidate_receipts),
+            "unavailable_candidate_count": len(unavailable_operation_receipts),
             "candidate_inventory": candidate_receipts,
             "unavailable_operation_inventory": unavailable_operation_receipts,
             "selected_candidate_index": selected_candidate_index,
@@ -230,12 +474,14 @@ def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settin
             "selected_candidate_grid_count": len(
                 candidate_receipts[selected_candidate_index]["grids"]
             ),
-            "best_available": transformer_group.best_available,
-            "engine_warnings": [str(item.message) for item in caught_warnings],
-            "transformer_description": transformer.description,
+            "best_available": best_available,
+            "engine_warnings": engine_warnings,
+            "transformer_description": transformer_description,
             "transformer_definition": pipeline,
             "transformer_definition_sha256": pipeline_sha256,
-            "accuracy": transformer.accuracy,
+            "execution_pipeline_sha256": execution_pipeline_sha256,
+            "accuracy": transformer_accuracy,
+            "governed_grid": governed_grid_receipt,
         },
         "source": {
             "path": str(path),
@@ -259,20 +505,28 @@ def reproject_geojson_crs(path: Path, *, target_crs: str, cfg: Settings = settin
             "transform_pipeline_frozen": bool(pipeline) and not pipeline.lower().startswith("unavailable until"),
             "offline_policy_satisfied": candidate_receipts[selected_candidate_index]["offline_capable"],
             "grid_inventory_complete": all(row["grid_metadata_complete"] for row in candidate_receipts),
+            "governed_grid_binding_satisfied": governed_grid_receipt is None
+            or (
+                governed_grid_receipt["grid_sha256"] == GOVERNED_GRID_SHA256
+                and governed_grid_receipt["grid_bytes"] == GOVERNED_GRID_BYTES
+                and governed_grid_receipt["network_access_performed"] is False
+            ),
         },
         "warnings": report_warnings,
         "limitations": [
             "XY coordinates are transformed with pyproj/PROJ using always_xy=True",
             "Z values are preserved but not vertically transformed",
             "M coordinates fail closed",
-            "remote grid downloads are not permitted; a lower-accuracy offline candidate may be selected",
+            "remote grid downloads are not permitted; a governed local grid is used only for an exact source-bound CRS pair, otherwise a lower-accuracy offline candidate may be selected",
             "local grid files are bound by path, byte count, and SHA-256 when selected",
             "candidate availability and transformer accuracy remain environment-dependent and are exposed in the receipt",
+            "the governed Puerto Rico datum-grid control is implementation and provenance evidence, not independent-engine certification",
         ],
         "falsification_criteria": [
             "reject if feature_row_conservation is false",
             "reject broad CRS claims if transformer definition or axis-order policy is absent",
             "reject if the selected candidate requires an unfrozen network grid",
+            "reject the governed-grid result if the manifest, grid bytes, authorized CRS pair, area of use, or canonical pipeline differs from the frozen receipt",
             "independently verify material transformations when local grid inventory or accuracy differs between runtimes",
         ],
     }

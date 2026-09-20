@@ -286,7 +286,9 @@ Observed success markers:
   governance gates are stronger.
   Advanced GIS now has a shared CLI/eval/contract boundary for bounded GeoJSON
   operations, explicit Shapely topology repair, pyproj/PROJ horizontal CRS
-  transformation with always-XY and pipeline identity, WGS84 ellipsoidal
+  transformation with always-XY and pipeline identity, one exact-source-bound
+  public-domain NOAA Puerto Rico datum grid with frozen
+  manifest/hash/byte/license provenance and no runtime download, WGS84 ellipsoidal
   measurement, GeoJSON/GeoPackage/Shapefile manifestation inspection, GeoTIFF
   inspection/sampling/transactional clipping/resampling, exact-CRS
   vector-raster cell-center zonal analysis, frozen Census TIGERweb and USGS
@@ -296,8 +298,8 @@ Observed success markers:
   conditioning with explicit outlet, no-breach, and maximum-depth policy,
   bounded D8 direction/accumulation
   with explicit boundary/sink/flat/tie terminal states, and renderer/layer-bound
-  map-export provenance. `mucaro eval gis` runs 62 committed cases across 25 operations,
-  including 25
+  map-export provenance. `mucaro eval gis` runs 64 committed cases across 25 operations,
+  including 26
   fail-closed negative cases for CRS, dimensions, formats, raster extents,
   vector-raster mismatch, resampling, and export identity, plus bounded
   always-XY axis-order and antimeridian/polar line/polygon controls. The CRS
@@ -307,8 +309,8 @@ Observed success markers:
   validate-gis-report` checks the corresponding saved receipts for source and
   output hashes, warning consistency, CRS policy, NODATA separation,
   per-feature states, renderer/layer binding, and arithmetic closure.
-  Full GIS maturity remains open until independently frozen local datum-grid
-  transformations, vertical/time-dependent CRS, broader axis-order and
+  Full GIS maturity remains open until additional regional datum-grid
+  transformations, independent-engine datum validation, vertical/time-dependent CRS, broader axis-order and
   large-geometry adjudication beyond the bounded controls, dimension-preserving
   mutation, broader topology/overlay policy,
   fractional zonal coverage, independent rendered-map validation, larger and

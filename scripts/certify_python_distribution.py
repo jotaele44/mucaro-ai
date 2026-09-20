@@ -9,11 +9,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 from email.parser import Parser
 from pathlib import Path
 from tarfile import TarFile
-import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -26,7 +26,22 @@ REQUIRED_SDIST_MEMBERS = [
     "README.md",
     "backend/app/cli.py",
     "backend/app/packaging.py",
+    "backend/app/gis_grids/manifest.json",
+    "backend/app/gis_grids/NOTICE.md",
+    "backend/app/gis_grids/us_noaa_pvhpgn.tif",
 ]
+GOVERNED_GRID_ASSETS = {
+    "backend/app/gis_grids/manifest.json": {
+        "sha256": "869e31ea30f1be6477c04899a384ddcac0beb6ded811d8dcad8d62050f140c2f",
+    },
+    "backend/app/gis_grids/NOTICE.md": {
+        "sha256": "94736fff04e4646cc08897ec8a9960d41f267ae24359d61c870baea84ccdd1fc",
+    },
+    "backend/app/gis_grids/us_noaa_pvhpgn.tif": {
+        "sha256": "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d",
+        "size_bytes": 3644,
+    },
+}
 
 
 def run(cmd: list[str], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -71,11 +86,19 @@ def certify_installed_wheel(
     run([str(install_mucaro), "--version"], cwd=workdir)
     run([str(install_mucaro), "--help"], cwd=workdir)
     import_check = (
-        "import importlib.metadata, pathlib, sys; "
-        "import backend.app.cli, backend.app.packaging; "
+        "import hashlib, importlib.metadata, pathlib, sys; "
+        "import backend.app, backend.app.cli, backend.app.packaging; "
         "module_path=pathlib.Path(backend.app.cli.__file__).resolve(); "
         "prefix=pathlib.Path(sys.prefix).resolve(); "
         "module_path.relative_to(prefix); "
+        "grid_root=pathlib.Path(backend.app.__file__).resolve().parent/'gis_grids'; "
+        "manifest_path=grid_root/'manifest.json'; "
+        "notice_path=grid_root/'NOTICE.md'; "
+        "grid_path=grid_root/'us_noaa_pvhpgn.tif'; "
+        "assert hashlib.sha256(manifest_path.read_bytes()).hexdigest() == '869e31ea30f1be6477c04899a384ddcac0beb6ded811d8dcad8d62050f140c2f'; "
+        "assert hashlib.sha256(notice_path.read_bytes()).hexdigest() == '94736fff04e4646cc08897ec8a9960d41f267ae24359d61c870baea84ccdd1fc'; "
+        "assert grid_path.stat().st_size == 3644; "
+        "assert hashlib.sha256(grid_path.read_bytes()).hexdigest() == 'a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d'; "
         f"assert importlib.metadata.version({expected['name']!r}) == {expected['version']!r}; "
         "print(f'ISOLATED_WHEEL_IMPORT_OK module={module_path} prefix={prefix}')"
     )
@@ -151,6 +174,16 @@ def wheel_metadata(wheel: Path) -> dict[str, object]:
         entry_points = configparser.ConfigParser()
         entry_points.read_string(archive.read(entry_point_names[0]).decode("utf-8"))
         console_scripts = entry_points["console_scripts"] if entry_points.has_section("console_scripts") else {}
+        governed_assets = {}
+        for path in GOVERNED_GRID_ASSETS:
+            if path not in names:
+                governed_assets[path] = None
+                continue
+            payload = archive.read(path)
+            governed_assets[path] = {
+                "size_bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
         return {
             "metadata_path": metadata_names[0],
             "entry_points_path": entry_point_names[0],
@@ -159,6 +192,7 @@ def wheel_metadata(wheel: Path) -> dict[str, object]:
             "requires_python": metadata.get("Requires-Python"),
             "mucaro_entrypoint": console_scripts.get("mucaro"),
             "has_backend_cli": "backend/app/cli.py" in names,
+            "governed_grid_assets": governed_assets,
         }
 
 
@@ -175,6 +209,16 @@ def verify_wheel_metadata(wheel: Path, expected: dict[str, str]) -> dict[str, ob
         errors.append(f"mucaro_entrypoint={metadata['mucaro_entrypoint']} expected={CLI_ENTRYPOINT}")
     if metadata["has_backend_cli"] is not True:
         errors.append("backend/app/cli.py missing from wheel")
+    governed_assets = metadata["governed_grid_assets"]
+    for path, asset_expected in GOVERNED_GRID_ASSETS.items():
+        observed = governed_assets.get(path) if isinstance(governed_assets, dict) else None
+        if not isinstance(observed, dict):
+            errors.append(f"{path} missing from wheel")
+            continue
+        if observed.get("sha256") != asset_expected["sha256"]:
+            errors.append(f"{path} sha256 mismatch")
+        if "size_bytes" in asset_expected and observed.get("size_bytes") != asset_expected["size_bytes"]:
+            errors.append(f"{path} size mismatch")
     return {"status": "PASS" if not errors else "FAIL", "errors": errors, "metadata": metadata}
 
 
@@ -188,6 +232,18 @@ def verify_sdist_members(sdist: Path, expected: dict[str, str]) -> dict[str, obj
         if pkg_info is None:
             raise ValueError(f"{pkg_info_name} missing from sdist")
         metadata = Parser().parsestr(pkg_info.read().decode("utf-8"))
+        governed_assets = {}
+        for path in GOVERNED_GRID_ASSETS:
+            member_name = f"{expected_root}/{path}"
+            member = archive.extractfile(member_name) if member_name in members else None
+            if member is None:
+                governed_assets[path] = None
+                continue
+            payload = member.read()
+            governed_assets[path] = {
+                "size_bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
     roots = {name.split("/", 1)[0] for name in names if name}
     missing = sorted(path for path in REQUIRED_SDIST_MEMBERS if f"{expected_root}/{path}" not in members)
     errors = []
@@ -199,12 +255,21 @@ def verify_sdist_members(sdist: Path, expected: dict[str, str]) -> dict[str, obj
         errors.append(f"version={metadata.get('Version')} expected={expected['version']}")
     if missing:
         errors.append(f"missing={','.join(missing)}")
+    for path, asset_expected in GOVERNED_GRID_ASSETS.items():
+        observed = governed_assets.get(path)
+        if not isinstance(observed, dict):
+            continue
+        if observed.get("sha256") != asset_expected["sha256"]:
+            errors.append(f"{path} sha256 mismatch")
+        if "size_bytes" in asset_expected and observed.get("size_bytes") != asset_expected["size_bytes"]:
+            errors.append(f"{path} size mismatch")
     return {
         "status": "PASS" if not errors else "FAIL",
         "errors": errors,
         "root": expected_root,
         "required_members": REQUIRED_SDIST_MEMBERS,
         "missing_members": missing,
+        "governed_grid_assets": governed_assets,
         "metadata": {
             "name": metadata.get("Name"),
             "version": metadata.get("Version"),

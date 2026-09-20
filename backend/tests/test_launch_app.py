@@ -360,6 +360,8 @@ def test_python_distribution_verifies_wheel_metadata(tmp_path):
             "Name: mucaro-ai\nVersion: 0.1.23\nRequires-Python: >=3.11\n",
         )
         archive.writestr("mucaro_ai-0.1.23.dist-info/entry_points.txt", "[console_scripts]\nmucaro = backend.app.cli:main\n")
+        for path in certify_python_distribution.GOVERNED_GRID_ASSETS:
+            archive.writestr(path, (certify_python_distribution.ROOT / path).read_bytes())
 
     result = certify_python_distribution.verify_wheel_metadata(
         wheel,
@@ -380,6 +382,8 @@ def test_python_distribution_rejects_bad_wheel_entrypoint(tmp_path):
             "Name: mucaro-ai\nVersion: 0.1.23\nRequires-Python: >=3.11\n",
         )
         archive.writestr("mucaro_ai-0.1.23.dist-info/entry_points.txt", "[console_scripts]\nmucaro = wrong.module:main\n")
+        for path in certify_python_distribution.GOVERNED_GRID_ASSETS:
+            archive.writestr(path, (certify_python_distribution.ROOT / path).read_bytes())
 
     result = certify_python_distribution.verify_wheel_metadata(
         wheel,
@@ -390,17 +394,42 @@ def test_python_distribution_rejects_bad_wheel_entrypoint(tmp_path):
     assert result["errors"] == ["mucaro_entrypoint=wrong.module:main expected=backend.app.cli:main"]
 
 
+def test_python_distribution_rejects_missing_governed_grid_asset(tmp_path):
+    wheel = tmp_path / "mucaro_ai-0.1.23-py3-none-any.whl"
+    with certify_python_distribution.zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("backend/app/cli.py", "")
+        archive.writestr(
+            "mucaro_ai-0.1.23.dist-info/METADATA",
+            "Name: mucaro-ai\nVersion: 0.1.23\nRequires-Python: >=3.11\n",
+        )
+        archive.writestr("mucaro_ai-0.1.23.dist-info/entry_points.txt", "[console_scripts]\nmucaro = backend.app.cli:main\n")
+        for path in certify_python_distribution.GOVERNED_GRID_ASSETS:
+            if path.endswith("us_noaa_pvhpgn.tif"):
+                continue
+            archive.writestr(path, (certify_python_distribution.ROOT / path).read_bytes())
+
+    result = certify_python_distribution.verify_wheel_metadata(
+        wheel,
+        {"name": "mucaro-ai", "version": "0.1.23", "requires_python": ">=3.11"},
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["errors"] == ["backend/app/gis_grids/us_noaa_pvhpgn.tif missing from wheel"]
+
+
 def test_python_distribution_verifies_sdist_members(tmp_path):
     sdist = tmp_path / "mucaro_ai-0.1.23.tar.gz"
     with tarfile.open(sdist, "w:gz") as archive:
-        for name, text in {
-            "mucaro_ai-0.1.23/PKG-INFO": "Name: mucaro-ai\nVersion: 0.1.23\n",
-            "mucaro_ai-0.1.23/pyproject.toml": "",
-            "mucaro_ai-0.1.23/README.md": "# Mucaro AI\n",
-            "mucaro_ai-0.1.23/backend/app/cli.py": "",
-            "mucaro_ai-0.1.23/backend/app/packaging.py": "",
-        }.items():
-            data = text.encode("utf-8")
+        members = {
+            "mucaro_ai-0.1.23/PKG-INFO": b"Name: mucaro-ai\nVersion: 0.1.23\n",
+            "mucaro_ai-0.1.23/pyproject.toml": b"",
+            "mucaro_ai-0.1.23/README.md": b"# Mucaro AI\n",
+            "mucaro_ai-0.1.23/backend/app/cli.py": b"",
+            "mucaro_ai-0.1.23/backend/app/packaging.py": b"",
+        }
+        for path in certify_python_distribution.GOVERNED_GRID_ASSETS:
+            members[f"mucaro_ai-0.1.23/{path}"] = (certify_python_distribution.ROOT / path).read_bytes()
+        for name, data in members.items():
             info = tarfile.TarInfo(name)
             info.size = len(data)
             archive.addfile(info, io.BytesIO(data))
@@ -447,6 +476,7 @@ def test_python_distribution_install_verification_is_isolated(tmp_path, monkeypa
     assert "--force-reinstall" in calls[0][0]
     assert "--no-cache-dir" in calls[0][0]
     assert "module_path.relative_to(prefix)" in calls[-1][0][-1]
+    assert "grid_path.stat().st_size == 3644" in calls[-1][0][-1]
     assert result["entrypoint"] == "bin/mucaro"
     assert result["module_origin_check"] == "backend.app.cli resolves under isolated sys.prefix"
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -50,6 +51,31 @@ def test_crs_axis_order_control_closes_in_both_declared_conventions() -> None:
         100_000 <= swapped_result[0] <= 900_000
         and 0 <= swapped_result[1] <= 10_000_000
     )
+
+
+def test_governed_datum_grid_control_closes_direct_proj_parity() -> None:
+    payload, rows = controls()
+    row = rows["CRS-004"]
+    grid_path = ROOT / row["input"]["grid"]
+    grid_bytes = grid_path.read_bytes()
+    expected = row["expected"]
+    pipeline = (
+        "proj=pipeline step proj=unitconvert xy_in=deg xy_out=rad "
+        f"step inv proj=hgridshift grids={json.dumps(grid_path.as_posix())} "
+        "step proj=lcc lat_0=17.8333333333333 lon_0=-66.4333333333333 "
+        "lat_1=18.4333333333333 lat_2=18.0333333333333 "
+        "x_0=200000 y_0=200000 ellps=GRS80"
+    )
+    transformer = Transformer.from_pipeline(pipeline)
+    x, y = transformer.transform(row["input"]["lon"], row["input"]["lat"], errcheck=True)
+    tolerance = payload["tolerances"]["datum_grid_m"]
+
+    assert len(grid_bytes) == expected["grid_bytes"]
+    assert hashlib.sha256(grid_bytes).hexdigest() == expected["grid_sha256"]
+    assert abs(x - expected["x"]) <= tolerance
+    assert abs(y - expected["y"]) <= tolerance
+    assert abs(x - expected["ballpark_x"]) > 0.25
+    assert abs(y - expected["ballpark_y"]) > 0.9
 
 
 def test_geodesic_control_closes_against_independent_geographiclib_engine() -> None:
@@ -207,6 +233,7 @@ def test_control_manifest_has_no_unbounded_claims() -> None:
     payload, _ = controls()
     assert "vertical CRS certification" in payload["explicit_nonclaims"]
     assert "time-dependent coordinate operation certification" in payload["explicit_nonclaims"]
+    assert "independent-engine certification of the Puerto Rico datum-grid transformation" in payload["explicit_nonclaims"]
     assert "unbounded antimeridian, polar, or large-geometry certification" in payload["explicit_nonclaims"]
     assert "unbounded depression conditioning, depression breaching, flat routing, watershed delineation, stream extraction, runoff, flood, groundwater, or hydraulic modeling" in payload["explicit_nonclaims"]
-    assert len(payload["controls"]) == 16
+    assert len(payload["controls"]) == 17

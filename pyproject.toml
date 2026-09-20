@@ -35,6 +35,9 @@ mucaro = "backend.app.cli:main"
 [tool.setuptools.packages.find]
 include = ["backend*"]
 
+[tool.setuptools.package-data]
+"backend.app" = ["gis_grids/*.json", "gis_grids/*.md", "gis_grids/*.tif"]
+
 [tool.pytest.ini_options]
 pythonpath = [".", "backend"]
 testpaths = ["backend/tests"]

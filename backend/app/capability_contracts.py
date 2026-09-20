@@ -11,6 +11,13 @@ CAPABILITY_OUTPUT_CONTRACT_OK = "CAPABILITY_OUTPUT_CONTRACT_OK"
 CAPABILITY_OUTPUT_CONTRACT_FAILED = "CAPABILITY_OUTPUT_CONTRACT_FAILED"
 GIS_REPORT_SCHEMA_VERSION = "mucaro_gis_report_v1"
 OCR_REPORT_SCHEMA_VERSION = "mucaro_ocr_report_v1"
+CRS_ENGINE_ADAPTERS = {
+    "pyproj_transformer_group_always_xy_v1",
+    "pyproj_governed_local_grid_always_xy_v1",
+}
+GOVERNED_CRS_GRID_MANIFEST_SHA256 = "869e31ea30f1be6477c04899a384ddcac0beb6ded811d8dcad8d62050f140c2f"
+GOVERNED_CRS_GRID_SHA256 = "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d"
+GOVERNED_CRS_GRID_BYTES = 3644
 
 
 @dataclass(frozen=True)
@@ -228,6 +235,7 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             "maximum_fill_depth_within_limit",
             "fill_volume_accounting_closed",
             "provenance_complete",
+            "governed_grid_binding_satisfied",
         ):
             if key in invariants:
                 checks.append(_contract_check(f"invariants.{key}", invariants.get(key) is True, f"{key} must be true when asserted"))
@@ -404,7 +412,7 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
         )
         checks.extend(
             [
-                _contract_check("crs_engine.parameters.adapter", _dotted(report, "parameters.adapter") == "pyproj_transformer_group_always_xy_v1", "CRS engine reports must name the pyproj TransformerGroup always-XY adapter"),
+                _contract_check("crs_engine.parameters.adapter", _dotted(report, "parameters.adapter") in CRS_ENGINE_ADAPTERS, "CRS engine reports must name a governed pyproj always-XY adapter"),
                 _contract_check("crs_engine.parameters.source_crs", bool(_dotted(report, "parameters.source_crs")), "resolved source CRS is required"),
                 _contract_check("crs_engine.parameters.target_crs", bool(_dotted(report, "parameters.target_crs")), "resolved target CRS is required"),
                 _contract_check("crs_engine.parameters.always_xy", _dotted(report, "parameters.always_xy") is True, "CRS axis order must be explicit"),
@@ -456,6 +464,22 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 [
                     _contract_check("crs_engine.grid_rows", all(isinstance(grid, dict) and isinstance(grid.get("requires_network_download"), bool) and isinstance(grid.get("available_without_network"), bool) and isinstance(grid.get("provenance_frozen"), bool) for grid in all_grid_rows), "all available and unavailable grid rows must expose offline availability and provenance state"),
                     _contract_check("crs_engine.local_grid_hashes", all(not grid.get("local_file_available") or (isinstance(grid.get("local_bytes"), int) and grid.get("local_bytes") > 0 and bool(grid.get("local_sha256"))) for grid in all_grid_rows), "available local grids must be frozen by byte count and SHA-256"),
+                ]
+            )
+        governed_grid = _dotted(report, "parameters.governed_grid")
+        if _dotted(report, "parameters.adapter") == "pyproj_governed_local_grid_always_xy_v1":
+            checks.extend(
+                [
+                    _contract_check("crs_engine.governed_grid.object", isinstance(governed_grid, dict), "governed-grid reports must include a grid binding receipt"),
+                    _contract_check("crs_engine.governed_grid.manifest_schema", isinstance(governed_grid, dict) and governed_grid.get("schema_version") == "mucaro_gis_grid_manifest_v1", "governed-grid reports must bind the supported manifest schema"),
+                    _contract_check("crs_engine.governed_grid.manifest_hash", isinstance(governed_grid, dict) and governed_grid.get("sha256") == GOVERNED_CRS_GRID_MANIFEST_SHA256, "governed-grid reports must bind the source-approved manifest SHA-256"),
+                    _contract_check("crs_engine.governed_grid.grid_hash", isinstance(governed_grid, dict) and governed_grid.get("grid_sha256") == GOVERNED_CRS_GRID_SHA256, "governed-grid reports must bind the source-approved grid SHA-256"),
+                    _contract_check("crs_engine.governed_grid.grid_bytes", isinstance(governed_grid, dict) and governed_grid.get("grid_bytes") == GOVERNED_CRS_GRID_BYTES, "governed-grid reports must bind the source-approved grid byte count"),
+                    _contract_check("crs_engine.governed_grid.crs_pair", isinstance(governed_grid, dict) and governed_grid.get("source_crs") == "EPSG:4326" and governed_grid.get("target_crs") == "EPSG:32161", "governed-grid reports must bind the authorized CRS pair"),
+                    _contract_check("crs_engine.governed_grid.network_absent", isinstance(governed_grid, dict) and governed_grid.get("network_access_performed") is False, "governed-grid execution must not perform network access"),
+                    _contract_check("crs_engine.governed_grid.independent_scope", isinstance(governed_grid, dict) and governed_grid.get("independent_engine_validation") == "OPEN", "governed-grid reports must not overclaim independent-engine validation"),
+                    _contract_check("crs_engine.governed_grid.invariant", _dotted(report, "invariants.governed_grid_binding_satisfied") is True, "governed-grid source and byte bindings must pass"),
+                    _contract_check("crs_engine.governed_grid.execution_pipeline_hash", bool(_dotted(report, "parameters.execution_pipeline_sha256")), "governed-grid reports must hash the execution pipeline"),
                 ]
             )
         if isinstance(features, list):
@@ -1278,6 +1302,12 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "crs_transform_adapter",
                 "axis_order_policy",
                 "transformer_definition_sha256",
+                "grid_manifest_sha256",
+                "grid_sha256",
+                "grid_bytes",
+                "grid_source_commit_sha",
+                "grid_license_evidence_url",
+                "network_access_performed",
                 "query_bbox",
                 "bbox_filter_mode",
                 "clip_bbox",
@@ -1372,6 +1402,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "standalone polygon overlay preserves CRS, writes output hashes, and closes feature-key and pair-state accounting",
                 "planar and geodesic measurements preserve CRS, units labels, per-feature residue, and total area/length accounting",
                 "pyproj CRS reprojection records an always-XY policy, frozen transformer definition, output hash, and feature conservation",
+                "the governed Puerto Rico datum-grid path binds the exact public-domain source revision, manifest hash, grid hash, byte count, authorized CRS pair, canonical pipeline, and absent runtime network access",
                 "explicit topology repair records before/after geometry hashes, repair state, output hash, and row/output accounting",
                 "ellipsoidal WGS84 measurement records pyproj Geod identity, meter units, per-feature state, and row accounting",
                 "vector and raster manifests preserve source format, CRS manifestations, bands, dimensions, NODATA, and source hashes",
@@ -1398,6 +1429,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "planar measurement fixture records polygon area with holes, line length, null residue, units, and aggregate totals",
                 "geodesic measurement fixture records EPSG:4326 source CRS, meter units, adapter identity, and aggregate totals",
                 "pyproj CRS fixture records always-XY policy and a frozen transformer pipeline hash",
+                "Puerto Rico datum-grid fixture selects the exact local NOAA grid, differs materially from the gridless ballpark transform, and preserves an explicit independent-engine OPEN state",
                 "explicit topology repair fixture records valid repaired output without changing inspection semantics",
                 "pyproj Geod fixture records WGS84 ellipsoidal distance and area receipts",
                 "GeoJSON vector-format and GeoTIFF raster fixtures preserve source manifestations and NODATA accounting",
@@ -1424,6 +1456,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "planar measurement fails closed on missing units and records invalid or unsupported geometries as residue",
                 "geodesic measurement fails closed for non-EPSG:4326 sources and records invalid longitude/latitude coordinates as residue",
                 "pyproj CRS transformation fails closed for invalid CRS and M coordinates",
+                "governed datum-grid transformation fails closed before output on manifest drift, missing or altered grid bytes, path escape, unauthorized CRS pairs, and coordinates outside the operation area",
                 "topology repair retains unsupported dimensions as explicit unresolved residue",
                 "ellipsoidal measurement fails closed for non-EPSG:4326 sources",
                 "raster clipping fails closed on invalid or nonintersecting extents",
@@ -1450,7 +1483,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
             ),
             unavailable_until=(
                 "topology policy and overlay operations extend beyond explicit planar make_valid and the current Polygon/MultiPolygon boundary",
-                "independently frozen local datum-grid transformations, vertical CRS, time-dependent operations, and broader axis-order cases are certified",
+                "additional regional datum-grid transformations, vertical CRS, time-dependent operations, broader axis-order cases, and independent-engine datum validation are certified",
                 "ellipsoidal hole-orientation and large-geometry edge cases close beyond the bounded antimeridian and polar control corpus",
                 "broader vector/raster formats, fractional zonal coverage, additional resampling kernels, remote sensing, hydrology beyond bounded priority-flood conditioning and D8, bathymetry, and temporal GIS are receipt-backed",
                 "rendered-map visual correctness and larger, more diverse real vector/raster corpora are independently certified",
