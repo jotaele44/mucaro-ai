@@ -37,6 +37,9 @@ REQUIRED_PACKAGE_INPUTS = [
     "docs/PACKAGING_POLICY.md",
     "docs/APPLE_APP_STORE_SECURITY.md",
     "_architecture/macos_app_store_security_profile.json",
+    "_architecture/schemas/macos-app-store-candidate-receipt.schema.json",
+    "_architecture/schemas/macos-app-store-vulnerability-scan.schema.json",
+    "_architecture/schemas/macos-app-store-malware-scan.schema.json",
     "packaging/macos/MucaroAI-AppStore.entitlements",
     "packaging/macos/PrivacyInfo.xcprivacy",
     "frontend/package.json",
@@ -539,7 +542,7 @@ def build_package_status(root: Path = ROOT) -> dict[str, Any]:
         )
     )
     blockers = [
-        "Hosted GitHub Actions startup is unresolved; governed release tags still require hosted CI success.",
+        "Hosted release governance remains open until exact-head CI and configured branch/tag controls are proven.",
         "Mac App Store signing, provisioning, upload processing, and Apple App Review remain external gates.",
     ]
     checks.append(_check("hosted_release_gate", "WARN", blockers[0]))

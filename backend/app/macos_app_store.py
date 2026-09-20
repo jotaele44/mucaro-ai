@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import plistlib
 import subprocess
 import sys
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
 
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE_SCHEMA_VERSION = "mucaro_macos_app_store_security_profile_v1"
@@ -96,6 +100,50 @@ def _git_sha(value: Any) -> bool:
     return isinstance(value, str) and len(value) == 40 and all(character in "0123456789abcdef" for character in value)
 
 
+def _sha256(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(character in "0123456789abcdef" for character in value)
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _repository_relative_path(value: Any) -> Path | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    path = Path(value)
+    if path.is_absolute() or not path.parts or ".." in path.parts:
+        return None
+    return path
+
+
+def _schema_errors(payload: dict[str, Any], schema: dict[str, Any]) -> list[str]:
+    return sorted(error.message for error in Draft202012Validator(schema).iter_errors(payload))
+
+
+def _parse_utc_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(UTC)
+
+
+def _fresh_timestamp(value: Any, *, now: datetime, maximum_age_hours: int) -> bool:
+    parsed = _parse_utc_timestamp(value)
+    if parsed is None:
+        return False
+    return now - timedelta(hours=maximum_age_hours) <= parsed <= now + timedelta(minutes=5)
+
+
 def _escaping_symlinks(app: Path) -> list[str]:
     app_root = app.resolve()
     escaping: list[str] = []
@@ -177,6 +225,86 @@ def _validate_source_profile(root: Path, profile: dict[str, Any]) -> tuple[list[
             "bundle_requirement_contract",
             "PASS" if bundle_contract_valid else "FAIL",
             "bundle-relative paths, required Info.plist keys, containment, and transport policy",
+        )
+    )
+
+    supply_chain_requirements = profile.get("supply_chain_requirements")
+    supply_chain_requirements = supply_chain_requirements if isinstance(supply_chain_requirements, dict) else {}
+    evidence_paths = {
+        "sbom": _bundle_relative_path(supply_chain_requirements.get("sbom_relative_path")),
+        "vulnerability_scan": _bundle_relative_path(
+            supply_chain_requirements.get("vulnerability_scan_relative_path")
+        ),
+        "malware_scan": _bundle_relative_path(supply_chain_requirements.get("malware_scan_relative_path")),
+    }
+    schema_paths = {
+        "candidate_receipt": _repository_relative_path(
+            supply_chain_requirements.get("candidate_receipt_schema_path")
+        ),
+        "vulnerability_scan": _repository_relative_path(
+            supply_chain_requirements.get("vulnerability_scan_schema_path")
+        ),
+        "malware_scan": _repository_relative_path(supply_chain_requirements.get("malware_scan_schema_path")),
+    }
+    maximum_scan_age_hours = supply_chain_requirements.get("maximum_scan_age_hours")
+    maximum_evidence_file_bytes = supply_chain_requirements.get("maximum_evidence_file_bytes")
+    allowed_sbom_spec_versions = supply_chain_requirements.get("allowed_sbom_spec_versions")
+    maximum_vulnerability_findings = supply_chain_requirements.get("maximum_vulnerability_findings")
+    supply_chain_contract_valid = (
+        bool(supply_chain_requirements)
+        and all(path is not None for path in evidence_paths.values())
+        and len(set(evidence_paths.values())) == len(evidence_paths)
+        and all(
+            path is not None and path.parts[:2] == ("_architecture", "schemas")
+            for path in schema_paths.values()
+        )
+        and isinstance(maximum_scan_age_hours, int)
+        and not isinstance(maximum_scan_age_hours, bool)
+        and maximum_scan_age_hours > 0
+        and isinstance(maximum_evidence_file_bytes, dict)
+        and set(maximum_evidence_file_bytes) == set(evidence_paths)
+        and all(
+            isinstance(value, int) and not isinstance(value, bool) and value > 0
+            for value in maximum_evidence_file_bytes.values()
+        )
+        and isinstance(allowed_sbom_spec_versions, list)
+        and bool(allowed_sbom_spec_versions)
+        and all(_nonempty_string(value) for value in allowed_sbom_spec_versions)
+        and len(allowed_sbom_spec_versions) == len(set(allowed_sbom_spec_versions))
+        and supply_chain_requirements.get("require_component_purls") is True
+        and isinstance(maximum_vulnerability_findings, dict)
+        and set(maximum_vulnerability_findings) == {"critical", "high", "known_patchable"}
+        and all(
+            isinstance(value, int) and not isinstance(value, bool) and value >= 0
+            for value in maximum_vulnerability_findings.values()
+        )
+        and supply_chain_requirements.get("maximum_malware_detections") == 0
+        and supply_chain_requirements.get("maximum_malware_scan_errors") == 0
+    )
+    checks.append(
+        _check(
+            "supply_chain_requirement_contract",
+            "PASS" if supply_chain_contract_valid else "FAIL",
+            "exact evidence paths, schemas, freshness, SBOM, vulnerability, and malware thresholds",
+        )
+    )
+    schemas: dict[str, dict[str, Any]] = {}
+    schema_failures: list[str] = []
+    for name, relative_path in schema_paths.items():
+        if relative_path is None:
+            schema_failures.append(f"{name}=invalid_path")
+            continue
+        try:
+            schema = _load_json(root / relative_path)
+            Draft202012Validator.check_schema(schema)
+            schemas[name] = schema
+        except (OSError, TypeError, ValueError, json.JSONDecodeError, SchemaError) as exc:
+            schema_failures.append(f"{name}={exc}")
+    checks.append(
+        _check(
+            "supply_chain_schemas",
+            "PASS" if not schema_failures and len(schemas) == len(schema_paths) else "FAIL",
+            "all valid" if not schema_failures else "; ".join(schema_failures),
         )
     )
 
@@ -276,7 +404,257 @@ def _validate_source_profile(root: Path, profile: dict[str, Any]) -> tuple[list[
         "provision_relative_path": provision_relative_path,
         "receipt_relative_path": receipt_relative_path,
         "required_info_keys": required_info_keys,
+        "supply_chain_requirements": supply_chain_requirements,
+        "evidence_paths": evidence_paths,
+        "schemas": schemas,
     }
+
+
+def _candidate_supply_chain_checks(
+    app: Path,
+    *,
+    info: dict[str, Any],
+    executable_sha256: str | None,
+    candidate_receipt: dict[str, Any],
+    source_evidence: dict[str, Any],
+    now: datetime,
+) -> list[dict[str, str]]:
+    checks: list[dict[str, str]] = []
+    requirements = source_evidence.get("supply_chain_requirements")
+    requirements = requirements if isinstance(requirements, dict) else {}
+    evidence_paths = source_evidence.get("evidence_paths")
+    evidence_paths = evidence_paths if isinstance(evidence_paths, dict) else {}
+    schemas = source_evidence.get("schemas")
+    schemas = schemas if isinstance(schemas, dict) else {}
+    references = candidate_receipt.get("security_evidence")
+    references = references if isinstance(references, dict) else {}
+
+    reference_contract_valid = set(references) == set(evidence_paths)
+    evidence_files: dict[str, Path] = {}
+    reference_failures: list[str] = []
+    for name, relative_path in evidence_paths.items():
+        reference = references.get(name)
+        reference = reference if isinstance(reference, dict) else {}
+        if (
+            not isinstance(relative_path, Path)
+            or reference.get("relative_path") != str(relative_path)
+            or not _sha256(reference.get("sha256"))
+        ):
+            reference_contract_valid = False
+            reference_failures.append(name)
+            continue
+        evidence_files[name] = app / relative_path
+    checks.append(
+        _check(
+            "candidate_security_evidence_contract",
+            "PASS" if reference_contract_valid else "FAIL",
+            "exact paths and SHA-256 references" if reference_contract_valid else "invalid=" + ",".join(reference_failures),
+        )
+    )
+
+    missing_or_unsafe: list[str] = []
+    oversized: list[str] = []
+    hash_mismatches: list[str] = []
+    hashed_names: set[str] = set()
+    payloads: dict[str, dict[str, Any]] = {}
+    parse_failures: list[str] = []
+    maximum_evidence_file_bytes = requirements.get("maximum_evidence_file_bytes")
+    maximum_evidence_file_bytes = (
+        maximum_evidence_file_bytes if isinstance(maximum_evidence_file_bytes, dict) else {}
+    )
+    for name, path in evidence_files.items():
+        if not path.is_file() or path.is_symlink():
+            missing_or_unsafe.append(name)
+            continue
+        maximum_bytes = maximum_evidence_file_bytes.get(name)
+        try:
+            observed_size = path.stat().st_size
+        except OSError:
+            missing_or_unsafe.append(name)
+            continue
+        if not isinstance(maximum_bytes, int) or observed_size > maximum_bytes:
+            oversized.append(name)
+            continue
+        reference = references[name]
+        try:
+            observed_sha256 = _sha256_file(path)
+        except OSError:
+            missing_or_unsafe.append(name)
+            continue
+        hashed_names.add(name)
+        if observed_sha256 != reference.get("sha256"):
+            hash_mismatches.append(name)
+        try:
+            payloads[name] = _load_json(path)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            parse_failures.append(f"{name}={exc}")
+    checks.extend(
+        [
+            _check(
+                "candidate_security_evidence_files",
+                "PASS" if len(evidence_files) == len(evidence_paths) and not missing_or_unsafe else "FAIL",
+                "all regular files" if not missing_or_unsafe else "missing_or_unsafe=" + ",".join(missing_or_unsafe),
+            ),
+            _check(
+                "candidate_security_evidence_sizes",
+                "PASS" if not oversized and len(evidence_files) == len(evidence_paths) else "FAIL",
+                "within configured limits" if not oversized else "oversized=" + ",".join(oversized),
+            ),
+            _check(
+                "candidate_security_evidence_hashes",
+                "PASS"
+                if len(hashed_names) == len(evidence_paths) and not hash_mismatches
+                else "FAIL",
+                (
+                    "all match receipt"
+                    if len(hashed_names) == len(evidence_paths) and not hash_mismatches
+                    else "unverifiable=" + ",".join(sorted(set(evidence_paths) - hashed_names))
+                    if not hash_mismatches
+                    else "mismatch=" + ",".join(hash_mismatches)
+                ),
+            ),
+            _check(
+                "candidate_security_evidence_json",
+                "PASS" if len(payloads) == len(evidence_paths) and not parse_failures else "FAIL",
+                "all parse" if not parse_failures else "; ".join(parse_failures),
+            ),
+        ]
+    )
+
+    source_head_sha = candidate_receipt.get("source_head_sha")
+    bundle_identifier = info.get("CFBundleIdentifier")
+    app_version = info.get("CFBundleShortVersionString")
+    sbom = payloads.get("sbom", {})
+    sbom_metadata = sbom.get("metadata") if isinstance(sbom.get("metadata"), dict) else {}
+    sbom_component = sbom_metadata.get("component") if isinstance(sbom_metadata.get("component"), dict) else {}
+    sbom_properties = sbom_metadata.get("properties") if isinstance(sbom_metadata.get("properties"), list) else []
+    property_map = {
+        row.get("name"): row.get("value")
+        for row in sbom_properties
+        if isinstance(row, dict) and _nonempty_string(row.get("name"))
+    }
+    components = sbom.get("components") if isinstance(sbom.get("components"), list) else []
+    component_purls = [row.get("purl") for row in components if isinstance(row, dict)]
+    allowed_sbom_versions = requirements.get("allowed_sbom_spec_versions")
+    allowed_sbom_versions = allowed_sbom_versions if isinstance(allowed_sbom_versions, list) else []
+    sbom_valid = (
+        sbom.get("bomFormat") == "CycloneDX"
+        and sbom.get("specVersion") in allowed_sbom_versions
+        and isinstance(sbom.get("serialNumber"), str)
+        and str(sbom.get("serialNumber")).startswith("urn:uuid:")
+        and sbom_component.get("name") == "mucaro-ai"
+        and sbom_component.get("version") == app_version
+        and bool(components)
+        and len(component_purls) == len(components)
+        and all(_nonempty_string(value) for value in component_purls)
+        and len(component_purls) == len(set(component_purls))
+        and property_map.get("mucaro:source-head-sha") == source_head_sha
+        and property_map.get("mucaro:bundle-identifier") == bundle_identifier
+        and property_map.get("mucaro:candidate-executable-sha256") == executable_sha256
+    )
+    checks.append(
+        _check(
+            "candidate_sbom_contract",
+            "PASS" if sbom_valid else "FAIL",
+            f"format={sbom.get('bomFormat')} spec={sbom.get('specVersion')} components={len(components)}",
+        )
+    )
+
+    vulnerability = payloads.get("vulnerability_scan", {})
+    vulnerability_schema = schemas.get("vulnerability_scan")
+    vulnerability_schema_errors = (
+        _schema_errors(vulnerability, vulnerability_schema)
+        if isinstance(vulnerability_schema, dict) and vulnerability
+        else ["schema or payload unavailable"]
+    )
+    vulnerability_summary = (
+        vulnerability.get("summary") if isinstance(vulnerability.get("summary"), dict) else {}
+    )
+    severity_total = sum(
+        value
+        for key in ("critical", "high", "moderate", "low", "unknown")
+        if isinstance((value := vulnerability_summary.get(key)), int) and not isinstance(value, bool)
+    )
+    vulnerability_thresholds = requirements.get("maximum_vulnerability_findings")
+    vulnerability_thresholds = vulnerability_thresholds if isinstance(vulnerability_thresholds, dict) else {}
+    vulnerability_binding_valid = (
+        not vulnerability_schema_errors
+        and vulnerability.get("source_head_sha") == source_head_sha
+        and vulnerability.get("bundle_identifier") == bundle_identifier
+        and vulnerability.get("app_version") == app_version
+        and vulnerability.get("candidate_executable_sha256") == executable_sha256
+        and vulnerability_summary.get("total") == severity_total
+        and all(
+            isinstance(vulnerability_summary.get(key), int)
+            and not isinstance(vulnerability_summary.get(key), bool)
+            and vulnerability_summary.get(key) <= maximum
+            for key, maximum in vulnerability_thresholds.items()
+        )
+    )
+    checks.append(
+        _check(
+            "candidate_vulnerability_scan_contract",
+            "PASS" if vulnerability_binding_valid else "FAIL",
+            (
+                f"total={vulnerability_summary.get('total')} known_patchable={vulnerability_summary.get('known_patchable')}"
+                if not vulnerability_schema_errors
+                else "schema=" + " | ".join(vulnerability_schema_errors[:3])
+            ),
+        )
+    )
+
+    malware = payloads.get("malware_scan", {})
+    malware_schema = schemas.get("malware_scan")
+    malware_schema_errors = (
+        _schema_errors(malware, malware_schema)
+        if isinstance(malware_schema, dict) and malware
+        else ["schema or payload unavailable"]
+    )
+    malware_summary = malware.get("summary") if isinstance(malware.get("summary"), dict) else {}
+    malware_binding_valid = (
+        not malware_schema_errors
+        and malware.get("source_head_sha") == source_head_sha
+        and malware.get("bundle_identifier") == bundle_identifier
+        and malware.get("app_version") == app_version
+        and malware.get("candidate_executable_sha256") == executable_sha256
+        and malware_summary.get("detections") == requirements.get("maximum_malware_detections")
+        and malware_summary.get("errors") == requirements.get("maximum_malware_scan_errors")
+    )
+    checks.append(
+        _check(
+            "candidate_malware_scan_contract",
+            "PASS" if malware_binding_valid else "FAIL",
+            (
+                f"files={malware_summary.get('files_scanned')} detections={malware_summary.get('detections')} errors={malware_summary.get('errors')}"
+                if not malware_schema_errors
+                else "schema=" + " | ".join(malware_schema_errors[:3])
+            ),
+        )
+    )
+
+    maximum_scan_age_hours = requirements.get("maximum_scan_age_hours")
+    maximum_scan_age_hours = maximum_scan_age_hours if isinstance(maximum_scan_age_hours, int) else 0
+    vulnerability_scanner = vulnerability.get("scanner") if isinstance(vulnerability.get("scanner"), dict) else {}
+    malware_scanner = malware.get("scanner") if isinstance(malware.get("scanner"), dict) else {}
+    freshness_values = {
+        "vulnerability_scanned_at": vulnerability.get("scanned_at"),
+        "vulnerability_database_updated_at": vulnerability_scanner.get("database_updated_at"),
+        "malware_scanned_at": malware.get("scanned_at"),
+        "malware_signatures_updated_at": malware_scanner.get("signatures_updated_at"),
+    }
+    stale = sorted(
+        name
+        for name, value in freshness_values.items()
+        if not _fresh_timestamp(value, now=now, maximum_age_hours=maximum_scan_age_hours)
+    )
+    checks.append(
+        _check(
+            "candidate_security_scan_freshness",
+            "PASS" if not stale else "FAIL",
+            f"within={maximum_scan_age_hours}h" if not stale else "stale_or_invalid=" + ",".join(stale),
+        )
+    )
+    return checks
 
 
 def build_macos_app_store_readiness(
@@ -285,8 +663,10 @@ def build_macos_app_store_readiness(
     app_path: Path | None = None,
     platform_name: str = sys.platform,
     runner: Runner = _default_runner,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     root = root.expanduser().resolve()
+    now = now.astimezone(UTC) if now is not None else datetime.now(UTC)
     profile_path = root / PROFILE_PATH
     try:
         profile = _load_json(profile_path)
@@ -336,6 +716,10 @@ def build_macos_app_store_readiness(
             executable_name = info.get("CFBundleExecutable")
             executable_name_valid = _nonempty_string(executable_name) and Path(str(executable_name)).name == executable_name
             executable_path = contents / "MacOS" / str(executable_name) if executable_name_valid else contents / "INVALID_EXECUTABLE"
+            try:
+                executable_sha256 = _sha256_file(executable_path) if executable_path.is_file() else None
+            except OSError:
+                executable_sha256 = None
             arbitrary_loads = bool(
                 info.get("NSAppTransportSecurity", {}).get("NSAllowsArbitraryLoads")
                 if isinstance(info.get("NSAppTransportSecurity"), dict)
@@ -380,8 +764,15 @@ def build_macos_app_store_readiness(
                     candidate_receipt_error = str(exc)
             else:
                 candidate_receipt_error = f"missing={candidate_receipt_path}"
+            candidate_receipt_schema = source_evidence.get("schemas", {}).get("candidate_receipt")
+            receipt_schema_errors = (
+                _schema_errors(candidate_receipt, candidate_receipt_schema)
+                if isinstance(candidate_receipt_schema, dict) and candidate_receipt
+                else ["schema or payload unavailable"]
+            )
             receipt_valid = (
                 candidate_receipt_error is None
+                and not receipt_schema_errors
                 and candidate_receipt.get("schema_version") == "mucaro_mac_app_store_candidate_receipt_v1"
                 and candidate_receipt.get("scope") == "self_contained_mac_app_store_candidate"
                 and candidate_receipt.get("build_profile") == "mac_app_store"
@@ -395,7 +786,8 @@ def build_macos_app_store_readiness(
                     _check(
                         "candidate_receipt",
                         "PASS" if receipt_valid else "FAIL",
-                        candidate_receipt_error or str(candidate_receipt_path),
+                        candidate_receipt_error
+                        or ("schema=" + " | ".join(receipt_schema_errors[:3]) if receipt_schema_errors else str(candidate_receipt_path)),
                     ),
                     _check(
                         "candidate_self_contained",
@@ -403,6 +795,16 @@ def build_macos_app_store_readiness(
                         str(candidate_receipt.get("scope") or "candidate receipt unavailable"),
                     ),
                 ]
+            )
+            artifact_checks.extend(
+                _candidate_supply_chain_checks(
+                    app,
+                    info=info,
+                    executable_sha256=executable_sha256,
+                    candidate_receipt=candidate_receipt,
+                    source_evidence=source_evidence,
+                    now=now,
+                )
             )
 
             local_receipt_path = contents / "Resources" / "mucaro-app-receipt.json"
@@ -579,6 +981,7 @@ def build_macos_app_store_readiness(
             "implement native user-selected file access and security-scoped bookmark lifecycle",
             "resolve coding execution and loopback server compatibility before enabling those capabilities in the Store profile",
             "complete privacy and third-party SDK data inventory before freezing PrivacyInfo.xcprivacy",
+            "generate exact-candidate SBOM, vulnerability, and malware evidence within the configured freshness window",
             "audit the exact signed candidate with this command before App Store Connect upload",
             "preserve App Store Connect processing and Apple App Review as external evidence gates",
         ],

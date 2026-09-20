@@ -125,7 +125,11 @@ The audit fails closed on malformed policy, path traversal, missing bundle
 metadata, arbitrary transport loads, escaping symlinks, source-bound wrappers,
 missing self-containment receipts, dangerous or undeclared entitlements,
 invalid signatures, expired or mismatched provisioning profiles, debug
-profiles, and development or Developer ID provisioning profiles.
+profiles, development or Developer ID provisioning profiles, missing or
+tampered supply-chain evidence, stale vulnerability or malware scans,
+cross-build evidence reuse, non-closing vulnerability counts, known patchable
+critical/high findings, malware detections, and scan errors. Candidate receipt
+and scanner contracts are versioned JSON Schemas under `_architecture/schemas`.
 
 When supplied a signed `.app`, the local audit can report only
 `MAC_APP_STORE_CANDIDATE_PROVISIONAL`. Mac App Distribution credentials,

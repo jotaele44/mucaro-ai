@@ -45,6 +45,29 @@
     "reject_escaping_symlinks": true,
     "reject_arbitrary_transport_loads": true
   },
+  "supply_chain_requirements": {
+    "candidate_receipt_schema_path": "_architecture/schemas/macos-app-store-candidate-receipt.schema.json",
+    "sbom_relative_path": "Contents/Resources/Security/mucaro-sbom.cdx.json",
+    "vulnerability_scan_relative_path": "Contents/Resources/Security/mucaro-vulnerability-scan.json",
+    "vulnerability_scan_schema_path": "_architecture/schemas/macos-app-store-vulnerability-scan.schema.json",
+    "malware_scan_relative_path": "Contents/Resources/Security/mucaro-malware-scan.json",
+    "malware_scan_schema_path": "_architecture/schemas/macos-app-store-malware-scan.schema.json",
+    "maximum_scan_age_hours": 72,
+    "maximum_evidence_file_bytes": {
+      "sbom": 52428800,
+      "vulnerability_scan": 10485760,
+      "malware_scan": 10485760
+    },
+    "allowed_sbom_spec_versions": ["1.5", "1.6"],
+    "require_component_purls": true,
+    "maximum_vulnerability_findings": {
+      "critical": 0,
+      "high": 0,
+      "known_patchable": 0
+    },
+    "maximum_malware_detections": 0,
+    "maximum_malware_scan_errors": 0
+  },
   "runtime_policy": {
     "downloaded_executable_code": "DENY",
     "unreviewed_plugins": "DENY",
