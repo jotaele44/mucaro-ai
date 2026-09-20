@@ -18,6 +18,14 @@ prototype lineage remains useful as historical evidence, but new development,
 release receipts, tags, governance checks, and packaging work must start from
 the canonical repo.
 
+## Flagpole End State
+
+`MUCARO_FLAGPOLE_V1` is the frozen umbrella development denominator. Its normative human-readable contract is `docs/MUCARO_FLAGPOLE_V1.md`; its machine-readable denominator and dependency DAG are `_architecture/mucaro_flagpole_v1.json`.
+
+The flagpole supersedes undefined "100% functionality" as the completion target without superseding narrower passed receipts. Development must inventory and reuse existing evidence, classify each required domain as IMPLEMENTED | PARTIAL | ABSENT | UNVERIFIED, and close only evidenced gaps. Mucaro is not the underlying model provider; session, context, and agent-run lifecycles remain separate; tool presence is not capability proof; and no aggregate readiness percentage can conceal a required-domain OPEN, BLOCKED, FAIL, or UNRESOLVED state.
+
+The frozen pre-flagpole baseline is main SHA `f8fb2e9fbf6ed2675b3ff4f3eb51e858d394c586`. This SHA is historical baseline identity, not a claim that later flagpole commits retain that HEAD.
+
 ## Current Position
 
 Mucaro AI has crossed the prototype-promotion line. The local product surface
