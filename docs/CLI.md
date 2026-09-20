@@ -75,6 +75,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis resample-raster RASTER_PATH --width N --height N --method METHOD` | Transactionally resample to explicit dimensions while preserving extent, CRS, band count, and NODATA declarations | 0 | 2 |
 | `mucaro gis derive-terrain RASTER_PATH --elevation-units meters` | Derive two-band slope/aspect output from a projected metre elevation grid with complete 3x3-neighborhood accounting | 0 | 2 |
 | `mucaro gis derive-hillshade RASTER_PATH --elevation-units meters` | Derive terrain-lineage-bound 0..255 hillshade with explicit azimuth/altitude and zero/NODATA separation | 0 | 2 |
+| `mucaro gis condition-depressions RASTER_PATH --elevation-units meters --maximum-fill-depth-m M` | Fill bounded enclosed depressions to their lowest reachable spill elevation with explicit outlet, no-breach, depth-limit, and volume receipts | 0 | 2 |
 | `mucaro gis derive-d8-flow RASTER_PATH --elevation-units meters` | Derive four-band D8 candidates, accumulation, contributing area, and explicit terminal-state output on a bounded projected-metre grid | 0 | 2 |
 | `mucaro gis validate-corpus MANIFEST_PATH` | Validate frozen authoritative GIS corpus bytes, provenance, explicit asset types, vector identities/geometries, and raster grids/value accounting | 0 | 2 |
 | `mucaro gis map-export-manifest OUTPUT_PATH --layer PATH CRS ...` | Bind an existing map/export artifact to renderer identity, extent, CRS, and source-layer hashes | 0 | 2 |
@@ -258,7 +259,14 @@ slope and clockwise-from-north aspect, and emits values only for complete valid
 terrain report and raster hash, requires explicit light azimuth and altitude,
 and writes float32 values from 0 through 255 so a zero-valued shadow remains
 distinct from -9999 NODATA. It is a bounded direct-light visualization model,
-not measured radiance or cast-shadow analysis. D8 flow derivation requires the
+not measured radiance or cast-shadow analysis. Depression conditioning requires
+the same explicit metre units and projected, axis-aligned grid. Its 8-connected
+priority flood treats valid raster-edge and NODATA-adjacent cells as unchanged
+outlets, raises enclosed cells only to the lowest reachable spill elevation,
+and writes conditioned elevation plus fill depth. The required
+`--maximum-fill-depth-m` guard fails before publication when exceeded; the
+receipt closes raised/unchanged cells and affine-pixel fill volume. It does not
+breach barriers or add epsilon gradients. D8 flow derivation requires the
 same explicit metre units and projected, axis-aligned grid. Its four-band
 float64 output records an ESRI-compatible candidate-direction bitmask, upstream
 cell count including self, affine contributing area in square metres, and an
@@ -266,9 +274,9 @@ explicit state code. Only complete valid 3x3 neighborhoods can route. Perimeter
 or NODATA-adjacent cells are boundary terminals, and sinks, flats, or tied top
 gradients remain terminal `UNRESOLVED` states rather than receiving synthetic
 fill or arbitrary direction. The terminal accumulated-cell total must equal the
-valid source-cell count. This bounded derivative is not depression conditioning,
-watershed or stream delineation, runoff, flood, groundwater, or hydraulic
-modeling. The real corpus, terrain, and D8 operations remain bounded and do not
+valid source-cell count. These bounded hydrology derivatives are not watershed
+or stream delineation, runoff, flood, groundwater, or hydraulic modeling. The
+real corpus, terrain, conditioning, and D8 operations remain bounded and do not
 establish broad raster, remote-sensing, hydrology, or bathymetry readiness.
 Numeric zero, NODATA, outside, null/empty, and unresolved states remain distinct.
 
@@ -519,6 +527,18 @@ approved and audited.
 | `ERROR_GIS_HILLSHADE_TERRAIN` | the intermediate slope/aspect manifestation violates the certified terrain semantics |
 | `ERROR_GIS_HILLSHADE_EMPTY` | no complete valid terrain neighborhood exists from which to derive hillshade |
 | `ERROR_GIS_HILLSHADE` | hillshade derivation or output verification failed before transactional publication |
+| `ERROR_GIS_DEPRESSION_FILL_NOT_FOUND` | depression conditioning could not find the declared elevation raster |
+| `ERROR_GIS_DEPRESSION_FILL_ENGINE_UNAVAILABLE` | Rasterio or NumPy is unavailable for depression conditioning |
+| `ERROR_GIS_DEPRESSION_FILL_BAND` | depression conditioning received an invalid one-based elevation band |
+| `ERROR_GIS_DEPRESSION_FILL_CRS` | depression conditioning received a missing, geographic, or unresolvable projected CRS |
+| `ERROR_GIS_DEPRESSION_FILL_UNITS` | depression conditioning did not receive explicit metre vertical units or a projected one-metre horizontal unit |
+| `ERROR_GIS_DEPRESSION_FILL_TRANSFORM` | depression conditioning received a rotated, sheared, or zero-resolution grid |
+| `ERROR_GIS_DEPRESSION_FILL_DIMENSIONS` | depression conditioning received a grid smaller than 3x3 or larger than 1,000,000 cells |
+| `ERROR_GIS_DEPRESSION_FILL_EMPTY` | depression conditioning received no valid elevation cells |
+| `ERROR_GIS_DEPRESSION_FILL_OUTLETS` | depression conditioning could not identify a valid raster-edge or NODATA-adjacent outlet |
+| `ERROR_GIS_DEPRESSION_FILL_LIMIT` | the configured depth guard is invalid or the required fill exceeds it |
+| `ERROR_GIS_DEPRESSION_FILL_GRAPH` | the priority-flood traversal did not classify every valid source cell |
+| `ERROR_GIS_DEPRESSION_FILL` | depression conditioning or output verification failed before transactional publication |
 | `ERROR_GIS_D8_NOT_FOUND` | D8 derivation could not find the declared elevation raster |
 | `ERROR_GIS_D8_ENGINE_UNAVAILABLE` | Rasterio or NumPy is unavailable for D8 derivation |
 | `ERROR_GIS_D8_BAND` | D8 derivation received an invalid one-based elevation band |
@@ -955,9 +975,10 @@ PROJ candidate/grid selection, explicit EPSG axis-order controls, bounded WGS84
 antimeridian and polar line/polygon controls, and unresolved invalid
 longitude/latitude residue, a frozen real USGS 3DEP raster manifestation,
 bounded projected-metre slope/aspect controls, terrain-lineage-bound hillshade,
-and bounded D8 flow direction/accumulation with explicit terminal ambiguity.
-The current committed denominator is 57 cases across 24 operations, including
-23 fail-closed negative cases.
+bounded priority-flood depression conditioning with explicit depth and volume
+accounting, and bounded D8 flow direction/accumulation with explicit terminal
+ambiguity. The current committed denominator is 62 cases across 25 operations,
+including 25 fail-closed negative cases.
 It returns `GIS_EVAL_OK` only when the fixture and every case pass;
 `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives automation a hard
 regression signal.

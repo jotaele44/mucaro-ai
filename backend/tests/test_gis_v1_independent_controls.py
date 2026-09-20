@@ -160,10 +160,53 @@ def test_d8_tie_control_preserves_all_top_candidates_without_routing() -> None:
     assert expected["terminal_accumulation_total"] == 9.0
 
 
+def test_depression_bowl_control_closes_volume_without_mucaro_engine() -> None:
+    _, rows = controls()
+    row = rows["HYDRO-003"]
+    grid = row["input"]["grid"]
+    spill_elevation = row["expected"]["spill_elevation_m"]
+    boundary = [
+        value
+        for r, values in enumerate(grid)
+        for c, value in enumerate(values)
+        if r in {0, len(grid) - 1} or c in {0, len(values) - 1}
+    ]
+    interior = [value for values in grid[1:-1] for value in values[1:-1]]
+    depths = [max(spill_elevation - value, 0.0) for value in interior]
+    expected = row["expected"]
+
+    assert min(boundary) == spill_elevation
+    assert len(boundary) == expected["outlet_seed_count"]
+    assert sum(depth > 0.0 for depth in depths) == expected["raised_cell_count"]
+    assert len(boundary) == expected["unchanged_cell_count"]
+    assert max(depths) == expected["maximum_fill_depth_m"]
+    assert sum(depths) == expected["total_fill_depth_m"]
+    assert sum(depths) * row["input"]["cell_size_m"] ** 2 == expected["fill_volume_cubic_metres"]
+
+
+def test_depression_nodata_adjacency_control_identifies_outlets_without_mucaro_engine() -> None:
+    _, rows = controls()
+    row = rows["HYDRO-004"]
+    grid = row["input"]["grid"]
+    nodata_row, nodata_column = row["expected"]["nodata_coordinate"]
+    adjacent = [
+        (nodata_row + row_delta, nodata_column + column_delta)
+        for row_delta in (-1, 0, 1)
+        for column_delta in (-1, 0, 1)
+        if (row_delta, column_delta) != (0, 0)
+        and grid[nodata_row + row_delta][nodata_column + column_delta] is not None
+    ]
+    representative_row, representative_column = row["expected"]["representative_outlet_coordinate"]
+
+    assert len(adjacent) == row["expected"]["nodata_adjacent_outlet_count"]
+    assert (representative_row, representative_column) in adjacent
+    assert grid[representative_row][representative_column] == row["expected"]["representative_outlet_elevation_m"]
+
+
 def test_control_manifest_has_no_unbounded_claims() -> None:
     payload, _ = controls()
     assert "vertical CRS certification" in payload["explicit_nonclaims"]
     assert "time-dependent coordinate operation certification" in payload["explicit_nonclaims"]
     assert "unbounded antimeridian, polar, or large-geometry certification" in payload["explicit_nonclaims"]
-    assert "depression filling, breaching, flat resolution, watershed delineation, stream extraction, runoff, flood, groundwater, or hydraulic modeling" in payload["explicit_nonclaims"]
-    assert len(payload["controls"]) == 14
+    assert "unbounded depression conditioning, depression breaching, flat routing, watershed delineation, stream extraction, runoff, flood, groundwater, or hydraulic modeling" in payload["explicit_nonclaims"]
+    assert len(payload["controls"]) == 16

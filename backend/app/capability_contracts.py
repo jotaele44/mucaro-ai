@@ -217,6 +217,16 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             "strict_descent_edges",
             "accumulation_range_bounded",
             "contributing_area_matches_cell_area",
+            "seed_accounting_closed",
+            "processed_accounting_closed",
+            "change_accounting_closed",
+            "nodata_preserved",
+            "outlet_seeds_unchanged",
+            "elevations_never_lowered",
+            "fill_depth_matches_elevation_delta",
+            "fill_depth_nonnegative",
+            "maximum_fill_depth_within_limit",
+            "fill_volume_accounting_closed",
             "provenance_complete",
         ):
             if key in invariants:
@@ -737,6 +747,75 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                     _contract_check("hillshade.fully_lit_accounting", all(isinstance(value, int) for value in (valid, fully_lit)) and 0 <= fully_lit <= valid, "hillshade fully-lit count must be bounded by valid cells"),
                     _contract_check("hillshade.band_accounting", output_band.get("valid_cell_count") == valid and output_band.get("nodata_cell_count") == nodata, "hillshade band accounting must match report accounting"),
                     _contract_check("hillshade.range", isinstance(minimum, (int, float)) and isinstance(maximum, (int, float)) and 0.0 <= minimum <= maximum <= 255.0, "hillshade output values must remain within 0..255"),
+                ]
+            )
+    elif operation == "condition_raster_depressions":
+        accounting = report.get("depression_fill_accounting")
+        output_bands = _dotted(report, "output.bands")
+        expected_band_names = [
+            "conditioned_elevation_meters",
+            "depression_fill_depth_meters",
+        ]
+        output_band_receipts_valid = (
+            isinstance(output_bands, list)
+            and len(output_bands) == 2
+            and all(isinstance(row, dict) for row in output_bands)
+        )
+        maximum_fill_depth = _dotted(report, "parameters.maximum_fill_depth_m")
+        checks.extend(
+            [
+                _contract_check("depression_fill.adapter", _dotted(report, "parameters.adapter") == "priority_flood_8_connected_open_boundary_v1", "depression-fill adapter identity must be frozen"),
+                _contract_check("depression_fill.band", isinstance(_dotted(report, "parameters.band"), int) and _dotted(report, "parameters.band") >= 1, "depression-fill band must be one-based"),
+                _contract_check("depression_fill.elevation_units", _dotted(report, "parameters.elevation_units") == "meters", "depression-fill elevation units must be explicitly meters"),
+                _contract_check("depression_fill.horizontal_units", _dotted(report, "parameters.horizontal_units") == "meters" and _dotted(report, "parameters.horizontal_unit_factor") == 1.0, "depression-fill horizontal units must resolve to metres"),
+                _contract_check("depression_fill.connectivity", _dotted(report, "parameters.connectivity") == 8, "depression-fill connectivity must be exact"),
+                _contract_check("depression_fill.boundary_policy", _dotted(report, "parameters.boundary_policy") == "raster_edge_and_nodata_adjacency_are_outlets", "depression-fill boundary policy must preserve edge and NODATA outlets"),
+                _contract_check("depression_fill.fill_policy", _dotted(report, "parameters.fill_policy") == "raise_enclosed_cells_to_lowest_reachable_spill_elevation", "depression-fill policy must be frozen"),
+                _contract_check("depression_fill.flat_policy", _dotted(report, "parameters.flat_policy") == "preserve_spill_elevation_no_epsilon_gradient", "depression-fill must not synthesize epsilon gradients"),
+                _contract_check("depression_fill.breach_policy", _dotted(report, "parameters.breach_policy") == "NONE", "depression-fill must not silently breach barriers"),
+                _contract_check("depression_fill.maximum_fill_depth", _is_number(maximum_fill_depth) and float(maximum_fill_depth) >= 0.0, "depression-fill maximum depth must be finite and non-negative"),
+                _contract_check("depression_fill.output_hash", bool(_dotted(report, "output.sha256")), "depression-fill output hash is required"),
+                _contract_check("depression_fill.crs", _dotted(report, "source.crs") == _dotted(report, "output.crs"), "depression-fill source and output CRS must match"),
+                _contract_check("depression_fill.transform", _dotted(report, "source.transform") == _dotted(report, "output.transform"), "depression-fill source and output transforms must match"),
+                _contract_check("depression_fill.bounds", _dotted(report, "source.bounds") == _dotted(report, "output.bounds"), "depression-fill source and output bounds must match"),
+                _contract_check("depression_fill.width", _dotted(report, "source.width") == _dotted(report, "output.width"), "depression-fill source and output widths must match"),
+                _contract_check("depression_fill.height", _dotted(report, "source.height") == _dotted(report, "output.height"), "depression-fill source and output heights must match"),
+                _contract_check("depression_fill.output_band_count", _dotted(report, "output.band_count") == 2, "depression-fill output must contain two semantic bands"),
+                _contract_check("depression_fill.output_dtypes", _dotted(report, "output.dtypes") == ["float64"] * 2, "depression-fill output bands must be float64"),
+                _contract_check("depression_fill.output_nodata", _dotted(report, "output.nodata_values") == [-9999.0] * 2, "depression-fill output NODATA declaration must be frozen"),
+                _contract_check("depression_fill.output_descriptions", _dotted(report, "output.descriptions") == expected_band_names, "depression-fill output band descriptions must be exact"),
+                _contract_check("depression_fill.output_bands", output_band_receipts_valid, "depression-fill output band receipts are required"),
+                _contract_check("depression_fill.accounting", isinstance(accounting, dict), "depression-fill accounting is required"),
+            ]
+        )
+        if isinstance(accounting, dict) and output_band_receipts_valid:
+            total = accounting.get("total_cell_count")
+            valid = accounting.get("source_valid_cell_count")
+            nodata = accounting.get("source_nodata_cell_count")
+            seeds = accounting.get("outlet_seed_cell_count")
+            interior = accounting.get("interior_nonseed_cell_count")
+            processed = accounting.get("processed_valid_cell_count")
+            raised = accounting.get("raised_cell_count")
+            unchanged = accounting.get("unchanged_cell_count")
+            components = accounting.get("depression_component_count")
+            observed_maximum = accounting.get("maximum_fill_depth_m")
+            total_fill_depth = accounting.get("total_fill_depth_m")
+            fill_volume = accounting.get("fill_volume_cubic_metres")
+            cell_area = _dotted(report, "parameters.cell_area_square_metres")
+            conditioned_band, fill_depth_band = output_bands
+            checks.extend(
+                [
+                    _contract_check("depression_fill.source_accounting", all(isinstance(value, int) and not isinstance(value, bool) for value in (total, valid, nodata)) and valid + nodata == total, "depression-fill source valid and NODATA counts must close"),
+                    _contract_check("depression_fill.seed_accounting", all(isinstance(value, int) and not isinstance(value, bool) for value in (valid, seeds, interior)) and seeds > 0 and seeds + interior == valid, "depression-fill outlet and interior counts must close"),
+                    _contract_check("depression_fill.processed_accounting", all(isinstance(value, int) and not isinstance(value, bool) for value in (valid, processed)) and processed == valid, "depression-fill must process every valid cell"),
+                    _contract_check("depression_fill.change_accounting", all(isinstance(value, int) and not isinstance(value, bool) for value in (valid, raised, unchanged)) and raised + unchanged == valid, "depression-fill raised and unchanged counts must close"),
+                    _contract_check("depression_fill.component_accounting", all(isinstance(value, int) and not isinstance(value, bool) for value in (raised, components)) and (components == 0 if raised == 0 else 0 < components <= raised), "depression components must be bounded by raised cells"),
+                    _contract_check("depression_fill.maximum_within_limit", _is_number(observed_maximum) and _is_number(maximum_fill_depth) and 0.0 <= float(observed_maximum) <= float(maximum_fill_depth) + 1e-12, "observed fill depth must remain within the explicit maximum"),
+                    _contract_check("depression_fill.volume_accounting", _is_number(fill_volume) and _is_number(total_fill_depth) and _is_number(cell_area) and math.isclose(float(fill_volume), float(total_fill_depth) * float(cell_area), rel_tol=0.0, abs_tol=max(1e-9, abs(float(fill_volume)) * 1e-12)), "fill volume must equal total depth times affine cell area"),
+                    _contract_check("depression_fill.band_accounting", all(band.get("valid_cell_count") == valid and band.get("nodata_cell_count") == nodata for band in output_bands), "every depression-fill band must preserve source valid and NODATA accounting"),
+                    _contract_check("depression_fill.band_names", [band.get("name") for band in output_bands] == expected_band_names, "depression-fill band receipt names must match output descriptions"),
+                    _contract_check("depression_fill.depth_range", _is_number(fill_depth_band.get("minimum")) and _is_number(fill_depth_band.get("maximum")) and float(fill_depth_band.get("minimum")) >= 0.0 and math.isclose(float(fill_depth_band.get("maximum")), float(observed_maximum), rel_tol=0.0, abs_tol=1e-12), "fill-depth band must be non-negative and match maximum accounting"),
+                    _contract_check("depression_fill.conditioned_range", _is_number(conditioned_band.get("minimum")) and _is_number(conditioned_band.get("maximum")) and float(conditioned_band.get("minimum")) <= float(conditioned_band.get("maximum")), "conditioned elevation range must be ordered"),
                 ]
             )
     elif operation == "derive_raster_d8_flow":
@@ -1270,6 +1349,12 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "gradient_tie_tolerance",
                 "terminal_accumulation_cell_count_total",
                 "terminal_contributing_area_square_metres_total",
+                "depression_conditioning_adapter",
+                "maximum_fill_depth_m",
+                "outlet_seed_cell_count",
+                "raised_cell_count",
+                "depression_component_count",
+                "fill_volume_cubic_metres",
             ),
             invariants=(
                 "row conservation or explicit retained/excluded counts",
@@ -1297,6 +1382,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "terrain derivation requires projected horizontal metres and explicit vertical metres, preserves grid identity, and separates complete neighborhoods, NODATA, and flat aspect",
                 "hillshade binds the exact terrain report and raster hashes, explicit sun azimuth/altitude, 0..255 value range, and valid/NODATA/shadow accounting",
                 "D8 hydrology requires projected horizontal metres and explicit vertical metres, preserves tied candidate directions, leaves boundaries/sinks/flats/ties terminal, and closes terminal accumulation and contributing-area accounting",
+                "priority-flood depression conditioning preserves edge and NODATA outlets, never lowers elevations, requires an explicit maximum fill depth, and closes changed-cell and fill-volume accounting",
                 "map/export provenance binds output hash, extent, CRS, renderer identity, and every declared source-layer hash",
             ),
             positive_regression_gates=(
@@ -1322,6 +1408,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "analytic terrain fixture proves slope/aspect orientation and complete-neighborhood accounting on a projected metre grid",
                 "analytic hillshade fixture proves light-direction semantics, terrain lineage, 0..255 bounds, and zero-shadow versus NODATA separation",
                 "analytic D8 fixtures prove monotonic direction, tie preservation, strict-descent edges, and terminal contribution conservation",
+                "analytic priority-flood fixtures prove enclosed-bowl fill, unchanged monotonic terrain, NODATA-adjacent outlet preservation, explicit depth limiting, and volume closure",
                 "GIS report contract validator accepts real saved measurement receipts and rejects weak provenance or false accounting",
                 "GIS eval manifest runs positive and negative fixtures through the supported CLI boundary",
                 "map export fixture preserves renderer identity plus source and derived layer hashes",
@@ -1346,6 +1433,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "terrain derivation fails closed on geographic/non-metre/rotated grids, invalid bands, and grids outside the bounded dimensions",
                 "hillshade fails closed on invalid azimuth or altitude, absent valid terrain neighborhoods, and terrain lineage that violates slope/aspect mask semantics",
                 "D8 hydrology fails closed on geographic/non-metre/rotated grids, invalid bands or tolerances, absent complete neighborhoods, and grids outside the bounded cell limit",
+                "depression conditioning fails closed on geographic/non-metre/rotated grids, invalid bands or depth limits, excessive required fill, and grids outside the bounded cell limit",
                 "real-corpus validation fails closed on byte drift, path escape, unknown asset type, vector ID/schema/geometry drift, or raster grid/value drift",
                 "map/export provenance fails closed on empty artifacts, invalid extents, missing layer CRS, or absent renderer identity",
                 "GIS report contract validation fails when warning status, source hashes, CRS, or asserted accounting are missing or inconsistent",
@@ -1364,7 +1452,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "topology policy and overlay operations extend beyond explicit planar make_valid and the current Polygon/MultiPolygon boundary",
                 "independently frozen local datum-grid transformations, vertical CRS, time-dependent operations, and broader axis-order cases are certified",
                 "ellipsoidal hole-orientation and large-geometry edge cases close beyond the bounded antimeridian and polar control corpus",
-                "broader vector/raster formats, fractional zonal coverage, additional resampling kernels, remote sensing, broader terrain and hydrology algorithms beyond bounded D8, bathymetry, and temporal GIS are receipt-backed",
+                "broader vector/raster formats, fractional zonal coverage, additional resampling kernels, remote sensing, hydrology beyond bounded priority-flood conditioning and D8, bathymetry, and temporal GIS are receipt-backed",
                 "rendered-map visual correctness and larger, more diverse real vector/raster corpora are independently certified",
             ),
         ),
