@@ -1,9 +1,9 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 52,
-    "operation_count": 23,
-    "negative_case_count": 20
+    "case_count": 57,
+    "operation_count": 24,
+    "negative_case_count": 23
   },
   "cases": [
     {
@@ -2566,6 +2566,171 @@
       },
       "expect_error": true,
       "expected_status": "ERROR_GIS_HILLSHADE_EMPTY",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "raster_d8_east_descent_closes_terminal_contributions",
+      "operation": "raster_d8_flow",
+      "parameters": {
+        "band": 1,
+        "elevation_units": "meters",
+        "elevation_tolerance_m": 0,
+        "gradient_tie_tolerance": 1e-12
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [
+            [
+              [4, 3, 2, 1, 0],
+              [4, 3, 2, 1, 0],
+              [4, 3, 2, 1, 0],
+              [4, 3, 2, 1, 0],
+              [4, 3, 2, 1, 0]
+            ]
+          ]
+        }
+      },
+      "expected_status": "GIS_RASTER_D8_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "projected_crs_required": true,
+        "horizontal_units_metre": true,
+        "vertical_units_metre": true,
+        "axis_aligned_transform": true,
+        "dimensions_preserved": true,
+        "crs_preserved": true,
+        "transform_preserved": true,
+        "bounds_preserved": true,
+        "output_band_count_exact": true,
+        "source_cell_accounting_closed": true,
+        "state_accounting_closed": true,
+        "flow_edge_accounting_closed": true,
+        "terminal_state_accounting_closed": true,
+        "direction_state_accounting_closed": true,
+        "terminal_contribution_accounting_closed": true,
+        "terminal_area_accounting_closed": true,
+        "strict_descent_edges": true,
+        "accumulation_range_bounded": true,
+        "contributing_area_matches_cell_area": true,
+        "transactional_output_published": true
+      },
+      "expected_fields": {
+        "parameters.adapter": "d8_steepest_descent_complete_neighborhood_v1",
+        "parameters.boundary_policy": "terminal_no_external_elevation_assumption",
+        "parameters.tie_policy": "PRESERVE_CANDIDATE_BITMASK_NO_ROUTING",
+        "direction_counts.E": 9,
+        "state_counts.FLOW_UNIQUE": 9,
+        "state_counts.BOUNDARY_TERMINAL": 16,
+        "flow_accounting.total_cell_count": 25,
+        "flow_accounting.complete_neighborhood_cell_count": 9,
+        "flow_accounting.flow_edge_count": 9,
+        "flow_accounting.terminal_cell_count": 16,
+        "flow_accounting.terminal_accumulation_cell_count_total": 25.0,
+        "flow_accounting.maximum_accumulation_cell_count": 4.0,
+        "output.band_count": 4,
+        "output.bands.0.minimum": 0.0,
+        "output.bands.0.maximum": 1.0
+      }
+    },
+    {
+      "case_id": "raster_d8_tied_candidates_remain_unresolved",
+      "operation": "raster_d8_flow",
+      "parameters": {
+        "band": 1,
+        "elevation_units": "meters"
+      },
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [
+            [
+              [20, 20, 20],
+              [20, 10, 9],
+              [20, 9, 20]
+            ]
+          ]
+        }
+      },
+      "expected_status": "GIS_RASTER_D8_WARN",
+      "expected_warnings": ["GIS_D8_TIES_UNRESOLVED"],
+      "expected_invariants": {
+        "state_accounting_closed": true,
+        "flow_edge_accounting_closed": true,
+        "terminal_contribution_accounting_closed": true,
+        "terminal_area_accounting_closed": true,
+        "transactional_output_published": true
+      },
+      "expected_fields": {
+        "state_counts.TIE_UNRESOLVED": 1,
+        "state_counts.BOUNDARY_TERMINAL": 8,
+        "flow_accounting.tie_candidate_direction_count": 2,
+        "flow_accounting.nonzero_direction_cell_count": 1,
+        "flow_accounting.flow_edge_count": 0,
+        "flow_accounting.terminal_accumulation_cell_count_total": 9.0,
+        "output.bands.0.maximum": 5.0
+      }
+    },
+    {
+      "case_id": "raster_d8_geographic_crs_fails_closed",
+      "operation": "raster_d8_flow",
+      "parameters": {"band": 1, "elevation_units": "meters"},
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [-67, 19, 0.01, 0.01],
+          "bands": [[[4, 3, 2], [4, 3, 2], [4, 3, 2]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_D8_CRS",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "raster_d8_vertical_feet_fails_closed",
+      "operation": "raster_d8_flow",
+      "parameters": {"band": 1, "elevation_units": "feet"},
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [[[4, 3, 2], [4, 3, 2], [4, 3, 2]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_D8_UNITS",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "raster_d8_missing_complete_neighborhood_fails_closed",
+      "operation": "raster_d8_flow",
+      "parameters": {"band": 1, "elevation_units": "meters"},
+      "inputs": {
+        "raster": {
+          "format": "raster",
+          "dtype": "float32",
+          "crs": "EPSG:32620",
+          "nodata": -9999,
+          "origin": [500000, 2000000, 1, 1],
+          "bands": [[[-9999, -9999, -9999], [-9999, 1, -9999], [-9999, -9999, -9999]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_D8_NO_COMPLETE_NEIGHBORHOOD",
       "expected_warnings": []
     }
   ]

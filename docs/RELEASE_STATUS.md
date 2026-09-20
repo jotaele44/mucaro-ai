@@ -287,9 +287,10 @@ Observed success markers:
   vector-raster cell-center zonal analysis, frozen Census TIGERweb and USGS
   vector snapshots, one frozen USGS 3DEP raster export, bounded projected-metre
   slope/aspect terrain derivation, terrain-lineage-bound hillshade with explicit
-  illumination and zero/NODATA separation, and renderer/layer-bound map-export
-  provenance. `mucaro eval gis` runs 52 committed cases across 23 operations,
-  including 20
+  illumination and zero/NODATA separation, bounded D8 direction/accumulation
+  with explicit boundary/sink/flat/tie terminal states, and renderer/layer-bound
+  map-export provenance. `mucaro eval gis` runs 57 committed cases across 24 operations,
+  including 23
   fail-closed negative cases for CRS, dimensions, formats, raster extents,
   vector-raster mismatch, resampling, and export identity, plus bounded
   always-XY axis-order and antimeridian/polar line/polygon controls. The CRS
@@ -306,7 +307,7 @@ Observed success markers:
   fractional zonal coverage, independent rendered-map validation, larger and
   more diverse real raster/vector corpora, additional vector/raster formats and
   terrain algorithms beyond bounded slope/aspect/hillshade, remote sensing,
-  hydrology, bathymetry, and
+  hydrology beyond bounded unconditioned D8, bathymetry, and
   temporal GIS are proven.
   State-of-the-art OCR
   remains open, but a narrow local image OCR receipt candidate now preserves

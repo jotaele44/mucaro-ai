@@ -12,12 +12,12 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 52,
-        "passed": 52,
+        "cases": 57,
+        "passed": 57,
         "failed": 0,
-        "positive_cases": 32,
-        "negative_cases": 20,
-        "operations": 23,
+        "positive_cases": 34,
+        "negative_cases": 23,
+        "operations": 24,
         "operation_names": [
             "bbox_filter",
             "clip_bbox",
@@ -31,6 +31,7 @@ def test_gis_eval_default_fixture_covers_core_operations():
             "overlay",
             "point_in_polygon",
             "raster_clip",
+            "raster_d8_flow",
             "raster_hillshade",
             "raster_inspect",
             "raster_resample",
@@ -79,6 +80,11 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["raster_hillshade_invalid_azimuth_fails_closed"]["observed_status"] == "ERROR_GIS_HILLSHADE_AZIMUTH"
     assert by_id["raster_hillshade_invalid_altitude_fails_closed"]["observed_status"] == "ERROR_GIS_HILLSHADE_ALTITUDE"
     assert by_id["raster_hillshade_all_nodata_fails_closed"]["observed_status"] == "ERROR_GIS_HILLSHADE_EMPTY"
+    assert by_id["raster_d8_east_descent_closes_terminal_contributions"]["observed_status"] == "GIS_RASTER_D8_OK"
+    assert by_id["raster_d8_tied_candidates_remain_unresolved"]["observed_status"] == "GIS_RASTER_D8_WARN"
+    assert by_id["raster_d8_geographic_crs_fails_closed"]["observed_status"] == "ERROR_GIS_D8_CRS"
+    assert by_id["raster_d8_vertical_feet_fails_closed"]["observed_status"] == "ERROR_GIS_D8_UNITS"
+    assert by_id["raster_d8_missing_complete_neighborhood_fails_closed"]["observed_status"] == "ERROR_GIS_D8_NO_COMPLETE_NEIGHBORHOOD"
     assert by_id["csv_points_skip_invalid_rows"]["observed_status"] == "GIS_CSV_POINTS_WARN"
     assert by_id["csv_points_skip_invalid_rows"]["observed_warnings"] == ["GIS_CSV_INVALID_ROWS_SKIPPED"]
     assert by_id["bbox_filter_intersects_with_null_residue"]["observed_status"] == "GIS_BBOX_FILTER_WARN"

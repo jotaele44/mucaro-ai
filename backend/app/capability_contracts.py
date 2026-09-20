@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
 
 CAPABILITY_CONTRACT_SCHEMA_VERSION = "mucaro_advanced_capability_contracts_v1"
 CAPABILITY_OUTPUT_CONTRACT_OK = "CAPABILITY_OUTPUT_CONTRACT_OK"
@@ -208,6 +208,15 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             "aspect_cell_accounting_closed",
             "neighborhood_accounting_closed",
             "flat_aspect_accounting_closed",
+            "state_accounting_closed",
+            "flow_edge_accounting_closed",
+            "terminal_state_accounting_closed",
+            "direction_state_accounting_closed",
+            "terminal_contribution_accounting_closed",
+            "terminal_area_accounting_closed",
+            "strict_descent_edges",
+            "accumulation_range_bounded",
+            "contributing_area_matches_cell_area",
             "provenance_complete",
         ):
             if key in invariants:
@@ -730,6 +739,124 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                     _contract_check("hillshade.range", isinstance(minimum, (int, float)) and isinstance(maximum, (int, float)) and 0.0 <= minimum <= maximum <= 255.0, "hillshade output values must remain within 0..255"),
                 ]
             )
+    elif operation == "derive_raster_d8_flow":
+        accounting = report.get("flow_accounting")
+        state_counts = report.get("state_counts")
+        direction_counts = report.get("direction_counts")
+        output_bands = _dotted(report, "output.bands")
+        expected_band_names = [
+            "d8_candidate_bitmask_esri",
+            "flow_accumulation_cells_including_self",
+            "contributing_area_square_metres",
+            "flow_state_code",
+        ]
+        output_band_receipts_valid = (
+            isinstance(output_bands, list)
+            and len(output_bands) == 4
+            and all(isinstance(row, dict) for row in output_bands)
+        )
+        expected_states = {
+            "FLOW_UNIQUE": 1,
+            "BOUNDARY_TERMINAL": 2,
+            "SINK_UNRESOLVED": 3,
+            "FLAT_UNRESOLVED": 4,
+            "TIE_UNRESOLVED": 5,
+        }
+        expected_directions = {
+            "E": 1,
+            "SE": 2,
+            "S": 4,
+            "SW": 8,
+            "W": 16,
+            "NW": 32,
+            "N": 64,
+            "NE": 128,
+        }
+        checks.extend(
+            [
+                _contract_check("d8.adapter", _dotted(report, "parameters.adapter") == "d8_steepest_descent_complete_neighborhood_v1", "D8 adapter identity must be frozen"),
+                _contract_check("d8.band", isinstance(_dotted(report, "parameters.band"), int) and _dotted(report, "parameters.band") >= 1, "D8 band must be one-based"),
+                _contract_check("d8.elevation_units", _dotted(report, "parameters.elevation_units") == "meters", "D8 elevation units must be explicitly meters"),
+                _contract_check("d8.horizontal_units", _dotted(report, "parameters.horizontal_units") == "meters" and _dotted(report, "parameters.horizontal_unit_factor") == 1.0, "D8 horizontal units must resolve to metres"),
+                _contract_check("d8.neighborhood_policy", _dotted(report, "parameters.neighborhood_policy") == "complete_3x3", "D8 neighborhood policy must be complete 3x3"),
+                _contract_check("d8.boundary_policy", _dotted(report, "parameters.boundary_policy") == "terminal_no_external_elevation_assumption", "D8 boundary policy must fail closed on unknown external elevation"),
+                _contract_check("d8.sink_policy", _dotted(report, "parameters.sink_policy") == "UNRESOLVED_NO_FILL", "D8 sinks must remain unresolved without synthetic fill"),
+                _contract_check("d8.flat_policy", _dotted(report, "parameters.flat_policy") == "UNRESOLVED_NO_ROUTING", "D8 flats must remain unresolved without synthetic routing"),
+                _contract_check("d8.tie_policy", _dotted(report, "parameters.tie_policy") == "PRESERVE_CANDIDATE_BITMASK_NO_ROUTING", "D8 ties must preserve candidates without arbitrary routing"),
+                _contract_check("d8.accumulation_policy", _dotted(report, "parameters.accumulation_policy") == "upstream_cell_count_including_self", "D8 accumulation semantics must be frozen"),
+                _contract_check("d8.direction_convention", _dotted(report, "parameters.direction_convention") == "esri_powers_of_two_clockwise_from_east", "D8 direction convention must be frozen"),
+                _contract_check("d8.state_codebook", report.get("state_codebook") == expected_states, "D8 state codebook must be exact"),
+                _contract_check("d8.direction_codebook", report.get("direction_codebook") == expected_directions, "D8 direction codebook must be exact"),
+                _contract_check("d8.output_hash", bool(_dotted(report, "output.sha256")), "D8 output hash is required"),
+                _contract_check("d8.crs", _dotted(report, "source.crs") == _dotted(report, "output.crs"), "D8 source and output CRS must match"),
+                _contract_check("d8.transform", _dotted(report, "source.transform") == _dotted(report, "output.transform"), "D8 source and output transforms must match"),
+                _contract_check("d8.bounds", _dotted(report, "source.bounds") == _dotted(report, "output.bounds"), "D8 source and output bounds must match"),
+                _contract_check("d8.width", _dotted(report, "source.width") == _dotted(report, "output.width"), "D8 source and output widths must match"),
+                _contract_check("d8.height", _dotted(report, "source.height") == _dotted(report, "output.height"), "D8 source and output heights must match"),
+                _contract_check("d8.output_band_count", _dotted(report, "output.band_count") == 4, "D8 output must contain four semantic bands"),
+                _contract_check("d8.output_dtypes", _dotted(report, "output.dtypes") == ["float64"] * 4, "D8 output bands must be float64"),
+                _contract_check("d8.output_nodata", _dotted(report, "output.nodata_values") == [-9999.0] * 4, "D8 output NODATA declaration must be frozen"),
+                _contract_check("d8.output_descriptions", _dotted(report, "output.descriptions") == expected_band_names, "D8 output band descriptions must be exact"),
+                _contract_check("d8.output_bands", output_band_receipts_valid, "D8 output band receipts are required"),
+                _contract_check("d8.state_counts", isinstance(state_counts, dict) and set(state_counts) == set(expected_states) and all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in state_counts.values()), "D8 state counts must cover the exact codebook with non-negative integers"),
+                _contract_check("d8.direction_counts", isinstance(direction_counts, dict) and set(direction_counts) == set(expected_directions) and all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in direction_counts.values()), "D8 direction counts must cover the exact codebook with non-negative integers"),
+                _contract_check("d8.accounting", isinstance(accounting, dict), "D8 flow accounting is required"),
+            ]
+        )
+        if (
+            isinstance(accounting, dict)
+            and isinstance(state_counts, dict)
+            and isinstance(direction_counts, dict)
+            and output_band_receipts_valid
+        ):
+            total = accounting.get("total_cell_count")
+            valid = accounting.get("source_valid_cell_count")
+            nodata = accounting.get("source_nodata_cell_count")
+            complete = accounting.get("complete_neighborhood_cell_count")
+            unique = accounting.get("unique_flow_cell_count")
+            terminal = accounting.get("terminal_cell_count")
+            flow_edges = accounting.get("flow_edge_count")
+            nonzero = accounting.get("nonzero_direction_cell_count")
+            terminal_accumulation = accounting.get("terminal_accumulation_cell_count_total")
+            terminal_area = accounting.get("terminal_contributing_area_square_metres_total")
+            cell_area = _dotted(report, "parameters.cell_area_square_metres")
+            state_counts_valid = all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in state_counts.values()
+            )
+            direction_counts_valid = all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in direction_counts.values()
+            )
+            state_total = sum(state_counts.values()) if state_counts_valid else -1
+            terminal_state_total = (
+                sum(
+                    state_counts.get(name, -1)
+                    for name in (
+                        "BOUNDARY_TERMINAL",
+                        "SINK_UNRESOLVED",
+                        "FLAT_UNRESOLVED",
+                        "TIE_UNRESOLVED",
+                    )
+                )
+                if state_counts_valid
+                else -1
+            )
+            direction_total = sum(direction_counts.values()) if direction_counts_valid else -1
+            checks.extend(
+                [
+                    _contract_check("d8.source_accounting", all(isinstance(value, int) for value in (total, valid, nodata)) and valid + nodata == total, "D8 source valid and NODATA counts must close"),
+                    _contract_check("d8.neighborhood_accounting", all(isinstance(value, int) for value in (valid, complete)) and 0 < complete <= valid, "D8 complete neighborhoods must be a non-empty subset of valid cells"),
+                    _contract_check("d8.state_accounting", state_counts_valid and isinstance(valid, int) and state_total == valid, "D8 states must classify every valid cell exactly once"),
+                    _contract_check("d8.flow_edge_accounting", state_counts_valid and all(isinstance(value, int) for value in (unique, flow_edges)) and unique == flow_edges == state_counts.get("FLOW_UNIQUE"), "D8 flow edges must equal unique-flow states"),
+                    _contract_check("d8.terminal_accounting", state_counts_valid and all(isinstance(value, int) for value in (terminal, valid, unique)) and terminal == terminal_state_total == valid - unique, "D8 terminal states must close to valid cells without flow edges"),
+                    _contract_check("d8.direction_accounting", state_counts_valid and direction_counts_valid and all(isinstance(value, int) for value in (nonzero, unique)) and direction_total == unique and nonzero == unique + state_counts.get("TIE_UNRESOLVED", -1), "D8 direction counts and nonzero direction cells must close"),
+                    _contract_check("d8.band_accounting", all(band.get("valid_cell_count") == valid and band.get("nodata_cell_count") == nodata for band in output_bands), "Every D8 band must preserve source valid and NODATA accounting"),
+                    _contract_check("d8.band_names", [band.get("name") for band in output_bands] == expected_band_names, "D8 band receipt names must match output descriptions"),
+                    _contract_check("d8.terminal_contribution", _is_number(terminal_accumulation) and isinstance(valid, int) and math.isclose(float(terminal_accumulation), float(valid), rel_tol=0.0, abs_tol=1e-9), "Terminal accumulation must equal the valid source-cell count"),
+                    _contract_check("d8.terminal_area", _is_number(terminal_area) and _is_number(cell_area) and isinstance(valid, int) and math.isclose(float(terminal_area), float(valid) * float(cell_area), rel_tol=0.0, abs_tol=max(1e-9, abs(float(valid) * float(cell_area)) * 1e-12)), "Terminal contributing area must equal valid cells times affine cell area"),
+                ]
+            )
     elif operation == "validate_real_gis_corpus":
         assets = report.get("assets")
         asset_type_counts = report.get("asset_type_counts")
@@ -1136,6 +1263,13 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "terrain_lineage_report_sha256",
                 "terrain_lineage_output_sha256",
                 "terrain_lineage_source_sha256",
+                "d8_direction_convention",
+                "d8_state_codebook",
+                "d8_direction_codebook",
+                "elevation_tolerance_m",
+                "gradient_tie_tolerance",
+                "terminal_accumulation_cell_count_total",
+                "terminal_contributing_area_square_metres_total",
             ),
             invariants=(
                 "row conservation or explicit retained/excluded counts",
@@ -1162,6 +1296,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "authoritative corpus fixtures preserve immutable bytes, query provenance, explicit asset types, vector schema/identity/geometry, and raster grid/value accounting",
                 "terrain derivation requires projected horizontal metres and explicit vertical metres, preserves grid identity, and separates complete neighborhoods, NODATA, and flat aspect",
                 "hillshade binds the exact terrain report and raster hashes, explicit sun azimuth/altitude, 0..255 value range, and valid/NODATA/shadow accounting",
+                "D8 hydrology requires projected horizontal metres and explicit vertical metres, preserves tied candidate directions, leaves boundaries/sinks/flats/ties terminal, and closes terminal accumulation and contributing-area accounting",
                 "map/export provenance binds output hash, extent, CRS, renderer identity, and every declared source-layer hash",
             ),
             positive_regression_gates=(
@@ -1186,6 +1321,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "frozen Census TIGERweb, USGS earthquake, and USGS 3DEP raster manifestations validate exact bytes, authority, retrieval UTC, type-specific schema, and accounting",
                 "analytic terrain fixture proves slope/aspect orientation and complete-neighborhood accounting on a projected metre grid",
                 "analytic hillshade fixture proves light-direction semantics, terrain lineage, 0..255 bounds, and zero-shadow versus NODATA separation",
+                "analytic D8 fixtures prove monotonic direction, tie preservation, strict-descent edges, and terminal contribution conservation",
                 "GIS report contract validator accepts real saved measurement receipts and rejects weak provenance or false accounting",
                 "GIS eval manifest runs positive and negative fixtures through the supported CLI boundary",
                 "map export fixture preserves renderer identity plus source and derived layer hashes",
@@ -1209,6 +1345,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "raster resampling fails closed on unsupported methods, absent CRS, invalid dimensions, or excessive output-cell requests",
                 "terrain derivation fails closed on geographic/non-metre/rotated grids, invalid bands, and grids outside the bounded dimensions",
                 "hillshade fails closed on invalid azimuth or altitude, absent valid terrain neighborhoods, and terrain lineage that violates slope/aspect mask semantics",
+                "D8 hydrology fails closed on geographic/non-metre/rotated grids, invalid bands or tolerances, absent complete neighborhoods, and grids outside the bounded cell limit",
                 "real-corpus validation fails closed on byte drift, path escape, unknown asset type, vector ID/schema/geometry drift, or raster grid/value drift",
                 "map/export provenance fails closed on empty artifacts, invalid extents, missing layer CRS, or absent renderer identity",
                 "GIS report contract validation fails when warning status, source hashes, CRS, or asserted accounting are missing or inconsistent",
@@ -1227,7 +1364,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "topology policy and overlay operations extend beyond explicit planar make_valid and the current Polygon/MultiPolygon boundary",
                 "independently frozen local datum-grid transformations, vertical CRS, time-dependent operations, and broader axis-order cases are certified",
                 "ellipsoidal hole-orientation and large-geometry edge cases close beyond the bounded antimeridian and polar control corpus",
-                "broader vector/raster formats, fractional zonal coverage, additional resampling kernels, remote sensing, broader terrain algorithms, hydrology, bathymetry, and temporal GIS are receipt-backed",
+                "broader vector/raster formats, fractional zonal coverage, additional resampling kernels, remote sensing, broader terrain and hydrology algorithms beyond bounded D8, bathymetry, and temporal GIS are receipt-backed",
                 "rendered-map visual correctness and larger, more diverse real vector/raster corpora are independently certified",
             ),
         ),

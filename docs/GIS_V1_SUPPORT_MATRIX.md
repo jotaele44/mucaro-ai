@@ -13,13 +13,15 @@ This matrix freezes the V1 GIS claim boundary. Capability outside this matrix is
 | Measurement | planar measurements and WGS84 ellipsoidal distance/area | independent control tolerance required |
 | Vector formats | GeoJSON plus GeoPackage/Shapefile source-manifest inspection | lossless cross-format conversion parity not claimed |
 | Raster | rasterio-readable local raster inspection; GeoTIFF fixture; point sample; bbox clip; transactional nearest/bilinear resampling to explicit dimensions | NODATA != zero; no implicit reprojection; no semantic equivalence claim after resampling |
+| Terrain | projected-metre, axis-aligned slope/aspect from complete valid 3x3 neighborhoods; terrain-lineage-bound direct-light hillshade | no smoothing, generalized terrain, curvature, contour, cast-shadow, or measured-radiance claim |
+| Hydrology | bounded D8 steepest descent on projected horizontal metres with explicit vertical metres; candidate bitmask, accumulation, affine contributing area, and boundary/sink/flat/tie terminal states | no depression fill/breach, flat resolution, watershed/stream extraction, runoff, flood, groundwater, hydraulic model, geographic grid, or grid over 1,000,000 cells |
 | Vector-raster | GeoJSON geometry to raster cell-center analytical intersection and zonal count/sum/min/max/mean/median/population-standard-deviation receipts | no fractional pixel coverage |
 | Real vector corpus | byte-frozen bounded Census TIGERweb municipio polygons and USGS earthquake points with authority/query/retrieval/hash/schema/stable-ID/geometry checks | not exhaustive; not a real-raster corpus; mutable service responses are not canonical identity |
 | Map/export | output hash + CRS/extent + renderer identity + bound layer hashes | provenance != visual correctness |
 
 ## Terminal/residue states
 
-`NULL_EMPTY | NODATA_ONLY | OUTSIDE | OUTSIDE_OR_NO_CELL_CENTER | UNSUPPORTED | UNRESOLVED` remain distinct where applicable.
+`NULL_EMPTY | NODATA_ONLY | OUTSIDE | OUTSIDE_OR_NO_CELL_CENTER | UNSUPPORTED | UNRESOLVED | FLOW_UNIQUE | BOUNDARY_TERMINAL | SINK_UNRESOLVED | FLAT_UNRESOLVED | TIE_UNRESOLVED` remain distinct where applicable.
 
 ## Certification rule
 
