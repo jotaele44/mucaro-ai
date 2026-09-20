@@ -18,10 +18,11 @@ BACKEND_APP = "backend.app.main:app"
 
 
 def build_env() -> dict[str, str]:
-    env = os.environ.copy()
-    existing = env.get("PYTHONPATH", "")
-    paths = [str(ROOT), str(ROOT / "backend")]
-    env["PYTHONPATH"] = os.pathsep.join(paths + ([existing] if existing else []))
+    env = {key: value for key, value in os.environ.items() if not key.startswith("PYTHON")}
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT), str(ROOT / "backend")])
+    env["PYTHONNOUSERSITE"] = "1"
+    env["PYTHONSAFEPATH"] = "1"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     return env
 
 
@@ -84,6 +85,8 @@ def wait_for_health(port: int, timeout_seconds: float) -> bool:
 def start_backend(port: int) -> subprocess.Popen:
     cmd = [
         sys.executable,
+        "-s",
+        "-P",
         "-m",
         "uvicorn",
         BACKEND_APP,

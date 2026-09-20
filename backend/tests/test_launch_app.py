@@ -30,6 +30,35 @@ def test_launch_app_self_test():
     assert "LAUNCH_APP_SELF_TEST_OK" in proc.stdout
 
 
+def test_launch_environment_replaces_host_python_controls(monkeypatch):
+    monkeypatch.setenv("PYTHONPATH", "/untrusted/path")
+    monkeypatch.setenv("PYTHONHOME", "/untrusted/home")
+    monkeypatch.setenv("PYTHONSTARTUP", "/untrusted/startup.py")
+
+    env = launch_app.build_env()
+
+    assert env["PYTHONPATH"] == f"{launch_app.ROOT}{launch_app.os.pathsep}{launch_app.ROOT / 'backend'}"
+    assert "PYTHONHOME" not in env
+    assert "PYTHONSTARTUP" not in env
+    assert env["PYTHONNOUSERSITE"] == "1"
+    assert env["PYTHONSAFEPATH"] == "1"
+
+
+def test_backend_process_uses_isolated_path_flags(monkeypatch):
+    observed = {}
+
+    def fake_popen(command, *, cwd, env):
+        observed.update(command=command, cwd=cwd, env=env)
+        return object()
+
+    monkeypatch.setattr(launch_app.subprocess, "Popen", fake_popen)
+    launch_app.start_backend(8123)
+
+    assert observed["command"][1:3] == ["-s", "-P"]
+    assert observed["env"]["PYTHONNOUSERSITE"] == "1"
+    assert observed["env"]["PYTHONSAFEPATH"] == "1"
+
+
 def test_package_desktop_self_test():
     proc = subprocess.run(
         [sys.executable, "scripts/package_desktop.py", "--self-test"],

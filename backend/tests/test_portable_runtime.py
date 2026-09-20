@@ -58,6 +58,7 @@ def test_portable_bundle_is_bundle_relative_and_hash_verified(tmp_path: Path) ->
     assert "${RESOURCES}/runtime/bin/python3" in launcher
     assert "PYTHONNOUSERSITE=1" in launcher
     assert "PYTHONSAFEPATH=1" in launcher
+    assert '"${PYTHON_EXECUTABLE}" -E -s -P' in launcher
     assert verify_portable_macos_app(app)["status"] == "PORTABLE_APP_VERIFIED"
 
 

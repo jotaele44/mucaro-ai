@@ -96,8 +96,11 @@ def certify_clean_machine_macos(
     launcher = installed / "Contents/MacOS/mucaro-ai"
     app_root = installed / "Contents/Resources/app"
     embedded_python = installed / "Contents/Resources/runtime/bin/python3"
-    env = os.environ.copy()
+    env = {key: value for key, value in os.environ.items() if not key.startswith("PYTHON")}
     env["PYTHONPATH"] = os.pathsep.join([str(app_root), str(app_root / "backend")])
+    env["PYTHONNOUSERSITE"] = "1"
+    env["PYTHONSAFEPATH"] = "1"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
 
     launch = _run(
         [str(launcher), "--smoke-test", "--no-browser", "--skip-build", "--port", str(port)],
@@ -106,7 +109,7 @@ def certify_clean_machine_macos(
         runner=runner,
     )
     workflow = _run(
-        [str(embedded_python), str(app_root / "scripts/certify_operator_workflow.py")],
+        [str(embedded_python), "-s", "-P", str(app_root / "scripts/certify_operator_workflow.py")],
         cwd=app_root,
         env=env,
         runner=runner,
