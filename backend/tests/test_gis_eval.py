@@ -12,11 +12,11 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 62,
-        "passed": 62,
+        "cases": 64,
+        "passed": 64,
         "failed": 0,
-        "positive_cases": 37,
-        "negative_cases": 25,
+        "positive_cases": 38,
+        "negative_cases": 26,
         "operations": 25,
         "operation_names": [
             "bbox_filter",
@@ -113,6 +113,9 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["reproject_invalid_latitude_fails_closed"]["case_type"] == "negative"
     assert by_id["reproject_invalid_latitude_fails_closed"]["observed_status"] == "ERROR_GIS_REPROJECT_INVALID_COORDINATES"
     assert by_id["reproject_crs_wgs84_to_utm20n"]["observed_status"] == "GIS_CRS_REPROJECT_OK"
+    assert by_id["reproject_crs_puerto_rico_governed_grid"]["observed_status"] == "GIS_CRS_REPROJECT_OK"
+    assert by_id["reproject_crs_puerto_rico_outside_grid_fails_closed"]["case_type"] == "negative"
+    assert by_id["reproject_crs_puerto_rico_outside_grid_fails_closed"]["observed_status"] == "ERROR_GIS_CRS_TRANSFORM"
     assert by_id["reproject_crs_m_coordinates_fail_closed"]["observed_status"] == "ERROR_GIS_CRS_M_UNSUPPORTED"
     assert by_id["repair_topology_bowtie_explicit"]["observed_status"] == "GIS_TOPOLOGY_REPAIR_OK"
     assert by_id["repair_topology_z_remains_unresolved"]["observed_status"] == "GIS_TOPOLOGY_REPAIR_WARN"

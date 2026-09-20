@@ -1,0 +1,42 @@
+{
+  "schema_version": "mucaro_gis_grid_manifest_v1",
+  "retrieval_utc": "2026-09-20T02:22:48Z",
+  "network_policy": "offline_only",
+  "grids": [
+    {
+      "grid_id": "us_noaa_pvhpgn",
+      "filename": "us_noaa_pvhpgn.tif",
+      "bytes": 3644,
+      "sha256": "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d",
+      "type": "HORIZONTAL_OFFSET",
+      "source_crs": "EPSG:4269",
+      "target_crs": "EPSG:4152",
+      "area_of_use": "USA - Puerto Rico and the Virgin Islands",
+      "bounds": [-68.0, 17.0, -62.0, 20.5],
+      "source": {
+        "authority": "US National Oceanographic and Atmospheric Administration (NOAA)",
+        "upstream_dataset_url": "https://www.ngs.noaa.gov/PC_PROD/NADCON/NADCON.zip",
+        "proj_cdn_url": "https://cdn.proj.org/us_noaa_pvhpgn.tif",
+        "proj_cdn_manifest_url": "https://cdn.proj.org/files.geojson",
+        "proj_data_repository": "https://github.com/OSGeo/PROJ-data",
+        "pinned_file_url": "https://raw.githubusercontent.com/OSGeo/PROJ-data/fd2cf11f9fc159c774b6800d1eb18b11fa0be3fd/us_noaa/us_noaa_pvhpgn.tif",
+        "file_commit_sha": "fd2cf11f9fc159c774b6800d1eb18b11fa0be3fd"
+      },
+      "license": {
+        "classification": "PUBLIC_DOMAIN",
+        "evidence_url": "https://raw.githubusercontent.com/OSGeo/PROJ-data/d59f83ff1115548c00bbd559932bdc2264fdb5ad/us_noaa/us_noaa_README.txt",
+        "evidence_sha256": "38561c43f20756a77d33406c54cda8c250d18b6b30bff1e00ff51578e3682723",
+        "evidence_commit_sha": "d59f83ff1115548c00bbd559932bdc2264fdb5ad"
+      },
+      "allowed_operation": {
+        "source_crs": "EPSG:4326",
+        "target_crs": "EPSG:32161",
+        "operation_name": "Inverse of NAD83 to WGS 84 (35) + SPCS83 Puerto Rico & Virgin Islands zone (meter)",
+        "operation_authority": "INVERSE(DERIVED_FROM(EPSG)):1731",
+        "accuracy_metres": 2.0,
+        "area_of_use": "Puerto Rico and US Virgin Islands - onshore",
+        "bounds": [-67.97, 17.62, -64.51, 18.57]
+      }
+    }
+  ]
+}

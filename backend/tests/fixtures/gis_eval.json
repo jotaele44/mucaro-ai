@@ -1,9 +1,9 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 57,
-    "operation_count": 24,
-    "negative_case_count": 23
+    "case_count": 64,
+    "operation_count": 25,
+    "negative_case_count": 26
   },
   "cases": [
     {
@@ -1692,6 +1692,74 @@
         "output.crs": "EPSG:32620",
         "features.0.transform_state": "TRANSFORMED"
       }
+    },
+    {
+      "case_id": "reproject_crs_puerto_rico_governed_grid",
+      "operation": "reproject_crs",
+      "parameters": {
+        "target_crs": "EPSG:32161"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "pr-grid", "properties": {}, "geometry": {"type": "Point", "coordinates": [-66.0, 18.2]}}
+          ]
+        }
+      },
+      "expected_status": "GIS_CRS_REPROJECT_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "feature_row_conservation": true,
+        "source_crs_parseable": true,
+        "target_crs_parseable": true,
+        "axis_order_explicit": true,
+        "transform_pipeline_frozen": true,
+        "offline_policy_satisfied": true,
+        "grid_inventory_complete": true,
+        "governed_grid_binding_satisfied": true
+      },
+      "expected_fields": {
+        "parameters.adapter": "pyproj_governed_local_grid_always_xy_v1",
+        "parameters.always_xy": true,
+        "parameters.axis_order_policy": "traditional_gis_xy",
+        "parameters.network_policy": "offline_only",
+        "parameters.source_crs": "EPSG:4326",
+        "parameters.target_crs": "EPSG:32161",
+        "parameters.selected_candidate_index": 0,
+        "parameters.selected_candidate_grid_count": 1,
+        "parameters.candidate_inventory.0.selection_policy": "exact_source_bound_governed_grid",
+        "parameters.candidate_inventory.0.grids.0.local_sha256": "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d",
+        "parameters.candidate_inventory.0.grids.0.local_bytes": 3644,
+        "parameters.candidate_inventory.0.grids.0.license_classification": "PUBLIC_DOMAIN",
+        "parameters.governed_grid.sha256": "869e31ea30f1be6477c04899a384ddcac0beb6ded811d8dcad8d62050f140c2f",
+        "parameters.governed_grid.grid_sha256": "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d",
+        "parameters.governed_grid.network_access_performed": false,
+        "parameters.governed_grid.independent_engine_validation": "OPEN",
+        "source.crs": "EPSG:4326",
+        "output.crs": "EPSG:32161",
+        "features.0.transform_state": "TRANSFORMED"
+      }
+    },
+    {
+      "case_id": "reproject_crs_puerto_rico_outside_grid_fails_closed",
+      "operation": "reproject_crs",
+      "parameters": {
+        "target_crs": "EPSG:32161"
+      },
+      "inputs": {
+        "geojson": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": [
+            {"type": "Feature", "id": "outside-grid", "properties": {}, "geometry": {"type": "Point", "coordinates": [-80.0, 25.0]}}
+          ]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_CRS_TRANSFORM",
+      "expected_warnings": []
     },
     {
       "case_id": "reproject_crs_m_coordinates_fail_closed",
