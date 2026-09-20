@@ -300,6 +300,18 @@ def main() -> int:
                     "off",
                 ],
             ),
+            gate_command(
+                "python_runtime_lock_audit",
+                [
+                    sys.executable,
+                    "-m",
+                    "pip_audit",
+                    "-r",
+                    "packaging/runtime/requirements-macos-x86_64.lock",
+                    "--progress-spinner",
+                    "off",
+                ],
+            ),
             gate_npm_audit(),
             gate_frontend_build(),
         ]

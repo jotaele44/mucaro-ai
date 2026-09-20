@@ -274,6 +274,26 @@ opens the browser UI through `scripts/launch_app.py`. This is not yet a portable
 signed installer with embedded runtime, reinstall, upgrade, and rollback
 guarantees.
 
+The portable lane starts by materializing the governed x86_64 macOS runtime,
+then embedding that verified input into an exact-head app bundle:
+
+```bash
+mucaro package portable-runtime --format text
+mucaro package portable-runtime \
+  --verify data/exports/portable_runtimes/macos-x86_64 \
+  --format text
+mucaro package portable-macos-app \
+  --runtime-dir data/exports/portable_runtimes/macos-x86_64 \
+  --format text
+```
+
+Runtime acquisition verifies the pinned upstream archive size and SHA-256,
+safe archive paths and types, the frozen logical member counts, a hash-locked
+wheel-only dependency graph, importability, relocation, and exclusion of host
+user-site packages. This tracked runtime source is architecture-specific; it is
+not arm64, universal-binary, signing, notarization, sandbox, or App Store
+evidence.
+
 The browser app includes the same permission workflow in the Directory Access panel.
 
 The CLI can also inspect and maintain the local source library: `mucaro sources

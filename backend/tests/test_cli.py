@@ -81,6 +81,49 @@ def test_cli_help_lists_serve(capsys):
     assert "serve" in output
 
 
+def test_cli_materializes_portable_runtime_with_governed_defaults(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    expected_output = tmp_path / "data" / "exports" / "portable_runtimes" / "macos-x86_64"
+
+    def fake_materialize(root: Path, manifest: Path, output: Path, *, archive_path: Path | None = None):
+        assert root == tmp_path
+        assert manifest == tmp_path / "packaging" / "runtime" / "macos-x86_64.json"
+        assert output == expected_output
+        assert archive_path is None
+        return {"status": "PORTABLE_RUNTIME_VERIFIED", "runtime_dir": str(output), "failed_checks": []}
+
+    monkeypatch.setattr(cli, "materialize_portable_runtime", fake_materialize)
+
+    assert main(["package", "portable-runtime", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "PORTABLE_RUNTIME_VERIFIED"
+    assert payload["runtime_dir"] == str(expected_output)
+
+
+def test_cli_refuses_portable_app_when_runtime_verification_fails(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+
+    monkeypatch.setattr(
+        cli,
+        "verify_materialized_runtime",
+        lambda *args, **kwargs: {
+            "status": "PORTABLE_RUNTIME_VERIFY_FAILED",
+            "failed_checks": ["runtime_tree"],
+        },
+    )
+
+    def forbidden_builder(*args, **kwargs):
+        raise AssertionError("portable app builder must not run")
+
+    monkeypatch.setattr(cli, "build_portable_macos_app", forbidden_builder)
+
+    assert main(["package", "portable-macos-app", "--runtime-dir", str(runtime)], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().err)
+    assert payload == {"status": "ERROR_PORTABLE_RUNTIME_VERIFY", "detail": "runtime_tree"}
+
+
 def test_cli_capabilities_contracts_reports_expanded_scope(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
@@ -1631,6 +1674,8 @@ mucaro = "backend.app.cli:main"
         "_architecture/schemas/macos-app-store-malware-scan.schema.json",
         "packaging/macos/MucaroAI-AppStore.entitlements",
         "packaging/macos/PrivacyInfo.xcprivacy",
+        "packaging/runtime/macos-x86_64.json",
+        "packaging/runtime/requirements-macos-x86_64.lock",
     ]:
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)

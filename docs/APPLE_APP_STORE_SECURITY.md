@@ -89,6 +89,21 @@ container, service, and federation-worker capabilities before process creation.
 Bounded in-process operations remain available. User-authored or generated
 source is not automatically exempt and is disabled in this profile.
 
+## Embedded runtime boundary
+
+The governed x86_64 macOS runtime source is pinned by upstream release, asset
+name, compressed byte count, SHA-256, logical archive counts, Python version,
+platform, and architecture. Its dependency lock contains exact versions and
+distribution hashes and denies source builds. Archive traversal, special
+members, duplicate destinations, escaping links, byte/count drift, dependency
+drift, missing imports, and host user-site discovery fail closed.
+
+The portable launcher sets `PYTHONNOUSERSITE=1` and `PYTHONSAFEPATH=1`, clears
+host Python startup/home controls, and uses only the bundle-relative runtime.
+The runtime remains an x86_64 direct-distribution input. It is not yet a
+universal Store runtime, a signed candidate, or proof that all embedded native
+libraries satisfy App Sandbox and App Review requirements.
+
 The current GUI launcher starts a loopback HTTP server. The minimal entitlement
 template intentionally omits `com.apple.security.network.server`. Before GUI
 work begins, the Store build must either replace that boundary with an

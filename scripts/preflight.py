@@ -31,6 +31,8 @@ REQUIRED_FILES = [
     "README.md",
     ".env.example",
     "backend/requirements.txt",
+    "packaging/runtime/macos-x86_64.json",
+    "packaging/runtime/requirements-macos-x86_64.lock",
     "backend/app/main.py",
     "scripts/release_check.py",
     "schemas/execution_gate.schema.json",
