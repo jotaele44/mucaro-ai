@@ -98,6 +98,11 @@ def build_context_state(
         "compacted_summary": "\n".join(summary_parts),
         "compacted_turn_refs": summary_refs,
         "raw_turn_ids": [turn.get("turn_id") for turn in turns],
+        "coverage": {
+            "represented_historical_turns": len(summary_refs),
+            "total_historical_turns": len(historical),
+            "ratio": (len(summary_refs) / len(historical)) if historical else 1.0,
+        },
         "policy": {
             "recent_turn_limit": recent_turn_limit,
             "recent_char_limit": recent_char_limit,
