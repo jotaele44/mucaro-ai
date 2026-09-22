@@ -1,0 +1,60 @@
+{
+  "schema": "mucaro-build-contract/1.0",
+  "baseline_head": "2029c59df13a471c786eed94c9a314be2fe4efc2",
+  "install": {
+    "python": [
+      "python",
+      "-m",
+      "pip",
+      "install",
+      "-e",
+      ".[dev]"
+    ],
+    "frontend": [
+      "npm",
+      "ci"
+    ]
+  },
+  "gates": {
+    "release": [
+      "python",
+      "scripts/certify_release.py"
+    ],
+    "backend_tests": [
+      "python",
+      "-m",
+      "pytest",
+      "backend/tests",
+      "-q"
+    ],
+    "frontend_build": [
+      "npm",
+      "run",
+      "build"
+    ],
+    "json_validation": [
+      "python",
+      "scripts/validate_json.py"
+    ]
+  },
+  "coding_profile": [
+    "pytest",
+    "ruff",
+    "mypy",
+    "python -m build"
+  ],
+  "invariants": [
+    "exact_head",
+    "patch_sha256",
+    "preimage_sha256",
+    "no_dirty_overlap",
+    "repository_boundary",
+    "no_unexpected_dirty_paths",
+    "targeted_regression_pass",
+    "full_regression_pass"
+  ],
+  "isolation": {
+    "coding_network": "disabled",
+    "host_source": "read_only"
+  }
+}

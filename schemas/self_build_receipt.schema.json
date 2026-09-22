@@ -1,0 +1,23 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://mucaro.local/schemas/self_build_receipt.schema.json",
+  "title":"Mucaro Self Build Receipt 1.0",
+  "type":"object","additionalProperties":false,
+  "required":["schema","baseline_head","candidate_head","failure_set_before","failure_set_after","decision","targeted_regression","full_regression","attempt"],
+  "properties":{
+    "schema":{"const":"mucaro-self-build-receipt/1.0"},
+    "baseline_head":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "candidate_head":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "failure_set_before":{"type":"array","uniqueItems":true,"items":{"type":"string"}},
+    "failure_set_after":{"type":"array","uniqueItems":true,"items":{"type":"string"}},
+    "decision":{"enum":["KEEP","ROLLBACK_REGRESSION","ROLLBACK_OSCILLATION","ROLLBACK_NO_IMPROVEMENT","BLOCKED"]},
+    "targeted_regression":{"enum":["PASS","FAIL","BLOCKED"]},
+    "full_regression":{"enum":["PASS","FAIL","BLOCKED"]},
+    "attempt":{"type":"integer","minimum":1,"maximum":3},
+    "patch_sha256":{"type":["string","null"],"pattern":"^[0-9a-f]{64}$"},
+    "preimages":{"type":"array","items":{"type":"object"}},
+    "postimages":{"type":"array","items":{"type":"object"}},
+    "classification":{"type":["string","null"]},
+    "block_reason":{"type":["string","null"]}
+  }
+}

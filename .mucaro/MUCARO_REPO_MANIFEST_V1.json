@@ -1,0 +1,39 @@
+{
+  "schema": "mucaro-repo-manifest/1.0",
+  "repo_id": "jotaele44/mucaro-ai",
+  "baseline_head": "2029c59df13a471c786eed94c9a314be2fe4efc2",
+  "runtimes": {
+    "python": ">=3.11",
+    "node": "22"
+  },
+  "components": [
+    "backend",
+    "frontend",
+    "docker",
+    "schemas",
+    "scripts"
+  ],
+  "canonical_primitives": [
+    "backend/app/coding_patch.py",
+    "backend/app/coding_mutation.py",
+    "scripts/certify_release.py",
+    "scripts/certify_coding_full_profile.py",
+    "scripts/certify_coding_mutation_live.py"
+  ],
+  "mutation_policy": {
+    "mode": "BOUNDED",
+    "max_repair_iterations": 3,
+    "max_patch_files": 5,
+    "max_patch_bytes": 524288,
+    "dependency_mutations": 0,
+    "schema_mutations": 0,
+    "security_mutations": 0,
+    "ci_policy_mutations": 0
+  },
+  "certification": {
+    "targeted_regression_required": true,
+    "full_regression_required": true,
+    "rollback_on_regression": true,
+    "unknown_failure": "FAIL_CLOSED"
+  }
+}
