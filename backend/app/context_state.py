@@ -30,6 +30,17 @@ def _turn_ref(turn: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _context_identity(conversation: dict[str, Any]) -> str:
+    turns = list(conversation.get("turns", []))
+    return stable_id(
+        "context",
+        str(conversation.get("conversation_id", "")),
+        str(len(turns)),
+        "|".join(str(turn.get("turn_id", "")) for turn in turns),
+        length=16,
+    )
+
+
 def build_context_state(
     conversation: dict[str, Any],
     *,
@@ -82,13 +93,7 @@ def build_context_state(
     now = utc_now()
     return {
         "schema_version": CONTEXT_STATE_SCHEMA_VERSION,
-        "context_state_id": stable_id(
-            "context",
-            str(conversation.get("conversation_id", "")),
-            str(len(turns)),
-            "|".join(str(turn.get("turn_id", "")) for turn in turns),
-            length=16,
-        ),
+        "context_state_id": _context_identity(conversation),
         "conversation_id": conversation.get("conversation_id"),
         "created_at": now,
         "raw_turn_count": len(turns),
@@ -111,6 +116,38 @@ def build_context_state(
             "raw_history_mutated": False,
         },
     }
+
+
+def validate_context_state(conversation: dict[str, Any], context_state: dict[str, Any]) -> None:
+    if context_state.get("schema_version") != CONTEXT_STATE_SCHEMA_VERSION:
+        raise ContextStateError("ERROR_CONTEXT_SCHEMA", "unsupported context state schema")
+    if context_state.get("conversation_id") != conversation.get("conversation_id"):
+        raise ContextStateError("ERROR_CONTEXT_CONVERSATION", "context state belongs to a different conversation")
+    expected_turn_ids = [turn.get("turn_id") for turn in conversation.get("turns", [])]
+    if context_state.get("raw_turn_ids") != expected_turn_ids:
+        raise ContextStateError("ERROR_CONTEXT_STALE", "canonical conversation turns changed after context state creation")
+    if context_state.get("context_state_id") != _context_identity(conversation):
+        raise ContextStateError("ERROR_CONTEXT_IDENTITY", "context state identity does not match canonical conversation")
+
+
+def rehydrate_context_state(
+    conversation: dict[str, Any],
+    context_state: dict[str, Any],
+) -> dict[str, Any]:
+    """Rebuild a bounded context state from canonical raw turns using the frozen policy.
+
+    The compacted summary is never treated as canonical history. Rehydration fails
+    closed if the supplied state is stale or belongs to another conversation.
+    """
+    validate_context_state(conversation, context_state)
+    policy = context_state.get("policy", {})
+    rebuilt = build_context_state(
+        conversation,
+        recent_turn_limit=int(policy.get("recent_turn_limit", DEFAULT_RECENT_TURNS)),
+        recent_char_limit=int(policy.get("recent_char_limit", DEFAULT_RECENT_CHARS)),
+        summary_char_limit=int(policy.get("summary_char_limit", DEFAULT_SUMMARY_CHARS)),
+    )
+    return rebuilt
 
 
 def build_model_context(context_state: dict[str, Any]) -> list[dict[str, Any]]:
