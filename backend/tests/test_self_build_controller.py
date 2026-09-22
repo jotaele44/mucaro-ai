@@ -21,3 +21,11 @@ def test_keep_requires_strict_improvement_and_both_regressions():
 def test_oscillation_rolls_back():
     prior=frozenset({"TYPE_FAILURE"})
     assert decide_after_patch({"TEST_FAILURE","TYPE_FAILURE"},{"TYPE_FAILURE"},targeted_pass=True,full_pass=True,history=[prior]) == "ROLLBACK_OSCILLATION"
+
+def test_iteration_and_patch_size_limits():
+    assert mutation_allowed("TEST_FAILURE",files=1,patch_bytes=10,iteration=4)[1] == "MUTATION_BUDGET_EXCEEDED"
+    assert mutation_allowed("TEST_FAILURE",files=1,patch_bytes=524289,iteration=1)[1] == "MUTATION_BUDGET_EXCEEDED"
+
+def test_authority_and_unknown_fail_closed():
+    assert mutation_allowed("SECRET_REQUIRED",files=1,patch_bytes=10,iteration=1) == (False,"SECRET_REQUIRED")
+    assert mutation_allowed("UNCLASSIFIED_FAILURE",files=1,patch_bytes=10,iteration=1) == (False,"UNCLASSIFIED_FAILURE")
