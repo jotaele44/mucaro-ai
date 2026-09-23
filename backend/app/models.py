@@ -14,6 +14,10 @@ class AskRequest(BaseModel):
     allow_mock_fallback: bool = False
     allow_live: bool = False
     require_offline: bool = False
+    choice_id: str | None = None
+    interaction_id: str | None = None
+    dismiss_pending: bool = False
+    response_interaction: dict | None = None
 
 
 class ConversationCreateRequest(BaseModel):
