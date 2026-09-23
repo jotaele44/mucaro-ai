@@ -53,6 +53,8 @@ from .permissions import (
 )
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
 from .services import answer_question
+from .response_flow import assemble, resolve
+from uuid import uuid4
 from .tools import (
     ToolRuntimeError,
     approve_tool_call,
@@ -293,9 +295,22 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         existing_conversation = get_conversation(conversation_id, cfg)
         if existing_conversation is None:
             raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        pending = existing_conversation.get("pending_interaction")
+        resolution = None
+        resolved_query = req.query
+        if pending:
+            try:
+                state, value = resolve(pending, req.query, choice_id=req.choice_id, interaction_id=req.interaction_id, dismiss=req.dismiss_pending)
+            except ValueError as exc:
+                raise api_error(str(exc), "Pending interaction could not be resolved.") from exc
+            resolution = {"interaction_id": pending["interaction_id"], "state": state, "value": value}
+            if state == "RESOLVED":
+                resolved_query = f"{pending['prompt']}\nResponse: {value}"
+        elif req.choice_id or req.interaction_id:
+            raise api_error("ERROR_NO_PENDING_INTERACTION", "No interaction is pending.")
         conversation_context = build_conversation_context(existing_conversation)
         answer = answer_question(
-            req.query,
+            resolved_query,
             top_k=req.top_k,
             retrieval_strategy=req.retrieval_strategy,
             model_provider=req.model_provider,
@@ -307,7 +322,11 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             cfg=cfg,
         )
         try:
-            conversation_payload = append_answer_turn(conversation_id, req.query, answer, cfg)
+            envelope = assemble(conversation_id, str(uuid4()), str(answer.get("answer") or answer.get("detail") or answer.get("status", "")), req.response_interaction)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise api_error("ERROR_INVALID_RESPONSE_ENVELOPE", str(exc)) from exc
+        try:
+            conversation_payload = append_answer_turn(conversation_id, req.query, answer, cfg, response_envelope=envelope, resolution=resolution)
         except KeyError as exc:
             raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
         return {"answer": answer, "conversation": conversation_payload}
