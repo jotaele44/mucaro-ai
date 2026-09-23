@@ -65,7 +65,7 @@ function App() {
     }
   }
 
-  async function ask() {
+  async function ask(choiceId = null, interactionId = null, dismissPending = false) {
     setStatus("Asking...");
     setError(null);
     try {
@@ -74,7 +74,7 @@ function App() {
         conversation = await api.createConversation({ title: "New chat" });
         setActiveConversation(conversation);
       }
-      const payload = await api.askConversation(conversation.conversation_id, { query, top_k: 5, retrieval_strategy: retrievalStrategy, model_provider: "mock" });
+      const payload = await api.askConversation(conversation.conversation_id, { query: choiceId ? (conversation.pending_interaction?.prompt || query) : query, choice_id: choiceId, interaction_id: interactionId, dismiss_pending: dismissPending, top_k: 5, retrieval_strategy: retrievalStrategy, model_provider: "mock" });
       const result = payload.answer;
       setAnswer(result);
       setActiveConversation(payload.conversation);
@@ -341,7 +341,13 @@ function App() {
                     {(activeConversation.turns || []).map((turn) => (
                       <article className={`turn ${turn.role}`} key={turn.turn_id}>
                         <strong>{turn.role}</strong>
-                        <p>{turn.content}</p>
+                        {turn.web_parts ? turn.web_parts.map((part, index) => (
+                          <div key={`${turn.turn_id}-${index}`}>
+                            {part.type === "text" && <p>{part.content}</p>}
+                            {part.type === "code_block" && <div className="response-code"><span>{part.language || "text"}</span><button type="button" onClick={() => navigator.clipboard.writeText(part.content)}>Copy</button><pre><code>{part.content}</code></pre></div>}
+                            {(part.type === "choice" || part.type === "clarification") && <div className="response-interaction"><p>{part.prompt}</p>{part.options?.map((option) => <button type="button" key={option.id} disabled={activeConversation?.pending_interaction?.interaction_id !== part.interaction_id} onClick={() => ask(option.id, part.interaction_id)}>{option.label}</button>)}{activeConversation?.pending_interaction?.interaction_id === part.interaction_id && <small>Type another answer below, or start a new topic.</small>}</div>}
+                          </div>
+                        )) : <p>{turn.content}</p>}
                       </article>
                     ))}
                   </div>
@@ -355,7 +361,8 @@ function App() {
                     </select>
                   </label>
                   <textarea value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Question" />
-                  <button onClick={ask}>Ask with citations</button>
+                  <button onClick={() => ask()}>Ask with citations</button>
+                  {activeConversation?.pending_interaction && <button type="button" className="secondary" onClick={() => ask(null, activeConversation.pending_interaction.interaction_id, true)}>New topic</button>}
                 </div>
                 {hasNoSourceAnswer && <div className="notice">No sources are available. Add them in the Sources workspace.</div>}
                 {answer?.status === "ERROR_NO_RETRIEVAL_CONTEXT" && <div className="notice">No matching context was found. Broaden the query, switch retrieval strategy, or reindex in Sources.</div>}
