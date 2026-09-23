@@ -6,6 +6,7 @@ from .config import Settings, settings
 from .context_state import build_context_state, build_model_context
 from .db import delete_payload, init_db, list_payloads, upsert_payload
 from .utils import stable_id, utc_now
+from .response_flow import web_render
 
 DEFAULT_TITLE = "New chat"
 MAX_CONTEXT_TURNS = 8
@@ -98,6 +99,8 @@ def append_answer_turn(
     query: str,
     answer_trace: dict[str, Any],
     cfg: Settings = settings,
+    response_envelope: dict[str, Any] | None = None,
+    resolution: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     conversation = get_conversation(conversation_id, cfg)
     if conversation is None:
@@ -111,6 +114,7 @@ def append_answer_turn(
             "content": query,
             "created_at": now,
             "status": "USER_MESSAGE",
+            "interaction_resolution": resolution,
         }
     )
     assistant_content = answer_trace.get("answer") or answer_trace.get("detail") or answer_trace.get("status", "")
@@ -127,9 +131,12 @@ def append_answer_turn(
             "source_ids": answer_trace.get("source_ids", []),
             "validation_flags": answer_trace.get("validation_flags", []),
             "answer_trace": answer_trace,
+            "response_envelope": response_envelope,
+            "web_parts": web_render(response_envelope) if response_envelope else None,
         }
     )
     conversation["turns"] = turns
+    conversation["pending_interaction"] = next((part for part in response_envelope["parts"] if part["interaction_id"]), None) if response_envelope else None
     if conversation.get("title") == DEFAULT_TITLE:
         conversation["title"] = _title_from_query(query)
     conversation["updated_at"] = now
