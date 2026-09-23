@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+import hashlib\nimport json\nfrom typing import Any, Callable
 
 from .agent_checkpoints import CheckpointError, get_checkpoint, resume_checkpoint, transition_checkpoint
 from .config import Settings, settings
@@ -16,7 +16,7 @@ PROVIDER_INTERRUPTION_STATUSES = {
 }
 
 
-class ProviderRecoveryError(RuntimeError):
+def _attempt_id(checkpoint: dict[str, Any], operation_key: str) -> str:\n    payload = {\n        "session_id": checkpoint["session_id"],\n        "run_id": checkpoint["run_id"],\n        "checkpoint_id": checkpoint["checkpoint_id"],\n        "operation_key": operation_key,\n    }\n    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")\n    return hashlib.sha256(raw).hexdigest()[:24]\n\n\nclass ProviderRecoveryError(RuntimeError):
     def __init__(self, status: str, detail: str) -> None:
         super().__init__(detail)
         self.status = status
