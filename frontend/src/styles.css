@@ -144,3 +144,8 @@ dd { margin: 0; overflow-wrap: anywhere; }
   .button-row { flex-wrap: wrap; }
   .chat-list, .chat-surface { padding: 10px; }
 }
+.response-code { margin: .6rem 0; padding: .7rem; overflow: auto; background: #17212b; color: #f3f7fa; border-radius: .5rem; }
+.response-code pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.response-code button { float: right; }
+.response-interaction { padding: .75rem; border: 1px solid currentColor; border-radius: .5rem; }
+.response-interaction button { margin-right: .4rem; }
