@@ -168,16 +168,22 @@ def envelope_for_conversation(conversation: dict[str, Any], cfg: Settings = sett
 
     This never mutates conversation turns or the stored answer_trace; the
     answer_trace remains the canonical evidence record, and the envelope is
-    a derived rendering surface only.
+    a derived rendering surface only. Resolved and dismissed interactions
+    are included alongside pending ones (not just the current pending
+    interaction) so that reloading a conversation reproduces the exact
+    question, the selected option, and when it was resolved -- a receipt,
+    not a rewrite of what the assistant said at the time.
     """
-    envelopes: list[dict[str, Any]] = []
+    dated_envelopes: list[tuple[str, dict[str, Any]]] = []
     for turn in conversation.get("turns", []):
         parts = [make_text_part(str(turn.get("content") or ""))]
-        envelopes.append(build_response_envelope(turn["turn_id"], parts))
-    pending = get_pending_interaction(conversation.get("conversation_id", ""), cfg)
-    if pending is not None:
-        envelopes.append(build_response_envelope(pending["interaction_id"], [make_question_part(pending)]))
-    return envelopes
+        envelope = build_response_envelope(turn["turn_id"], parts)
+        dated_envelopes.append((str(turn.get("created_at") or ""), envelope))
+    for interaction in list_interactions(conversation.get("conversation_id", ""), cfg):
+        envelope = build_response_envelope(interaction["interaction_id"], [make_question_part(interaction)])
+        dated_envelopes.append((str(interaction.get("created_at") or ""), envelope))
+    dated_envelopes.sort(key=lambda item: item[0])
+    return [envelope for _, envelope in dated_envelopes]
 
 
 # ---------------------------------------------------------------------------
