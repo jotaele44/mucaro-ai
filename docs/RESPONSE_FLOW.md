@@ -57,19 +57,22 @@ separate per the brief's implementation order (step 1):
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/conversations/{id}/envelope` | Typed envelope for every turn, plus the pending interaction if any. |
+| GET | `/conversations/{id}/envelope` | Typed envelope for every turn and every interaction (pending, resolved, or dismissed), interleaved chronologically. |
 | GET | `/conversations/{id}/interactions` | Full interaction history for the conversation. |
 | GET | `/conversations/{id}/interactions/pending` | The single pending interaction, or `INTERACTION_NONE_PENDING`. |
 | POST | `/conversations/{id}/interactions` | Create a pending multiple-choice interaction. |
 | POST | `/interactions/{id}/resolve` | Resolve by `option_id` or `freeform_text`, with `expected_version`. |
 | POST | `/interactions/{id}/dismiss` | Dismiss with a required `reason` and `expected_version`. |
 
-Tests: `backend/tests/test_response_flow.py` (21 cases) cover the envelope
+Tests: `backend/tests/test_response_flow.py` (23 cases) cover the envelope
 builder/validator, the one-pending-max invariant, resolve-by-id, stale vs.
-duplicate submission rejection, freeform gating, dismiss/resume, and an
+duplicate submission rejection, freeform gating, dismiss/resume, an
 interruption scenario modeled directly on the brief's 12–44s window (a
 question is shown, an unrelated message interrupts it, and resuming must
-surface the same interaction rather than a rewritten one).
+surface the same interaction rather than a rewritten one), and that
+resolved/dismissed interactions still render as receipts after reload,
+interleaved with turns by `created_at` rather than dropped once no
+longer pending.
 
 ## Feature-row mapping and what remains open
 
@@ -84,9 +87,11 @@ API-level support to:
   not addressed here.
 - **F12** (freeform override) — `allow_freeform` + `freeform_text`
   resolution path.
-- **F13** (question/choice receipt in transcript) — `resolution` is
-  retained on the interaction record after resolve/dismiss; not yet
-  spliced back into the conversation's turn list as a rendered receipt.
+- **F13** (question/choice receipt in transcript) — `envelope_for_conversation`
+  interleaves every interaction (pending, resolved, or dismissed) with
+  turns by `created_at`, so a resolved/dismissed question still renders
+  as a receipt after reload. This is a read-only projection: the
+  underlying turn list and answer_trace are never rewritten.
 - **F14** (interruption and return to pending question) — `dismiss_pending`
   for explicit supersession, `get_pending_interaction` for resumption.
 

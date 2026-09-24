@@ -105,6 +105,53 @@ def test_envelope_for_conversation_reflects_turns_and_pending_question(tmp_path:
     assert assistant_turn["answer_trace"]["answer"] == "Working on it."
 
 
+def test_envelope_surfaces_resolved_interaction_as_receipt_after_reload(tmp_path: Path) -> None:
+    cfg = _cfg(tmp_path)
+    conversation = create_conversation("Merge review", cfg)
+    interaction = create_interaction(conversation["conversation_id"], "Which merges?", _options(), cfg=cfg)
+    resolved = resolve_interaction(
+        interaction["interaction_id"],
+        expected_version=interaction["version"],
+        resolved_by="user",
+        option_id="opt_retry",
+        cfg=cfg,
+    )
+    conversation = append_answer_turn(
+        conversation["conversation_id"],
+        "Thanks",
+        {"answer": "Retrying now.", "status": "DONE", "run_id": "run_2"},
+        cfg,
+    )
+
+    envelopes = envelope_for_conversation(conversation, cfg)
+    kinds = [part["kind"] for envelope in envelopes for part in envelope["parts"]]
+    # The resolved interaction still renders as a receipt, ordered before the
+    # later turns since it was created first -- not dropped once resolved.
+    assert kinds == ["question", "text", "text"]
+    question_part = envelopes[0]["parts"][0]
+    assert question_part["status"] == "RESOLVED"
+    assert question_part["resolution"] == resolved["resolution"]
+
+
+def test_envelope_includes_dismissed_interaction_receipt(tmp_path: Path) -> None:
+    cfg = _cfg(tmp_path)
+    conversation = create_conversation("Merge review", cfg)
+    interaction = create_interaction(conversation["conversation_id"], "Which merges?", _options(), cfg=cfg)
+    dismiss_interaction(
+        interaction["interaction_id"],
+        expected_version=interaction["version"],
+        reason="User started an unrelated topic.",
+        dismissed_by="user",
+        cfg=cfg,
+    )
+
+    envelopes = envelope_for_conversation(conversation, cfg)
+    assert len(envelopes) == 1
+    question_part = envelopes[0]["parts"][0]
+    assert question_part["status"] == "DISMISSED"
+    assert question_part["resolution"]["reason"] == "User started an unrelated topic."
+
+
 def test_make_question_part_uses_interaction_fields() -> None:
     interaction = {
         "interaction_id": "interaction_abc",
