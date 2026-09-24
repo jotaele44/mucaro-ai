@@ -58,7 +58,9 @@ class Settings:
     @classmethod
     def load(cls) -> "Settings":
         root = find_project_root()
-        data_dir = root / "data"
+        # Packaged apps keep user data outside the (read-only, replaceable) bundle (SD-006, TGT-017).
+        env_data_dir = os.getenv("MUCARO_AI_DATA_DIR")
+        data_dir = Path(env_data_dir).expanduser().resolve() if env_data_dir else root / "data"
         max_upload_bytes = parse_positive_int(os.getenv("MUCARO_AI_MAX_UPLOAD_BYTES"), DEFAULT_MAX_UPLOAD_BYTES)
         cors_origins = tuple(
             origin.strip()

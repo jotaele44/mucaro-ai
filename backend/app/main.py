@@ -154,6 +154,41 @@ async def read_limited_upload(upload: UploadFile, max_bytes: int) -> bytes:
     return content
 
 
+SECURITY_HEADERS = (
+    (b"x-content-type-options", b"nosniff"),
+    (b"x-frame-options", b"DENY"),
+    (b"referrer-policy", b"no-referrer"),
+    (b"cross-origin-opener-policy", b"same-origin"),
+    (
+        b"content-security-policy",
+        b"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; "
+        b"connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    ),
+)
+
+
+class SecurityHeadersMiddleware:
+    """Pure ASGI middleware (safe for streamed responses) adding browser hardening headers."""
+
+    def __init__(self, app: object) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict, receive: object, send: object) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)  # type: ignore[operator]
+            return
+
+        async def send_with_headers(message: dict) -> None:
+            if message.get("type") == "http.response.start":
+                present = {key.lower() for key, _ in message.get("headers", [])}
+                message["headers"] = list(message.get("headers", [])) + [
+                    (key, value) for key, value in SECURITY_HEADERS if key not in present
+                ]
+            await send(message)  # type: ignore[operator]
+
+        await self.app(scope, receive, send_with_headers)  # type: ignore[operator]
+
+
 def create_app(cfg: Settings = settings) -> FastAPI:
     try:
         enforce_startup_security(cfg)
@@ -169,6 +204,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
 
     app = FastAPI(title="Mucaro AI", version="0.1.21", dependencies=[Depends(require_auth_unless_public)])
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),
@@ -302,6 +338,14 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/sources")
     def sources() -> dict:
         return {"sources": get_sources(cfg), "index": get_index_status(cfg)}
+
+    @app.get("/sources/{source_id}")
+    def source_detail(source_id: str) -> dict:
+        source = next((row for row in get_sources(cfg) if row.get("source_id") == source_id), None)
+        if source is None:
+            raise api_error("ERROR_SOURCE_NOT_FOUND", "Source not found.", status_code=404, source_id=source_id)
+        chunks = [chunk for chunk in get_chunks(cfg) if chunk.get("source_id") == source_id]
+        return {"status": "SOURCE_OK", "source": source, "chunks": chunks}
 
     @app.post("/sources/reindex")
     def reindex(_auth: dict = Depends(require_auth)) -> dict:

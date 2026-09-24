@@ -30,3 +30,4 @@ frontend/node_modules/
 frontend/dist/
 _references/*
 !_references/.gitkeep
+qa/rendered/node_modules/

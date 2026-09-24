@@ -1,0 +1,353 @@
+// Rendered UI QA (MATRIX-015, MOB F01-F20): drives the real built UI against a real local
+// backend at desktop and iPhone widths, saves screenshots, runs axe, and writes a receipt.
+// Usage: node rendered_qa.mjs [--python PATH] [--out DIR]
+import AxeBuilder from "@axe-core/playwright";
+import { chromium, devices } from "playwright";
+import { spawn, execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HERE, "..", "..");
+const args = process.argv.slice(2);
+const argValue = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
+const python = argValue("--python", existsSync(path.join(ROOT, ".venv/bin/python")) ? path.join(ROOT, ".venv/bin/python") : "python3");
+const head = (() => {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT }).toString().trim();
+  } catch {
+    return "UNKNOWN_HEAD";
+  }
+})();
+const dirtyPaths = (() => {
+  try {
+    return execFileSync("git", ["status", "--porcelain"], { cwd: ROOT }).toString().split("\n").filter(Boolean);
+  } catch {
+    return ["UNKNOWN"];
+  }
+})();
+const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+const outDir = path.resolve(argValue("--out", path.join(ROOT, "data", "exports", "rendered_qa", `${stamp}-${head.slice(0, 12)}`)));
+mkdirSync(outDir, { recursive: true });
+
+const checks = [];
+const shots = [];
+function check(name, viewport, pass, detail = "") {
+  checks.push({ name, viewport, pass: Boolean(pass), detail: String(detail).slice(0, 400) });
+  console.log(`${pass ? "PASS" : "FAIL"} [${viewport}] ${name}${detail ? ` — ${String(detail).slice(0, 160)}` : ""}`);
+}
+
+async function freePort() {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+async function waitForHealth(base, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${base}/health`);
+      if (res.ok) return true;
+    } catch {
+      /* not up yet */
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return false;
+}
+
+async function startBackend(dataDir, port) {
+  const child = spawn(python, ["-m", "uvicorn", "backend.app.main:app", "--host", "127.0.0.1", "--port", String(port)], {
+    cwd: ROOT,
+    env: { ...process.env, MUCARO_AI_DATA_DIR: dataDir, PYTHONPATH: `${ROOT}:${path.join(ROOT, "backend")}`, MUCARO_AI_LIVE_MODE: "0" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let log = "";
+  child.stdout.on("data", (chunk) => (log += chunk));
+  child.stderr.on("data", (chunk) => (log += chunk));
+  child.log = () => log;
+  return child;
+}
+
+async function seed(base) {
+  for (const file of readdirSync(path.join(ROOT, "data", "input")).filter((name) => name.startsWith("sample_"))) {
+    const form = new FormData();
+    form.append("upload", new Blob([readFileSync(path.join(ROOT, "data", "input", file))]), file);
+    const res = await fetch(`${base}/ingest`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(`seed ${file}: ${res.status} ${await res.text()}`);
+  }
+}
+
+async function shot(page, viewport, name) {
+  const file = path.join(outDir, `${viewport}-${name}.png`);
+  await page.screenshot({ path: file, fullPage: false });
+  shots.push({ file: path.relative(ROOT, file), sha256: createHash("sha256").update(readFileSync(file)).digest("hex") });
+}
+
+const lastRun = (page) => page.locator("article.run").last();
+
+async function waitRunState(page, states, timeout = 20000) {
+  const wanted = Array.isArray(states) ? states : [states];
+  await page.waitForFunction(
+    (list) => {
+      const runs = document.querySelectorAll("article.run");
+      const last = runs[runs.length - 1];
+      return last && list.includes(last.getAttribute("data-state"));
+    },
+    wanted,
+    { timeout },
+  );
+}
+
+async function send(page, text) {
+  const box = page.getByLabel("Message Mucaro");
+  await box.fill(text);
+  await box.press("Enter");
+}
+
+async function axe(page, viewport, name) {
+  const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  const serious = result.violations.filter((v) => ["serious", "critical"].includes(v.impact));
+  check(`axe ${name}: no serious/critical WCAG violations`, viewport, serious.length === 0, serious.map((v) => `${v.id}(${v.nodes.length})`).join(", ") || `${result.violations.length} minor`);
+  return { view: name, viewport, violations: result.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })) };
+}
+
+async function scenario(browser, base, viewport, contextOptions) {
+  const context = await browser.newContext({ ...contextOptions, baseURL: base });
+  const page = await context.newPage();
+  const consoleErrors = [];
+  page.on("console", (msg) => msg.type() === "error" && consoleErrors.push(msg.text()));
+  page.on("pageerror", (err) => consoleErrors.push(String(err)));
+  const axeRuns = [];
+
+  // Loading state: delay /health so the startup state is observable.
+  await page.route("**/health", async (route) => {
+    await new Promise((r) => setTimeout(r, 600));
+    await route.continue().catch(() => {});
+  });
+  await page.goto("/");
+  await page.getByText("Starting…").waitFor({ timeout: 5000 }).then(
+    () => check("loading state renders while the service starts", viewport, true),
+    () => check("loading state renders while the service starts", viewport, false),
+  );
+  await shot(page, viewport, "00-loading");
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+
+  // Empty state (F01).
+  await page.getByRole("heading", { name: "What should Mucaro work on?" }).waitFor();
+  check("empty conversation state", viewport, true);
+  const send0 = page.getByRole("button", { name: "Send message" });
+  check("empty send is disabled (F05)", viewport, await send0.isDisabled());
+  await shot(page, viewport, "01-empty");
+  axeRuns.push(await axe(page, viewport, "empty"));
+
+  // Ask with citations (F02, TGT-002, TGT-031).
+  await send(page, "How does source lineage work?");
+  await waitRunState(page, "COMPLETED");
+  const citations = lastRun(page).getByRole("button", { name: /Open citation/ });
+  check("answer completes with citations", viewport, (await citations.count()) > 0, `${await citations.count()} citations`);
+  check("answer text rendered", viewport, (await lastRun(page).locator(".assistant-bubble").count()) === 1);
+  await shot(page, viewport, "02-answer");
+  axeRuns.push(await axe(page, viewport, "answer"));
+
+  // Evidence sheet (TGT-030), Escape closes and restores focus.
+  await citations.first().click();
+  const evidence = page.getByRole("dialog", { name: /Evidence \[1\]/ });
+  await evidence.waitFor();
+  await evidence.getByText("Cited text").waitFor();
+  check("citation opens exact source evidence", viewport, await evidence.getByText(/SHA-256|Byte identity/).count() > 0);
+  await shot(page, viewport, "03-evidence");
+  await page.keyboard.press("Escape");
+  await evidence.waitFor({ state: "detached" });
+  const focusedName = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") || "");
+  check("Escape closes the sheet and returns focus", viewport, focusedName.startsWith("Open citation"), focusedName);
+
+  // Approval-bound action (F07) and tool summary / drawer (F08, F09).
+  await send(page, "/status");
+  await waitRunState(page, "AWAITING_APPROVAL");
+  const approval = page.getByRole("region", { name: "Permission request for source_library.status" });
+  check("permission sheet shows the exact tool and arguments", viewport, (await approval.getByText("Argument digest").count()) === 1);
+  await shot(page, viewport, "04-approval");
+  await approval.getByRole("button", { name: "Allow once" }).click();
+  await waitRunState(page, "COMPLETED");
+  const summary = lastRun(page).getByRole("button", { name: /Used 1 tool/ });
+  check("tool summary counts from records", viewport, (await summary.count()) === 1);
+  await shot(page, viewport, "05-tool-done");
+  await summary.click();
+  const drawer = page.getByRole("dialog", { name: "Tool activity" });
+  await drawer.waitFor();
+  check("tool drawer lists the executed call", viewport, (await drawer.getByText("EXECUTED").count()) >= 1);
+  await shot(page, viewport, "06-tool-drawer");
+  await page.keyboard.press("Escape");
+
+  // Failure -> question -> choice receipt (F10, F11, F13, F16).
+  await send(page, "/fetch http://127.0.0.1:9/private");
+  await waitRunState(page, "AWAITING_APPROVAL");
+  await page.getByRole("button", { name: "Allow once" }).click();
+  await waitRunState(page, "AWAITING_INPUT");
+  const question = page.getByRole("form", { name: "Question from Mucaro" });
+  await question.waitFor();
+  const submit = question.getByRole("button", { name: "Submit" });
+  check("submit disabled until a choice is made (F11)", viewport, await submit.isDisabled());
+  check("options carry consequences (F10)", viewport, (await question.getByText(/Successful actions are not repeated/).count()) === 1);
+  await shot(page, viewport, "07-question");
+  await question.getByText("Stop here").click();
+  await submit.click();
+  await waitRunState(page, "COMPLETED");
+  check("choice receipt persists in the feed (F13)", viewport, (await lastRun(page).getByText("You chose:").count()) === 1);
+  await shot(page, viewport, "08-receipt");
+
+  // Queue while a turn waits; stop the active turn (F03, F04).
+  await send(page, "/memory");
+  await waitRunState(page, "AWAITING_APPROVAL");
+  await send(page, "What is a stable chunk id?");
+  const queueList = page.getByRole("list", { name: "Queued messages" });
+  await queueList.waitFor();
+  check("message queued behind the active turn (F04)", viewport, (await queueList.getByRole("listitem").count()) === 1);
+  await shot(page, viewport, "09-queue");
+  await page.getByRole("button", { name: "Stop the current turn" }).click();
+  await page.waitForFunction(() => [...document.querySelectorAll("article.run")].some((node) => node.getAttribute("data-state") === "INTERRUPTED"), null, { timeout: 15000 });
+  await waitRunState(page, "COMPLETED", 20000);
+  check("stop interrupts and the queued message then runs (F03)", viewport, (await page.locator('article.run[data-state="INTERRUPTED"]').count()) >= 1);
+  await shot(page, viewport, "10-after-stop");
+
+  // Keyboard: Shift+Enter inserts a newline and does not send.
+  const box = page.getByLabel("Message Mucaro");
+  await box.fill("line one");
+  await box.press("Shift+Enter");
+  await box.type("line two");
+  check("Shift+Enter keeps composing (F05)", viewport, (await box.inputValue()) === "line one\nline two");
+  await box.fill("");
+
+  // Conversation menu and background tasks (F17, F18).
+  await page.getByRole("button", { name: "Conversation menu" }).click();
+  await page.getByRole("menuitem", { name: "Background tasks" }).click();
+  const tasks = page.getByRole("dialog", { name: "Background tasks" });
+  await tasks.waitFor();
+  await tasks.locator(".task-row").first().waitFor();
+  check("background tasks list runs with metrics", viewport, (await tasks.locator(".task-row").count()) >= 4);
+  await tasks.getByRole("button", { name: "View transcript" }).first().click();
+  await tasks.locator(".transcript li").first().waitFor();
+  await shot(page, viewport, "11-tasks");
+  await page.keyboard.press("Escape");
+
+  // Workspaces (TGT-003, TGT-032, TGT-033).
+  const openNav = async () => {
+    if (viewport === "iphone") await page.getByRole("button", { name: "Open navigation" }).click();
+  };
+  await openNav();
+  if (viewport === "iphone") await shot(page, viewport, "12-nav-open");
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources", exact: true }).click();
+  await page.getByRole("heading", { name: "Sources" }).waitFor();
+  check("sources workspace lists ingested sources", viewport, (await page.locator(".source-row").count()) >= 2);
+  await page.locator(".source-row").first().click();
+  await page.getByText("SHA-256").first().waitFor();
+  await shot(page, viewport, "13-sources");
+  axeRuns.push(await axe(page, viewport, "sources"));
+
+  await openNav();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Memory", exact: true }).click();
+  await page.getByLabel("Remember").fill("Prefer tables for comparisons");
+  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByText("Prefer tables for comparisons").waitFor();
+  check("memory add is visible with provenance", viewport, (await page.getByText(/preference · from api/).count()) >= 1);
+  await shot(page, viewport, "14-memory");
+
+  await openNav();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Provenance", exact: true }).click();
+  await page.getByText(/Verified \(\d+ events\)/).waitFor();
+  check("provenance shows a verified audit chain", viewport, true);
+  await shot(page, viewport, "15-provenance");
+
+  await openNav();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByText("What works offline").waitFor();
+  check("settings shows model choice and offline capabilities", viewport, (await page.getByRole("radio", { name: /openai_compatible_local/ }).count()) === 1);
+  await shot(page, viewport, "16-settings");
+  axeRuns.push(await axe(page, viewport, "settings"));
+
+  const layoutOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  check("no horizontal page overflow", viewport, !layoutOverflow);
+  check("no console errors", viewport, consoleErrors.length === 0, consoleErrors.join(" | "));
+  await context.close();
+  return axeRuns;
+}
+
+async function offlineScenario(browser, base, viewport, contextOptions, stopBackend) {
+  const context = await browser.newContext({ ...contextOptions, baseURL: base });
+  const page = await context.newPage();
+  await page.goto("/");
+  await page.getByRole("heading", { name: "What should Mucaro work on?" }).waitFor();
+  await stopBackend();
+  await page.getByText("Mucaro's local service is not reachable.").waitFor({ timeout: 10000 }).then(
+    () => check("service-unreachable error state", viewport, true),
+    () => check("service-unreachable error state", viewport, false),
+  );
+  await shot(page, viewport, "17-service-unreachable");
+  await context.close();
+}
+
+const dataDir = mkdtempSync(path.join(tmpdir(), "mucaro-qa-"));
+const port = await freePort();
+const base = `http://127.0.0.1:${port}`;
+if (!existsSync(path.join(ROOT, "frontend", "dist", "index.html"))) {
+  console.error("frontend/dist missing: run `npm run build` in frontend/ first");
+  process.exit(2);
+}
+const backend = await startBackend(dataDir, port);
+let status = "RENDERED_QA_FAIL";
+const axeResults = [];
+let browserVersion = null;
+try {
+  if (!(await waitForHealth(base))) throw new Error(`backend did not start:\n${backend.log()}`);
+  await seed(base);
+  const browser = await chromium.launch();
+  browserVersion = browser.version();
+  axeResults.push(...(await scenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } })));
+  const iphone = devices["iPhone 13"];
+  axeResults.push(...(await scenario(browser, base, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
+  const headers = (await fetch(`${base}/`)).headers;
+  check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
+  await offlineScenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } }, async () => {
+    backend.kill("SIGTERM");
+    await new Promise((r) => setTimeout(r, 800));
+  });
+  await browser.close();
+  status = checks.every((row) => row.pass) ? "RENDERED_QA_PASS" : "RENDERED_QA_FAIL";
+} catch (err) {
+  check("harness completed", "all", false, err.stack || String(err));
+} finally {
+  if (!backend.killed) backend.kill("SIGTERM");
+}
+
+const receipt = {
+  schema_version: "mucaro-rendered-qa/1.0",
+  status,
+  head_sha: head,
+  worktree_clean: dirtyPaths.length === 0,
+  dirty_paths: dirtyPaths,
+  created_utc: new Date().toISOString(),
+  browser: `chromium ${browserVersion}`,
+  viewports: { desktop: "1440x900", iphone: "390x844 (iPhone 13 profile, touch, DPR 3)" },
+  checks,
+  passed: checks.filter((row) => row.pass).length,
+  failed: checks.filter((row) => !row.pass).length,
+  axe: axeResults,
+  screenshots: shots,
+  limitations: [
+    "Rendered in Chromium (Playwright); the packaged macOS app uses WKWebView, whose rendering is verified separately on a macOS runner.",
+    "iPhone width is emulated in Chromium, not rendered by iOS Safari.",
+  ],
+};
+writeFileSync(path.join(outDir, "receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`);
+console.log(`${status} checks=${receipt.passed}/${checks.length} receipt=${path.relative(ROOT, path.join(outDir, "receipt.json"))}`);
+process.exit(status === "RENDERED_QA_PASS" ? 0 : 1);
