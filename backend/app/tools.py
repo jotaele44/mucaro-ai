@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -347,6 +348,17 @@ def _append_audit_event(event: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     return payload
 
 
+def _binding_sha256(tool_name: str, arguments: Any) -> str:
+    # Approval authorizes this exact tool and argument set; execution re-derives it before running.
+    canonical = json.dumps(
+        {"tool_name": tool_name, "arguments": arguments},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _find_tool_call(tool_call_id: str, calls: list[dict[str, Any]]) -> tuple[int, dict[str, Any]]:
     for index, call in enumerate(calls):
         if call.get("tool_call_id") == tool_call_id:
@@ -397,6 +409,7 @@ def request_tool_call(
         "tool_call_id": tool_call_id,
         "tool_name": tool_name,
         "arguments": arguments,
+        "binding_sha256": _binding_sha256(tool_name, arguments),
         "status": "PENDING_APPROVAL",
         "requested_by": requested_by,
         "reason": reason,
@@ -436,7 +449,30 @@ def approve_tool_call(
     index, call = _find_tool_call(tool_call_id, calls)
     if call.get("status") != "PENDING_APPROVAL":
         raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_PENDING", f"Tool call is not pending approval: {tool_call_id}")
-    call = {**call, "status": "APPROVED", "approved_by": approved_by, "approved_at": utc_now()}
+    binding = _binding_sha256(str(call.get("tool_name", "")), call.get("arguments"))
+    if call.get("binding_sha256") != binding:
+        _append_audit_event(
+            {
+                "event": "TOOL_CALL_BINDING_REJECTED",
+                "tool_call_id": tool_call_id,
+                "tool_name": call.get("tool_name"),
+                "status": "ERROR_TOOL_BINDING_MISMATCH",
+                "actor": approved_by,
+                "reason": reason,
+            },
+            cfg,
+        )
+        raise ToolRuntimeError(
+            "ERROR_TOOL_BINDING_MISMATCH",
+            f"Tool call arguments changed after request; request a new call: {tool_call_id}",
+        )
+    call = {
+        **call,
+        "status": "APPROVED",
+        "approved_by": approved_by,
+        "approved_at": utc_now(),
+        "approved_binding_sha256": binding,
+    }
     calls[index] = call
     _write_tool_calls(calls, cfg)
     _append_audit_event(
@@ -481,6 +517,42 @@ def deny_tool_call(
     return {"status": "TOOL_CALL_DENIED", "tool_call": call}
 
 
+def _replace_tool_call(call: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    # Re-read the ledger so calls recorded while a handler ran are not overwritten.
+    calls = _load_tool_calls(cfg)
+    index, _ = _find_tool_call(str(call["tool_call_id"]), calls)
+    calls[index] = call
+    _write_tool_calls(calls, cfg)
+    return call
+
+
+def _fail_tool_call(
+    call: dict[str, Any],
+    *,
+    status: str,
+    detail: str,
+    executed_by: str,
+    cfg: Settings,
+) -> dict[str, Any]:
+    result = {"status": status, "detail": detail}
+    failed = _replace_tool_call(
+        {**call, "status": "FAILED", "executed_at": utc_now(), "executed_by": executed_by, "result": result},
+        cfg,
+    )
+    _append_audit_event(
+        {
+            "event": "TOOL_CALL_FAILED",
+            "tool_call_id": call.get("tool_call_id"),
+            "tool_name": call.get("tool_name"),
+            "status": status,
+            "actor": executed_by,
+            "result_status": status,
+        },
+        cfg,
+    )
+    return failed
+
+
 def run_tool_call(
     tool_call_id: str,
     *,
@@ -488,13 +560,20 @@ def run_tool_call(
     executed_by: str = "operator",
 ) -> dict[str, Any]:
     calls = _load_tool_calls(cfg)
-    index, call = _find_tool_call(tool_call_id, calls)
+    _, call = _find_tool_call(tool_call_id, calls)
     if call.get("status") == "PENDING_APPROVAL":
         raise ToolRuntimeError("ERROR_TOOL_APPROVAL_REQUIRED", f"Approve tool call before execution: {tool_call_id}")
     if call.get("status") == "DENIED":
         raise ToolRuntimeError("ERROR_TOOL_CALL_DENIED", f"Denied tool call cannot execute: {tool_call_id}")
     if call.get("status") == "EXECUTED":
         raise ToolRuntimeError("ERROR_TOOL_CALL_ALREADY_EXECUTED", f"Tool call already executed: {tool_call_id}")
+    if call.get("status") == "EXECUTING":
+        raise ToolRuntimeError(
+            "ERROR_TOOL_CALL_IN_FLIGHT",
+            f"Tool call started and did not finish; recover it and request a new call: {tool_call_id}",
+        )
+    if call.get("status") == "INTERRUPTED":
+        raise ToolRuntimeError("ERROR_TOOL_CALL_INTERRUPTED", f"Interrupted tool call cannot execute: {tool_call_id}")
     if call.get("status") != "APPROVED":
         raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_APPROVED", f"Tool call is not approved: {tool_call_id}")
     tool_name = str(call.get("tool_name", ""))
@@ -502,28 +581,38 @@ def run_tool_call(
     if tool is None:
         raise ToolRuntimeError("ERROR_TOOL_NOT_ALLOWED", f"Tool is not in the local allowlist: {tool_name}")
 
+    approved_binding = call.get("approved_binding_sha256")
+    if not approved_binding:
+        status, detail = "ERROR_TOOL_APPROVAL_BINDING_MISSING", "Approval does not bind tool arguments; request a new call."
+    elif approved_binding != _binding_sha256(tool_name, call.get("arguments")):
+        status, detail = "ERROR_TOOL_BINDING_MISMATCH", "Tool call arguments changed after approval; request a new call."
+    else:
+        status, detail = "", ""
+    if status:
+        _fail_tool_call(call, status=status, detail=detail, executed_by=executed_by, cfg=cfg)
+        raise ToolRuntimeError(status, f"{detail} {tool_call_id}")
+
+    # Write-ahead: a crash inside the handler leaves EXECUTING, which is never re-run automatically.
+    call = _replace_tool_call({**call, "status": "EXECUTING", "started_at": utc_now(), "executed_by": executed_by}, cfg)
     try:
         result = tool.handler(dict(call.get("arguments") or {}), cfg)
     except ToolRuntimeError as exc:
-        result = {"status": exc.status, "detail": exc.detail}
-        call = {**call, "status": "FAILED", "executed_at": utc_now(), "executed_by": executed_by, "result": result}
-        calls[index] = call
-        _write_tool_calls(calls, cfg)
-        _append_audit_event(
-            {
-                "event": "TOOL_CALL_FAILED",
-                "tool_call_id": tool_call_id,
-                "tool_name": tool_name,
-                "status": exc.status,
-                "actor": executed_by,
-                "result_status": exc.status,
-            },
-            cfg,
-        )
+        _fail_tool_call(call, status=exc.status, detail=exc.detail, executed_by=executed_by, cfg=cfg)
         raise
-    call = {**call, "status": "EXECUTED", "executed_at": utc_now(), "executed_by": executed_by, "result": result}
-    calls[index] = call
-    _write_tool_calls(calls, cfg)
+    except Exception as exc:
+        # Only the exception class is persisted; the message may carry request content.
+        _fail_tool_call(
+            call,
+            status="ERROR_TOOL_HANDLER_EXCEPTION",
+            detail=type(exc).__name__,
+            executed_by=executed_by,
+            cfg=cfg,
+        )
+        raise ToolRuntimeError("ERROR_TOOL_HANDLER_EXCEPTION", f"{tool_name}:{type(exc).__name__}") from exc
+    call = _replace_tool_call(
+        {**call, "status": "EXECUTED", "executed_at": utc_now(), "executed_by": executed_by, "result": result},
+        cfg,
+    )
     _append_audit_event(
         {
             "event": "TOOL_CALL_EXECUTED",
@@ -536,3 +625,33 @@ def run_tool_call(
         cfg,
     )
     return {"status": "TOOL_CALL_EXECUTED", "tool_call": call, "result": result}
+
+
+def recover_tool_call(
+    tool_call_id: str,
+    *,
+    cfg: Settings = settings,
+    recovered_by: str = "operator",
+    reason: str | None = None,
+) -> dict[str, Any]:
+    """Close a call left EXECUTING by an interrupted process without re-running it."""
+    calls = _load_tool_calls(cfg)
+    _, call = _find_tool_call(tool_call_id, calls)
+    if call.get("status") != "EXECUTING":
+        raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_IN_FLIGHT", f"Tool call is not in flight: {tool_call_id}")
+    call = _replace_tool_call(
+        {**call, "status": "INTERRUPTED", "interrupted_at": utc_now(), "recovered_by": recovered_by},
+        cfg,
+    )
+    _append_audit_event(
+        {
+            "event": "TOOL_CALL_INTERRUPTED",
+            "tool_call_id": tool_call_id,
+            "tool_name": call.get("tool_name"),
+            "status": "INTERRUPTED",
+            "actor": recovered_by,
+            "reason": reason,
+        },
+        cfg,
+    )
+    return {"status": "TOOL_CALL_INTERRUPTED", "tool_call": call}
