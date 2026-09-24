@@ -76,6 +76,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
   const [loading, setLoading] = useState(false);
   const [citation, setCitation] = useState(null);
   const streams = useRef(new Map());
+  const caughtUp = useRef(new Set());
   const refreshRef = useRef(null);
   const feedRef = useRef(null);
   const stick = useRef(true);
@@ -124,7 +125,11 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
     const loaded = await Promise.all(started.map((row) => api.runEvents(row.run_id)));
     setRuns(new Map(loaded.map((payload) => [payload.run.run_id, { run: payload.run, events: payload.events }])));
     for (const payload of loaded) {
-      if (ACTIVE_STATES.has(payload.run.state)) {
+      const finished = payload.events.some((event) => ["final", "cancelled", "interrupted"].includes(event.type));
+      // Active runs are followed live; a terminal run missing its closing event is caught up once.
+      const catchUp = !finished && !caughtUp.current.has(payload.run.run_id);
+      if (catchUp) caughtUp.current.add(payload.run.run_id);
+      if (ACTIVE_STATES.has(payload.run.state) || catchUp) {
         const lastSeq = payload.events.length ? payload.events[payload.events.length - 1].seq : 0;
         follow(payload.run.run_id, lastSeq);
       }
@@ -285,6 +290,12 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
         activeRun={Boolean(activeRun)}
         queued={queued}
         onCancelQueued={cancelQueued}
+        onEditQueued={async (run, prompt) => {
+          await api.editQueuedRun(run.run_id, prompt, run.version);
+          const runList = await api.conversationRuns(conversationId);
+          setSummaries(runList.runs);
+          announce("Queued message updated.");
+        }}
         disabled={false}
       />
       {citation && <EvidencePanel citation={citation} onClose={() => setCitation(null)} />}

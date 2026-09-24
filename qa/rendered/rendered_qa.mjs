@@ -95,20 +95,24 @@ async function shot(page, viewport, name) {
 
 const lastRun = (page) => page.locator("article.run").last();
 
+let expectedRuns = 0;
+
 async function waitRunState(page, states, timeout = 20000) {
+  // Waits on the newest run only once it exists, so an earlier completed run cannot satisfy the wait.
   const wanted = Array.isArray(states) ? states : [states];
   await page.waitForFunction(
-    (list) => {
+    ([list, count]) => {
       const runs = document.querySelectorAll("article.run");
       const last = runs[runs.length - 1];
-      return last && list.includes(last.getAttribute("data-state"));
+      return runs.length >= count && last && list.includes(last.getAttribute("data-state"));
     },
-    wanted,
+    [wanted, expectedRuns],
     { timeout },
   );
 }
 
-async function send(page, text) {
+async function send(page, text, { queued = false } = {}) {
+  if (!queued) expectedRuns = (await page.locator("article.run").count()) + 1;
   const box = page.getByLabel("Message Mucaro");
   await box.fill(text);
   await box.press("Enter");
@@ -134,6 +138,7 @@ async function scenario(browser, base, viewport, contextOptions) {
     await new Promise((r) => setTimeout(r, 600));
     await route.continue().catch(() => {});
   });
+  expectedRuns = 0;
   await page.goto("/");
   await page.getByText("Starting…").waitFor({ timeout: 5000 }).then(
     () => check("loading state renders while the service starts", viewport, true),
@@ -158,6 +163,12 @@ async function scenario(browser, base, viewport, contextOptions) {
   check("answer text rendered", viewport, (await lastRun(page).locator(".assistant-bubble").count()) === 1);
   await shot(page, viewport, "02-answer");
   axeRuns.push(await axe(page, viewport, "answer"));
+
+  // Reload reproduces the transcript (F02).
+  const answerText = await lastRun(page).locator(".assistant-bubble").innerText();
+  await page.reload();
+  await lastRun(page).locator(".assistant-bubble").waitFor();
+  check("reload reproduces the transcript (F02)", viewport, (await lastRun(page).locator(".assistant-bubble").innerText()) === answerText);
 
   // Evidence sheet (TGT-030), Escape closes and restores focus.
   await citations.first().click();
@@ -200,22 +211,52 @@ async function scenario(browser, base, viewport, contextOptions) {
   check("submit disabled until a choice is made (F11)", viewport, await submit.isDisabled());
   check("options carry consequences (F10)", viewport, (await question.getByText(/Successful actions are not repeated/).count()) === 1);
   await shot(page, viewport, "07-question");
-  await question.getByText("Stop here").click();
-  await submit.click();
-  await waitRunState(page, "COMPLETED");
-  check("choice receipt persists in the feed (F13)", viewport, (await lastRun(page).getByText("You chose:").count()) === 1);
+  if (viewport === "desktop") {
+    // Retry needs a fresh approval and repeats only the failed target (F16).
+    await question.getByText("Retry the failed action").click();
+    await submit.click();
+    await waitRunState(page, "AWAITING_APPROVAL");
+    check("retry asks for a fresh approval (F16)", viewport, (await lastRun(page).getByRole("region", { name: /Permission request for web.fetch/ }).count()) === 1);
+    await lastRun(page).getByRole("button", { name: "Deny" }).click();
+    await waitRunState(page, "COMPLETED");
+    check("per-call outcomes stay distinct after retry (F08, F16)", viewport, (await lastRun(page).getByRole("button", { name: /Used 2 tools \(1 failed, 1 denied\)/ }).count()) === 1);
+    check("choice receipt persists in the feed (F13)", viewport, (await lastRun(page).getByText("You chose:").count()) === 1);
+  } else {
+    // Freeform answer tied to the interaction (F12).
+    await question.getByText("Other", { exact: true }).click();
+    check("submit stays disabled for an empty Other answer (F11)", viewport, await submit.isDisabled());
+    await question.getByLabel("Your answer").fill("Skip it for now");
+    await submit.click();
+    await waitRunState(page, "COMPLETED");
+    check("freeform answer recorded as the choice (F12, F13)", viewport, (await lastRun(page).getByText("Skip it for now").count()) === 1);
+  }
   await shot(page, viewport, "08-receipt");
+
+  // Plan mode executes nothing (F06).
+  await page.getByRole("button", { name: /^Mode:/ }).click();
+  await page.getByRole("option", { name: /^Plan/ }).click();
+  await send(page, "/status");
+  await waitRunState(page, "COMPLETED");
+  check("plan mode shows the plan and executes nothing (F06)", viewport, (await lastRun(page).getByText("Plan only: nothing was executed.").count()) === 1 && (await lastRun(page).locator(".tool-summary").count()) === 0);
+  await page.getByRole("button", { name: /^Mode:/ }).click();
+  await page.getByRole("option", { name: /^Ask first/ }).click();
 
   // Queue while a turn waits; stop the active turn (F03, F04).
   await send(page, "/memory");
   await waitRunState(page, "AWAITING_APPROVAL");
-  await send(page, "What is a stable chunk id?");
+  await send(page, "What is a stable chunk id?", { queued: true });
   const queueList = page.getByRole("list", { name: "Queued messages" });
   await queueList.waitFor();
   check("message queued behind the active turn (F04)", viewport, (await queueList.getByRole("listitem").count()) === 1);
+  await queueList.getByRole("button", { name: /^Edit queued message/ }).click();
+  await queueList.getByLabel("Edit queued message").fill("What is a stable chunk identifier?");
+  await queueList.getByRole("button", { name: "Save" }).click();
+  await queueList.getByText("What is a stable chunk identifier?").waitFor();
+  check("queued message editable before dispatch (F04)", viewport, true);
   await shot(page, viewport, "09-queue");
   await page.getByRole("button", { name: "Stop the current turn" }).click();
   await page.waitForFunction(() => [...document.querySelectorAll("article.run")].some((node) => node.getAttribute("data-state") === "INTERRUPTED"), null, { timeout: 15000 });
+  expectedRuns += 1;
   await waitRunState(page, "COMPLETED", 20000);
   check("stop interrupts and the queued message then runs (F03)", viewport, (await page.locator('article.run[data-state="INTERRUPTED"]').count()) >= 1);
   await shot(page, viewport, "10-after-stop");
@@ -227,6 +268,15 @@ async function scenario(browser, base, viewport, contextOptions) {
   await box.type("line two");
   check("Shift+Enter keeps composing (F05)", viewport, (await box.inputValue()) === "line one\nline two");
   await box.fill("");
+
+  // Conversation menu: rename (F17).
+  await page.getByRole("button", { name: "Conversation menu" }).click();
+  await page.getByRole("menuitem", { name: "Rename" }).click();
+  const renameDialog = page.getByRole("dialog", { name: "Rename conversation" });
+  await renameDialog.getByLabel("Title").fill(`QA ${viewport} conversation`);
+  await renameDialog.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("heading", { name: `QA ${viewport} conversation` }).waitFor();
+  check("rename from the conversation menu (F17)", viewport, true);
 
   // Conversation menu and background tasks (F17, F18).
   await page.getByRole("button", { name: "Conversation menu" }).click();
@@ -248,6 +298,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   if (viewport === "iphone") await shot(page, viewport, "12-nav-open");
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources", exact: true }).click();
   await page.getByRole("heading", { name: "Sources" }).waitFor();
+  await page.locator(".source-row").nth(1).waitFor();
   check("sources workspace lists ingested sources", viewport, (await page.locator(".source-row").count()) >= 2);
   await page.locator(".source-row").first().click();
   await page.getByText("SHA-256").first().waitFor();

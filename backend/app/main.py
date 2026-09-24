@@ -576,8 +576,10 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/work-runs/{run_id}/events")
     def work_run_events(run_id: str, after: int = 0, limit: int = 500) -> dict:
         try:
+            # Read state before events: every event of a run already terminal at this read is included.
+            run = get_run(run_id, cfg)
             events = list_run_events(run_id, after_seq=after, limit=limit, cfg=cfg)
-            return {"status": "RUN_EVENTS_OK", "run": get_run(run_id, cfg), "events": events}
+            return {"status": "RUN_EVENTS_OK", "run": run, "events": events}
         except RunError as exc:
             raise run_error(exc) from exc
 

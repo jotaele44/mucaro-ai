@@ -237,6 +237,7 @@ def summarize_run(run: dict[str, Any], cfg: Settings = settings) -> dict[str, An
         "run_id": run["run_id"],
         "conversation_id": run["conversation_id"],
         "state": run["state"],
+        "version": run["version"],
         "mode": run.get("mode"),
         "prompt_preview": run.get("prompt", "")[:120],
         "created_at": run.get("created_at"),

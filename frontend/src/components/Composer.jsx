@@ -4,7 +4,52 @@ const MODE_LABEL = { plan: "Plan", ask: "Ask first", auto: "Auto (local read-onl
 
 // Message composer (F05/F06): empty send disabled, Enter sends (Shift+Enter for a new line),
 // IME composition never submits, and the draft survives sheets and reloads per conversation.
-export function Composer({ conversationId, modes, mode, onModeChange, onSend, onStop, activeRun, queued, onCancelQueued, disabled }) {
+function QueuedItem({ run, onCancel, onEdit }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(run.prompt_preview);
+  const [error, setError] = useState(null);
+  if (editing) {
+    return (
+      <li>
+        <form
+          className="inline-form grow"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            try {
+              await onEdit(run, value.trim());
+              setEditing(false);
+            } catch (err) {
+              setError(`${err.status}: ${err.message}`);
+            }
+          }}
+        >
+          <label className="field grow">
+            <span className="sr-only">Edit queued message</span>
+            <input value={value} onChange={(event) => setValue(event.target.value)} />
+          </label>
+          <button type="submit" className="secondary-button" disabled={!value.trim()}>Save</button>
+          <button type="button" className="ghost-button" onClick={() => setEditing(false)}>Cancel edit</button>
+        </form>
+        {error && <p className="error-text small" role="alert">{error}</p>}
+      </li>
+    );
+  }
+  return (
+    <li>
+      <span className="grow">
+        <span className="muted small">Queued:</span> {run.prompt_preview}
+      </span>
+      <button type="button" className="ghost-button" onClick={() => setEditing(true)} aria-label={`Edit queued message ${run.prompt_preview}`}>
+        Edit
+      </button>
+      <button type="button" className="ghost-button" onClick={() => onCancel(run.run_id)} aria-label={`Cancel queued message ${run.prompt_preview}`}>
+        Cancel
+      </button>
+    </li>
+  );
+}
+
+export function Composer({ conversationId, modes, mode, onModeChange, onSend, onStop, activeRun, queued, onCancelQueued, onEditQueued, disabled }) {
   const storageKey = `mucaro.draft.${conversationId || "new"}`;
   const [text, setText] = useState(() => {
     try {
@@ -67,12 +112,7 @@ export function Composer({ conversationId, modes, mode, onModeChange, onSend, on
       {queued.length > 0 && (
         <ul className="queue" aria-label="Queued messages">
           {queued.map((run) => (
-            <li key={run.run_id}>
-              <span className="muted small">Queued:</span> {run.prompt_preview}
-              <button type="button" className="ghost-button" onClick={() => onCancelQueued(run.run_id)} aria-label={`Cancel queued message ${run.prompt_preview}`}>
-                Cancel
-              </button>
-            </li>
+            <QueuedItem key={run.run_id} run={run} onCancel={onCancelQueued} onEdit={onEditQueued} />
           ))}
         </ul>
       )}
