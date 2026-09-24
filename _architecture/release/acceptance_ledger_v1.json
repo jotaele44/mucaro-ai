@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-24T21:18:37Z",
+  "updated_utc": "2026-09-24T21:29:48Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -512,17 +512,21 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
+        "backend/app/model_router.py",
         "backend/app/model_routing_policy.py"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_local_model.py::test_non_loopback_local_url_is_refused_before_any_request",
+        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N13",
-      "notes": ""
+      "notes": "Defaults are local (mock/loopback model); remote transmission requires explicit live mode, key and per-request allow_live; loopback-only enforcement for the local provider. Remote prompt fencing lands in M5."
     },
     {
       "requirement_id": "INV-005",
@@ -1018,19 +1022,25 @@
       "requirement_id": "TGT-008",
       "requirement_text": "Local AI execution",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
+      "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/model_router.py"
+        "backend/app/model_router.py",
+        "_architecture/release/local_ai_declaration_v1.json"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_local_model.py::test_local_answer_is_grounded_cited_and_fences_untrusted_sources",
+        "backend/tests/test_local_model.py::test_run_streams_local_tokens_live",
+        "backend/tests/test_local_model.py::test_local_ai_declaration_matches_the_provider_registry",
+        "_architecture/release/local_ai_declaration_v1.json"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N13",
-      "notes": "Only mock and anthropic providers exist."
+      "notes": "Loopback OpenAI-compatible provider with streaming, readiness probing and declarations (backends, hardware baseline, memory/storage, offline, limitations). OPEN: evaluation against a real local model on the declared Apple Silicon baseline (tests use a protocol-faithful fake server)."
     },
     {
       "requirement_id": "TGT-009",
@@ -1055,19 +1065,25 @@
       "requirement_id": "TGT-010",
       "requirement_text": "Model routing",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/model_routing_policy.py"
+        "backend/app/model_routing_policy.py",
+        "backend/app/model_router.py",
+        "backend/app/work_runs.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_local_model.py::test_local_only_excludes_remote_and_default_stays_offline",
+      "negative_gate": "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_local_model.py::test_modality_and_context_constraints_make_providers_ineligible",
+        "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+        "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N13",
-      "notes": ""
+      "notes": "Routing over declared locality, modalities, context size, permissions (allow_live), offline state and readiness; each run emits an inspectable route event with candidates, reasons and route_sha256."
     },
     {
       "requirement_id": "TGT-011",
@@ -1238,18 +1254,21 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/gis_crs.py",
+        "backend/app/offline.py",
         "backend/app/model_routing_policy.py"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_local_model.py::test_offline_manifest_classifies_every_capability_and_closes",
+        "backend/tests/test_web_render.py::offline_dns"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N21",
-      "notes": "No system-wide offline manifest."
+      "notes": "Every capability classified AVAILABLE_LOCALLY / UNAVAILABLE_OFFLINE / REQUIRES_REMOTE_SERVICE (plus LOCAL_DEPENDENCY_MISSING); remote providers ineligible when offline. OPEN: UI offline states and network-interruption tests (MATRIX-016)."
     },
     {
       "requirement_id": "TGT-020",
@@ -1835,19 +1854,25 @@
       "requirement_id": "MATRIX-012",
       "requirement_text": "Model-routing benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/tests/test_model_routing_policy.py"
+        "backend/tests/test_local_model.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_local_model.py::test_local_only_excludes_remote_and_default_stays_offline",
+      "negative_gate": "backend/tests/test_local_model.py::test_remote_allowed_but_unavailable_is_blocked_not_silently_substituted",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider",
+        "backend/tests/test_local_model.py::test_unavailable_local_model_blocks_the_route",
+        "backend/tests/test_local_model.py::test_modality_and_context_constraints_make_providers_ineligible",
+        "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+        "backend/tests/test_local_model.py::test_conflicting_constraints_fail_closed"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N13",
-      "notes": ""
+      "notes": "Local-only, remote allowed, remote forbidden, unavailable local, unavailable remote, modality mismatch, context constraint and offline state; no case violates permissions."
     },
     {
       "requirement_id": "MATRIX-013",

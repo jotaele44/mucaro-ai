@@ -741,13 +741,13 @@ def test_cli_models_list_reports_provider_registry(tmp_path: Path, capsys, monke
 
     assert payload["status"] == "MODEL_PROVIDERS_OK"
     providers = {provider["name"]: provider for provider in payload["providers"]}
-    assert set(providers) == {"mock", "anthropic"}
+    assert set(providers) == {"mock", "anthropic", "openai_compatible_local"}
     assert providers["mock"]["status"] == "MODEL_PROVIDER_READY"
     assert providers["anthropic"]["status"] == "MODEL_PROVIDER_DISABLED"
 
     assert main(["models", "list", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
-    assert "providers=2" in text_output
+    assert "providers=3" in text_output
     assert "MODEL_PROVIDER_READY mock" in text_output
     assert "MODEL_PROVIDER_DISABLED anthropic" in text_output
 

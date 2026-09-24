@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from .citations import build_citation_records, score_confidence, validate_citations
 from .config import Settings, settings
@@ -32,6 +32,7 @@ def answer_question(
     memory_context: list[dict[str, Any]] | None = None,
     cfg: Settings = settings,
     persist: bool = True,
+    on_text_delta: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     normalized_query = query.strip()
     if not normalized_query:
@@ -117,6 +118,7 @@ def answer_question(
             allow_mock_fallback=False,
             conversation_context=conversation_context or [],
             memory_context=selected_memory_context,
+            on_text_delta=on_text_delta,
         )
     except ModelProviderError as exc:
         return {
@@ -154,6 +156,7 @@ def answer_question(
         "cited_chunks": cited_chunks,
         "source_ids": source_ids,
         "answer": model["answer"],
+        "answer_streamed": bool(model.get("streamed")),
         "confidence": score_confidence(cited_ids, source_ids, bool(retrieved)),
         "validation_flags": [],
         "created_at": utc_now(),

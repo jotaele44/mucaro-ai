@@ -52,7 +52,9 @@ from .models import (
     ToolDecisionRequest,
     WorkspaceProfileRequest,
 )
+from .model_router import list_model_providers
 from .multimodal import MULTIMODAL_SUFFIXES
+from .offline import build_offline_manifest
 from .memory import (
     MemoryError,
     delete_memory_item,
@@ -482,6 +484,14 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             raise api_error(exc.status, exc.detail, status_code=status_code) from exc
         resume_for_interaction(interaction_id)
         return {"status": "INTERACTION_DISMISSED", "interaction": interaction}
+
+    @app.get("/models")
+    def models() -> dict:
+        return {"status": "MODEL_PROVIDERS_OK", "providers": list_model_providers()}
+
+    @app.get("/offline-manifest")
+    def offline_manifest(offline: bool = False) -> dict:
+        return build_offline_manifest(system_offline=offline)
 
     @app.get("/work-runs/modes")
     def work_run_modes() -> dict:

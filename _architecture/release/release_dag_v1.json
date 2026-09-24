@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-09-24T21:18:37Z",
+  "updated_utc": "2026-09-24T21:29:48Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -324,7 +324,7 @@
         "N03",
         "N05"
       ],
-      "state": "OPEN",
+      "state": "PROVISIONAL",
       "risk": "MEDIUM",
       "user_value": "HIGH",
       "downstream_unlock_value": "HIGH",
@@ -333,7 +333,7 @@
         "model-routing benchmark"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "Routing and MATRIX-012 PASS; local provider verified against a protocol-faithful fake server; real-model evaluation and live remote evaluation remain."
     },
     {
       "node_id": "N14",

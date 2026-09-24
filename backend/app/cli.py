@@ -88,6 +88,7 @@ from .ingestion import (
     reindex_sources,
 )
 from .contracts import contract_errors, list_contracts
+from .offline import build_offline_manifest
 from .macos_app_store import build_macos_app_store_readiness
 from .parser import ParseError
 from .memory import (
@@ -985,6 +986,13 @@ def build_parser() -> argparse.ArgumentParser:
     tools_verify = tools_subcommands.add_parser("verify-audit", help="Verify the tool audit hash chain.")
     tools_verify.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tools_verify.set_defaults(handler=run_tools_verify_audit)
+
+    offline = subcommands.add_parser("offline", help="Report which capabilities work without a network.")
+    offline_subcommands = offline.add_subparsers(dest="offline_command", required=True)
+    offline_manifest = offline_subcommands.add_parser("manifest", help="Classify capabilities for offline use.")
+    offline_manifest.add_argument("--assume-offline", action="store_true", help="Report states as if the network were unavailable.")
+    offline_manifest.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    offline_manifest.set_defaults(handler=run_offline_manifest)
 
     contracts = subcommands.add_parser("contracts", help="Inspect and validate the common governed contracts.")
     contracts_subcommands = contracts.add_subparsers(dest="contracts_command", required=True)
@@ -7990,6 +7998,18 @@ def run_tools_verify_audit(args: argparse.Namespace, cfg: Settings) -> int:
     result = verify_tool_audit_chain(cfg)
     emit_payload(result, args.format)
     return 0 if result["status"] == "TOOL_AUDIT_CHAIN_OK" else 1
+
+
+def run_offline_manifest(args: argparse.Namespace, cfg: Settings) -> int:
+    payload = build_offline_manifest(system_offline=args.assume_offline)
+    if args.format == "text":
+        print(payload["status"])
+        print(" ".join(f"{key}={value}" for key, value in payload["counts"].items()))
+        for row in payload["capabilities"]:
+            print(f"{row['state_now']} {row['capability']}")
+        return 0
+    emit_payload(payload, args.format)
+    return 0
 
 
 def run_contracts_list(args: argparse.Namespace, cfg: Settings) -> int:

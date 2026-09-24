@@ -874,6 +874,11 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
         return
     options = run.get("options", {})
     conversation = get_conversation(run["conversation_id"], cfg) or {"turns": []}
+
+    def stream_delta(text: str) -> None:
+        # Live token streaming from providers that support it (TGT-002 STREAM RESULTS).
+        _emit_only(run_id, cfg, "text_delta", {"text": text, "live": True})
+
     try:
         trace = answer_question(
             question,
@@ -886,6 +891,7 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
             require_offline=bool(options.get("require_offline")),
             conversation_context=build_conversation_context(conversation),
             cfg=cfg,
+            on_text_delta=stream_delta,
         )
     except (ModelProviderError, ModelRoutingError, ValueError) as exc:
         status = getattr(exc, "status", None) or str(exc)
@@ -900,8 +906,9 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
                        "source_ids": trace.get("source_ids", [])}),
     ]
     answer = str(trace["answer"])
-    for start in range(0, len(answer), TEXT_DELTA_CHARS):
-        events.append(("text_delta", {"text": answer[start:start + TEXT_DELTA_CHARS]}))
+    if not trace.get("answer_streamed"):
+        for start in range(0, len(answer), TEXT_DELTA_CHARS):
+            events.append(("text_delta", {"text": answer[start:start + TEXT_DELTA_CHARS], "live": False}))
     for record in trace.get("cited_chunks", []):
         events.append(("citation", {key: record.get(key) for key in (
             "citation_order", "retrieval_rank", "chunk_id", "source_id", "text_snippet", "score", "source_format",
