@@ -222,13 +222,21 @@ async function scenario(browser, base, viewport, contextOptions) {
     check("per-call outcomes stay distinct after retry (F08, F16)", viewport, (await lastRun(page).getByRole("button", { name: /Used 2 tools \(1 failed, 1 denied\)/ }).count()) === 1);
     check("choice receipt persists in the feed (F13)", viewport, (await lastRun(page).getByText("You chose:").count()) === 1);
   } else {
+    // A new message while the question is pending queues; the same question stays (F14).
+    const before = await question.getAttribute("aria-label");
+    await send(page, "Queued while the question is open", { queued: true });
+    await page.getByRole("list", { name: "Queued messages" }).waitFor();
+    check("pending question survives a new message (F14)", viewport, (await page.getByRole("form", { name: "Question from Mucaro" }).count()) === 1 && before === "Question from Mucaro");
     // Freeform answer tied to the interaction (F12).
     await question.getByText("Other", { exact: true }).click();
     check("submit stays disabled for an empty Other answer (F11)", viewport, await submit.isDisabled());
     await question.getByLabel("Your answer").fill("Skip it for now");
     await submit.click();
+    const receiptLine = page.locator(".receipt").filter({ hasText: "Skip it for now" });
+    await receiptLine.waitFor();
+    check("freeform answer recorded as the choice (F12, F13)", viewport, (await receiptLine.getByText("You chose:").count()) === 1);
+    expectedRuns += 1;
     await waitRunState(page, "COMPLETED");
-    check("freeform answer recorded as the choice (F12, F13)", viewport, (await lastRun(page).getByText("Skip it for now").count()) === 1);
   }
   await shot(page, viewport, "08-receipt");
 
@@ -277,6 +285,14 @@ async function scenario(browser, base, viewport, contextOptions) {
   await renameDialog.getByRole("button", { name: "Save" }).click();
   await page.getByRole("heading", { name: `QA ${viewport} conversation` }).waitFor();
   check("rename from the conversation menu (F17)", viewport, true);
+
+  // Delete asks for confirmation and says there is no archive (F17).
+  await page.getByRole("button", { name: "Conversation menu" }).click();
+  await page.getByRole("menuitem", { name: "Delete…" }).click();
+  const confirm = page.getByRole("dialog", { name: "Delete conversation?" });
+  check("delete confirms and states there is no archive (F17)", viewport, (await confirm.getByText(/There is no archive or undo/).count()) === 1);
+  await confirm.getByRole("button", { name: "Keep it" }).click();
+  await confirm.waitFor({ state: "detached" });
 
   // Conversation menu and background tasks (F17, F18).
   await page.getByRole("button", { name: "Conversation menu" }).click();
