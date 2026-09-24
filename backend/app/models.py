@@ -66,6 +66,8 @@ class ToolCallRequest(BaseModel):
 
 class ToolDecisionRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
+    # When supplied, the decision binds to the exact arguments the decider saw.
+    arguments_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 class InteractionOptionInput(BaseModel):

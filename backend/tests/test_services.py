@@ -150,7 +150,7 @@ def test_answer_question_carries_web_snapshot_citation_metadata(tmp_path: Path):
             "retrieval_utc": "2026-09-10T00:00:01Z",
             "http_status": 200,
             "content_type": "text/html; charset=utf-8",
-            "content_sha256": "contenthash",
+            "content_sha256": "4d70936fef2a7cae9c35d7adeccf0fb553981e9f1df96a20d27cc3f5b7173fbb",
             "content_size_bytes": 80,
             "content_base64": "",
             "parser_name": "web_snapshot_preview_v1",
@@ -171,7 +171,7 @@ def test_answer_question_carries_web_snapshot_citation_metadata(tmp_path: Path):
     assert citation["source_url"] == "https://example.com/brief"
     assert citation["snapshot_id"] == "websnap_fixture"
     assert citation["snapshot_sha256"] == ingested["snapshot_sha256"]
-    assert citation["content_sha256"] == "contenthash"
+    assert citation["content_sha256"] == "4d70936fef2a7cae9c35d7adeccf0fb553981e9f1df96a20d27cc3f5b7173fbb"
     assert citation["retrieval_utc"] == "2026-09-10T00:00:01Z"
     md_text = Path(result["export_paths"]["markdown"]).read_text(encoding="utf-8")
     assert "source_format=web_snapshot" in md_text

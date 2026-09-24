@@ -5,6 +5,7 @@ import json
 from typing import Any
 
 from .model_router import ModelProviderError, get_model_provider_spec, list_model_providers, normalize_model_provider
+from .contracts import validate_contract
 
 MODEL_ROUTING_SCHEMA_VERSION = "mucaro-model-routing/1.0"
 TASK_TYPES = {"cited_qa", "coding", "analysis", "summarization", "extraction", "conversation"}
@@ -159,4 +160,4 @@ def plan_model_route(
         ],
     }
     payload["route_sha256"] = _stable_hash(payload)
-    return payload
+    return validate_contract("model_route_decision", payload)

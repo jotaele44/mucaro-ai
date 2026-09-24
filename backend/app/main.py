@@ -79,6 +79,10 @@ from .services import answer_question
 from .tools import (
     ToolRuntimeError,
     approve_tool_call,
+    cancel_tool_call,
+    reconcile_interrupted_tool_calls,
+    summarize_tool_calls,
+    verify_tool_audit_chain,
     deny_tool_call,
     list_tool_audit_events,
     list_tool_calls,
@@ -154,6 +158,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     )
     cfg.ensure_dirs()
     init_db(cfg.sqlite_path)
+    reconcile_interrupted_tool_calls(cfg)
 
     def require_auth(
         authorization: str | None = Header(default=None),
@@ -515,7 +520,13 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         _auth: dict = Depends(require_auth),
     ) -> dict:
         try:
-            return approve_tool_call(tool_call_id, cfg=cfg, approved_by="api", reason=req.reason if req else None)
+            return approve_tool_call(
+                tool_call_id,
+                cfg=cfg,
+                approved_by="api",
+                reason=req.reason if req else None,
+                expected_arguments_sha256=req.arguments_sha256 if req else None,
+            )
         except ToolRuntimeError as exc:
             raise api_error(exc.status, exc.detail, status_code=400) from exc
 
@@ -526,7 +537,13 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         _auth: dict = Depends(require_auth),
     ) -> dict:
         try:
-            return deny_tool_call(tool_call_id, cfg=cfg, denied_by="api", reason=req.reason if req else None)
+            return deny_tool_call(
+                tool_call_id,
+                cfg=cfg,
+                denied_by="api",
+                reason=req.reason if req else None,
+                expected_arguments_sha256=req.arguments_sha256 if req else None,
+            )
         except ToolRuntimeError as exc:
             raise api_error(exc.status, exc.detail, status_code=400) from exc
 
@@ -536,6 +553,22 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             return run_tool_call(tool_call_id, cfg=cfg, executed_by="api")
         except ToolRuntimeError as exc:
             raise api_error(exc.status, exc.detail, status_code=400) from exc
+
+    @app.post("/tools/requests/{tool_call_id}/cancel")
+    def cancel_tool_request(
+        tool_call_id: str,
+        req: ToolDecisionRequest | None = None,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return cancel_tool_call(tool_call_id, cfg=cfg, cancelled_by="api", reason=req.reason if req else None)
+        except ToolRuntimeError as exc:
+            raise api_error(exc.status, exc.detail, status_code=409 if exc.status != "ERROR_TOOL_CALL_NOT_FOUND" else 404) from exc
+
+    @app.get("/tools/summary")
+    def tool_summary() -> dict:
+        calls = list_tool_calls(cfg)["tool_calls"]
+        return {"status": "TOOL_SUMMARY_OK", **summarize_tool_calls(calls), "audit_chain": verify_tool_audit_chain(cfg)}
 
     @app.get("/tools/audit")
     def tool_audit() -> dict:

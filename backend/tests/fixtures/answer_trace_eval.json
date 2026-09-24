@@ -64,7 +64,7 @@
           "fetch_url": "https://example.com/mucaro-web-eval",
           "final_url": "https://example.com/mucaro-web-eval",
           "retrieval_utc": "2026-09-10T00:00:01Z",
-          "content_sha256": "websnap_eval_content_hash",
+          "content_sha256": "6a109e9c0f9f940bb530504b5502ad265ab58fa041fdfb0090eb3221b77a4a66",
           "text_preview": "Governed web browsing preserves source URL, retrieval UTC, snapshot hash, and content hash for citations."
         }
       ]

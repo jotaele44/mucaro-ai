@@ -87,6 +87,7 @@ from .ingestion import (
     ingest_web_snapshot,
     reindex_sources,
 )
+from .contracts import contract_errors, list_contracts
 from .macos_app_store import build_macos_app_store_readiness
 from .parser import ParseError
 from .memory import (
@@ -154,12 +155,14 @@ from .services import answer_question
 from .tools import (
     ToolRuntimeError,
     approve_tool_call,
+    cancel_tool_call,
     deny_tool_call,
     list_tool_audit_events,
     list_tool_calls,
     list_tools,
     request_tool_call,
     run_tool_call,
+    verify_tool_audit_chain,
 )
 from .validation import validate_project_json
 
@@ -957,12 +960,14 @@ def build_parser() -> argparse.ArgumentParser:
     tools_approve = tools_subcommands.add_parser("approve", help="Approve one pending tool-call request.")
     tools_approve.add_argument("tool_call_id", help="Tool call identifier.")
     tools_approve.add_argument("--reason", help="Optional approval reason.")
+    tools_approve.add_argument("--arguments-sha256", help="Bind the approval to this argument digest (refuses stale views).")
     tools_approve.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tools_approve.set_defaults(handler=run_tools_approve)
 
     tools_deny = tools_subcommands.add_parser("deny", help="Deny one pending tool-call request.")
     tools_deny.add_argument("tool_call_id", help="Tool call identifier.")
     tools_deny.add_argument("--reason", help="Optional denial reason.")
+    tools_deny.add_argument("--arguments-sha256", help="Bind the denial to this argument digest (refuses stale views).")
     tools_deny.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tools_deny.set_defaults(handler=run_tools_deny)
 
@@ -970,6 +975,27 @@ def build_parser() -> argparse.ArgumentParser:
     tools_run.add_argument("tool_call_id", help="Tool call identifier.")
     tools_run.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tools_run.set_defaults(handler=run_tools_run)
+
+    tools_cancel = tools_subcommands.add_parser("cancel", help="Cancel a pending or approved tool call that has not started.")
+    tools_cancel.add_argument("tool_call_id", help="Tool call identifier.")
+    tools_cancel.add_argument("--reason", help="Optional cancellation reason.")
+    tools_cancel.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tools_cancel.set_defaults(handler=run_tools_cancel)
+
+    tools_verify = tools_subcommands.add_parser("verify-audit", help="Verify the tool audit hash chain.")
+    tools_verify.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tools_verify.set_defaults(handler=run_tools_verify_audit)
+
+    contracts = subcommands.add_parser("contracts", help="Inspect and validate the common governed contracts.")
+    contracts_subcommands = contracts.add_subparsers(dest="contracts_command", required=True)
+    contracts_list = contracts_subcommands.add_parser("list", help="List contract families and their schemas.")
+    contracts_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    contracts_list.set_defaults(handler=run_contracts_list)
+    contracts_validate = contracts_subcommands.add_parser("validate", help="Validate a JSON record against a contract kind.")
+    contracts_validate.add_argument("kind", help="Record kind, e.g. citation_record or tool_call.")
+    contracts_validate.add_argument("path", help="JSON file holding one record.")
+    contracts_validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    contracts_validate.set_defaults(handler=run_contracts_validate)
 
     tools_audit = tools_subcommands.add_parser("audit", help="List tool runtime audit events.")
     tools_audit.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
@@ -7910,7 +7936,13 @@ def run_tools_request(args: argparse.Namespace, cfg: Settings) -> int:
 
 def run_tools_approve(args: argparse.Namespace, cfg: Settings) -> int:
     try:
-        result = approve_tool_call(args.tool_call_id, cfg=cfg, approved_by="cli", reason=args.reason)
+        result = approve_tool_call(
+            args.tool_call_id,
+            cfg=cfg,
+            approved_by="cli",
+            reason=args.reason,
+            expected_arguments_sha256=args.arguments_sha256,
+        )
     except ToolRuntimeError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
@@ -7920,7 +7952,13 @@ def run_tools_approve(args: argparse.Namespace, cfg: Settings) -> int:
 
 def run_tools_deny(args: argparse.Namespace, cfg: Settings) -> int:
     try:
-        result = deny_tool_call(args.tool_call_id, cfg=cfg, denied_by="cli", reason=args.reason)
+        result = deny_tool_call(
+            args.tool_call_id,
+            cfg=cfg,
+            denied_by="cli",
+            reason=args.reason,
+            expected_arguments_sha256=args.arguments_sha256,
+        )
     except ToolRuntimeError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
@@ -7936,6 +7974,47 @@ def run_tools_run(args: argparse.Namespace, cfg: Settings) -> int:
         return 2
     emit_payload(result, args.format)
     return 0
+
+
+def run_tools_cancel(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = cancel_tool_call(args.tool_call_id, cfg=cfg, cancelled_by="cli", reason=args.reason)
+    except ToolRuntimeError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_tools_verify_audit(args: argparse.Namespace, cfg: Settings) -> int:
+    result = verify_tool_audit_chain(cfg)
+    emit_payload(result, args.format)
+    return 0 if result["status"] == "TOOL_AUDIT_CHAIN_OK" else 1
+
+
+def run_contracts_list(args: argparse.Namespace, cfg: Settings) -> int:
+    payload = list_contracts(cfg.project_root if (cfg.project_root / "schemas").is_dir() else None)
+    if args.format == "text":
+        print(payload["status"])
+        for family in payload["families"]:
+            kinds = ",".join(row["kind"] for row in family["record_kinds"])
+            print(f"{family['family']} {kinds}")
+        return 0
+    emit_payload(payload, args.format)
+    return 0
+
+
+def run_contracts_validate(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        record = json.loads(Path(args.path).read_text(encoding="utf-8"))
+        errors = contract_errors(args.kind, record)
+    except KeyError as exc:
+        raise MucaroCLIError("ERROR_CONTRACT_KIND_UNKNOWN", args.kind) from exc
+    except json.JSONDecodeError as exc:
+        raise MucaroCLIError("ERROR_CONTRACT_JSON_INVALID", str(exc)) from exc
+    payload = {"status": "CONTRACT_VALID" if not errors else "ERROR_CONTRACT_VIOLATION", "kind": args.kind, "errors": errors}
+    emit_payload(payload, args.format)
+    return 0 if not errors else 1
 
 
 def run_tools_audit(args: argparse.Namespace, cfg: Settings) -> int:

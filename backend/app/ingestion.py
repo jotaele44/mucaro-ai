@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -8,7 +9,9 @@ from .chunker import chunk_text
 from .config import Settings, settings
 from .db import delete_chunks_for_source, delete_payload, init_db, upsert_payload
 from .multimodal import MULTIMODAL_SUFFIXES
+from .contracts import validate_contract
 from .parser import ParseError, detect_mime, parse_file
+from .provenance import build_provenance_record
 from .semantic_store import build_semantic_store, get_semantic_store_status
 from .utils import read_json, sha256_file, stable_id, utc_now, write_json
 from .vector_index import build_persistent_index, fingerprint_chunks, load_persistent_index
@@ -51,7 +54,7 @@ def _store_source_payload(source_payload: dict[str, Any], chunks: list[dict[str,
     }
 
 
-def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
+def ingest_file(path: Path, cfg: Settings = settings, *, source_kind: str = "LOCAL_FILE") -> dict[str, Any]:
     cfg.ensure_dirs()
     init_db(cfg.sqlite_path)
     if not path.exists() or not path.is_file():
@@ -91,7 +94,19 @@ def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
         "chunk_count": len(chunks),
         "errors": [],
         "warnings": warnings,
+        "provenance": build_provenance_record(
+            source_kind=source_kind,
+            source_locator=path.name,
+            retrieval_utc=utc_now(),
+            raw_byte_sha256=file_sha,
+            raw_byte_count=size,
+            processor=str(parse_result.get("parser", "unknown")),
+            row_or_feature_count=parse_result.get("row_count") if isinstance(parse_result.get("row_count"), int) else None,
+        ),
     }
+    for chunk in chunks:
+        chunk.setdefault("trust", "UNTRUSTED_CONTENT")
+    validate_contract("source_manifest", source_payload)
     store = _store_source_payload(source_payload, chunks, cfg)
     return {
         "status": "INGEST_OK",
@@ -127,6 +142,13 @@ def ingest_web_snapshot(snapshot_path: Path, cfg: Settings = settings) -> dict[s
             "snapshot_id": snapshot_id,
             "snapshot_path": str(snapshot_path),
         }
+    if not re.fullmatch(r"[0-9a-f]{64}", content_sha256):
+        return {
+            "status": "ERROR_WEB_SNAPSHOT_HASH_INVALID",
+            "detail": "content_sha256 must be a lowercase hex SHA-256 of the fetched bytes.",
+            "snapshot_id": snapshot_id,
+            "snapshot_path": str(snapshot_path),
+        }
     source_id = stable_id("src_web", snapshot_id, final_url, content_sha256)
     chunks = chunk_text(source_id, text)
     parser_warnings = list(snapshot.get("parser_warnings") or [])
@@ -143,6 +165,7 @@ def ingest_web_snapshot(snapshot_path: Path, cfg: Settings = settings) -> dict[s
                 "content_sha256": content_sha256,
                 "retrieval_utc": retrieval_utc,
                 "parser_warnings": parser_warnings,
+                "trust": "UNTRUSTED_CONTENT",
             }
         )
     source_payload = {
@@ -181,7 +204,18 @@ def ingest_web_snapshot(snapshot_path: Path, cfg: Settings = settings) -> dict[s
         "chunk_count": len(chunks),
         "errors": [],
         "warnings": warnings,
+        "provenance": build_provenance_record(
+            source_kind="WEB_SNAPSHOT",
+            source_locator=final_url or str(snapshot.get("requested_url") or snapshot_path.name),
+            service_or_repository=None,
+            retrieval_utc=retrieval_utc or utc_now(),
+            raw_byte_sha256=content_sha256,
+            raw_byte_count=int(snapshot.get("content_size_bytes") or 0),
+            processor="web_snapshot_preview_v1",
+            identity_basis=["BYTE_IDENTITY", "SOURCE_MANIFESTATION_IDENTITY"],
+        ),
     }
+    validate_contract("source_manifest", source_payload)
     store = _store_source_payload(source_payload, chunks, cfg)
     return {
         "status": "WEB_SNAPSHOT_INGEST_OK",

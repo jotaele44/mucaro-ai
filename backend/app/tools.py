@@ -11,7 +11,8 @@ from .config import Settings, settings
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
 from .product_audit import build_product_audit
-from .utils import read_json, stable_id, utc_now, write_json
+from .contracts import validate_contract
+from .utils import canonical_sha256, read_json, stable_id, update_json, utc_now
 from .web_browsing import (
     WebBrowsingError,
     build_web_browse_session_policy,
@@ -25,6 +26,7 @@ from .workspaces import list_workspace_profiles
 
 TOOL_CALLS_NAME = "tool_calls.json"
 TOOL_AUDIT_NAME = "tool_audit_log.json"
+TOOL_CALL_STATUSES = ("PENDING_APPROVAL", "APPROVED", "DENIED", "CANCELLED", "RUNNING", "EXECUTED", "FAILED", "INTERRUPTED")
 
 
 class ToolRuntimeError(RuntimeError):
@@ -326,25 +328,55 @@ def _load_tool_calls(cfg: Settings) -> list[dict[str, Any]]:
     return read_json(_tool_calls_path(cfg), [])
 
 
-def _write_tool_calls(calls: list[dict[str, Any]], cfg: Settings) -> None:
-    write_json(_tool_calls_path(cfg), calls)
-
-
 def _load_audit_events(cfg: Settings) -> list[dict[str, Any]]:
     return read_json(_tool_audit_path(cfg), [])
 
 
+def arguments_digest(arguments: dict[str, Any]) -> str:
+    return canonical_sha256(arguments)
+
+
 def _append_audit_event(event: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    """Append a hash-chained audit event under an exclusive lock."""
     cfg.ensure_dirs()
+
+    def append(events: list[dict[str, Any]]) -> dict[str, Any]:
+        previous = next((row.get("event_sha256") for row in reversed(events) if row.get("event_sha256")), None)
+        created_at = utc_now()
+        payload = {
+            "event_id": stable_id("toolevent", created_at, event.get("tool_call_id", ""), event.get("event", ""), str(len(events))),
+            "created_at": created_at,
+            "tool_name": event.get("tool_name") or "",
+            **event,
+            "previous_event_sha256": previous,
+        }
+        payload["event_sha256"] = canonical_sha256(payload)
+        validate_contract("tool_audit_event", payload)
+        events.append(payload)
+        return payload
+
+    return update_json(_tool_audit_path(cfg), [], append)
+
+
+def verify_tool_audit_chain(cfg: Settings = settings) -> dict[str, Any]:
+    """Detect edited, removed or reordered audit events (TGT-035)."""
     events = _load_audit_events(cfg)
-    payload = {
-        "event_id": stable_id("toolevent", utc_now(), event.get("tool_call_id", ""), event.get("event", "")),
-        "created_at": utc_now(),
-        **event,
-    }
-    events.append(payload)
-    write_json(_tool_audit_path(cfg), events)
-    return payload
+    previous: str | None = None
+    chained = 0
+    for index, event in enumerate(events):
+        digest = event.get("event_sha256")
+        if not digest:
+            if chained:
+                return {"status": "TOOL_AUDIT_CHAIN_BROKEN", "index": index, "reason": "UNHASHED_EVENT_AFTER_CHAIN_START"}
+            continue
+        body = {key: value for key, value in event.items() if key != "event_sha256"}
+        if canonical_sha256(body) != digest:
+            return {"status": "TOOL_AUDIT_CHAIN_BROKEN", "index": index, "reason": "EVENT_HASH_MISMATCH"}
+        if event.get("previous_event_sha256") != previous:
+            return {"status": "TOOL_AUDIT_CHAIN_BROKEN", "index": index, "reason": "PREVIOUS_HASH_MISMATCH"}
+        previous = digest
+        chained += 1
+    return {"status": "TOOL_AUDIT_CHAIN_OK", "event_count": len(events), "chained_event_count": chained}
 
 
 def _find_tool_call(tool_call_id: str, calls: list[dict[str, Any]]) -> tuple[int, dict[str, Any]]:
@@ -352,6 +384,22 @@ def _find_tool_call(tool_call_id: str, calls: list[dict[str, Any]]) -> tuple[int
         if call.get("tool_call_id") == tool_call_id:
             return index, call
     raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_FOUND", f"Tool call not found: {tool_call_id}")
+
+
+def _transition(
+    tool_call_id: str,
+    cfg: Settings,
+    change: Callable[[dict[str, Any]], dict[str, Any]],
+) -> dict[str, Any]:
+    """Atomically read, check and update one call; change() raises to refuse the transition."""
+
+    def mutate(calls: list[dict[str, Any]]) -> dict[str, Any]:
+        index, call = _find_tool_call(tool_call_id, calls)
+        updated = validate_contract("tool_call", change(dict(call)))
+        calls[index] = updated
+        return updated
+
+    return update_json(_tool_calls_path(cfg), [], mutate)
 
 
 def list_tools() -> dict[str, Any]:
@@ -366,6 +414,15 @@ def list_tool_audit_events(cfg: Settings = settings) -> dict[str, Any]:
     return {"status": "TOOL_AUDIT_OK", "events": _load_audit_events(cfg)}
 
 
+def summarize_tool_calls(calls: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate counts from call records; every call lands in exactly one bucket (F08)."""
+    buckets = {status: 0 for status in TOOL_CALL_STATUSES}
+    for call in calls:
+        buckets[str(call.get("status"))] = buckets.get(str(call.get("status")), 0) + 1
+    total = len(calls)
+    return {"total": total, "by_status": buckets, "arithmetic_closes": sum(buckets.values()) == total}
+
+
 def request_tool_call(
     tool_name: str,
     arguments: dict[str, Any] | None = None,
@@ -373,6 +430,7 @@ def request_tool_call(
     cfg: Settings = settings,
     requested_by: str = "operator",
     reason: str | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
     arguments = arguments or {}
@@ -392,14 +450,17 @@ def request_tool_call(
         raise ToolRuntimeError("ERROR_TOOL_NOT_ALLOWED", f"Tool is not in the local allowlist: {tool_name}")
 
     created_at = utc_now()
-    tool_call_id = stable_id("toolcall", tool_name, json.dumps(arguments, sort_keys=True), created_at)
+    digest = arguments_digest(arguments)
+    tool_call_id = stable_id("toolcall", tool_name, digest, created_at)
     call = {
         "tool_call_id": tool_call_id,
         "tool_name": tool_name,
         "arguments": arguments,
+        "arguments_sha256": digest,
         "status": "PENDING_APPROVAL",
         "requested_by": requested_by,
         "reason": reason,
+        "run_id": run_id,
         "created_at": created_at,
         "approved_by": None,
         "approved_at": None,
@@ -408,9 +469,8 @@ def request_tool_call(
         "executed_at": None,
         "result": None,
     }
-    calls = _load_tool_calls(cfg)
-    calls.append(call)
-    _write_tool_calls(calls, cfg)
+    validate_contract("tool_call", call)
+    update_json(_tool_calls_path(cfg), [], lambda calls: calls.append(call))
     _append_audit_event(
         {
             "event": "TOOL_CALL_REQUESTED",
@@ -419,10 +479,22 @@ def request_tool_call(
             "status": "PENDING_APPROVAL",
             "actor": requested_by,
             "reason": reason,
+            "arguments_sha256": digest,
         },
         cfg,
     )
     return {"status": "TOOL_CALL_REQUESTED", "tool_call": call}
+
+
+def _require_pending(call: dict[str, Any], expected_arguments_sha256: str | None) -> None:
+    if call.get("status") != "PENDING_APPROVAL":
+        raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_PENDING", f"Tool call is not pending approval: {call.get('tool_call_id')}")
+    # A decision binds to the exact arguments the decider saw (F07); a stale view is refused.
+    if expected_arguments_sha256 is not None and expected_arguments_sha256 != call.get("arguments_sha256"):
+        raise ToolRuntimeError(
+            "ERROR_TOOL_DECISION_STALE",
+            f"Decision was made against different arguments than tool call {call.get('tool_call_id')} holds.",
+        )
 
 
 def approve_tool_call(
@@ -431,14 +503,13 @@ def approve_tool_call(
     cfg: Settings = settings,
     approved_by: str = "operator",
     reason: str | None = None,
+    expected_arguments_sha256: str | None = None,
 ) -> dict[str, Any]:
-    calls = _load_tool_calls(cfg)
-    index, call = _find_tool_call(tool_call_id, calls)
-    if call.get("status") != "PENDING_APPROVAL":
-        raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_PENDING", f"Tool call is not pending approval: {tool_call_id}")
-    call = {**call, "status": "APPROVED", "approved_by": approved_by, "approved_at": utc_now()}
-    calls[index] = call
-    _write_tool_calls(calls, cfg)
+    def change(call: dict[str, Any]) -> dict[str, Any]:
+        _require_pending(call, expected_arguments_sha256)
+        return {**call, "status": "APPROVED", "approved_by": approved_by, "approved_at": utc_now()}
+
+    call = _transition(tool_call_id, cfg, change)
     _append_audit_event(
         {
             "event": "TOOL_CALL_APPROVED",
@@ -447,6 +518,7 @@ def approve_tool_call(
             "status": "APPROVED",
             "actor": approved_by,
             "reason": reason,
+            "arguments_sha256": call.get("arguments_sha256"),
         },
         cfg,
     )
@@ -459,14 +531,13 @@ def deny_tool_call(
     cfg: Settings = settings,
     denied_by: str = "operator",
     reason: str | None = None,
+    expected_arguments_sha256: str | None = None,
 ) -> dict[str, Any]:
-    calls = _load_tool_calls(cfg)
-    index, call = _find_tool_call(tool_call_id, calls)
-    if call.get("status") != "PENDING_APPROVAL":
-        raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_PENDING", f"Tool call is not pending approval: {tool_call_id}")
-    call = {**call, "status": "DENIED", "denied_by": denied_by, "denied_at": utc_now()}
-    calls[index] = call
-    _write_tool_calls(calls, cfg)
+    def change(call: dict[str, Any]) -> dict[str, Any]:
+        _require_pending(call, expected_arguments_sha256)
+        return {**call, "status": "DENIED", "denied_by": denied_by, "denied_at": utc_now()}
+
+    call = _transition(tool_call_id, cfg, change)
     _append_audit_event(
         {
             "event": "TOOL_CALL_DENIED",
@@ -481,58 +552,132 @@ def deny_tool_call(
     return {"status": "TOOL_CALL_DENIED", "tool_call": call}
 
 
+def cancel_tool_call(
+    tool_call_id: str,
+    *,
+    cfg: Settings = settings,
+    cancelled_by: str = "operator",
+    reason: str | None = None,
+) -> dict[str, Any]:
+    """Cancel a call that has not started. A RUNNING in-process handler cannot be interrupted safely."""
+
+    def change(call: dict[str, Any]) -> dict[str, Any]:
+        status = call.get("status")
+        if status == "RUNNING":
+            raise ToolRuntimeError("ERROR_TOOL_CALL_RUNNING_NOT_CANCELLABLE", f"Tool call is already running: {tool_call_id}")
+        if status not in {"PENDING_APPROVAL", "APPROVED"}:
+            raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_CANCELLABLE", f"Tool call is {status}: {tool_call_id}")
+        return {**call, "status": "CANCELLED", "cancelled_by": cancelled_by, "cancelled_at": utc_now()}
+
+    call = _transition(tool_call_id, cfg, change)
+    _append_audit_event(
+        {
+            "event": "TOOL_CALL_CANCELLED",
+            "tool_call_id": tool_call_id,
+            "tool_name": call.get("tool_name"),
+            "status": "CANCELLED",
+            "actor": cancelled_by,
+            "reason": reason,
+        },
+        cfg,
+    )
+    return {"status": "TOOL_CALL_CANCELLED", "tool_call": call}
+
+
+def reconcile_interrupted_tool_calls(cfg: Settings = settings) -> dict[str, Any]:
+    """After a restart, a call still RUNNING was interrupted mid-execution.
+
+    Its side effects are unknown, so it is recorded as INTERRUPTED and never
+    retried implicitly; a retry needs a new request and a new approval.
+    """
+    if not _tool_calls_path(cfg).exists():
+        return {"status": "TOOL_RECONCILE_OK", "interrupted": []}
+
+    def mutate(calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        interrupted = []
+        for index, call in enumerate(calls):
+            if call.get("status") == "RUNNING":
+                calls[index] = {
+                    **call,
+                    "status": "INTERRUPTED",
+                    "interrupted_at": utc_now(),
+                    "result": {"status": "ERROR_TOOL_CALL_INTERRUPTED", "detail": "Process ended while the call was running; side effects unknown."},
+                }
+                interrupted.append(calls[index])
+        return interrupted
+
+    interrupted = update_json(_tool_calls_path(cfg), [], mutate)
+    for call in interrupted:
+        _append_audit_event(
+            {
+                "event": "TOOL_CALL_INTERRUPTED",
+                "tool_call_id": call["tool_call_id"],
+                "tool_name": call.get("tool_name"),
+                "status": "INTERRUPTED",
+                "actor": "system",
+                "reason": "startup reconciliation",
+            },
+            cfg,
+        )
+    return {"status": "TOOL_RECONCILE_OK", "interrupted": [call["tool_call_id"] for call in interrupted]}
+
+
 def run_tool_call(
     tool_call_id: str,
     *,
     cfg: Settings = settings,
     executed_by: str = "operator",
 ) -> dict[str, Any]:
-    calls = _load_tool_calls(cfg)
-    index, call = _find_tool_call(tool_call_id, calls)
-    if call.get("status") == "PENDING_APPROVAL":
-        raise ToolRuntimeError("ERROR_TOOL_APPROVAL_REQUIRED", f"Approve tool call before execution: {tool_call_id}")
-    if call.get("status") == "DENIED":
-        raise ToolRuntimeError("ERROR_TOOL_CALL_DENIED", f"Denied tool call cannot execute: {tool_call_id}")
-    if call.get("status") == "EXECUTED":
-        raise ToolRuntimeError("ERROR_TOOL_CALL_ALREADY_EXECUTED", f"Tool call already executed: {tool_call_id}")
-    if call.get("status") != "APPROVED":
-        raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_APPROVED", f"Tool call is not approved: {tool_call_id}")
-    tool_name = str(call.get("tool_name", ""))
-    tool = TOOL_REGISTRY.get(tool_name)
-    if tool is None:
-        raise ToolRuntimeError("ERROR_TOOL_NOT_ALLOWED", f"Tool is not in the local allowlist: {tool_name}")
+    def claim(call: dict[str, Any]) -> dict[str, Any]:
+        status = call.get("status")
+        if status == "PENDING_APPROVAL":
+            raise ToolRuntimeError("ERROR_TOOL_APPROVAL_REQUIRED", f"Approve tool call before execution: {tool_call_id}")
+        if status == "DENIED":
+            raise ToolRuntimeError("ERROR_TOOL_CALL_DENIED", f"Denied tool call cannot execute: {tool_call_id}")
+        if status == "EXECUTED":
+            raise ToolRuntimeError("ERROR_TOOL_CALL_ALREADY_EXECUTED", f"Tool call already executed: {tool_call_id}")
+        if status == "RUNNING":
+            raise ToolRuntimeError("ERROR_TOOL_CALL_ALREADY_RUNNING", f"Tool call is already running: {tool_call_id}")
+        if status != "APPROVED":
+            raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_APPROVED", f"Tool call is not approved: {tool_call_id}")
+        if call.get("tool_name") not in TOOL_REGISTRY:
+            raise ToolRuntimeError("ERROR_TOOL_NOT_ALLOWED", f"Tool is not in the local allowlist: {call.get('tool_name')}")
+        return {**call, "status": "RUNNING", "started_at": utc_now(), "executed_by": executed_by}
 
+    # The APPROVED -> RUNNING claim is atomic, so a duplicate invocation cannot execute twice.
+    call = _transition(tool_call_id, cfg, claim)
+    tool_name = str(call.get("tool_name", ""))
+    tool = TOOL_REGISTRY[tool_name]
+    _append_audit_event(
+        {"event": "TOOL_CALL_STARTED", "tool_call_id": tool_call_id, "tool_name": tool_name, "status": "RUNNING", "actor": executed_by},
+        cfg,
+    )
+    failure: ToolRuntimeError | None = None
     try:
         result = tool.handler(dict(call.get("arguments") or {}), cfg)
     except ToolRuntimeError as exc:
+        failure = exc
         result = {"status": exc.status, "detail": exc.detail}
-        call = {**call, "status": "FAILED", "executed_at": utc_now(), "executed_by": executed_by, "result": result}
-        calls[index] = call
-        _write_tool_calls(calls, cfg)
-        _append_audit_event(
-            {
-                "event": "TOOL_CALL_FAILED",
-                "tool_call_id": tool_call_id,
-                "tool_name": tool_name,
-                "status": exc.status,
-                "actor": executed_by,
-                "result_status": exc.status,
-            },
-            cfg,
-        )
-        raise
-    call = {**call, "status": "EXECUTED", "executed_at": utc_now(), "executed_by": executed_by, "result": result}
-    calls[index] = call
-    _write_tool_calls(calls, cfg)
+    except Exception as exc:  # noqa: BLE001 - an unexpected handler crash must not leave the call RUNNING
+        failure = ToolRuntimeError("ERROR_TOOL_INTERNAL_FAILURE", f"{type(exc).__name__}: {exc}")
+        result = {"status": failure.status, "detail": failure.detail}
+    final_status = "FAILED" if failure else "EXECUTED"
+    call = _transition(
+        tool_call_id,
+        cfg,
+        lambda current: {**current, "status": final_status, "executed_at": utc_now(), "executed_by": executed_by, "result": result},
+    )
     _append_audit_event(
         {
-            "event": "TOOL_CALL_EXECUTED",
+            "event": "TOOL_CALL_FAILED" if failure else "TOOL_CALL_EXECUTED",
             "tool_call_id": tool_call_id,
             "tool_name": tool_name,
-            "status": "EXECUTED",
+            "status": failure.status if failure else "EXECUTED",
             "actor": executed_by,
             "result_status": result.get("status"),
         },
         cfg,
     )
+    if failure:
+        raise failure
     return {"status": "TOOL_CALL_EXECUTED", "tool_call": call, "result": result}

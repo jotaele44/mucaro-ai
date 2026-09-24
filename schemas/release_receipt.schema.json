@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/release_receipt.schema.json",
+  "title": "Mucaro Release Receipt 1.0",
+  "description": "CERTIFICATION contract: an exact-head certification receipt. Script success alone is not PASS; the acceptance ledger decides.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "receipt_type", "status", "head_sha", "created_utc", "command", "payload"],
+  "properties": {
+    "schema_version": {"const": "mucaro_release_receipt_v1"},
+    "receipt_type": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+    "status": {"type": "string", "pattern": "^[A-Z0-9_]+$"},
+    "head_sha": {"type": "string", "pattern": "^([0-9a-f]{40}|UNKNOWN_HEAD)$"},
+    "created_utc": {"type": "string", "minLength": 1},
+    "command": {"type": "array", "items": {"type": "string"}},
+    "payload": {"type": "object"}
+  }
+}

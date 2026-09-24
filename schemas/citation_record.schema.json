@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/citation_record.schema.json",
+  "title": "Mucaro Citation Record 1.0",
+  "description": "CITATION contract: one cited chunk bound to its retrieval rank, source identity and snippet.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["citation_order", "retrieval_rank", "chunk_id", "source_id", "text_snippet"],
+  "properties": {
+    "citation_order": {"type": "integer", "minimum": 1},
+    "retrieval_rank": {"type": "integer", "minimum": 1},
+    "chunk_id": {"type": "string", "pattern": "^chunk_[a-f0-9]+$"},
+    "source_id": {"type": "string", "pattern": "^src_(web_)?[a-f0-9]+$"},
+    "chunk_index": {"type": ["integer", "null"], "minimum": 0},
+    "text_snippet": {"type": "string"},
+    "score": {"type": "number"},
+    "retrieval_strategy": {"type": "string"},
+    "matched_terms": {"type": "array", "items": {"type": "string"}},
+    "source_format": {"type": "string"},
+    "source_url": {"type": "string"},
+    "snapshot_id": {"type": "string"},
+    "snapshot_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "retrieval_utc": {"type": "string"},
+    "trust": {"enum": ["OPERATOR_AUTHORED", "UNTRUSTED_CONTENT"]},
+    "parser_warnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

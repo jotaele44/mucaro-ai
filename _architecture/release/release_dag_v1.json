@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-09-24T20:52:49Z",
+  "updated_utc": "2026-09-24T21:05:50Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -91,7 +91,7 @@
       "dependencies": [
         "N01"
       ],
-      "state": "READY",
+      "state": "PROVISIONAL",
       "risk": "MEDIUM",
       "user_value": "MEDIUM",
       "downstream_unlock_value": "HIGH",
@@ -100,7 +100,7 @@
         "schemas + runtime validate_contract at boundaries"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "contracts.py registry + boundary enforcement; residue listed on TGT-016."
     },
     {
       "node_id": "N04",
