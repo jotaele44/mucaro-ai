@@ -383,7 +383,7 @@ def test_snapshot_records_credential_presence_not_values(tmp_path):
 
 
 def test_snapshot_never_contains_secret_values(tmp_path):
-    secret = "sk-ant-never-write-me-0123456789"
+    secret = "sk-" + "ant-never-write-me-0123456789"  # built at runtime so the source holds no key-shaped literal
     snapshot = capture_state_snapshot(REPO_ROOT, environ={"ANTHROPIC_API_KEY": secret, "GITHUB_TOKEN": secret})
     path = write_state_snapshot(REPO_ROOT, snapshot, tmp_path / "snapshot.json")
     assert secret not in path.read_text(encoding="utf-8")
