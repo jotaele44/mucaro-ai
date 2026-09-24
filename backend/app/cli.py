@@ -125,6 +125,13 @@ from .permissions import (
 )
 from .product_audit import build_product_audit, build_product_roadmap
 from .release_receipts import find_release_receipt, list_release_receipts, load_release_receipt, summarize_release_receipts
+from .release_scope import (
+    capture_state_snapshot,
+    compute_release_status,
+    freeze_release_scope,
+    validate_release_scope,
+    write_state_snapshot,
+)
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .retrieval_eval import DEFAULT_FIXTURE, build_retrieval_eval_report, format_retrieval_eval_text
 from .retrieval_quality_certification import (
@@ -1361,6 +1368,37 @@ def build_parser() -> argparse.ArgumentParser:
     release_receipt.add_argument("receipt_id", help="Receipt file stem or JSON filename under data/exports/release_receipts.")
     release_receipt.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     release_receipt.set_defaults(handler=run_release_receipt_show)
+
+    release_scope = release_subcommands.add_parser(
+        "scope", help="Validate the release scope manifest, ledgers and certification verdict."
+    )
+    release_scope_subcommands = release_scope.add_subparsers(dest="release_scope_command", required=True)
+    release_scope_validate = release_scope_subcommands.add_parser(
+        "validate", help="Validate manifest, acceptance ledger, DAG, blockers, contradictions and scope deltas."
+    )
+    release_scope_validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_scope_validate.set_defaults(handler=run_release_scope_validate)
+    release_scope_status = release_scope_subcommands.add_parser(
+        "status", help="Compute the release verdict under the terminal certification rule."
+    )
+    release_scope_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_scope_status.set_defaults(handler=run_release_scope_status)
+    release_scope_snapshot = release_scope_subcommands.add_parser(
+        "snapshot", help="Capture a current-state snapshot (credential presence only, never values)."
+    )
+    release_scope_snapshot.add_argument("--output", help="Write to this path instead of the committed snapshot path.")
+    release_scope_snapshot.add_argument("--pytest-summary", help="Recorded backend test result line, e.g. '663 passed'.")
+    release_scope_snapshot.add_argument("--frontend-build", choices=["pass", "fail", "not_run"], default="not_run")
+    release_scope_snapshot.add_argument("--connected-resource", action="append", default=[], help="Connected resource name.")
+    release_scope_snapshot.add_argument("--boundary", action="append", default=[], help="Known architectural boundary.")
+    release_scope_snapshot.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_scope_snapshot.set_defaults(handler=run_release_scope_snapshot)
+    release_scope_freeze = release_scope_subcommands.add_parser(
+        "freeze", help="Write an immutable ledger checkpoint used to detect silent scope loss."
+    )
+    release_scope_freeze.add_argument("label", help="Checkpoint label, e.g. 20260924T210000Z-baseline.")
+    release_scope_freeze.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_scope_freeze.set_defaults(handler=run_release_scope_freeze)
 
     permissions = subcommands.add_parser("permissions", help="Manage user-directory access grants.")
     permissions_subcommands = permissions.add_subparsers(dest="permission_command", required=True)
@@ -6229,6 +6267,66 @@ def run_release_receipts(args: argparse.Namespace, cfg: Settings) -> int:
         "receipts": receipts,
     }
     emit_payload(payload, args.format)
+    return 0
+
+
+def _emit_release_scope_text(payload: dict[str, Any]) -> None:
+    print(payload.get("status"))
+    if payload.get("release_status_line"):
+        print(payload["release_status_line"])
+    denominator = payload.get("denominator") or {}
+    if denominator:
+        states = denominator.get("by_state", {})
+        print(f"denominator={denominator.get('total')} " + " ".join(f"{key}={value}" for key, value in states.items()))
+        print(f"arithmetic_closes={denominator.get('arithmetic_closes')}")
+    for name, value in (payload.get("conditions") or {}).items():
+        print(f"condition {name}={value}")
+    for name, ids in (payload.get("residue") or {}).items():
+        print(f"residue {name}={len(ids)} {','.join(ids)}")
+    for error in payload.get("errors", []):
+        print(f"{error['code']} {error['detail']}")
+
+
+def run_release_scope_validate(args: argparse.Namespace, cfg: Settings) -> int:
+    payload = validate_release_scope(cfg.project_root)
+    if args.format == "json":
+        emit_payload(payload, "json")
+    else:
+        _emit_release_scope_text(payload)
+    return 0 if payload["status"] == "RELEASE_SCOPE_VALID" else 1
+
+
+def run_release_scope_status(args: argparse.Namespace, cfg: Settings) -> int:
+    payload = compute_release_status(cfg.project_root)
+    if args.format == "json":
+        emit_payload(payload, "json")
+    else:
+        _emit_release_scope_text({**payload, "errors": payload["validation"].get("errors", [])})
+    return 0 if payload["status"] != "MUCARO_AI_RELEASE_SCOPE_INVALID" else 1
+
+
+def run_release_scope_snapshot(args: argparse.Namespace, cfg: Settings) -> int:
+    tests = {"recorded": bool(args.pytest_summary), "backend_pytest": args.pytest_summary}
+    build = {
+        "frontend_build": args.frontend_build,
+        "frontend_dist_present": (cfg.project_root / "frontend" / "dist" / "index.html").is_file(),
+    }
+    snapshot = capture_state_snapshot(
+        cfg.project_root,
+        tests=tests,
+        build=build,
+        connected_resources=args.connected_resource,
+        known_boundaries=args.boundary,
+    )
+    path = write_state_snapshot(cfg.project_root, snapshot, Path(args.output) if args.output else None)
+    payload = {"status": "RELEASE_STATE_SNAPSHOT_OK", "path": str(path), "snapshot": snapshot}
+    emit_payload(payload if args.format == "json" else {"status": payload["status"]}, args.format)
+    return 0
+
+
+def run_release_scope_freeze(args: argparse.Namespace, cfg: Settings) -> int:
+    index = freeze_release_scope(cfg.project_root, args.label)
+    emit_payload({"status": "RELEASE_SCOPE_FROZEN", **index}, args.format)
     return 0
 
 

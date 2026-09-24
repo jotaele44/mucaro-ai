@@ -1,0 +1,2488 @@
+{
+  "schema_version": "mucaro-release-acceptance-ledger/1.0",
+  "updated_utc": "2026-09-24T21:00:00Z",
+  "rows": [
+    {
+      "requirement_id": "GOAL-001",
+      "requirement_text": "Product outcome",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/packaging.py",
+        "backend/app/portable_runtime.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Current .app is a bash wrapper that opens the system browser (RC-006)."
+    },
+    {
+      "requirement_id": "GOAL-002",
+      "requirement_text": "Primary interaction model",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Chat surface exists; no streaming work feed."
+    },
+    {
+      "requirement_id": "GOAL-003",
+      "requirement_text": "Governing objective",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-001",
+      "requirement_text": "Instruction precedence",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-002",
+      "requirement_text": "Binding target and denominator",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/release_scope.py",
+        "_architecture/release/release_scope_manifest_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_silent_scope_loss_is_detected",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_duplicate_requirement_is_rejected",
+        "backend/tests/test_release_scope.py::test_not_applicable_requires_justification",
+        "backend/tests/test_release_scope.py::test_silent_scope_loss_is_detected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-003",
+      "requirement_text": "Binding specification discovery",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "_architecture/release/release_scope_manifest_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-SPEC-001",
+      "dag_node": "N26",
+      "notes": "Contract and mobile brief are bound by hash; the separate Workbench Specification is missing (SPECIFICATION_BINDING=OPEN)."
+    },
+    {
+      "requirement_id": "KERNEL-004",
+      "requirement_text": "Current-state snapshot",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/release_scope.py",
+        "_architecture/release/current_state_snapshot_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_snapshot_records_credential_presence_not_values",
+      "negative_gate": "backend/tests/test_release_scope.py::test_snapshot_never_contains_secret_values",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/current_state_snapshot_v1.json",
+        "backend/tests/test_release_scope.py::test_snapshot_never_contains_secret_values",
+        "backend/tests/test_release_scope.py::test_snapshot_records_credential_presence_not_values"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N00",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-005",
+      "requirement_text": "Reuse validated work",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-006",
+      "requirement_text": "Dependency DAG",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/release_dag_v1.json",
+        "backend/app/release_scope.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_dag_cycle_is_detected",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/release_dag_v1.json",
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_dag_cycle_is_detected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-007",
+      "requirement_text": "Autonomous priority selection",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-008",
+      "requirement_text": "Preferred dependency vector",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-009",
+      "requirement_text": "Autonomous execution authority",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-010",
+      "requirement_text": "Credentials-last rule",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-011",
+      "requirement_text": "Execution cycle",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-012",
+      "requirement_text": "Preemptive hardening",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-013",
+      "requirement_text": "Anti-loop rule",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-014",
+      "requirement_text": "Contradiction handling",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/contradiction_ledger_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_frozen_checkpoint_detects_dropped_records",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/contradiction_ledger_v1.json",
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_frozen_checkpoint_detects_dropped_records"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-015",
+      "requirement_text": "Testing escalation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-016",
+      "requirement_text": "Positive and negative gates",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-017",
+      "requirement_text": "Tool-routing preference",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-018",
+      "requirement_text": "Source refresh and artifact reuse",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-019",
+      "requirement_text": "Scope-delta control",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/scope_delta_ledger_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_scope_delta_defect_must_enter_denominator",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_scope_delta_defect_must_enter_denominator",
+        "backend/tests/test_release_scope.py::test_unadopted_enhancement_cannot_enter_denominator"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-020",
+      "requirement_text": "Blocker behavior",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/blocker_ledger_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_blocked_state_requires_active_blocker",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/blocker_ledger_v1.json",
+        "backend/tests/test_release_scope.py::test_blocked_state_requires_active_blocker",
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-021",
+      "requirement_text": "Progress communication",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-022",
+      "requirement_text": "Hard stop conditions",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "INV-001",
+      "requirement_text": "Epistemic classification",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/capability_contracts.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N03",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-002",
+      "requirement_text": "Certification state",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "schemas/release_acceptance_ledger.schema.json",
+        "schemas/release_dag.schema.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_state_outside_denominator_is_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_state_outside_denominator_is_rejected",
+        "schemas/release_acceptance_ledger.schema.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": "Certification states enforced for the release ledgers; subsystem receipts adopt them through TGT-016."
+    },
+    {
+      "requirement_id": "INV-003",
+      "requirement_text": "Completion truthfulness",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-004",
+      "requirement_text": "Local-first privacy",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/model_routing_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N13",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-005",
+      "requirement_text": "Common contracts",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "schemas/"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N03",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-006",
+      "requirement_text": "Consequential actions",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/tools.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N05",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-007",
+      "requirement_text": "Data ingestion",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/parser.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-008",
+      "requirement_text": "Raw / normalized / canonical separation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/capability_contracts.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-009",
+      "requirement_text": "Identity proof",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/gis_processing.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N10",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-010",
+      "requirement_text": "Data conservation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/gis_processing.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-011",
+      "requirement_text": "Whole-record integrity",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-012",
+      "requirement_text": "Spatial correctness",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/gis_processing.py",
+        "backend/app/gis_crs.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N10",
+      "notes": "FULLY_WITHIN/TOUCH_ONLY/OUTSIDE/NULL_EMPTY/UNRESOLVED implemented for point-in-polygon; PARTIAL state absent (no polygon-polygon join)."
+    },
+    {
+      "requirement_id": "INV-013",
+      "requirement_text": "Source acquisition",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/web_search.py",
+        "backend/app/web_browsing.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N11",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-014",
+      "requirement_text": "Untrusted content",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N16",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-015",
+      "requirement_text": "Security boundary",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/security.py",
+        "backend/app/permissions.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-016",
+      "requirement_text": "Measurable vulnerability gate",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "scripts/certify_release.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N22",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-017",
+      "requirement_text": "Determinism versus evidence",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-018",
+      "requirement_text": "Provenance",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/artifact_identity.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N04",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-019",
+      "requirement_text": "Archive comparison",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/packaging.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N04",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-020",
+      "requirement_text": "Citation integrity",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/citations.py",
+        "backend/app/answer_trace_eval.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N09",
+      "notes": "Structural citation checks exist; claim-level faithfulness absent."
+    },
+    {
+      "requirement_id": "INV-021",
+      "requirement_text": "Memory authority",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/memory.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N14",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-022",
+      "requirement_text": "User-interface uniqueness",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-023",
+      "requirement_text": "Packaging truthfulness",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "scripts/certify_release_grade.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N20",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-001",
+      "requirement_text": "Executable macOS application",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/packaging.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N19",
+      "notes": "Wrapper opens system browser; no native window (RC-006)."
+    },
+    {
+      "requirement_id": "TGT-002",
+      "requirement_text": "Conversation-first work feed",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx",
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "No streaming; tool/plan/artifact events absent from the feed."
+    },
+    {
+      "requirement_id": "TGT-003",
+      "requirement_text": "Specialized workspaces",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Sources/Memory/Settings exist; GIS/OCR/Code/Provenance/Artifacts surfaces absent."
+    },
+    {
+      "requirement_id": "TGT-004",
+      "requirement_text": "GIS and spatial engine",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/gis_processing.py",
+        "backend/app/gis_raster.py",
+        "backend/app/gis_hydrology.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N10",
+      "notes": "Remote sensing, bathymetry and temporal GIS absent."
+    },
+    {
+      "requirement_id": "TGT-005",
+      "requirement_text": "OCR and document intelligence",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/ocr_analysis.py",
+        "backend/app/ocr_pdf.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N08",
+      "notes": "Tables/forms absent; OCR not wired into ingestion."
+    },
+    {
+      "requirement_id": "TGT-006",
+      "requirement_text": "Governed web research",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/web_browsing.py",
+        "backend/app/web_search.py",
+        "backend/app/web_render.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N11",
+      "notes": "Live search needs BLK-WEB-001; prompt-injection resistance absent."
+    },
+    {
+      "requirement_id": "TGT-007",
+      "requirement_text": "Software engineering engine",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/coding_workspace.py",
+        "backend/app/coding_mutation.py",
+        "backend/app/coding_container.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N12",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-008",
+      "requirement_text": "Local AI execution",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [
+        "backend/app/model_router.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N13",
+      "notes": "Only mock and anthropic providers exist."
+    },
+    {
+      "requirement_id": "TGT-009",
+      "requirement_text": "Permissioned remote AI",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/model_router.py",
+        "backend/app/model_routing_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N13",
+      "notes": "Remote gating implemented; live remote evidence needs BLK-LLM-001."
+    },
+    {
+      "requirement_id": "TGT-010",
+      "requirement_text": "Model routing",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/model_routing_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N13",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-011",
+      "requirement_text": "Retrieval-augmented generation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/retrieval.py",
+        "backend/app/retrieval_eval.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N09",
+      "notes": "Faithfulness/unsupported-claim metrics absent."
+    },
+    {
+      "requirement_id": "TGT-012",
+      "requirement_text": "Multimodal file handling",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/parser.py",
+        "backend/app/multimodal.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": "No declared format registry artifact."
+    },
+    {
+      "requirement_id": "TGT-013",
+      "requirement_text": "Explicit memory",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/memory.py",
+        "backend/app/memory_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N14",
+      "notes": "Memory has no scope."
+    },
+    {
+      "requirement_id": "TGT-014",
+      "requirement_text": "Governed tool execution",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/tools.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N05",
+      "notes": "No cancel; approvals not bound to argument digest."
+    },
+    {
+      "requirement_id": "TGT-015",
+      "requirement_text": "Artifact generation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/artifact_identity.py",
+        "backend/app/exports.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N04",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-016",
+      "requirement_text": "Common execution contracts",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "schemas/"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N03",
+      "notes": "Citation, memory, certification schemas missing; no runtime validation."
+    },
+    {
+      "requirement_id": "TGT-017",
+      "requirement_text": "Local-first storage and workspace state",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/db.py",
+        "backend/app/config.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N06",
+      "notes": "Data dir inside bundle (SD-006)."
+    },
+    {
+      "requirement_id": "TGT-018",
+      "requirement_text": "Recovery and restartability",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/agent_checkpoints.py",
+        "backend/app/provider_recovery.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "No cancel; checkpoints not wired to a runtime."
+    },
+    {
+      "requirement_id": "TGT-019",
+      "requirement_text": "Offline behavior",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/gis_crs.py",
+        "backend/app/model_routing_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N21",
+      "notes": "No system-wide offline manifest."
+    },
+    {
+      "requirement_id": "TGT-020",
+      "requirement_text": "Performance",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N21",
+      "notes": "No frozen performance thresholds."
+    },
+    {
+      "requirement_id": "TGT-021",
+      "requirement_text": "Security",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/security.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-022",
+      "requirement_text": "Prompt-injection resistance",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N16",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-023",
+      "requirement_text": "Archive safety",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": "No general archive handling; DOCX bomb (SD-002)."
+    },
+    {
+      "requirement_id": "TGT-024",
+      "requirement_text": "Secrets isolation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/local_worker.py",
+        "scripts/certify_release.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N22",
+      "notes": "Secrets via environment only; no platform keychain."
+    },
+    {
+      "requirement_id": "TGT-025",
+      "requirement_text": "Permission boundaries",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/permissions.py",
+        "backend/app/capability_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N05",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-026",
+      "requirement_text": "macOS packaging",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/packaging.py",
+        "backend/app/portable_runtime.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N20",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-027",
+      "requirement_text": "Signing and notarization",
+      "scope_state": "EXTERNALLY_BLOCKED",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/macos_distribution.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-SIGN-001",
+      "dag_node": "N23",
+      "notes": "Verification tooling exists; signing/notarization credentials unavailable (SIGNING_NOTARIZATION = BLOCKED)."
+    },
+    {
+      "requirement_id": "TGT-028",
+      "requirement_text": "Installation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/portable_install.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N20",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-029",
+      "requirement_text": "Upgrade and rollback",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/portable_install.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N20",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-030",
+      "requirement_text": "Source and evidence inspection",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-031",
+      "requirement_text": "Citation interaction",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/citations.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-032",
+      "requirement_text": "Provenance inspection",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-033",
+      "requirement_text": "Configuration and settings",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-034",
+      "requirement_text": "Error behavior",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/main.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Error codes exist but are not categorized by the TGT-034 classes."
+    },
+    {
+      "requirement_id": "TGT-035",
+      "requirement_text": "Observability",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/tools.py",
+        "backend/app/db.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-036",
+      "requirement_text": "Accessibility and interaction quality",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "No keyboard submit, focus styles or live regions."
+    },
+    {
+      "requirement_id": "TGT-037",
+      "requirement_text": "Minimalist UI",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/styles.css"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-038",
+      "requirement_text": "Coherent architecture",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/tools.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N03",
+      "notes": "GIS/OCR/coding extras are CLI-only, outside the governed tool registry."
+    },
+    {
+      "requirement_id": "MATRIX-001",
+      "requirement_text": "Required evidence model",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/release_scope.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_pass_without_evidence_is_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_fabricated_evidence_reference_is_rejected",
+        "backend/tests/test_release_scope.py::test_pass_without_evidence_is_rejected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-002",
+      "requirement_text": "Acceptance ledger schema",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/acceptance_ledger_v1.json",
+        "schemas/release_acceptance_ledger.schema.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_ledger_drift_is_detected",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/acceptance_ledger_v1.json",
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_ledger_drift_is_detected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-003",
+      "requirement_text": "Denominator arithmetic",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/release_scope.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_denominator_arithmetic_closes",
+      "negative_gate": "backend/tests/test_release_scope.py::test_state_outside_denominator_is_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_denominator_arithmetic_closes",
+        "backend/tests/test_release_scope.py::test_state_outside_denominator_is_rejected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-004",
+      "requirement_text": "Material unresolved residue",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/contradiction_ledger_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_materiality_cannot_be_redefined_after_freeze",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_materiality_cannot_be_redefined_after_freeze",
+        "schemas/release_contradiction_ledger.schema.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-005",
+      "requirement_text": "GIS benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/gis_eval.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N10",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-006",
+      "requirement_text": "OCR/document benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "_architecture/ocr_v1_corpus_manifest.json"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N08",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-007",
+      "requirement_text": "Retrieval benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/retrieval_eval.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N09",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-008",
+      "requirement_text": "Web research benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "_architecture/web08_live_search_eval_manifest.json"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N11",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-009",
+      "requirement_text": "Coding benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "_architecture/coding_regression_manifest.json"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N12",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-010",
+      "requirement_text": "File-ingestion benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/tests/test_parser.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-011",
+      "requirement_text": "Tool-governance benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/tests/test_tools.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N05",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-012",
+      "requirement_text": "Model-routing benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/tests/test_model_routing_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N13",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-013",
+      "requirement_text": "Memory benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/tests/test_memory_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N14",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-014",
+      "requirement_text": "Security benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "scripts/certify_release.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N22",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-015",
+      "requirement_text": "UI benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N18",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-016",
+      "requirement_text": "Recovery benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/tests/test_agent_checkpoint_process_recovery.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N21",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-017",
+      "requirement_text": "Performance benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N21",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-018",
+      "requirement_text": "Packaging benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/clean_machine_macos.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N20",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-019",
+      "requirement_text": "Clean-environment certification",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "scripts/certify_fresh_clone.py",
+        "scripts/certify_release_grade.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N24",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-020",
+      "requirement_text": "Final release manifest",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "scripts/certify_release_grade.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": ""
+    },
+    {
+      "requirement_id": "CERT-RULE-001",
+      "requirement_text": "TERMINAL CERTIFICATION RULE",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/release_scope.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_release_status_certifies_only_when_every_condition_holds",
+      "negative_gate": "backend/tests/test_release_scope.py::test_release_status_is_provisional_with_residue",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_release_status_certifies_only_when_every_condition_holds",
+        "backend/tests/test_release_scope.py::test_release_status_is_provisional_with_residue"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "EXEC-DIRECTIVE-001",
+      "requirement_text": "FINAL AUTONOMOUS EXECUTION DIRECTIVE",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": ""
+    },
+    {
+      "requirement_id": "LEARN-GATE-001",
+      "requirement_text": "POST-CERTIFICATION LEARNING GATE 🚩",
+      "scope_state": "NOT_APPLICABLE",
+      "implementation_state": "NOT_APPLICABLE",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "NOT_APPLICABLE",
+      "blocker_id": null,
+      "dag_node": null,
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F01",
+      "requirement_text": "Mobile conversation shell and long transcript",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/styles.css"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F02",
+      "requirement_text": "User/assistant/tool turns, time separators",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/conversations.py",
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F03",
+      "requirement_text": "Incremental thinking/working indication and stop",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F04",
+      "requirement_text": "Queue for after this turn",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F05",
+      "requirement_text": "Text composer, send, keyboard interaction",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F06",
+      "requirement_text": "Model/mode chip and Auto/Accept edits/Plan sheet",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F07",
+      "requirement_text": "Per-tool permission sheet with arguments, Deny/Allow once",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/tools.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F08",
+      "requirement_text": "Tool activity summary and failure count",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F09",
+      "requirement_text": "Tool detail drawer and output",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F10",
+      "requirement_text": "Pending multiple-choice question with descriptions",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_response_flow.py"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Backend state machine verified (test_response_flow.py); UI and rendered evidence OPEN."
+    },
+    {
+      "requirement_id": "MOB-F11",
+      "requirement_text": "Disabled submit until valid choice; selection feedback",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_response_flow.py"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Backend state machine verified (test_response_flow.py); UI and rendered evidence OPEN."
+    },
+    {
+      "requirement_id": "MOB-F12",
+      "requirement_text": "Other and freeform override",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_response_flow.py"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Backend state machine verified (test_response_flow.py); UI and rendered evidence OPEN."
+    },
+    {
+      "requirement_id": "MOB-F13",
+      "requirement_text": "Question/choice receipt in transcript",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_response_flow.py"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Backend state machine verified (test_response_flow.py); UI and rendered evidence OPEN."
+    },
+    {
+      "requirement_id": "MOB-F14",
+      "requirement_text": "Interruption and return to pending question",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_response_flow.py"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Backend state machine verified (test_response_flow.py); UI and rendered evidence OPEN."
+    },
+    {
+      "requirement_id": "MOB-F15",
+      "requirement_text": "Side-effect reconciliation after contradictory status",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F16",
+      "requirement_text": "Multi-action batch with partial failure and retry",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F17",
+      "requirement_text": "Context menu: share, copy branch, rename, feedback, archive",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F18",
+      "requirement_text": "Background tasks with state, metrics, transcript, load more",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F19",
+      "requirement_text": "Linked pull-request list and exact PR detail",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/artifact_identity.py",
+        "backend/app/coding_lifecycle.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F20",
+      "requirement_text": "Copy and read-aloud message actions",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": ""
+    },
+    {
+      "requirement_id": "SD-001",
+      "requirement_text": "ingest_folder follows symlinks and does not re-check the directory grant per file, allowing reads outside a granted folder",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "Defect revealed; repair pending."
+    },
+    {
+      "requirement_id": "SD-002",
+      "requirement_text": "DOCX parsing reads word/document.xml with no decompressed-size or ratio cap (decompression bomb)",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "Defect revealed; repair pending."
+    },
+    {
+      "requirement_id": "SD-003",
+      "requirement_text": "Sensitive GET routes (memory export, tool calls/audit, chunks, runs, exports) are readable without the operator token when one is configured",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "Defect revealed; repair pending."
+    },
+    {
+      "requirement_id": "SD-004",
+      "requirement_text": "Operator token comparison is not constant-time",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "Defect revealed; repair pending."
+    },
+    {
+      "requirement_id": "SD-005",
+      "requirement_text": "test_web_render performs a real DNS lookup (hidden network dependency; fails offline)",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "Defect revealed; repair pending."
+    },
+    {
+      "requirement_id": "SD-006",
+      "requirement_text": "Application data directory resolves inside the application bundle (project_root/data)",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N06",
+      "notes": "Defect revealed; repair pending."
+    },
+    {
+      "requirement_id": "SD-007",
+      "requirement_text": "Built UI calls a hard-coded API base (127.0.0.1:8000); any other launch port breaks the GUI",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N19",
+      "notes": "Defect revealed; repair pending."
+    },
+    {
+      "requirement_id": "SD-008",
+      "requirement_text": "Tool audit log and JSON ledgers use unlocked read-modify-write; concurrent writers can lose events",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N06",
+      "notes": "Defect revealed; repair pending."
+    },
+    {
+      "requirement_id": "SD-011",
+      "requirement_text": "Web fetch validates DNS before urllib reconnects (DNS-rebinding window to private hosts)",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "Defect revealed; repair pending."
+    }
+  ]
+}
