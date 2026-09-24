@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-09-24T21:36:38Z",
+  "updated_utc": "2026-09-24T21:58:06Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -440,7 +440,7 @@
       "dependencies": [
         "N15"
       ],
-      "state": "OPEN",
+      "state": "PROVISIONAL",
       "risk": "MEDIUM",
       "user_value": "HIGH",
       "downstream_unlock_value": "MEDIUM",
@@ -449,7 +449,7 @@
         "rendered QA at desktop and 390px widths"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "Conversation-first GUI with Sources/Memory/Provenance/Settings; GIS/OCR/Code workspaces open."
     },
     {
       "node_id": "N18",
@@ -460,7 +460,7 @@
       "dependencies": [
         "N17"
       ],
-      "state": "OPEN",
+      "state": "PROVISIONAL",
       "risk": "LOW",
       "user_value": "MEDIUM",
       "downstream_unlock_value": "LOW",
@@ -469,7 +469,7 @@
         "Playwright screenshots + receipt"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "70/70 rendered checks in Chromium; WKWebView/macOS pending."
     },
     {
       "node_id": "N19",

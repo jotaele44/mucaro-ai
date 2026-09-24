@@ -1,0 +1,621 @@
+{
+  "schema_version": "mucaro-rendered-qa/1.0",
+  "status": "RENDERED_QA_PASS",
+  "head_sha": "a8515be3ce56ec92861a7cd007e53d5c616b2696",
+  "worktree_clean": true,
+  "dirty_paths": [],
+  "created_utc": "2026-09-24T21:57:24.165Z",
+  "browser": "chromium 141.0.7390.37",
+  "viewports": {
+    "desktop": "1440x900",
+    "iphone": "390x844 (iPhone 13 profile, touch, DPR 3)"
+  },
+  "checks": [
+    {
+      "name": "loading state renders while the service starts",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty conversation state",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty send is disabled (F05)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe empty: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "answer completes with citations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "2 citations"
+    },
+    {
+      "name": "answer text rendered",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe answer: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "reload reproduces the transcript (F02)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "citation opens exact source evidence",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Escape closes the sheet and returns focus",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "Open citation 1: src_bfbf9a5edb5c991d"
+    },
+    {
+      "name": "permission sheet shows the exact tool and arguments",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool summary counts from records",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool drawer lists the executed call",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "submit disabled until a choice is made (F11)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "options carry consequences (F10)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "retry asks for a fresh approval (F16)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "per-call outcomes stay distinct after retry (F08, F16)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "choice receipt persists in the feed (F13)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "plan mode shows the plan and executes nothing (F06)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message queued behind the active turn (F04)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "queued message editable before dispatch (F04)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "stop interrupts and the queued message then runs (F03)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Shift+Enter keeps composing (F05)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rename from the conversation menu (F17)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "delete confirms and states there is no archive (F17)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "background tasks list runs with metrics",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "sources workspace lists ingested sources",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe sources: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "memory add is visible with provenance",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "provenance shows a verified audit chain",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "settings shows model choice and offline capabilities",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe settings: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "no horizontal page overflow",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no console errors",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "loading state renders while the service starts",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty conversation state",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty send is disabled (F05)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe empty: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "answer completes with citations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "2 citations"
+    },
+    {
+      "name": "answer text rendered",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe answer: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "reload reproduces the transcript (F02)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "citation opens exact source evidence",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Escape closes the sheet and returns focus",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "Open citation 1: src_bfbf9a5edb5c991d"
+    },
+    {
+      "name": "permission sheet shows the exact tool and arguments",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool summary counts from records",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool drawer lists the executed call",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "submit disabled until a choice is made (F11)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "options carry consequences (F10)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pending question survives a new message (F14)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "submit stays disabled for an empty Other answer (F11)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "freeform answer recorded as the choice (F12, F13)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "plan mode shows the plan and executes nothing (F06)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message queued behind the active turn (F04)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "queued message editable before dispatch (F04)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "stop interrupts and the queued message then runs (F03)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Shift+Enter keeps composing (F05)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rename from the conversation menu (F17)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "delete confirms and states there is no archive (F17)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "background tasks list runs with metrics",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "sources workspace lists ingested sources",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe sources: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "memory add is visible with provenance",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "provenance shows a verified audit chain",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "settings shows model choice and offline capabilities",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe settings: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "no horizontal page overflow",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no console errors",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "security headers served with the UI",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "service-unreachable error state",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "passed": 70,
+  "failed": 0,
+  "axe": [
+    {
+      "view": "empty",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "answer",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "sources",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "settings",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "empty",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "answer",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "sources",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "settings",
+      "viewport": "iphone",
+      "violations": []
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-00-loading.png",
+      "sha256": "32fc966d5e248f47a5970c7be2f883e1bbf8482512d63fd075f9c171a67e06e8"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-01-empty.png",
+      "sha256": "2fe6d7a35aa2b6e629191596cc81311c1c33f17ece95ed7befd2c67361cffe67"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-02-answer.png",
+      "sha256": "0b4ec19a73d9e0ec59eec43b39b7097770fd551602e7184e06c3c3c10c4415bb"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-03-evidence.png",
+      "sha256": "58196ff0fe47ac7669e3c6580ec6ccc122a996f66ba40742f7ce12602f5a0a77"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-04-approval.png",
+      "sha256": "64a58f894c662cf22947754a53817dc51115aaa0dab7b80237fb562e83a56938"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-05-tool-done.png",
+      "sha256": "b826ede135f70efa83fa7bf40f97585e7495c326b145ee3d27d0863cad9c056d"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-06-tool-drawer.png",
+      "sha256": "9cfcf99f51c826b7d0d90827e1e072c0973c95954a4610533f6b337c57ec1141"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-07-question.png",
+      "sha256": "fb7520486d6d0a30dc3aab2526e8f6b9e01f58730e3843cda1b1a9b97c03af64"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-08-receipt.png",
+      "sha256": "9f5506751e056aa577301f9512fa9559da4c4f2b10e06d0f69b6cdecd17812fc"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-09-queue.png",
+      "sha256": "c0a1823fb29a98e43267125986824aa60f83cb039a71a5afc812ce06467a31ff"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-10-after-stop.png",
+      "sha256": "b8037ae5847cfce543741d2ec9450f98e407c7da8e69a3e4993a66704ef6228f"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-11-tasks.png",
+      "sha256": "4c77e405365a41d3b80bacad3273def509cc5a0e96c8d7023d3eb1cc85ccb497"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-13-sources.png",
+      "sha256": "2219997e7dda57cc460112d95732afbc0e8f73dbc1a6c17cd4aa4ddbf9e7540e"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-14-memory.png",
+      "sha256": "cdc1e22b721cced26b7682319f803627d32a6686bb254e7856dcdf0f1aca7a5e"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-15-provenance.png",
+      "sha256": "7c7f10eec47de0ffdedb90c56a78514cc52d96bd791a0dd68d577a0db02aa587"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-16-settings.png",
+      "sha256": "eb91c4bfe2b630c5640af38ff8e8205f02e02f216f2a4747e8a058d0f3ecb4fd"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-00-loading.png",
+      "sha256": "8e5fea7022b88cf52df54e6faea035e448616c7787047bd92d17d8d87d7e60c0"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-01-empty.png",
+      "sha256": "fc78b006d0356c311e6277bde61788264c900c66e06a3da394e6b6dffa87c0b3"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-02-answer.png",
+      "sha256": "05d23f452ed343bd08cd7c73f3a5631a933c16e0c2b36ea3d0ad93230306e4b1"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-03-evidence.png",
+      "sha256": "d06ea8e85dfaedbc13c3e71a2c595b305f3321282b6735d6049d9d75f58d5083"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-04-approval.png",
+      "sha256": "4df1a2f90cee4e82e2a361b7f20f584a48d2c03030a8d40416773337d04e87dd"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-05-tool-done.png",
+      "sha256": "2fed78ff5487e476612df0ae7778b4b94eaf22f1f487e2377b59094456a21385"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-06-tool-drawer.png",
+      "sha256": "292a5a67f11d2b396e11f32999bddedd2427e933e090e1f6a34ea236a78525b8"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-07-question.png",
+      "sha256": "f333957ac940128ad429335e5bae82cc3f7161e7a5cd6ae229180e8b1d31cc35"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-08-receipt.png",
+      "sha256": "c8763cd52dca12e0fb192de02384248fc0fdf71820adf852c58a2d6dcb4f3ce5"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-09-queue.png",
+      "sha256": "6205557f783611a9f27361b94e1d705df2406120cb1b0440004573093c3e3713"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-10-after-stop.png",
+      "sha256": "6a18dcb322ef8bf59031a401f83fef154a0da722517d5e61d6aea46c8581ada9"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-11-tasks.png",
+      "sha256": "2fd8551182c671af1fbcd8a5fca0c207812fe370e9d7c0952644a19b41462ca8"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-12-nav-open.png",
+      "sha256": "6076d6ea90a61cf429f3b5ecadac59b700b45492bb62f10922c0c2c9fd5e5195"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-13-sources.png",
+      "sha256": "fc0c9b102ee48fb3d6b2004d248bab39543b41c98ef29df6ba549c746304805c"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-14-memory.png",
+      "sha256": "51a66607476acfd478edbd34d913b0dd2a03f844e094f4fb1d934e06a84ef458"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-15-provenance.png",
+      "sha256": "45534e1abcd0af64a9c332383d9860401cec746b7ff4187b99558b26fd0ba167"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/iphone-16-settings.png",
+      "sha256": "56c44836d2dd7dfd9fb36fea5329cccc0a935192c12a6dbaf2658e661c7e1c1e"
+    },
+    {
+      "file": "data/exports/rendered_qa/20260924T215705Z-a8515be3ce56/desktop-17-service-unreachable.png",
+      "sha256": "6d910ea51a365b8fd4d2d17c7df38d4271c6fc7f9688820a5ea0849af21d3968"
+    }
+  ],
+  "limitations": [
+    "Rendered in Chromium (Playwright); the packaged macOS app uses WKWebView, whose rendering is verified separately on a macOS runner.",
+    "iPhone width is emulated in Chromium, not rendered by iOS Safari."
+  ]
+}

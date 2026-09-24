@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-24T21:36:38Z",
+  "updated_utc": "2026-09-24T21:58:06Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -33,11 +33,13 @@
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "Chat surface exists; no streaming work feed."
+      "notes": "Ask/plan/execute/stream/inspect/refine flows render; export and GIS/OCR workspaces still open."
     },
     {
       "requirement_id": "GOAL-003",
@@ -855,7 +857,7 @@
       "requirement_id": "INV-022",
       "requirement_text": "User-interface uniqueness",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "frontend/src/App.jsx"
       ],
@@ -863,11 +865,13 @@
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": ""
+      "notes": "Planning lives only in the Plan mode (PlanningGate removed); one settings home. No mechanical uniqueness check."
     },
     {
       "requirement_id": "INV-023",
@@ -920,12 +924,13 @@
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
-        "backend/tests/test_work_runs.py::test_api_message_stream_replays_and_ends"
+        "backend/tests/test_work_runs.py::test_api_message_stream_replays_and_ends",
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Ordered, replayable event feed (plan, route, tool calls, approvals, results, retrieval, text, citations, artifacts, warnings, final) over SSE. UI rendering is M6."
+      "notes": "Feed renders plans, actions, approvals, results, text, citations, artifacts, warnings and outcomes. OPEN: maps, tables and code-execution output in the feed (GIS/coding workspaces)."
     },
     {
       "requirement_id": "TGT-003",
@@ -1480,71 +1485,83 @@
       "requirement_id": "TGT-030",
       "requirement_text": "Source and evidence inspection",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "frontend/src/App.jsx"
+        "frontend/src/components/EvidencePanel.jsx",
+        "frontend/src/components/workspaces/SourcesWorkspace.jsx",
+        "backend/app/main.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": ""
+      "notes": "Citation -> source manifestation, byte identity, parser/processor, trust, cited chunk, provenance record."
     },
     {
       "requirement_id": "TGT-031",
       "requirement_text": "Citation interaction",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/citations.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "frontend/src/components/EvidencePanel.jsx"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": ""
+      "notes": "Traceable to source, chunk and chunk index; page-level location is available only where the parser records it."
     },
     {
       "requirement_id": "TGT-032",
       "requirement_text": "Provenance inspection",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/workspaces/ProvenanceWorkspace.jsx"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": ""
+      "notes": "Verified audit chain, per-action records behind disclosure."
     },
     {
       "requirement_id": "TGT-033",
       "requirement_text": "Configuration and settings",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "frontend/src/App.jsx"
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "backend/tests/test_api_auth_boundary.py::test_status_routes_remain_public_so_clients_can_discover_auth",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": ""
+      "notes": "Single settings surface: model (with readiness and remote consent), retrieval, token, offline capability view."
     },
     {
       "requirement_id": "TGT-034",
@@ -1594,37 +1611,43 @@
       "requirement_id": "TGT-036",
       "requirement_text": "Accessibility and interaction quality",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
+        "frontend/src/components/Sheet.jsx",
         "frontend/src/App.jsx"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+        "docs/release/UI_ACCESSIBILITY.md"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "No keyboard submit, focus styles or live regions."
+      "notes": "Declared behaviours verified in Chromium with zero axe violations; VoiceOver/WKWebView on macOS pending (M7)."
     },
     {
       "requirement_id": "TGT-037",
       "requirement_text": "Minimalist UI",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "frontend/src/styles.css"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "qa/rendered/rendered_qa.mjs",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "docs/release/UI_ACCESSIBILITY.md"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": ""
+      "notes": "Plan, route and JSON behind disclosure; permission, trust, provenance and failures are always visible (approval card, untrusted-content notice, error category)."
     },
     {
       "requirement_id": "TGT-038",
@@ -1938,17 +1961,22 @@
       "requirement_id": "MATRIX-015",
       "requirement_text": "UI benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "qa/rendered/rendered_qa.mjs",
+        ".github/workflows/rendered-qa.yml"
+      ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N18",
-      "notes": ""
+      "notes": "70 rendered checks pass (navigation, feed, progressive disclosure, settings, provenance, sources, error/loading/empty/offline-service states, keyboard). OPEN: GIS and OCR surfaces, and rendering on the supported macOS environment (WKWebView)."
     },
     {
       "requirement_id": "MATRIX-016",
@@ -2096,133 +2124,143 @@
       "requirement_id": "MOB-F01",
       "requirement_text": "Mobile conversation shell and long transcript",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "frontend/src/styles.css"
-      ],
-      "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
-      "blocker_id": null,
-      "dag_node": "N17",
-      "notes": ""
-    },
-    {
-      "requirement_id": "MOB-F02",
-      "requirement_text": "User/assistant/tool turns, time separators",
-      "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
-      "implementation_refs": [
-        "backend/app/conversations.py",
-        "backend/app/response_flow.py"
-      ],
-      "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [
-        "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns"
-      ],
-      "state": "PROVISIONAL",
-      "blocker_id": null,
-      "dag_node": "N15",
-      "notes": "Backend verified; rendered reload evidence pending (M6)."
-    },
-    {
-      "requirement_id": "MOB-F03",
-      "requirement_text": "Incremental thinking/working indication and stop",
-      "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
-      "implementation_refs": [
-        "backend/app/work_runs.py"
-      ],
-      "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [
-        "backend/tests/test_work_runs.py::test_stop_during_a_running_tool_records_it_in_flight_and_halts_later_steps",
-        "backend/tests/test_work_runs.py::test_stop_while_awaiting_approval_interrupts_and_cancels_pending_calls"
-      ],
-      "state": "PROVISIONAL",
-      "blocker_id": null,
-      "dag_node": "N15",
-      "notes": "Stop records INTERRUPTED, halts later steps and lists calls in flight at stop; UI pending."
-    },
-    {
-      "requirement_id": "MOB-F04",
-      "requirement_text": "Queue for after this turn",
-      "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
-      "implementation_refs": [
-        "backend/app/work_runs.py"
-      ],
-      "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [
-        "backend/tests/test_work_runs.py::test_messages_queue_fifo_and_dequeue_exactly_once"
-      ],
-      "state": "PROVISIONAL",
-      "blocker_id": null,
-      "dag_node": "N15",
-      "notes": "FIFO queue, edit/cancel before dispatch, exactly-once dequeue; UI pending."
-    },
-    {
-      "requirement_id": "MOB-F05",
-      "requirement_text": "Text composer, send, keyboard interaction",
-      "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
-      "implementation_refs": [
+        "frontend/src/styles.css",
         "frontend/src/App.jsx"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": ""
+      "notes": "Rendered at 390x844 (Chromium iPhone profile): header, off-canvas nav, safe-area insets, scroll anchoring, no overflow. OPEN: software-keyboard avoidance on real iOS/WKWebView."
+    },
+    {
+      "requirement_id": "MOB-F02",
+      "requirement_text": "User/assistant/tool turns, time separators",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/work_runs.py",
+        "frontend/src/components/ChatView.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
+      "negative_gate": "backend/tests/test_work_runs.py::test_invalid_messages_are_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: reload reproduces the transcript at both widths."
+    },
+    {
+      "requirement_id": "MOB-F03",
+      "requirement_text": "Incremental thinking/working indication and stop",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/work_runs.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_stop_while_awaiting_approval_interrupts_and_cancels_pending_calls",
+      "negative_gate": "backend/tests/test_work_runs.py::test_stop_during_a_running_tool_records_it_in_flight_and_halts_later_steps",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: Stop interrupts, the queued message then runs."
+    },
+    {
+      "requirement_id": "MOB-F04",
+      "requirement_text": "Queue for after this turn",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/work_runs.py",
+        "frontend/src/components/Composer.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_messages_queue_fifo_and_dequeue_exactly_once",
+      "negative_gate": "backend/tests/test_work_runs.py::test_messages_queue_fifo_and_dequeue_exactly_once",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: queue, edit and cancel before dispatch. Backend: FIFO, stale edit refused, exactly-once dequeue."
+    },
+    {
+      "requirement_id": "MOB-F05",
+      "requirement_text": "Text composer, send, keyboard interaction",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/Composer.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "backend/tests/test_work_runs.py::test_invalid_messages_are_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Rendered: empty send disabled, Enter sends, Shift+Enter newline; drafts persisted per conversation; IME guard in code."
     },
     {
       "requirement_id": "MOB-F06",
       "requirement_text": "Model/mode chip and Auto/Accept edits/Plan sheet",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/Composer.jsx",
+        "backend/app/work_runs.py"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_plan_mode_executes_nothing",
+      "negative_gate": "backend/tests/test_work_runs.py::test_auto_mode_preapproves_only_local_read_only_tools",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": ""
+      "notes": "Modes discovered from /work-runs/modes; rendered plan mode executes nothing; auto cannot bypass the gate for network or mutating tools."
     },
     {
       "requirement_id": "MOB-F07",
       "requirement_text": "Per-tool permission sheet with arguments, Deny/Allow once",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/tools.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_ask_mode_waits_for_approval_then_resumes",
+      "negative_gate": "backend/tests/test_contracts.py::test_decision_against_stale_arguments_is_refused",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_work_runs.py::test_ask_mode_waits_for_approval_then_resumes",
-        "backend/tests/test_work_runs.py::test_api_tool_decision_resumes_the_waiting_run"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
       "notes": "Approval request carries call id and argument digest; stale decisions refused; UI sheet pending."
@@ -2231,99 +2269,96 @@
       "requirement_id": "MOB-F08",
       "requirement_text": "Tool activity summary and failure count",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_denied_action_is_a_distinct_outcome_and_counts_close",
+      "negative_gate": "backend/tests/test_work_runs.py::test_run_envelope_takes_tool_state_from_records",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_work_runs.py::test_denied_action_is_a_distinct_outcome_and_counts_close"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Counts from records; denied is distinct; UI pending."
+      "notes": "Rendered: 'Used 2 tools (1 failed, 1 denied)' after retry and deny."
     },
     {
       "requirement_id": "MOB-F09",
       "requirement_text": "Tool detail drawer and output",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/work_runs.py"
+        "frontend/src/components/RunBlock.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_run_envelope_takes_tool_state_from_records",
+      "negative_gate": "backend/tests/test_contracts.py::test_handler_crash_and_tool_error_end_failed_not_running",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_work_runs.py::test_run_envelope_takes_tool_state_from_records"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Tool detail data available in events/envelope; drawer UI pending."
+      "notes": "Tool drawer shows exact status, input, output and error; JSON rendered inertly."
     },
     {
       "requirement_id": "MOB-F10",
       "requirement_text": "Pending multiple-choice question with descriptions",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/response_flow.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
+      "negative_gate": "backend/tests/test_response_flow.py",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_response_flow.py",
-        "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Backend state machine verified (test_response_flow.py); UI and rendered evidence OPEN."
+      "notes": "Rendered: options with consequences."
     },
     {
       "requirement_id": "MOB-F11",
       "requirement_text": "Disabled submit until valid choice; selection feedback",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/response_flow.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
+      "negative_gate": "backend/tests/test_work_runs.py::test_stale_and_duplicate_question_answers_are_rejected",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_response_flow.py",
-        "backend/tests/test_work_runs.py::test_stale_and_duplicate_question_answers_are_rejected"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Backend state machine verified (test_response_flow.py); UI and rendered evidence OPEN."
+      "notes": "Rendered: submit disabled until a choice, and for an empty Other."
     },
     {
       "requirement_id": "MOB-F12",
       "requirement_text": "Other and freeform override",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/response_flow.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_freeform_answer_is_recorded_as_a_user_note",
+      "negative_gate": "backend/tests/test_response_flow.py",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_response_flow.py",
-        "backend/tests/test_work_runs.py::test_freeform_answer_is_recorded_as_a_user_note"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
       "notes": "Backend state machine verified (test_response_flow.py); UI and rendered evidence OPEN."
@@ -2332,42 +2367,42 @@
       "requirement_id": "MOB-F13",
       "requirement_text": "Question/choice receipt in transcript",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/response_flow.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
+      "negative_gate": "backend/tests/test_work_runs.py::test_stale_and_duplicate_question_answers_are_rejected",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_response_flow.py"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Backend state machine verified (test_response_flow.py); UI and rendered evidence OPEN."
+      "notes": "Rendered: 'You chose:' receipt persists."
     },
     {
       "requirement_id": "MOB-F14",
       "requirement_text": "Interruption and return to pending question",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/response_flow.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_new_message_keeps_the_pending_question_unless_dismissed",
+      "negative_gate": "backend/tests/test_work_runs.py::test_new_message_keeps_the_pending_question_unless_dismissed",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_response_flow.py",
-        "backend/tests/test_work_runs.py::test_new_message_keeps_the_pending_question_unless_dismissed"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+        "backend/tests/test_response_flow.py"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Backend state machine verified (test_response_flow.py); UI and rendered evidence OPEN."
+      "notes": "Rendered: a new message queues while the same question stays open."
     },
     {
       "requirement_id": "MOB-F15",
@@ -2393,58 +2428,59 @@
       "requirement_id": "MOB-F16",
       "requirement_text": "Multi-action batch with partial failure and retry",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
+      "negative_gate": "backend/tests/test_work_runs.py::test_retry_in_ask_mode_needs_a_fresh_approval",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
-        "backend/tests/test_work_runs.py::test_retry_in_ask_mode_needs_a_fresh_approval"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "One result per target, retry only failed targets with fresh approval; UI pending."
+      "notes": "Rendered: retry raises a fresh approval for the failed target only."
     },
     {
       "requirement_id": "MOB-F17",
       "requirement_text": "Context menu: share, copy branch, rename, feedback, archive",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "frontend/src/App.jsx"
+        "frontend/src/components/ChatView.jsx"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "qa/rendered/rendered_qa.mjs",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": ""
+      "notes": "Rename, copy transcript, background tasks and confirmed permanent delete (the dialog states there is no archive). Share-to-external and feedback are intentionally absent: no corresponding Mucaro object exists (per the brief's own rule)."
     },
     {
       "requirement_id": "MOB-F18",
       "requirement_text": "Background tasks with state, metrics, transcript, load more",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/work_runs.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_background_task_list_paginates_with_receipt_metrics",
+      "negative_gate": "backend/tests/test_work_runs.py::test_crashing_step_ends_the_run_failed_with_a_category",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_work_runs.py::test_background_task_list_paginates_with_receipt_metrics"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Persisted runs with state, timing, tool metrics and paginated events; drawer UI pending."
+      "notes": "Rendered: tasks with metrics and transcript drill-down."
     },
     {
       "requirement_id": "MOB-F19",
@@ -2469,17 +2505,21 @@
       "requirement_id": "MOB-F20",
       "requirement_text": "Copy and read-aloud message actions",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/MessageActions.jsx"
+      ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": ""
+      "notes": "Copy and Read aloud controls with accessible start/stop render; activation (clipboard permission, speech synthesis) is not exercised headlessly."
     },
     {
       "requirement_id": "SD-001",
@@ -2603,17 +2643,22 @@
       "requirement_id": "SD-007",
       "requirement_text": "Built UI calls a hard-coded API base (127.0.0.1:8000); any other launch port breaks the GUI",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/api.js",
+        "frontend/vite.config.js"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "qa/rendered/rendered_qa.mjs",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "frontend/src/api.js"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N19",
-      "notes": "Defect revealed; repair pending."
+      "notes": "Same-origin API base; the rendered QA serves the UI from a random free port and every workflow works."
     },
     {
       "requirement_id": "SD-008",
