@@ -19,6 +19,8 @@ CHECKPOINT_STATES = {
     "COMPLETED",
 }
 TERMINAL_STATES = {"FAILED", "COMPLETED"}
+# Transitions may annotate these fields atomically; identity fields are never writable.
+ANNOTATION_FIELDS = {"provider", "model", "metadata"}
 
 
 class CheckpointError(RuntimeError):
@@ -96,10 +98,16 @@ def transition_checkpoint(
     completed_steps: list[dict[str, Any]] | None = None,
     pending_steps: list[dict[str, Any]] | None = None,
     contradictions: list[dict[str, Any]] | None = None,
+    annotations: dict[str, Any] | None = None,
     cfg: Settings = settings,
 ) -> dict[str, Any]:
     if state not in CHECKPOINT_STATES:
         raise CheckpointError("ERROR_CHECKPOINT_STATE", f"unsupported checkpoint state: {state}")
+    unexpected = sorted(set(annotations or {}) - ANNOTATION_FIELDS)
+    if unexpected:
+        raise CheckpointError("ERROR_CHECKPOINT_FIELD", f"annotations may not set: {', '.join(unexpected)}")
+    if annotations and "metadata" in annotations and not isinstance(annotations["metadata"], dict):
+        raise CheckpointError("ERROR_CHECKPOINT_FIELD", "metadata annotation must be an object")
     checkpoint = get_checkpoint(checkpoint_id, cfg)
     if checkpoint is None:
         raise CheckpointError("ERROR_CHECKPOINT_NOT_FOUND", checkpoint_id)
@@ -119,14 +127,21 @@ def transition_checkpoint(
         updated["pending_steps"] = list(pending_steps)
     if contradictions is not None:
         updated["contradictions"] = list(contradictions)
+    for field, value in (annotations or {}).items():
+        updated[field] = dict(value) if field == "metadata" else value
     upsert_payload("agent_checkpoints", "checkpoint_id", updated, cfg.sqlite_path)
     return updated
 
 
-def resume_checkpoint(checkpoint_id: str, cfg: Settings = settings) -> dict[str, Any]:
+def resume_checkpoint(
+    checkpoint_id: str,
+    cfg: Settings = settings,
+    *,
+    annotations: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     checkpoint = get_checkpoint(checkpoint_id, cfg)
     if checkpoint is None:
         raise CheckpointError("ERROR_CHECKPOINT_NOT_FOUND", checkpoint_id)
     if checkpoint.get("state") not in {"PAUSED_PROVIDER", "PAUSED_RESOURCE", "BLOCKED_EXTERNAL"}:
         raise CheckpointError("ERROR_CHECKPOINT_NOT_RESUMABLE", f"state is not resumable: {checkpoint.get('state')}")
-    return transition_checkpoint(checkpoint_id, state="EXECUTING", cfg=cfg)
+    return transition_checkpoint(checkpoint_id, state="EXECUTING", annotations=annotations, cfg=cfg)

@@ -13,6 +13,51 @@ class ModelProviderError(RuntimeError):
         self.detail = detail
 
 
+# Provider-side interruptions pause affected work instead of failing it. Invalid
+# requests and unclassified failures are deliberately excluded and fail closed.
+PROVIDER_INTERRUPTION_STATUSES = frozenset(
+    {
+        "ERROR_LIVE_MODE_DISABLED",
+        "ERROR_MODEL_API_KEY_MISSING",
+        "ERROR_MODEL_SDK_MISSING",
+        "ERROR_MODEL_PROVIDER_AUTH",
+        "ERROR_MODEL_PROVIDER_UNAVAILABLE",
+        "ERROR_MODEL_PROVIDER_RATE_LIMIT",
+        "ERROR_MODEL_PROVIDER_TIMEOUT",
+    }
+)
+
+
+def classify_provider_exception(provider: str, exc: BaseException) -> ModelProviderError:
+    """Normalize a provider SDK or transport exception into a canonical ModelProviderError.
+
+    Classification uses exception class names and ``status_code`` so it does not
+    require the provider SDK to be importable. The exception message is never
+    copied into the detail, which keeps request content and credentials out of
+    checkpoints and logs.
+    """
+    if isinstance(exc, ModelProviderError):
+        return exc
+    names = {cls.__name__ for cls in type(exc).__mro__}
+    raw_code = getattr(exc, "status_code", None)
+    code = raw_code if isinstance(raw_code, int) and not isinstance(raw_code, bool) else None
+    # APITimeoutError subclasses APIConnectionError in the Anthropic SDK, so timeouts are checked first.
+    if "APITimeoutError" in names or isinstance(exc, TimeoutError) or code == 408:
+        status = "ERROR_MODEL_PROVIDER_TIMEOUT"
+    elif "RateLimitError" in names or code == 429:
+        status = "ERROR_MODEL_PROVIDER_RATE_LIMIT"
+    elif "APIConnectionError" in names or isinstance(exc, ConnectionError) or (code is not None and code >= 500):
+        status = "ERROR_MODEL_PROVIDER_UNAVAILABLE"
+    elif code in {401, 403} or names & {"AuthenticationError", "PermissionDeniedError"}:
+        status = "ERROR_MODEL_PROVIDER_AUTH"
+    elif code is not None and 400 <= code < 500:
+        status = "ERROR_INVALID_MODEL_REQUEST"
+    else:
+        status = "ERROR_MODEL_PROVIDER_FAILURE"
+    detail = f"{provider}:{type(exc).__name__}" + (f":http_{code}" if code is not None else "")
+    return ModelProviderError(status, detail)
+
+
 @dataclass(frozen=True)
 class ModelProviderSpec:
     name: str
@@ -261,7 +306,6 @@ def _anthropic_answer(
             conversation_context=conversation_context,
             memory_context=memory_context,
         )
-    client = Anthropic()
     context = "\n\n".join(
         f"chunk_id={c['chunk_id']} source_id={c['source_id']}\n{c['text']}" for c in retrieved_chunks[:5]
     )
@@ -274,11 +318,24 @@ def _anthropic_answer(
         f"Memory:\n{chr(10).join(_format_memory_context(memory_context)) or 'none'}\n\n"
         f"Question: {query}\n\nContext:\n{context}"
     )
-    response = client.messages.create(
-        model=model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model),
-        max_tokens=900,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    try:
+        client = Anthropic()
+        response = client.messages.create(
+            model=model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model),
+            max_tokens=900,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except Exception as exc:
+        error = classify_provider_exception("anthropic", exc)
+        return _fallback_or_error(
+            query,
+            retrieved_chunks,
+            allow_mock_fallback=allow_mock_fallback,
+            status=error.status,
+            detail=error.detail,
+            conversation_context=conversation_context,
+            memory_context=memory_context,
+        )
     text = "\n".join(block.text for block in response.content if getattr(block, "type", None) == "text")
     cited = [c["chunk_id"] for c in retrieved_chunks if c["chunk_id"] in text]
     return {
