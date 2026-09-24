@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: bootstrap setup preflight test validate ingest ask cli serve launch-smoke release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
+.PHONY: bootstrap setup preflight test validate ingest ask cli serve launch-smoke desktop macos-app macos-app-verify release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
 
 bootstrap:
 	bash scripts/bootstrap_macos.sh
@@ -32,6 +32,17 @@ serve:
 
 launch-smoke:
 	PYTHONPATH=.:backend $(PYTHON) scripts/launch_app.py --smoke-test --no-browser
+
+# Desktop shell from source (needs the `desktop` extra for the native window).
+desktop:
+	PYTHONPATH=. $(PYTHON) -m backend.app.desktop_shell
+
+# Mucaro AI.app (macOS arm64; see docs/release/MACOS_APP.md).
+macos-app:
+	$(PYTHON) scripts/build_macos_app.py --build-frontend
+
+macos-app-verify:
+	$(PYTHON) scripts/verify_macos_app.py --zip "$$(ls -t data/exports/macos_app/*/Mucaro-AI-*-macos-arm64.zip | head -1)" --output data/exports/macos_app/e2e_receipt.json
 
 release:
 	PYTHONPATH=.:backend $(PYTHON) scripts/release_check.py

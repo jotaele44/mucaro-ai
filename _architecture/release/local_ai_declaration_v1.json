@@ -26,7 +26,7 @@
     }
   ],
   "supported_hardware_baseline": {
-    "platform": "macOS 13 or later",
+    "platform": "macOS 14 or later",
     "architecture": "Apple Silicon (arm64)",
     "minimum_memory_gb": 16,
     "minimum_free_storage_gb": 10,

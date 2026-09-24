@@ -8,9 +8,9 @@
     "architectures": [
       "arm64"
     ],
-    "minimum_os": "13.0",
+    "minimum_os": "14.0",
     "distribution": "Developer ID direct download (.app in .zip/.dmg); Mac App Store lane is an unadopted ENHANCEMENT (SD-009)",
-    "notes": "Declared hardware baseline: Apple Silicon, 16 GB RAM, 10 GB free storage (assumption A3; see docs/release/RELEASE_ENGINEERING_STATE.md)."
+    "notes": "Declared hardware baseline: Apple Silicon, 16 GB RAM, 10 GB free storage (assumption A3; see docs/release/RELEASE_ENGINEERING_STATE.md). Minimum macOS raised from 13.0 to 14.0 by RC-008: the pinned pyproj 3.7.2 and rasterio 1.4.3 arm64 wheels require macOS 14."
   },
   "bound_specifications": [
     {

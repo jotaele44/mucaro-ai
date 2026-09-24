@@ -72,10 +72,22 @@ These are all reversible. They are recorded as ASSUMPTION rather than FACT.
 - **A2: Desktop shell.** A native window (pywebview/WKWebView) hosts the
   built UI. The backend runs in-process on a loopback ephemeral port. The
   Python runtime is embedded, and app data lives outside the bundle.
+  - *Refinement (M7):* the app is frozen with PyInstaller 6.22.3 (onedir
+    `.app` with a native Mach-O launcher, so the Dock and Finder see a real
+    application) instead of a shell-script wrapper around a downloaded Python.
+    Inputs are hash-locked in `packaging/macos/requirements-macos-arm64.lock`.
+  - The per-launch token reaches the window in the URL fragment, which is
+    never sent to the server, and the GUI removes it from the address at once.
+  - Data lives in `~/Library/Application Support/Mucaro AI`. One instance runs
+    per data directory, and `instance.json` (mode 0600) tells local tooling
+    where the service is.
+  - pywebview's JavaScript bridge needs `eval`, which the app's CSP forbids.
+    So the shell proves that the GUI is running from the first authorized API
+    call carrying `X-Mucaro-Client: mucaro-gui`. It does not relax the CSP.
 - **A3: Local AI.** Local AI uses an OpenAI-compatible loopback provider
   (Ollama, the llama.cpp server or LM Studio), and model weights are not
   bundled. The declared hardware baseline is Apple Silicon (arm64), 16 GB RAM,
-  10 GB free storage and macOS 13 or later.
+  10 GB free storage and macOS 14 or later (raised from 13 by RC-008).
 - **A4: Streaming.** Results stream over server-sent events.
 - **A5: Mobile rows.** Mobile rows F01–F20 are satisfied by a responsive UI
   verified at 390×844. A native iOS client is an unadopted enhancement

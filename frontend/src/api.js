@@ -3,9 +3,37 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const TOKEN_STORAGE_KEY = "mucaro.operatorToken";
 
+const LAUNCH_TOKEN_KEY = "mucaro.launchToken";
+
+function takeLaunchToken() {
+  // The desktop shell opens `/#token=<per-launch token>`. The fragment is never sent to the server;
+  // it is removed from the address at once and kept only for this window's session (reloads keep working,
+  // the next launch uses a new port, so a new origin and a new token).
+  const match = /(?:^#|&)token=([^&]+)/.exec(window.location.hash || "");
+  if (match) {
+    const token = decodeURIComponent(match[1]);
+    try {
+      window.sessionStorage.setItem(LAUNCH_TOKEN_KEY, token);
+    } catch {
+      // Storage may be blocked; the in-memory token still works until reload.
+    }
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    return token;
+  }
+  try {
+    return window.sessionStorage.getItem(LAUNCH_TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+let launchManaged = false;
+
 function readStoredToken() {
   if (typeof window === "undefined") return "";
-  // The desktop shell injects a per-launch token; it never touches localStorage.
+  const launch = takeLaunchToken();
+  launchManaged = Boolean(launch);
+  if (launch) return launch;
   const injected = window.__MUCARO_BOOTSTRAP__?.token;
   if (injected) return injected;
   try {
@@ -29,6 +57,8 @@ export class ApiError extends Error {
 function authHeaders(extra = {}) {
   const headers = new Headers(extra);
   if (operatorToken && !headers.has("X-Mucaro-Token")) headers.set("X-Mucaro-Token", operatorToken);
+  // Lets the desktop shell confirm that its window is running the app (see backend/app/desktop_shell.py).
+  headers.set("X-Mucaro-Client", "mucaro-gui");
   return headers;
 }
 
@@ -91,6 +121,7 @@ export async function streamRunEvents(runId, after, onEvent, signal) {
 
 export const api = {
   getOperatorToken: () => operatorToken,
+  tokenIsLaunchManaged: () => launchManaged,
   setOperatorToken: (token) => {
     operatorToken = token.trim();
     try {

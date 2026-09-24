@@ -241,6 +241,38 @@ def test_offline_manifest_classifies_every_capability_and_closes():
     assert {row["capability"] for row in online["capabilities"]} == set(by_name)
 
 
+def test_offline_manifest_reports_missing_packages_even_for_network_capabilities(monkeypatch):
+    import backend.app.offline as offline
+
+    real = offline._module_present
+    monkeypatch.setattr(offline, "_module_present", lambda name: False if name == "playwright" else real(name))
+    rows = {row["capability"]: row for row in build_offline_manifest()["capabilities"]}
+    assert rows["tool:web.render"]["state_now"] == "LOCAL_DEPENDENCY_MISSING"
+    assert rows["tool:web.render"]["local_dependency"] == "playwright"
+    assert rows["tool:web.fetch"]["state_now"] == "REQUIRES_REMOTE_SERVICE"
+
+    monkeypatch.setattr(offline, "_module_present", lambda name: True)
+    rows = {row["capability"]: row for row in build_offline_manifest(system_offline=True)["capabilities"]}
+    assert rows["tool:web.render"]["state_now"] == "UNAVAILABLE_OFFLINE"
+
+
+def test_offline_manifest_reports_a_missing_remote_sdk(monkeypatch):
+    import backend.app.offline as offline
+
+    providers = [
+        {"name": "anthropic", "description": "remote", "locality": "remote", "status": "MODEL_PROVIDER_NOT_READY",
+         "optional_dependency": "anthropic", "dependency_available": False},
+        {"name": "mock", "description": "local", "locality": "local", "status": "MODEL_PROVIDER_READY",
+         "optional_dependency": None, "dependency_available": None},
+    ]
+    monkeypatch.setattr(offline, "list_model_providers", lambda: providers)
+    manifest = build_offline_manifest()
+    rows = {row["capability"]: row for row in manifest["capabilities"]}
+    assert rows["model:anthropic"]["state_now"] == "LOCAL_DEPENDENCY_MISSING"
+    assert rows["model:mock"]["state_now"] == "AVAILABLE_LOCALLY"
+    assert manifest["arithmetic_closes"] is True
+
+
 def test_local_ai_declaration_matches_the_provider_registry():
     from pathlib import Path
 

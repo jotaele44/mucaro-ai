@@ -4,7 +4,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { chromium, devices } from "playwright";
 import { spawn, execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -65,10 +65,10 @@ async function waitForHealth(base, timeoutMs = 30000) {
   return false;
 }
 
-async function startBackend(dataDir, port) {
+async function startBackend(dataDir, port, extraEnv = {}) {
   const child = spawn(python, ["-m", "uvicorn", "backend.app.main:app", "--host", "127.0.0.1", "--port", String(port)], {
     cwd: ROOT,
-    env: { ...process.env, MUCARO_AI_DATA_DIR: dataDir, PYTHONPATH: `${ROOT}:${path.join(ROOT, "backend")}`, MUCARO_AI_LIVE_MODE: "0" },
+    env: { ...process.env, MUCARO_AI_DATA_DIR: dataDir, PYTHONPATH: `${ROOT}:${path.join(ROOT, "backend")}`, MUCARO_AI_LIVE_MODE: "0", ...extraEnv },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let log = "";
@@ -363,6 +363,43 @@ async function offlineScenario(browser, base, viewport, contextOptions, stopBack
   await context.close();
 }
 
+// The desktop app opens `/#token=<per-launch token>` on a token-protected service (backend/app/desktop_shell.py).
+async function launchTokenScenario(browser, viewport) {
+  const token = randomBytes(24).toString("base64url");
+  const tokenPort = await freePort();
+  const tokenBase = `http://127.0.0.1:${tokenPort}`;
+  const tokenBackend = await startBackend(mkdtempSync(path.join(tmpdir(), "mucaro-qa-token-")), tokenPort, { MUCARO_AI_OPERATOR_TOKEN: token });
+  try {
+    if (!(await waitForHealth(tokenBase))) throw new Error(`token backend did not start:\n${tokenBackend.log()}`);
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, baseURL: tokenBase });
+    const page = await context.newPage();
+    const listed = page.waitForResponse((res) => new URL(res.url()).pathname === "/conversations");
+    await page.goto(`/#token=${token}`);
+    const first = await listed;
+    check("launch token from the URL fragment authorizes the GUI", viewport, first.status() === 200, `status ${first.status()}`);
+    check("launch token is removed from the address bar", viewport, !page.url().includes("token="), page.url());
+    const stored = await page.evaluate((value) => ({ session: sessionStorage.getItem("mucaro.launchToken") === value, local: JSON.stringify(localStorage).includes(value) }), token);
+    check("launch token kept for this window only (not localStorage)", viewport, stored.session && !stored.local, JSON.stringify(stored));
+    const relisted = page.waitForResponse((res) => new URL(res.url()).pathname === "/conversations");
+    await page.reload();
+    check("reload keeps the launch session authorized", viewport, (await relisted).status() === 200);
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
+    const managed = await page.getByText("created a fresh token for this launch").isVisible().catch(() => false);
+    const tokenField = await page.getByLabel("Token", { exact: true }).count();
+    check("Settings shows the launch token as app-managed (no token field)", viewport, managed && tokenField === 0);
+    await context.close();
+
+    const wrong = await browser.newContext({ viewport: { width: 1440, height: 900 }, baseURL: tokenBase });
+    const wrongPage = await wrong.newPage();
+    const refused = wrongPage.waitForResponse((res) => new URL(res.url()).pathname === "/conversations");
+    await wrongPage.goto("/#token=not-the-launch-token");
+    check("a wrong launch token is refused", viewport, (await refused).status() === 401);
+    await wrong.close();
+  } finally {
+    tokenBackend.kill("SIGTERM");
+  }
+}
+
 const dataDir = mkdtempSync(path.join(tmpdir(), "mucaro-qa-"));
 const port = await freePort();
 const base = `http://127.0.0.1:${port}`;
@@ -382,6 +419,7 @@ try {
   axeResults.push(...(await scenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } })));
   const iphone = devices["iPhone 13"];
   axeResults.push(...(await scenario(browser, base, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
+  await launchTokenScenario(browser, "desktop");
   const headers = (await fetch(`${base}/`)).headers;
   check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
   await offlineScenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } }, async () => {

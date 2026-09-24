@@ -133,6 +133,26 @@
       "related_requirement_ids": [
         "TGT-007"
       ]
+    },
+    {
+      "contradiction_id": "RC-008",
+      "type": "RUNTIME",
+      "observation_a": {
+        "claim": "Release class declared minimum macOS 13.0 (assumption, M0 manifest)",
+        "evidence": "_architecture/release/release_scope_manifest_v1.json (release_class.minimum_os, frozen baseline 20260924T210000Z)"
+      },
+      "observation_b": {
+        "claim": "Pinned arm64 wheels pyproj==3.7.2 and rasterio==1.4.3 are published only as macosx_14_0_arm64; pip finds no macOS 13 arm64 wheel for either",
+        "evidence": "pip download --only-binary=:all: --platform macosx_13_0_arm64 --python-version 3.11 (2026-09-24); packaging/macos/requirements-macos-arm64.lock"
+      },
+      "adjudication": "Raise the release-class minimum to macOS 14.0 (Info.plist LSMinimumSystemVersion, build script, manifest). Supporting 13.x would need GDAL/PROJ built from source or older GIS pins, which would invalidate the frozen GIS evidence. Reversible: a later source build can lower the minimum again.",
+      "state": "ADJUDICATED",
+      "material": true,
+      "materiality_reason": "Changes which Macs can install the release (TGT-026 release class).",
+      "related_requirement_ids": [
+        "TGT-026",
+        "TGT-028"
+      ]
     }
   ]
 }

@@ -1,0 +1,76 @@
+name: macOS app
+
+# Builds the double-clickable Mucaro AI.app on Apple Silicon and verifies it end to end
+# through LaunchServices (GOAL-001, TGT-001, TGT-017, TGT-026, TGT-028, TGT-029).
+# Ad-hoc signed only: Developer ID signing and notarization need credentials (BLK-SIGN-001).
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/**"
+      - "frontend/**"
+      - "schemas/**"
+      - "packaging/macos/**"
+      - "scripts/build_macos_app.py"
+      - "scripts/verify_macos_app.py"
+      - "pyproject.toml"
+      - ".github/workflows/macos-app.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # CFBundleVersion is the commit count
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install the hash-locked build environment
+        run: |
+          python -m venv "$RUNNER_TEMP/build-venv"
+          "$RUNNER_TEMP/build-venv/bin/python" -m pip install --require-hashes --no-deps -r packaging/macos/requirements-macos-arm64.lock
+      - name: Build the GUI
+        working-directory: frontend
+        run: |
+          npm ci --registry=https://registry.npmjs.org/
+          npm run build
+      - name: Build, sign ad-hoc and smoke-test Mucaro AI.app
+        run: |
+          "$RUNNER_TEMP/build-venv/bin/python" scripts/build_macos_app.py --output-dir "$RUNNER_TEMP/macos-app"
+      - name: Install from the zip, open via LaunchServices and verify end to end
+        run: |
+          ZIP="$(ls "$RUNNER_TEMP"/macos-app/Mucaro-AI-*-macos-arm64.zip)"
+          "$RUNNER_TEMP/build-venv/bin/python" scripts/verify_macos_app.py \
+            --zip "$ZIP" --head "$GITHUB_SHA" --output "$RUNNER_TEMP/macos-e2e/e2e_receipt.json"
+      - name: Collect receipts
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/evidence"
+          cp "$RUNNER_TEMP"/macos-app/build_receipt.json "$RUNNER_TEMP"/macos-app/bundle_manifest.json "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP"/macos-app/pyinstaller.log "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP"/macos-e2e/* "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+          cp "$HOME/Library/Application Support/Mucaro AI/logs/"*.log "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+      - name: Upload receipts and screenshot
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-app-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: warn
+      - name: Upload the app archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: mucaro-ai-macos-arm64-${{ github.sha }}
+          path: ${{ runner.temp }}/macos-app/Mucaro-AI-*-macos-arm64.zip
+          if-no-files-found: error

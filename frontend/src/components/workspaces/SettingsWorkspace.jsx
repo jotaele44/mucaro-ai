@@ -63,21 +63,27 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
 
       <fieldset className="panel">
         <legend>Local access token</legend>
-        <p className="muted small">{config?.auth?.auth_required ? "This Mucaro service requires a token." : "No token is required by this Mucaro service."}</p>
-        <form
-          className="inline-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            api.setOperatorToken(token);
-            announce("Token saved for this device.");
-          }}
-        >
-          <label className="field grow">
-            <span>Token</span>
-            <input type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} />
-          </label>
-          <button type="submit" className="secondary-button">Save</button>
-        </form>
+        {api.tokenIsLaunchManaged() ? (
+          <p className="muted small">The Mucaro app created a fresh token for this launch and uses it automatically. Nothing to set here.</p>
+        ) : (
+          <>
+            <p className="muted small">{config?.auth?.auth_required ? "This Mucaro service requires a token." : "No token is required by this Mucaro service."}</p>
+            <form
+              className="inline-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                api.setOperatorToken(token);
+                announce("Token saved for this device.");
+              }}
+            >
+              <label className="field grow">
+                <span>Token</span>
+                <input type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} />
+              </label>
+              <button type="submit" className="secondary-button">Save</button>
+            </form>
+          </>
+        )}
       </fieldset>
 
       {manifest && (

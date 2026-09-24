@@ -19,10 +19,17 @@ def get_connection(sqlite_path: Path | None = None) -> sqlite3.Connection:
     return conn
 
 
-def init_db(sqlite_path: Path | None = None) -> None:
-    with get_connection(sqlite_path) as conn:
-        conn.executescript(
-            """
+class SchemaVersionError(RuntimeError):
+    """The database was written by a newer Mucaro; refuse rather than risk corrupting it (TGT-029)."""
+
+    def __init__(self, found: int, supported: int) -> None:
+        super().__init__(f"database schema {found} is newer than this app supports ({supported})")
+        self.status = "ERROR_DATABASE_SCHEMA_TOO_NEW"
+        self.found = found
+        self.supported = supported
+
+
+_SCHEMA_SQL = """
             CREATE TABLE IF NOT EXISTS sources (
                 source_id TEXT PRIMARY KEY,
                 payload_json TEXT NOT NULL
@@ -77,12 +84,34 @@ def init_db(sqlite_path: Path | None = None) -> None:
                 value TEXT NOT NULL
             );
             """
-        )
-        conn.execute(
-            "INSERT INTO schema_meta (key, value) VALUES ('schema_version', ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE CAST(value AS INTEGER) < CAST(excluded.value AS INTEGER)",
-            (str(SCHEMA_VERSION),),
-        )
+
+
+def init_db(sqlite_path: Path | None = None) -> None:
+    """Create or upgrade the schema atomically; a newer schema fails safe instead of being touched."""
+    conn = get_connection(sqlite_path)
+    try:
+        conn.isolation_level = None
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            has_meta = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_meta'").fetchone()
+            if has_meta:
+                row = conn.execute("SELECT value FROM schema_meta WHERE key = 'schema_version'").fetchone()
+                found = int(row["value"]) if row else 0
+                if found > SCHEMA_VERSION:
+                    raise SchemaVersionError(found, SCHEMA_VERSION)
+            for statement in [part.strip() for part in _SCHEMA_SQL.split(";") if part.strip()]:
+                conn.execute(statement)
+            conn.execute(
+                "INSERT INTO schema_meta (key, value) VALUES ('schema_version', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE CAST(value AS INTEGER) < CAST(excluded.value AS INTEGER)",
+                (str(SCHEMA_VERSION),),
+            )
+            conn.execute("COMMIT")
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.close()
 
 
 _INITIALIZED_PATHS: set[str] = set()
