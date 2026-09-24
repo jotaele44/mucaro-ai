@@ -46,12 +46,16 @@ def init_db(sqlite_path: Path | None = None) -> None:
                 checkpoint_id TEXT PRIMARY KEY,
                 payload_json TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS interactions (
+                interaction_id TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL
+            );
             """
         )
 
 
 def upsert_payload(table: str, key_field: str, payload: dict[str, Any], sqlite_path: Path | None = None) -> None:
-    allowed = {"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints"}
+    allowed = {"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints", "interactions"}
     if table not in allowed:
         raise ValueError(f"Invalid table {table}")
     key = payload[key_field]
@@ -69,7 +73,7 @@ def upsert_payload(table: str, key_field: str, payload: dict[str, Any], sqlite_p
 
 
 def list_payloads(table: str, sqlite_path: Path | None = None) -> list[dict[str, Any]]:
-    allowed = {"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints"}
+    allowed = {"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints", "interactions"}
     if table not in allowed:
         raise ValueError(f"Invalid table {table}")
     with get_connection(sqlite_path) as conn:
@@ -78,7 +82,7 @@ def list_payloads(table: str, sqlite_path: Path | None = None) -> list[dict[str,
 
 
 def delete_payload(table: str, key_field: str, key: str, sqlite_path: Path | None = None) -> int:
-    allowed = {"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints"}
+    allowed = {"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints", "interactions"}
     if table not in allowed:
         raise ValueError(f"Invalid table {table}")
     with get_connection(sqlite_path) as conn:
