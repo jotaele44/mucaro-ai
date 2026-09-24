@@ -1,5 +1,10 @@
 # Desktop Launcher Mode
 
+> **Developer tool, not the release app.** Mucaro's release artifact is `Mucaro AI.app`, a
+> self-contained app with a native window: see [release/MACOS_APP.md](release/MACOS_APP.md).
+> The launcher and source-bound bundle described here need a checkout and a Python
+> environment, and open the system browser (contradiction RC-006, adjudicated).
+
 Desktop Launcher Mode lets Mucaro AI run with one command.
 
 It starts the private local backend on `127.0.0.1:8000`, serves the built React UI through FastAPI, opens the browser, and stops cleanly with `Ctrl+C`.

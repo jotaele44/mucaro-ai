@@ -268,7 +268,11 @@ def run(argv: list[str] | None = None) -> int:
     args, _unknown = parser.parse_known_args(argv)  # LaunchServices may add -psn_* arguments
 
     data_dir = Path(args.data_dir).expanduser().resolve() if args.data_dir else default_data_dir()
+    created = not data_dir.exists()
     data_dir.mkdir(parents=True, exist_ok=True)
+    if created or not args.data_dir:
+        # Sources, transcripts and memory are private to this user (INV-016 unsafe permissions).
+        data_dir.chmod(0o700)
     (data_dir / "logs").mkdir(exist_ok=True)
     lock = InstanceLock(data_dir)
     try:

@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-24T21:58:06Z",
+  "updated_utc": "2026-09-24T22:45:07Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -8,18 +8,23 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/packaging.py",
-        "backend/app/portable_runtime.py"
+        "backend/app/desktop_shell.py",
+        "packaging/macos/mucaro.spec",
+        "scripts/build_macos_app.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+      "negative_gate": "backend/tests/test_desktop_shell.py::test_no_window_service_enforces_the_launch_token_and_single_instance",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/window.png",
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N25",
-      "notes": "Current .app is a bash wrapper that opens the system browser (RC-006)."
+      "notes": "Launch path proven on a hosted macOS 14 arm64 runner: install from zip, LaunchServices open (the Finder double-click path), native window shown in 0.63 s, GUI connected with the launch token in 3.6 s, and ingest, cited answer and export, with no terminal or setup. Residue: a literal double-click by the user (BLK-PHYS-001), Developer ID signing so a downloaded copy opens without a Gatekeeper override (BLK-SIGN-001), and the workbench vectors still OPEN (GIS, OCR and code workspaces, benchmarks)."
     },
     {
       "requirement_id": "GOAL-002",
@@ -746,19 +751,25 @@
       "requirement_id": "INV-016",
       "requirement_text": "Measurable vulnerability gate",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "scripts/certify_release.py"
+        "backend/app/security_gates.py",
+        "scripts/certify_security_gates.py",
+        "_architecture/release/security/static_security_dispositions_v1.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_security_gates.py::test_repository_dispositions_cover_every_current_finding",
+      "negative_gate": "backend/tests/test_security_gates.py::test_untriaged_high_and_stale_findings_fail_the_triage",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "docs/release/SECURITY_GATES.md",
+        "backend/tests/test_security_gates.py::test_listening_addresses_see_a_real_all_interfaces_bind",
+        "backend/tests/test_ingestion_safety.py::test_docx_entity_amplification_is_refused_quickly"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N22",
-      "notes": ""
+      "notes": "SBOMs (CycloneDX) from the hashed locks. pip-audit of the 45 shipped Python components and npm audit: 0 known vulnerabilities. Secret scan covers tracked files and generated evidence. Every one of 89 static findings has a disposition (80 LOW, 9 NOT_APPLICABLE; no MEDIUM or above). Fixed: SQL identifier validation, asserts that vanished under -O, and a /tmp fallback. The service listens on loopback only, with data dir 0700 and instance file 0600. XML amplification and external entities are refused. Makes no claim that unknown vulnerabilities are absent."
     },
     {
       "requirement_id": "INV-017",
@@ -877,37 +888,49 @@
       "requirement_id": "INV-023",
       "requirement_text": "Packaging truthfulness",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "scripts/certify_release_grade.py"
+        ".github/workflows/macos-app.yml",
+        "scripts/build_macos_app.py",
+        "scripts/verify_macos_app.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/provenance.json",
+      "negative_gate": "backend/tests/test_macos_packaging.py::test_build_refuses_a_non_macos_host_without_structural_mode",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json",
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/provenance.json"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N20",
-      "notes": ""
+      "notes": "Packaging evidence comes from a fresh hosted macOS runner that builds from a clean checkout with the hash-locked inputs, not from a development machine. Local Linux structural builds are labelled non-distributable and make no window claims."
     },
     {
       "requirement_id": "TGT-001",
       "requirement_text": "Executable macOS application",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/packaging.py"
+        "backend/app/desktop_shell.py",
+        "packaging/macos/desktop_entry.py",
+        "packaging/macos/mucaro.spec"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+      "negative_gate": "backend/tests/test_desktop_shell.py::test_startup_failure_exits_with_status_and_writes_a_log",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
-      "blocker_id": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/window.png",
+        "backend/tests/test_desktop_shell.py::test_smoke_starts_serves_and_stops_with_data_outside_the_code_tree"
+      ],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-PHYS-001",
       "dag_node": "N19",
-      "notes": "Wrapper opens system browser; no native window (RC-006)."
+      "notes": "Valid .app (codesign --verify passes, arm64, Info.plist checked). Opened through LaunchServices, it shows the native window and a working GUI; there is no terminal, dev server or source tree. Every agent-executable check passes. The only residue is a literal physical double-click on a user's Mac (BLK-PHYS-001, or acceptance of LaunchServices evidence as equivalent)."
     },
     {
       "requirement_id": "TGT-002",
@@ -1223,20 +1246,25 @@
       "requirement_id": "TGT-017",
       "requirement_text": "Local-first storage and workspace state",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/db.py",
-        "backend/app/config.py"
+        "backend/app/config.py",
+        "backend/app/desktop_shell.py",
+        "backend/app/work_runs.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_desktop_shell.py::test_smoke_starts_serves_and_stops_with_data_outside_the_code_tree",
+      "negative_gate": "backend/tests/test_db_upgrade.py",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "backend/tests/test_work_runs.py::test_restart_interrupts_running_runs_and_resumes_waiting_ones",
+        "backend/tests/test_desktop_shell.py::test_macos_data_dir_is_application_support"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N06",
-      "notes": "Data dir inside bundle (SD-006)."
+      "notes": "State lives in ~/Library/Application Support/Mucaro AI (mode 0700), outside the replaceable bundle. It is local by default and survives quit/relaunch and reinstall (macOS E2E). Runs are reconciled on restart."
     },
     {
       "requirement_id": "TGT-018",
@@ -1376,56 +1404,80 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/local_worker.py",
-        "scripts/certify_release.py"
+        "backend/app/security_gates.py",
+        "scripts/verify_macos_app.py",
+        "backend/app/desktop_shell.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_security_gates.py::test_evidence_values_under_secret_keys_are_flagged",
+      "negative_gate": "backend/tests/test_security_gates.py::test_secret_patterns_are_detected_and_clean_text_passes",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "docs/release/SECURITY_GATES.md",
+        "backend/tests/test_prompt_injection.py"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N22",
-      "notes": "Secrets via environment only; no platform keychain."
+      "notes": "Secrets are not committed (secret scan) or surfaced in evidence (evidence-field scan). The launch token stays out of receipts and logs, is kept in a 0600 instance file, and reaches the window only through the URL fragment. Prompts and exports never contain credentials. Residue: production API keys still come from environment variables; macOS Keychain storage is not implemented."
     },
     {
       "requirement_id": "TGT-025",
       "requirement_text": "Permission boundaries",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/permissions.py",
-        "backend/app/capability_policy.py"
+        "backend/app/tools.py",
+        "backend/app/model_routing_policy.py",
+        "backend/app/web_browsing.py",
+        "backend/app/auth.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_permissions.py::test_external_path_requires_then_accepts_directory_grant",
+      "negative_gate": "backend/tests/test_tools.py::test_tool_runtime_requires_approval_before_execution",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_permissions.py::test_directory_grant_rejects_filesystem_root",
+        "backend/tests/test_web_browsing.py::test_validate_web_fetch_url_blocks_private_dns_resolution",
+        "backend/tests/test_local_model.py::test_non_loopback_local_url_is_refused_before_any_request",
+        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider",
+        "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+        "backend/tests/test_tools.py::test_tool_runtime_denies_unknown_tools_and_audits_rejection",
+        "backend/tests/test_contracts.py::test_decision_against_stale_arguments_is_refused",
+        "backend/tests/test_tools.py::test_tool_runtime_web_search_stays_fail_closed_without_live_permission",
+        "backend/tests/test_work_runs.py::test_retry_in_ask_mode_needs_a_fresh_approval",
+        "backend/tests/test_prompt_injection.py::test_injected_document_cannot_create_tool_calls_or_approvals",
+        "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_reject_missing_token_when_configured"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": ""
+      "notes": "Permissions and their negative gates:\n- Filesystem: directory grants.\n- Network: remote tools need approval; SSRF/private-address blocking; the service listens on loopback only.\n- Models: loopback-only local provider; routing modes local-only, remote-forbidden and offline.\n- Tools: per-call approval bound to the argument digest; unknown tools are refused.\n- External services: web search stays fail-closed without live permission and a key.\n- Consequential actions: mutating tools need approval; a retry needs a fresh approval; untrusted content cannot create approvals.\n- API: token boundary.\nThe security gate permission_boundaries checks the registry on every run."
     },
     {
       "requirement_id": "TGT-026",
       "requirement_text": "macOS packaging",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/packaging.py",
-        "backend/app/portable_runtime.py"
+        "scripts/build_macos_app.py",
+        "packaging/macos/mucaro.spec",
+        "packaging/macos/requirements-macos-arm64.lock"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json",
+      "negative_gate": "backend/tests/test_macos_packaging.py::test_build_refuses_a_non_macos_host_without_structural_mode",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
-      "blocker_id": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json",
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "backend/tests/test_macos_packaging.py::test_lock_is_fully_hash_pinned_and_covers_every_input"
+      ],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-SIGN-001",
       "dag_node": "N20",
-      "notes": ""
+      "notes": "All eight TGT-026 verifications pass on macOS: bundle validity, launch, resources, runtime dependencies, and no dev server, terminal or source tree; clean reinstall is covered by the E2E reinstall step. The artifact is ad-hoc signed, so it is not yet distributable under the declared Developer ID release class; Gatekeeper rejects it (BLK-SIGN-001)."
     },
     {
       "requirement_id": "TGT-027",
@@ -1449,37 +1501,46 @@
       "requirement_id": "TGT-028",
       "requirement_text": "Installation",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/portable_install.py"
+        "scripts/verify_macos_app.py",
+        "docs/release/MACOS_APP.md"
       ],
       "dependencies": [],
-      "positive_gate": null,
+      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
-      "blocker_id": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "docs/release/MACOS_APP.md"
+      ],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-SIGN-001",
       "dag_node": "N20",
-      "notes": ""
+      "notes": "Install path: unzip into Applications, then open. The installed app satisfies every TGT-001 check. A downloaded (quarantined) copy needs a Gatekeeper override until it is Developer ID signed and notarized (BLK-SIGN-001)."
     },
     {
       "requirement_id": "TGT-029",
       "requirement_text": "Upgrade and rollback",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/portable_install.py"
+        "backend/app/db.py",
+        "docs/release/MACOS_APP.md"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_db_upgrade.py",
+      "negative_gate": "backend/tests/test_db_upgrade.py",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_db_upgrade.py",
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "docs/release/MACOS_APP.md"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N20",
-      "notes": ""
+      "notes": "Declared policy (MACOS_APP.md): bundle replacement keeps data; schema upgrades are atomic and forward-only; a too-new database fails safely with ERROR_DATABASE_SCHEMA_TOO_NEW. Tested: upgrade, interrupted upgrade (rolled back), compatibility refusal, and app reinstall keeping data (macOS E2E). A cross-version app-to-app upgrade needs a previous packaged release (this is the first)."
     },
     {
       "requirement_id": "TGT-030",
@@ -1943,19 +2004,25 @@
       "requirement_id": "MATRIX-014",
       "requirement_text": "Security benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "scripts/certify_release.py"
+        "scripts/certify_security_gates.py",
+        ".github/workflows/ci.yml"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_security_gates.py::test_sboms_are_deterministic_and_scope_the_gui_runtime",
+      "negative_gate": "backend/tests/test_security_gates.py::test_secret_patterns_are_detected_and_clean_text_passes",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "docs/release/SECURITY_GATES.md",
+        "backend/tests/test_api_auth_boundary.py",
+        "backend/tests/test_prompt_injection.py",
+        "backend/tests/test_ingestion_safety.py"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N22",
-      "notes": ""
+      "notes": "All listed checks run in one gate (dependency scan, SBOM, secrets, static triage, permission, archive, prompt-injection, unsafe-path and network-boundary regressions, and packaging checks via the macOS build receipt). It runs in CI on every PR."
     },
     {
       "requirement_id": "MATRIX-015",
@@ -2016,19 +2083,24 @@
       "requirement_id": "MATRIX-018",
       "requirement_text": "Packaging benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/clean_machine_macos.py"
+        ".github/workflows/macos-app.yml",
+        "scripts/verify_macos_app.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
+      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
-      "blocker_id": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/window.png",
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json"
+      ],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-PHYS-001",
       "dag_node": "N20",
-      "notes": ""
+      "notes": "Build -> verify bundle -> install -> open (LaunchServices) -> verify GUI (window list, screenshot, GUI-connected signal) -> ingest/ask/cite/export -> quit (Apple Event) -> relaunch -> verify state: all pass on a hosted runner. A literal double-click is BLK-PHYS-001."
     },
     {
       "requirement_id": "MATRIX-019",
@@ -2036,36 +2108,42 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
+        "scripts/certify_release_grade.py",
         "scripts/certify_fresh_clone.py",
-        "scripts/certify_release_grade.py"
+        ".github/workflows/macos-app.yml"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_release_grade_certification.py::test_certified_only_when_every_gate_and_the_terminal_rule_hold",
+      "negative_gate": "backend/tests/test_release_grade_certification.py::test_every_gate_passing_is_still_provisional_while_the_ledgers_are_not_certified",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_release_grade_certification.py::test_receipt_gate_binds_head_status_schema_and_blocking_checks"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N24",
-      "notes": ""
+      "notes": "The sequence is wired. certify_release_grade.py runs fresh-clone, build, tests, benchmarks and security gates, checks exact-head macOS build and E2E receipts, freezes the final manifest, and applies the terminal rule. It has not been run end to end at one head with every receipt, and signing is blocked (BLK-SIGN-001)."
     },
     {
       "requirement_id": "MATRIX-020",
       "requirement_text": "Final release manifest",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
+        "backend/app/release_manifest.py",
         "scripts/certify_release_grade.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
+      "positive_gate": "backend/tests/test_release_grade_certification.py::test_final_release_manifest_names_every_missing_or_blocked_entry",
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/app/release_manifest.py"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N25",
-      "notes": ""
+      "notes": "The builder freezes every MATRIX-020 entry. An entry that is unavailable is recorded explicitly as BLOCKED, NOT_APPLICABLE or MISSING, never omitted. A certified-release manifest cannot exist until signing (BLK-SIGN-001) and the remaining gates close."
     },
     {
       "requirement_id": "CERT-RULE-001",
@@ -2627,17 +2705,22 @@
       "requirement_id": "SD-006",
       "requirement_text": "Application data directory resolves inside the application bundle (project_root/data)",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/config.py",
+        "backend/app/desktop_shell.py"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_desktop_shell.py::test_smoke_starts_serves_and_stops_with_data_outside_the_code_tree",
+      "negative_gate": "backend/tests/test_desktop_shell.py::test_frozen_bundle_sets_resource_root",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N06",
-      "notes": "Defect revealed; repair pending."
+      "notes": "Repaired by MUCARO_AI_DATA_DIR and the shell's Application Support default. The build receipt check no_user_data_or_secrets_in_bundle passes."
     },
     {
       "requirement_id": "SD-007",

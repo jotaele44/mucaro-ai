@@ -641,8 +641,8 @@ def build_release_artifacts(
         }
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    assert version is not None
-    assert head_sha is not None
+    if version is None or head_sha is None:  # guarded by the checks above; explicit so it survives python -O
+        raise RuntimeError("package version and head must be known before writing the artifact")
     archive_path = output_dir / f"{PYTHON_PACKAGE_NAME}-{version}-{head_sha[:12]}-source.zip"
     manifest_path = output_dir / f"{PYTHON_PACKAGE_NAME}-{version}-{head_sha[:12]}-artifact-manifest.json"
     archive_root = f"{PYTHON_PACKAGE_NAME}-{version}"

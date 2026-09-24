@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: bootstrap setup preflight test validate ingest ask cli serve launch-smoke desktop macos-app macos-app-verify release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
+.PHONY: bootstrap setup preflight test validate ingest ask cli serve launch-smoke desktop macos-app macos-app-verify security-gates release-grade release-status release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
 
 bootstrap:
 	bash scripts/bootstrap_macos.sh
@@ -43,6 +43,19 @@ macos-app:
 
 macos-app-verify:
 	$(PYTHON) scripts/verify_macos_app.py --zip "$$(ls -t data/exports/macos_app/*/Mucaro-AI-*-macos-arm64.zip | head -1)" --output data/exports/macos_app/e2e_receipt.json
+
+# Measured security gates, SBOMs and receipt (docs/release/SECURITY_GATES.md).
+security-gates:
+	PYTHONPATH=.:backend $(PYTHON) scripts/certify_security_gates.py
+
+# Fail-closed release-grade verdict. Pass the macOS workflow receipts for this head, e.g.
+#   make release-grade GRADE_ARGS="--macos-build-receipt build_receipt.json --macos-e2e-receipt e2e_receipt.json"
+release-grade:
+	PYTHONPATH=.:backend $(PYTHON) scripts/certify_release_grade.py $(GRADE_ARGS)
+
+# Regenerate the computed block in docs/RELEASE_STATUS.md from the release ledgers.
+release-status:
+	PYTHONPATH=.:backend $(PYTHON) scripts/mucaro.py release scope status --write-doc --format text
 
 release:
 	PYTHONPATH=.:backend $(PYTHON) scripts/release_check.py

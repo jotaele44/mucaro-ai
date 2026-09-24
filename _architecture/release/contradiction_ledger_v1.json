@@ -105,8 +105,8 @@
         "claim": "GOAL-001/TGT-001 require double-click -> GUI opens -> user can begin work with no terminal or developer setup",
         "evidence": "docs/release/MUCARO_RELEASE_ENGINEERING_CONTRACT_V1.md"
       },
-      "adjudication": "",
-      "state": "UNRESOLVED",
+      "adjudication": "Resolved in favour of GOAL-001/TGT-001. The release artifact is now Mucaro AI.app: a frozen PyInstaller bundle whose native pywebview window hosts the GUI, with an in-process loopback service and no browser, terminal or source tree (backend/app/desktop_shell.py, packaging/macos/mucaro.spec). Proven on a hosted macOS 14 runner: _architecture/release/evidence/macos_app_1d32e8ce1d02. The browser launcher (docs/DESKTOP_LAUNCHER.md) remains a developer convenience and is not the release path. Remaining launch residue is tracked as BLK-PHYS-001 and BLK-SIGN-001, not as this contradiction.",
+      "state": "ADJUDICATED",
       "material": true,
       "materiality_reason": "Directly affects launch behavior and packaging claims (MATRIX-004: launch behavior, packaging behavior).",
       "related_requirement_ids": [

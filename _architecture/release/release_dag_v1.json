@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-09-24T21:58:06Z",
+  "updated_utc": "2026-09-24T22:45:07Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -160,7 +160,7 @@
       "dependencies": [
         "N03"
       ],
-      "state": "OPEN",
+      "state": "PASS",
       "risk": "MEDIUM",
       "user_value": "HIGH",
       "downstream_unlock_value": "HIGH",
@@ -169,7 +169,7 @@
         "data dir outside bundle; transactional ledgers"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "TGT-017, SD-006 and SD-008 PASS."
     },
     {
       "node_id": "N07",
@@ -483,7 +483,7 @@
         "N06",
         "N17"
       ],
-      "state": "OPEN",
+      "state": "BLOCKED",
       "risk": "HIGH",
       "user_value": "HIGH",
       "downstream_unlock_value": "HIGH",
@@ -491,8 +491,8 @@
       "evidence_required": [
         "launch without terminal or browser"
       ],
-      "blocker": null,
-      "notes": ""
+      "blocker": "BLK-PHYS-001",
+      "notes": "Native pywebview shell proven on macOS via LaunchServices (see evidence/macos_app_1d32e8ce1d02). Literal double-click is BLK-PHYS-001."
     },
     {
       "node_id": "N20",
@@ -507,7 +507,7 @@
       "dependencies": [
         "N19"
       ],
-      "state": "OPEN",
+      "state": "BLOCKED",
       "risk": "HIGH",
       "user_value": "HIGH",
       "downstream_unlock_value": "HIGH",
@@ -515,8 +515,8 @@
       "evidence_required": [
         "macOS runner packaging receipts"
       ],
-      "blocker": null,
-      "notes": ""
+      "blocker": "BLK-SIGN-001",
+      "notes": "PyInstaller .app built, verified, installed, opened, relaunched and reinstalled on macOS 14; TGT-029 and INV-023 PASS. Developer ID distribution is BLK-SIGN-001; double-click is BLK-PHYS-001."
     },
     {
       "node_id": "N21",
@@ -554,7 +554,7 @@
         "N02",
         "N20"
       ],
-      "state": "OPEN",
+      "state": "PROVISIONAL",
       "risk": "HIGH",
       "user_value": "MEDIUM",
       "downstream_unlock_value": "MEDIUM",
@@ -563,7 +563,7 @@
         "SBOM + scan receipts"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "INV-016 and MATRIX-014 PASS; TGT-024 residue is Keychain storage for production secrets."
     },
     {
       "node_id": "N23",
@@ -595,7 +595,7 @@
         "N20",
         "N22"
       ],
-      "state": "OPEN",
+      "state": "PROVISIONAL",
       "risk": "MEDIUM",
       "user_value": "HIGH",
       "downstream_unlock_value": "HIGH",
@@ -604,7 +604,7 @@
         "fresh-clone receipt at frozen SHA"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "certify_release_grade.py wires the clean-environment sequence; not yet run end to end at one head."
     },
     {
       "node_id": "N25",

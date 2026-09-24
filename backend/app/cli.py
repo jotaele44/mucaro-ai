@@ -135,6 +135,7 @@ from .release_scope import (
     freeze_release_scope,
     validate_release_scope,
     write_state_snapshot,
+    write_status_doc,
 )
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .retrieval_eval import DEFAULT_FIXTURE, build_retrieval_eval_report, format_retrieval_eval_text
@@ -1418,6 +1419,9 @@ def build_parser() -> argparse.ArgumentParser:
         "status", help="Compute the release verdict under the terminal certification rule."
     )
     release_scope_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_scope_status.add_argument(
+        "--write-doc", action="store_true", help="Regenerate the computed status block in docs/RELEASE_STATUS.md."
+    )
     release_scope_status.set_defaults(handler=run_release_scope_status)
     release_scope_snapshot = release_scope_subcommands.add_parser(
         "snapshot", help="Capture a current-state snapshot (credential presence only, never values)."
@@ -6343,6 +6347,8 @@ def run_release_scope_validate(args: argparse.Namespace, cfg: Settings) -> int:
 
 def run_release_scope_status(args: argparse.Namespace, cfg: Settings) -> int:
     payload = compute_release_status(cfg.project_root)
+    if getattr(args, "write_doc", False) and payload["status"] != "MUCARO_AI_RELEASE_SCOPE_INVALID":
+        payload["status_doc"] = str(write_status_doc(cfg.project_root, payload))
     if args.format == "json":
         emit_payload(payload, "json")
     else:

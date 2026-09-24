@@ -22,6 +22,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -340,7 +341,7 @@ def main() -> int:
                 raise VerificationError("--zip verification needs macOS")
             receipt = macos(args.zip.resolve(), args.install_root.expanduser(), args.output)
         else:
-            data_dir = args.data_dir or Path(os.environ.get("TMPDIR", "/tmp")) / f"mucaro-e2e-{uuid.uuid4().hex[:8]}"
+            data_dir = args.data_dir or Path(tempfile.mkdtemp(prefix="mucaro-e2e-"))
             receipt = headless(args.executable.resolve(), data_dir)
         failures = blocking(receipt)
         status = "MACOS_APP_E2E_PASS" if not failures and receipt["mode"] == "MACOS_LAUNCHSERVICES" else "HEADLESS_E2E_PASS" if not failures else "E2E_FAIL"

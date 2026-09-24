@@ -335,7 +335,10 @@ def test_release_status_is_provisional_with_residue():
     assert status["release_status_line"] == "MUCARO AI RELEASE STATUS = PROVISIONAL"
     assert status["conditions"]["bound_specification"] is False
     assert "TGT-027" in status["residue"]["externally_blocked"]
-    assert "RC-006" in status["residue"]["unresolved_material_contradictions"]
+    ledger = json.loads((REPO_ROOT / "_architecture/release/contradiction_ledger_v1.json").read_text(encoding="utf-8"))
+    expected = sorted(row["contradiction_id"] for row in ledger["contradictions"] if row["material"] and row["state"] == "UNRESOLVED")
+    assert status["residue"]["unresolved_material_contradictions"] == expected
+    assert "BLK-SIGN-001" in status["residue"]["active_blockers"]
     assert status["residue"]["open"]
 
 
@@ -398,3 +401,28 @@ def test_cli_release_scope_validate_and_status(capsys):
     text = capsys.readouterr().out
     assert "MUCARO AI RELEASE STATUS = PROVISIONAL" in text
     assert "arithmetic_closes=True" in text
+
+
+def test_release_status_doc_block_is_generated_from_computed_state():
+    from backend.app.release_scope import compute_release_status, render_status_block, status_doc_block
+
+    root = Path(__file__).resolve().parents[2]
+    expected = render_status_block(compute_release_status(root))
+    assert status_doc_block(root) == expected, "run: mucaro release scope status --write-doc"
+    assert "RELEASE-GRADE CERTIFIED" not in expected or "zero active blockers | yes" in expected
+
+
+def test_write_status_doc_inserts_then_replaces_only_the_block(tmp_path):
+    from backend.app.release_scope import STATUS_BLOCK_BEGIN, STATUS_DOC, write_status_doc
+
+    doc = tmp_path / STATUS_DOC
+    doc.parent.mkdir(parents=True)
+    doc.write_text("# Release Status\n\nHand-written history.\n", encoding="utf-8")
+    status = {"release_status_line": "MUCARO AI RELEASE STATUS = PROVISIONAL", "denominator": {"total": 2, "by_state": {"PASS": 1, "OPEN": 1}, "arithmetic_closes": True},
+              "conditions": {"zero_in_scope_open": False}, "residue": {"open": ["X-1"]}}
+    write_status_doc(tmp_path, status)
+    first = doc.read_text(encoding="utf-8")
+    assert first.startswith("# Release Status\n\n" + STATUS_BLOCK_BEGIN) and first.rstrip().endswith("Hand-written history.")
+    write_status_doc(tmp_path, {**status, "residue": {"open": []}})
+    second = doc.read_text(encoding="utf-8")
+    assert second.count(STATUS_BLOCK_BEGIN) == 1 and "Hand-written history." in second and "`X-1`" not in second

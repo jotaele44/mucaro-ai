@@ -585,3 +585,76 @@ def freeze_release_scope(root: Path, label: str) -> dict[str, Any]:
     index = {"label": label, "frozen_utc": _utc_now(), "files": hashes, "denominator": validation["denominator"]}
     (target / "checkpoint.json").write_text(json.dumps(index, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return index
+
+
+# --- docs/RELEASE_STATUS.md: the status block is generated from computed state only --------
+
+STATUS_DOC = Path("docs") / "RELEASE_STATUS.md"
+STATUS_BLOCK_BEGIN = "<!-- BEGIN GENERATED: release-scope-status (mucaro release scope status --write-doc) -->"
+STATUS_BLOCK_END = "<!-- END GENERATED: release-scope-status -->"
+
+
+def render_status_block(status: dict[str, Any]) -> str:
+    """Markdown for the verdict, denominator, conditions and residue. Head-independent by design."""
+    denominator = status.get("denominator") or {}
+    residue = status.get("residue") or {}
+    lines = [
+        STATUS_BLOCK_BEGIN,
+        "## Release-engineering verdict (computed)",
+        "",
+        f"**{status['release_status_line']}**",
+        "",
+        "This block is generated from the ledgers in `_architecture/release/` by",
+        "`mucaro release scope status --write-doc`. Do not edit it by hand; a test",
+        "fails when it drifts from the computed state. Older sections below are",
+        "historical and are not the current verdict.",
+        "",
+        (
+            f"Requirement denominator: {denominator.get('total', 0)} "
+            f"(arithmetic closes: {'yes' if denominator.get('arithmetic_closes') else 'NO'})."
+        ),
+        "",
+        "| State | Requirements |",
+        "| --- | ---: |",
+        *(f"| {state} | {count} |" for state, count in (denominator.get("by_state") or {}).items()),
+        "",
+        "| Terminal-rule condition | Holds |",
+        "| --- | --- |",
+        *(f"| {name.replace('_', ' ')} | {'yes' if held else 'no'} |" for name, held in (status.get("conditions") or {}).items()),
+        "",
+        "Residue:",
+        "",
+    ]
+    for key in ("fail", "blocked", "externally_blocked", "provisional", "open"):
+        ids = residue.get(key) or []
+        shown = ", ".join(f"`{item}`" for item in ids) if len(ids) <= 25 else f"{len(ids)} requirements (see `mucaro release scope status`)"
+        lines.append(f"- {key.replace('_', ' ')} ({len(ids)}): {shown or 'none'}")
+    lines += [
+        f"- active blockers: {', '.join(f'`{item}`' for item in residue.get('active_blockers') or []) or 'none'}",
+        f"- unresolved material contradictions: {', '.join(f'`{item}`' for item in residue.get('unresolved_material_contradictions') or []) or 'none'}",
+        f"- open specification bindings: {', '.join(residue.get('open_specification_bindings') or []) or 'none'}",
+        STATUS_BLOCK_END,
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def write_status_doc(root: Path, status: dict[str, Any] | None = None) -> Path:
+    path = root / STATUS_DOC
+    text = path.read_text(encoding="utf-8")
+    block = render_status_block(status or compute_release_status(root))
+    if STATUS_BLOCK_BEGIN in text and STATUS_BLOCK_END in text:
+        before, rest = text.split(STATUS_BLOCK_BEGIN, 1)
+        after = rest.split(STATUS_BLOCK_END, 1)[1].lstrip("\n")
+        text = before + block + "\n" + after
+    else:
+        title, _, body = text.partition("\n")
+        text = f"{title}\n\n{block}\n{body.lstrip(chr(10))}"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def status_doc_block(root: Path) -> str | None:
+    text = (root / STATUS_DOC).read_text(encoding="utf-8")
+    if STATUS_BLOCK_BEGIN not in text or STATUS_BLOCK_END not in text:
+        return None
+    return STATUS_BLOCK_BEGIN + text.split(STATUS_BLOCK_BEGIN, 1)[1].split(STATUS_BLOCK_END, 1)[0] + STATUS_BLOCK_END + "\n"

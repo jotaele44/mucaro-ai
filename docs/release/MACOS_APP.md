@@ -44,6 +44,24 @@ the folder yourself if you want your data gone.
   you to confirm: Control-click the app, choose **Open**, or allow it under
   System Settings → Privacy & Security.
 
+## Upgrades, downgrades and reinstalls
+
+- **Replacing the app keeps your data.** The app bundle holds no user data, so
+  dragging in a newer `Mucaro AI.app`, or reinstalling the same one, keeps
+  everything in Application Support. The macOS workflow checks this on every
+  build: it deletes the app, reinstalls it from the zip, and confirms that the
+  earlier conversation and source are still there.
+- **Database upgrades are atomic and forward-only.** On first start after an
+  upgrade, the local database moves to the new schema in a single transaction.
+  If that is interrupted, it rolls back and the old data stays intact.
+- **Downgrades fail safely.** An older app will not open a database written by
+  a newer one. It stops with `ERROR_DATABASE_SCHEMA_TOO_NEW` instead of
+  guessing, and it does not modify the data.
+
+`backend/tests/test_db_upgrade.py` tests all three paths: upgrade, interrupted
+upgrade, and a too-new database. A cross-version app-to-app upgrade test needs
+a previous packaged release, and this is the first one.
+
 ## Build and verify (maintainers)
 
 On an Apple Silicon Mac:

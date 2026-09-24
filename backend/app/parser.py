@@ -226,6 +226,9 @@ def parse_file(path: Path) -> dict[str, Any]:
         }
     except ArchiveSafetyError as exc:
         raise ParseError(f"PARSE_FAILED:{path.name}:{exc}", status=exc.status) from exc
+    except ElementTree.ParseError as exc:
+        # Includes expat's refusal of entity amplification (billion laughs) and undefined external entities.
+        raise ParseError(f"PARSE_FAILED:{path.name}:{exc}", status="ERROR_XML_REJECTED") from exc
     except Exception as exc:
         raise ParseError(f"PARSE_FAILED:{path.name}:{exc}") from exc
 

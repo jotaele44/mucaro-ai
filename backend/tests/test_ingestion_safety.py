@@ -5,6 +5,7 @@ import os
 import socket
 import stat
 import threading
+import time
 import zipfile
 from dataclasses import replace
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -174,6 +175,39 @@ def test_docx_decompression_bomb_is_rejected(tmp_path):
     with pytest.raises(ParseError) as exc:
         parse_file(path)
     assert exc.value.status == "ERROR_ARCHIVE_UNSAFE"
+
+
+def test_docx_entity_amplification_is_refused_quickly(tmp_path):
+    # Billion laughs: ten nested entity levels would expand to ~10^10 characters if resolved.
+    entities = '<!ENTITY lol0 "lol">' + "".join(f'<!ENTITY lol{i} "{("&lol" + str(i - 1) + ";") * 10}">' for i in range(1, 11))
+    body = (
+        f"<?xml version='1.0'?><!DOCTYPE w:document [{entities}]>"
+        "<w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'>"
+        "<w:body><w:p><w:r><w:t>&lol10;</w:t></w:r></w:p></w:body></w:document>"
+    ).encode()
+    path = _docx(tmp_path / "laughs.docx", body)
+    started = time.monotonic()
+    with pytest.raises(ParseError) as exc:
+        parse_file(path)
+    assert exc.value.status == "ERROR_XML_REJECTED"
+    assert time.monotonic() - started < 5
+
+
+def test_docx_external_entities_are_never_resolved(tmp_path):
+    secret = tmp_path / "host-secret.txt"
+    secret.write_text("HOST-SECRET-CONTENT", encoding="utf-8")
+    body = (
+        f"<?xml version='1.0'?><!DOCTYPE w:document [<!ENTITY xxe SYSTEM '{secret.as_uri()}'>]>"
+        "<w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'>"
+        "<w:body><w:p><w:r><w:t>before &xxe; after</w:t></w:r></w:p></w:body></w:document>"
+    ).encode()
+    path = _docx(tmp_path / "xxe.docx", body)
+    try:
+        parsed = parse_file(path)
+    except ParseError as exc:
+        assert "HOST-SECRET-CONTENT" not in str(exc)
+    else:
+        assert "HOST-SECRET-CONTENT" not in json.dumps(parsed)
 
 
 # --- signatures and mislabeled content (INV-007) ------------------------------

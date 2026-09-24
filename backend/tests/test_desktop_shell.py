@@ -66,6 +66,7 @@ def test_smoke_starts_serves_and_stops_with_data_outside_the_code_tree(tmp_path:
     assert "DESKTOP_SMOKE_OK" in result.stdout
     assert (data_dir / "processed" / "mucaro_ai.sqlite3").exists()
     assert (data_dir / "logs").is_dir()
+    assert stat.S_IMODE(data_dir.stat().st_mode) == 0o700, "a new data directory is private to the user"
     assert not (data_dir / "instance.json").exists(), "instance file must be removed on exit"
 
 

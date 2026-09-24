@@ -24,9 +24,13 @@ jobs:
   build-and-verify:
     runs-on: macos-14
     timeout-minutes: 45
+    env:
+      # Receipts bind to the commit under review, not the synthetic pull-request merge commit.
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.HEAD_SHA }}
           fetch-depth: 0  # CFBundleVersion is the commit count
       - uses: actions/setup-python@v7
         with:
@@ -52,7 +56,7 @@ jobs:
         run: |
           ZIP="$(ls "$RUNNER_TEMP"/macos-app/Mucaro-AI-*-macos-arm64.zip)"
           "$RUNNER_TEMP/build-venv/bin/python" scripts/verify_macos_app.py \
-            --zip "$ZIP" --head "$GITHUB_SHA" --output "$RUNNER_TEMP/macos-e2e/e2e_receipt.json"
+            --zip "$ZIP" --head "$HEAD_SHA" --output "$RUNNER_TEMP/macos-e2e/e2e_receipt.json"
       - name: Collect receipts
         if: always()
         run: |
@@ -65,12 +69,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: macos-app-evidence-${{ github.sha }}
+          name: macos-app-evidence-${{ env.HEAD_SHA }}
           path: ${{ runner.temp }}/evidence
           if-no-files-found: warn
       - name: Upload the app archive
         uses: actions/upload-artifact@v7
         with:
-          name: mucaro-ai-macos-arm64-${{ github.sha }}
+          name: mucaro-ai-macos-arm64-${{ env.HEAD_SHA }}
           path: ${{ runner.temp }}/macos-app/Mucaro-AI-*-macos-arm64.zip
           if-no-files-found: error

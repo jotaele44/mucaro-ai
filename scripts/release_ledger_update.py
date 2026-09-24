@@ -24,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from backend.app.release_scope import LEDGER_FILES, RELEASE_DIR, validate_release_scope
+from backend.app.release_scope import LEDGER_FILES, RELEASE_DIR, validate_release_scope, write_status_doc
 
 ROW_FIELDS = {
     "implementation_state", "implementation_refs", "dependencies", "positive_gate", "negative_gate", "benchmark",
@@ -65,6 +65,7 @@ def main() -> int:
         print("RELEASE_LEDGER_UPDATE_ROLLED_BACK")
         return 1
     print(json.dumps(report["denominator"]["by_state"]))
+    print(f"STATUS_DOC {write_status_doc(ROOT).relative_to(ROOT)}")
     print("RELEASE_LEDGER_UPDATE_OK")
     return 0
 

@@ -27,6 +27,17 @@ jobs:
         working-directory: frontend
       - name: Certify release gates
         run: python scripts/certify_release.py
+      - name: Certify security gates (SBOM, audits, secrets, static triage, network exposure)
+        run: python scripts/certify_security_gates.py
+      - name: Upload security receipt and SBOMs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: security-gates-${{ github.sha }}
+          path: |
+            data/exports/security
+            data/exports/release_receipts/security_gates-*.json
+          if-no-files-found: warn
       - name: Provision immutable coding probe image
         id: coding_image
         run: |

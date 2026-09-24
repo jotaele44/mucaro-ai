@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -127,10 +128,20 @@ def ensure_db(sqlite_path: Path | None = None) -> None:
     _INITIALIZED_PATHS.add(str(path.resolve()))
 
 
-def upsert_payload(table: str, key_field: str, payload: dict[str, Any], sqlite_path: Path | None = None) -> None:
-    allowed = {"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints", "interactions"}
-    if table not in allowed:
+PAYLOAD_TABLES = frozenset({"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints", "interactions"})
+_IDENTIFIER = re.compile(r"^[a-z_][a-z0-9_]{0,63}$")
+
+
+def _checked_identifiers(table: str, key_field: str | None = None) -> None:
+    """Table and column names cannot be bound as SQL parameters, so they are allow-listed/validated instead."""
+    if table not in PAYLOAD_TABLES:
         raise ValueError(f"Invalid table {table}")
+    if key_field is not None and not _IDENTIFIER.match(key_field):
+        raise ValueError(f"Invalid key field {key_field!r}")
+
+
+def upsert_payload(table: str, key_field: str, payload: dict[str, Any], sqlite_path: Path | None = None) -> None:
+    _checked_identifiers(table, key_field)
     key = payload[key_field]
     with get_connection(sqlite_path) as conn:
         if table == "chunks":
@@ -146,18 +157,14 @@ def upsert_payload(table: str, key_field: str, payload: dict[str, Any], sqlite_p
 
 
 def list_payloads(table: str, sqlite_path: Path | None = None) -> list[dict[str, Any]]:
-    allowed = {"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints", "interactions"}
-    if table not in allowed:
-        raise ValueError(f"Invalid table {table}")
+    _checked_identifiers(table)
     with get_connection(sqlite_path) as conn:
         rows = conn.execute(f"SELECT payload_json FROM {table} ORDER BY rowid ASC").fetchall()
     return [json.loads(row["payload_json"]) for row in rows]
 
 
 def delete_payload(table: str, key_field: str, key: str, sqlite_path: Path | None = None) -> int:
-    allowed = {"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints", "interactions"}
-    if table not in allowed:
-        raise ValueError(f"Invalid table {table}")
+    _checked_identifiers(table, key_field)
     with get_connection(sqlite_path) as conn:
         cursor = conn.execute(f"DELETE FROM {table} WHERE {key_field} = ?", (key,))
         return int(cursor.rowcount)
