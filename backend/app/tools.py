@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import json
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from .coding_mutation import CodingMutationError, apply_patch_transaction
 from .coding_patch import validate_patch_proposal
 from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
+from .contracts import validate_contract
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
 from .product_audit import build_product_audit
-from .contracts import validate_contract
 from .utils import canonical_sha256, read_json, stable_id, update_json, utc_now
 from .web_browsing import (
     WebBrowsingError,

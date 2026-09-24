@@ -30,7 +30,6 @@ from typing import Any
 
 import jsonschema
 
-
 RELEASE_DIR = Path("_architecture") / "release"
 FROZEN_DIR = RELEASE_DIR / "frozen"
 SCHEMA_DIR = Path("schemas")
@@ -367,10 +366,9 @@ def validate_release_scope(
                 errors.append(_error("ERROR_UNKNOWN_BLOCKER", f"{requirement_id}:{blocker_id}"))
             elif blockers[blocker_id]["status"] != "ACTIVE":
                 errors.append(_error("ERROR_BLOCKER_NOT_ACTIVE", f"{requirement_id}:{blocker_id}"))
-        if state == "PASS":
-            # MATRIX-001: a PASS needs gates and evidence; script success alone is not PASS.
-            if not row["positive_gate"] or not row["negative_gate"] or not row["evidence_refs"]:
-                errors.append(_error("ERROR_PASS_WITHOUT_EVIDENCE", requirement_id))
+        # MATRIX-001: a PASS needs gates and evidence; script success alone is not PASS.
+        if state == "PASS" and (not row["positive_gate"] or not row["negative_gate"] or not row["evidence_refs"]):
+            errors.append(_error("ERROR_PASS_WITHOUT_EVIDENCE", requirement_id))
         if state in {"PASS", "PROVISIONAL"}:
             refs = [*row["evidence_refs"], row["positive_gate"], row["negative_gate"]]
             for ref in sorted({ref for ref in refs if ref}):

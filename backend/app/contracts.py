@@ -9,14 +9,13 @@ violates the shared contract: violations fail closed with ``ContractViolation``.
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 from typing import Any
 
 import jsonschema
 
 from .config import find_project_root
-
 
 SCHEMA_DIR_NAME = "schemas"
 
@@ -70,7 +69,7 @@ def _schema_dir(root: Path | None = None) -> Path:
     return (root or find_project_root()) / SCHEMA_DIR_NAME
 
 
-@lru_cache(maxsize=None)
+@cache
 def _validator(kind: str, schema_dir: str) -> jsonschema.protocols.Validator:
     if kind not in RECORD_SCHEMAS:
         raise KeyError(f"unknown contract record kind: {kind}")
@@ -96,7 +95,7 @@ def validate_contract(kind: str, payload: Any, *, root: Path | None = None) -> A
 
 def list_contracts(root: Path | None = None) -> dict[str, Any]:
     schema_dir = _schema_dir(root)
-    families = []
+    families: list[dict[str, Any]] = []
     for family, kinds in CONTRACT_FAMILIES.items():
         families.append(
             {

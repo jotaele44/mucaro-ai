@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 import json
 import os
 import socket
@@ -132,9 +131,8 @@ def test_decompression_bomb_is_rejected_by_ratio_and_by_actual_bytes(tmp_path):
     report = inspect_zip(bomb)
     assert report["status"] == "ARCHIVE_UNSAFE"
     assert "COMPRESSION_RATIO_EXCEEDED" in {row["finding"] for row in report["findings"]}
-    with zipfile.ZipFile(bomb) as archive:
-        with pytest.raises(ArchiveSafetyError) as exc:
-            read_member_limited(archive, "big.txt", 1024 * 1024)
+    with zipfile.ZipFile(bomb) as archive, pytest.raises(ArchiveSafetyError) as exc:
+        read_member_limited(archive, "big.txt", 1024 * 1024)
     assert exc.value.status == "ERROR_ARCHIVE_MEMBER_TOO_LARGE"
 
 
@@ -273,7 +271,7 @@ def test_cli_ingest_of_executable_payload_exits_with_status(tmp_path, capsys):
 
 
 class _Quiet(SimpleHTTPRequestHandler):
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         body = b"<html><body>internal only</body></html>"
         self.send_response(200)
         self.send_header("Content-Type", "text/html")

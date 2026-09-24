@@ -11,7 +11,14 @@ from fastapi.testclient import TestClient
 
 from backend.app import tools as tools_module
 from backend.app.cli import main
-from backend.app.contracts import CONTRACT_FAMILIES, RECORD_SCHEMAS, ContractViolation, contract_errors, list_contracts, validate_contract
+from backend.app.contracts import (
+    CONTRACT_FAMILIES,
+    RECORD_SCHEMAS,
+    ContractViolation,
+    contract_errors,
+    list_contracts,
+    validate_contract,
+)
 from backend.app.exports import export_answer_trace
 from backend.app.ingestion import ingest_file
 from backend.app.main import create_app

@@ -24,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from backend.app.release_scope import LEDGER_FILES, RELEASE_DIR, validate_release_scope  # noqa: E402
+from backend.app.release_scope import LEDGER_FILES, RELEASE_DIR, validate_release_scope
 
 ROW_FIELDS = {
     "implementation_state", "implementation_refs", "dependencies", "positive_gate", "negative_gate", "benchmark",

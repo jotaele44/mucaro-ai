@@ -209,7 +209,7 @@ def _pinned_create_connection(
     except socket.gaierror as exc:
         raise WebBrowsingError("ERROR_WEB_DNS_FAILED", f"DNS lookup failed for {host}: {exc}") from exc
     if not allow_private_hosts:
-        private = sorted({info[4][0] for info in infos if _is_private_host(info[4][0])})
+        private = sorted({str(info[4][0]) for info in infos if _is_private_host(str(info[4][0]))})
         if private:
             raise WebBrowsingError(
                 "ERROR_WEB_PRIVATE_HOST_BLOCKED",

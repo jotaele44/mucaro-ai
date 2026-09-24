@@ -7,9 +7,10 @@ import os
 import re
 import tempfile
 import threading
-from datetime import datetime, timezone
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Iterator, TypeVar
+from typing import Any, TypeVar
 
 try:  # POSIX advisory locks; macOS and Linux are the supported platforms.
     import fcntl
@@ -53,7 +54,7 @@ STOPWORDS = {
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def sha256_file(path: Path) -> str:
@@ -100,15 +101,14 @@ def file_lock(path: Path) -> Iterator[None]:
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with _LOCKS_GUARD:
         thread_lock = _THREAD_LOCKS.setdefault(str(lock_path.resolve()), threading.Lock())
-    with thread_lock:
-        with lock_path.open("a+") as handle:
+    with thread_lock, lock_path.open("a+") as handle:
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
             if fcntl is not None:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                if fcntl is not None:
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def update_json(path: Path, default: Any, mutate: Callable[[Any], T]) -> T:

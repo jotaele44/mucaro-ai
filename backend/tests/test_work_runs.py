@@ -12,7 +12,14 @@ from backend.app.conversations import create_conversation, get_conversation
 from backend.app.ingestion import ingest_file
 from backend.app.main import create_app
 from backend.app.response_flow import get_interaction, get_pending_interaction
-from backend.app.tools import TOOL_REGISTRY, ToolDefinition, ToolRuntimeError, approve_tool_call, deny_tool_call, list_tool_calls
+from backend.app.tools import (
+    TOOL_REGISTRY,
+    ToolDefinition,
+    ToolRuntimeError,
+    approve_tool_call,
+    deny_tool_call,
+    list_tool_calls,
+)
 from backend.app.work_runs import (
     RunError,
     edit_queued_run,
@@ -146,7 +153,7 @@ def test_plan_mode_executes_nothing(cfg, conversation):
     assert run["outcome"] == "PLAN_ONLY"
     assert list_tool_calls(cfg)["tool_calls"] == []
     plan = next(event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "plan")
-    assert [step.get("tool") for step in plan["data"]["steps"]][0] == "source_library.status"
+    assert plan["data"]["steps"][0].get("tool") == "source_library.status"
 
 
 def test_auto_mode_preapproves_only_local_read_only_tools(cfg, conversation):

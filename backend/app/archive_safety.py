@@ -17,7 +17,6 @@ from typing import Any
 
 from .file_signatures import detect_signature
 
-
 EXECUTABLE_SUFFIXES = {
     ".app", ".bat", ".bin", ".cmd", ".com", ".command", ".dll", ".dylib", ".exe", ".jar", ".msi", ".pkg",
     ".ps1", ".scr", ".sh", ".so", ".vbs",

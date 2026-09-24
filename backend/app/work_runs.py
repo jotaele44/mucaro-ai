@@ -34,7 +34,8 @@ from __future__ import annotations
 import json
 import threading
 import time
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
@@ -137,7 +138,7 @@ def available_modes() -> dict[str, Any]:
 
 def _auto_approvable(tool_name: str) -> bool:
     tool = TOOL_REGISTRY.get(tool_name)
-    return bool(tool) and not tool.mutates_state and tool.network == "none"
+    return tool is not None and not tool.mutates_state and tool.network == "none"
 
 
 # --- persistence --------------------------------------------------------------
@@ -197,7 +198,7 @@ class _Tx:
         self.conn.execute("BEGIN IMMEDIATE")
         return self.conn
 
-    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
         try:
             self.conn.execute("ROLLBACK" if exc_type else "COMMIT")
         finally:
@@ -258,7 +259,8 @@ def list_runs(
     cfg: Settings = settings,
 ) -> dict[str, Any]:
     ensure_db(cfg.sqlite_path)
-    clauses, params = [], []
+    clauses: list[str] = []
+    params: list[Any] = []
     if conversation_id:
         clauses.append("conversation_id = ?")
         params.append(conversation_id)
@@ -347,7 +349,7 @@ def submit_message(
         seq_row = conn.execute("SELECT COALESCE(MAX(queue_seq), 0) AS seq FROM work_runs").fetchone()
         queue_seq = int(seq_row["seq"]) + 1
         run_id = stable_id("wrun", conversation_id, text, now, str(queue_seq))
-        body = {
+        body: dict[str, Any] = {
             "run_id": run_id,
             "conversation_id": conversation_id,
             "prompt": text,
@@ -387,24 +389,23 @@ def submit_message(
 
 def _dispatch(conversation_id: str, cfg: Settings) -> str | None:
     """Claim the oldest queued run when the conversation has no active run (exactly-once)."""
-    with _CONVERSATION_DISPATCH_LOCK:
-        with _Tx(cfg) as conn:
-            active = conn.execute(
-                "SELECT 1 FROM work_runs WHERE conversation_id = ? AND state IN ('RUNNING','AWAITING_APPROVAL','AWAITING_INPUT') LIMIT 1",
-                (conversation_id,),
-            ).fetchone()
-            if active is not None:
-                return None
-            row = conn.execute(
-                "SELECT * FROM work_runs WHERE conversation_id = ? AND state = 'QUEUED' ORDER BY queue_seq ASC LIMIT 1",
-                (conversation_id,),
-            ).fetchone()
-            if row is None:
-                return None
-            run = _row_to_run(row)
-            run["state"] = "RUNNING"
-            run["started_at"] = utc_now()
-            _save(conn, run)
+    with _CONVERSATION_DISPATCH_LOCK, _Tx(cfg) as conn:
+        active = conn.execute(
+            "SELECT 1 FROM work_runs WHERE conversation_id = ? AND state IN ('RUNNING','AWAITING_APPROVAL','AWAITING_INPUT') LIMIT 1",
+            (conversation_id,),
+        ).fetchone()
+        if active is not None:
+            return None
+        row = conn.execute(
+            "SELECT * FROM work_runs WHERE conversation_id = ? AND state = 'QUEUED' ORDER BY queue_seq ASC LIMIT 1",
+            (conversation_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        run = _row_to_run(row)
+        run["state"] = "RUNNING"
+        run["started_at"] = utc_now()
+        _save(conn, run)
     _schedule(run["run_id"], cfg)
     return run["run_id"]
 
@@ -770,12 +771,12 @@ def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
     events = [("tool_result", _result_view(call)) for call in unreported]
     events.append(("tool_summary", {"round": run["round"], **summarize_tool_calls(calls)}))
 
-    def change(current: dict[str, Any]) -> None:
+    def record_round(current: dict[str, Any]) -> None:
         current["reported_call_ids"] = sorted(set(current["reported_call_ids"]) | {call["tool_call_id"] for call in unreported})
         current["phase"] = "tools_decision" if failed else "answer"
         current["failed_call_ids"] = [call["tool_call_id"] for call in failed]
 
-    _update(run_id, cfg, change, events)
+    _update(run_id, cfg, record_round, events)
     if failed:
         _ask_about_failures(get_run(run_id, cfg), failed, len(round_calls), cfg)
         return False
