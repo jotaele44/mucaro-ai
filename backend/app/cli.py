@@ -39,10 +39,8 @@ from .conversations import (
 from .db import list_payloads
 from .execution_gate import analyze_task
 from .gis_crs import reproject_geojson_crs
-from .gis_corpus import validate_real_gis_corpus
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
-from .gis_hydrology import condition_raster_depressions, derive_raster_d8_flow
 from .gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -55,17 +53,10 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
-from .gis_raster import (
-    clip_raster_bbox,
-    derive_raster_hillshade,
-    derive_raster_terrain,
-    inspect_raster,
-    resample_raster,
-    sample_raster,
-)
+from .gis_raster import clip_raster_bbox, inspect_raster, sample_raster
 from .gis_topology_repair import repair_geojson_topology
 from .gis_vector_formats import inspect_vector_format
-from .gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
+from .gis_vector_raster import analyze_vector_raster_intersection
 from .gis_eval import (
     DEFAULT_GIS_EVAL_FIXTURE,
     GIS_EVAL_OK,
@@ -86,7 +77,6 @@ from .ingestion import (
     ingest_web_snapshot,
     reindex_sources,
 )
-from .macos_app_store import build_macos_app_store_readiness
 from .memory import (
     MemoryError,
     delete_memory_item,
@@ -709,130 +699,6 @@ def build_parser() -> argparse.ArgumentParser:
     gis_vector_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_vector_raster.set_defaults(handler=run_gis_vector_raster)
 
-    gis_zonal_stats = gis_subcommands.add_parser(
-        "zonal-stats",
-        help="Compute bounded per-feature raster statistics using explicit cell-center inclusion.",
-    )
-    gis_zonal_stats.add_argument("vector_path", help="Path to a GeoJSON FeatureCollection.")
-    gis_zonal_stats.add_argument("raster_path", help="Path to a local raster source.")
-    gis_zonal_stats.add_argument("--band", type=int, default=1, help="One-based raster band index.")
-    gis_zonal_stats.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
-    gis_zonal_stats.set_defaults(handler=run_gis_zonal_stats)
-
-    gis_resample_raster = gis_subcommands.add_parser(
-        "resample-raster",
-        help="Transactionally resample a raster to explicit dimensions while preserving extent, CRS, and NODATA metadata.",
-    )
-    gis_resample_raster.add_argument("raster_path", help="Path to a local raster source.")
-    gis_resample_raster.add_argument("--width", type=int, required=True, help="Positive output pixel width.")
-    gis_resample_raster.add_argument("--height", type=int, required=True, help="Positive output pixel height.")
-    gis_resample_raster.add_argument("--method", choices=["nearest", "bilinear"], default="nearest", help="Bounded resampling method.")
-    gis_resample_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
-    gis_resample_raster.set_defaults(handler=run_gis_resample_raster)
-
-    gis_derive_terrain = gis_subcommands.add_parser(
-        "derive-terrain",
-        help="Derive slope and aspect from a projected metre elevation raster using complete 3x3 neighborhoods.",
-    )
-    gis_derive_terrain.add_argument("raster_path", help="Path to a local projected elevation raster.")
-    gis_derive_terrain.add_argument("--band", type=int, default=1, help="One-based elevation band index.")
-    gis_derive_terrain.add_argument(
-        "--elevation-units",
-        choices=["meters"],
-        required=True,
-        help="Explicit vertical units for the selected elevation band.",
-    )
-    gis_derive_terrain.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
-    gis_derive_terrain.set_defaults(handler=run_gis_derive_terrain)
-
-    gis_derive_hillshade = gis_subcommands.add_parser(
-        "derive-hillshade",
-        help="Derive bounded 0..255 hillshade from certified slope/aspect terrain lineage.",
-    )
-    gis_derive_hillshade.add_argument("raster_path", help="Path to a local projected elevation raster.")
-    gis_derive_hillshade.add_argument("--band", type=int, default=1, help="One-based elevation band index.")
-    gis_derive_hillshade.add_argument(
-        "--elevation-units",
-        choices=["meters"],
-        required=True,
-        help="Explicit vertical units for the selected elevation band.",
-    )
-    gis_derive_hillshade.add_argument(
-        "--azimuth",
-        type=float,
-        default=315.0,
-        help="Light-source azimuth in degrees clockwise from north, in [0,360).",
-    )
-    gis_derive_hillshade.add_argument(
-        "--altitude",
-        type=float,
-        default=45.0,
-        help="Light-source altitude in degrees above the horizon, in (0,90].",
-    )
-    gis_derive_hillshade.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
-    gis_derive_hillshade.set_defaults(handler=run_gis_derive_hillshade)
-
-    gis_condition_depressions = gis_subcommands.add_parser(
-        "condition-depressions",
-        help="Fill bounded enclosed raster depressions to their lowest reachable spill elevation.",
-    )
-    gis_condition_depressions.add_argument("raster_path", help="Path to a local projected elevation raster.")
-    gis_condition_depressions.add_argument("--band", type=int, default=1, help="One-based elevation band index.")
-    gis_condition_depressions.add_argument(
-        "--elevation-units",
-        choices=["meters"],
-        required=True,
-        help="Explicit vertical units for the selected elevation band.",
-    )
-    gis_condition_depressions.add_argument(
-        "--maximum-fill-depth-m",
-        type=float,
-        required=True,
-        help="Fail closed when any cell would need a larger fill depth in metres.",
-    )
-    gis_condition_depressions.add_argument(
-        "--format",
-        choices=["json", "text"],
-        default="json",
-        help="Output format.",
-    )
-    gis_condition_depressions.set_defaults(handler=run_gis_condition_depressions)
-
-    gis_derive_d8_flow = gis_subcommands.add_parser(
-        "derive-d8-flow",
-        help="Derive bounded D8 direction, accumulation, contributing area, and explicit terminal states.",
-    )
-    gis_derive_d8_flow.add_argument("raster_path", help="Path to a local projected elevation raster.")
-    gis_derive_d8_flow.add_argument("--band", type=int, default=1, help="One-based elevation band index.")
-    gis_derive_d8_flow.add_argument(
-        "--elevation-units",
-        choices=["meters"],
-        required=True,
-        help="Explicit vertical units for the selected elevation band.",
-    )
-    gis_derive_d8_flow.add_argument(
-        "--elevation-tolerance-m",
-        type=float,
-        default=0.0,
-        help="Non-negative elevation difference treated as level, in metres.",
-    )
-    gis_derive_d8_flow.add_argument(
-        "--gradient-tie-tolerance",
-        type=float,
-        default=1e-12,
-        help="Non-negative absolute tolerance for tied top descent gradients.",
-    )
-    gis_derive_d8_flow.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
-    gis_derive_d8_flow.set_defaults(handler=run_gis_derive_d8_flow)
-
-    gis_validate_corpus = gis_subcommands.add_parser(
-        "validate-corpus",
-        help="Validate frozen authoritative GIS corpus bytes, provenance, schema, IDs, and geometries.",
-    )
-    gis_validate_corpus.add_argument("manifest_path", help="Path to a mucaro_gis_real_corpus_v1 manifest.")
-    gis_validate_corpus.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
-    gis_validate_corpus.set_defaults(handler=run_gis_validate_corpus)
-
     gis_map_export = gis_subcommands.add_parser(
         "map-export-manifest",
         help="Bind an existing rendered map/export artifact to its renderer, extent, CRS, and source layers.",
@@ -1074,19 +940,6 @@ def build_parser() -> argparse.ArgumentParser:
     package_macos_app.add_argument("--python-executable", help="Python executable to embed in the app launcher.")
     package_macos_app.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     package_macos_app.set_defaults(handler=run_package_macos_app)
-
-    package_app_store_audit = package_subcommands.add_parser(
-        "app-store-audit",
-        help="Audit the Mac App Store security profile or one signed candidate bundle.",
-    )
-    package_app_store_audit.add_argument("--app", type=Path, help="Optional signed .app candidate to inspect.")
-    package_app_store_audit.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
-    package_app_store_audit.add_argument(
-        "--strict",
-        action="store_true",
-        help="Exit nonzero until external App Store signing, upload, and review gates are certified.",
-    )
-    package_app_store_audit.set_defaults(handler=run_package_app_store_audit)
 
     package_portable_app = package_subcommands.add_parser(
         "portable-macos-app",
@@ -1809,47 +1662,6 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"{check.get('status')} {check.get('name')} {detail}")
         for command in payload.get("next_commands", []):
             print(f"command={command}")
-    elif status in {
-        "MAC_APP_STORE_READINESS_FAIL",
-        "MAC_APP_STORE_READINESS_OPEN",
-        "MAC_APP_STORE_CANDIDATE_PROVISIONAL",
-    }:
-        print(f"schema_version={payload.get('schema_version')}")
-        print(f"project_root={payload.get('project_root')}")
-        print(f"profile_path={payload.get('profile_path')}")
-        print(f"profile_state={payload.get('profile_state')}")
-        print(f"candidate_scope={payload.get('candidate_scope')}")
-        counts = payload.get("counts", {})
-        if isinstance(counts, dict):
-            print(
-                "counts="
-                f"pass:{counts.get('pass')} "
-                f"open:{counts.get('open')} "
-                f"blocked:{counts.get('blocked')} "
-                f"fail:{counts.get('fail')} "
-                f"total:{counts.get('total')}"
-            )
-        for check in payload.get("checks", []):
-            if isinstance(check, dict):
-                detail = str(check.get("detail")).replace("\n", "\\n")
-                print(f"{check.get('status')} {check.get('name')} {detail}")
-        for gate in payload.get("external_gates", []):
-            if isinstance(gate, dict):
-                print(f"external_gate={gate.get('state')}:{gate.get('id')}:{gate.get('title')}")
-        external_gate_counts = payload.get("external_gate_counts", {})
-        if isinstance(external_gate_counts, dict):
-            print(
-                "external_gate_counts="
-                f"pass:{external_gate_counts.get('pass')} "
-                f"open:{external_gate_counts.get('open')} "
-                f"blocked:{external_gate_counts.get('blocked')} "
-                f"fail:{external_gate_counts.get('fail')} "
-                f"total:{external_gate_counts.get('total')}"
-            )
-        for nonclaim in payload.get("explicit_nonclaims", []):
-            print(f"nonclaim={nonclaim}")
-        for step in payload.get("next_steps", []):
-            print(f"next_step={step}")
     elif status in {"ADVANCED_CAPABILITY_CONTRACTS_READY", "ADVANCED_CAPABILITY_CONTRACTS_FAILED"}:
         print(f"schema_version={payload.get('schema_version')}")
         print(f"contract_count={payload.get('contract_count')}")
@@ -2248,7 +2060,6 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_MEASURE_OK",
         "GIS_MEASURE_WARN",
         "GIS_CRS_REPROJECT_OK",
-        "GIS_CRS_REPROJECT_WARN",
         "GIS_TOPOLOGY_REPAIR_OK",
         "GIS_TOPOLOGY_REPAIR_WARN",
         "GIS_ELLIPSOIDAL_OK",
@@ -2257,17 +2068,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_RASTER_INSPECT_OK",
         "GIS_RASTER_SAMPLE_OK",
         "GIS_RASTER_CLIP_OK",
-        "GIS_RASTER_RESAMPLE_OK",
-        "GIS_RASTER_TERRAIN_OK",
-        "GIS_RASTER_HILLSHADE_OK",
-        "GIS_RASTER_DEPRESSION_FILL_OK",
-        "GIS_RASTER_D8_OK",
-        "GIS_RASTER_D8_WARN",
         "GIS_VECTOR_RASTER_OK",
         "GIS_VECTOR_RASTER_WARN",
-        "GIS_ZONAL_STATS_OK",
-        "GIS_ZONAL_STATS_WARN",
-        "GIS_CORPUS_VALIDATION_OK",
         "GIS_MAP_EXPORT_MANIFEST_OK",
     }:
         print(status)
@@ -2301,17 +2103,6 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                     print(f"{source_name}_crs={named_source.get('crs')}")
                 if "feature_count" in named_source:
                     print(f"{source_name}_feature_count={named_source.get('feature_count')}")
-        assets = payload.get("assets")
-        if isinstance(assets, list):
-            print(f"asset_count={len(assets)}")
-            for asset in assets:
-                if isinstance(asset, dict):
-                    print(
-                        f"asset={asset.get('asset_id')} sha256={asset.get('sha256')} "
-                        f"type={asset.get('asset_type')} "
-                        f"features={asset.get('feature_count')} grid={asset.get('width')}x{asset.get('height')} "
-                        f"crs={asset.get('declared_crs')}"
-                    )
         if payload.get("join_cardinality"):
             print(f"join_cardinality={payload.get('join_cardinality')}")
         if payload.get("match_on"):
@@ -2342,36 +2133,6 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "implicit_reprojection",
                 "requested_bbox",
                 "effective_bbox",
-                "width",
-                "height",
-                "method",
-                "elevation_units",
-                "horizontal_units",
-                "horizontal_unit_factor",
-                "x_resolution",
-                "y_resolution",
-                "cell_area_square_metres",
-                "maximum_fill_depth_m",
-                "connectivity",
-                "slope_units",
-                "aspect_units",
-                "flat_aspect_policy",
-                "neighborhood_policy",
-                "azimuth_degrees_clockwise_from_north",
-                "altitude_degrees_above_horizon",
-                "illumination_model",
-                "output_scale",
-                "nodata_policy",
-                "elevation_tolerance_m",
-                "gradient_tie_tolerance",
-                "direction_convention",
-                "boundary_policy",
-                "fill_policy",
-                "breach_policy",
-                "sink_policy",
-                "flat_policy",
-                "tie_policy",
-                "accumulation_policy",
             ):
                 if key in parameters:
                     print(f"{key}={parameters.get(key)}")
@@ -2380,10 +2141,6 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
             print(f"output_path={output.get('path')}")
             print(f"output_sha256={output.get('sha256')}")
             print(f"output_crs={output.get('crs')}")
-            if "width" in output:
-                print(f"output_width={output.get('width')}")
-            if "height" in output:
-                print(f"output_height={output.get('height')}")
         invariants = payload.get("invariants")
         if isinstance(invariants, dict):
             for key in (
@@ -2474,64 +2231,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "point_accounting_closed",
                 "source_and_output_hash_present",
                 "feature_accounting_closed",
-                "cell_accounting_closed",
                 "crs_exactly_matched",
                 "nodata_separate_from_zero",
                 "no_implicit_reprojection",
-                "dimensions_exact",
-                "bounds_preserved",
-                "band_count_preserved",
-                "nodata_definition_preserved",
-                "nodata_accounting_recorded",
-                "transactional_output_published",
-                "asset_accounting_closed",
-                "all_asset_hashes_matched",
-                "all_feature_counts_matched",
-                "all_stable_ids_present_and_unique",
-                "all_geometries_valid",
-                "all_coordinate_dimensions_accounted",
-                "asset_type_accounting_closed",
-                "all_raster_grids_matched",
-                "all_raster_band_values_accounted",
-                "projected_crs_required",
-                "horizontal_units_metre",
-                "vertical_units_metre",
-                "axis_aligned_transform",
-                "dimensions_preserved",
-                "transform_preserved",
-                "output_band_count_exact",
-                "source_cell_accounting_closed",
-                "seed_accounting_closed",
-                "processed_accounting_closed",
-                "change_accounting_closed",
-                "nodata_preserved",
-                "outlet_seeds_unchanged",
-                "elevations_never_lowered",
-                "fill_depth_matches_elevation_delta",
-                "fill_depth_nonnegative",
-                "maximum_fill_depth_within_limit",
-                "fill_volume_accounting_closed",
-                "slope_cell_accounting_closed",
-                "aspect_cell_accounting_closed",
-                "neighborhood_accounting_closed",
-                "flat_aspect_accounting_closed",
-                "terrain_lineage_hashes_present",
-                "terrain_source_identity_bound",
-                "output_semantics_exact",
-                "cell_accounting_closed",
-                "illumination_accounting_closed",
-                "hillshade_range_bounded",
-                "terrain_validity_mask_preserved",
-                "state_accounting_closed",
-                "flow_edge_accounting_closed",
-                "terminal_state_accounting_closed",
-                "direction_state_accounting_closed",
-                "terminal_contribution_accounting_closed",
-                "terminal_area_accounting_closed",
-                "strict_descent_edges",
-                "accumulation_range_bounded",
-                "contributing_area_matches_cell_area",
-                "provenance_complete",
                 "layer_count",
                 "all_layer_hashes_present",
                 "output_hash_present",
@@ -2548,22 +2250,6 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         if isinstance(state_counts, dict):
             for state, count in state_counts.items():
                 print(f"{state}={count}")
-        terrain_accounting = payload.get("terrain_accounting")
-        if isinstance(terrain_accounting, dict):
-            for key, value in terrain_accounting.items():
-                print(f"{key}={value}")
-        hillshade_accounting = payload.get("hillshade_accounting")
-        if isinstance(hillshade_accounting, dict):
-            for key, value in hillshade_accounting.items():
-                print(f"{key}={value}")
-        depression_fill_accounting = payload.get("depression_fill_accounting")
-        if isinstance(depression_fill_accounting, dict):
-            for key, value in depression_fill_accounting.items():
-                print(f"{key}={value}")
-        flow_accounting = payload.get("flow_accounting")
-        if isinstance(flow_accounting, dict):
-            for key, value in flow_accounting.items():
-                print(f"{key}={value}")
         manifest = payload.get("manifest")
         if isinstance(manifest, dict):
             for key in ("driver", "width", "height", "band_count", "crs", "feature_count", "feature_table_count", "shape_type_code"):
@@ -3050,85 +2736,6 @@ def run_gis_vector_raster(args: argparse.Namespace, cfg: Settings) -> int:
     )
 
 
-def run_gis_zonal_stats(args: argparse.Namespace, cfg: Settings) -> int:
-    vector_path = _resolve_project_path(args.vector_path, cfg)
-    raster_path = _resolve_project_path(args.raster_path, cfg)
-    return _run_gis_report(
-        args,
-        lambda: compute_zonal_statistics(vector_path, raster_path, cfg=cfg, band=args.band),
-    )
-
-
-def run_gis_resample_raster(args: argparse.Namespace, cfg: Settings) -> int:
-    path = _resolve_project_path(args.raster_path, cfg)
-    return _run_gis_report(
-        args,
-        lambda: resample_raster(path, width=args.width, height=args.height, method=args.method, cfg=cfg),
-    )
-
-
-def run_gis_derive_terrain(args: argparse.Namespace, cfg: Settings) -> int:
-    path = _resolve_project_path(args.raster_path, cfg)
-    return _run_gis_report(
-        args,
-        lambda: derive_raster_terrain(
-            path,
-            band=args.band,
-            elevation_units=args.elevation_units,
-            cfg=cfg,
-        ),
-    )
-
-
-def run_gis_derive_hillshade(args: argparse.Namespace, cfg: Settings) -> int:
-    path = _resolve_project_path(args.raster_path, cfg)
-    return _run_gis_report(
-        args,
-        lambda: derive_raster_hillshade(
-            path,
-            band=args.band,
-            elevation_units=args.elevation_units,
-            azimuth_degrees=args.azimuth,
-            altitude_degrees=args.altitude,
-            cfg=cfg,
-        ),
-    )
-
-
-def run_gis_condition_depressions(args: argparse.Namespace, cfg: Settings) -> int:
-    path = _resolve_project_path(args.raster_path, cfg)
-    return _run_gis_report(
-        args,
-        lambda: condition_raster_depressions(
-            path,
-            band=args.band,
-            elevation_units=args.elevation_units,
-            maximum_fill_depth_m=args.maximum_fill_depth_m,
-            cfg=cfg,
-        ),
-    )
-
-
-def run_gis_derive_d8_flow(args: argparse.Namespace, cfg: Settings) -> int:
-    path = _resolve_project_path(args.raster_path, cfg)
-    return _run_gis_report(
-        args,
-        lambda: derive_raster_d8_flow(
-            path,
-            band=args.band,
-            elevation_units=args.elevation_units,
-            elevation_tolerance_m=args.elevation_tolerance_m,
-            gradient_tie_tolerance=args.gradient_tie_tolerance,
-            cfg=cfg,
-        ),
-    )
-
-
-def run_gis_validate_corpus(args: argparse.Namespace, cfg: Settings) -> int:
-    path = _resolve_project_path(args.manifest_path, cfg)
-    return _run_gis_report(args, lambda: validate_real_gis_corpus(path, cfg=cfg))
-
-
 def run_gis_map_export_manifest(args: argparse.Namespace, cfg: Settings) -> int:
     output_path = _resolve_project_path(args.output_path, cfg)
     layers = [
@@ -3444,16 +3051,6 @@ def run_package_macos_app(args: argparse.Namespace, cfg: Settings) -> int:
     )
     emit_payload(report, args.format)
     return 0 if report["status"] == "MACOS_APP_BUNDLE_READY" else 2
-
-
-def run_package_app_store_audit(args: argparse.Namespace, cfg: Settings) -> int:
-    report = build_macos_app_store_readiness(cfg.project_root, app_path=args.app)
-    emit_payload(report, args.format)
-    if report["status"] == "MAC_APP_STORE_READINESS_FAIL":
-        return 2
-    if args.strict:
-        return 2
-    return 0
 
 
 def run_package_portable_macos_app(args: argparse.Namespace, cfg: Settings) -> int:
@@ -3844,44 +3441,26 @@ def _expected_handoff_path(root: Path, directory: Path, prefix: str, head_sha: s
     return root / directory / f"{prefix}-{head_prefix}.json"
 
 
-def _remote_branch_check(
-    cfg: Settings,
-    branch: str | None,
-    head_sha: str | None,
-    *,
-    upstream: str | None = None,
-) -> dict[str, Any]:
+def _remote_branch_check(cfg: Settings, branch: str | None, head_sha: str | None) -> dict[str, Any]:
     if not branch:
         return _certification_gate("remote_branch_binding", "WARN", "branch unavailable")
     if not head_sha:
         return _certification_gate("remote_branch_binding", "WARN", "head SHA unavailable")
-    remote_name = "origin"
-    remote_branch = branch
-    if upstream:
-        normalized_upstream = upstream.removeprefix("refs/remotes/")
-        if "/" not in normalized_upstream:
-            return _certification_gate(
-                "remote_branch_binding",
-                "WARN",
-                f"upstream ref is not remote-qualified: {upstream}",
-            )
-        remote_name, remote_branch = normalized_upstream.split("/", 1)
-    remote_ref = f"refs/heads/{remote_branch}"
-    ok, output = _git_output(cfg, ["ls-remote", remote_name, remote_ref])
+    ok, output = _git_output(cfg, ["ls-remote", "origin", f"refs/heads/{branch}"])
     if not ok:
         return _certification_gate("remote_branch_binding", "WARN", output or "remote branch lookup failed")
     remote_sha = None
     for line in output.splitlines():
         parts = line.split()
-        if len(parts) == 2 and parts[1] == remote_ref:
+        if len(parts) == 2 and parts[1] == f"refs/heads/{branch}":
             remote_sha = parts[0]
             break
     if not remote_sha:
-        return _certification_gate("remote_branch_binding", "FAIL", f"{remote_name}/{remote_branch} not found")
+        return _certification_gate("remote_branch_binding", "FAIL", f"origin/{branch} not found")
     return _certification_gate(
         "remote_branch_binding",
         "PASS" if remote_sha == head_sha else "FAIL",
-        f"{remote_name}/{remote_branch}={remote_sha} head={head_sha}",
+        f"origin/{branch}={remote_sha} head={head_sha}",
     )
 
 
@@ -3957,8 +3536,7 @@ def build_release_dashboard_report(
             probe_workflow_name=probe_workflow,
         )
 
-    upstream = git_payload.get("upstream") if isinstance(git_payload.get("upstream"), str) else None
-    remote_branch = _remote_branch_check(cfg, branch, head_sha, upstream=upstream)
+    remote_branch = _remote_branch_check(cfg, branch, head_sha)
     governed_state = _release_state_row(release_state, "GOVERNED_RELEASE_READY")
     github_state = _release_state_row(release_state, "GITHUB_GOVERNANCE_OPEN")
     receipt_expected_count = len(expected_receipt_types)
