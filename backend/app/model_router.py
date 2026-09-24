@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
+from .injection_guard import neutralize_fence
+
 
 class ModelProviderError(RuntimeError):
     def __init__(self, status: str, detail: str) -> None:
@@ -378,22 +380,12 @@ def _anthropic_answer(
             memory_context=memory_context,
         )
     client = Anthropic()
-    context = "\n\n".join(
-        f"chunk_id={c['chunk_id']} source_id={c['source_id']}\n{c['text']}" for c in retrieved_chunks[:5]
-    )
-    prompt = (
-        "Answer using only the provided context. Cite chunk IDs explicitly. "
-        "Use conversation history only to interpret the user's follow-up, not as source evidence. "
-        "Use memory only for user preferences or durable profile context, not as source evidence. "
-        "If context is insufficient, say so.\n\n"
-        f"Conversation history:\n{chr(10).join(_format_conversation_context(conversation_context)) or 'none'}\n\n"
-        f"Memory:\n{chr(10).join(_format_memory_context(memory_context)) or 'none'}\n\n"
-        f"Question: {query}\n\nContext:\n{context}"
-    )
+    system, user = build_grounded_prompt(query, retrieved_chunks, conversation_context, memory_context)
     response = client.messages.create(
         model=model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model),
         max_tokens=900,
-        messages=[{"role": "user", "content": prompt}],
+        system=system,
+        messages=[{"role": "user", "content": user}],
     )
     text = "\n".join(block.text for block in response.content if getattr(block, "type", None) == "text")
     cited = [c["chunk_id"] for c in retrieved_chunks if c["chunk_id"] in text]
@@ -424,7 +416,7 @@ def build_grounded_prompt(
         "Conversation history and memory are context about the user, not evidence."
     )
     sources = "\n\n".join(
-        f"<source chunk_id=\"{c['chunk_id']}\" source_id=\"{c['source_id']}\">\n{c.get('text', '')}\n</source>"
+        f"<source chunk_id=\"{c['chunk_id']}\" source_id=\"{c['source_id']}\">\n{neutralize_fence(str(c.get('text', '')))}\n</source>"
         for c in retrieved_chunks[:5]
     )
     user = (

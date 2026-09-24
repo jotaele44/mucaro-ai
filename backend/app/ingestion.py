@@ -7,9 +7,10 @@ from typing import Any
 
 from .chunker import chunk_text
 from .config import Settings, settings
-from .db import delete_chunks_for_source, delete_payload, init_db, upsert_payload
-from .multimodal import MULTIMODAL_SUFFIXES
 from .contracts import validate_contract
+from .db import delete_chunks_for_source, delete_payload, init_db, upsert_payload
+from .injection_guard import scan_text
+from .multimodal import MULTIMODAL_SUFFIXES
 from .parser import ParseError, detect_mime, parse_file
 from .provenance import build_provenance_record
 from .semantic_store import build_semantic_store, get_semantic_store_status
@@ -70,6 +71,9 @@ def ingest_file(path: Path, cfg: Settings = settings, *, source_kind: str = "LOC
     parse_result = parse_file(target)
     warnings = list(parse_result.get("warnings", []))
     text = str(parse_result.get("text", ""))
+    injection_scan = scan_text(text)
+    if injection_scan["suspected"]:
+        warnings.append("UNTRUSTED_INSTRUCTION_TEXT_DETECTED:" + ",".join(injection_scan["signals"]))
     chunks = chunk_text(source_id, text)
     lineage_status = "VALID" if chunks else "PARTIAL"
     if not chunks:

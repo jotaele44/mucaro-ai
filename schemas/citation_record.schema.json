@@ -23,6 +23,7 @@
     "content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "retrieval_utc": {"type": "string"},
     "trust": {"enum": ["OPERATOR_AUTHORED", "UNTRUSTED_CONTENT"]},
-    "parser_warnings": {"type": "array", "items": {"type": "string"}}
+    "parser_warnings": {"type": "array", "items": {"type": "string"}},
+    "injection_signals": {"type": "array", "items": {"type": "string"}}
   }
 }

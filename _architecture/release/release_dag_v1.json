@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-09-24T21:29:48Z",
+  "updated_utc": "2026-09-24T21:36:38Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -407,7 +407,7 @@
       "dependencies": [
         "N03"
       ],
-      "state": "OPEN",
+      "state": "PASS",
       "risk": "HIGH",
       "user_value": "MEDIUM",
       "downstream_unlock_value": "MEDIUM",
@@ -416,7 +416,7 @@
         "injection regression fixtures"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "Injection regressions: documents, web snapshots, model output, memory, fence breaking, credential leakage, permissions."
     },
     {
       "node_id": "N17",

@@ -17,11 +17,14 @@ ERROR_CATEGORIES = (
     "MODEL_UNAVAILABLE",
     "OFFLINE",
     "BLOCKED_ACTION",
+    "UNTRUSTED_CONTENT",
     "INTERNAL_FAILURE",
 )
 
 # Ordered (substring, category) rules; the first match wins.
 _RULES: tuple[tuple[str, str], ...] = (
+    ("UNTRUSTED", "UNTRUSTED_CONTENT"),
+    ("CONTAINS_INSTRUCTIONS", "UNTRUSTED_CONTENT"),
     ("OFFLINE", "OFFLINE"),
     ("DNS_FAILED", "OFFLINE"),
     ("PERMISSION", "PERMISSION_DENIED"),

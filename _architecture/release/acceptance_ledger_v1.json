@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-24T21:29:48Z",
+  "updated_utc": "2026-09-24T21:36:38Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -703,17 +703,23 @@
       "requirement_id": "INV-014",
       "requirement_text": "Untrusted content",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/injection_guard.py",
+        "backend/app/provenance.py"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_prompt_injection.py::test_ingested_source_records_the_instruction_like_text",
+      "negative_gate": "backend/tests/test_prompt_injection.py::test_injected_web_snapshot_is_evidence_only",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_prompt_injection.py::test_model_output_cannot_trigger_actions",
+        "backend/tests/test_prompt_injection.py::test_injected_document_cannot_create_tool_calls_or_approvals"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N16",
-      "notes": ""
+      "notes": "Documents, archives, uploads and web snapshots are labelled UNTRUSTED_CONTENT; model output is never parsed for actions."
     },
     {
       "requirement_id": "INV-015",
@@ -1055,11 +1061,14 @@
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
-      "blocker_id": null,
+      "evidence_refs": [
+        "backend/tests/test_mock_model.py",
+        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider"
+      ],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-LLM-001",
       "dag_node": "N13",
-      "notes": "Remote gating implemented; live remote evidence needs BLK-LLM-001."
+      "notes": "Credential-free work complete: remote use requires live mode + key + per-request allow_live, never implicit; the remote prompt uses the same fenced grounded prompt. Live remote evaluation needs an operator key."
     },
     {
       "requirement_id": "TGT-010",
@@ -1308,17 +1317,28 @@
       "requirement_id": "TGT-022",
       "requirement_text": "Prompt-injection resistance",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/injection_guard.py",
+        "backend/app/model_router.py",
+        "backend/app/work_runs.py",
+        "backend/app/services.py"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_prompt_injection.py::test_answer_trace_surfaces_signals_per_citation",
+      "negative_gate": "backend/tests/test_prompt_injection.py::test_injected_document_cannot_create_tool_calls_or_approvals",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_prompt_injection.py::test_model_output_cannot_trigger_actions",
+        "backend/tests/test_prompt_injection.py::test_memory_instructions_cannot_authorize_tools",
+        "backend/tests/test_prompt_injection.py::test_source_fence_cannot_be_broken_by_content",
+        "backend/tests/test_prompt_injection.py::test_prompts_and_exports_never_contain_credentials",
+        "backend/tests/test_prompt_injection.py::test_injected_web_snapshot_is_evidence_only"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N16",
-      "notes": ""
+      "notes": "Structural guarantees: tool calls only from the user's own message, approvals only from user decisions or the documented auto policy, fenced sources with unforgeable closing tags, prompts never include credentials, grants only via explicit grant. Detection is advisory (documented false positives) and never gates or triggers actions."
     },
     {
       "requirement_id": "TGT-023",
@@ -1772,17 +1792,21 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "_architecture/web08_live_search_eval_manifest.json"
+        "backend/app/web_browsing.py",
+        "backend/app/injection_guard.py"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_prompt_injection.py::test_injected_web_snapshot_is_evidence_only",
+        "backend/tests/test_web_browsing.py"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N11",
-      "notes": ""
+      "notes": "Instruction-bearing source content verified inert; OPEN/CAPTURE/FREEZE/CITE covered by existing web tests. SEARCH needs BLK-WEB-001; COMPARE/SYNTHESIZE workflow benchmark not yet frozen."
     },
     {
       "requirement_id": "MATRIX-009",
