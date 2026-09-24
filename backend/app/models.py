@@ -66,3 +66,27 @@ class ToolCallRequest(BaseModel):
 
 class ToolDecisionRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
+
+
+class InteractionOptionInput(BaseModel):
+    option_id: str = Field(min_length=1, max_length=80)
+    label: str = Field(min_length=1, max_length=200)
+    consequence: str | None = Field(default=None, max_length=400)
+
+
+class InteractionCreateRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    options: list[InteractionOptionInput] = Field(min_length=1)
+    allow_freeform: bool = True
+    dismiss_pending: bool = False
+
+
+class InteractionResolveRequest(BaseModel):
+    expected_version: int = Field(ge=1)
+    option_id: str | None = Field(default=None, max_length=80)
+    freeform_text: str | None = Field(default=None, max_length=2000)
+
+
+class InteractionDismissRequest(BaseModel):
+    expected_version: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=400)
