@@ -8,7 +8,7 @@ from .chunker import chunk_text
 from .config import Settings, settings
 from .db import delete_chunks_for_source, delete_payload, init_db, upsert_payload
 from .multimodal import MULTIMODAL_SUFFIXES
-from .parser import detect_mime, parse_file
+from .parser import ParseError, detect_mime, parse_file
 from .semantic_store import build_semantic_store, get_semantic_store_status
 from .utils import read_json, sha256_file, stable_id, utc_now, write_json
 from .vector_index import build_persistent_index, fingerprint_chunks, load_persistent_index
@@ -56,6 +56,9 @@ def ingest_file(path: Path, cfg: Settings = settings) -> dict[str, Any]:
     init_db(cfg.sqlite_path)
     if not path.exists() or not path.is_file():
         raise FileNotFoundError(f"Input file not found: {path}")
+    size = path.stat().st_size
+    if size > cfg.max_ingest_bytes:
+        raise IngestLimitError("ERROR_INGEST_FILE_TOO_LARGE", f"{path.name}:{size}>{cfg.max_ingest_bytes}")
     file_sha = sha256_file(path)
     source_id = stable_id("src", file_sha, path.name)
     target = cfg.input_dir / f"{source_id}_{path.name}"
@@ -191,17 +194,63 @@ def ingest_web_snapshot(snapshot_path: Path, cfg: Settings = settings) -> dict[s
     }
 
 
+FOLDER_SUPPORTED_SUFFIXES = (
+    {".txt", ".md", ".csv", ".json", ".pdf", ".zip"} | HTML_SUFFIXES | DOCX_SUFFIXES | EMAIL_SUFFIXES | MULTIMODAL_SUFFIXES
+)
+
+
+class IngestLimitError(ValueError):
+    def __init__(self, status: str, detail: str) -> None:
+        super().__init__(f"{status}:{detail}")
+        self.status = status
+        self.detail = detail
+
+
 def ingest_folder(folder: Path, cfg: Settings = settings) -> dict[str, Any]:
+    """Ingest direct children of a folder with full accounting.
+
+    Every entry seen is either ingested, skipped with a reason, or failed with a
+    status: entries_seen == files_ingested + skipped + failed. Symlinks are never
+    followed, so a link inside a granted folder cannot read files outside it.
+    """
     if not folder.exists() or not folder.is_dir():
         raise FileNotFoundError(f"Input folder not found: {folder}")
-    supported = {".txt", ".md", ".csv", ".json", ".pdf"} | HTML_SUFFIXES | DOCX_SUFFIXES | EMAIL_SUFFIXES | MULTIMODAL_SUFFIXES
+    root = folder.resolve()
     results = []
-    for path in sorted(folder.iterdir()):
+    skipped: list[dict[str, str]] = []
+    failed: list[dict[str, str]] = []
+    entries = sorted(folder.iterdir())
+    for path in entries:
         if path.name.startswith("src_"):
+            skipped.append({"name": path.name, "reason": "GENERATED_NAME"})
             continue
-        if path.is_file() and path.suffix.lower() in supported:
+        if path.is_symlink():
+            skipped.append({"name": path.name, "reason": "SYMLINK_NOT_FOLLOWED"})
+            continue
+        if path.is_dir():
+            skipped.append({"name": path.name, "reason": "SUBDIRECTORY_NOT_RECURSED"})
+            continue
+        if not path.is_file():
+            skipped.append({"name": path.name, "reason": "NOT_A_REGULAR_FILE"})
+            continue
+        if path.resolve().parent != root:
+            skipped.append({"name": path.name, "reason": "OUTSIDE_GRANTED_FOLDER"})
+            continue
+        if path.suffix.lower() not in FOLDER_SUPPORTED_SUFFIXES:
+            skipped.append({"name": path.name, "reason": "UNSUPPORTED_FORMAT"})
+            continue
+        try:
             results.append(ingest_file(path, cfg))
-    return {"status": "INGEST_FOLDER_OK", "files_ingested": len(results), "results": results}
+        except (IngestLimitError, ParseError) as exc:
+            failed.append({"name": path.name, "status": getattr(exc, "status", "ERROR_PARSE_FAILED"), "detail": str(exc)})
+    return {
+        "status": "INGEST_FOLDER_OK" if not failed else "INGEST_FOLDER_PARTIAL",
+        "entries_seen": len(entries),
+        "files_ingested": len(results),
+        "skipped": skipped,
+        "failed": failed,
+        "results": results,
+    }
 
 
 def get_sources(cfg: Settings = settings) -> list[dict[str, Any]]:

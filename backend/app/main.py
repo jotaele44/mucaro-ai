@@ -3,11 +3,11 @@ from __future__ import annotations
 import re
 from pathlib import Path, PurePath
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .auth import auth_status, require_operator_auth
+from .auth import auth_status, is_public_api_path, require_operator_auth
 from .config import Settings, settings
 from .conversations import (
     append_answer_turn,
@@ -20,7 +20,18 @@ from .conversations import (
 )
 from .db import init_db, list_payloads, upsert_payload
 from .execution_gate import analyze_task, approve_execution
-from .ingestion import delete_source, get_chunks, get_index_status, get_sources, ingest_file, ingest_folder, reindex_sources
+from .ingestion import (
+    FOLDER_SUPPORTED_SUFFIXES,
+    IngestLimitError,
+    delete_source,
+    get_chunks,
+    get_index_status,
+    get_sources,
+    ingest_file,
+    ingest_folder,
+    reindex_sources,
+)
+from .parser import ParseError
 from .models import (
     ApprovalRequest,
     AskRequest,
@@ -78,7 +89,7 @@ from .tools import (
 from .validation import validate_project_json
 from .workspaces import list_workspace_profiles, upsert_workspace_profile
 
-SUPPORTED_UPLOAD_SUFFIXES = {".txt", ".md", ".csv", ".json", ".pdf"} | MULTIMODAL_SUFFIXES
+SUPPORTED_UPLOAD_SUFFIXES = FOLDER_SUPPORTED_SUFFIXES
 GENERATED_NAME_PATTERN = re.compile(r"^(src_|run_|chunk_)", re.IGNORECASE)
 
 
@@ -124,7 +135,16 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         enforce_startup_security(cfg)
     except SecurityProfileError as exc:
         raise RuntimeError(f"{exc.status}: {exc.detail}") from exc
-    app = FastAPI(title="Mucaro AI", version="0.1.21")
+    def require_auth_unless_public(
+        request: Request,
+        authorization: str | None = Header(default=None),
+        x_mucaro_token: str | None = Header(default=None),
+    ) -> dict:
+        if is_public_api_path(request.url.path):
+            return {"status": "AUTH_PUBLIC_ROUTE"}
+        return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
+
+    app = FastAPI(title="Mucaro AI", version="0.1.21", dependencies=[Depends(require_auth_unless_public)])
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(cfg.cors_origins),
@@ -187,6 +207,9 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         target.write_bytes(content)
         try:
             return ingest_file(target, cfg)
+        except (ParseError, IngestLimitError) as exc:
+            target.unlink(missing_ok=True)
+            raise api_error(exc.status, str(exc), status_code=422, filename=safe_name) from exc
         except Exception as exc:
             raise api_error("ERROR_INGEST_FAILED", type(exc).__name__, filename=safe_name) from exc
 
@@ -202,6 +225,8 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             raise api_error(str(permission["status"]), str(permission["detail"]), status_code=403, path=permission["path"])
         try:
             result = ingest_folder(path, cfg) if path.is_dir() else ingest_file(path, cfg)
+        except (ParseError, IngestLimitError) as exc:
+            raise api_error(exc.status, str(exc), status_code=422, path=str(path)) from exc
         except Exception as exc:
             raise api_error("ERROR_INGEST_FAILED", type(exc).__name__, path=str(path)) from exc
         result["directory_permission"] = permission

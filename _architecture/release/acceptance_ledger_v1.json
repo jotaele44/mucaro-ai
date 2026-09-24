@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-24T21:00:00Z",
+  "updated_utc": "2026-09-24T20:52:49Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -566,17 +566,20 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
+        "backend/app/file_signatures.py",
         "backend/app/parser.py"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_ingestion_safety.py::test_mislabeled_and_executable_payloads_fail_closed"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": ""
+      "notes": "Container/signature/extension/MIME checks enforced; CSV header-location and preamble detection still assume the sniffed header row."
     },
     {
       "requirement_id": "INV-008",
@@ -1276,17 +1279,26 @@
       "requirement_id": "TGT-023",
       "requirement_text": "Archive safety",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/archive_safety.py",
+        "backend/app/file_signatures.py",
+        "backend/app/parser.py"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_ingestion_safety.py::test_safe_extract_writes_non_executable_files_inside_destination",
+      "negative_gate": "backend/tests/test_ingestion_safety.py::test_traversal_members_make_archive_unsafe_and_nothing_escapes",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_ingestion_safety.py::test_symlink_executable_and_encrypted_members_are_flagged",
+        "backend/tests/test_ingestion_safety.py::test_malformed_and_truncated_archives_fail_closed",
+        "backend/tests/test_ingestion_safety.py::test_mislabeled_and_executable_payloads_fail_closed",
+        "backend/tests/test_ingestion_safety.py::test_extracted_executable_payload_is_refused"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": "No general archive handling; DOCX bomb (SD-002)."
+      "notes": "Covers path traversal, absolute/backslash paths, bombs (ratio + actual bytes), symlink/executable/encrypted members, malformed/truncated archives, extension/content mismatch, executable payloads. Scope: ZIP-family archives (zip, docx); tar/7z/rar are UNSUPPORTED and never extracted."
     },
     {
       "requirement_id": "TGT-024",
@@ -1744,17 +1756,21 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
+        "backend/tests/test_ingestion_safety.py",
         "backend/tests/test_parser.py"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_ingestion_safety.py",
+        "backend/tests/test_parser.py"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": ""
+      "notes": "Malformed, mislabeled, empty, truncated, encrypted, oversized, archive-attack and unsupported cases are covered; a declared format registry and a frozen benchmark receipt remain OPEN (TGT-012)."
     },
     {
       "requirement_id": "MATRIX-011",
@@ -2344,81 +2360,103 @@
       "requirement_id": "SD-001",
       "requirement_text": "ingest_folder follows symlinks and does not re-check the directory grant per file, allowing reads outside a granted folder",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/ingestion.py"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_ingestion_safety.py::test_folder_ingest_accounts_for_failures_without_aborting",
+      "negative_gate": "backend/tests/test_ingestion_safety.py::test_symlink_inside_granted_folder_is_not_followed",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_ingestion_safety.py"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N02",
-      "notes": "Defect revealed; repair pending."
+      "notes": "Symlinks are never followed; each entry is ingested, skipped with a reason, or failed with a status (entries_seen closes)."
     },
     {
       "requirement_id": "SD-002",
       "requirement_text": "DOCX parsing reads word/document.xml with no decompressed-size or ratio cap (decompression bomb)",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/parser.py",
+        "backend/app/archive_safety.py"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_ingestion_safety.py::test_safe_zip_is_inventoried_and_extracts_text_members",
+      "negative_gate": "backend/tests/test_ingestion_safety.py::test_docx_decompression_bomb_is_rejected",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_ingestion_safety.py::test_decompression_bomb_is_rejected_by_ratio_and_by_actual_bytes"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N02",
-      "notes": "Defect revealed; repair pending."
+      "notes": "DOCX is inspected with inspect_zip (ratio/size/member limits) and XML members are read with bounded actual-byte reads."
     },
     {
       "requirement_id": "SD-003",
       "requirement_text": "Sensitive GET routes (memory export, tool calls/audit, chunks, runs, exports) are readable without the operator token when one is configured",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/auth.py",
+        "backend/app/main.py"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_accept_correct_token",
+      "negative_gate": "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_reject_missing_token_when_configured",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_api_auth_boundary.py::test_status_routes_remain_public_so_clients_can_discover_auth"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N02",
-      "notes": "Defect revealed; repair pending."
+      "notes": "Default-deny app dependency; only /health, /config, /security, /tools stay public."
     },
     {
       "requirement_id": "SD-004",
       "requirement_text": "Operator token comparison is not constant-time",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/auth.py"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_accept_correct_token",
+      "negative_gate": "backend/tests/test_api_auth_boundary.py::test_wrong_tokens_are_rejected_including_prefix_and_length_variants",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/app/auth.py"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N02",
-      "notes": "Defect revealed; repair pending."
+      "notes": "hmac.compare_digest on UTF-8 bytes."
     },
     {
       "requirement_id": "SD-005",
       "requirement_text": "test_web_render performs a real DNS lookup (hidden network dependency; fails offline)",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/tests/test_web_render.py"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_web_render.py::test_render_receipt_binds_engine_dom_and_screenshot",
+      "negative_gate": "backend/tests/test_web_render.py::test_render_rejects_oversized_dom",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_web_render.py::offline_dns"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N02",
-      "notes": "Defect revealed; repair pending."
+      "notes": "Falsified: under `unshare -rn` the baseline file fails 2/4, the fixed file passes 4/4."
     },
     {
       "requirement_id": "SD-006",
@@ -2472,17 +2510,21 @@
       "requirement_id": "SD-011",
       "requirement_text": "Web fetch validates DNS before urllib reconnects (DNS-rebinding window to private hosts)",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/web_browsing.py"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_web_browsing.py",
+      "negative_gate": "backend/tests/test_ingestion_safety.py::test_dns_rebinding_to_private_address_is_blocked_at_connect_time",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/app/web_browsing.py"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N02",
-      "notes": "Defect revealed; repair pending."
+      "notes": "Direct connections re-resolve and vet every address at connect time; proxied connections delegate resolution to the configured proxy."
     }
   ]
 }

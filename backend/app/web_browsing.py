@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import base64
+import functools
 import hashlib
+import http.client
 from io import BytesIO
 import ipaddress
 import re
@@ -185,6 +187,94 @@ def _resolved_private_addresses(hostname: str) -> list[str]:
         if _is_private_host(address):
             addresses.append(address)
     return sorted(set(addresses))
+
+
+def _pinned_create_connection(
+    address: tuple[str, int],
+    timeout: Any = socket._GLOBAL_DEFAULT_TIMEOUT,  # type: ignore[attr-defined]
+    source_address: tuple[str, int] | None = None,
+    *,
+    allow_private_hosts: bool,
+) -> socket.socket:
+    """Resolve and vet addresses at connect time (closes the DNS-rebinding window, SD-011).
+
+    validate_web_fetch_url checks DNS before the request; without this, urllib would
+    resolve again when connecting and a rebinding resolver could return a private
+    address the second time. Every address is re-checked here and the socket connects
+    only to a vetted address.
+    """
+    host, port = address
+    try:
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise WebBrowsingError("ERROR_WEB_DNS_FAILED", f"DNS lookup failed for {host}: {exc}") from exc
+    if not allow_private_hosts:
+        private = sorted({info[4][0] for info in infos if _is_private_host(info[4][0])})
+        if private:
+            raise WebBrowsingError(
+                "ERROR_WEB_PRIVATE_HOST_BLOCKED",
+                f"{host} resolved to private, local, loopback, or link-local addresses at connect time: {', '.join(private)}.",
+            )
+    last_error: OSError | None = None
+    for family, socktype, proto, _canonname, sockaddr in infos:
+        sock = socket.socket(family, socktype, proto)
+        try:
+            if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:  # type: ignore[attr-defined]
+                sock.settimeout(timeout)
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(sockaddr)
+            return sock
+        except OSError as exc:
+            last_error = exc
+            sock.close()
+    raise last_error or OSError(f"no usable address for {host}")
+
+
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, *args: Any, pin_dns: bool, allow_private_hosts: bool, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if pin_dns:
+            self._create_connection = functools.partial(_pinned_create_connection, allow_private_hosts=allow_private_hosts)
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, *args: Any, pin_dns: bool, allow_private_hosts: bool, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if pin_dns:
+            self._create_connection = functools.partial(_pinned_create_connection, allow_private_hosts=allow_private_hosts)
+
+
+class _PinnedHTTPHandler(urllib.request.HTTPHandler):
+    def __init__(self, allow_private_hosts: bool) -> None:
+        super().__init__()
+        self.allow_private_hosts = allow_private_hosts
+
+    def http_open(self, req):  # type: ignore[override]
+        # Through a configured proxy the proxy resolves the target; pinning applies to direct connections.
+        factory = functools.partial(
+            _PinnedHTTPConnection, pin_dns=not req.has_proxy(), allow_private_hosts=self.allow_private_hosts
+        )
+        return self.do_open(factory, req)
+
+
+class _PinnedHTTPSHandler(urllib.request.HTTPSHandler):
+    def __init__(self, allow_private_hosts: bool) -> None:
+        super().__init__()
+        self.allow_private_hosts = allow_private_hosts
+
+    def https_open(self, req):  # type: ignore[override]
+        direct = not req.has_proxy() and not getattr(req, "_tunnel_host", None)
+        factory = functools.partial(_PinnedHTTPSConnection, pin_dns=direct, allow_private_hosts=self.allow_private_hosts)
+        return self.do_open(factory, req, context=self._context)
+
+
+def _governed_opener(policy: "WebFetchPolicy", *handlers: Any) -> urllib.request.OpenerDirector:
+    return urllib.request.build_opener(
+        _PinnedHTTPHandler(policy.allow_private_hosts),
+        _PinnedHTTPSHandler(policy.allow_private_hosts),
+        *handlers,
+    )
 
 
 def validate_web_fetch_url(url: str, *, allow_private_hosts: bool = False) -> dict[str, Any]:
@@ -404,7 +494,7 @@ def _check_robots_policy(fetch_url: str, policy: WebFetchPolicy) -> dict[str, An
         headers={"User-Agent": "MucaroAI/0.1 local-first governed-fetch"},
         method="GET",
     )
-    opener = urllib.request.build_opener(_GovernedRedirectHandler(policy, [], check_target_robots=False))
+    opener = _governed_opener(policy, _GovernedRedirectHandler(policy, [], check_target_robots=False))
     try:
         with opener.open(request, timeout=policy.timeout_seconds) as response:
             content = response.read(DEFAULT_ROBOTS_MAX_BYTES + 1)
@@ -508,7 +598,7 @@ def fetch_web_snapshot(
     checked = validate_web_fetch_url(url, allow_private_hosts=policy.allow_private_hosts)
     requested_at = utc_now()
     redirect_chain: list[dict[str, Any]] = []
-    opener = urllib.request.build_opener(_GovernedRedirectHandler(policy, redirect_chain))
+    opener = _governed_opener(policy, _GovernedRedirectHandler(policy, redirect_chain))
     robots_policy = _check_robots_policy(str(checked["fetch_url"]), policy)
     request = urllib.request.Request(
         str(checked["fetch_url"]),

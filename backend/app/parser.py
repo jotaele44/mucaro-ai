@@ -12,11 +12,15 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
 
+from .archive_safety import ArchiveSafetyError, inspect_zip, read_member_limited
+from .file_signatures import SignatureError, check_signature
 from .multimodal import MULTIMODAL_SUFFIXES, parse_multimodal_metadata
 
 
 class ParseError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, status: str = "ERROR_PARSE_FAILED") -> None:
+        super().__init__(message)
+        self.status = status
 
 
 WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -34,6 +38,10 @@ EMAIL_ATTACHMENT_TEXT_TYPES = {
 EMAIL_ATTACHMENT_TEXT_SUFFIXES = {".csv", ".htm", ".html", ".json", ".md", ".txt"}
 MSG_COMPOUND_FILE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 MSG_TEXT_SEGMENT_LIMIT = 80
+DOCX_XML_BYTE_LIMIT = 32 * 1024 * 1024
+ZIP_TEXT_MEMBER_SUFFIXES = {".csv", ".json", ".md", ".txt"}
+ZIP_TEXT_MEMBER_BYTE_LIMIT = 2 * 1024 * 1024
+ZIP_TEXT_TOTAL_BYTE_LIMIT = 20 * 1024 * 1024
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -164,6 +172,7 @@ def detect_mime(path: Path) -> str:
         ".mp4": "video/mp4",
         ".mov": "video/quicktime",
         ".webm": "video/webm",
+        ".zip": "application/zip",
     }.get(suffix, "application/octet-stream")
 
 
@@ -184,6 +193,10 @@ def parse_file(path: Path) -> dict[str, Any]:
     mime = detect_mime(path)
     suffix = path.suffix.lower()
     try:
+        check_signature(path)
+    except SignatureError as exc:
+        raise ParseError(f"PARSE_FAILED:{path.name}:{exc}", status=exc.status) from exc
+    try:
         if suffix in {".txt", ".md"}:
             text = path.read_text(encoding="utf-8", errors="replace")
             warnings = ["EMPTY_FILE_NO_TEXT"] if not text.strip() else []
@@ -196,6 +209,8 @@ def parse_file(path: Path) -> dict[str, Any]:
             return _parse_html(path)
         if suffix == ".docx":
             return _parse_docx(path)
+        if suffix == ".zip":
+            return _parse_zip(path)
         if suffix == ".eml":
             return _parse_eml(path)
         if suffix == ".msg":
@@ -209,6 +224,8 @@ def parse_file(path: Path) -> dict[str, Any]:
             "text": raw,
             **_base_result(path, parser="text_fallback", mime_type=mime, warnings=["UNKNOWN_EXTENSION_TEXT_FALLBACK"]),
         }
+    except ArchiveSafetyError as exc:
+        raise ParseError(f"PARSE_FAILED:{path.name}:{exc}", status=exc.status) from exc
     except Exception as exc:
         raise ParseError(f"PARSE_FAILED:{path.name}:{exc}") from exc
 
@@ -295,7 +312,7 @@ def _docx_text(node: ElementTree.Element) -> str:
 def _docx_core_metadata(archive: zipfile.ZipFile) -> dict[str, str]:
     if "docProps/core.xml" not in archive.namelist():
         return {}
-    root = ElementTree.fromstring(archive.read("docProps/core.xml"))
+    root = ElementTree.fromstring(read_member_limited(archive, "docProps/core.xml", DOCX_XML_BYTE_LIMIT))
     fields = {
         "title": f"{DUBLIN_CORE_NS}title",
         "creator": f"{DUBLIN_CORE_NS}creator",
@@ -315,6 +332,9 @@ def _docx_core_metadata(archive: zipfile.ZipFile) -> dict[str, str]:
 
 def _parse_docx(path: Path) -> dict[str, Any]:
     warnings: list[str] = []
+    safety = inspect_zip(path)
+    if safety["status"] != "ARCHIVE_SAFE":
+        raise ArchiveSafetyError("ERROR_ARCHIVE_UNSAFE", path.name, safety["findings"])
     with zipfile.ZipFile(path) as archive:
         names = set(archive.namelist())
         if "word/document.xml" not in names:
@@ -332,7 +352,7 @@ def _parse_docx(path: Path) -> dict[str, Any]:
                     core_properties={},
                 ),
             }
-        root = ElementTree.fromstring(archive.read("word/document.xml"))
+        root = ElementTree.fromstring(read_member_limited(archive, "word/document.xml", DOCX_XML_BYTE_LIMIT))
         body = root.find(f".//{WORD_NS}body")
         blocks = list(body) if body is not None else []
         lines: list[str] = []
@@ -363,6 +383,56 @@ def _parse_docx(path: Path) -> dict[str, Any]:
                 core_properties=_docx_core_metadata(archive),
             ),
         }
+
+
+def _parse_zip(path: Path) -> dict[str, Any]:
+    """Inventory a ZIP and extract text members; unsafe archives fail closed."""
+    safety = inspect_zip(path)
+    if safety["status"] != "ARCHIVE_SAFE":
+        raise ArchiveSafetyError(
+            "ERROR_ARCHIVE_UNSAFE" if safety["status"] == "ARCHIVE_UNSAFE" else "ERROR_ARCHIVE_MALFORMED",
+            path.name,
+            safety["findings"],
+        )
+    warnings: list[str] = []
+    sections: list[str] = []
+    text_members = 0
+    skipped_members = 0
+    total = 0
+    with zipfile.ZipFile(path) as archive:
+        for member in safety["members"]:
+            name = member["path"]
+            if member["is_dir"]:
+                continue
+            if Path(name).suffix.lower() not in ZIP_TEXT_MEMBER_SUFFIXES:
+                skipped_members += 1
+                continue
+            data = read_member_limited(archive, name, ZIP_TEXT_MEMBER_BYTE_LIMIT)
+            total += len(data)
+            if total > ZIP_TEXT_TOTAL_BYTE_LIMIT:
+                warnings.append(f"ZIP_TEXT_TRUNCATED:limit={ZIP_TEXT_TOTAL_BYTE_LIMIT}")
+                break
+            sections.append(f"--- archive member: {name} ---\n{data.decode('utf-8', errors='replace')}")
+            text_members += 1
+    if skipped_members:
+        warnings.append(f"ZIP_NON_TEXT_MEMBERS_NOT_EXTRACTED:{skipped_members}")
+    if not sections:
+        warnings.append("ZIP_NO_TEXT_MEMBERS")
+    text = "\n\n".join(sections)
+    return {
+        "text": text,
+        **_base_result(
+            path,
+            parser="zip_archive_v1",
+            mime_type="application/zip",
+            warnings=warnings,
+            member_count=safety["member_count"],
+            text_member_count=text_members,
+            skipped_member_count=skipped_members,
+            declared_total_bytes=safety["declared_total_bytes"],
+            archive_safety="ARCHIVE_SAFE",
+        ),
+    }
 
 
 def _email_headers(message: Message) -> dict[str, str]:

@@ -78,6 +78,7 @@ from .gis_eval import (
 )
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
 from .ingestion import (
+    IngestLimitError,
     delete_source,
     get_index_status,
     get_sources,
@@ -87,6 +88,7 @@ from .ingestion import (
     reindex_sources,
 )
 from .macos_app_store import build_macos_app_store_readiness
+from .parser import ParseError
 from .memory import (
     MemoryError,
     delete_memory_item,
@@ -2679,6 +2681,15 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(payload["answer"])
     elif "files_ingested" in payload:
         print(f"files_ingested={payload['files_ingested']}")
+        if "entries_seen" in payload:
+            print(
+                f"entries_seen={payload['entries_seen']} skipped={len(payload.get('skipped', []))} "
+                f"failed={len(payload.get('failed', []))}"
+            )
+        for row in payload.get("skipped", []):
+            print(f"SKIPPED {row.get('name')} {row.get('reason')}")
+        for row in payload.get("failed", []):
+            print(f"FAILED {row.get('name')} {row.get('status')}")
     elif "source" in payload:
         source = payload["source"]
         print(f"source_id={source.get('source_id')} chunks_added={payload.get('chunks_added', 0)}")
@@ -8105,6 +8116,9 @@ def main(argv: Sequence[str] | None = None, cfg: Settings = settings) -> int:
         return 2
     except DirectoryPermissionError as exc:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
+        return 2
+    except (ParseError, IngestLimitError) as exc:
+        emit_error(exc.status, str(exc), getattr(args, "format", "json"))
         return 2
     except ValueError as exc:
         emit_error("ERROR_INVALID_INPUT", str(exc), getattr(args, "format", "json"))
