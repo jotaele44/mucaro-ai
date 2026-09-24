@@ -28,6 +28,9 @@ from .models import (
     ConversationUpdateRequest,
     DirectoryPermissionRequest,
     IngestPathRequest,
+    InteractionCreateRequest,
+    InteractionDismissRequest,
+    InteractionResolveRequest,
     MemoryCreateRequest,
     MemoryUpdateRequest,
     PlanRequest,
@@ -50,6 +53,15 @@ from .permissions import (
     grant_directory,
     load_directory_grants,
     revoke_directory,
+)
+from .response_flow import (
+    InteractionError,
+    create_interaction,
+    dismiss_interaction,
+    envelope_for_conversation,
+    get_pending_interaction,
+    list_interactions,
+    resolve_interaction,
 )
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
 from .services import answer_question
@@ -311,6 +323,93 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         except KeyError as exc:
             raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
         return {"answer": answer, "conversation": conversation_payload}
+
+    @app.get("/conversations/{conversation_id}/envelope")
+    def conversation_envelope(conversation_id: str) -> dict:
+        existing_conversation = get_conversation(conversation_id, cfg)
+        if existing_conversation is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        return {"status": "ENVELOPE_OK", "envelopes": envelope_for_conversation(existing_conversation, cfg)}
+
+    @app.get("/conversations/{conversation_id}/interactions")
+    def conversation_interactions(conversation_id: str) -> dict:
+        if get_conversation(conversation_id, cfg) is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        return {"status": "INTERACTIONS_OK", "interactions": list_interactions(conversation_id, cfg)}
+
+    @app.get("/conversations/{conversation_id}/interactions/pending")
+    def conversation_pending_interaction(conversation_id: str) -> dict:
+        if get_conversation(conversation_id, cfg) is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        try:
+            pending = get_pending_interaction(conversation_id, cfg)
+        except InteractionError as exc:
+            raise api_error(exc.status, exc.detail, status_code=409) from exc
+        return {
+            "status": "INTERACTION_PENDING" if pending is not None else "INTERACTION_NONE_PENDING",
+            "interaction": pending,
+        }
+
+    @app.post("/conversations/{conversation_id}/interactions")
+    def create_conversation_interaction(
+        conversation_id: str,
+        req: InteractionCreateRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        if get_conversation(conversation_id, cfg) is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        try:
+            interaction = create_interaction(
+                conversation_id,
+                req.question,
+                [option.model_dump() for option in req.options],
+                allow_freeform=req.allow_freeform,
+                dismiss_pending=req.dismiss_pending,
+                created_by="api",
+                cfg=cfg,
+            )
+        except InteractionError as exc:
+            raise api_error(exc.status, exc.detail, status_code=409) from exc
+        return {"status": "INTERACTION_CREATED", "interaction": interaction}
+
+    @app.post("/interactions/{interaction_id}/resolve")
+    def resolve_conversation_interaction(
+        interaction_id: str,
+        req: InteractionResolveRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            interaction = resolve_interaction(
+                interaction_id,
+                expected_version=req.expected_version,
+                resolved_by="api",
+                option_id=req.option_id,
+                freeform_text=req.freeform_text,
+                cfg=cfg,
+            )
+        except InteractionError as exc:
+            status_code = 404 if exc.status == "ERROR_INTERACTION_NOT_FOUND" else 409
+            raise api_error(exc.status, exc.detail, status_code=status_code) from exc
+        return {"status": "INTERACTION_RESOLVED", "interaction": interaction}
+
+    @app.post("/interactions/{interaction_id}/dismiss")
+    def dismiss_conversation_interaction(
+        interaction_id: str,
+        req: InteractionDismissRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            interaction = dismiss_interaction(
+                interaction_id,
+                expected_version=req.expected_version,
+                reason=req.reason,
+                dismissed_by="api",
+                cfg=cfg,
+            )
+        except InteractionError as exc:
+            status_code = 404 if exc.status == "ERROR_INTERACTION_NOT_FOUND" else 409
+            raise api_error(exc.status, exc.detail, status_code=status_code) from exc
+        return {"status": "INTERACTION_DISMISSED", "interaction": interaction}
 
     @app.get("/runs")
     def runs() -> dict:
