@@ -5,6 +5,7 @@ from pathlib import Path, PurePath
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_status, is_public_api_path, require_operator_auth
@@ -44,6 +45,8 @@ from .models import (
     InteractionResolveRequest,
     MemoryCreateRequest,
     MemoryUpdateRequest,
+    MessageRequest,
+    RunEditRequest,
     PlanRequest,
     ToolCallRequest,
     ToolDecisionRequest,
@@ -91,6 +94,21 @@ from .tools import (
     run_tool_call,
 )
 from .validation import validate_project_json
+from .work_runs import (
+    RunError,
+    available_modes,
+    edit_queued_run,
+    get_run,
+    list_run_events,
+    list_runs,
+    reconcile_runs_on_startup,
+    resume_waiting_run,
+    run_envelope,
+    run_for_interaction,
+    stop_run,
+    stream_run_events,
+    submit_message,
+)
 from .workspaces import list_workspace_profiles, upsert_workspace_profile
 
 SUPPORTED_UPLOAD_SUFFIXES = FOLDER_SUPPORTED_SUFFIXES
@@ -159,6 +177,23 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     cfg.ensure_dirs()
     init_db(cfg.sqlite_path)
     reconcile_interrupted_tool_calls(cfg)
+    reconcile_runs_on_startup(cfg)
+
+    def resume_for_tool_call(result: dict) -> dict:
+        run_id = (result.get("tool_call") or {}).get("run_id")
+        if run_id:
+            resume_waiting_run(run_id, cfg)
+        return result
+
+    def resume_for_interaction(interaction_id: str) -> None:
+        run_id = run_for_interaction(interaction_id, cfg)
+        if run_id:
+            resume_waiting_run(run_id, cfg)
+
+    def run_error(exc: RunError) -> HTTPException:
+        not_found = exc.status in {"ERROR_RUN_NOT_FOUND", "ERROR_CONVERSATION_NOT_FOUND"}
+        conflict = exc.status in {"ERROR_RUN_VERSION_CONFLICT", "ERROR_RUN_NOT_QUEUED", "ERROR_RUN_ALREADY_FINISHED"}
+        return api_error(exc.status, exc.detail, status_code=404 if not_found else 409 if conflict else 400)
 
     def require_auth(
         authorization: str | None = Header(default=None),
@@ -359,7 +394,12 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         existing_conversation = get_conversation(conversation_id, cfg)
         if existing_conversation is None:
             raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
-        return {"status": "ENVELOPE_OK", "envelopes": envelope_for_conversation(existing_conversation, cfg)}
+        runs = list_runs(conversation_id=conversation_id, limit=100, cfg=cfg)["runs"]
+        return {
+            "status": "ENVELOPE_OK",
+            "envelopes": envelope_for_conversation(existing_conversation, cfg),
+            "run_envelopes": [run_envelope(row["run_id"], cfg) for row in reversed(runs)],
+        }
 
     @app.get("/conversations/{conversation_id}/interactions")
     def conversation_interactions(conversation_id: str) -> dict:
@@ -420,6 +460,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         except InteractionError as exc:
             status_code = 404 if exc.status == "ERROR_INTERACTION_NOT_FOUND" else 409
             raise api_error(exc.status, exc.detail, status_code=status_code) from exc
+        resume_for_interaction(interaction_id)
         return {"status": "INTERACTION_RESOLVED", "interaction": interaction}
 
     @app.post("/interactions/{interaction_id}/dismiss")
@@ -439,7 +480,76 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         except InteractionError as exc:
             status_code = 404 if exc.status == "ERROR_INTERACTION_NOT_FOUND" else 409
             raise api_error(exc.status, exc.detail, status_code=status_code) from exc
+        resume_for_interaction(interaction_id)
         return {"status": "INTERACTION_DISMISSED", "interaction": interaction}
+
+    @app.get("/work-runs/modes")
+    def work_run_modes() -> dict:
+        return available_modes()
+
+    @app.post("/conversations/{conversation_id}/messages")
+    def post_message(conversation_id: str, req: MessageRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return submit_message(
+                conversation_id,
+                req.prompt,
+                mode=req.mode,
+                options=req.options.model_dump(),
+                idempotency_key=req.idempotency_key,
+                interrupt=req.interrupt,
+                dismiss_pending_question=req.dismiss_pending_question,
+                cfg=cfg,
+            )
+        except RunError as exc:
+            raise run_error(exc) from exc
+
+    @app.get("/conversations/{conversation_id}/runs")
+    def conversation_runs(conversation_id: str, limit: int = 50) -> dict:
+        return list_runs(conversation_id=conversation_id, limit=limit, cfg=cfg)
+
+    @app.get("/work-runs")
+    def work_runs(state: str | None = None, limit: int = 20, before_seq: int | None = None) -> dict:
+        states = [item for item in (state or "").split(",") if item] or None
+        return list_runs(states=states, limit=limit, before_seq=before_seq, cfg=cfg)
+
+    @app.get("/work-runs/{run_id}")
+    def work_run(run_id: str) -> dict:
+        try:
+            return {"status": "RUN_OK", "run": get_run(run_id, cfg), "envelope": run_envelope(run_id, cfg)}
+        except RunError as exc:
+            raise run_error(exc) from exc
+
+    @app.get("/work-runs/{run_id}/events")
+    def work_run_events(run_id: str, after: int = 0, limit: int = 500) -> dict:
+        try:
+            events = list_run_events(run_id, after_seq=after, limit=limit, cfg=cfg)
+            return {"status": "RUN_EVENTS_OK", "run": get_run(run_id, cfg), "events": events}
+        except RunError as exc:
+            raise run_error(exc) from exc
+
+    @app.get("/work-runs/{run_id}/events/stream")
+    def work_run_event_stream(run_id: str, after: int = 0, last_event_id: str | None = Header(default=None)) -> StreamingResponse:
+        try:
+            get_run(run_id, cfg)
+        except RunError as exc:
+            raise run_error(exc) from exc
+        start = int(last_event_id) if last_event_id and last_event_id.isdigit() else after
+        return StreamingResponse(stream_run_events(run_id, start, cfg), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    @app.post("/work-runs/{run_id}/stop")
+    def stop_work_run(run_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return {"status": "RUN_STOP_REQUESTED", "run": stop_run(run_id, cfg=cfg)}
+        except RunError as exc:
+            raise run_error(exc) from exc
+
+    @app.patch("/work-runs/{run_id}")
+    def edit_work_run(run_id: str, req: RunEditRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return {"status": "RUN_EDITED", "run": edit_queued_run(run_id, req.prompt, expected_version=req.expected_version, cfg=cfg)}
+        except RunError as exc:
+            raise run_error(exc) from exc
 
     @app.get("/runs")
     def runs() -> dict:
@@ -520,13 +630,13 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         _auth: dict = Depends(require_auth),
     ) -> dict:
         try:
-            return approve_tool_call(
+            return resume_for_tool_call(approve_tool_call(
                 tool_call_id,
                 cfg=cfg,
                 approved_by="api",
                 reason=req.reason if req else None,
                 expected_arguments_sha256=req.arguments_sha256 if req else None,
-            )
+            ))
         except ToolRuntimeError as exc:
             raise api_error(exc.status, exc.detail, status_code=400) from exc
 
@@ -537,13 +647,13 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         _auth: dict = Depends(require_auth),
     ) -> dict:
         try:
-            return deny_tool_call(
+            return resume_for_tool_call(deny_tool_call(
                 tool_call_id,
                 cfg=cfg,
                 denied_by="api",
                 reason=req.reason if req else None,
                 expected_arguments_sha256=req.arguments_sha256 if req else None,
-            )
+            ))
         except ToolRuntimeError as exc:
             raise api_error(exc.status, exc.detail, status_code=400) from exc
 
@@ -561,7 +671,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         _auth: dict = Depends(require_auth),
     ) -> dict:
         try:
-            return cancel_tool_call(tool_call_id, cfg=cfg, cancelled_by="api", reason=req.reason if req else None)
+            return resume_for_tool_call(cancel_tool_call(tool_call_id, cfg=cfg, cancelled_by="api", reason=req.reason if req else None))
         except ToolRuntimeError as exc:
             raise api_error(exc.status, exc.detail, status_code=409 if exc.status != "ERROR_TOOL_CALL_NOT_FOUND" else 404) from exc
 

@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-09-24T21:05:50Z",
+  "updated_utc": "2026-09-24T21:18:37Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -386,7 +386,7 @@
         "N06",
         "N13"
       ],
-      "state": "OPEN",
+      "state": "PROVISIONAL",
       "risk": "HIGH",
       "user_value": "HIGH",
       "downstream_unlock_value": "HIGH",
@@ -395,7 +395,7 @@
         "run ledger + SSE + cancel + queue regressions"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "Run bus implemented with 29 regressions; UI integration (N17) and model-proposed tool calls remain."
     },
     {
       "node_id": "N16",

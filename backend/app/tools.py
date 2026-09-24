@@ -43,6 +43,8 @@ class ToolDefinition:
     mutates_state: bool
     requires_approval: bool
     handler: Callable[[dict[str, Any], Settings], dict[str, Any]]
+    # "none": local only; "remote": contacts an external service (TGT-019 offline classification).
+    network: str = "none"
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -50,6 +52,8 @@ class ToolDefinition:
             "description": self.description,
             "mutates_state": self.mutates_state,
             "requires_approval": self.requires_approval,
+            "network": self.network,
+            "offline_availability": "AVAILABLE_LOCALLY" if self.network == "none" else "REQUIRES_REMOTE_SERVICE",
         }
 
 
@@ -290,6 +294,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         description="Render one explicitly approved public HTTP(S) page in an optional headless browser and save DOM/screenshot provenance; rendered output is not citation-ready by default.",
         mutates_state=True,
         requires_approval=True,
+        network="remote",
         handler=_web_render,
     ),
     "web.search": ToolDefinition(
@@ -297,6 +302,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         description="Run an explicitly approved live web search and save a credential-free search receipt; result snippets are discovery evidence, not cited page evidence.",
         mutates_state=True,
         requires_approval=True,
+        network="remote",
         handler=_web_search,
     ),
     "web.fetch": ToolDefinition(
@@ -304,6 +310,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         description="Fetch one HTTP(S) URL through governed policy and save a byte-pinned local snapshot.",
         mutates_state=True,
         requires_approval=True,
+        network="remote",
         handler=_web_fetch,
     ),
     "web.fetch_session": ToolDefinition(
@@ -311,6 +318,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         description="Fetch an approved operator-supplied URL set and save a replayable multi-page browsing receipt.",
         mutates_state=True,
         requires_approval=True,
+        network="remote",
         handler=_web_fetch_session,
     ),
 }
@@ -431,6 +439,7 @@ def request_tool_call(
     requested_by: str = "operator",
     reason: str | None = None,
     run_id: str | None = None,
+    retry_of: str | None = None,
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
     arguments = arguments or {}
@@ -461,6 +470,7 @@ def request_tool_call(
         "requested_by": requested_by,
         "reason": reason,
         "run_id": run_id,
+        "retry_of": retry_of,
         "created_at": created_at,
         "approved_by": None,
         "approved_at": None,
