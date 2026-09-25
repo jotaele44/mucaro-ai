@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+// The built UI is served by the backend itself, so production requests stay same-origin.
+// The Vite dev server runs on its own port and talks to the default local backend.
+const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
 const TOKEN_STORAGE_KEY = "mucaro.operatorToken";
 
 let operatorToken = typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_STORAGE_KEY) || "" : "";
@@ -29,6 +31,7 @@ async function request(path, options = {}) {
 
 export const api = {
   baseUrl: API_BASE,
+  displayUrl: API_BASE || (typeof window !== "undefined" ? window.location.origin : ""),
   getOperatorToken: () => operatorToken,
   setOperatorToken: (token) => {
     operatorToken = token.trim();

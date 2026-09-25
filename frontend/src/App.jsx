@@ -5,6 +5,9 @@ import { DirectoryIntake } from "./components/DirectoryIntake.jsx";
 import { PlanningGate } from "./components/PlanningGate.jsx";
 import "./styles.css";
 
+// Mirrors SUPPORTED_UPLOAD_SUFFIXES in backend/app/main.py so the iOS picker offers only ingestible files.
+const UPLOAD_ACCEPT = ".txt,.md,.csv,.json,.pdf,.png,.jpg,.jpeg,.gif,.webp,.wav,.mp3,.m4a,.mp4,.mov,.webm";
+
 function App() {
   const [health, setHealth] = useState(null);
   const [sources, setSources] = useState([]);
@@ -28,9 +31,21 @@ function App() {
   const [status, setStatus] = useState("Idle");
   const [error, setError] = useState(null);
   const [view, setView] = useState("chat");
+  const [connection, setConnection] = useState("checking");
+  const [asking, setAsking] = useState(false);
 
   async function refresh() {
-    setHealth(await api.health());
+    let healthPayload;
+    try {
+      healthPayload = await api.health();
+    } catch (err) {
+      setHealth(null);
+      setConnection("offline");
+      err.connectionFailure = true;
+      throw err;
+    }
+    setHealth(healthPayload);
+    setConnection("online");
     setConfig(await api.config());
     const src = await api.sources();
     setSources(src.sources || []);
@@ -46,7 +61,24 @@ function App() {
     setWorkspaces(workspacePayload.workspaces || []);
   }
 
-  useEffect(() => { refresh().catch((err) => setStatus(err.message)); }, []);
+  async function loadWorkspace() {
+    try {
+      await refresh();
+      setStatus("Idle");
+    } catch (err) {
+      setStatus(err.connectionFailure ? "BACKEND_OFFLINE" : err.message);
+      if (!err.connectionFailure) setError(err.message);
+    }
+  }
+
+  useEffect(() => { loadWorkspace(); }, []);
+
+  async function retryConnection() {
+    setConnection("checking");
+    setStatus("Reconnecting...");
+    setError(null);
+    await loadWorkspace();
+  }
 
   async function upload(e) {
     const file = e.target.files[0];
@@ -66,6 +98,8 @@ function App() {
   }
 
   async function ask() {
+    if (asking || !query.trim()) return;
+    setAsking(true);
     setStatus("Asking...");
     setError(null);
     try {
@@ -74,16 +108,27 @@ function App() {
         conversation = await api.createConversation({ title: "New chat" });
         setActiveConversation(conversation);
       }
-      const payload = await api.askConversation(conversation.conversation_id, { query, top_k: 5, retrieval_strategy: retrievalStrategy, model_provider: "mock" });
+      // No model_provider: the backend applies its configured default (MUCARO_AI_MODEL_PROVIDER).
+      const payload = await api.askConversation(conversation.conversation_id, { query, top_k: 5, retrieval_strategy: retrievalStrategy });
       const result = payload.answer;
       setAnswer(result);
       setActiveConversation(payload.conversation);
+      setQuery("");
       setStatus(result.citation_status || result.status || "DONE");
       const conversationPayload = await api.conversations();
       setConversations(conversationPayload.conversations || []);
     } catch (err) {
       setError(err.message);
       setStatus("ASK_ERROR");
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  function handleComposerKeyDown(event) {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      ask();
     }
   }
 
@@ -102,6 +147,7 @@ function App() {
 
   async function removeSelectedSource() {
     if (!selectedSource) return;
+    if (!window.confirm(`Delete source "${selectedSource.file_name}" from the library? This cannot be undone.`)) return;
     setStatus("Deleting source...");
     setError(null);
     try {
@@ -131,7 +177,12 @@ function App() {
   async function saveOperatorToken() {
     api.setOperatorToken(operatorToken);
     setStatus(operatorToken.trim() ? "OPERATOR_TOKEN_SAVED" : "OPERATOR_TOKEN_CLEARED");
-    await refresh();
+    setError(null);
+    try {
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   async function rememberPreference() {
@@ -163,6 +214,7 @@ function App() {
   }
 
   async function deleteMemory(item) {
+    if (!window.confirm("Delete this memory item? This cannot be undone.")) return;
     setStatus("Deleting memory...");
     setError(null);
     try {
@@ -224,6 +276,7 @@ function App() {
 
   async function deleteActiveConversation() {
     if (!activeConversation) return;
+    if (!window.confirm(`Delete chat "${activeConversation.title || "Untitled"}"? This cannot be undone.`)) return;
     setStatus("Deleting chat...");
     setError(null);
     try {
@@ -280,8 +333,8 @@ function App() {
           ))}
         </nav>
         <div className="nav-health">
-          <span className="status-dot" aria-hidden="true" />
-          <div><strong>{health ? health.status : "offline"}</strong><small>{status}</small></div>
+          <span className={`status-dot ${connection}`} aria-hidden="true" />
+          <div><strong>{connection === "checking" ? "connecting" : health ? health.status : "offline"}</strong><small>{status}</small></div>
         </div>
       </aside>
 
@@ -297,7 +350,19 @@ function App() {
             <span>Index <strong>{indexStatus?.status || "unknown"}</strong></span>
           </div>
         </header>
-        {error && <div className="notice error">{error}</div>}
+        {connection === "offline" && (
+          <div className="notice error connection-banner" role="alert">
+            <div>
+              <strong>Backend not reachable</strong>
+              <p>
+                Mucaro could not reach its local service at {api.displayUrl}. Start it on the computer that hosts your
+                sources with <code>python scripts/launch_app.py</code> (or double-click <code>Mucaro AI.command</code>), then retry.
+              </p>
+            </div>
+            <button onClick={retryConnection}>Retry</button>
+          </div>
+        )}
+        {error && <div className="notice error" role="alert">{error}</div>}
 
         {view === "chat" && (
           <section className="panel conversation-workspace">
@@ -318,7 +383,7 @@ function App() {
             <div className="chat-layout">
               <section className="chat-list">
                 <h3>Sessions</h3>
-                <input className="compact-input" value={chatFilter} onChange={(event) => setChatFilter(event.target.value)} placeholder="Search chats" />
+                <input className="compact-input" type="search" value={chatFilter} onChange={(event) => setChatFilter(event.target.value)} placeholder="Search chats" aria-label="Search chats" />
                 {conversations.length === 0 && <p className="hint">No saved chats yet.</p>}
                 {conversations.length > 0 && filteredConversations.length === 0 && <p className="hint">No chats match the filter.</p>}
                 {filteredConversations.map((conversation) => (
@@ -354,9 +419,10 @@ function App() {
                       <option value="bm25">bm25</option><option value="vector">vector</option><option value="lexical">lexical</option>
                     </select>
                   </label>
-                  <textarea value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Question" />
-                  <button onClick={ask}>Ask with citations</button>
+                  <textarea value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={handleComposerKeyDown} aria-label="Question" placeholder="Ask a question about your sources" />
+                  <button onClick={ask} disabled={asking || !query.trim()}>{asking ? "Asking…" : "Ask with citations"}</button>
                 </div>
+                <p className="hint composer-hint">Answers cite the retrieved source chunks. Press ⌘/Ctrl + Enter to send.</p>
                 {hasNoSourceAnswer && <div className="notice">No sources are available. Add them in the Sources workspace.</div>}
                 {answer?.status === "ERROR_NO_RETRIEVAL_CONTEXT" && <div className="notice">No matching context was found. Broaden the query, switch retrieval strategy, or reindex in Sources.</div>}
               </section>
@@ -372,7 +438,7 @@ function App() {
                     <div><dt>Retrieval</dt><dd>{answer.retrieval_strategy || "unknown"}</dd></div>
                     <div><dt>Confidence</dt><dd>{answer.confidence}</dd></div>
                   </dl>
-                  {answer.run_id && <a className="export-link" href={`${api.baseUrl}/exports/${answer.run_id}`}>Open JSON trace</a>}
+                  {answer.run_id && <a className="export-link" href={`${api.baseUrl}/exports/${answer.run_id}`} target="_blank" rel="noopener noreferrer">Open JSON trace</a>}
                 </section>
                 <section>
                   <h3>Cited chunks</h3>
@@ -392,7 +458,14 @@ function App() {
           <>
             <section className="panel">
               <div className="panel-header"><h2>File Intake</h2><span className="badge">{sources.length} sources</span></div>
-              <input type="file" onChange={upload} />
+              <label className="file-picker">
+                Add a file
+                <input type="file" accept={UPLOAD_ACCEPT} onChange={upload} />
+              </label>
+              <p className="hint">
+                Supported: text, Markdown, CSV, JSON, PDF, images (PNG, JPEG, GIF, WebP), audio (WAV, MP3, M4A), and video
+                (MP4, MOV, WebM). Media files are indexed by file metadata only.
+              </p>
               {sources.length === 0 && <p className="hint">No sources ingested yet.</p>}
             </section>
             <section className="panel">
@@ -402,7 +475,7 @@ function App() {
               </div>
               <div className="table-scroll">
                 <table><thead><tr><th>Source</th><th>File</th><th>Status</th><th>Chunks</th><th>Parser</th></tr></thead>
-                <tbody>{sources.map((source) => <tr key={source.source_id} onClick={() => setSelectedSourceId(source.source_id)} className={selectedSource?.source_id === source.source_id ? "selected-row" : ""}><td>{source.source_id}</td><td>{source.file_name}</td><td>{source.lineage_status}</td><td>{source.chunk_count}</td><td>{source.parser}</td></tr>)}</tbody></table>
+                <tbody>{sources.map((source) => <tr key={source.source_id} tabIndex={0} onClick={() => setSelectedSourceId(source.source_id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedSourceId(source.source_id); } }} className={selectedSource?.source_id === source.source_id ? "selected-row" : ""}><td>{source.source_id}</td><td>{source.file_name}</td><td>{source.lineage_status}</td><td>{source.chunk_count}</td><td>{source.parser}</td></tr>)}</tbody></table>
               </div>
               {selectedSource && <div className="source-detail"><h3>{selectedSource.file_name}</h3><dl><div><dt>SHA256</dt><dd>{selectedSource.source_sha256}</dd></div><div><dt>Bytes</dt><dd>{selectedSource.bytes ?? "unknown"}</dd></div><div><dt>Parse</dt><dd>{selectedSource.parse_status || "unknown"}</dd></div><div><dt>Warnings</dt><dd>{(selectedSource.warnings || []).join(", ") || "none"}</dd></div><div><dt>Path</dt><dd>{selectedSource.source_path || "unknown"}</dd></div></dl></div>}
             </section>
@@ -413,11 +486,11 @@ function App() {
 
         {view === "memory" && (
           <section className="panel">
-            <div className="panel-header"><h2>Memory</h2><a className="export-link" href={`${api.baseUrl}/memory/export`}>Export JSON</a></div>
+            <div className="panel-header"><h2>Memory</h2><a className="export-link" href={`${api.baseUrl}/memory/export`} target="_blank" rel="noopener noreferrer">Export JSON</a></div>
             <p className="hint">Memory supplies bounded preference/profile context and is never treated as cited source evidence.</p>
             <div className="memory-form">
-              <select value={memoryKind} onChange={(event) => setMemoryKind(event.target.value)}><option value="preference">preference</option><option value="profile">profile</option><option value="instruction">instruction</option><option value="fact">fact</option></select>
-              <input value={memoryContent} onChange={(event) => setMemoryContent(event.target.value)} placeholder="Save explicit context" />
+              <select value={memoryKind} onChange={(event) => setMemoryKind(event.target.value)} aria-label="Memory kind"><option value="preference">preference</option><option value="profile">profile</option><option value="instruction">instruction</option><option value="fact">fact</option></select>
+              <input value={memoryContent} onChange={(event) => setMemoryContent(event.target.value)} placeholder="Save explicit context" aria-label="Memory content" />
               <button onClick={rememberPreference} disabled={!memoryContent.trim()}>Remember</button>
             </div>
             <div className="memory-list">
