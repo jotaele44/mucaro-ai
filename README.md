@@ -409,3 +409,13 @@ Then rerun:
 ```bash
 bash scripts/bootstrap_macos.sh
 ```
+
+<!-- PROJECT-OPERATING-CONTRACT:START -->
+## Current development and certification contract
+
+Mucaro AI is being developed as a local-first, conversation-centered orchestration environment with durable Run/Event/Action/Evidence/Receipt history, source lineage, memory, planning gates, isolated coding execution, controlled mutation, and reproducible verification.
+
+The orchestration-kernel v1 substrate is append-only. DEMO_CANDIDATE fixtures are not execution evidence. Current priority is Git path-identity hardening, isolated coding/container execution, patch preimage/HEAD/dirty-state revalidation with rollback, test/lint/type/build receipts, branch/commit/PR safety, retrieval/OCR/GIS/browser/model/memory closure, conversation-first UI, and zero-setup packaged desktop delivery.
+
+Certification requires a fresh-clone → install → build → test → security → representative workflows → package → reinstall/rollback chain with preserved evidence. Script success alone is not release certification. Passed artifacts survive downstream failure and provisional behavior must not be used to train reusable automation.
+<!-- PROJECT-OPERATING-CONTRACT:END -->
