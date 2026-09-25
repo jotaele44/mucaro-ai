@@ -256,7 +256,7 @@ def git_head() -> str:
 
 def main() -> int:
     env = os.environ.copy()
-    env["PYTHONPATH"] = f"{ROOT}:{ROOT / 'backend'}"
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT), str(ROOT / "backend")])
     head_sha = git_head()
     files = tracked_files()
     gates = [

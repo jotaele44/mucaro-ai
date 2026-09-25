@@ -96,7 +96,7 @@ class Settings:
             index_dir=data_dir / "indexes",
             sqlite_path=data_dir / "processed" / "mucaro_ai.sqlite3",
             default_model_provider=os.getenv("MUCARO_AI_MODEL_PROVIDER", "mock"),
-            default_model_name=os.getenv("MUCARO_AI_MODEL", "claude-3-5-sonnet-latest"),
+            default_model_name=os.getenv("MUCARO_AI_MODEL", "claude-sonnet-5"),
             max_upload_bytes=max_upload_bytes,
             cors_origins=cors_origins or DEFAULT_CORS_ORIGINS,
             operator_token=os.getenv("MUCARO_AI_OPERATOR_TOKEN") or None,

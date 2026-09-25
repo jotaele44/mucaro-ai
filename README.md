@@ -2,31 +2,44 @@
 
 Local-first prototype for a custom LLM workflow with file ingestion, source lineage, cited retrieval, mock/Claude model routing, and a Planning-to-Execution Gate.
 
-## Fastest first run
+## Quick start
 
-### macOS/Linux
+**Double-click `Mucaro AI.command` (macOS) or `Mucaro AI.cmd` (Windows).** That is the whole setup.
+
+The first double-click downloads private, checksum-verified copies of Python 3.12 and Node.js
+into this folder (about 200 MB to download, about 700 MB on disk, 2-5 minutes on a typical
+connection), installs everything, builds
+the interface, loads two sample documents, starts the app, and opens it in your browser. Nothing
+needs to be installed beforehand and nothing is written outside the project folder. Later
+double-clicks start the app in seconds and work offline. Keep the window open while you use the
+app; close it (or press `Ctrl+C`) to stop.
+
+Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, and Linux x86_64
+(run `./"Mucaro AI.command"` from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
+does, its error codes, and how to remove it.
+
+Settings go in `.env` (created from `.env.example` on first run). The launcher reads it at
+startup; variables already exported in your shell take precedence. If the UI shows **Backend not
+reachable**, double-click the launcher again and press **Retry**.
+
+See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
+`docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
+
+### Developer setup (manual)
+
+Requirements: Python 3.11-3.13 and Node 20+ already installed.
 
 ```bash
 cd mucaro-ai
-bash scripts/bootstrap_macos.sh
+bash scripts/bootstrap_macos.sh        # macOS/Linux
+# .\scripts\bootstrap_windows.ps1      # Windows PowerShell
+source .venv/bin/activate
+python scripts/launch_app.py           # or: make start
 ```
 
-Expected final markers:
-
-```text
-PREFLIGHT_OK
-RELEASE_CHECK_OK
-BOOTSTRAP_OK
-```
-
-### Windows PowerShell
-
-```powershell
-cd mucaro-ai
-.\scripts\bootstrap_windows.ps1
-```
-
-See `docs/FIRST_RUN.md` for step-by-step startup and error recovery.
+Expected bootstrap markers: `PREFLIGHT_OK`, `RELEASE_CHECK_OK`, `BOOTSTRAP_OK`. The bootstrap and
+the double-click setup share `.venv`; the double-click setup rebuilds it on its private Python
+3.12 if it finds a venv made from another interpreter.
 
 ## Safe startup helpers
 
@@ -81,7 +94,10 @@ python scripts\release_check.py
 
 ## Optional environment variables
 
-Copy `.env.example` to `.env` and fill only what you need.
+Copy `.env.example` to `.env` and fill only what you need. `scripts/launch_app.py`
+and `scripts/dev_start.py` load `.env` automatically (shell-exported values win);
+when running `uvicorn` or `mucaro serve` directly, export the variables in your
+shell instead.
 
 - `ANTHROPIC_API_KEY`: required for Anthropic mode when `MUCARO_AI_LIVE_MODE=1`.
 - `MUCARO_AI_LIVE_MODE=1`: permits live Anthropic calls. Default is deterministic mock mode.
@@ -429,3 +445,13 @@ Then rerun:
 ```bash
 bash scripts/bootstrap_macos.sh
 ```
+
+<!-- PROJECT-OPERATING-CONTRACT:START -->
+## Current development and certification contract
+
+Mucaro AI is being developed as a local-first, conversation-centered orchestration environment with durable Run/Event/Action/Evidence/Receipt history, source lineage, memory, planning gates, isolated coding execution, controlled mutation, and reproducible verification.
+
+The orchestration-kernel v1 substrate is append-only. DEMO_CANDIDATE fixtures are not execution evidence. Current priority is Git path-identity hardening, isolated coding/container execution, patch preimage/HEAD/dirty-state revalidation with rollback, test/lint/type/build receipts, branch/commit/PR safety, retrieval/OCR/GIS/browser/model/memory closure, conversation-first UI, and zero-setup packaged desktop delivery.
+
+Certification requires a fresh-clone → install → build → test → security → representative workflows → package → reinstall/rollback chain with preserved evidence. Script success alone is not release certification. Passed artifacts survive downstream failure and provisional behavior must not be used to train reusable automation.
+<!-- PROJECT-OPERATING-CONTRACT:END -->
