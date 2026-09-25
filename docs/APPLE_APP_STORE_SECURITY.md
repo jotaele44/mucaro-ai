@@ -20,6 +20,27 @@ Notarization is part of the direct-distribution lane. Apple states that Store
 submission already includes equivalent security checks, so a notarization
 receipt is not accepted as proof of Mac App Store readiness.
 
+## Current safeguard matrix
+
+| Control | State | Evidence boundary |
+|---|---|---|
+| Embedded Python provenance and dependency hashes | `PASS` | Exact x86_64 runtime source, lock, tree hash, import probe, and zero-known-vulnerability audit |
+| Host Python isolation | `PASS` | `-E -s -P -B`, sanitized child environment, and host user-site exclusion |
+| Mutable-data separation | `PASS` | External Application Support default, absolute override requirement, and Store-profile bundle-path rejection |
+| Post-launch bundle immutability | `PASS` | Real smoke launch followed by exact runtime/application member-manifest verification |
+| Local backend regression suite | `PASS` | Full repository-declared backend suite for the exact source head |
+| arm64 or universal runtime | `OPEN` | Current governed runtime is x86_64 only |
+| App Sandbox execution | `OPEN` | Entitlement template and static audit exist; a signed sandboxed candidate has not executed |
+| Loopback server entitlement decision | `OPEN` | Requires an in-process/IPC replacement or a documented server-entitlement threat model |
+| Final privacy inventory and disclosure | `OPEN` | Must be regenerated for the final feature and third-party dependency set |
+| Mac App Distribution signature and provisioning | `BLOCKED` | Requires Apple Developer credentials and an exact candidate |
+| App Store Connect processing and App Review | `BLOCKED` | Requires Apple acceptance evidence for the exact submitted build and metadata |
+
+The five local `PASS` rows above are bounded safeguards, not equivalence to an
+Apple-reviewed Store build. Any source, dependency, entitlement, architecture,
+or privacy-inventory change invalidates the affected evidence and requires a
+new exact-head candidate and receipts.
+
 ## Binding local gates
 
 The machine-readable profile is
@@ -88,6 +109,34 @@ local-worker calls, and container entry points reject subprocess, worker,
 container, service, and federation-worker capabilities before process creation.
 Bounded in-process operations remain available. User-authored or generated
 source is not automatically exempt and is disabled in this profile.
+
+## Embedded runtime boundary
+
+The governed x86_64 macOS runtime source is pinned by upstream release, asset
+name, compressed byte count, SHA-256, logical archive counts, Python version,
+platform, and architecture. Its dependency lock contains exact versions and
+distribution hashes and denies source builds. Archive traversal, special
+members, duplicate destinations, escaping links, byte/count drift, dependency
+drift, missing imports, and host user-site discovery fail closed.
+
+The portable launcher sets `PYTHONNOUSERSITE=1` and `PYTHONSAFEPATH=1`, clears
+host Python startup/home controls, passes `-B` to every supported embedded
+Python entry point, and uses only the bundle-relative runtime. Mutable user data
+is directed to `~/Library/Application Support/Mucaro AI` by default rather than
+`Contents/Resources/app/data`; an explicit override must be absolute. The
+`mac_app_store` profile rejects any configured data directory inside the
+application bundle.
+
+Portable launch certification re-hashes the installed runtime and application
+trees after the health and representative-workflow checks. Any new bytecode,
+database, or other bundle member makes `post_launch_bundle_immutable=false` and
+blocks the receipt. This is local evidence that the tested launch path preserves
+the unsigned bundle; the final code signature remains the authoritative seal
+for a signed candidate.
+
+The runtime remains an x86_64 direct-distribution input. It is not yet a
+universal Store runtime, a signed candidate, or proof that all embedded native
+libraries satisfy App Sandbox and App Review requirements.
 
 The current GUI launcher starts a loopback HTTP server. The minimal entitlement
 template intentionally omits `com.apple.security.network.server`. Before GUI

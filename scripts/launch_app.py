@@ -23,11 +23,13 @@ BACKEND_APP = "backend.app.main:app"
 
 
 def build_env() -> dict[str, str]:
-    # Shell-exported variables win over values from the project .env file.
-    env = merge_env_file(os.environ, ROOT / ".env")
-    existing = env.get("PYTHONPATH", "")
-    paths = [str(ROOT), str(ROOT / "backend")]
-    env["PYTHONPATH"] = os.pathsep.join(paths + ([existing] if existing else []))
+    # Load Mucaro settings from .env, then replace every host-controlled Python setting.
+    merged = merge_env_file(os.environ, ROOT / ".env")
+    env = {key: value for key, value in merged.items() if not key.startswith("PYTHON")}
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT), str(ROOT / "backend")])
+    env["PYTHONNOUSERSITE"] = "1"
+    env["PYTHONSAFEPATH"] = "1"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     return env
 
 
@@ -90,6 +92,9 @@ def wait_for_health(port: int, timeout_seconds: float) -> bool:
 def start_backend(port: int) -> subprocess.Popen:
     cmd = [
         sys.executable,
+        "-s",
+        "-P",
+        "-B",
         "-m",
         "uvicorn",
         BACKEND_APP,

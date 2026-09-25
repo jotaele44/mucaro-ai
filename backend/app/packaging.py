@@ -42,6 +42,8 @@ REQUIRED_PACKAGE_INPUTS = [
     "_architecture/schemas/macos-app-store-malware-scan.schema.json",
     "packaging/macos/MucaroAI-AppStore.entitlements",
     "packaging/macos/PrivacyInfo.xcprivacy",
+    "packaging/runtime/macos-x86_64.json",
+    "packaging/runtime/requirements-macos-x86_64.lock",
     "frontend/package.json",
     "frontend/package-lock.json",
 ]
@@ -177,6 +179,8 @@ def build_desktop_package_manifest(root: Path = ROOT) -> dict[str, Any]:
         "scripts/bootstrap_windows.ps1",
         "frontend/package-lock.json",
         "pyproject.toml",
+        "packaging/runtime/macos-x86_64.json",
+        "packaging/runtime/requirements-macos-x86_64.lock",
     ]
     missing = [path for path in required if not (root / path).exists()]
     metadata_error = None

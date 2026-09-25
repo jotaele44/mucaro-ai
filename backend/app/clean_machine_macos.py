@@ -96,8 +96,12 @@ def certify_clean_machine_macos(
     launcher = installed / "Contents/MacOS/mucaro-ai"
     app_root = installed / "Contents/Resources/app"
     embedded_python = installed / "Contents/Resources/runtime/bin/python3"
-    env = os.environ.copy()
+    env = {key: value for key, value in os.environ.items() if not key.startswith("PYTHON")}
     env["PYTHONPATH"] = os.pathsep.join([str(app_root), str(app_root / "backend")])
+    env["PYTHONNOUSERSITE"] = "1"
+    env["PYTHONSAFEPATH"] = "1"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["MUCARO_AI_DATA_DIR"] = str(root / "user-data")
 
     launch = _run(
         [str(launcher), "--smoke-test", "--no-browser", "--skip-build", "--port", str(port)],
@@ -106,11 +110,19 @@ def certify_clean_machine_macos(
         runner=runner,
     )
     workflow = _run(
-        [str(embedded_python), str(app_root / "scripts/certify_operator_workflow.py")],
+        [str(embedded_python), "-s", "-P", "-B", str(app_root / "scripts/certify_operator_workflow.py")],
         cwd=app_root,
         env=env,
         runner=runner,
     )
+    try:
+        post_launch_verify = verify_portable_macos_app(installed, expected_head=expected_head)
+    except PortableRuntimeError as exc:
+        post_launch_verify = {
+            "status": "PORTABLE_APP_VERIFY_FAILED",
+            "failed_checks": [exc.status],
+            "detail": exc.detail,
+        }
     rollback = rollback_portable_macos_app(install_root=root)
     rollback_head = str(rollback.get("installation", {}).get("head_sha") or "")
     reinstall = install_portable_macos_app(current, install_root=root)
@@ -120,6 +132,7 @@ def certify_clean_machine_macos(
         "install": current_install.get("status") == "PORTABLE_INSTALL_OK",
         "launch": launch["status"] == "PASS",
         "representative_workflow": workflow["status"] == "PASS",
+        "post_launch_bundle_immutable": post_launch_verify.get("status") == "PORTABLE_APP_VERIFIED",
         "reinstall": reinstall.get("status") == "PORTABLE_INSTALL_OK" and reinstalled_head == expected_head,
         "rollback": rollback.get("status") == "PORTABLE_ROLLBACK_OK" and rollback_head == previous_head,
     }
@@ -135,10 +148,11 @@ def certify_clean_machine_macos(
             "current_install": current_install,
             "launch": launch,
             "representative_workflow": workflow,
+            "post_launch_bundle_verification": post_launch_verify,
             "rollback": rollback,
             "reinstall": reinstall,
         },
-        "basis": "distinct-version install/launch/workflow/rollback/reinstall executed with the embedded portable runtime on macOS",
+        "basis": "distinct-version install/launch/workflow/bundle-integrity/rollback/reinstall executed with the embedded portable runtime on macOS",
         "limitations": [
             "The operator must run this on a genuinely clean macOS machine for the receipt to qualify as clean-machine evidence.",
             "This function cannot independently prove the machine was clean before execution; release procedure must preserve host identity and setup evidence.",
