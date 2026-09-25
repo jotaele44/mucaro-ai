@@ -19,7 +19,30 @@ RELEASE_CHECK_OK
 BOOTSTRAP_OK
 ```
 
-Then start the backend:
+### Start the app (one command)
+
+```bash
+source .venv/bin/activate
+python scripts/launch_app.py
+```
+
+Or double-click `Mucaro AI.command`, or run `make start`. The launcher builds
+`frontend/dist` if it is missing, starts the backend on `127.0.0.1:8000`, opens
+the browser, and stops everything on `Ctrl+C`. It reads `.env`; variables
+exported in your shell take precedence.
+
+Open:
+
+```text
+http://127.0.0.1:8000
+```
+
+If the page shows **Backend not reachable**, the launcher is not running (or is
+on another port). Start it and press **Retry**.
+
+### Developer mode (two processes, hot reload)
+
+Start the backend:
 
 ```bash
 source .venv/bin/activate
@@ -59,12 +82,15 @@ cd mucaro-ai
 .\scripts\bootstrap_windows.ps1
 ```
 
-Then:
+Then start the app:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-python scripts\dev_start.py --backend-only
+python scripts\launch_app.py
 ```
+
+For developer mode, use `python scripts\dev_start.py --backend-only` and
+`python scripts\dev_start.py --frontend-only` in two terminals.
 
 ## Manual verification commands
 
@@ -97,8 +123,12 @@ Common failures:
 
 | Error | Fix |
 |---|---|
-| `ERROR_PYTHON_MISSING` | Install Python 3.11+ |
+| `ERROR_PYTHON_MISSING` | Install Python 3.11+ (`brew install python@3.12` or python.org) |
+| `ERROR_PYTHON_TOO_OLD` | Bootstrap found only an older Python; install 3.11+ and rerun |
+| `ERROR_PYTHON_TOO_OLD_OR_MISSING` | Windows: install Python 3.11+ from python.org with "Add to PATH" |
 | `PYTHON_TOO_OLD` | Use Python 3.11+ explicitly |
+| `BOOTSTRAP_FAILED step=...` | Windows: the named step failed; its output is printed just above |
+| `ENV_MODEL_RETIRED` (warning) | Your `.env` pins a retired model; set `MUCARO_AI_MODEL=claude-sonnet-5` |
 | `ERROR_NPM_MISSING` | Install Node 20+ or run backend-only |
 | `PY_IMPORT_MISSING` | Run `python -m pip install -r backend/requirements.txt` inside `.venv` |
 | `ERROR_FRONTEND_DEPS_MISSING` | Run `cd frontend && npm ci` |
