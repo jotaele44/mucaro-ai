@@ -159,6 +159,22 @@ def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
     assert "PASS package_artifact manifest_member_count=1" in output
     assert "PASS package_artifact_verify manifest_member_count=1" in output
     assert "CERTIFY_RELEASE_OK" in output
+    assert (
+        "python_runtime_lock_audit",
+        [
+            sys.executable,
+            "-m",
+            "pip_audit",
+            "-r",
+            "packaging/runtime/requirements-macos-x86_64.lock",
+            "--no-deps",
+            "--disable-pip",
+            "--strict",
+            "--progress-spinner",
+            "off",
+        ],
+        certify_release.ROOT,
+    ) in calls
 
 
 def test_certify_release_npm_audit_uses_working_node_fallback(monkeypatch):
