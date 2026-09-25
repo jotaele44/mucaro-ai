@@ -76,6 +76,7 @@ from .gis_eval import (
     format_gis_eval_text,
     format_gis_quality_certification_text,
 )
+from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
 from .ingestion import (
     delete_source,
@@ -869,6 +870,25 @@ def build_parser() -> argparse.ArgumentParser:
     ocr_analyze.add_argument("--timeout-seconds", type=int, default=30, help="OCR engine timeout.")
     ocr_analyze.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     ocr_analyze.set_defaults(handler=run_ocr_analyze)
+
+    flagpole = subcommands.add_parser("flagpole", help="Flagpole evidence tooling bound to exact Git SHAs.")
+    flagpole_subcommands = flagpole.add_subparsers(dest="flagpole_command", required=True)
+    flagpole_inventory = flagpole_subcommands.add_parser("inventory", help="Generate or verify the exact-tree inventory.")
+    flagpole_inventory_subcommands = flagpole_inventory.add_subparsers(dest="flagpole_inventory_command", required=True)
+
+    flagpole_inventory_generate = flagpole_inventory_subcommands.add_parser("generate", help="Write an inventory of the tracked tree at HEAD.")
+    flagpole_inventory_generate.add_argument("--output", default="_architecture/mucaro_flagpole_tree_inventory_v1.json", help="Output path, relative to the project root.")
+    flagpole_inventory_generate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    flagpole_inventory_generate.set_defaults(handler=run_flagpole_inventory_generate)
+
+    flagpole_inventory_verify = flagpole_inventory_subcommands.add_parser(
+        "verify",
+        help="Verify HEAD self-consistency, or a stored inventory against the exact commit it names.",
+    )
+    flagpole_inventory_verify.add_argument("--inventory", help="Stored inventory to verify as a receipt for its own source_sha.")
+    flagpole_inventory_verify.add_argument("--require-clean", action="store_true", help="Fail when the worktree has modified or untracked files.")
+    flagpole_inventory_verify.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    flagpole_inventory_verify.set_defaults(handler=run_flagpole_inventory_verify)
 
     conversations = subcommands.add_parser("conversations", help="Manage persistent local chat sessions.")
     conversations_subcommands = conversations.add_subparsers(dest="conversations_command", required=True)
@@ -3172,6 +3192,57 @@ def run_ocr_analyze(args: argparse.Namespace, cfg: Settings) -> int:
         return 2
     emit_payload(result, args.format)
     return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_flagpole_inventory_generate(args: argparse.Namespace, cfg: Settings) -> int:
+    output = Path(args.output)
+    if not output.is_absolute():
+        output = cfg.project_root / output
+    inventory = write_flagpole_inventory(cfg.project_root, output)
+    emit_payload(
+        {
+            "status": "FLAGPOLE_INVENTORY_WRITTEN",
+            "output": str(output),
+            "source_sha": inventory["source_sha"],
+            "file_count": inventory["file_count"],
+            "inventory_sha256": inventory["inventory_sha256"],
+        },
+        args.format,
+    )
+    return 0
+
+
+def run_flagpole_inventory_verify(args: argparse.Namespace, cfg: Settings) -> int:
+    errors: list[str] = []
+    if args.require_clean:
+        errors.extend(f"DIRTY_PATH:{path}" for path in dirty_paths(cfg.project_root))
+    schema_path = cfg.project_root / "schemas" / "flagpole_inventory.schema.json"
+    if args.inventory:
+        path = Path(args.inventory)
+        if not path.is_absolute():
+            path = cfg.project_root / path
+        inventory = json.loads(path.read_text(encoding="utf-8"))
+        mode = "RECEIPT"
+        errors.extend(validate_flagpole_inventory_schema(inventory, schema_path))
+        errors.extend(verify_flagpole_receipt(cfg.project_root, inventory))
+    else:
+        inventory = generate_flagpole_inventory(cfg.project_root)
+        mode = "HEAD_SELF_CONSISTENCY"
+        errors.extend(validate_flagpole_inventory_schema(inventory, schema_path))
+        errors.extend(validate_flagpole_inventory(cfg.project_root, inventory))
+    emit_payload(
+        {
+            "status": "FLAGPOLE_INVENTORY_OK" if not errors else "FLAGPOLE_INVENTORY_FAILED",
+            "mode": mode,
+            "source_sha": inventory.get("source_sha"),
+            "file_count": inventory.get("file_count"),
+            "errors": errors,
+        },
+        args.format,
+    )
+    for error in errors if args.format == "text" else []:
+        print(error, file=sys.stderr)
+    return 0 if not errors else 2
 
 
 def _doctor_check(name: str, status: str, detail: str) -> dict[str, str]:
