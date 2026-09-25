@@ -9,6 +9,7 @@ from typing import Any, Callable
 from pypdf import PdfReader
 
 from .config import Settings, settings
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
 from .utils import stable_id, utc_now, write_json
 
@@ -105,6 +106,11 @@ def analyze_pdf_ocr(
     tesseract = tesseract_path or shutil.which("tesseract")
     if not tesseract:
         raise PDFOCRAnalysisError("ERROR_OCR_ENGINE_UNAVAILABLE", "Local tesseract executable was not found.")
+    for engine in (renderer, tesseract):
+        try:
+            require(PermissionRequest(capability="subprocess.execute", subject="ocr_pdf", target=engine, origin="operator"), cfg=cfg)
+        except PermissionEngineError as exc:
+            raise PDFOCRAnalysisError(exc.status, exc.detail) from exc
 
     source_sha256 = _sha256_file(source)
     source_bytes = source.stat().st_size
