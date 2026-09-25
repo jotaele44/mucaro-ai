@@ -8,7 +8,9 @@ from .db import init_db, upsert_payload
 from .exports import export_answer_trace
 from .ingestion import get_chunks
 from .memory_policy import MemorySelectionError, select_memory_context
-from .model_router import ModelProviderError, generate_answer
+from .agent_checkpoints import CheckpointError, transition_checkpoint
+from .model_failover import FailoverPolicy, run_with_failover
+from .model_router import generate_answer
 from .model_routing_policy import ModelRoutingError, plan_model_route
 from .retrieval import retrieve
 from .utils import stable_id, utc_now
@@ -32,6 +34,8 @@ def answer_question(
     memory_context: list[dict[str, Any]] | None = None,
     cfg: Settings = settings,
     persist: bool = True,
+    checkpoint_id: str | None = None,
+    failover_policy: FailoverPolicy | None = None,
 ) -> dict[str, Any]:
     normalized_query = query.strip()
     if not normalized_query:
@@ -69,6 +73,7 @@ def answer_question(
             allow_live=allow_live,
             require_offline=require_offline,
             require_citations=True,
+            allow_offline_failover=allow_mock_fallback,
         )
     except ModelRoutingError as exc:
         if not allow_mock_fallback:
@@ -108,24 +113,46 @@ def answer_question(
                 "model_route": model_route,
             }
 
-    try:
-        model = generate_answer(
+    failover = run_with_failover(
+        model_route.get("failover_order") or [{"provider": model_route["selected_provider"], "model": model_route["selected_model"]}],
+        lambda provider, model_id: generate_answer(
             normalized_query,
             retrieved,
-            model_provider=model_route["selected_provider"],
-            model_name=model_route["selected_model"],
+            model_provider=provider,
+            model_name=model_id,
             allow_mock_fallback=False,
             conversation_context=conversation_context or [],
             memory_context=selected_memory_context,
-        )
-    except ModelProviderError as exc:
-        return {
-            "status": exc.status,
+            cfg=cfg,
+        ),
+        policy=failover_policy,
+    )
+    if failover["status"] != "FAILOVER_OK":
+        failure = {
+            "status": failover.get("error_status") or "ERROR_MODEL_ROUTE_BLOCKED",
             "query": normalized_query,
             "retrieved_chunks": retrieved,
-            "detail": exc.detail,
+            "detail": failover.get("detail", ""),
             "model_route": model_route,
+            "model_attempts": failover["attempts"],
         }
+        if failover.get("interruption") and checkpoint_id:
+            # Provider outage: pause the run with its state intact instead of failing it (invariant 8).
+            last = failover["attempts"][-1]
+            try:
+                paused = transition_checkpoint(
+                    checkpoint_id,
+                    state="PAUSED_PROVIDER",
+                    pause_reason=f"{last['provider']}:{last['status']}",
+                    provider=last["provider"],
+                    model=last["model"],
+                    cfg=cfg,
+                )
+            except CheckpointError as exc:
+                return {**failure, "checkpoint_error": exc.status}
+            return {**failure, "status": "PAUSED_PROVIDER", "provider_error": failover["error_status"], "checkpoint": paused}
+        return failure
+    model = failover["result"]
     retrieved_ids = [chunk["chunk_id"] for chunk in retrieved]
     cited_ids = model.get("cited_chunk_ids", [])
     cited_chunks = build_citation_records(retrieved, cited_ids)
@@ -148,6 +175,8 @@ def answer_question(
         "model_route_sha256": model_route["route_sha256"],
         "model_route_selection_reason": model_route.get("selection_reason"),
         "model_route_fallback_reason": model_route.get("fallback_reason"),
+        "model_attempts": failover["attempts"],
+        "model_failed_over": failover["failed_over"],
         "retrieval_strategy": retrieved[0].get("retrieval_strategy", "unknown") if retrieved else "none",
         "retrieved_chunk_ids": retrieved_ids,
         "cited_chunk_ids": cited_ids,

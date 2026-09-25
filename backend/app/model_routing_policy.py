@@ -33,6 +33,7 @@ def plan_model_route(
     allow_live: bool = False,
     require_offline: bool = False,
     require_citations: bool = True,
+    allow_offline_failover: bool = False,
 ) -> dict[str, Any]:
     task = task_type.strip().lower() if isinstance(task_type, str) else ""
     if task not in TASK_TYPES:
@@ -122,6 +123,18 @@ def plan_model_route(
         selected["default_model"] if selected else None
     )
     status = "MODEL_ROUTE_READY" if selected else "MODEL_ROUTE_BLOCKED"
+    # Ordered failover: the selected provider first, then other eligible providers in allowlist order.
+    # A live provider is only ever eligible with allow_live, and an offline provider (mock) is only
+    # a failover target when explicitly permitted, so an outage never silently degrades a live answer.
+    failover_order: list[dict[str, Any]] = []
+    if selected is not None:
+        failover_order.append({"provider": selected["provider"], "model": selected_model})
+        for row in eligible:
+            if row["provider"] == selected["provider"]:
+                continue
+            if not row["live"] and not (allow_offline_failover or not selected["live"]):
+                continue
+            failover_order.append({"provider": row["provider"], "model": row["default_model"]})
     payload: dict[str, Any] = {
         "schema_version": MODEL_ROUTING_SCHEMA_VERSION,
         "status": status,
@@ -134,17 +147,23 @@ def plan_model_route(
             "allow_live": allow_live,
             "require_offline": require_offline,
             "require_citations": require_citations,
+            "allow_offline_failover": allow_offline_failover,
         },
         "selected_provider": selected_provider,
         "selected_model": selected_model,
         "selection_reason": selection_reason,
         "candidates": candidates,
+        "failover_order": failover_order,
         "invariants": {
             "selected_provider_is_allowed": selected_provider is None or selected_provider in allowed,
             "no_implicit_live_escalation": selected is None or not selected["live"] or allow_live,
             "offline_constraint_honored": not require_offline or selected is None or not selected["live"],
             "live_constraint_honored": not require_live or selected is None or selected["live"],
             "selected_provider_ready": selected is None or selected["provider_status"] == "MODEL_PROVIDER_READY",
+            "failover_order_within_allowlist": all(row["provider"] in allowed for row in failover_order),
+            "no_implicit_offline_failover_from_live": selected is None or not selected["live"] or allow_offline_failover or all(
+                next(c for c in candidates if c["provider"] == row["provider"])["live"] for row in failover_order
+            ),
         },
         "limitations": [
             "Routing is policy selection over registered providers; it does not estimate answer quality or cost from unobserved future outputs.",

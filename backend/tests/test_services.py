@@ -241,3 +241,124 @@ def test_answer_question_explicit_mock_fallback_is_policy_driven(tmp_path: Path,
     assert result["model_provider"] == "mock"
     assert result["model_route_fallback_reason"] in {"PRIMARY_ROUTE_BLOCKED", "ERROR_MODEL_ROUTING_LIVE_NOT_ALLOWED"}
     assert len(result["model_route_sha256"]) == 64
+
+
+# --- V04: failover, attempt chain, and provider-outage pause wired into the answer path ---------------
+
+from backend.app.agent_checkpoints import create_checkpoint, get_checkpoint  # noqa: E402
+from backend.app.model_failover import FailoverPolicy  # noqa: E402
+from backend.app.model_router import ModelProviderError  # noqa: E402
+
+RATE = "ERROR_MODEL_PROVIDER_RATE_LIMIT"
+NO_SLEEP = FailoverPolicy(max_attempts_per_provider=2, backoff_seconds=(0.0,))
+
+
+def _live_ready(monkeypatch) -> None:
+    monkeypatch.setenv("MUCARO_AI_LIVE_MODE", "1")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr("backend.app.model_router.importlib.util.find_spec", lambda name: object())
+
+
+def _scripted_generate(monkeypatch, per_provider: dict[str, list]):
+    seen: list[str] = []
+
+    def fake(query, chunks, *, model_provider=None, **kwargs):
+        seen.append(model_provider)
+        step = per_provider[model_provider].pop(0)
+        if isinstance(step, str):
+            raise ModelProviderError(step, f"{model_provider} down")
+        return step
+
+    monkeypatch.setattr("backend.app.services.generate_answer", fake)
+    return seen
+
+
+def _live_answer(text="Lineage needs chunk_a."):
+    return {"model_provider": "anthropic", "model_name": "live", "answer": text, "cited_chunk_ids": ["chunk_a"]}
+
+
+def test_outage_with_checkpoint_pauses_run_instead_of_failing(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    _live_ready(monkeypatch)
+    seen = _scripted_generate(monkeypatch, {"anthropic": [RATE, RATE]})
+    checkpoint = create_checkpoint(session_id="s", run_id="r", objective="answer", source_sha="a" * 40, state="EXECUTING", cfg=cfg)
+
+    result = answer_question(
+        "What does source lineage require?", model_provider="anthropic", allow_live=True, cfg=cfg,
+        checkpoint_id=checkpoint["checkpoint_id"], failover_policy=NO_SLEEP, persist=False,
+    )
+
+    assert result["status"] == "PAUSED_PROVIDER" and result["provider_error"] == RATE
+    assert seen == ["anthropic", "anthropic"] and len(result["model_attempts"]) == 2
+    stored = get_checkpoint(checkpoint["checkpoint_id"], cfg)
+    assert stored["state"] == "PAUSED_PROVIDER" and stored["provider"] == "anthropic"
+    assert (stored["session_id"], stored["run_id"]) == ("s", "r")  # identity preserved across the outage
+
+
+def test_outage_without_checkpoint_keeps_the_original_error_shape(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    _live_ready(monkeypatch)
+    _scripted_generate(monkeypatch, {"anthropic": [RATE, RATE]})
+
+    result = answer_question("What does source lineage require?", model_provider="anthropic", allow_live=True, cfg=cfg, failover_policy=NO_SLEEP, persist=False)
+
+    assert result["status"] == RATE
+    assert result["retrieved_chunks"] and result["model_route"]["selected_provider"] == "anthropic"
+    assert len(result["model_attempts"]) == 2
+
+
+def test_live_outage_never_silently_degrades_to_mock_without_opt_in(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    _live_ready(monkeypatch)
+    seen = _scripted_generate(monkeypatch, {"anthropic": ["ERROR_MODEL_PROVIDER_UNAVAILABLE"], "mock": [_live_answer()]})
+
+    result = answer_question("What does source lineage require?", model_provider="anthropic", allow_live=True, cfg=cfg, failover_policy=NO_SLEEP, persist=False)
+
+    assert result["status"] == "ERROR_MODEL_PROVIDER_UNAVAILABLE"
+    assert seen == ["anthropic"]
+
+
+def test_opt_in_offline_failover_answers_and_records_the_chain(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    _live_ready(monkeypatch)
+    mock_answer = {"model_provider": "mock", "model_name": "mock", "answer": "Lineage needs chunk_a.", "cited_chunk_ids": ["chunk_a"]}
+    seen = _scripted_generate(monkeypatch, {"anthropic": ["ERROR_MODEL_PROVIDER_UNAVAILABLE"], "mock": [mock_answer]})
+
+    result = answer_question(
+        "What does source lineage require?", model_provider="anthropic", allow_live=True, allow_mock_fallback=True,
+        cfg=cfg, failover_policy=NO_SLEEP, persist=False,
+    )
+
+    assert seen == ["anthropic", "mock"]
+    assert result["model_provider"] == "mock" and result["model_failed_over"] is True
+    assert [a["status"] for a in result["model_attempts"]] == ["ERROR_MODEL_PROVIDER_UNAVAILABLE", "OK"]
+
+
+def test_hard_provider_failure_is_not_masked_by_failover_or_pause(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    _live_ready(monkeypatch)
+    _scripted_generate(monkeypatch, {"anthropic": ["ERROR_MODEL_PROVIDER_CALL_FAILED"], "mock": [_live_answer()]})
+    checkpoint = create_checkpoint(session_id="s", run_id="r", objective="answer", source_sha="a" * 40, state="EXECUTING", cfg=cfg)
+
+    result = answer_question(
+        "What does source lineage require?", model_provider="anthropic", allow_live=True, allow_mock_fallback=True,
+        cfg=cfg, checkpoint_id=checkpoint["checkpoint_id"], failover_policy=NO_SLEEP, persist=False,
+    )
+
+    assert result["status"] == "ERROR_MODEL_PROVIDER_CALL_FAILED"
+    assert get_checkpoint(checkpoint["checkpoint_id"], cfg)["state"] == "EXECUTING"  # a bad request is not an outage
+
+
+def test_successful_answer_records_single_ok_attempt(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+
+    result = answer_question("What does source lineage require?", cfg=cfg, persist=False)
+
+    assert result["model_failed_over"] is False
+    assert [a["status"] for a in result["model_attempts"]] == ["OK"]

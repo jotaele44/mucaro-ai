@@ -177,9 +177,7 @@ def test_cli_gh_runner_requires_network_capability_and_is_denied_on_unsupported_
     assert (ok, detail.startswith("ERROR_PERMISSION_DENIED")) == (False, True)
 
 
-@pytest.mark.xfail(strict=True, reason="V04/Workstream C: the live model call has no cfg and is not gated yet")
 def test_live_model_call_is_gated_by_model_invoke_permission() -> None:
-    # The Anthropic SDK does its own HTTP, so the primitive scan cannot see it. Tracked explicitly;
-    # strict xfail turns this into a failure the moment it is gated, forcing removal of the marker.
+    # The Anthropic SDK does its own HTTP, so the primitive scan cannot see it; assert the gate explicitly.
     text = (APP_DIR / "model_router.py").read_text(encoding="utf-8")
     assert FACADE_IMPORT.search(text)

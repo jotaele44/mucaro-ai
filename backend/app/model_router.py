@@ -5,6 +5,9 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from .config import Settings, settings
+from .permission_engine import PermissionEngineError, PermissionRequest, require
+
 
 class ModelProviderError(RuntimeError):
     def __init__(self, status: str, detail: str) -> None:
@@ -44,6 +47,28 @@ MODEL_PROVIDER_SPECS: dict[str, ModelProviderSpec] = {
         description="Live Anthropic Messages API adapter, disabled unless live mode and credentials are explicit.",
     ),
 }
+
+
+def classify_provider_exception(exc: BaseException) -> ModelProviderError:
+    """Map an SDK/transport exception to a stable ModelProviderError status.
+
+    Matches on class name and status_code so the optional provider SDK is never imported here.
+    Interruptions (rate limit, timeout, unavailable) are what recovery and failover act on;
+    anything else is a hard, non-retryable failure (bad request, auth, unknown).
+    """
+    if isinstance(exc, ModelProviderError):
+        return exc
+    name = type(exc).__name__
+    code = getattr(exc, "status_code", None)
+    code = code if isinstance(code, int) else None
+    detail = f"{name}: {exc}"[:500]
+    if name == "RateLimitError" or code == 429:
+        return ModelProviderError("ERROR_MODEL_PROVIDER_RATE_LIMIT", detail)
+    if isinstance(exc, TimeoutError) or name in {"APITimeoutError", "Timeout", "ReadTimeout", "ConnectTimeout"}:
+        return ModelProviderError("ERROR_MODEL_PROVIDER_TIMEOUT", detail)
+    if name in {"APIConnectionError", "InternalServerError", "ServiceUnavailableError", "OverloadedError"} or (code is not None and code >= 500):
+        return ModelProviderError("ERROR_MODEL_PROVIDER_UNAVAILABLE", detail)
+    return ModelProviderError("ERROR_MODEL_PROVIDER_CALL_FAILED", detail)
 
 
 def normalize_model_provider(model_provider: str | None) -> str:
@@ -115,6 +140,7 @@ def generate_answer(
     allow_mock_fallback: bool = False,
     conversation_context: list[dict[str, Any]] | None = None,
     memory_context: list[dict[str, Any]] | None = None,
+    cfg: Settings = settings,
 ) -> dict[str, Any]:
     spec = get_model_provider_spec(model_provider)
     if spec.name == "mock":
@@ -145,6 +171,10 @@ def generate_answer(
             conversation_context=conversation_context or [],
             memory_context=memory_context or [],
         )
+    try:
+        require(PermissionRequest(capability="model.invoke", subject=spec.name, target=model_name, origin="operator"), cfg=cfg)
+    except PermissionEngineError as exc:
+        raise ModelProviderError(exc.status, exc.detail) from exc
     return _anthropic_answer(
         query,
         retrieved_chunks,
@@ -274,12 +304,17 @@ def _anthropic_answer(
         f"Memory:\n{chr(10).join(_format_memory_context(memory_context)) or 'none'}\n\n"
         f"Question: {query}\n\nContext:\n{context}"
     )
-    response = client.messages.create(
-        model=model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model),
-        max_tokens=900,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    text = "\n".join(block.text for block in response.content if getattr(block, "type", None) == "text")
+    try:
+        response = client.messages.create(
+            model=model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model),
+            max_tokens=900,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except Exception as exc:  # SDK/transport errors become stable statuses so recovery can act on them
+        raise classify_provider_exception(exc) from exc
+    text = "\n".join(block.text for block in getattr(response, "content", None) or [] if getattr(block, "type", None) == "text")
+    if not text.strip():
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_MALFORMED_RESPONSE", "provider returned no text content")
     cited = [c["chunk_id"] for c in retrieved_chunks if c["chunk_id"] in text]
     return {
         "model_provider": "anthropic",
