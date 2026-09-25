@@ -12,6 +12,7 @@ from typing import Any
 
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .container_runtime import ContainerRuntimeError, resolve_container_engine, validate_pinned_image
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
 
@@ -156,6 +157,10 @@ def build_coding_container_plan(
     except DistributionPolicyError as exc:
         raise CodingContainerError(exc.status, exc.detail) from exc
     try:
+        require(PermissionRequest(capability="subprocess.execute", subject="coding_container.plan", target=str(repo_root), origin="operator"), cfg=cfg)
+    except PermissionEngineError as exc:
+        raise CodingContainerError(exc.status, exc.detail) from exc
+    try:
         context = resolve_repository(repo_root, cfg)
         state = inspect_repository(context.repo_root, cfg=cfg)
     except CodingWorkspaceError as exc:
@@ -289,6 +294,11 @@ def run_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = sett
         raise CodingContainerError("ERROR_CODING_CONTAINER_PLAN_STALE", "repository state drifted before execution")
 
     argv = build_coding_container_command(plan)
+    # Re-checked at execution: the channel or policy may differ from when the plan was built.
+    try:
+        require(PermissionRequest(capability="subprocess.execute", subject="coding_container.run", target=argv[0], origin="operator"), cfg=cfg)
+    except PermissionEngineError as exc:
+        raise CodingContainerError(exc.status, exc.detail) from exc
     started = time.monotonic()
     try:
         proc = subprocess.run(

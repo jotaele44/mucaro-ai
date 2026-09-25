@@ -185,3 +185,10 @@ def test_decisions_validate_against_published_schema(cfg: Settings) -> None:
     schema = json.loads((Path(__file__).resolve().parents[2] / "schemas" / "permission_decision.schema.json").read_text())
     for request in (_req("model.invoke"), _req("git.mutate", origin="planning"), _req("teleport.anywhere")):
         jsonschema.validate(evaluate(request, cfg=cfg).as_dict(), schema)
+
+
+@pytest.mark.parametrize("capability", ["git.read", "git.mutate"])
+def test_git_capabilities_inherit_subprocess_denial_on_app_store(cfg: Settings, capability: str) -> None:
+    decision = evaluate(_req(capability, origin="operator"), cfg=replace(cfg, distribution_channel="mac_app_store"))
+    assert decision.decision == DENY
+    assert "Mac App Store" in decision.reasons[0]

@@ -7,6 +7,7 @@ from typing import Any
 
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .permissions import is_within_path
 
 DEFAULT_PATCH_MAX_BYTES = 512 * 1024
@@ -157,6 +158,10 @@ def validate_patch_proposal(
         )
 
     context = resolve_repository(repo_root, cfg)
+    try:
+        require(PermissionRequest(capability="git.read", subject="coding_patch.validate_patch_proposal", target=str(context.repo_root), origin="operator"), cfg=cfg)
+    except PermissionEngineError as exc:
+        raise CodingWorkspaceError(exc.status, exc.detail) from exc
     paths = _parse_diff_paths(context.repo_root, patch, patch_bytes)
     preimages = [_path_preimage(context.repo_root, path) for path in paths]
     state = inspect_repository(context.repo_root, cfg=cfg)

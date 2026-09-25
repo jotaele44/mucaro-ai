@@ -37,6 +37,8 @@ SIDE_EFFECTING_CAPABILITIES = frozenset(
     }
 )
 FILESYSTEM_CAPABILITIES = frozenset({"filesystem.read", "filesystem.write"})
+# The git capabilities are implemented by spawning the git CLI, so they inherit subprocess restrictions.
+SUBPROCESS_BACKED_CAPABILITIES = frozenset({"git.read", "git.mutate"})
 ORIGINS = frozenset({"operator", "planning", "agent"})
 
 
@@ -115,9 +117,15 @@ def evaluate(
     *,
     cfg: Settings = settings,
     policy: CapabilityPolicy | None = None,
+    distribution_channel: str | None = None,
 ) -> PermissionDecision:
-    """Single fail-closed permission decision. Deny beats ask beats allow."""
+    """Single fail-closed permission decision. Deny beats ask beats allow.
+
+    ``distribution_channel`` overrides ``cfg.distribution_channel`` for callers (workers) that are
+    handed a channel explicitly rather than a Settings object.
+    """
     policy = policy or default_policy()
+    channel = distribution_channel if distribution_channel is not None else cfg.distribution_channel
     if request.origin not in ORIGINS:
         return _decision(request, DENY, [f"unknown request origin: {request.origin}"])
     if request.capability not in KNOWN_CAPABILITIES:
@@ -132,9 +140,10 @@ def evaluate(
     if not capability_decision.authorized:
         return _decision(request, DENY, capability_decision.reasons)
 
-    if cfg.distribution_channel not in SUPPORTED_DISTRIBUTION_CHANNELS:
-        return _decision(request, DENY, [f"unsupported distribution channel: {cfg.distribution_channel}"])
-    if cfg.distribution_channel == MAC_APP_STORE_DISTRIBUTION_CHANNEL and request.capability in APP_STORE_DENIED_CAPABILITIES:
+    if channel not in SUPPORTED_DISTRIBUTION_CHANNELS:
+        return _decision(request, DENY, [f"unsupported distribution channel: {channel}"])
+    effective = {request.capability} | ({"subprocess.execute"} if request.capability in SUBPROCESS_BACKED_CAPABILITIES else set())
+    if channel == MAC_APP_STORE_DISTRIBUTION_CHANNEL and effective & APP_STORE_DENIED_CAPABILITIES:
         return _decision(request, DENY, [f"capability disabled for Mac App Store distribution: {request.capability}"])
 
     if request.capability in FILESYSTEM_CAPABILITIES:
@@ -164,8 +173,9 @@ def require(
     *,
     cfg: Settings = settings,
     policy: CapabilityPolicy | None = None,
+    distribution_channel: str | None = None,
 ) -> PermissionDecision:
-    decision = evaluate(request, cfg=cfg, policy=policy)
+    decision = evaluate(request, cfg=cfg, policy=policy, distribution_channel=distribution_channel)
     if not decision.allowed:
         raise PermissionEngineError(decision)
     return decision
