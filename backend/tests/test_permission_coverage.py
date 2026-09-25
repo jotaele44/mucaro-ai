@@ -76,10 +76,11 @@ def _cfg(root: Path, channel: str = "local") -> Settings:
 
 
 def test_ocr_denied_on_app_store_channel_before_any_subprocess(tmp_path: Path) -> None:
-    from PIL import Image
+    import base64
 
     image = tmp_path / "scan.png"
-    Image.new("RGB", (8, 8), "white").save(image)
+    # Minimal valid 1x1 PNG; avoids depending on Pillow, which CI does not install.
+    image.write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="))
     calls: list[list[str]] = []
 
     def runner(command, timeout_seconds):
