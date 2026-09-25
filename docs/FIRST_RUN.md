@@ -1,8 +1,31 @@
 # First Run Guide
 
-This guide is the safest path before opening the full app.
+## Recommended: double-click
 
-## macOS recommended path
+Double-click `Mucaro AI.command` (macOS) or `Mucaro AI.cmd` (Windows). No other step is needed.
+
+The first run prepares everything inside the project folder and then opens the app:
+
+| Step | Marker when done | First run | Later runs |
+|---|---|---|---|
+| 0. Private uv, Node.js 22, Python 3.12 (SHA-256 verified), `.venv` | `UV_OK`, `NODE_OK`, `VENV_OK` | downloads | `cached` |
+| 1. Python packages | `PY_DEPS_OK` | installs | `PY_DEPS_CACHED` |
+| 2. Web interface packages | `FRONTEND_DEPS_OK` | `npm ci` | `FRONTEND_DEPS_CACHED` |
+| 3. Web interface build | `FRONTEND_BUILD_OK` | builds | rebuilt only when `frontend/` changed |
+| 4. `.env` and readiness check | `PREFLIGHT_OK` | runs | `PREFLIGHT_CACHED` |
+| 5. Sample documents | `INGEST_FOLDER_OK` | loads `data/input` samples (skipped if you already have sources) | `SAMPLES_CACHED` |
+| 6. Start and open the browser | `BACKEND_READY` | | |
+
+`ONE_CLICK_SETUP_OK` marks a run that did setup work; `ONE_CLICK_FAST_PATH` marks a run that had
+nothing to do. If port 8000 is taken by another program the app moves to the next free port
+(`PORT_FALLBACK`). If Mucaro AI is already running, a second double-click just opens it
+(`DESKTOP_LAUNCH_REUSED`). If setup stops, the window names the problem and the log file; fix it
+(usually the internet connection) and double-click again: setup resumes where it stopped. Details
+and error codes: `docs/ONE_CLICK_SETUP.md`.
+
+## Manual developer path (macOS)
+
+Use this only if you manage Python 3.11-3.13 and Node 20+ yourself.
 
 From the folder containing `mucaro-ai/`:
 
@@ -123,6 +146,8 @@ Common failures:
 
 | Error | Fix |
 |---|---|
+| `ERROR_DOWNLOAD_FAILED` | Double-click setup: no internet connection during first setup; reconnect and double-click again |
+| `ERROR_MACOS_TOO_OLD` / `ERROR_PLATFORM_UNSUPPORTED` | Double-click setup: see the supported platforms in `docs/ONE_CLICK_SETUP.md` |
 | `ERROR_PYTHON_MISSING` | Install Python 3.11+ (`brew install python@3.12` or python.org) |
 | `ERROR_PYTHON_TOO_OLD` | Bootstrap found only an older Python; install 3.11+ and rerun |
 | `ERROR_PYTHON_TOO_OLD_OR_MISSING` | Windows: install Python 3.11+ from python.org with "Add to PATH" |

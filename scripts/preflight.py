@@ -167,6 +167,11 @@ def check_tools(strict_frontend: bool) -> bool:
     return ok
 
 
+def skip_tool_probe() -> bool:
+    status_line("OK", "TOOL_PROBE_SKIPPED", "private runtimes from the double-click setup are used instead of PATH tools")
+    return True
+
+
 def check_sample_data() -> bool:
     sample = ROOT / "data" / "input" / "sample_mucaro_ai.txt"
     if sample.exists():
@@ -181,6 +186,12 @@ def main() -> int:
     parser.add_argument("--create-env", action="store_true", help="Create .env from .env.example when missing.")
     parser.add_argument("--strict-imports", action="store_true", help="Fail if Python dependencies are not importable.")
     parser.add_argument("--strict-frontend", action="store_true", help="Fail if Node/npm/frontend dependencies are missing.")
+    parser.add_argument(
+        "--skip-tool-probe",
+        action="store_true",
+        help="Do not run git/node/npm from PATH (the double-click setup uses private runtimes; on macOS "
+        "without developer tools, /usr/bin/git opens an install dialog).",
+    )
     args = parser.parse_args()
 
     print(f"PREFLIGHT_ROOT {ROOT}")
@@ -188,7 +199,7 @@ def main() -> int:
         check_paths(),
         ensure_env_file(args.create_env),
         check_python(args.strict_imports),
-        check_tools(args.strict_frontend),
+        skip_tool_probe() if args.skip_tool_probe else check_tools(args.strict_frontend),
         check_sample_data(),
     ]
     if all(checks):

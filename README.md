@@ -4,37 +4,42 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-Requirements: Python 3.11+ and, for the browser UI, Node 20+.
+**Double-click `Mucaro AI.command` (macOS) or `Mucaro AI.cmd` (Windows).** That is the whole setup.
 
-1. **Set up once**
+The first double-click downloads private, checksum-verified copies of Python 3.12 and Node.js
+into this folder (about 200 MB to download, about 700 MB on disk, 2-5 minutes on a typical
+connection), installs everything, builds
+the interface, loads two sample documents, starts the app, and opens it in your browser. Nothing
+needs to be installed beforehand and nothing is written outside the project folder. Later
+double-clicks start the app in seconds and work offline. Keep the window open while you use the
+app; close it (or press `Ctrl+C`) to stop.
 
-   ```bash
-   cd mucaro-ai
-   bash scripts/bootstrap_macos.sh        # macOS/Linux
-   # .\scripts\bootstrap_windows.ps1      # Windows PowerShell
-   ```
+Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, and Linux x86_64
+(run `./"Mucaro AI.command"` from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
+does, its error codes, and how to remove it.
 
-   Expected final markers: `PREFLIGHT_OK`, `RELEASE_CHECK_OK`, `BOOTSTRAP_OK`.
-   The bootstrap picks a Python 3.11+ interpreter and stops with
-   `ERROR_PYTHON_TOO_OLD` if none is installed.
-
-2. **Start the app**
-
-   ```bash
-   source .venv/bin/activate
-   python scripts/launch_app.py           # or: make start, or double-click "Mucaro AI.command" on macOS
-   ```
-
-3. **Open** `http://127.0.0.1:8000`. The launcher builds the UI if needed,
-   starts the local backend, and opens your browser. Press `Ctrl+C` to stop.
-
-Settings go in `.env` (created from `.env.example` by the bootstrap). The
-launcher and `scripts/dev_start.py` read it at startup; variables already
-exported in your shell take precedence. If the UI shows **Backend not
-reachable**, start the launcher and press **Retry**.
+Settings go in `.env` (created from `.env.example` on first run). The launcher reads it at
+startup; variables already exported in your shell take precedence. If the UI shows **Backend not
+reachable**, double-click the launcher again and press **Retry**.
 
 See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
 `docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
+
+### Developer setup (manual)
+
+Requirements: Python 3.11-3.13 and Node 20+ already installed.
+
+```bash
+cd mucaro-ai
+bash scripts/bootstrap_macos.sh        # macOS/Linux
+# .\scripts\bootstrap_windows.ps1      # Windows PowerShell
+source .venv/bin/activate
+python scripts/launch_app.py           # or: make start
+```
+
+Expected bootstrap markers: `PREFLIGHT_OK`, `RELEASE_CHECK_OK`, `BOOTSTRAP_OK`. The bootstrap and
+the double-click setup share `.venv`; the double-click setup rebuilds it on its private Python
+3.12 if it finds a venv made from another interpreter.
 
 ## Safe startup helpers
 
