@@ -36,7 +36,7 @@ MODEL_PROVIDER_SPECS: dict[str, ModelProviderSpec] = {
     ),
     "anthropic": ModelProviderSpec(
         name="anthropic",
-        default_model="claude-3-5-sonnet-latest",
+        default_model="claude-sonnet-5",
         live=True,
         requires_live_mode=True,
         api_key_env="ANTHROPIC_API_KEY",

@@ -532,3 +532,43 @@ def test_launch_app_rejects_non_mucaro_port_conflict(monkeypatch, capsys):
     assert launch_app.main() == 5
     error_output = capsys.readouterr().err
     assert "ERROR_PORT_IN_USE_NON_MUCARO_AI port=54321" in error_output
+
+
+def test_launch_app_build_env_loads_project_env_without_overriding_shell(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text(
+        "MUCARO_AI_LIVE_MODE=1\nMUCARO_AI_MODEL=from-file\nMUCARO_AI_OPERATOR_TOKEN=\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    monkeypatch.setenv("MUCARO_AI_MODEL", "from-shell")
+    monkeypatch.delenv("MUCARO_AI_LIVE_MODE", raising=False)
+    monkeypatch.delenv("MUCARO_AI_OPERATOR_TOKEN", raising=False)
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+
+    env = launch_app.build_env()
+
+    assert env["MUCARO_AI_LIVE_MODE"] == "1"
+    assert env["MUCARO_AI_MODEL"] == "from-shell"
+    assert "MUCARO_AI_OPERATOR_TOKEN" not in env
+    assert env["PYTHONPATH"].split(launch_app.os.pathsep) == [str(tmp_path), str(tmp_path / "backend")]
+
+
+def test_release_check_pythonpath_uses_platform_separator(tmp_path, monkeypatch):
+    calls = []
+
+    class StopAfterFirstRun(Exception):
+        pass
+
+    def fake_run(cmd, *, env=None, cwd=release_check.ROOT):
+        calls.append(env)
+        raise StopAfterFirstRun
+
+    monkeypatch.setattr(release_check, "ROOT", tmp_path)
+    monkeypatch.setattr(release_check, "run", fake_run)
+    # Simulate Windows, where ":" would corrupt drive-letter paths.
+    monkeypatch.setattr(release_check.os, "pathsep", ";")
+
+    with pytest.raises(StopAfterFirstRun):
+        release_check.main()
+
+    assert calls[0]["PYTHONPATH"] == f"{tmp_path};{tmp_path / 'backend'}"
