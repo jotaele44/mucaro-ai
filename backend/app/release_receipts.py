@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import json
 import hashlib
+import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -11,8 +12,18 @@ RECEIPT_SCHEMA_VERSION = "mucaro_release_receipt_v1"
 RECEIPT_DIR = Path("data") / "exports" / "release_receipts"
 
 
+def release_receipt_directory(root: Path) -> Path:
+    external_data_dir = os.getenv("MUCARO_AI_DATA_DIR")
+    if not external_data_dir:
+        return root / RECEIPT_DIR
+    data_dir = Path(external_data_dir).expanduser()
+    if not data_dir.is_absolute():
+        raise ValueError("MUCARO_AI_DATA_DIR must be an absolute path")
+    return data_dir.resolve() / "exports" / "release_receipts"
+
+
 def receipt_path(root: Path, receipt_type: str, head_sha: str) -> Path:
-    return root / RECEIPT_DIR / f"{receipt_type}-{head_sha[:12]}.json"
+    return release_receipt_directory(root) / f"{receipt_type}-{head_sha[:12]}.json"
 
 
 def _sha256_file(path: Path) -> str:
@@ -100,7 +111,7 @@ def read_release_receipt_file(path: Path) -> tuple[dict[str, Any] | None, str | 
 
 
 def list_release_receipts(root: Path) -> list[dict[str, Any]]:
-    directory = root / RECEIPT_DIR
+    directory = release_receipt_directory(root)
     if not directory.exists():
         return []
     rows: list[dict[str, Any]] = []
@@ -137,7 +148,7 @@ def summarize_release_receipts(rows: list[dict[str, Any]]) -> dict[str, Any]:
 def find_release_receipt(root: Path, receipt_id: str) -> dict[str, Any] | None:
     if Path(receipt_id).name != receipt_id:
         return None
-    directory = root / RECEIPT_DIR
+    directory = release_receipt_directory(root)
     candidates = [
         directory / receipt_id,
         directory / f"{receipt_id}.json",
