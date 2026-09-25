@@ -36,6 +36,9 @@ REQUIRED_FILES = [
     "schemas/execution_gate.schema.json",
 ]
 PY_IMPORTS = ["fastapi", "pydantic", "jsonschema", "pytest", "pypdf"]
+# .env files copied from older .env.example versions may still pin these retired model ids.
+RETIRED_MODEL_IDS = {"claude-3-5-sonnet-latest"}
+CURRENT_DEFAULT_MODEL = "claude-sonnet-5"
 
 
 def status_line(level: str, code: str, detail: str) -> None:
@@ -62,9 +65,18 @@ def command_version(cmd: str, args: list[str] | None = None) -> tuple[bool, str]
     return proc.returncode == 0, version
 
 
+def warn_retired_env_model(env_file: Path) -> None:
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        key, sep, value = line.strip().partition("=")
+        model = value.split("#", 1)[0].strip().strip("\"'")
+        if sep and key.strip() == "MUCARO_AI_MODEL" and model in RETIRED_MODEL_IDS:
+            status_line("WARN", "ENV_MODEL_RETIRED", f"{model} in {env_file.name}; set MUCARO_AI_MODEL={CURRENT_DEFAULT_MODEL}")
+
+
 def ensure_env_file(create_env: bool) -> bool:
     if ENV_FILE.exists():
         status_line("OK", "ENV_PRESENT", str(ENV_FILE))
+        warn_retired_env_model(ENV_FILE)
         return True
     if not ENV_EXAMPLE.exists():
         status_line("ERROR", "ENV_EXAMPLE_MISSING", str(ENV_EXAMPLE))

@@ -2,31 +2,39 @@
 
 Local-first prototype for a custom LLM workflow with file ingestion, source lineage, cited retrieval, mock/Claude model routing, and a Planning-to-Execution Gate.
 
-## Fastest first run
+## Quick start
 
-### macOS/Linux
+Requirements: Python 3.11+ and, for the browser UI, Node 20+.
 
-```bash
-cd mucaro-ai
-bash scripts/bootstrap_macos.sh
-```
+1. **Set up once**
 
-Expected final markers:
+   ```bash
+   cd mucaro-ai
+   bash scripts/bootstrap_macos.sh        # macOS/Linux
+   # .\scripts\bootstrap_windows.ps1      # Windows PowerShell
+   ```
 
-```text
-PREFLIGHT_OK
-RELEASE_CHECK_OK
-BOOTSTRAP_OK
-```
+   Expected final markers: `PREFLIGHT_OK`, `RELEASE_CHECK_OK`, `BOOTSTRAP_OK`.
+   The bootstrap picks a Python 3.11+ interpreter and stops with
+   `ERROR_PYTHON_TOO_OLD` if none is installed.
 
-### Windows PowerShell
+2. **Start the app**
 
-```powershell
-cd mucaro-ai
-.\scripts\bootstrap_windows.ps1
-```
+   ```bash
+   source .venv/bin/activate
+   python scripts/launch_app.py           # or: make start, or double-click "Mucaro AI.command" on macOS
+   ```
 
-See `docs/FIRST_RUN.md` for step-by-step startup and error recovery.
+3. **Open** `http://127.0.0.1:8000`. The launcher builds the UI if needed,
+   starts the local backend, and opens your browser. Press `Ctrl+C` to stop.
+
+Settings go in `.env` (created from `.env.example` by the bootstrap). The
+launcher and `scripts/dev_start.py` read it at startup; variables already
+exported in your shell take precedence. If the UI shows **Backend not
+reachable**, start the launcher and press **Retry**.
+
+See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
+`docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
 
 ## Safe startup helpers
 
@@ -81,7 +89,10 @@ python scripts\release_check.py
 
 ## Optional environment variables
 
-Copy `.env.example` to `.env` and fill only what you need.
+Copy `.env.example` to `.env` and fill only what you need. `scripts/launch_app.py`
+and `scripts/dev_start.py` load `.env` automatically (shell-exported values win);
+when running `uvicorn` or `mucaro serve` directly, export the variables in your
+shell instead.
 
 - `ANTHROPIC_API_KEY`: required for Anthropic mode when `MUCARO_AI_LIVE_MODE=1`.
 - `MUCARO_AI_LIVE_MODE=1`: permits live Anthropic calls. Default is deterministic mock mode.

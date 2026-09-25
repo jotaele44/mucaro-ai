@@ -1,11 +1,14 @@
-:root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #17202a; background: #eef2f6; }
+:root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #17202a; background: #eef2f6; color-scheme: light; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0; }
+button, input, select, textarea { font-family: inherit; }
 main { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
 aside { background: #111827; color: white; padding: 24px; }
 aside h1 { font-size: 22px; margin: 0 0 24px; }
 nav { display: grid; gap: 10px; }
 nav a { color: #d1d5db; padding: 10px; border-radius: 8px; background: #1f2937; }
-.workspace { padding: 24px; display: grid; gap: 18px; }
+/* minmax(0, 1fr): let wide children (source table, nav strip) scroll inside their box instead of widening the page. */
+.workspace { padding: 24px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
 header { display: flex; gap: 18px; background: white; border-radius: 12px; padding: 14px 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
 .panel { background: white; border-radius: 12px; padding: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 .panel-header { display: flex; align-items: center; justify-content: space-between; }
@@ -38,7 +41,8 @@ button.secondary { background: #e5e7eb; color: #17202a; }
 table { width: 100%; border-collapse: collapse; }
 th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
 tr { cursor: pointer; }
-tr:hover, .selected-row { background: #f3f6fa; }
+.selected-row { background: #f3f6fa; }
+tr:focus-visible { outline: 2px solid #0f766e; outline-offset: -2px; }
 pre { white-space: pre-wrap; background: #0f172a; color: #e5e7eb; padding: 14px; border-radius: 10px; overflow: auto; }
 .notice { margin-top: 12px; padding: 12px; border-radius: 8px; background: #eef6ff; border: 1px solid #b9d9ff; color: #17324d; }
 .error { background: #fff1f2; border-color: #fecdd3; color: #7f1d1d; }
@@ -94,24 +98,25 @@ dd { margin: 0; overflow-wrap: anywhere; }
 
 
 /* Conversation-first shell */
-.app-shell { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
-.app-nav { position: sticky; top: 0; height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; background: #111827; color: white; padding: 22px; }
+.app-shell { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; min-height: 100dvh; }
+.app-nav { position: sticky; top: 0; height: 100vh; height: 100dvh; box-sizing: border-box; display: flex; flex-direction: column; background: #111827; color: white; padding: 22px; }
 .brand-block h1 { margin: 0; font-size: 22px; }
 .brand-block p { margin: 6px 0 22px; color: #9ca3af; font-size: 13px; }
 .app-nav nav { display: grid; gap: 7px; }
 .nav-button { width: 100%; text-align: left; background: transparent; color: #d1d5db; border: 1px solid transparent; }
-.nav-button:hover { background: #1f2937; }
 .nav-button.active { background: white; color: #111827; }
 .nav-health { margin-top: auto; display: grid; grid-template-columns: auto 1fr; gap: 9px; align-items: center; padding-top: 18px; border-top: 1px solid #374151; }
 .nav-health strong, .nav-health small { display: block; }
 .nav-health small { margin-top: 2px; color: #9ca3af; overflow-wrap: anywhere; }
 .status-dot { width: 9px; height: 9px; border-radius: 999px; background: #34d399; }
+.status-dot.checking { background: #fbbf24; }
+.status-dot.offline { background: #f87171; }
 .workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .workspace-header h2 { margin: 3px 0 0; }
 .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #6b7280; font-weight: 800; }
 .header-facts { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: #6b7280; }
 .header-facts strong { color: #17202a; }
-.conversation-workspace { min-height: calc(100vh - 120px); }
+.conversation-workspace { min-height: calc(100vh - 120px); min-height: calc(100dvh - 120px); }
 .composer { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-top: 12px; }
 .composer textarea { box-sizing: border-box; min-height: 76px; margin: 0; resize: vertical; }
 .evidence-drawer { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(220px, .6fr); gap: 12px; margin-top: 14px; }
@@ -120,10 +125,30 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .answer-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
 .table-scroll { overflow-x: auto; }
 .table-scroll table { min-width: 720px; }
+.composer-hint { margin: 8px 0 0; font-size: 13px; }
+.connection-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 0; }
+.connection-banner p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.connection-banner code, .notice code { font-size: 0.92em; background: rgba(127, 29, 29, 0.08); padding: 1px 4px; border-radius: 4px; }
+.file-picker { display: grid; gap: 6px; font-weight: 700; color: #374151; }
+.file-picker input { box-sizing: border-box; min-width: 0; max-width: 100%; margin: 0; font-weight: 400; }
+
+/* Hover feedback only where a real hover exists; on touch screens :hover sticks after a tap. */
+@media (hover: hover) {
+  tr:hover { background: #f3f6fa; }
+  .nav-button:hover { background: #1f2937; }
+  .nav-button.active:hover { background: white; }
+}
+
+/* Touch-first sizing for phones, portrait tablets, and any coarse pointer:
+   iOS Safari zooms the page when a focused field is under 16px, and Apple's HIG asks for 44px targets. */
+@media (max-width: 900px), (pointer: coarse) {
+  input, select, textarea { font-size: 16px; }
+  button, .nav-button, .chat-tab, select, input:not([type="file"]):not([type="checkbox"]):not([type="radio"]) { min-height: 44px; }
+}
 
 @media (max-width: 900px) {
-  .app-shell { grid-template-columns: 1fr; }
-  .app-nav { position: static; height: auto; padding: 14px; }
+  .app-shell { grid-template-columns: minmax(0, 1fr); }
+  .app-nav { position: static; height: auto; padding: 14px; min-width: 0; }
   .brand-block p { margin-bottom: 12px; }
   .app-nav nav { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 4px; }
   .nav-button { width: auto; flex: 0 0 auto; white-space: nowrap; }
@@ -139,6 +164,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
 
 @media (max-width: 480px) {
   .workspace-header { display: grid; grid-template-columns: 1fr; }
+  .connection-banner { display: grid; grid-template-columns: 1fr; }
   .panel { padding: 14px; }
   .panel-header { align-items: flex-start; gap: 10px; }
   .button-row { flex-wrap: wrap; }
