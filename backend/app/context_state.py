@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 from .utils import stable_id, utc_now
@@ -30,13 +31,19 @@ def _turn_ref(turn: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _turn_digest(turn: dict[str, Any]) -> str:
+    # Bind identity to what the turn says, not just its id: a rewritten turn must not validate.
+    payload = "\x1f".join(str(turn.get(key, "")) for key in ("turn_id", "role", "content"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def _context_identity(conversation: dict[str, Any]) -> str:
     turns = list(conversation.get("turns", []))
     return stable_id(
         "context",
         str(conversation.get("conversation_id", "")),
         str(len(turns)),
-        "|".join(str(turn.get("turn_id", "")) for turn in turns),
+        "|".join(_turn_digest(turn) for turn in turns),
         length=16,
     )
 

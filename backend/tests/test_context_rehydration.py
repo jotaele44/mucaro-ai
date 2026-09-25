@@ -97,3 +97,26 @@ def test_rehydration_rejects_turn_reordering_even_when_count_is_equal() -> None:
     with pytest.raises(ContextStateError) as exc:
         rehydrate_context_state(conversation, state)
     assert exc.value.status == "ERROR_CONTEXT_STALE"
+
+
+def test_rehydration_rejects_tampered_turn_content_with_unchanged_ids() -> None:
+    conversation = _conversation()
+    state = build_context_state(conversation)
+    conversation["turns"][2]["content"] = "silently rewritten history"
+    with pytest.raises(ContextStateError) as exc:
+        validate_context_state(conversation, state)
+    assert exc.value.status == "ERROR_CONTEXT_IDENTITY"
+
+
+def test_rehydration_rejects_tampered_turn_role_with_unchanged_ids() -> None:
+    conversation = _conversation()
+    state = build_context_state(conversation)
+    conversation["turns"][1]["role"] = "system"
+    with pytest.raises(ContextStateError) as exc:
+        rehydrate_context_state(conversation, state)
+    assert exc.value.status == "ERROR_CONTEXT_IDENTITY"
+
+
+def test_context_identity_is_stable_for_unchanged_conversation() -> None:
+    conversation = _conversation()
+    assert build_context_state(conversation)["context_state_id"] == build_context_state(deepcopy(conversation))["context_state_id"]
