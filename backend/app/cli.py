@@ -27,6 +27,7 @@ from .answer_trace_eval import (
     format_answer_trace_eval_text,
     format_answer_trace_quality_certification_text,
 )
+from .context_state import ContextStateError
 from .conversations import (
     append_answer_turn,
     build_conversation_context,
@@ -7719,6 +7720,11 @@ def run_conversations_ask(args: argparse.Namespace, cfg: Settings) -> int:
     if conversation is None:
         emit_payload({"status": "ERROR_CONVERSATION_NOT_FOUND", "conversation_id": args.conversation_id}, args.format)
         return 2
+    try:
+        conversation_context = build_conversation_context(conversation)
+    except ContextStateError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
     answer = answer_question(
         " ".join(args.query),
         top_k=args.top_k,
@@ -7728,7 +7734,7 @@ def run_conversations_ask(args: argparse.Namespace, cfg: Settings) -> int:
         allow_mock_fallback=args.allow_mock_fallback,
         allow_live=args.allow_live,
         require_offline=args.require_offline,
-        conversation_context=build_conversation_context(conversation),
+        conversation_context=conversation_context,
         cfg=cfg,
     )
     updated = append_answer_turn(args.conversation_id, " ".join(args.query), answer, cfg)

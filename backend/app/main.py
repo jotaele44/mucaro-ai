@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_status, require_operator_auth
 from .config import Settings, settings
+from .context_state import ContextStateError
 from .conversations import (
     append_answer_turn,
     build_conversation_context,
@@ -305,7 +306,10 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         existing_conversation = get_conversation(conversation_id, cfg)
         if existing_conversation is None:
             raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
-        conversation_context = build_conversation_context(existing_conversation)
+        try:
+            conversation_context = build_conversation_context(existing_conversation)
+        except ContextStateError as exc:
+            raise api_error(exc.status, exc.detail, status_code=409) from exc
         answer = answer_question(
             req.query,
             top_k=req.top_k,

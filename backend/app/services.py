@@ -159,6 +159,11 @@ def answer_question(
         "created_at": utc_now(),
     }
     answer_trace = validate_citations(answer_trace)
+    lossy = [t for t in (conversation_context or []) if t.get("status") == "COMPACTED_CONTEXT" and float(t.get("coverage_ratio", 1.0)) < 1.0]
+    if lossy:
+        # Compaction dropped part of the older history; surface it rather than implying full recall.
+        answer_trace["validation_flags"] = [*answer_trace.get("validation_flags", []), "CONTEXT_LOSSY"]
+        answer_trace["context_coverage_ratio"] = float(lossy[0]["coverage_ratio"])
     answer_trace["export_paths"] = export_answer_trace(answer_trace, cfg)
     if persist:
         upsert_payload("runs", "run_id", answer_trace, cfg.sqlite_path)

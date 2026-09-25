@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
+
+import jsonschema
 
 from .utils import stable_id, utc_now
 
@@ -157,6 +162,23 @@ def rehydrate_context_state(
     return rebuilt
 
 
+@lru_cache(maxsize=1)
+def _schema() -> dict[str, Any]:
+    # Application code, not project data: resolve relative to this module.
+    path = Path(__file__).resolve().parents[2] / "schemas" / "context_state.schema.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ContextStateError("ERROR_CONTEXT_SCHEMA_UNAVAILABLE", f"{path}: {exc}") from exc
+
+
+def validate_context_state_schema(context_state: dict[str, Any]) -> None:
+    errors = sorted(jsonschema.Draft202012Validator(_schema()).iter_errors(context_state), key=lambda e: list(e.absolute_path))
+    if errors:
+        where = "/".join(str(part) for part in errors[0].absolute_path) or "<root>"
+        raise ContextStateError("ERROR_CONTEXT_SCHEMA", f"{where}: {errors[0].message}")
+
+
 def build_model_context(context_state: dict[str, Any]) -> list[dict[str, Any]]:
     context: list[dict[str, Any]] = []
     summary = str(context_state.get("compacted_summary", "")).strip()
@@ -166,6 +188,8 @@ def build_model_context(context_state: dict[str, Any]) -> list[dict[str, Any]]:
             "content": "Compacted prior conversation state (not source evidence):\n" + summary,
             "status": "COMPACTED_CONTEXT",
             "run_id": None,
+            # Lets callers see that history was truncated, not just summarized.
+            "coverage_ratio": context_state.get("coverage", {}).get("ratio", 1.0),
         })
     context.extend(
         {

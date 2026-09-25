@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .config import Settings, settings
-from .context_state import build_context_state, build_model_context
+from .context_state import ContextStateError, build_context_state, build_model_context, validate_context_state, validate_context_state_schema
 from .db import delete_payload, init_db, list_payloads, upsert_payload
 from .utils import stable_id, utc_now
 
@@ -83,14 +83,29 @@ def delete_conversation(conversation_id: str, cfg: Settings = settings) -> dict[
     }
 
 
-def build_conversation_context(conversation: dict[str, Any]) -> list[dict[str, Any]]:
-    """Build bounded model context without mutating or deleting canonical turns."""
-    state = build_context_state(
+def _context_state_for(conversation: dict[str, Any]) -> dict[str, Any]:
+    return build_context_state(
         conversation,
         recent_turn_limit=MAX_CONTEXT_TURNS,
         recent_char_limit=MAX_CONTEXT_CHARS,
     )
-    return build_model_context(state)
+
+
+def build_conversation_context(conversation: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build bounded model context without mutating or deleting canonical turns.
+
+    A previously persisted context state is never trusted as history: it is verified against the
+    canonical turns (a rewritten turn fails closed with ContextStateError) and the model context is
+    always rebuilt from those turns. A state that is merely behind (newer turns) is not an error.
+    """
+    stored = conversation.get("context_state")
+    if isinstance(stored, dict):
+        try:
+            validate_context_state(conversation, stored)
+        except ContextStateError as exc:
+            if exc.status != "ERROR_CONTEXT_STALE":
+                raise
+    return build_model_context(_context_state_for(conversation))
 
 
 def append_answer_turn(
@@ -130,6 +145,10 @@ def append_answer_turn(
         }
     )
     conversation["turns"] = turns
+    # Persist the derived state so restarts can verify (not trust) it against the canonical turns.
+    context_state = _context_state_for(conversation)
+    validate_context_state_schema(context_state)
+    conversation["context_state"] = context_state
     if conversation.get("title") == DEFAULT_TITLE:
         conversation["title"] = _title_from_query(query)
     conversation["updated_at"] = now
