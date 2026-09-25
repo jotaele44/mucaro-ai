@@ -1,0 +1,6 @@
+# cmd.exe misparses labels and blocks in batch files without CRLF line endings.
+*.cmd text eol=crlf
+# Scripts run by bash (Mucaro AI.command sources the pins file) must keep LF even in Windows checkouts.
+*.sh text eol=lf
+*.command text eol=lf
+scripts/one_click_pins.env text eol=lf

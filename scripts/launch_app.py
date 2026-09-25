@@ -121,6 +121,44 @@ def stop_backend(proc: subprocess.Popen, port: int) -> bool:
     return False
 
 
+def find_fallback_port(port: int, span: int = 20) -> int | None:
+    """Return the first later port that is free or already serves a healthy Mucaro AI backend."""
+    for candidate in range(port + 1, port + span + 1):
+        if not port_open(candidate) or health_ok(candidate):
+            return candidate
+    return None
+
+
+def _raise_keyboard_interrupt(signum, frame) -> None:
+    del frame
+    if signum == getattr(signal, "SIGHUP", None):
+        # The terminal is gone; printing to it would fail before the backend is stopped.
+        sys.stdout = sys.stderr = open(os.devnull, "w", encoding="utf-8")
+    raise KeyboardInterrupt
+
+
+def install_stop_signals() -> dict[int, object]:
+    # Closing the Terminal window sends SIGHUP; treat it (and SIGTERM) like Ctrl+C so the backend is stopped.
+    previous: dict[int, object] = {}
+    for name in ("SIGHUP", "SIGTERM"):
+        sig = getattr(signal, name, None)
+        if sig is None:
+            continue
+        try:
+            previous[sig] = signal.signal(sig, _raise_keyboard_interrupt)
+        except (OSError, ValueError):
+            continue
+    return previous
+
+
+def restore_signals(previous: dict[int, object]) -> None:
+    for sig, handler in previous.items():
+        try:
+            signal.signal(sig, handler)
+        except (OSError, ValueError, TypeError):
+            continue
+
+
 def self_test() -> int:
     checks = {
         "ROOT_PRESENT": ROOT.exists(),
@@ -136,7 +174,7 @@ def self_test() -> int:
     return 0
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Launch Mucaro AI as a desktop-style local app.")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--no-browser", action="store_true")
@@ -145,62 +183,103 @@ def main() -> int:
     parser.add_argument("--smoke-test", action="store_true", help="Start, verify, stop, and exit without opening a long-running session.")
     parser.add_argument("--hold-seconds", type=float, default=0.5, help="Seconds to hold a successful smoke-test backend before stopping.")
     parser.add_argument("--startup-timeout", type=float, default=20.0)
-    args = parser.parse_args()
+    parser.add_argument(
+        "--auto-port",
+        action="store_true",
+        help="If the port is used by another program, use the next free port (up to 20 higher) instead of failing.",
+    )
+    parser.add_argument(
+        "--exit-if-running",
+        action="store_true",
+        help="If Mucaro AI is already running, open it in the browser and exit instead of waiting.",
+    )
+    args = parser.parse_args(argv)
 
     if args.self_test:
         return self_test()
 
+    previous_signals = install_stop_signals()
+    try:
+        return _launch(args)
+    finally:
+        restore_signals(previous_signals)
+
+
+def _launch(args: argparse.Namespace) -> int:
     print(f"DESKTOP_LAUNCH_START root={ROOT}")
     ensure_frontend_dist(skip_build=args.skip_build)
 
-    url = url_for(args.port)
-    proc: subprocess.Popen | None = None
-
-    if port_open(args.port):
-        if health_ok(args.port):
-            print(f"REUSING_EXISTING_BACKEND {health_url(args.port)}")
-        else:
-            print(f"ERROR_PORT_IN_USE_NON_MUCARO_AI port={args.port}", file=sys.stderr)
+    port = args.port
+    if args.auto_port and port_open(port) and not health_ok(port):
+        fallback = find_fallback_port(port)
+        if fallback is None:
+            print(f"ERROR_PORT_IN_USE_NON_MUCARO_AI port={port} no free port up to {port + 20}", file=sys.stderr)
             return 5
-    else:
-        proc = start_backend(args.port)
-        if not wait_for_health(args.port, args.startup_timeout):
-            if proc.poll() is not None:
-                print(f"ERROR_BACKEND_EXITED_EARLY returncode={proc.returncode}", file=sys.stderr)
-                return proc.returncode or 6
-            print(f"ERROR_BACKEND_HEALTH_TIMEOUT url={health_url(args.port)}", file=sys.stderr)
-            return 7
-        print(f"BACKEND_READY {health_url(args.port)}")
+        print(f"PORT_FALLBACK from={port} to={fallback}")
+        port = fallback
 
-    if not args.no_browser:
-        print(f"OPENING_BROWSER {url}")
-        webbrowser.open(url)
-
-    print("DESKTOP_LAUNCH_OK press Ctrl+C to stop")
-    if args.smoke_test:
-        time.sleep(max(0.0, args.hold_seconds))
-        print("DESKTOP_SMOKE_READY")
-        if proc is not None:
-            ok = stop_backend(proc, args.port)
-            proc = None
-            if not ok:
-                return 9
-        print("DESKTOP_SMOKE_OK")
-        return 0
-
+    url = url_for(port)
+    proc: subprocess.Popen | None = None
     try:
-        while True:
-            if proc is not None and proc.poll() is not None:
-                print(f"ERROR_BACKEND_EXITED returncode={proc.returncode}", file=sys.stderr)
-                return proc.returncode or 8
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("DESKTOP_STOP_REQUESTED")
-        return 0
+        if port_open(port):
+            if health_ok(port):
+                print(f"REUSING_EXISTING_BACKEND {health_url(port)}")
+            else:
+                print(f"ERROR_PORT_IN_USE_NON_MUCARO_AI port={port}", file=sys.stderr)
+                return 5
+        else:
+            proc = start_backend(port)
+            if not wait_for_health(port, args.startup_timeout):
+                if proc.poll() is not None:
+                    print(f"ERROR_BACKEND_EXITED_EARLY returncode={proc.returncode}", file=sys.stderr)
+                    return proc.returncode or 6
+                print(f"ERROR_BACKEND_HEALTH_TIMEOUT url={health_url(port)}", file=sys.stderr)
+                return 7
+            print(f"BACKEND_READY {health_url(port)}")
+
+        if not args.no_browser:
+            print(f"OPENING_BROWSER {url}")
+            webbrowser.open(url)
+
+        if proc is None and args.exit_if_running and not args.smoke_test:
+            print(f"DESKTOP_LAUNCH_REUSED {url}")
+            print(f"Mucaro AI is already running at {url} (in another window). This window can be closed.")
+            return 0
+
+        print("DESKTOP_LAUNCH_OK press Ctrl+C to stop")
+        if args.smoke_test:
+            time.sleep(max(0.0, args.hold_seconds))
+            print("DESKTOP_SMOKE_READY")
+            if proc is not None:
+                ok = stop_backend(proc, port)
+                proc = None
+                if not ok:
+                    return 9
+            print("DESKTOP_SMOKE_OK")
+            return 0
+
+        print("")
+        print(f"Mucaro AI is running at {url}")
+        print("Keep this window open while you use it. To stop, close this window or press Ctrl+C.")
+        print("", flush=True)
+        try:
+            while True:
+                if proc is not None and proc.poll() is not None:
+                    print(f"ERROR_BACKEND_EXITED returncode={proc.returncode}", file=sys.stderr)
+                    return proc.returncode or 8
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("DESKTOP_STOP_REQUESTED")
+            return 0
+        finally:
+            if proc is not None and proc.poll() is None:
+                stop_backend(proc, port)
+                proc = None
+            print("DESKTOP_STOP_OK")
     finally:
+        # Covers Ctrl+C, a closed window, or an error while the backend was still starting.
         if proc is not None and proc.poll() is None:
-            stop_backend(proc, args.port)
-        print("DESKTOP_STOP_OK")
+            stop_backend(proc, port)
 
 
 if __name__ == "__main__":
