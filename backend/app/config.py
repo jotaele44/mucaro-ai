@@ -35,6 +35,24 @@ def find_project_root() -> Path:
     return Path.cwd().resolve()
 
 
+def find_data_dir(project_root: Path) -> Path:
+    env_data_dir = os.getenv("MUCARO_AI_DATA_DIR")
+    if not env_data_dir:
+        return project_root / "data"
+    data_dir = Path(env_data_dir).expanduser()
+    if not data_dir.is_absolute():
+        raise ValueError("MUCARO_AI_DATA_DIR must be an absolute path")
+    return data_dir.resolve()
+
+
+def path_is_within(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
 @dataclass(frozen=True)
 class Settings:
     project_root: Path
@@ -59,8 +77,13 @@ class Settings:
     def load(cls) -> "Settings":
         root = find_project_root()
         # Packaged apps keep user data outside the (read-only, replaceable) bundle (SD-006, TGT-017).
-        env_data_dir = os.getenv("MUCARO_AI_DATA_DIR")
-        data_dir = Path(env_data_dir).expanduser().resolve() if env_data_dir else root / "data"
+        data_dir = find_data_dir(root)
+        distribution_channel = (
+            os.getenv("MUCARO_AI_DISTRIBUTION_CHANNEL", DEFAULT_DISTRIBUTION_CHANNEL).strip().lower()
+            or DEFAULT_DISTRIBUTION_CHANNEL
+        )
+        if distribution_channel == "mac_app_store" and path_is_within(data_dir, root):
+            raise ValueError("mac_app_store data directory must be outside the application bundle")
         max_upload_bytes = parse_positive_int(os.getenv("MUCARO_AI_MAX_UPLOAD_BYTES"), DEFAULT_MAX_UPLOAD_BYTES)
         cors_origins = tuple(
             origin.strip()
@@ -76,7 +99,7 @@ class Settings:
             index_dir=data_dir / "indexes",
             sqlite_path=data_dir / "processed" / "mucaro_ai.sqlite3",
             default_model_provider=os.getenv("MUCARO_AI_MODEL_PROVIDER", "mock"),
-            default_model_name=os.getenv("MUCARO_AI_MODEL", "claude-3-5-sonnet-latest"),
+            default_model_name=os.getenv("MUCARO_AI_MODEL", "claude-sonnet-5"),
             max_upload_bytes=max_upload_bytes,
             max_ingest_bytes=parse_positive_int(os.getenv("MUCARO_AI_MAX_INGEST_BYTES"), DEFAULT_MAX_INGEST_BYTES),
             cors_origins=cors_origins or DEFAULT_CORS_ORIGINS,
@@ -84,10 +107,7 @@ class Settings:
             workspace_profile=os.getenv("MUCARO_AI_WORKSPACE_PROFILE", "default"),
             deployment_profile=os.getenv("MUCARO_AI_DEPLOYMENT_PROFILE", "local").strip().lower() or "local",
             allow_public_bind=parse_bool(os.getenv("MUCARO_AI_ALLOW_PUBLIC_BIND"), False),
-            distribution_channel=(
-                os.getenv("MUCARO_AI_DISTRIBUTION_CHANNEL", DEFAULT_DISTRIBUTION_CHANNEL).strip().lower()
-                or DEFAULT_DISTRIBUTION_CHANNEL
-            ),
+            distribution_channel=distribution_channel,
         )
 
     def ensure_dirs(self) -> None:

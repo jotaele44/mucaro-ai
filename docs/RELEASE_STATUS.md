@@ -14,11 +14,11 @@ Requirement denominator: 138 (arithmetic closes: yes).
 
 | State | Requirements |
 | --- | ---: |
-| PASS | 56 |
+| PASS | 55 |
 | FAIL | 0 |
 | OPEN | 50 |
 | BLOCKED | 7 |
-| PROVISIONAL | 24 |
+| PROVISIONAL | 25 |
 | NOT_APPLICABLE | 1 |
 
 | Terminal-rule condition | Holds |
@@ -38,7 +38,7 @@ Residue:
 - fail (0): none
 - blocked (6): `KERNEL-003`, `MATRIX-018`, `TGT-001`, `TGT-009`, `TGT-026`, `TGT-028`
 - externally blocked (1): `TGT-027`
-- provisional (24): `GOAL-001`, `GOAL-002`, `INV-004`, `INV-005`, `INV-007`, `INV-018`, `INV-022`, `MATRIX-008`, `MATRIX-010`, `MATRIX-015`, `MATRIX-019`, `MATRIX-020`, `MOB-F01`, `MOB-F15`, `MOB-F20`, `TGT-002`, `TGT-008`, `TGT-014`, `TGT-016`, `TGT-019`, `TGT-024`, `TGT-034`, `TGT-035`, `TGT-036`
+- provisional (25): `GOAL-001`, `GOAL-002`, `INV-004`, `INV-005`, `INV-007`, `INV-018`, `INV-022`, `MATRIX-008`, `MATRIX-010`, `MATRIX-015`, `MATRIX-019`, `MATRIX-020`, `MOB-F01`, `MOB-F15`, `MOB-F20`, `TGT-002`, `TGT-008`, `TGT-014`, `TGT-016`, `TGT-019`, `TGT-024`, `TGT-029`, `TGT-034`, `TGT-035`, `TGT-036`
 - open (50): 50 requirements (see `mucaro release scope status`)
 - active blockers: `BLK-LLM-001`, `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-SPEC-001`, `BLK-WEB-001`
 - unresolved material contradictions: none

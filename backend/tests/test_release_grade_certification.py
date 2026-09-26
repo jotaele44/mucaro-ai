@@ -83,8 +83,10 @@ def test_receipt_gate_binds_head_status_schema_and_blocking_checks(tmp_path: Pat
     assert check(blocking_checks=["window"]).status == "FAIL"
 
 
-def _run_main(tmp_path: Path, monkeypatch, *, certified_scope: bool) -> tuple[int, dict, str]:
+def _run_main(tmp_path: Path, monkeypatch, *, certified_scope: bool, portable_lane: bool = True) -> tuple[int, dict, str]:
     passed = grade.Gate("stub", "PASS", "ok")
+    if portable_lane:
+        monkeypatch.setattr(grade, "portable_runtime_gates", lambda args, **_: [grade.Gate(name, "PASS", "ok") for name in grade.PORTABLE_RUNTIME_GATES])
     monkeypatch.setattr(grade, "git_head", lambda: HEAD)
     monkeypatch.setattr(grade, "run_gate", lambda name, command, **_: (grade.Gate(name, "PASS", "ok", command), ""))
     monkeypatch.setattr(grade, "security_profile_gate", lambda *a, **k: grade.Gate("security_profile", passed.status, "ok"))
@@ -115,7 +117,28 @@ def test_every_gate_passing_is_still_provisional_while_the_ledgers_are_not_certi
     assert code == 2
     assert line == "MUCARO AI RELEASE STATUS = PROVISIONAL"
     assert captured["payload"]["blocking_gates"] == ["release_scope"]
-    assert set(captured["payload"]["superseded_gates"]) == {"portable_embedded_runtime", "portable_install_reinstall_smoke", "distinct_version_upgrade_rollback", "clean_machine_macos"}
+    assert captured["payload"]["release_lanes"] == {
+        "native_app": ["macos_app_build", "macos_app_e2e", "security_profile"],
+        "portable_runtime": ["portable_embedded_runtime", "portable_install_reinstall_smoke", "distinct_version_upgrade_rollback", "clean_machine_macos"],
+    }
+
+
+def test_both_release_lanes_are_required(tmp_path: Path, monkeypatch) -> None:
+    # Everything else passes and the ledgers are certified, but the portable lane has no inputs.
+    code, captured, line = _run_main(tmp_path, monkeypatch, certified_scope=True, portable_lane=False)
+    assert code == 2 and line == "MUCARO AI RELEASE STATUS = PROVISIONAL"
+    assert captured["payload"]["blocking_gates"] == sorted(grade.PORTABLE_RUNTIME_GATES)
+    assert set(grade.NATIVE_APP_GATES) | set(grade.PORTABLE_RUNTIME_GATES) <= set(grade.REQUIRED_GATES)
+
+
+def test_clean_machine_receipt_must_prove_the_bundle_stayed_immutable(tmp_path: Path) -> None:
+    evidence = {field: True for field in grade.CLEAN_MACHINE_EVIDENCE}
+    good = _receipt(tmp_path, "clean.json", schema_version=grade.EXTERNAL_EVIDENCE_SCHEMA, head_sha=HEAD, evidence=evidence)
+    assert grade.external_gate("clean_machine_macos", good, expected_head=HEAD, required_true=grade.CLEAN_MACHINE_EVIDENCE).status == "PASS"
+    mutable = _receipt(tmp_path, "mutable.json", schema_version=grade.EXTERNAL_EVIDENCE_SCHEMA, head_sha=HEAD,
+                       evidence={**evidence, "post_launch_bundle_immutable": False})
+    gate = grade.external_gate("clean_machine_macos", mutable, expected_head=HEAD, required_true=grade.CLEAN_MACHINE_EVIDENCE)
+    assert gate.status == "FAIL" and "post_launch_bundle_immutable" in gate.detail
 
 
 def test_certified_only_when_every_gate_and_the_terminal_rule_hold(tmp_path: Path, monkeypatch) -> None:

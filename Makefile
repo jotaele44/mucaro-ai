@@ -1,9 +1,12 @@
 PYTHON ?= python3
 
-.PHONY: bootstrap setup preflight test validate ingest ask cli serve launch-smoke desktop macos-app macos-app-verify security-gates release-grade release-status release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
+.PHONY: bootstrap start setup preflight test validate ingest ask cli serve launch-smoke desktop macos-app macos-app-verify security-gates release-grade release-status release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
 
 bootstrap:
 	bash scripts/bootstrap_macos.sh
+
+start:
+	PYTHONPATH=.:backend $(PYTHON) scripts/launch_app.py
 
 setup:
 	$(PYTHON) -m pip install --upgrade pip

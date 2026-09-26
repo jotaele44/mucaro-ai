@@ -138,6 +138,22 @@
       "classification": "NOT_APPLICABLE",
       "rationale": "Verifier calls the app's own loopback service (http://127.0.0.1:<port>) only.",
       "evidence": "scripts/verify_macos_app.py::call"
+    },
+    {
+      "rule": "S310",
+      "path": "backend/app/portable_runtime_source.py",
+      "code": "request = urllib.request.Request(source[\"url\"], headers={\"User-Agent\": \"mucaro-ai-runtime-materializer/1.0\"})",
+      "classification": "LOW",
+      "rationale": "Maintainer-side runtime materialization only (not reachable from the app or its tools). load_runtime_source_manifest rejects any source URL that is not https://github.com; the response URL after redirects must still be https; the download is capped at the pinned byte count and is rejected before extraction unless its size and SHA-256 match the repository-tracked manifest.",
+      "evidence": "backend/tests/test_portable_runtime_source.py::test_runtime_source_url_must_be_https_github"
+    },
+    {
+      "rule": "S310",
+      "path": "backend/app/portable_runtime_source.py",
+      "code": "with urllib.request.urlopen(request, timeout=120) as response, target.open(\"wb\") as output:",
+      "classification": "LOW",
+      "rationale": "Maintainer-side runtime materialization only (not reachable from the app or its tools). load_runtime_source_manifest rejects any source URL that is not https://github.com; the response URL after redirects must still be https; the download is capped at the pinned byte count and is rejected before extraction unless its size and SHA-256 match the repository-tracked manifest.",
+      "evidence": "backend/tests/test_portable_runtime_source.py::test_runtime_source_url_must_be_https_github"
     }
   ],
   "vulnerability_dispositions": []

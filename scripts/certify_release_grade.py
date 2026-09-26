@@ -11,8 +11,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -30,16 +32,24 @@ EXTERNAL_EVIDENCE_SCHEMA = "mucaro-external-release-evidence/1.0"
 MACOS_BUILD_SCHEMA = "mucaro-macos-app-build/1.0"
 MACOS_E2E_SCHEMA = "mucaro-macos-app-e2e/1.0"
 
-# Gates of the earlier source-bound/portable-wrapper packaging lane, replaced by the frozen
-# PyInstaller app (assumption A2 refinement). Listed in every receipt so the change is visible.
-SUPERSEDED_GATES = {
-    "portable_embedded_runtime": "replaced by macos_app_build (PyInstaller bundle with its own Python runtime)",
-    "portable_install_reinstall_smoke": "replaced by macos_app_e2e (install from zip, relaunch, reinstall keeping data)",
-    "distinct_version_upgrade_rollback": "replaced by macos_app_e2e reinstall plus backend/tests/test_db_upgrade.py "
-    "(atomic schema upgrade, interrupted-upgrade rollback, too-new database refused); a cross-version app upgrade "
-    "needs a previous packaged release",
-    "clean_machine_macos": "replaced by macos_app_e2e on a fresh hosted macOS runner (LaunchServices open)",
-}
+# Release lanes. Both are required (user decision 2026-09-26): the native-window app frozen with
+# PyInstaller, and the portable embedded-runtime app with its install, upgrade and rollback lifecycle.
+NATIVE_APP_GATES = ("macos_app_build", "macos_app_e2e", "security_profile")
+PORTABLE_RUNTIME_GATES = (
+    "portable_embedded_runtime",
+    "portable_install_reinstall_smoke",
+    "distinct_version_upgrade_rollback",
+    "clean_machine_macos",
+)
+CLEAN_MACHINE_EVIDENCE = (
+    "install",
+    "launch",
+    "representative_workflow",
+    "post_launch_bundle_immutable",
+    "reinstall",
+    "rollback",
+)
+LANE_DECISION = "Both release lanes are required for release-grade certification (user decision 2026-09-26)."
 REQUIRED_GATES = (
     "clean_worktree",
     "local_release",
@@ -48,18 +58,16 @@ REQUIRED_GATES = (
     "representative_operator_workflow",
     "retrieval_benchmark",
     "gis_benchmark",
-    "security_profile",
     "security_gates",
     "package_build",
     "source_artifact_installability",
-    "macos_app_build",
-    "macos_app_e2e",
+    *NATIVE_APP_GATES,
+    *PORTABLE_RUNTIME_GATES,
     "signed_notarized_installer",
     "hosted_ci_current_head",
     "final_release_manifest",
     "release_scope",
 )
-
 
 @dataclass
 class Gate:
@@ -174,6 +182,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--signing-receipt", type=Path)
     parser.add_argument("--notarization-receipt", type=Path)
     parser.add_argument("--hosted-ci-receipt", type=Path)
+    parser.add_argument("--portable-runtime-dir", type=Path, help="Portable lane: embedded Python runtime to bundle")
+    parser.add_argument("--previous-portable-app", type=Path, help="Portable lane: previous release for upgrade/rollback")
+    parser.add_argument("--portable-install-root", type=Path, help="Portable lane: install root for lifecycle checks")
+    parser.add_argument("--clean-machine-receipt", type=Path, help="Portable lane: clean-machine macOS lifecycle receipt")
     return parser
 
 
@@ -227,6 +239,85 @@ def hosted_ci_gate(path: Path | None, *, expected_head: str) -> Gate:
     return gate
 
 
+def portable_runtime_gates(args: argparse.Namespace, *, head: str) -> list[Gate]:
+    """The portable embedded-runtime lane: build, install/reinstall, distinct-version upgrade/rollback, clean machine."""
+    gates: list[Gate] = []
+    portable_app: Path | None = None
+    if args.portable_runtime_dir is None:
+        gates.append(Gate("portable_embedded_runtime", "BLOCKED", "--portable-runtime-dir not supplied"))
+    else:
+        with tempfile.TemporaryDirectory(prefix="mucaro-release-grade-portable-") as tmp:
+            portable_gate, portable_stdout = run_gate(
+                "portable_embedded_runtime",
+                [
+                    sys.executable, "scripts/mucaro.py", "package", "portable-macos-app",
+                    "--runtime-dir", str(args.portable_runtime_dir), "--output-dir", tmp, "--format", "json",
+                ],
+            )
+            gates.append(portable_gate)
+            if portable_gate.status == "PASS":
+                portable_payload, parse_error = parse_json_stdout("portable_embedded_runtime_json", portable_stdout)
+                if parse_error:
+                    gates.append(parse_error)
+                elif isinstance(portable_payload, dict) and isinstance(portable_payload.get("app_path"), str):
+                    persistent_dir = ROOT / "data" / "exports" / "release_grade_portable"
+                    persistent_dir.mkdir(parents=True, exist_ok=True)
+                    source = Path(portable_payload["app_path"])
+                    portable_app = persistent_dir / source.name
+                    if portable_app.exists():
+                        shutil.rmtree(portable_app)
+                    shutil.copytree(source, portable_app)
+
+    if portable_app is None or args.portable_install_root is None:
+        gates.append(Gate("portable_install_reinstall_smoke", "BLOCKED", "portable app or --portable-install-root unavailable"))
+    else:
+        install_cmd = [
+            sys.executable, "scripts/mucaro.py", "package", "portable-install", "install",
+            "--source-app", str(portable_app), "--install-root", str(args.portable_install_root), "--format", "json",
+        ]
+        first, _ = run_gate("portable_install", install_cmd)
+        second, _ = run_gate("portable_reinstall", install_cmd)
+        gates.extend([first, second])
+        gates.append(
+            Gate(
+                "portable_install_reinstall_smoke",
+                "PASS" if first.status == second.status == "PASS" else "FAIL",
+                "current portable bundle installed and reinstalled transactionally",
+            )
+        )
+
+    if portable_app is None or args.previous_portable_app is None or args.portable_install_root is None:
+        gates.append(Gate("distinct_version_upgrade_rollback", "BLOCKED", "current/previous portable apps and install root are required"))
+    else:
+        try:
+            current_manifest = json.loads((portable_app / "Contents/Resources/portable-manifest.json").read_text(encoding="utf-8"))
+            previous_manifest = json.loads((args.previous_portable_app / "Contents/Resources/portable-manifest.json").read_text(encoding="utf-8"))
+            current_head = current_manifest.get("head_sha")
+            previous_head = previous_manifest.get("head_sha")
+        except (OSError, json.JSONDecodeError) as exc:
+            gates.append(Gate("distinct_version_upgrade_rollback", "FAIL", f"portable manifests unreadable: {exc}"))
+        else:
+            if not previous_head or previous_head == current_head:
+                gates.append(Gate("distinct_version_upgrade_rollback", "FAIL", "previous portable app must bind to a different non-empty head"))
+            else:
+                install = [sys.executable, "scripts/mucaro.py", "package", "portable-install"]
+                root_args = ["--install-root", str(args.portable_install_root), "--format", "json"]
+                previous_install, _ = run_gate("previous_version_install", [*install, "install", "--source-app", str(args.previous_portable_app), *root_args])
+                upgrade, _ = run_gate("upgrade_to_current", [*install, "install", "--source-app", str(portable_app), *root_args])
+                rollback, _ = run_gate("rollback_to_previous", [*install, "rollback", *root_args])
+                gates.extend([previous_install, upgrade, rollback])
+                gates.append(
+                    Gate(
+                        "distinct_version_upgrade_rollback",
+                        "PASS" if previous_install.status == upgrade.status == rollback.status == "PASS" else "FAIL",
+                        f"previous_head={previous_head} current_head={current_head}",
+                    )
+                )
+
+    gates.append(external_gate("clean_machine_macos", args.clean_machine_receipt, expected_head=head, required_true=CLEAN_MACHINE_EVIDENCE))
+    return gates
+
+
 def package_gates() -> list[Gate]:
     package_gate, stdout = run_gate("package_build", [sys.executable, "scripts/mucaro.py", "package", "build", "--format", "json"])
     gates = [package_gate]
@@ -271,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
     gates.append(receipt_gate("macos_app_build", args.macos_build_receipt, expected_head=head, schema_version=MACOS_BUILD_SCHEMA, expected_status="MACOS_APP_BUILD_OK"))
     gates.append(receipt_gate("macos_app_e2e", args.macos_e2e_receipt, expected_head=head, schema_version=MACOS_E2E_SCHEMA, expected_status="MACOS_APP_E2E_PASS"))
     gates.append(external_gate("signed_notarized_installer", args.signing_receipt, expected_head=head, required_true=("signed", "notarized", "installer_verified")))
+    gates.extend(portable_runtime_gates(args, head=head))
     gates.append(hosted_ci_gate(args.hosted_ci_receipt, expected_head=head))
 
     manifest = build_final_release_manifest(
@@ -312,7 +404,8 @@ def main(argv: list[str] | None = None) -> int:
             "gates": [gate.as_dict() for gate in gates],
             "required_gate_names": list(REQUIRED_GATES),
             "blocking_gates": sorted(name for name in REQUIRED_GATES if by_name[name].status != "PASS"),
-            "superseded_gates": SUPERSEDED_GATES,
+            "release_lanes": {"native_app": list(NATIVE_APP_GATES), "portable_runtime": list(PORTABLE_RUNTIME_GATES)},
+            "lane_decision": LANE_DECISION,
             "gate_sources": {
                 "security_profile": "runtime security report of the packaged app in the exact-head macOS E2E receipt",
                 "developer_environment_security": "informational only: the certifier's own shell, not the shipped configuration",

@@ -1080,3 +1080,22 @@ details summary {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Touch-first sizing (from the #115 iOS audit): iOS Safari zooms the page when a focused field
+   is under 16px, and Apple's HIG asks for 44px touch targets. Applies to phones, portrait
+   tablets and any coarse pointer. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* :root :is(...) outranks the single-class component rules (.field input, .icon-button, ...). */
+@media (max-width: 900px), (pointer: coarse) {
+  :root :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+    font-size: 16px;
+  }
+
+  :root :is(button, select, input:not([type="file"]):not([type="checkbox"]):not([type="radio"])) {
+    min-height: 44px;
+  }
+}

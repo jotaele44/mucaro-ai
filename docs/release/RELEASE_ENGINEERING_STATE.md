@@ -95,5 +95,17 @@ These are all reversible. They are recorded as ASSUMPTION rather than FACT.
 - **A6: Launch evidence.** Launch evidence comes from LaunchServices (`open`)
   on hosted macOS runners. A literal physical double-click stays blocked on the
   user (`BLK-PHYS-001`).
+- **A7: Release lanes (user decision, 2026-09-26).** Release-grade
+  certification requires both packaged lanes:
+  - the native app lane: `Mucaro AI.app`, frozen with PyInstaller;
+  - the portable embedded-runtime lane from `main`, which covers install and
+    reinstall, distinct-version upgrade and rollback, and a clean-machine
+    receipt that includes `post_launch_bundle_immutable`.
+
+  `scripts/certify_release_grade.py` blocks certification when either lane's
+  gates are missing. The one-click files (`Mucaro AI.command` and
+  `Mucaro AI.cmd`) are the supported source setup, not a release lane. This
+  decision amends the RC-006 adjudication and makes TGT-029 PROVISIONAL until
+  the portable lane has upgrade and rollback evidence.
 - **Release class.** The release class is direct distribution with a
   Developer ID. The Mac App Store lane is an unadopted enhancement (`SD-009`).

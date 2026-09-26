@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .release_receipts import release_receipt_directory
 from .release_scope import LEDGER_FILES, RELEASE_DIR, compute_denominator, load_release_scope, sha256_file
 
 SCHEMA_VERSION = "mucaro-final-release-manifest/1.0"
@@ -21,6 +22,8 @@ DEPENDENCY_LOCKS = (
     "pyproject.toml",
     "packaging/macos/requirements-macos-arm64.in",
     "packaging/macos/requirements-macos-arm64.lock",
+    "packaging/runtime/requirements-macos-x86_64.lock",
+    "scripts/one_click_pins.env",
     "backend/requirements.txt",
     "frontend/package-lock.json",
     "qa/rendered/package-lock.json",
@@ -89,7 +92,7 @@ def build_final_release_manifest(
         specifications.append({"spec_id": spec["spec_id"], "path": spec["path"], "sha256": spec["sha256"], "verified": actual == spec["sha256"]})
     specifications += [{"spec_id": row["name"], "state": "BLOCKED", "blocker": row.get("blocker_id")} for row in manifest.get("missing_specifications", [])]
 
-    receipts_dir = root / "data" / "exports" / "release_receipts"
+    receipts_dir = release_receipt_directory(root)
     head_receipts = sorted(receipts_dir.glob(f"*-{head[:12]}.json")) if receipts_dir.is_dir() else []
     test_receipts = [_receipt_ref(path, root) for path in head_receipts if not path.name.startswith("security_gates-")]
     security_path = receipts_dir / f"security_gates-{head[:12]}.json"

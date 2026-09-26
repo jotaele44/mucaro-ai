@@ -256,7 +256,7 @@ def git_head() -> str:
 
 def main() -> int:
     env = os.environ.copy()
-    env["PYTHONPATH"] = f"{ROOT}:{ROOT / 'backend'}"
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT), str(ROOT / "backend")])
     head_sha = git_head()
     files = tracked_files()
     gates = [
@@ -296,6 +296,21 @@ def main() -> int:
                     "pip_audit",
                     "-r",
                     "backend/requirements.txt",
+                    "--progress-spinner",
+                    "off",
+                ],
+            ),
+            gate_command(
+                "python_runtime_lock_audit",
+                [
+                    sys.executable,
+                    "-m",
+                    "pip_audit",
+                    "-r",
+                    "packaging/runtime/requirements-macos-x86_64.lock",
+                    "--no-deps",
+                    "--disable-pip",
+                    "--strict",
                     "--progress-spinner",
                     "off",
                 ],

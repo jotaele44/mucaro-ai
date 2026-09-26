@@ -310,6 +310,15 @@ async function scenario(browser, base, viewport, contextOptions) {
   const openNav = async () => {
     if (viewport === "iphone") await page.getByRole("button", { name: "Open navigation" }).click();
   };
+  // The phone drawer slides out after a choice; wait for it to leave the screen before any
+  // screenshot, and fail if it stays over the workspace.
+  const drawerClosed = async () => {
+    if (viewport !== "iphone") return true;
+    return page
+      .waitForFunction(() => document.querySelector(".sidebar").getBoundingClientRect().right <= 0, null, { timeout: 5000 })
+      .then(() => true, () => false);
+  };
+  const drawerStates = [];
   await openNav();
   if (viewport === "iphone") await shot(page, viewport, "12-nav-open");
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources", exact: true }).click();
@@ -318,6 +327,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   check("sources workspace lists ingested sources", viewport, (await page.locator(".source-row").count()) >= 2);
   await page.locator(".source-row").first().click();
   await page.getByText("SHA-256").first().waitFor();
+  drawerStates.push(await drawerClosed());
   await shot(page, viewport, "13-sources");
   axeRuns.push(await axe(page, viewport, "sources"));
 
@@ -327,20 +337,49 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.getByRole("button", { name: "Save" }).click();
   await page.getByText("Prefer tables for comparisons").waitFor();
   check("memory add is visible with provenance", viewport, (await page.getByText(/preference · from api/).count()) >= 1);
+  drawerStates.push(await drawerClosed());
   await shot(page, viewport, "14-memory");
 
   await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Provenance", exact: true }).click();
   await page.getByText(/Verified \(\d+ events\)/).waitFor();
   check("provenance shows a verified audit chain", viewport, true);
+  drawerStates.push(await drawerClosed());
   await shot(page, viewport, "15-provenance");
 
   await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByText("What works offline").waitFor();
   check("settings shows model choice and offline capabilities", viewport, (await page.getByRole("radio", { name: /openai_compatible_local/ }).count()) === 1);
+  drawerStates.push(await drawerClosed());
   await shot(page, viewport, "16-settings");
   axeRuns.push(await axe(page, viewport, "settings"));
+
+  if (viewport === "iphone") {
+    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
+    // iOS zooms into fields under 16px on focus; touch targets need 44px (Apple HIG).
+    const touch = await page.evaluate(() => {
+      const visible = (el) => {
+        const box = el.getBoundingClientRect();
+        return box.width > 0 && box.height > 0 && getComputedStyle(el).visibility !== "hidden";
+      };
+      const label = (el) => `${el.tagName.toLowerCase()}:${(el.getAttribute("aria-label") || el.textContent || el.name || "").trim().slice(0, 30)}`;
+      const fields = [...document.querySelectorAll("input, select, textarea")].filter(
+        (el) => visible(el) && !["checkbox", "radio", "file", "hidden"].includes(el.type),
+      );
+      const targets = [...document.querySelectorAll("button, select, input")].filter(
+        (el) => visible(el) && !["checkbox", "radio", "file", "hidden"].includes(el.type),
+      );
+      return {
+        fields: fields.length,
+        smallFonts: fields.filter((el) => parseFloat(getComputedStyle(el).fontSize) < 16).map(label),
+        targets: targets.length,
+        smallTargets: targets.filter((el) => el.getBoundingClientRect().height < 44).map(label),
+      };
+    });
+    check("form fields are at least 16px (no iOS focus zoom)", viewport, touch.fields > 0 && touch.smallFonts.length === 0, touch.smallFonts.join(", ") || `${touch.fields} fields`);
+    check("touch targets are at least 44px tall", viewport, touch.targets > 0 && touch.smallTargets.length === 0, touch.smallTargets.join(", ") || `${touch.targets} targets`);
+  }
 
   const layoutOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   check("no horizontal page overflow", viewport, !layoutOverflow);

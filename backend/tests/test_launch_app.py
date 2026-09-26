@@ -30,6 +30,49 @@ def test_launch_app_self_test():
     assert "LAUNCH_APP_SELF_TEST_OK" in proc.stdout
 
 
+def test_launch_environment_replaces_host_python_controls(monkeypatch):
+    monkeypatch.setenv("PYTHONPATH", "/untrusted/path")
+    monkeypatch.setenv("PYTHONHOME", "/untrusted/home")
+    monkeypatch.setenv("PYTHONSTARTUP", "/untrusted/startup.py")
+
+    env = launch_app.build_env()
+
+    assert env["PYTHONPATH"] == f"{launch_app.ROOT}{launch_app.os.pathsep}{launch_app.ROOT / 'backend'}"
+    assert "PYTHONHOME" not in env
+    assert "PYTHONSTARTUP" not in env
+    assert env["PYTHONNOUSERSITE"] == "1"
+    assert env["PYTHONSAFEPATH"] == "1"
+
+
+def test_launch_environment_loads_app_settings_but_rejects_python_controls_from_env_file(monkeypatch, tmp_path):
+    (tmp_path / ".env").write_text(
+        "MUCARO_AI_LIVE_MODE=1\nPYTHONHOME=/untrusted/file-home\nPYTHONPATH=/untrusted/file-path\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+
+    env = launch_app.build_env()
+
+    assert env["MUCARO_AI_LIVE_MODE"] == "1"
+    assert "PYTHONHOME" not in env
+    assert env["PYTHONPATH"] == f"{tmp_path}{launch_app.os.pathsep}{tmp_path / 'backend'}"
+
+
+def test_backend_process_uses_isolated_path_flags(monkeypatch):
+    observed = {}
+
+    def fake_popen(command, *, cwd, env):
+        observed.update(command=command, cwd=cwd, env=env)
+        return object()
+
+    monkeypatch.setattr(launch_app.subprocess, "Popen", fake_popen)
+    launch_app.start_backend(8123)
+
+    assert observed["command"][1:4] == ["-s", "-P", "-B"]
+    assert observed["env"]["PYTHONNOUSERSITE"] == "1"
+    assert observed["env"]["PYTHONSAFEPATH"] == "1"
+
+
 def test_package_desktop_self_test():
     proc = subprocess.run(
         [sys.executable, "scripts/package_desktop.py", "--self-test"],
@@ -116,6 +159,22 @@ def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
     assert "PASS package_artifact manifest_member_count=1" in output
     assert "PASS package_artifact_verify manifest_member_count=1" in output
     assert "CERTIFY_RELEASE_OK" in output
+    assert (
+        "python_runtime_lock_audit",
+        [
+            sys.executable,
+            "-m",
+            "pip_audit",
+            "-r",
+            "packaging/runtime/requirements-macos-x86_64.lock",
+            "--no-deps",
+            "--disable-pip",
+            "--strict",
+            "--progress-spinner",
+            "off",
+        ],
+        certify_release.ROOT,
+    ) in calls
 
 
 def test_certify_release_npm_audit_uses_working_node_fallback(monkeypatch):
@@ -532,3 +591,43 @@ def test_launch_app_rejects_non_mucaro_port_conflict(monkeypatch, capsys):
     assert launch_app.main() == 5
     error_output = capsys.readouterr().err
     assert "ERROR_PORT_IN_USE_NON_MUCARO_AI port=54321" in error_output
+
+
+def test_launch_app_build_env_loads_project_env_without_overriding_shell(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text(
+        "MUCARO_AI_LIVE_MODE=1\nMUCARO_AI_MODEL=from-file\nMUCARO_AI_OPERATOR_TOKEN=\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    monkeypatch.setenv("MUCARO_AI_MODEL", "from-shell")
+    monkeypatch.delenv("MUCARO_AI_LIVE_MODE", raising=False)
+    monkeypatch.delenv("MUCARO_AI_OPERATOR_TOKEN", raising=False)
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+
+    env = launch_app.build_env()
+
+    assert env["MUCARO_AI_LIVE_MODE"] == "1"
+    assert env["MUCARO_AI_MODEL"] == "from-shell"
+    assert "MUCARO_AI_OPERATOR_TOKEN" not in env
+    assert env["PYTHONPATH"].split(launch_app.os.pathsep) == [str(tmp_path), str(tmp_path / "backend")]
+
+
+def test_release_check_pythonpath_uses_platform_separator(tmp_path, monkeypatch):
+    calls = []
+
+    class StopAfterFirstRun(Exception):
+        pass
+
+    def fake_run(cmd, *, env=None, cwd=release_check.ROOT):
+        calls.append(env)
+        raise StopAfterFirstRun
+
+    monkeypatch.setattr(release_check, "ROOT", tmp_path)
+    monkeypatch.setattr(release_check, "run", fake_run)
+    # Simulate Windows, where ":" would corrupt drive-letter paths.
+    monkeypatch.setattr(release_check.os, "pathsep", ";")
+
+    with pytest.raises(StopAfterFirstRun):
+        release_check.main()
+
+    assert calls[0]["PYTHONPATH"] == f"{tmp_path};{tmp_path / 'backend'}"

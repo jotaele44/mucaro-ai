@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-26T17:32:03Z",
+  "updated_utc": "2026-09-26T20:05:31Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1478,7 +1478,7 @@
       "state": "BLOCKED",
       "blocker_id": "BLK-SIGN-001",
       "dag_node": "N20",
-      "notes": "All eight TGT-026 verifications pass on macOS: bundle validity, launch, resources, runtime dependencies, and no dev server, terminal or source tree; clean reinstall is covered by the E2E reinstall step. The artifact is ad-hoc signed, so it is not yet distributable under the declared Developer ID release class; Gatekeeper rejects it (BLK-SIGN-001)."
+      "notes": "Both release lanes are required (A7). Native app lane: all eight TGT-026 verifications pass on macOS: bundle validity, launch, resources, runtime dependencies, and no dev server, terminal or source tree; clean reinstall is covered by the E2E reinstall step. The artifact is ad-hoc signed, so it is not yet distributable under the declared Developer ID release class; Gatekeeper rejects it (BLK-SIGN-001). Portable embedded-runtime lane: assembly and verification exist (backend/app/portable_runtime.py); its release-grade gates (portable_embedded_runtime, portable_install_reinstall_smoke) have no exact-head evidence yet."
     },
     {
       "requirement_id": "TGT-027",
@@ -1527,21 +1527,24 @@
       "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/db.py",
-        "docs/release/MACOS_APP.md"
+        "docs/release/MACOS_APP.md",
+        "backend/app/clean_machine_macos.py",
+        "scripts/certify_release_grade.py"
       ],
       "dependencies": [],
       "positive_gate": "backend/tests/test_db_upgrade.py",
-      "negative_gate": "backend/tests/test_db_upgrade.py",
+      "negative_gate": "backend/tests/test_clean_machine_macos.py::test_same_head_previous_version_is_rejected",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_db_upgrade.py",
         "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
-        "docs/release/MACOS_APP.md"
+        "docs/release/MACOS_APP.md",
+        "backend/tests/test_clean_machine_macos.py::test_distinct_version_flow_emits_all_required_evidence"
       ],
-      "state": "PASS",
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N20",
-      "notes": "Declared policy (MACOS_APP.md): bundle replacement keeps data; schema upgrades are atomic and forward-only; a too-new database fails safely with ERROR_DATABASE_SCHEMA_TOO_NEW. Tested: upgrade, interrupted upgrade (rolled back), compatibility refusal, and app reinstall keeping data (macOS E2E). A cross-version app-to-app upgrade needs a previous packaged release (this is the first)."
+      "notes": "Both release lanes are required (user decision 2026-09-26, assumption A7). Native app lane: bundle replacement keeps data; schema upgrades are atomic and forward-only; a too-new database fails safely with ERROR_DATABASE_SCHEMA_TOO_NEW. Tested: upgrade, interrupted upgrade (rolled back), compatibility refusal, and app reinstall keeping data (macOS E2E). Portable embedded-runtime lane: the distinct-version upgrade/rollback check and the clean-machine flow are implemented and unit-tested, but no receipt from two distinct packaged portable versions exists yet, so this row is PROVISIONAL rather than PASS."
     },
     {
       "requirement_id": "TGT-030",
@@ -2104,7 +2107,7 @@
       "state": "BLOCKED",
       "blocker_id": "BLK-PHYS-001",
       "dag_node": "N20",
-      "notes": "Build -> verify bundle -> install -> open (LaunchServices) -> verify GUI (window list, screenshot, GUI-connected signal) -> ingest/ask/cite/export -> quit (Apple Event) -> relaunch -> verify state: all pass on a hosted runner. A literal double-click is BLK-PHYS-001."
+      "notes": "Both release lanes are required (A7). Native app lane: build -> verify bundle -> install -> open (LaunchServices) -> verify GUI (window list, screenshot, GUI-connected signal) -> ingest/ask/cite/export -> quit (Apple Event) -> relaunch -> verify state: all pass on a hosted runner. Portable lane benchmark: not yet run end to end. A literal double-click is BLK-PHYS-001."
     },
     {
       "requirement_id": "MATRIX-019",
@@ -2121,12 +2124,14 @@
       "negative_gate": "backend/tests/test_release_grade_certification.py::test_every_gate_passing_is_still_provisional_while_the_ledgers_are_not_certified",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_release_grade_certification.py::test_receipt_gate_binds_head_status_schema_and_blocking_checks"
+        "backend/tests/test_release_grade_certification.py::test_receipt_gate_binds_head_status_schema_and_blocking_checks",
+        "backend/tests/test_release_grade_certification.py::test_both_release_lanes_are_required",
+        "backend/tests/test_release_grade_certification.py::test_clean_machine_receipt_must_prove_the_bundle_stayed_immutable"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N24",
-      "notes": "The sequence is wired. certify_release_grade.py runs fresh-clone, build, tests, benchmarks and security gates, checks exact-head macOS build and E2E receipts, freezes the final manifest, and applies the terminal rule. It has not been run end to end at one head with every receipt, and signing is blocked (BLK-SIGN-001)."
+      "notes": "The sequence is wired and requires both release lanes (A7). certify_release_grade.py runs fresh-clone, build, tests, benchmarks and security gates, checks exact-head native-app build and E2E receipts, checks the portable lane (embedded runtime, install/reinstall smoke, distinct-version upgrade/rollback, clean-machine receipt with post_launch_bundle_immutable), freezes the final manifest, and applies the terminal rule. It has not been run end to end at one head with every receipt, and signing is blocked (BLK-SIGN-001)."
     },
     {
       "requirement_id": "MATRIX-020",
