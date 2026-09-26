@@ -3604,6 +3604,40 @@ def test_github_governance_fails_when_current_head_ci_fails(tmp_path: Path, monk
     assert github["latest_ci"]["startup_layer"] == "before_jobs"
 
 
+def test_detached_head_resolves_exact_remote_default_branch(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "a" * 40
+
+    def fake_git_output(_cfg: Settings, args: list[str]):
+        outputs = {
+            ("branch", "--show-current"): (True, ""),
+            ("symbolic-ref", "--short", "refs/remotes/origin/HEAD"): (True, "origin/main"),
+            ("rev-parse", "origin/main"): (True, head_sha),
+        }
+        return outputs.get(tuple(args), (False, "unexpected command"))
+
+    monkeypatch.setattr(cli, "_git_output", fake_git_output)
+
+    assert cli._git_branch_for_head(cfg, head_sha) == (True, "main")
+    assert cli._git_branch_for_head(cfg, "b" * 40) == (False, "")
+
+
+def test_exact_head_ci_with_jobs_supersedes_stale_startup_probe():
+    head_sha = "a" * 40
+    gate = cli._classify_startup_probe(
+        ci_latest={"databaseId": 11, "status": "completed", "conclusion": "success", "headSha": head_sha},
+        ci_jobs_count=1,
+        probe_latest={"databaseId": 22, "status": "completed", "conclusion": "success", "headSha": "b" * 40},
+        probe_error=None,
+        head_sha=head_sha,
+        probe_jobs_count=1,
+    )
+
+    assert gate["status"] == "PASS"
+    assert "NOT_REQUIRED exact-head CI passed with jobs=1" in gate["detail"]
+    assert "run_id=22" in gate["detail"]
+
+
 def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     head_sha = "a" * 40
