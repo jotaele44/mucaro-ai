@@ -17,7 +17,7 @@ Mucaro is free of unknown vulnerabilities.
 | `sbom` | CycloneDX 1.5 SBOMs of the shipped Python runtime (from the hashed lock) and of the GUI bundle. React, React DOM and Scheduler are `required`; build tooling is `excluded`. |
 | `python_vulnerabilities` | `pip-audit` of the exact locked versions shipped in the app (`--disable-pip`, hash-pinned). |
 | `npm_vulnerabilities` | `npm audit --omit=dev` of the frontend. |
-| `network_exposure` | Starts the desktop service and reads its listening sockets (`/proc` on Linux, `lsof` on macOS). It must listen on loopback only, with the data directory at mode 0700 and `instance.json` at 0600. |
+| `network_exposure` | Starts the desktop service and reads its listening sockets (`/proc` on Linux, `lsof` on macOS). It must listen on loopback only, with the data directory at mode 0700 and `instance.json` at 0600. Its own runtime security report must be `production_ready` (production profile, launch token of 32+ characters, own-origin CORS). |
 | `permission_boundaries` | Every tool that reaches the network or changes state requires approval (TGT-025). |
 | `xml_amplification_guard` | expat is 2.4.1 or later, so ElementTree refuses billion-laughs and quadratic-blowup amplification. |
 | `security_regressions` | Auth boundary, archive and ingestion attacks, XML entity attacks, prompt injection, permissions, tools, the web SSRF policy, the desktop shell, contracts and schema upgrade. |
@@ -42,6 +42,8 @@ able to change that `PATH` can already run code as the user, so the risk is
 accepted for local tooling.
 
 ## Where this feeds
+
+The release-grade `security_profile` row reads the packaged app's own runtime security report. The report comes from the exact-head macOS E2E receipt, written by the app into `instance.json` at launch. The certifier's developer shell is reported separately as the informational `developer_environment_security` row, because it is not the shipped configuration.
 
 `scripts/certify_release_grade.py` runs these gates as its `security_gates` row.
 It records the SBOM hashes and the security receipt in the final release

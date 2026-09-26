@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -27,6 +28,9 @@ from .workspaces import list_workspace_profiles
 TOOL_CALLS_NAME = "tool_calls.json"
 TOOL_AUDIT_NAME = "tool_audit_log.json"
 TOOL_CALL_STATUSES = ("PENDING_APPROVAL", "APPROVED", "DENIED", "CANCELLED", "RUNNING", "EXECUTED", "FAILED", "INTERRUPTED")
+# Wall-clock bound for one in-process handler (MATRIX-011 TIMEOUT). Remote tools also carry their own
+# network timeouts; this bound covers everything else (slow disks, huge repositories, stuck parsers).
+DEFAULT_TOOL_TIMEOUT_SECONDS = 120.0
 
 
 class ToolRuntimeError(RuntimeError):
@@ -45,6 +49,7 @@ class ToolDefinition:
     handler: Callable[[dict[str, Any], Settings], dict[str, Any]]
     # "none": local only; "remote": contacts an external service (TGT-019 offline classification).
     network: str = "none"
+    timeout_seconds: float = DEFAULT_TOOL_TIMEOUT_SECONDS
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -53,6 +58,7 @@ class ToolDefinition:
             "mutates_state": self.mutates_state,
             "requires_approval": self.requires_approval,
             "network": self.network,
+            "timeout_seconds": self.timeout_seconds,
             "offline_availability": "AVAILABLE_LOCALLY" if self.network == "none" else "REQUIRES_REMOTE_SERVICE",
         }
 
@@ -663,14 +669,38 @@ def run_tool_call(
         cfg,
     )
     failure: ToolRuntimeError | None = None
-    try:
-        result = tool.handler(dict(call.get("arguments") or {}), cfg)
-    except ToolRuntimeError as exc:
-        failure = exc
-        result = {"status": exc.status, "detail": exc.detail}
-    except Exception as exc:  # noqa: BLE001 - an unexpected handler crash must not leave the call RUNNING
+    outcome: dict[str, Any] = {}
+
+    def invoke() -> None:
+        try:
+            outcome["result"] = tool.handler(dict(call.get("arguments") or {}), cfg)
+        except BaseException as exc:  # noqa: BLE001 - reported to the caller below
+            outcome["error"] = exc
+
+    # The handler runs in a worker so a stuck handler cannot hold the call RUNNING forever.
+    worker = threading.Thread(target=invoke, name=f"tool-{tool_call_id}", daemon=True)
+    worker.start()
+    worker.join(tool.timeout_seconds)
+    if worker.is_alive():
+        # Python cannot kill the thread; its eventual return value is discarded and never recorded as EXECUTED.
+        failure = ToolRuntimeError("ERROR_TOOL_TIMEOUT", f"{tool_name} exceeded {tool.timeout_seconds:g}s")
+        result = {
+            "status": failure.status,
+            "detail": failure.detail,
+            "timeout_seconds": tool.timeout_seconds,
+            "handler_abandoned": True,
+            # A mutating handler may still finish its change after the timeout; say so instead of guessing.
+            "side_effects": "UNKNOWN" if tool.mutates_state else "NONE_EXPECTED",
+        }
+    elif isinstance(outcome.get("error"), ToolRuntimeError):
+        failure = outcome["error"]
+        result = {"status": failure.status, "detail": failure.detail}
+    elif "error" in outcome:
+        exc = outcome["error"]
         failure = ToolRuntimeError("ERROR_TOOL_INTERNAL_FAILURE", f"{type(exc).__name__}: {exc}")
         result = {"status": failure.status, "detail": failure.detail}
+    else:
+        result = outcome["result"]
     final_status = "FAILED" if failure else "EXECUTED"
     call = _transition(
         tool_call_id,

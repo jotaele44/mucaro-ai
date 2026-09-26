@@ -34,8 +34,13 @@ BENCHMARK_FIXTURES = (
 )
 
 
-def _git(root: Path, *args: str) -> str:
-    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True).stdout.strip()
+def _git(root: Path, *args: str) -> str | None:
+    """None when Git or its metadata is unavailable (e.g. an extracted source artifact)."""
+    try:
+        proc = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=False)
+    except OSError:
+        return None
+    return proc.stdout.strip() if proc.returncode == 0 else None
 
 
 def _file_row(root: Path, relative: str) -> dict[str, Any]:
@@ -127,12 +132,14 @@ def build_final_release_manifest(
     blockers = loaded.get("blockers", {}).get("blockers", [])
     contradictions = loaded.get("contradictions", {}).get("contradictions", [])
 
+    tree_sha = _git(root, "rev-parse", f"{head}^{{tree}}")
+    porcelain = _git(root, "status", "--porcelain")
     record = {
         "schema_version": SCHEMA_VERSION,
         "created_utc": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "source_revision": head,
-        "source_tree_sha": _git(root, "rev-parse", f"{head}^{{tree}}"),
-        "worktree_clean": not _git(root, "status", "--porcelain"),
+        "source_tree_sha": tree_sha or {"state": "MISSING", "reason": "no VCS metadata for this revision"},
+        "worktree_clean": None if porcelain is None else not porcelain,
         "dependency_locks": [_file_row(root, path) for path in DEPENDENCY_LOCKS],
         "specifications": specifications,
         "requirement_manifest": {
@@ -165,7 +172,7 @@ def build_final_release_manifest(
     }
     missing = [key for key, value in record.items() if isinstance(value, dict) and value.get("state") == "MISSING"]
     record["missing_entries"] = missing
-    record["complete_except_blocked"] = not missing and record["worktree_clean"]
+    record["complete_except_blocked"] = not missing and record["worktree_clean"] is True
     return record
 
 

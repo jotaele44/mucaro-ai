@@ -109,6 +109,17 @@ def wait_field(data_dir: Path, field: str, status: str, timeout: float = 90.0) -
     return {"status": "NOT_OBSERVED", "expected": status}
 
 
+def wait_security(data_dir: Path, timeout: float = 30.0) -> dict[str, Any]:
+    """The running app's own security report (production profile, loopback, own-origin CORS)."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        block = (read_instance(data_dir) or {}).get("security")
+        if isinstance(block, dict):
+            return {**block, "ok": block.get("production_ready") is True}
+        time.sleep(0.2)
+    return {"ok": False, "status": "NOT_REPORTED"}
+
+
 def pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
@@ -205,6 +216,7 @@ def headless(executable: Path, data_dir: Path) -> dict[str, Any]:
     first = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     try:
         instance = wait_instance(data_dir)
+        receipt["security"] = wait_security(data_dir)
         base = f"http://127.0.0.1:{instance['port']}"
         receipt["workflow"] = workflow(base, instance["token"])
         second = subprocess.run([str(executable), "--smoke", "--data-dir", str(data_dir)], env=env, capture_output=True, text=True, timeout=60, check=False)
@@ -274,6 +286,7 @@ def macos(zip_path: Path, install_root: Path, output: Path) -> dict[str, Any]:
     launch(app)
     instance = wait_instance(data_dir)
     receipt["launch"] = {"seconds_to_service": round(time.monotonic() - started, 3), "pid": instance["pid"]}
+    receipt["security"] = wait_security(data_dir)
     receipt["window_event"] = wait_field(data_dir, "window", "WINDOW_SHOWN")
     # Checked before this script makes any authorized call, so only the window can have made it.
     receipt["gui"] = wait_field(data_dir, "ui", "GUI_CONNECTED")
@@ -310,7 +323,7 @@ def macos(zip_path: Path, install_root: Path, output: Path) -> dict[str, Any]:
 
 
 def blocking(receipt: dict[str, Any]) -> list[str]:
-    names = ["workflow", "single_instance", "relaunch", "sigterm"]
+    names = ["workflow", "single_instance", "relaunch", "sigterm", "security"]
     if receipt["mode"] == "MACOS_LAUNCHSERVICES":
         names += ["install", "window", "quit", "reinstall"]
         failures = [name for name in names if not receipt.get(name, {}).get("ok")]

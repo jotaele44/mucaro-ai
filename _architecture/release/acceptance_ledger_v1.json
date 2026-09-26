@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-24T22:45:07Z",
+  "updated_utc": "2026-09-26T17:32:03Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -13,13 +13,14 @@
         "scripts/build_macos_app.py"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
       "negative_gate": "backend/tests/test_desktop_shell.py::test_no_window_service_enforces_the_launch_token_and_single_instance",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/window.png",
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json"
+        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_948fda472af7/window.png",
+        "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json",
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/provenance.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
@@ -895,13 +896,13 @@
         "scripts/verify_macos_app.py"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/provenance.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/provenance.json",
       "negative_gate": "backend/tests/test_macos_packaging.py::test_build_refuses_a_non_macos_host_without_structural_mode",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json",
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/provenance.json"
+        "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json",
+        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_948fda472af7/provenance.json"
       ],
       "state": "PASS",
       "blocker_id": null,
@@ -919,12 +920,12 @@
         "packaging/macos/mucaro.spec"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
       "negative_gate": "backend/tests/test_desktop_shell.py::test_startup_failure_exits_with_status_and_writes_a_log",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/window.png",
+        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_948fda472af7/window.png",
         "backend/tests/test_desktop_shell.py::test_smoke_starts_serves_and_stops_with_data_outside_the_code_tree"
       ],
       "state": "BLOCKED",
@@ -1257,7 +1258,7 @@
       "negative_gate": "backend/tests/test_db_upgrade.py",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
         "backend/tests/test_work_runs.py::test_restart_interrupts_running_runs_and_resumes_waiting_ones",
         "backend/tests/test_desktop_shell.py::test_macos_data_dir_is_application_support"
       ],
@@ -1466,12 +1467,12 @@
         "packaging/macos/requirements-macos-arm64.lock"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json",
       "negative_gate": "backend/tests/test_macos_packaging.py::test_build_refuses_a_non_macos_host_without_structural_mode",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json",
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json",
+        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
         "backend/tests/test_macos_packaging.py::test_lock_is_fully_hash_pinned_and_covers_every_input"
       ],
       "state": "BLOCKED",
@@ -1507,11 +1508,11 @@
         "docs/release/MACOS_APP.md"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
       "negative_gate": null,
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
         "docs/release/MACOS_APP.md"
       ],
       "state": "BLOCKED",
@@ -1534,7 +1535,7 @@
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_db_upgrade.py",
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
         "docs/release/MACOS_APP.md"
       ],
       "state": "PASS",
@@ -1936,27 +1937,30 @@
       "requirement_id": "MATRIX-011",
       "requirement_text": "Tool-governance benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/tools.py"
+        "backend/app/tools.py",
+        "backend/app/work_runs.py",
+        "backend/app/error_categories.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_contracts.py::test_allowed_approved_action_executes_once_and_duplicate_invocation_is_refused",
+      "negative_gate": "backend/tests/test_tools.py::test_a_hung_handler_times_out_and_is_never_recorded_as_executed",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_contracts.py::test_allowed_approved_action_executes_once_and_duplicate_invocation_is_refused",
-        "backend/tests/test_contracts.py::test_disallowed_tool_is_rejected_and_audited",
         "backend/tests/test_contracts.py::test_denied_and_cancelled_actions_never_execute",
+        "backend/tests/test_tools.py::test_tool_runtime_requires_approval_before_execution",
         "backend/tests/test_contracts.py::test_handler_crash_and_tool_error_end_failed_not_running",
+        "backend/tests/test_tools.py::test_a_hung_handler_times_out_and_is_never_recorded_as_executed",
+        "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
         "backend/tests/test_contracts.py::test_restart_marks_running_calls_interrupted_without_retrying",
         "backend/tests/test_contracts.py::test_concurrent_runs_execute_the_handler_exactly_once",
         "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "ALLOWED, DENIED, APPROVAL-REQUIRED, CANCELLED, TOOL ERROR, RESTART and DUPLICATE covered with audit truthfulness. OPEN: TIMEOUT (in-process handlers have no enforced timeout) and RETRY-of-failed-target flow (M3)."
+      "notes": "All nine action classes are covered with audit and state truthfulness: allowed, denied, approval-required, cancelled, tool error/crash (FAILED, never left RUNNING), TIMEOUT, retry (failed target only, fresh approval), restart (RUNNING -> INTERRUPTED, no auto-retry) and duplicate invocation (atomic claim, handler runs exactly once). TIMEOUT: every handler runs under a per-tool wall-clock bound (default 120 s). On expiry the call is FAILED with ERROR_TOOL_TIMEOUT (category TOOL_FAILURE) and handler_abandoned=true. A mutating tool is marked side_effects=UNKNOWN because Python cannot kill the thread. A late return is discarded and never recorded as EXECUTED. The audit log is hash-chained and tamper-evident."
     },
     {
       "requirement_id": "MATRIX-012",
@@ -2089,13 +2093,13 @@
         "scripts/verify_macos_app.py"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
       "negative_gate": null,
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/window.png",
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json"
+        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_948fda472af7/window.png",
+        "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json"
       ],
       "state": "BLOCKED",
       "blocker_id": "BLK-PHYS-001",
@@ -2715,7 +2719,7 @@
       "negative_gate": "backend/tests/test_desktop_shell.py::test_frozen_bundle_sets_resource_root",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json"
+        "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json"
       ],
       "state": "PASS",
       "blocker_id": null,

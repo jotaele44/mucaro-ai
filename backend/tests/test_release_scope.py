@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -379,7 +380,10 @@ def test_snapshot_records_credential_presence_not_values(tmp_path):
     presence = {row["name"]: row["present"] for row in snapshot["credentials"]}
     assert presence["ANTHROPIC_API_KEY"] is True
     assert presence["MUCARO_BRAVE_SEARCH_API_KEY"] is False
-    assert snapshot["repository"]["head_sha"]
+    # The head is recorded when this is a checkout, and explicitly unknown (None) otherwise, e.g. in a source artifact.
+    git_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True, check=False)
+    expected_head = git_head.stdout.strip() if git_head.returncode == 0 else None
+    assert snapshot["repository"]["head_sha"] == expected_head
     path = write_state_snapshot(REPO_ROOT, snapshot, tmp_path / "snapshot.json")
     assert json.loads(path.read_text(encoding="utf-8"))["schema_version"] == "mucaro-release-state-snapshot/1.0"
 

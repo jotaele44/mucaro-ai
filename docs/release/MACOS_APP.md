@@ -9,7 +9,9 @@ source checkout or manual server start involved.
 1. The launcher takes a lock on the data directory, so only one copy writes
    your data at a time.
 2. It starts the local service on `127.0.0.1` with a random port and a fresh
-   access token. The service does not listen on any network interface.
+   access token. The service does not listen on any network interface. It runs
+   under the `production` security profile, and only its own origin may read
+   it cross-origin. It refuses to start if that profile's checks fail.
 3. It opens a native window (WKWebView) on the app. The token travels in the
    URL fragment, which is never sent over HTTP, and the GUI removes it from the
    address as soon as it loads.

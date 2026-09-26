@@ -44,6 +44,13 @@ def _get(url: str, token: str | None = None, *, gui: bool = False) -> tuple[int,
         return exc.code, exc.read()
 
 
+def _cors_origin(url: str, origin: str) -> str | None:
+    request = urllib.request.Request(url, headers={"Origin": origin})
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(request, timeout=5) as response:
+        return response.headers.get("access-control-allow-origin")
+
+
 def _wait_serving(process: subprocess.Popen[str], data_dir: Path, timeout: float = 60.0) -> dict[str, object]:
     deadline = time.monotonic() + timeout
     instance = data_dir / "instance.json"
@@ -95,6 +102,13 @@ def test_no_window_service_enforces_the_launch_token_and_single_instance(tmp_pat
 
         # The service listens on loopback only.
         assert instance["url"] == f"{base}/"
+
+        # The packaged runtime is a production deployment, and only its own origin may read it cross-origin.
+        security = json.loads(instance_path.read_text(encoding="utf-8"))["security"]
+        assert security == {"status": "SECURITY_OK", "production_ready": True, "deployment_profile": "production", "cors_origins": [base], "failing": []}
+        own = _cors_origin(f"{base}/health", base)
+        foreign = _cors_origin(f"{base}/health", "http://localhost:5173")
+        assert own == base and foreign is None
 
         second = subprocess.run(_shell("--smoke", "--data-dir", str(data_dir)), cwd=tmp_path, env=_env(), capture_output=True, text=True, timeout=120, check=False)
         assert second.returncode == desktop_shell.EXIT_ALREADY_RUNNING

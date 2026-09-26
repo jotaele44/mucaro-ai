@@ -137,7 +137,13 @@ def network_exposure_gate() -> dict[str, Any]:
                 if proc.poll() is not None:
                     return gate("network_exposure", False, f"service exited early: {proc.stderr.read().decode()[-400:] if proc.stderr else ''}")
                 time.sleep(0.1)
-            time.sleep(0.3)
+            security: dict[str, Any] = {}
+            while time.monotonic() < deadline and not security:
+                try:
+                    security = json.loads(instance_path.read_text(encoding="utf-8")).get("security") or {}
+                except (OSError, json.JSONDecodeError):
+                    security = {}
+                time.sleep(0.1)
             addresses = listening_addresses(proc.pid)
             modes = {
                 "data_dir": oct(stat.S_IMODE(data_dir.stat().st_mode)),
@@ -146,8 +152,12 @@ def network_exposure_gate() -> dict[str, Any]:
         finally:
             proc.send_signal(signal.SIGTERM)
             proc.wait(timeout=30)
-    ok = loopback_only(addresses) and modes == {"data_dir": "0o700", "instance_json": "0o600"}
-    return gate("network_exposure", ok, {"listening": addresses, "file_modes": modes})
+    ok = (
+        loopback_only(addresses)
+        and modes == {"data_dir": "0o700", "instance_json": "0o600"}
+        and security.get("production_ready") is True
+    )
+    return gate("network_exposure", ok, {"listening": addresses, "file_modes": modes, "runtime_security": security})
 
 
 def permission_boundary_gate() -> dict[str, Any]:

@@ -87,10 +87,15 @@ class InstanceLock:
 
 
 def prepare_environment(data_dir: Path, token: str) -> None:
-    """Must run before backend.app.config is imported: settings are read at import time."""
+    """Must run before backend.app.config is imported: settings are read at import time.
+
+    The packaged app is the production deployment: a per-launch token of at least 32
+    characters, a loopback-only bind and same-origin CORS, checked at startup by
+    ``enforce_startup_security`` under the ``production`` profile.
+    """
     os.environ["MUCARO_AI_DATA_DIR"] = str(data_dir)
     os.environ["MUCARO_AI_OPERATOR_TOKEN"] = token
-    os.environ.setdefault("MUCARO_AI_DEPLOYMENT_PROFILE", "local")
+    os.environ["MUCARO_AI_DEPLOYMENT_PROFILE"] = "production"
     root = bundle_root()
     if root is not None:
         os.environ["MUCARO_AI_ROOT"] = str(root)
@@ -108,14 +113,27 @@ class LocalService:
     """uvicorn serving the app on a pre-bound loopback socket in a background thread."""
 
     def __init__(self, log_path: Path, on_gui_ready: Any = None) -> None:
+        self.socket = _bind_loopback()
+        self.port = self.socket.getsockname()[1]
+        # The GUI is served by this service itself, so the only allowed browser origin is its own.
+        os.environ["MUCARO_AI_CORS_ORIGINS"] = f"http://127.0.0.1:{self.port}"
+
         import uvicorn
 
         from .config import Settings
         from .main import create_app
+        from .security import build_security_report
 
-        self.socket = _bind_loopback()
-        self.port = self.socket.getsockname()[1]
-        app: Any = create_app(Settings.load())
+        settings = Settings.load()
+        app: Any = create_app(settings)  # refuses to start on SECURITY_FAIL
+        report = build_security_report(settings, bind_host="127.0.0.1")
+        self.security = {
+            "status": report["status"],
+            "production_ready": report["production_ready"],
+            "deployment_profile": report["deployment_profile"],
+            "cors_origins": list(settings.cors_origins),
+            "failing": [check["name"] for check in report["checks"] if check["status"] != "PASS"],
+        }
         if on_gui_ready is not None:
             app = GuiReadyRecorder(app, on_gui_ready)
         config = uvicorn.Config(app, log_level="warning", access_log=False, lifespan="off")
@@ -300,6 +318,7 @@ def run(argv: list[str] | None = None) -> int:
         service = LocalService(data_dir / "logs" / "service.log", on_gui_ready=on_gui_ready)
         service.start()
         instance = write_instance_file(data_dir, service.port, token)
+        update_instance_file(instance, security=service.security)
         url = f"http://127.0.0.1:{service.port}/#token={token}"
         if args.smoke:
             print(f"DESKTOP_SMOKE_OK port={service.port} data_dir={data_dir}")

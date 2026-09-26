@@ -33,7 +33,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: security-gates-${{ github.sha }}
+          name: security-gates-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             data/exports/security
             data/exports/release_receipts/security_gates-*.json
@@ -90,10 +90,25 @@ jobs:
           name: coding-mutation-live-${{ github.sha }}
           path: ${{ runner.temp }}/mucaro-coding-mutation-live.json
           archive: false
+      - name: Compare the tested tree with the pull-request head
+        id: tree
+        if: github.event_name == 'pull_request'
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # CI tests GitHub's merge commit; the receipt may stand for the PR head only if the trees are identical.
+          git fetch --no-tags --depth=1 origin "$PR_HEAD"
+          if [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse "$PR_HEAD^{tree}")" ]; then
+            echo "equivalent=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "equivalent=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Write hosted CI evidence receipt
         env:
           MUCARO_CI_RECEIPT: ${{ runner.temp }}/mucaro-hosted-ci-evidence.json
           MUCARO_CI_SHA: ${{ github.sha }}
+          MUCARO_CI_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          MUCARO_CI_TREE_EQUIVALENT: ${{ steps.tree.outputs.equivalent }}
           MUCARO_CI_RUN_ID: ${{ github.run_id }}
           MUCARO_CI_RUN_ATTEMPT: ${{ github.run_attempt }}
           MUCARO_CI_EVENT: ${{ github.event_name }}
@@ -109,6 +124,10 @@ jobs:
           payload = {
               "schema_version": "mucaro-external-release-evidence/1.0",
               "head_sha": os.environ["MUCARO_CI_SHA"],
+              "pull_request_head_sha": os.environ.get("MUCARO_CI_PR_HEAD") or None,
+              "tree_equivalent_to_pull_request_head": (
+                  os.environ.get("MUCARO_CI_TREE_EQUIVALENT") == "true" if os.environ.get("MUCARO_CI_PR_HEAD") else None
+              ),
               "evidence": {
                   "ci_admitted": True,
                   "ci_passed": True,
@@ -130,6 +149,6 @@ jobs:
       - name: Upload hosted CI evidence receipt
         uses: actions/upload-artifact@v7
         with:
-          name: hosted-ci-evidence-${{ github.sha }}
+          name: hosted-ci-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/mucaro-hosted-ci-evidence.json
           archive: false

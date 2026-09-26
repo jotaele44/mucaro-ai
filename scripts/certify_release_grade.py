@@ -177,17 +177,54 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def security_profile_gate() -> Gate:
+def _receipt_payload(path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def security_profile_gate(e2e_receipt: Path | None, *, expected_head: str) -> Gate:
+    """The shipped app's own runtime security report, taken from the exact-head macOS E2E receipt."""
+    if e2e_receipt is None:
+        return Gate("security_profile", "BLOCKED", "macOS E2E receipt not supplied; it carries the packaged app's runtime security report")
+    payload = _receipt_payload(e2e_receipt)
+    if payload is None:
+        return Gate("security_profile", "FAIL", "E2E receipt unreadable")
+    if payload.get("head_sha") != expected_head:
+        return Gate("security_profile", "FAIL", f"E2E receipt head_sha={payload.get('head_sha')}")
+    security = payload.get("security")
+    if not isinstance(security, dict):
+        return Gate("security_profile", "FAIL", "E2E receipt has no runtime security report")
+    if security.get("production_ready") is True and security.get("status") == "SECURITY_OK":
+        return Gate("security_profile", "PASS", f"packaged app: production profile, SECURITY_OK, cors={security.get('cors_origins')}")
+    return Gate("security_profile", "FAIL", f"packaged app: production_ready={security.get('production_ready')} status={security.get('status')} failing={security.get('failing')}")
+
+
+def developer_environment_security_gate() -> Gate:
+    """Informational: the certifier's own shell, which is not the shipped configuration."""
     command = [sys.executable, "scripts/mucaro.py", "security", "status", "--host", "127.0.0.1", "--format", "json"]
-    process_gate, stdout = run_gate("security_profile_command", command)
-    if process_gate.status != "PASS":
-        return Gate("security_profile", "FAIL", process_gate.detail, command)
-    payload, parse_error = parse_json_stdout("security_profile_json", stdout)
-    if parse_error or payload is None:
-        return Gate("security_profile", "FAIL", parse_error.detail if parse_error else "no payload", command)
-    if payload.get("production_ready") is True and payload.get("status") == "SECURITY_OK":
-        return Gate("security_profile", "PASS", "production_ready=true SECURITY_OK", command)
-    return Gate("security_profile", "BLOCKED", f"production_ready={payload.get('production_ready')} status={payload.get('status')}", command)
+    process_gate, stdout = run_gate("developer_environment_security_command", command)
+    payload, parse_error = parse_json_stdout("developer_environment_security_json", stdout) if process_gate.status == "PASS" else (None, None)
+    if payload is None:
+        return Gate("developer_environment_security", "FAIL", parse_error.detail if parse_error else process_gate.detail, command)
+    return Gate("developer_environment_security", "INFO", f"profile={payload.get('deployment_profile')} status={payload.get('status')}", command)
+
+
+def hosted_ci_gate(path: Path | None, *, expected_head: str) -> Gate:
+    """Hosted CI tests the pull-request merge commit; accept it for this head only when its tree is identical."""
+    required = ("ci_admitted", "ci_passed", "jobs_executed")
+    gate = external_gate("hosted_ci_current_head", path, expected_head=expected_head, required_true=required)
+    if gate.status != "FAIL" or path is None:
+        return gate
+    payload = _receipt_payload(path) or {}
+    tested = str(payload.get("head_sha") or "")
+    if payload.get("pull_request_head_sha") == expected_head and payload.get("tree_equivalent_to_pull_request_head") is True and tested:
+        equivalent = external_gate("hosted_ci_current_head", path, expected_head=tested, required_true=required)
+        if equivalent.status == "PASS":
+            return Gate("hosted_ci_current_head", "PASS", f"tested merge {tested[:12]} has the same tree as {expected_head[:12]}; {equivalent.detail}")
+    return gate
 
 
 def package_gates() -> list[Gate]:
@@ -228,12 +265,13 @@ def main(argv: list[str] | None = None) -> int:
     ]
     for name, command in commands:
         gates.append(run_gate(name, command)[0])
-    gates.append(security_profile_gate())
+    gates.append(security_profile_gate(args.macos_e2e_receipt, expected_head=head))
+    gates.append(developer_environment_security_gate())
     gates.extend(package_gates())
     gates.append(receipt_gate("macos_app_build", args.macos_build_receipt, expected_head=head, schema_version=MACOS_BUILD_SCHEMA, expected_status="MACOS_APP_BUILD_OK"))
     gates.append(receipt_gate("macos_app_e2e", args.macos_e2e_receipt, expected_head=head, schema_version=MACOS_E2E_SCHEMA, expected_status="MACOS_APP_E2E_PASS"))
     gates.append(external_gate("signed_notarized_installer", args.signing_receipt, expected_head=head, required_true=("signed", "notarized", "installer_verified")))
-    gates.append(external_gate("hosted_ci_current_head", args.hosted_ci_receipt, expected_head=head, required_true=("ci_admitted", "ci_passed", "jobs_executed")))
+    gates.append(hosted_ci_gate(args.hosted_ci_receipt, expected_head=head))
 
     manifest = build_final_release_manifest(
         ROOT,
@@ -275,6 +313,11 @@ def main(argv: list[str] | None = None) -> int:
             "required_gate_names": list(REQUIRED_GATES),
             "blocking_gates": sorted(name for name in REQUIRED_GATES if by_name[name].status != "PASS"),
             "superseded_gates": SUPERSEDED_GATES,
+            "gate_sources": {
+                "security_profile": "runtime security report of the packaged app in the exact-head macOS E2E receipt",
+                "developer_environment_security": "informational only: the certifier's own shell, not the shipped configuration",
+                "hosted_ci_current_head": "hosted CI receipt for this head, or for a merge commit whose tree equals it",
+            },
             "final_release_manifest": {"path": str(manifest_path.relative_to(ROOT)), "sha256": manifest_sha},
             "release_scope_status": scope["status"],
             "release_status_line": status_line,
