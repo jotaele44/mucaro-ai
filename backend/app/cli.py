@@ -6874,6 +6874,29 @@ def _git_branch_for_head(cfg: Settings, head_sha: str | None) -> tuple[bool, str
     return True, remote_ref.removeprefix("origin/")
 
 
+def _git_upstream_for_head(
+    cfg: Settings,
+    head_sha: str | None,
+    branch: str | None,
+) -> tuple[bool, str]:
+    upstream_ok, upstream = _git_output(
+        cfg,
+        ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+    )
+    if upstream_ok and upstream:
+        return True, upstream
+    if not head_sha or not branch:
+        return False, ""
+
+    remote_ok, remote_ref = _git_output(cfg, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+    if not remote_ok or remote_ref != f"origin/{branch}":
+        return False, ""
+    remote_head_ok, remote_head = _git_output(cfg, ["rev-parse", remote_ref])
+    if not remote_head_ok or remote_head != head_sha:
+        return False, ""
+    return True, remote_ref
+
+
 def _run_evidence(latest: dict[str, Any]) -> str:
     parts = []
     if latest.get("databaseId"):
@@ -7302,7 +7325,11 @@ def build_certification_status(
     branch_ok, branch = _git_branch_for_head(cfg, head_sha if head_ok else None)
     status_ok, worktree_status = _git_output(cfg, ["status", "--short"])
     tags_ok, tags_output = _git_output(cfg, ["tag", "--points-at", "HEAD"])
-    upstream_ok, upstream = _git_output(cfg, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+    upstream_ok, upstream = _git_upstream_for_head(
+        cfg,
+        head_sha if head_ok else None,
+        branch if branch_ok else None,
+    )
     remote_ok, remote_url = _git_output(cfg, ["remote", "get-url", "origin"])
 
     tags_at_head = [line for line in tags_output.splitlines() if line.strip()] if tags_ok else []

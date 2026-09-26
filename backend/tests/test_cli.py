@@ -3619,7 +3619,10 @@ def test_detached_head_resolves_exact_remote_default_branch(tmp_path: Path, monk
     monkeypatch.setattr(cli, "_git_output", fake_git_output)
 
     assert cli._git_branch_for_head(cfg, head_sha) == (True, "main")
+    assert cli._git_upstream_for_head(cfg, head_sha, "main") == (True, "origin/main")
     assert cli._git_branch_for_head(cfg, "b" * 40) == (False, "")
+    assert cli._git_upstream_for_head(cfg, "b" * 40, "main") == (False, "")
+    assert cli._git_upstream_for_head(cfg, head_sha, "release") == (False, "")
 
 
 def test_exact_head_ci_with_jobs_supersedes_stale_startup_probe():
