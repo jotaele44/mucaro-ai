@@ -6858,6 +6858,22 @@ def _run_summary(latest: dict[str, Any] | None, jobs_count: int | None = None) -
     }
 
 
+def _git_branch_for_head(cfg: Settings, head_sha: str | None) -> tuple[bool, str]:
+    branch_ok, branch = _git_output(cfg, ["branch", "--show-current"])
+    if branch_ok and branch:
+        return True, branch
+    if not head_sha:
+        return False, ""
+
+    remote_ok, remote_ref = _git_output(cfg, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+    if not remote_ok or not remote_ref.startswith("origin/"):
+        return False, ""
+    remote_head_ok, remote_head = _git_output(cfg, ["rev-parse", remote_ref])
+    if not remote_head_ok or remote_head != head_sha:
+        return False, ""
+    return True, remote_ref.removeprefix("origin/")
+
+
 def _run_evidence(latest: dict[str, Any]) -> str:
     parts = []
     if latest.get("databaseId"):
@@ -6890,6 +6906,41 @@ def _classify_latest_run(
     if status == "completed":
         return _certification_gate(name, "FAIL", f"{status} {conclusion or 'unknown'} {run_head}{jobs_detail}{evidence_detail}")
     return _certification_gate(name, "WARN", f"{status} {conclusion or 'pending'} {run_head}{jobs_detail}{evidence_detail}")
+
+
+def _classify_startup_probe(
+    *,
+    ci_latest: dict[str, Any] | None,
+    ci_jobs_count: int | None,
+    probe_latest: dict[str, Any] | None,
+    probe_error: str | None,
+    head_sha: str | None,
+    probe_jobs_count: int | None,
+) -> dict[str, str]:
+    exact_head_ci_passed = bool(
+        head_sha
+        and ci_latest
+        and ci_latest.get("headSha") == head_sha
+        and ci_latest.get("status") == "completed"
+        and ci_latest.get("conclusion") == "success"
+        and isinstance(ci_jobs_count, int)
+        and ci_jobs_count > 0
+    )
+    if exact_head_ci_passed:
+        probe_evidence = _run_evidence(probe_latest) if probe_latest else ""
+        suffix = f"; latest_probe {probe_evidence}" if probe_evidence else ""
+        return _certification_gate(
+            "startup_probe",
+            "PASS",
+            f"NOT_REQUIRED exact-head CI passed with jobs={ci_jobs_count}{suffix}",
+        )
+    return _classify_latest_run(
+        name="startup_probe",
+        latest=probe_latest,
+        error=probe_error,
+        head_sha=head_sha,
+        jobs_count=probe_jobs_count,
+    )
 
 
 def _github_actions_support_summary(
@@ -6954,8 +7005,8 @@ def build_github_actions_diagnostic_status(
     workflow_name: str = "CI",
     probe_workflow_name: str = "CI Startup Probe",
 ) -> dict[str, Any]:
-    branch_ok, branch = _git_output(cfg, ["branch", "--show-current"])
     head_ok, head_sha = _git_output(cfg, ["rev-parse", "HEAD"])
+    branch_ok, branch = _git_branch_for_head(cfg, head_sha if head_ok else None)
     remote_ok, remote_url = _git_output(cfg, ["remote", "get-url", "origin"])
     repo = _github_repo_from_origin(remote_url if remote_ok else None)
     checks: list[dict[str, str]] = []
@@ -7091,12 +7142,13 @@ def build_github_actions_diagnostic_status(
     if probe_jobs_error and probe_latest:
         checks.append(_certification_gate("probe_jobs_lookup", "WARN", probe_jobs_error))
     checks.append(
-        _classify_latest_run(
-            name="startup_probe",
-            latest=probe_latest,
-            error=probe_error,
+        _classify_startup_probe(
+            ci_latest=ci_latest,
+            ci_jobs_count=ci_jobs_count,
+            probe_latest=probe_latest,
+            probe_error=probe_error,
             head_sha=head_sha if head_ok else None,
-            jobs_count=probe_jobs_count,
+            probe_jobs_count=probe_jobs_count,
         )
     )
 
@@ -7246,8 +7298,8 @@ def build_certification_status(
     doctor = build_doctor_report(cfg)
     validation = validate_project_json(cfg)
 
-    branch_ok, branch = _git_output(cfg, ["branch", "--show-current"])
     head_ok, head_sha = _git_output(cfg, ["rev-parse", "HEAD"])
+    branch_ok, branch = _git_branch_for_head(cfg, head_sha if head_ok else None)
     status_ok, worktree_status = _git_output(cfg, ["status", "--short"])
     tags_ok, tags_output = _git_output(cfg, ["tag", "--points-at", "HEAD"])
     upstream_ok, upstream = _git_output(cfg, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
