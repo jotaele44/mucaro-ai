@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-26T20:05:31Z",
+  "updated_utc": "2026-09-27T03:40:07Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -13,19 +13,19 @@
         "scripts/build_macos_app.py"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
       "negative_gate": "backend/tests/test_desktop_shell.py::test_no_window_service_enforces_the_launch_token_and_single_instance",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
-        "_architecture/release/evidence/macos_app_948fda472af7/window.png",
-        "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/window.png",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
         "_architecture/release/evidence/macos_app_1d32e8ce1d02/provenance.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N25",
-      "notes": "Launch path proven on a hosted macOS 14 arm64 runner: install from zip, LaunchServices open (the Finder double-click path), native window shown in 0.63 s, GUI connected with the launch token in 3.6 s, and ingest, cited answer and export, with no terminal or setup. Residue: a literal double-click by the user (BLK-PHYS-001), Developer ID signing so a downloaded copy opens without a Gatekeeper override (BLK-SIGN-001), and the workbench vectors still OPEN (GIS, OCR and code workspaces, benchmarks)."
+      "notes": "Launch path proven on a hosted macOS 14 arm64 runner: install from zip, LaunchServices open (the Finder double-click path), native window shown in 0.6 s, GUI connected with the launch token in 3.1 s (run at 0a806c1), and ingest, cited answer and export, with no terminal or setup. Residue: a literal double-click by the user (BLK-PHYS-001), Developer ID signing so a downloaded copy opens without a Gatekeeper override (BLK-SIGN-001), and the workbench vectors still OPEN (GIS, OCR and code workspaces, benchmarks)."
     },
     {
       "requirement_id": "GOAL-002",
@@ -896,13 +896,13 @@
         "scripts/verify_macos_app.py"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/provenance.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/provenance.json",
       "negative_gate": "backend/tests/test_macos_packaging.py::test_build_refuses_a_non_macos_host_without_structural_mode",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json",
-        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
-        "_architecture/release/evidence/macos_app_948fda472af7/provenance.json"
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/provenance.json"
       ],
       "state": "PASS",
       "blocker_id": null,
@@ -920,12 +920,12 @@
         "packaging/macos/mucaro.spec"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
       "negative_gate": "backend/tests/test_desktop_shell.py::test_startup_failure_exits_with_status_and_writes_a_log",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
-        "_architecture/release/evidence/macos_app_948fda472af7/window.png",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/window.png",
         "backend/tests/test_desktop_shell.py::test_smoke_starts_serves_and_stops_with_data_outside_the_code_tree"
       ],
       "state": "BLOCKED",
@@ -1258,7 +1258,7 @@
       "negative_gate": "backend/tests/test_db_upgrade.py",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
         "backend/tests/test_work_runs.py::test_restart_interrupts_running_runs_and_resumes_waiting_ones",
         "backend/tests/test_desktop_shell.py::test_macos_data_dir_is_application_support"
       ],
@@ -1467,12 +1467,12 @@
         "packaging/macos/requirements-macos-arm64.lock"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
       "negative_gate": "backend/tests/test_macos_packaging.py::test_build_refuses_a_non_macos_host_without_structural_mode",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json",
-        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
         "backend/tests/test_macos_packaging.py::test_lock_is_fully_hash_pinned_and_covers_every_input"
       ],
       "state": "BLOCKED",
@@ -1508,11 +1508,11 @@
         "docs/release/MACOS_APP.md"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
       "negative_gate": null,
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
         "docs/release/MACOS_APP.md"
       ],
       "state": "BLOCKED",
@@ -1537,7 +1537,7 @@
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_db_upgrade.py",
-        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
         "docs/release/MACOS_APP.md",
         "backend/tests/test_clean_machine_macos.py::test_distinct_version_flow_emits_all_required_evidence"
       ],
@@ -2096,13 +2096,13 @@
         "scripts/verify_macos_app.py"
       ],
       "dependencies": [],
-      "positive_gate": "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
       "negative_gate": null,
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
-        "_architecture/release/evidence/macos_app_948fda472af7/window.png",
-        "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json"
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/window.png",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json"
       ],
       "state": "BLOCKED",
       "blocker_id": "BLK-PHYS-001",
@@ -2126,12 +2126,14 @@
       "evidence_refs": [
         "backend/tests/test_release_grade_certification.py::test_receipt_gate_binds_head_status_schema_and_blocking_checks",
         "backend/tests/test_release_grade_certification.py::test_both_release_lanes_are_required",
-        "backend/tests/test_release_grade_certification.py::test_clean_machine_receipt_must_prove_the_bundle_stayed_immutable"
+        "backend/tests/test_release_grade_certification.py::test_clean_machine_receipt_must_prove_the_bundle_stayed_immutable",
+        "_architecture/release/evidence/release_grade_0a806c1e8c98/release_grade_receipt.json",
+        "_architecture/release/evidence/release_grade_0a806c1e8c98/provenance.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N24",
-      "notes": "The sequence is wired and requires both release lanes (A7). certify_release_grade.py runs fresh-clone, build, tests, benchmarks and security gates, checks exact-head native-app build and E2E receipts, checks the portable lane (embedded runtime, install/reinstall smoke, distinct-version upgrade/rollback, clean-machine receipt with post_launch_bundle_immutable), freezes the final manifest, and applies the terminal rule. It has not been run end to end at one head with every receipt, and signing is blocked (BLK-SIGN-001)."
+      "notes": "The sequence is wired and requires both release lanes (A7). First end-to-end run at 0a806c1 (evidence: release_grade_0a806c1e8c98) with the exact-head native-app build and E2E receipts and the hosted-CI receipt (merge e3cfb5f, tree-equivalent to the head): clean worktree, local release, fresh clone, Python distribution, operator workflow, retrieval and GIS benchmarks, security gates, the packaged app's security profile, source-artifact installability, native-app build and E2E, hosted CI and the final manifest all PASS. Verdict PROVISIONAL, blocked by the four portable-lane gates (no portable inputs produced yet), signed_notarized_installer (BLK-SIGN-001) and release_scope."
     },
     {
       "requirement_id": "MATRIX-020",
@@ -2147,12 +2149,13 @@
       "negative_gate": null,
       "benchmark": null,
       "evidence_refs": [
-        "backend/app/release_manifest.py"
+        "backend/app/release_manifest.py",
+        "_architecture/release/evidence/release_grade_0a806c1e8c98/final_release_manifest.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N25",
-      "notes": "The builder freezes every MATRIX-020 entry. An entry that is unavailable is recorded explicitly as BLOCKED, NOT_APPLICABLE or MISSING, never omitted. A certified-release manifest cannot exist until signing (BLK-SIGN-001) and the remaining gates close."
+      "notes": "The builder freezes every MATRIX-020 entry. An entry that is unavailable is recorded explicitly as BLOCKED, NOT_APPLICABLE or MISSING, never omitted. Frozen at 0a806c1 with no missing entries (complete_except_blocked); signing and notarization are recorded as BLOCKED. A certified-release manifest cannot exist until signing (BLK-SIGN-001) and the remaining gates close."
     },
     {
       "requirement_id": "CERT-RULE-001",
@@ -2724,7 +2727,7 @@
       "negative_gate": "backend/tests/test_desktop_shell.py::test_frozen_bundle_sets_resource_root",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json"
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json"
       ],
       "state": "PASS",
       "blocker_id": null,

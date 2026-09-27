@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-09-26T20:05:31Z",
+  "updated_utc": "2026-09-27T03:40:07Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -492,7 +492,7 @@
         "launch without terminal or browser"
       ],
       "blocker": "BLK-PHYS-001",
-      "notes": "Native pywebview shell proven on macOS via LaunchServices (see evidence/macos_app_948fda472af7). Literal double-click is BLK-PHYS-001."
+      "notes": "Native pywebview shell proven on macOS via LaunchServices (see evidence/macos_app_0a806c1e8c98). Literal double-click is BLK-PHYS-001."
     },
     {
       "node_id": "N20",
