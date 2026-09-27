@@ -223,7 +223,10 @@ def run_logged(cmd: list[str], *, log: SetupLog, cwd: Path | None = None, env: M
     except OSError as exc:
         log.line(f"ERROR_COMMAND_START {exc}")
         return 127
-    assert proc.stdout is not None
+    if proc.stdout is None:
+        log.line("ERROR_COMMAND_START stdout pipe unavailable")
+        proc.kill()
+        return 127
     for chunk in iter(proc.stdout.readline, b""):
         log.raw(chunk.decode("utf-8", errors="replace"))
     return proc.wait()

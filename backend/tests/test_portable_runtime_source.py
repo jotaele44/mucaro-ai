@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import io
+import json
 import tarfile
 from pathlib import Path
 
@@ -10,6 +12,7 @@ from backend.app.portable_runtime_source import (
     PortableRuntimeSourceError,
     _isolated_python_env,
     _parse_lock,
+    _validate_archive_bytes,
     extract_runtime_archive,
     load_runtime_source_manifest,
 )
@@ -159,3 +162,67 @@ def test_runtime_lock_must_match_direct_project_dependencies(tmp_path: Path) -> 
         load_runtime_source_manifest(tmp_path, manifest)
 
     assert exc.value.status == "ERROR_PORTABLE_RUNTIME_LOCK_PROJECT_MISMATCH"
+
+
+def _source_manifest(tmp_path: Path, url: str) -> Path:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname="fixture"\nversion="1.0"\ndependencies=["example==1.0"]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "runtime.lock").write_text("example==1.0 \\\n+    --hash=sha256:" + "a" * 64 + "\n", encoding="utf-8")
+    manifest = tmp_path / "runtime.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "archive_policy": {
+                    "max_members": 1,
+                    "max_regular_bytes": 1,
+                    "member_count": 1,
+                    "regular_file_count": 1,
+                    "symlink_count": 0,
+                    "total_regular_bytes": 1,
+                },
+                "dependency_lock": "runtime.lock",
+                "required_imports": ["example"],
+                "schema_version": "mucaro-portable-runtime-source/1.0",
+                "source": {"bytes": 1, "sha256": "a" * 64, "url": url},
+                "target": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return manifest
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://github.com/example/runtime",
+        "https://github.com.attacker.invalid/example/runtime",
+        "https://objects.githubusercontent.com/example/runtime",
+        "file:///etc/passwd",
+    ],
+)
+def test_runtime_source_url_must_be_https_github(tmp_path: Path, url: str) -> None:
+    assert load_runtime_source_manifest(tmp_path, _source_manifest(tmp_path, "https://github.com/example/runtime"))
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        load_runtime_source_manifest(tmp_path, _source_manifest(tmp_path, url))
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_SOURCE_URL"
+
+
+def test_downloaded_archive_must_match_pinned_size_and_sha256(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    archive.write_bytes(b"x")
+    pinned = {"bytes": 1, "sha256": hashlib.sha256(b"x").hexdigest()}
+    _validate_archive_bytes(archive, pinned)
+
+    archive.write_bytes(b"y")
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        _validate_archive_bytes(archive, pinned)
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_SOURCE_HASH"
+
+    archive.write_bytes(b"xy")
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        _validate_archive_bytes(archive, pinned)
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_SOURCE_SIZE"

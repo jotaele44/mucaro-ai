@@ -1,5 +1,15 @@
 # Desktop Launcher Mode
 
+> **Source setup, not a release artifact.** `Mucaro AI.command` / `Mucaro AI.cmd` is the supported
+> way to run Mucaro from a source checkout. Release-grade certification requires two packaged lanes,
+> and neither is this launcher:
+>
+> - the native app, `Mucaro AI.app` with its own window: see [release/MACOS_APP.md](release/MACOS_APP.md);
+> - the portable embedded-runtime app: see [PACKAGING_POLICY.md](PACKAGING_POLICY.md#portable-runtime-and-application).
+>
+> The source-bound bundle below needs a checkout and a Python environment, and opens the system
+> browser (contradiction RC-006, adjudicated).
+
 Desktop Launcher Mode lets Mucaro AI run with one command.
 
 ## Double-click setup and launch

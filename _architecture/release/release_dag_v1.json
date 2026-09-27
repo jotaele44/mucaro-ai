@@ -1,0 +1,655 @@
+{
+  "schema_version": "mucaro-release-dag/1.0",
+  "updated_utc": "2026-09-27T03:40:07Z",
+  "nodes": [
+    {
+      "node_id": "N00",
+      "title": "Current-state snapshot",
+      "requirement_ids": [
+        "KERNEL-004"
+      ],
+      "dependencies": [],
+      "state": "PASS",
+      "risk": "LOW",
+      "user_value": "LOW",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "LOW",
+      "evidence_required": [
+        "_architecture/release/current_state_snapshot_v1.json"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N01",
+      "title": "Release control plane (manifest, ledgers, DAG, verdict)",
+      "requirement_ids": [
+        "KERNEL-002",
+        "KERNEL-003",
+        "KERNEL-006",
+        "KERNEL-014",
+        "KERNEL-019",
+        "KERNEL-020",
+        "MATRIX-001",
+        "MATRIX-002",
+        "MATRIX-003",
+        "MATRIX-004",
+        "CERT-RULE-001",
+        "INV-002"
+      ],
+      "dependencies": [
+        "N00"
+      ],
+      "state": "PASS",
+      "risk": "LOW",
+      "user_value": "MEDIUM",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "LOW",
+      "evidence_required": [
+        "backend/app/release_scope.py",
+        "backend/tests/test_release_scope.py"
+      ],
+      "blocker": null,
+      "notes": "Validator, CLI (mucaro release scope validate|status|snapshot|freeze) and 22 regressions; baseline checkpoint 20260924T210000Z-baseline."
+    },
+    {
+      "node_id": "N02",
+      "title": "Architecture and trust-boundary audit; security defect repair",
+      "requirement_ids": [
+        "INV-015",
+        "TGT-021",
+        "TGT-025",
+        "SD-001",
+        "SD-002",
+        "SD-003",
+        "SD-004",
+        "SD-005",
+        "SD-011"
+      ],
+      "dependencies": [
+        "N00"
+      ],
+      "state": "PASS",
+      "risk": "HIGH",
+      "user_value": "MEDIUM",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "LOW",
+      "evidence_required": [
+        "negative permission and path regressions"
+      ],
+      "blocker": null,
+      "notes": "Auth boundary, symlink escape, DOCX bomb, archive safety, DNS rebinding and hermetic tests repaired with negative regressions."
+    },
+    {
+      "node_id": "N03",
+      "title": "Common data and execution contracts",
+      "requirement_ids": [
+        "TGT-016",
+        "INV-005",
+        "TGT-038"
+      ],
+      "dependencies": [
+        "N01"
+      ],
+      "state": "PROVISIONAL",
+      "risk": "MEDIUM",
+      "user_value": "MEDIUM",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "schemas + runtime validate_contract at boundaries"
+      ],
+      "blocker": null,
+      "notes": "contracts.py registry + boundary enforcement; residue listed on TGT-016."
+    },
+    {
+      "node_id": "N04",
+      "title": "Provenance, source and artifact control plane",
+      "requirement_ids": [
+        "TGT-015",
+        "INV-018",
+        "INV-019",
+        "TGT-032"
+      ],
+      "dependencies": [
+        "N03"
+      ],
+      "state": "OPEN",
+      "risk": "MEDIUM",
+      "user_value": "MEDIUM",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "artifact lineage on every derivation"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N05",
+      "title": "Permissions and tool governance",
+      "requirement_ids": [
+        "TGT-014",
+        "TGT-025",
+        "INV-006",
+        "MATRIX-011"
+      ],
+      "dependencies": [
+        "N02",
+        "N03"
+      ],
+      "state": "OPEN",
+      "risk": "HIGH",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "tool-governance benchmark"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N06",
+      "title": "Local-first storage and workspace state",
+      "requirement_ids": [
+        "TGT-017",
+        "SD-006",
+        "SD-008"
+      ],
+      "dependencies": [
+        "N03"
+      ],
+      "state": "PASS",
+      "risk": "MEDIUM",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "data dir outside bundle; transactional ledgers"
+      ],
+      "blocker": null,
+      "notes": "TGT-017, SD-006 and SD-008 PASS."
+    },
+    {
+      "node_id": "N07",
+      "title": "File ingestion, format registry, archive safety",
+      "requirement_ids": [
+        "TGT-012",
+        "TGT-023",
+        "INV-007",
+        "INV-008",
+        "INV-010",
+        "INV-011",
+        "MATRIX-010"
+      ],
+      "dependencies": [
+        "N02",
+        "N03"
+      ],
+      "state": "OPEN",
+      "risk": "HIGH",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "MEDIUM",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "file-ingestion benchmark"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N08",
+      "title": "OCR and document intelligence",
+      "requirement_ids": [
+        "TGT-005",
+        "MATRIX-006"
+      ],
+      "dependencies": [
+        "N07"
+      ],
+      "state": "OPEN",
+      "risk": "MEDIUM",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "LOW",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "frozen OCR corpus metrics"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N09",
+      "title": "Retrieval and citation quality",
+      "requirement_ids": [
+        "TGT-011",
+        "INV-020",
+        "TGT-031",
+        "MATRIX-007"
+      ],
+      "dependencies": [
+        "N07"
+      ],
+      "state": "OPEN",
+      "risk": "MEDIUM",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "MEDIUM",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "frozen retrieval benchmark with thresholds"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N10",
+      "title": "GIS and spatial engine",
+      "requirement_ids": [
+        "TGT-004",
+        "INV-009",
+        "INV-012",
+        "MATRIX-005"
+      ],
+      "dependencies": [
+        "N03"
+      ],
+      "state": "OPEN",
+      "risk": "MEDIUM",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "LOW",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "frozen GIS benchmark corpus"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N11",
+      "title": "Governed web research",
+      "requirement_ids": [
+        "TGT-006",
+        "INV-013",
+        "INV-014",
+        "MATRIX-008"
+      ],
+      "dependencies": [
+        "N05",
+        "N16"
+      ],
+      "state": "OPEN",
+      "risk": "HIGH",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "LOW",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "web research benchmark incl. injection fixtures"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N12",
+      "title": "Coding and repository engine",
+      "requirement_ids": [
+        "TGT-007",
+        "MATRIX-009"
+      ],
+      "dependencies": [
+        "N05"
+      ],
+      "state": "OPEN",
+      "risk": "HIGH",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "LOW",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "coding benchmark"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N13",
+      "title": "Model routing and local AI",
+      "requirement_ids": [
+        "TGT-008",
+        "TGT-009",
+        "TGT-010",
+        "MATRIX-012",
+        "INV-004"
+      ],
+      "dependencies": [
+        "N03",
+        "N05"
+      ],
+      "state": "PROVISIONAL",
+      "risk": "MEDIUM",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "model-routing benchmark"
+      ],
+      "blocker": null,
+      "notes": "Routing and MATRIX-012 PASS; local provider verified against a protocol-faithful fake server; real-model evaluation and live remote evaluation remain."
+    },
+    {
+      "node_id": "N14",
+      "title": "Memory control plane",
+      "requirement_ids": [
+        "TGT-013",
+        "INV-021",
+        "MATRIX-013"
+      ],
+      "dependencies": [
+        "N03"
+      ],
+      "state": "OPEN",
+      "risk": "MEDIUM",
+      "user_value": "MEDIUM",
+      "downstream_unlock_value": "LOW",
+      "expected_rework_cost": "LOW",
+      "evidence_required": [
+        "memory benchmark"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N15",
+      "title": "Conversational execution bus",
+      "requirement_ids": [
+        "TGT-002",
+        "TGT-018",
+        "TGT-034",
+        "TGT-035",
+        "MOB-F02",
+        "MOB-F03",
+        "MOB-F04",
+        "MOB-F07",
+        "MOB-F08",
+        "MOB-F09",
+        "MOB-F10",
+        "MOB-F11",
+        "MOB-F12",
+        "MOB-F13",
+        "MOB-F14",
+        "MOB-F15",
+        "MOB-F16",
+        "MOB-F18",
+        "MOB-F19"
+      ],
+      "dependencies": [
+        "N05",
+        "N06",
+        "N13"
+      ],
+      "state": "PROVISIONAL",
+      "risk": "HIGH",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "HIGH",
+      "evidence_required": [
+        "run ledger + SSE + cancel + queue regressions"
+      ],
+      "blocker": null,
+      "notes": "Run bus implemented with 29 regressions; UI integration (N17) and model-proposed tool calls remain."
+    },
+    {
+      "node_id": "N16",
+      "title": "Prompt-injection and untrusted-content resistance",
+      "requirement_ids": [
+        "TGT-022",
+        "INV-014"
+      ],
+      "dependencies": [
+        "N03"
+      ],
+      "state": "PASS",
+      "risk": "HIGH",
+      "user_value": "MEDIUM",
+      "downstream_unlock_value": "MEDIUM",
+      "expected_rework_cost": "LOW",
+      "evidence_required": [
+        "injection regression fixtures"
+      ],
+      "blocker": null,
+      "notes": "Injection regressions: documents, web snapshots, model output, memory, fence breaking, credential leakage, permissions."
+    },
+    {
+      "node_id": "N17",
+      "title": "Conversation-first GUI and specialized workspaces",
+      "requirement_ids": [
+        "GOAL-002",
+        "TGT-003",
+        "TGT-030",
+        "TGT-031",
+        "TGT-032",
+        "TGT-033",
+        "TGT-036",
+        "TGT-037",
+        "INV-022",
+        "MOB-F01",
+        "MOB-F05",
+        "MOB-F06",
+        "MOB-F17",
+        "MOB-F20"
+      ],
+      "dependencies": [
+        "N15"
+      ],
+      "state": "PROVISIONAL",
+      "risk": "MEDIUM",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "MEDIUM",
+      "expected_rework_cost": "HIGH",
+      "evidence_required": [
+        "rendered QA at desktop and 390px widths"
+      ],
+      "blocker": null,
+      "notes": "Conversation-first GUI with Sources/Memory/Provenance/Settings; GIS/OCR/Code workspaces open."
+    },
+    {
+      "node_id": "N18",
+      "title": "Rendered UI QA",
+      "requirement_ids": [
+        "MATRIX-015"
+      ],
+      "dependencies": [
+        "N17"
+      ],
+      "state": "PROVISIONAL",
+      "risk": "LOW",
+      "user_value": "MEDIUM",
+      "downstream_unlock_value": "LOW",
+      "expected_rework_cost": "LOW",
+      "evidence_required": [
+        "Playwright screenshots + receipt"
+      ],
+      "blocker": null,
+      "notes": "70/70 rendered checks in Chromium; WKWebView/macOS pending."
+    },
+    {
+      "node_id": "N19",
+      "title": "Desktop shell (native window, app data dir)",
+      "requirement_ids": [
+        "TGT-001",
+        "GOAL-001",
+        "SD-007"
+      ],
+      "dependencies": [
+        "N06",
+        "N17"
+      ],
+      "state": "BLOCKED",
+      "risk": "HIGH",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "launch without terminal or browser"
+      ],
+      "blocker": "BLK-PHYS-001",
+      "notes": "Native pywebview shell proven on macOS via LaunchServices (see evidence/macos_app_0a806c1e8c98). Literal double-click is BLK-PHYS-001."
+    },
+    {
+      "node_id": "N20",
+      "title": "macOS packaging, install, upgrade/rollback",
+      "requirement_ids": [
+        "TGT-026",
+        "TGT-028",
+        "TGT-029",
+        "MATRIX-018",
+        "INV-023"
+      ],
+      "dependencies": [
+        "N19"
+      ],
+      "state": "BLOCKED",
+      "risk": "HIGH",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "macOS runner packaging receipts"
+      ],
+      "blocker": "BLK-SIGN-001",
+      "notes": "PyInstaller .app built, verified, installed, opened, relaunched and reinstalled on macOS 14; TGT-029 and INV-023 PASS. Developer ID distribution is BLK-SIGN-001; double-click is BLK-PHYS-001."
+    },
+    {
+      "node_id": "N21",
+      "title": "Performance, recovery and offline",
+      "requirement_ids": [
+        "TGT-019",
+        "TGT-020",
+        "MATRIX-016",
+        "MATRIX-017"
+      ],
+      "dependencies": [
+        "N15",
+        "N19"
+      ],
+      "state": "OPEN",
+      "risk": "MEDIUM",
+      "user_value": "MEDIUM",
+      "downstream_unlock_value": "LOW",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "frozen thresholds + recovery benchmark"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N22",
+      "title": "Security hardening, SBOM, secrets",
+      "requirement_ids": [
+        "TGT-024",
+        "INV-016",
+        "MATRIX-014"
+      ],
+      "dependencies": [
+        "N02",
+        "N20"
+      ],
+      "state": "PROVISIONAL",
+      "risk": "HIGH",
+      "user_value": "MEDIUM",
+      "downstream_unlock_value": "MEDIUM",
+      "expected_rework_cost": "LOW",
+      "evidence_required": [
+        "SBOM + scan receipts"
+      ],
+      "blocker": null,
+      "notes": "INV-016 and MATRIX-014 PASS; TGT-024 residue is Keychain storage for production secrets."
+    },
+    {
+      "node_id": "N23",
+      "title": "Signing and notarization",
+      "requirement_ids": [
+        "TGT-027"
+      ],
+      "dependencies": [
+        "N20"
+      ],
+      "state": "BLOCKED",
+      "risk": "MEDIUM",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "MEDIUM",
+      "expected_rework_cost": "LOW",
+      "evidence_required": [
+        "codesign/notarytool/stapler receipts"
+      ],
+      "blocker": "BLK-SIGN-001",
+      "notes": ""
+    },
+    {
+      "node_id": "N24",
+      "title": "Fresh-clone clean-environment certification",
+      "requirement_ids": [
+        "MATRIX-019"
+      ],
+      "dependencies": [
+        "N20",
+        "N22"
+      ],
+      "state": "PROVISIONAL",
+      "risk": "MEDIUM",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "LOW",
+      "evidence_required": [
+        "fresh-clone receipt at frozen SHA"
+      ],
+      "blocker": null,
+      "notes": "certify_release_grade.py wires the clean-environment sequence; not yet run end to end at one head."
+    },
+    {
+      "node_id": "N25",
+      "title": "Release freeze and final manifest",
+      "requirement_ids": [
+        "MATRIX-020",
+        "GOAL-001",
+        "GOAL-003"
+      ],
+      "dependencies": [
+        "N24",
+        "N23",
+        "N21",
+        "N18"
+      ],
+      "state": "OPEN",
+      "risk": "LOW",
+      "user_value": "HIGH",
+      "downstream_unlock_value": "LOW",
+      "expected_rework_cost": "LOW",
+      "evidence_required": [
+        "hashed release manifest"
+      ],
+      "blocker": null,
+      "notes": ""
+    },
+    {
+      "node_id": "N26",
+      "title": "Binding workbench specification",
+      "requirement_ids": [
+        "KERNEL-003"
+      ],
+      "dependencies": [
+        "N01"
+      ],
+      "state": "BLOCKED",
+      "risk": "HIGH",
+      "user_value": "MEDIUM",
+      "downstream_unlock_value": "HIGH",
+      "expected_rework_cost": "MEDIUM",
+      "evidence_required": [
+        "specification file + hash"
+      ],
+      "blocker": "BLK-SPEC-001",
+      "notes": ""
+    }
+  ]
+}

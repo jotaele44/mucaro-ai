@@ -50,6 +50,8 @@ def build_citation_records(retrieved_chunks: list[dict[str, Any]], cited_chunk_i
             "content_sha256",
             "retrieval_utc",
             "parser_warnings",
+            "trust",
+            "injection_signals",
         ):
             if optional_key in chunk:
                 record[optional_key] = chunk[optional_key]

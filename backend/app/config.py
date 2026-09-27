@@ -6,6 +6,7 @@ from pathlib import Path
 
 DEFAULT_CORS_ORIGINS = ("http://127.0.0.1:5173", "http://localhost:5173")
 DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+DEFAULT_MAX_INGEST_BYTES = 200 * 1024 * 1024
 DEFAULT_DISTRIBUTION_CHANNEL = "local"
 
 
@@ -70,10 +71,12 @@ class Settings:
     deployment_profile: str = "local"
     allow_public_bind: bool = False
     distribution_channel: str = DEFAULT_DISTRIBUTION_CHANNEL
+    max_ingest_bytes: int = DEFAULT_MAX_INGEST_BYTES
 
     @classmethod
     def load(cls) -> "Settings":
         root = find_project_root()
+        # Packaged apps keep user data outside the (read-only, replaceable) bundle (SD-006, TGT-017).
         data_dir = find_data_dir(root)
         distribution_channel = (
             os.getenv("MUCARO_AI_DISTRIBUTION_CHANNEL", DEFAULT_DISTRIBUTION_CHANNEL).strip().lower()
@@ -98,6 +101,7 @@ class Settings:
             default_model_provider=os.getenv("MUCARO_AI_MODEL_PROVIDER", "mock"),
             default_model_name=os.getenv("MUCARO_AI_MODEL", "claude-sonnet-5"),
             max_upload_bytes=max_upload_bytes,
+            max_ingest_bytes=parse_positive_int(os.getenv("MUCARO_AI_MAX_INGEST_BYTES"), DEFAULT_MAX_INGEST_BYTES),
             cors_origins=cors_origins or DEFAULT_CORS_ORIGINS,
             operator_token=os.getenv("MUCARO_AI_OPERATOR_TOKEN") or None,
             workspace_profile=os.getenv("MUCARO_AI_WORKSPACE_PROFILE", "default"),

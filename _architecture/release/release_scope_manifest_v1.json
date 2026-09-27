@@ -1,0 +1,1466 @@
+{
+  "schema_version": "mucaro-release-scope-manifest/1.0",
+  "manifest_id": "MUCARO_RELEASE_SCOPE_V1",
+  "created_utc": "2026-09-24T21:00:00Z",
+  "release_class": {
+    "name": "direct-distribution macOS desktop workbench",
+    "platform": "macOS",
+    "architectures": [
+      "arm64"
+    ],
+    "minimum_os": "14.0",
+    "distribution": "Developer ID direct download (.app in .zip/.dmg); Mac App Store lane is an unadopted ENHANCEMENT (SD-009)",
+    "notes": "Declared hardware baseline: Apple Silicon, 16 GB RAM, 10 GB free storage (assumption A3; see docs/release/RELEASE_ENGINEERING_STATE.md). Minimum macOS raised from 13.0 to 14.0 by RC-008: the pinned pyproj 3.7.2 and rasterio 1.4.3 arm64 wheels require macOS 14."
+  },
+  "bound_specifications": [
+    {
+      "spec_id": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "title": "Mucaro AI — Autonomous Release Engineering Contract",
+      "path": "docs/release/MUCARO_RELEASE_ENGINEERING_CONTRACT_V1.md",
+      "version": null,
+      "sha256": "5d031f20011bc04dae796ae9edda25bcf6e004e65f85124f0de99a0f4b079ad5",
+      "id_pattern": "^(?P<id>(?:GOAL|KERNEL|INV|TGT|MATRIX)-[0-9]{3}) — (?P<title>.+)$",
+      "id_prefix": "",
+      "extra_named_requirements": [
+        {
+          "requirement_id": "CERT-RULE-001",
+          "heading": "TERMINAL CERTIFICATION RULE"
+        },
+        {
+          "requirement_id": "EXEC-DIRECTIVE-001",
+          "heading": "FINAL AUTONOMOUS EXECUTION DIRECTIVE"
+        },
+        {
+          "requirement_id": "LEARN-GATE-001",
+          "heading": "POST-CERTIFICATION LEARNING GATE 🚩"
+        }
+      ],
+      "binding": "BOUND",
+      "provenance": "User-issued contract text, committed verbatim 2026-09-24."
+    },
+    {
+      "spec_id": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "title": "Mucaro AI: mobile interaction extraction",
+      "path": "docs/release/MOBILE_INTERACTION_EXTRACTION_V1.md",
+      "version": null,
+      "sha256": "9a13a192fc51a4419dbee8bc1cfb43a5939e0c94d1e90e6a3fa096967f4558ab",
+      "id_pattern": "^(?P<id>F[0-9]{2})\\t(?P<title>[^\\t]+)\\t",
+      "id_prefix": "MOB-",
+      "extra_named_requirements": [],
+      "binding": "BOUND",
+      "provenance": "User-issued brief (source recording ZIP SHA-256 db2e4759...c469c4), committed verbatim 2026-09-24."
+    }
+  ],
+  "missing_specifications": [
+    {
+      "name": "Mucaro AI Release-Grade Workbench Specification",
+      "binding": "OPEN",
+      "blocker_id": "BLK-SPEC-001",
+      "search_record": [
+        "repository full-text search 2026-09-24: not found",
+        "Google Drive search 2026-09-24: not found"
+      ]
+    }
+  ],
+  "requirements": [
+    {
+      "requirement_id": "GOAL-001",
+      "title": "Product outcome",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "GOAL",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PACKAGING_EVIDENCE",
+      "crosswalk": [
+        "PKG-05",
+        "PKG-07",
+        "V21",
+        "V22"
+      ]
+    },
+    {
+      "requirement_id": "GOAL-002",
+      "title": "Primary interaction model",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "GOAL",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": [
+        "CLI-10",
+        "V21",
+        "V07"
+      ]
+    },
+    {
+      "requirement_id": "GOAL-003",
+      "title": "Governing objective",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "GOAL",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": [
+        "V19",
+        "V20"
+      ]
+    },
+    {
+      "requirement_id": "KERNEL-001",
+      "title": "Instruction precedence",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-002",
+      "title": "Binding target and denominator",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-003",
+      "title": "Binding specification discovery",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-004",
+      "title": "Current-state snapshot",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-005",
+      "title": "Reuse validated work",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-006",
+      "title": "Dependency DAG",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-007",
+      "title": "Autonomous priority selection",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-008",
+      "title": "Preferred dependency vector",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-009",
+      "title": "Autonomous execution authority",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-010",
+      "title": "Credentials-last rule",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-011",
+      "title": "Execution cycle",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-012",
+      "title": "Preemptive hardening",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-013",
+      "title": "Anti-loop rule",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-014",
+      "title": "Contradiction handling",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-015",
+      "title": "Testing escalation",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-016",
+      "title": "Positive and negative gates",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-017",
+      "title": "Tool-routing preference",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-018",
+      "title": "Source refresh and artifact reuse",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-019",
+      "title": "Scope-delta control",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-020",
+      "title": "Blocker behavior",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-021",
+      "title": "Progress communication",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "KERNEL-022",
+      "title": "Hard stop conditions",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-001",
+      "title": "Epistemic classification",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-002",
+      "title": "Certification state",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-003",
+      "title": "Completion truthfulness",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-004",
+      "title": "Local-first privacy",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-005",
+      "title": "Common contracts",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "BC-01"
+      ]
+    },
+    {
+      "requirement_id": "INV-006",
+      "title": "Consequential actions",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "CLI-06"
+      ]
+    },
+    {
+      "requirement_id": "INV-007",
+      "title": "Data ingestion",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-008",
+      "title": "Raw / normalized / canonical separation",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "OCR-02"
+      ]
+    },
+    {
+      "requirement_id": "INV-009",
+      "title": "Identity proof",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-010",
+      "title": "Data conservation",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-011",
+      "title": "Whole-record integrity",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-012",
+      "title": "Spatial correctness",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "GIS-01",
+        "GIS-02",
+        "GIS-03"
+      ]
+    },
+    {
+      "requirement_id": "INV-013",
+      "title": "Source acquisition",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "WEB-01",
+        "WEB-02"
+      ]
+    },
+    {
+      "requirement_id": "INV-014",
+      "title": "Untrusted content",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-015",
+      "title": "Security boundary",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-016",
+      "title": "Measurable vulnerability gate",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "EXTERNAL_RECEIPT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-017",
+      "title": "Determinism versus evidence",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-018",
+      "title": "Provenance",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "PR-01",
+        "PR-04",
+        "PR-10"
+      ]
+    },
+    {
+      "requirement_id": "INV-019",
+      "title": "Archive comparison",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "PKG-02"
+      ]
+    },
+    {
+      "requirement_id": "INV-020",
+      "title": "Citation integrity",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-021",
+      "title": "Memory authority",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "CLI-05"
+      ]
+    },
+    {
+      "requirement_id": "INV-022",
+      "title": "User-interface uniqueness",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "INV-023",
+      "title": "Packaging truthfulness",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "INVARIANT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PACKAGING_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "TGT-001",
+      "title": "Executable macOS application",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PACKAGING_EVIDENCE",
+      "crosswalk": [
+        "PKG-05",
+        "V22"
+      ]
+    },
+    {
+      "requirement_id": "TGT-002",
+      "title": "Conversation-first work feed",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": [
+        "CLI-10",
+        "V21"
+      ]
+    },
+    {
+      "requirement_id": "TGT-003",
+      "title": "Specialized workspaces",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": [
+        "V21"
+      ]
+    },
+    {
+      "requirement_id": "TGT-004",
+      "title": "GIS and spatial engine",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "GIS-01",
+        "GIS-10",
+        "V16"
+      ]
+    },
+    {
+      "requirement_id": "TGT-005",
+      "title": "OCR and document intelligence",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "OCR-01",
+        "OCR-10"
+      ]
+    },
+    {
+      "requirement_id": "TGT-006",
+      "title": "Governed web research",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "WEB-01",
+        "WEB-10",
+        "V14"
+      ]
+    },
+    {
+      "requirement_id": "TGT-007",
+      "title": "Software engineering engine",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "CODE-01",
+        "CODE-10",
+        "CLI-09",
+        "V13"
+      ]
+    },
+    {
+      "requirement_id": "TGT-008",
+      "title": "Local AI execution",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "BC-05",
+        "V04"
+      ]
+    },
+    {
+      "requirement_id": "TGT-009",
+      "title": "Permissioned remote AI",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "BC-05",
+        "V04"
+      ]
+    },
+    {
+      "requirement_id": "TGT-010",
+      "title": "Model routing",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "BC-05",
+        "V04"
+      ]
+    },
+    {
+      "requirement_id": "TGT-011",
+      "title": "Retrieval-augmented generation",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "RT-01",
+        "RT-10",
+        "V15"
+      ]
+    },
+    {
+      "requirement_id": "TGT-012",
+      "title": "Multimodal file handling",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "CLI-01"
+      ]
+    },
+    {
+      "requirement_id": "TGT-013",
+      "title": "Explicit memory",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "CLI-05",
+        "V17"
+      ]
+    },
+    {
+      "requirement_id": "TGT-014",
+      "title": "Governed tool execution",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "CLI-06",
+        "V05",
+        "V06"
+      ]
+    },
+    {
+      "requirement_id": "TGT-015",
+      "title": "Artifact generation",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "PR-07",
+        "PR-09",
+        "V18"
+      ]
+    },
+    {
+      "requirement_id": "TGT-016",
+      "title": "Common execution contracts",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "BC-01",
+        "V02"
+      ]
+    },
+    {
+      "requirement_id": "TGT-017",
+      "title": "Local-first storage and workspace state",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "V02"
+      ]
+    },
+    {
+      "requirement_id": "TGT-018",
+      "title": "Recovery and restartability",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "V07",
+        "V08"
+      ]
+    },
+    {
+      "requirement_id": "TGT-019",
+      "title": "Offline behavior",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "TGT-020",
+      "title": "Performance",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "RT-10"
+      ]
+    },
+    {
+      "requirement_id": "TGT-021",
+      "title": "Security",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "V06"
+      ]
+    },
+    {
+      "requirement_id": "TGT-022",
+      "title": "Prompt-injection resistance",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "TGT-023",
+      "title": "Archive safety",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "PKG-02"
+      ]
+    },
+    {
+      "requirement_id": "TGT-024",
+      "title": "Secrets isolation",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "TGT-025",
+      "title": "Permission boundaries",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "BC-06",
+        "BC-07",
+        "V06"
+      ]
+    },
+    {
+      "requirement_id": "TGT-026",
+      "title": "macOS packaging",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PACKAGING_EVIDENCE",
+      "crosswalk": [
+        "PKG-05",
+        "PKG-07",
+        "PKG-08",
+        "V22"
+      ]
+    },
+    {
+      "requirement_id": "TGT-027",
+      "title": "Signing and notarization",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "EXTERNALLY_BLOCKED",
+      "verification_method": "EXTERNAL_RECEIPT",
+      "crosswalk": [
+        "PKG-09"
+      ],
+      "blocker_id": "BLK-SIGN-001"
+    },
+    {
+      "requirement_id": "TGT-028",
+      "title": "Installation",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PACKAGING_EVIDENCE",
+      "crosswalk": [
+        "PKG-08"
+      ]
+    },
+    {
+      "requirement_id": "TGT-029",
+      "title": "Upgrade and rollback",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PACKAGING_EVIDENCE",
+      "crosswalk": [
+        "PKG-10"
+      ]
+    },
+    {
+      "requirement_id": "TGT-030",
+      "title": "Source and evidence inspection",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": [
+        "PR-03",
+        "RT-06"
+      ]
+    },
+    {
+      "requirement_id": "TGT-031",
+      "title": "Citation interaction",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": [
+        "PR-03"
+      ]
+    },
+    {
+      "requirement_id": "TGT-032",
+      "title": "Provenance inspection",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": [
+        "PR-09",
+        "V18"
+      ]
+    },
+    {
+      "requirement_id": "TGT-033",
+      "title": "Configuration and settings",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "TGT-034",
+      "title": "Error behavior",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "TGT-035",
+      "title": "Observability",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": [
+        "BC-04"
+      ]
+    },
+    {
+      "requirement_id": "TGT-036",
+      "title": "Accessibility and interaction quality",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "TGT-037",
+      "title": "Minimalist UI",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "TGT-038",
+      "title": "Coherent architecture",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "INSPECTION",
+      "crosswalk": [
+        "BC-01"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-001",
+      "title": "Required evidence model",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MATRIX-002",
+      "title": "Acceptance ledger schema",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MATRIX-003",
+      "title": "Denominator arithmetic",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MATRIX-004",
+      "title": "Material unresolved residue",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MATRIX-005",
+      "title": "GIS benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "GIS-01",
+        "GIS-10"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-006",
+      "title": "OCR/document benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "OCR-10"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-007",
+      "title": "Retrieval benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "RT-07",
+        "RT-09",
+        "RT-10"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-008",
+      "title": "Web research benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "WEB-08"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-009",
+      "title": "Coding benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "CODE-10"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-010",
+      "title": "File-ingestion benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "CLI-01"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-011",
+      "title": "Tool-governance benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "CLI-06"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-012",
+      "title": "Model-routing benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "BC-05"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-013",
+      "title": "Memory benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": [
+        "CLI-05"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-014",
+      "title": "Security benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MATRIX-015",
+      "title": "UI benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MATRIX-016",
+      "title": "Recovery benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MATRIX-017",
+      "title": "Performance benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "BENCHMARK",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MATRIX-018",
+      "title": "Packaging benchmark",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PACKAGING_EVIDENCE",
+      "crosswalk": [
+        "PKG-05",
+        "PKG-08"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-019",
+      "title": "Clean-environment certification",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PACKAGING_EVIDENCE",
+      "crosswalk": [
+        "PKG-04"
+      ]
+    },
+    {
+      "requirement_id": "MATRIX-020",
+      "title": "Final release manifest",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PACKAGING_EVIDENCE",
+      "crosswalk": [
+        "PR-08"
+      ]
+    },
+    {
+      "requirement_id": "CERT-RULE-001",
+      "title": "TERMINAL CERTIFICATION RULE",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "EVIDENCE_GATE",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "LEDGER_VALIDATOR",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "EXEC-DIRECTIVE-001",
+      "title": "FINAL AUTONOMOUS EXECUTION DIRECTIVE",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "PROCESS_AUDIT",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "LEARN-GATE-001",
+      "title": "POST-CERTIFICATION LEARNING GATE 🚩",
+      "source": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "requirement_class": "PROCESS",
+      "scope_state": "NOT_APPLICABLE",
+      "verification_method": "INSPECTION",
+      "crosswalk": [],
+      "justification": "The contract places this gate strictly after final release certification ('Only after ... final certification'); it cannot be a precondition of the release denominator it follows.",
+      "justification_evidence": [
+        "docs/release/MUCARO_RELEASE_ENGINEERING_CONTRACT_V1.md::POST-CERTIFICATION LEARNING GATE"
+      ]
+    },
+    {
+      "requirement_id": "MOB-F01",
+      "title": "Mobile conversation shell and long transcript",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F02",
+      "title": "User/assistant/tool turns, time separators",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F03",
+      "title": "Incremental thinking/working indication and stop",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F04",
+      "title": "Queue for after this turn",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F05",
+      "title": "Text composer, send, keyboard interaction",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F06",
+      "title": "Model/mode chip and Auto/Accept edits/Plan sheet",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F07",
+      "title": "Per-tool permission sheet with arguments, Deny/Allow once",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F08",
+      "title": "Tool activity summary and failure count",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F09",
+      "title": "Tool detail drawer and output",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F10",
+      "title": "Pending multiple-choice question with descriptions",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F11",
+      "title": "Disabled submit until valid choice; selection feedback",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F12",
+      "title": "Other and freeform override",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F13",
+      "title": "Question/choice receipt in transcript",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F14",
+      "title": "Interruption and return to pending question",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F15",
+      "title": "Side-effect reconciliation after contradictory status",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F16",
+      "title": "Multi-action batch with partial failure and retry",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F17",
+      "title": "Context menu: share, copy branch, rename, feedback, archive",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F18",
+      "title": "Background tasks with state, metrics, transcript, load more",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F19",
+      "title": "Linked pull-request list and exact PR detail",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "MOB-F20",
+      "title": "Copy and read-aloud message actions",
+      "source": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "requirement_class": "INTERACTION",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "RENDERED_EVIDENCE",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "SD-001",
+      "title": "ingest_folder follows symlinks and does not re-check the directory grant per file, allowing reads outside a granted folder",
+      "source": "SCOPE_DELTA",
+      "requirement_class": "DEFECT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "SD-002",
+      "title": "DOCX parsing reads word/document.xml with no decompressed-size or ratio cap (decompression bomb)",
+      "source": "SCOPE_DELTA",
+      "requirement_class": "DEFECT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "SD-003",
+      "title": "Sensitive GET routes (memory export, tool calls/audit, chunks, runs, exports) are readable without the operator token when one is configured",
+      "source": "SCOPE_DELTA",
+      "requirement_class": "DEFECT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "SD-004",
+      "title": "Operator token comparison is not constant-time",
+      "source": "SCOPE_DELTA",
+      "requirement_class": "DEFECT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "SD-005",
+      "title": "test_web_render performs a real DNS lookup (hidden network dependency; fails offline)",
+      "source": "SCOPE_DELTA",
+      "requirement_class": "DEFECT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "SD-006",
+      "title": "Application data directory resolves inside the application bundle (project_root/data)",
+      "source": "SCOPE_DELTA",
+      "requirement_class": "DEFECT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "SD-007",
+      "title": "Built UI calls a hard-coded API base (127.0.0.1:8000); any other launch port breaks the GUI",
+      "source": "SCOPE_DELTA",
+      "requirement_class": "DEFECT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "SD-008",
+      "title": "Tool audit log and JSON ledgers use unlocked read-modify-write; concurrent writers can lose events",
+      "source": "SCOPE_DELTA",
+      "requirement_class": "DEFECT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    },
+    {
+      "requirement_id": "SD-011",
+      "title": "Web fetch validates DNS before urllib reconnects (DNS-rebinding window to private hosts)",
+      "source": "SCOPE_DELTA",
+      "requirement_class": "DEFECT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
+    }
+  ]
+}

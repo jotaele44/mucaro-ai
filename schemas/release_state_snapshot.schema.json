@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/release_state_snapshot.schema.json",
+  "title": "Mucaro Current State Snapshot 1.0",
+  "description": "KERNEL-004 CURRENT_STATE_SNAPSHOT. Records credential presence only, never values.",
+  "type": "object",
+  "required": ["schema_version", "captured_utc", "repository", "runtime", "dependency_locks", "tests", "build", "credentials", "receipts", "known_boundaries"],
+  "properties": {
+    "schema_version": {"const": "mucaro-release-state-snapshot/1.0"},
+    "captured_utc": {"type": "string"},
+    "repository": {
+      "type": "object",
+      "required": ["path", "head_sha", "branch", "dirty_paths"],
+      "properties": {
+        "path": {"type": "string"},
+        "head_sha": {"type": ["string", "null"]},
+        "branch": {"type": ["string", "null"]},
+        "dirty_paths": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "runtime": {"type": "object"},
+    "dependency_locks": {"type": "array", "items": {"type": "object", "required": ["path", "sha256", "lock_kind"]}},
+    "tests": {"type": "object"},
+    "build": {"type": "object"},
+    "credentials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "present"],
+        "properties": {"name": {"type": "string"}, "present": {"type": "boolean"}, "purpose": {"type": "string"}}
+      }
+    },
+    "receipts": {"type": "array"},
+    "known_boundaries": {"type": "array", "items": {"type": "string"}}
+  }
+}

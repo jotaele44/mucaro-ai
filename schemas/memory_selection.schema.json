@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/memory_selection.schema.json",
+  "title": "Mucaro Memory Selection 1.0",
+  "description": "MEMORY contract: bounded, accounted selection of memory rows injected as prompt context.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "status", "source_count", "selected_count", "excluded_count", "selected", "excluded", "invariants"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^mucaro-memory-selection/"},
+    "status": {"type": "string"},
+    "source_count": {"type": "integer", "minimum": 0},
+    "selected_count": {"type": "integer", "minimum": 0},
+    "excluded_count": {"type": "integer", "minimum": 0},
+    "selected": {"type": "array", "items": {"type": "object", "required": ["memory_id", "kind", "content"]}},
+    "excluded": {"type": "array", "items": {"type": "object", "required": ["reason"]}},
+    "invariants": {
+      "type": "object",
+      "required": ["row_accounting_closed"],
+      "properties": {"row_accounting_closed": {"const": true}}
+    }
+  }
+}

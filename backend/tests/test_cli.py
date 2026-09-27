@@ -348,7 +348,7 @@ def test_cli_sources_ingest_web_snapshot(tmp_path: Path, capsys):
                 "retrieval_utc": "2026-09-10T00:00:01Z",
                 "http_status": 200,
                 "content_type": "text/html; charset=utf-8",
-                "content_sha256": "contenthash",
+                "content_sha256": "27063147d74d8ad4df1af70a0b7cd1585c6db476543a4b5f27f7347dade5ab4e",
                 "content_size_bytes": 64,
                 "content_base64": "",
                 "parser_name": "web_snapshot_preview_v1",
@@ -784,13 +784,13 @@ def test_cli_models_list_reports_provider_registry(tmp_path: Path, capsys, monke
 
     assert payload["status"] == "MODEL_PROVIDERS_OK"
     providers = {provider["name"]: provider for provider in payload["providers"]}
-    assert set(providers) == {"mock", "anthropic"}
+    assert set(providers) == {"mock", "anthropic", "openai_compatible_local"}
     assert providers["mock"]["status"] == "MODEL_PROVIDER_READY"
     assert providers["anthropic"]["status"] == "MODEL_PROVIDER_DISABLED"
 
     assert main(["models", "list", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
-    assert "providers=2" in text_output
+    assert "providers=3" in text_output
     assert "MODEL_PROVIDER_READY mock" in text_output
     assert "MODEL_PROVIDER_DISABLED anthropic" in text_output
 
@@ -5259,6 +5259,7 @@ def test_cli_tools_require_approval_and_audit_execution(tmp_path: Path, capsys):
     assert [event["event"] for event in audit["events"]] == [
         "TOOL_CALL_REQUESTED",
         "TOOL_CALL_APPROVED",
+        "TOOL_CALL_STARTED",
         "TOOL_CALL_EXECUTED",
     ]
 
@@ -5310,7 +5311,7 @@ def test_cli_certify_operator_workflow_exercises_local_boundary(tmp_path: Path, 
     assert payload["summary"]["failed"] == 0
     assert payload["summary"]["source_count"] == 2
     assert payload["summary"]["run_count"] == 1
-    assert payload["summary"]["tool_audit_event_count"] == 3
+    assert payload["summary"]["tool_audit_event_count"] == 4
     assert payload["summary"]["trace_export_count"] == 3
     assert payload["receipt"] == "data/exports/release_receipts/operator_workflow-UNKNOWN_HEAD.json"
     by_name = {check["name"]: check for check in payload["checks"]}

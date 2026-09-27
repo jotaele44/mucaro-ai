@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .contracts import validate_contract
+
 
 RECEIPT_SCHEMA_VERSION = "mucaro_release_receipt_v1"
 RECEIPT_DIR = Path("data") / "exports" / "release_receipts"
@@ -76,6 +78,7 @@ def write_release_receipt(
         "command": command,
         "payload": payload,
     }
+    validate_contract("release_receipt", receipt, root=root if (root / "schemas").is_dir() else None)
     path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 

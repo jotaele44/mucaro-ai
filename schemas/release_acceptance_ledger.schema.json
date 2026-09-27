@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/release_acceptance_ledger.schema.json",
+  "title": "Mucaro Release Acceptance Ledger 1.0",
+  "description": "MATRIX-002 acceptance ledger; one row per manifest requirement.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "rows"],
+  "properties": {
+    "schema_version": {"const": "mucaro-release-acceptance-ledger/1.0"},
+    "updated_utc": {"type": "string"},
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requirement_id", "requirement_text", "scope_state", "implementation_state", "implementation_refs", "dependencies", "positive_gate", "negative_gate", "benchmark", "evidence_refs", "state", "blocker_id", "notes"],
+        "properties": {
+          "requirement_id": {"type": "string", "minLength": 1},
+          "requirement_text": {"type": "string", "minLength": 1},
+          "scope_state": {"enum": ["IN_SCOPE", "NOT_APPLICABLE", "EXTERNALLY_BLOCKED"]},
+          "implementation_state": {"enum": ["IMPLEMENTED", "PARTIAL", "ABSENT", "UNVERIFIED", "NOT_APPLICABLE"]},
+          "implementation_refs": {"type": "array", "items": {"type": "string"}},
+          "dependencies": {"type": "array", "items": {"type": "string"}},
+          "positive_gate": {"type": ["string", "null"]},
+          "negative_gate": {"type": ["string", "null"]},
+          "benchmark": {"type": ["string", "null"]},
+          "evidence_refs": {"type": "array", "items": {"type": "string"}},
+          "state": {"enum": ["PASS", "FAIL", "OPEN", "BLOCKED", "PROVISIONAL", "NOT_APPLICABLE"]},
+          "blocker_id": {"type": ["string", "null"]},
+          "dag_node": {"type": ["string", "null"]},
+          "notes": {"type": "string"}
+        }
+      }
+    }
+  }
+}

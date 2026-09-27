@@ -1,0 +1,20 @@
+{
+  "basis": "receipt emitted only after scripts/certify_release.py exits successfully in the admitted hosted validate job",
+  "evidence": {
+    "ci_admitted": true,
+    "ci_passed": true,
+    "jobs_executed": true
+  },
+  "github": {
+    "event_name": "pull_request",
+    "job": "validate",
+    "ref": "refs/pull/110/merge",
+    "repository": "jotaele44/mucaro-ai",
+    "run_attempt": "1",
+    "run_id": "36268886568"
+  },
+  "head_sha": "e3cfb5fc03dfc22be3046e34f7fe75467eb0dfd9",
+  "pull_request_head_sha": "0a806c1e8c98cc159568fea898a76a30189b0d1c",
+  "schema_version": "mucaro-external-release-evidence/1.0",
+  "tree_equivalent_to_pull_request_head": true
+}
