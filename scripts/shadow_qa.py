@@ -65,6 +65,49 @@ def classify_rendered(paths: list[str]) -> tuple[str, str]:
     return ("AUDIT_ONLY", "No frontend surface changed in this checkpoint denominator.")
 
 
+REQUIRED_ADVERSARIAL_VECTORS = [
+    "null_empty",
+    "duplicate",
+    "stale",
+    "m_to_n_cardinality",
+    "race",
+    "replay_idempotency",
+    "cancellation",
+    "restart_reconstruction",
+    "resume",
+    "malformed_tool_result",
+    "partial_delayed_tool_result",
+    "orphan_state_transition",
+    "persistence_loss",
+    "schema_drift",
+    "unexpected_codes",
+]
+
+SHADOW_BOOTSTRAP_PATHS = {
+    ".github/workflows/shadow-qa.yml",
+    "backend/tests/test_shadow_qa.py",
+    "docs/SHADOW_QA.md",
+    "scripts/shadow_qa.py",
+}
+
+
+def adversarial_vector_results(paths: list[str]) -> dict[str, dict[str, str]]:
+    path_set = set(paths)
+    bootstrap_only = bool(path_set) and path_set <= SHADOW_BOOTSTRAP_PATHS
+    if bootstrap_only:
+        reason = (
+            "NOT_APPLICABLE: checkpoint changes only Shadow QA infrastructure; "
+            "no application runtime/state/persistence/tool-result surface is in the denominator."
+        )
+        return {vector: {"state": "NOT_APPLICABLE", "reason": reason} for vector in REQUIRED_ADVERSARIAL_VECTORS}
+
+    reason = (
+        "UNRESOLVED: this generic runner cannot prove the vector from broad release gates alone; "
+        "checkpoint-specific adversarial evidence is required."
+    )
+    return {vector: {"state": "UNRESOLVED", "reason": reason} for vector in REQUIRED_ADVERSARIAL_VECTORS}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run bounded MUCARO Shadow QA against an exact frozen checkpoint.")
     parser.add_argument("--base", default="HEAD^", help="Base commit/ref for the changed-surface denominator.")
@@ -110,14 +153,19 @@ def main() -> int:
     blocked = [gate for gate in gates if gate.get("state") == "BLOCKED"]
 
     rendered_state, rendered_reason = classify_rendered(paths)
+    vector_results = adversarial_vector_results(paths)
+    unresolved_vectors = [
+        name for name, result in vector_results.items() if result["state"] == "UNRESOLVED"
+    ]
 
-    # A gate can verify the declared changed-file denominator only when every executable gate passes.
-    # BLOCKED gates remain unresolved rather than being silently counted as verified.
+    # A gate can verify the declared changed-file denominator only when every executable gate passes
+    # and every required adversarial vector is explicitly classified.
+    # BLOCKED gates or unresolved vectors remain unresolved rather than being silently counted as verified.
     if failed:
         verified: list[str] = []
         unresolved = list(paths)
         overall = "FAIL"
-    elif blocked:
+    elif blocked or unresolved_vectors:
         verified = []
         unresolved = list(paths)
         overall = "PROVISIONAL"
@@ -161,23 +209,13 @@ def main() -> int:
             "state": rendered_state,
             "reason": rendered_reason,
         },
-        "required_adversarial_vectors": [
-            "null_empty",
-            "duplicate",
-            "stale",
-            "m_to_n_cardinality",
-            "race",
-            "replay_idempotency",
-            "cancellation",
-            "restart_reconstruction",
-            "resume",
-            "malformed_tool_result",
-            "partial_delayed_tool_result",
-            "orphan_state_transition",
-            "persistence_loss",
-            "schema_drift",
-            "unexpected_codes",
-        ],
+        "adversarial_vectors": vector_results,
+        "vector_arithmetic": {
+            "required": len(REQUIRED_ADVERSARIAL_VECTORS),
+            "classified": len(vector_results),
+            "unresolved": len(unresolved_vectors),
+            "closes": len(vector_results) == len(REQUIRED_ADVERSARIAL_VECTORS),
+        },
         "overall_state": overall,
         "scope_note": "This receipt is bounded to the exact checkpoint and declared gates; it does not claim universal defect freedom.",
     }
@@ -188,6 +226,9 @@ def main() -> int:
     if not receipt["defect_arithmetic"]["closes"]:
         print("ERROR_SHADOW_DEFECT_ARITHMETIC", file=sys.stderr)
         return 4
+    if not receipt["vector_arithmetic"]["closes"]:
+        print("ERROR_SHADOW_VECTOR_ARITHMETIC", file=sys.stderr)
+        return 5
 
     out = ROOT / args.output
     out.parent.mkdir(parents=True, exist_ok=True)
