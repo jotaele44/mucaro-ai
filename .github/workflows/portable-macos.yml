@@ -14,6 +14,20 @@ on:
       - "frontend/**"
       - ".github/workflows/portable-macos.yml"
 
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/portable_runtime.py"
+      - "backend/app/portable_runtime_source.py"
+      - "backend/app/portable_install.py"
+      - "backend/app/clean_machine_macos.py"
+      - "scripts/certify_clean_machine_macos.py"
+      - "scripts/certify_portable_release_lane.py"
+      - "packaging/runtime/**"
+      - "frontend/**"
+      - ".github/workflows/portable-macos.yml"
+
 permissions:
   contents: read
 
