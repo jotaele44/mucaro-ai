@@ -49,3 +49,10 @@ def test_non_bootstrap_runtime_change_cannot_silently_pass_adversarial_vectors()
     assert set(results) == set(shadow_qa.REQUIRED_ADVERSARIAL_VECTORS)
     assert all(result["state"] == "UNRESOLVED" for result in results.values())
     assert all("checkpoint-specific adversarial evidence" in result["reason"] for result in results.values())
+
+
+def test_shadow_exit_codes_distinguish_pass_fail_and_provisional():
+    assert shadow_qa.exit_code_for_state("PASS") == 0
+    assert shadow_qa.exit_code_for_state("FAIL") == 1
+    assert shadow_qa.exit_code_for_state("PROVISIONAL") != 0
+    assert shadow_qa.exit_code_for_state("BLOCKED") != 0
