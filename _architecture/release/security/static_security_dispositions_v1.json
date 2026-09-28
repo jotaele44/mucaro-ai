@@ -154,6 +154,22 @@
       "classification": "LOW",
       "rationale": "Maintainer-side runtime materialization only (not reachable from the app or its tools). load_runtime_source_manifest rejects any source URL that is not https://github.com; the response URL after redirects must still be https; the download is capped at the pinned byte count and is rejected before extraction unless its size and SHA-256 match the repository-tracked manifest.",
       "evidence": "backend/tests/test_portable_runtime_source.py::test_runtime_source_url_must_be_https_github"
+    },
+    {
+      "rule": "S310",
+      "path": "scripts/certify_retrieval_real_world_live.py",
+      "code": "request = urllib.request.Request(url, headers={\"User-Agent\": \"Mucaro-RT09-Cert/1.0\"})",
+      "classification": "LOW",
+      "rationale": "Maintainer-side RT-09 certification only. The source denominator is repository-frozen; acquisition accepts only HTTPS URLs whose requested/final host is in the explicit IETF/W3C/NIST allowlist, caps response bytes, and freezes final URL/status/time/SHA-256 before parsing or evaluation.",
+      "evidence": "backend/tests/test_rt09_real_world_corpus.py::test_rt09_denominator_is_large_real_world_and_mixed_format"
+    },
+    {
+      "rule": "S310",
+      "path": "scripts/certify_retrieval_real_world_live.py",
+      "code": "with urllib.request.urlopen(request, timeout=timeout) as response:",
+      "classification": "LOW",
+      "rationale": "Maintainer-side RT-09 certification only. Redirects are accepted only when the final host remains in the frozen allowlist; response bytes are bounded and exact source identities are hashed before any retrieval-quality claim.",
+      "evidence": "scripts/certify_retrieval_real_world_live.py::acquire"
     }
   ],
   "vulnerability_dispositions": []
