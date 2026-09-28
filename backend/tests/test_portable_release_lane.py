@@ -36,6 +36,14 @@ def test_portable_lane_requires_all_release_checks(tmp_path: Path, monkeypatch) 
         "status": "PORTABLE_APP_VERIFIED",
         "manifest_sha256": "c"*64,
     })
+    monkeypatch.setattr(cert, "verify_materialized_runtime", lambda root, runtime_dir, manifest_path: {
+        "status": "PORTABLE_RUNTIME_VERIFIED",
+        "failed_checks": [],
+    })
+    monkeypatch.setattr(cert, "verify_materialized_runtime", lambda root, runtime_dir, manifest_path: {
+        "status": "PORTABLE_RUNTIME_VERIFIED",
+        "failed_checks": [],
+    })
 
     receipt = cert.certify_portable_lane(
         current_app=current, previous_app=previous, runtime_dir=runtime,
