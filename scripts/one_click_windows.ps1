@@ -1,4 +1,6 @@
-# Stage 0 of the double-click setup on Windows (started by "Mucaro AI.cmd").
+# Stage 0 of the double-click setup on Windows. Started by "Mucaro AI.exe" with --ui (no console window;
+# progress is shown on the browser page .mucaro-runtime\ui\progress.html) or by the console fallback
+# "scripts\Mucaro AI.cmd".
 #
 # Provisions pinned, checksum-verified private runtimes inside .mucaro-runtime\
 # (uv, Node, CPython) and the project .venv, then hands off to scripts\one_click.py,
@@ -21,6 +23,37 @@ $VenvPy = Join-Path $Root ".venv\Scripts\python.exe"
 $MinFreeBytes = 2GB
 $script:Log = $null
 $script:LockToken = $null
+$ScriptArgs = @($args)
+$UiMode = $ScriptArgs -contains "--ui"
+$NoBrowser = $ScriptArgs -contains "--no-browser"
+$Page = Join-Path $Runtime "ui\progress.html"
+$PageTemplate = Join-Path $Root "scripts\one_click_progress.html"
+
+function ConvertTo-PageText([string]$Text) {
+    # Same escaping as Python's html.escape(quote=True), so all three renderers produce identical pages.
+    return $Text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace('"', "&quot;").Replace("'", "&#x27;")
+}
+
+function Write-ProgressPage([string]$State, [int]$Step, [string]$Title, [string]$Detail) {
+    # PowerShell copy of scripts\progress_page.py. Best effort: a page that cannot be written never stops setup.
+    if (-not $UiMode) { return }
+    try {
+        $total = 6
+        if ($State -eq "ready" -or $State -eq "stopped") { $pct = 100 } else { $pct = [int][Math]::Floor($Step * 100 / $total) }
+        $refresh = ""
+        if ($State -eq "running") { $refresh = '<meta http-equiv="refresh" content="1">' }
+        $logText = ""
+        if ($script:Log) { $logText = $script:Log }
+        $html = [IO.File]::ReadAllText($PageTemplate)
+        $html = $html.Replace("{{REFRESH}}", $refresh)
+        $html = $html.Replace("{{STATE}}", $State).Replace("{{STEP}}", "$Step").Replace("{{TOTAL}}", "$total").Replace("{{PERCENT}}", "$pct")
+        $html = $html.Replace("{{TITLE}}", (ConvertTo-PageText $Title)).Replace("{{DETAIL}}", (ConvertTo-PageText $Detail))
+        $html = $html.Replace("{{LOG}}", (ConvertTo-PageText $logText)).Replace("{{URL}}", "")
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Page) | Out-Null
+        [IO.File]::WriteAllText("$Page.tmp", $html)
+        Move-Item -LiteralPath "$Page.tmp" -Destination $Page -Force
+    } catch { $null = $_ }
+}
 
 function Write-SetupLog([string]$Text) {
     Write-Host $Text
@@ -40,6 +73,7 @@ function Exit-Lock {
 }
 
 function Stop-Setup([string]$Code, [string]$Detail) {
+    Write-ProgressPage "error" 0 "Mucaro AI setup did not finish" "${Code}: $Detail"
     Write-SetupLog ""
     Write-SetupLog "$Code $Detail"
     Write-SetupLog ""
@@ -196,6 +230,7 @@ function Install-Uv {
     if ($found -like ("uv " + $Pins["UV_VERSION"] + "*")) { Write-SetupLog ("UV_OK cached " + $Pins["UV_VERSION"]); return }
     Assert-DiskSpace
     Write-SetupLog ("==> Downloading the Python installer uv " + $Pins["UV_VERSION"] + " (one time, about 20 MB)")
+    Write-ProgressPage "running" 0 "Preparing Mucaro AI" "Downloading the Python installer (one time, about 20 MB)"
     $work = New-WorkDir
     $zip = Join-Path $work "uv.zip"
     Get-VerifiedDownload ("https://github.com/astral-sh/uv/releases/download/" + $Pins["UV_VERSION"] + "/uv-x86_64-pc-windows-msvc.zip") $zip $Pins["UV_SHA256_x86_64_pc_windows_msvc"]
@@ -214,6 +249,7 @@ function Install-Node {
     if ($found -eq ("v" + $Pins["NODE_VERSION"])) { Write-SetupLog ("NODE_OK cached " + $Pins["NODE_VERSION"]); return }
     Assert-DiskSpace
     Write-SetupLog ("==> Downloading private Node.js " + $Pins["NODE_VERSION"] + " (one time, about 35 MB)")
+    Write-ProgressPage "running" 0 "Preparing Mucaro AI" "Downloading Node.js (one time, about 35 MB)"
     $work = New-WorkDir
     $archive = "node-v" + $Pins["NODE_VERSION"] + "-win-x64"
     $zip = Join-Path $work "node.zip"
@@ -249,6 +285,7 @@ function Install-Venv {
     }
     Assert-DiskSpace
     Write-SetupLog ("==> Installing private Python " + $Pins["PYTHON_VERSION"] + " (one time, about 30 MB)")
+    Write-ProgressPage "running" 0 "Preparing Mucaro AI" ("Installing a private Python " + $Pins["PYTHON_VERSION"] + " (one time, about 30 MB)")
     & $UvBin python install --no-bin --no-registry $Pins["PYTHON_VERSION"]
     if ($LASTEXITCODE -ne 0) { Stop-Setup "ERROR_PYTHON_INSTALL_FAILED" ("uv python install returncode=$LASTEXITCODE") }
     Remove-Item -LiteralPath (Join-Path $Root ".venv") -Recurse -Force -ErrorAction SilentlyContinue
@@ -261,6 +298,12 @@ function Install-Venv {
 Write-SetupLog "Mucaro AI - setup and launch"
 Write-SetupLog "No input is needed. The first run downloads everything it needs (2-5 minutes); later runs start in seconds."
 Write-SetupLog "ONE_CLICK_STAGE0_START root=$Root log=$($script:Log)"
+if ($UiMode) {
+    Write-ProgressPage "running" 0 "Preparing Mucaro AI" "Checking the private Python and Node.js"
+    if (-not $NoBrowser) {
+        try { Start-Process -FilePath $Page } catch { Write-SetupLog ("WARN_PROGRESS_PAGE_NOT_OPENED " + $_.Exception.Message) }
+    }
+}
 
 $arch = $env:PROCESSOR_ARCHITECTURE
 if ($env:PROCESSOR_ARCHITEW6432) { $arch = $env:PROCESSOR_ARCHITEW6432 }
@@ -288,7 +331,17 @@ $env:MUCARO_SETUP_LOCK_TOKEN = $script:LockToken
 $env:MUCARO_SETUP_LOG = $script:Log
 
 # one_click.py releases the lock before it starts the app; Exit-Lock below only covers a crash.
-& $VenvPy (Join-Path $Root "scripts\one_click.py") @args
+# With --ui this process has a console without a window (Mucaro AI.exe starts it with CREATE_NO_WINDOW),
+# and python.exe and everything it starts inherit that console, so no window ever appears.
+& $VenvPy (Join-Path $Root "scripts\one_click.py") @ScriptArgs
 $rc = $LASTEXITCODE
 Exit-Lock
+if ($UiMode -and (Test-Path -LiteralPath $Page)) {
+    # one_click.py and launch_app.py leave the page ready, stopped, or in error; "running" here means a crash.
+    try {
+        if ([IO.File]::ReadAllText($Page).Contains('class="state-running"')) {
+            Write-ProgressPage "error" 0 "Mucaro AI stopped unexpectedly" "Setup ended with code $rc before the app was ready."
+        }
+    } catch { $null = $_ }
+}
 exit $rc

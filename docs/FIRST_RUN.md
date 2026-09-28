@@ -2,9 +2,10 @@
 
 ## Recommended: double-click
 
-Double-click `Mucaro AI.command` (macOS) or `Mucaro AI.cmd` (Windows). No other step is needed.
+Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows). No other step is needed.
 
-The first run prepares everything inside the project folder and then opens the app:
+A progress page opens in your browser and follows each step; when the app is ready the page turns
+into Mucaro AI. The first run prepares everything inside the project folder:
 
 | Step | Marker when done | First run | Later runs |
 |---|---|---|---|
@@ -19,9 +20,15 @@ The first run prepares everything inside the project folder and then opens the a
 `ONE_CLICK_SETUP_OK` marks a run that did setup work; `ONE_CLICK_FAST_PATH` marks a run that had
 nothing to do. If port 8000 is taken by another program the app moves to the next free port
 (`PORT_FALLBACK`). If Mucaro AI is already running, a second double-click just opens it
-(`DESKTOP_LAUNCH_REUSED`). If setup stops, the window names the problem and the log file; fix it
-(usually the internet connection) and double-click again: setup resumes where it stopped. Details
-and error codes: `docs/ONE_CLICK_SETUP.md`.
+(`DESKTOP_LAUNCH_REUSED`). If setup stops, the progress page names the problem and the log file;
+fix it (usually the internet connection) and double-click again: setup resumes where it stopped.
+
+Mucaro AI keeps running in the background. Stop it with **Quit Mucaro AI** at the bottom of the
+sidebar (or under Settings).
+
+To watch setup in a window instead, run `scripts/Mucaro AI.command` (macOS/Linux) or
+`scripts/Mucaro AI.cmd` (Windows); the markers above appear there, and closing the window stops the
+app. Details and error codes: `docs/ONE_CLICK_SETUP.md`.
 
 ## Manual developer path (macOS)
 
@@ -49,7 +56,7 @@ source .venv/bin/activate
 python scripts/launch_app.py
 ```
 
-Or double-click `Mucaro AI.command`, or run `make start`. The launcher builds
+Or double-click `Mucaro AI.app`, or run `make start`. The launcher builds
 `frontend/dist` if it is missing, starts the backend on `127.0.0.1:8000`, opens
 the browser, and stops everything on `Ctrl+C`. It reads `.env`; variables
 exported in your shell take precedence.

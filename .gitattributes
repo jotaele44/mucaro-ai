@@ -1,6 +1,12 @@
 # cmd.exe misparses labels and blocks in batch files without CRLF line endings.
 *.cmd text eol=crlf
-# Scripts run by bash (Mucaro AI.command sources the pins file) must keep LF even in Windows checkouts.
+# Scripts run by bash must keep LF even in Windows checkouts (a CR breaks the shebang and the pins file).
 *.sh text eol=lf
 *.command text eol=lf
 scripts/one_click_pins.env text eol=lf
+# The launcher inside Mucaro AI.app (patterns cannot contain spaces, so match by folder).
+**/Contents/MacOS/* text eol=lf
+# Built launcher assets: byte-exact, checked by scripts/build_launchers.py --check.
+*.exe binary
+*.icns binary
+*.ico binary

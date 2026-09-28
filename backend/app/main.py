@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import ipaddress
+import os
 import re
 from pathlib import Path, PurePath
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -88,6 +90,23 @@ def api_error(status: str, detail: str, *, status_code: int = 400, **extra: obje
     return HTTPException(status_code=status_code, detail=payload)
 
 
+# Set by scripts/launch_app.py (--stop-file) when the desktop launcher supervises this backend.
+STOP_FILE_ENV = "MUCARO_AI_STOP_FILE"
+
+
+def _is_loopback_client(host: str | None) -> bool:
+    if not host:
+        return False
+    if host.strip().lower() == "localhost":
+        return True
+    try:
+        address = ipaddress.ip_address(host.strip())
+    except ValueError:
+        return False
+    mapped = getattr(address, "ipv4_mapped", None)
+    return address.is_loopback or bool(mapped and mapped.is_loopback)
+
+
 def sanitize_upload_filename(filename: str | None) -> str:
     raw = (filename or "").strip()
     if not raw:
@@ -158,7 +177,32 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             "cors_origins": list(cfg.cors_origins),
             "auth": auth_status(cfg),
             "security": build_security_report(cfg),
+            "desktop": {"quit_supported": bool(os.environ.get(STOP_FILE_ENV))},
         }
+
+    @app.post("/shutdown")
+    def shutdown(
+        request: Request,
+        x_mucaro_action: str | None = Header(default=None),
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        # The custom header forces a CORS preflight, so other websites cannot trigger this from a browser.
+        if x_mucaro_action != "quit":
+            raise api_error("SHUTDOWN_HEADER_REQUIRED", "Send the header X-Mucaro-Action: quit.")
+        if not _is_loopback_client(request.client.host if request.client else None):
+            raise api_error("SHUTDOWN_LOOPBACK_ONLY", "Mucaro AI can only be quit from this computer.", status_code=403)
+        stop_file = os.environ.get(STOP_FILE_ENV)
+        if not stop_file:
+            raise api_error(
+                "SHUTDOWN_NOT_SUPERVISED",
+                "This backend was not started by the Mucaro AI launcher; stop it where it was started.",
+                status_code=409,
+            )
+        try:
+            Path(stop_file).write_text("quit\n", encoding="utf-8")
+        except OSError as exc:
+            raise api_error("SHUTDOWN_FAILED", f"Could not signal the launcher: {exc}", status_code=500) from exc
+        return {"status": "SHUTDOWN_REQUESTED"}
 
     @app.get("/security")
     def security_status() -> dict:

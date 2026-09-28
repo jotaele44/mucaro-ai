@@ -4,8 +4,11 @@ Desktop Launcher Mode lets Mucaro AI run with one command.
 
 ## Double-click setup and launch
 
-`Mucaro AI.command` (macOS) and `Mucaro AI.cmd` (Windows) set up everything on first use and then
-run `scripts/launch_app.py --auto-port --exit-if-running`. See `docs/ONE_CLICK_SETUP.md`.
+`Mucaro AI.app` (macOS) and `Mucaro AI.exe` (Windows) set up everything on first use, show progress
+on a browser page, and run the app in the background until **Quit Mucaro AI** is clicked. The
+console fallbacks `scripts/Mucaro AI.command` and `scripts/Mucaro AI.cmd` do the same in a Terminal
+or console window. All of them end in `scripts/launch_app.py --auto-port --exit-if-running`. See
+`docs/ONE_CLICK_SETUP.md`.
 
 Launcher options used by the double-click files:
 
@@ -13,12 +16,17 @@ Launcher options used by the double-click files:
 |---|---|
 | `--auto-port` | If the port is used by another program, use the next free port (up to 20 higher) and print `PORT_FALLBACK from=... to=...` |
 | `--exit-if-running` | If a healthy Mucaro AI backend is already running, open it in the browser, print `DESKTOP_LAUNCH_REUSED`, and exit 0 |
+| `--status-file PATH` | Keep the progress page at PATH up to date: ready (with the app URL), error, or stopped |
+| `--stop-file PATH` | Stop cleanly when PATH appears (`DESKTOP_STOP_REQUESTED reason=quit_button`); the backend's `POST /shutdown` creates it, and gets its location in `MUCARO_AI_STOP_FILE` |
 
 Closing the terminal window (SIGHUP) or SIGTERM stops the backend the same way `Ctrl+C` does.
 
 It starts the private local backend on `127.0.0.1:8000`, serves the built React UI through FastAPI, opens the browser, and stops cleanly with `Ctrl+C`.
 
-## Double-Click App
+## Machine-bound App Bundle (legacy)
+
+The committed `Mucaro AI.app` above is the one to use. The builder below makes an older kind of
+bundle into `data/exports/` that records this machine's Python path and needs a prior bootstrap.
 
 Build a local source-bound macOS Application bundle:
 

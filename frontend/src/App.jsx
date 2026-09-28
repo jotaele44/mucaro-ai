@@ -33,6 +33,8 @@ function App() {
   const [view, setView] = useState("chat");
   const [connection, setConnection] = useState("checking");
   const [asking, setAsking] = useState(false);
+  const [quitting, setQuitting] = useState(false);
+  const [stopped, setStopped] = useState(false);
 
   async function refresh() {
     let healthPayload;
@@ -72,6 +74,19 @@ function App() {
   }
 
   useEffect(() => { loadWorkspace(); }, []);
+
+  async function quitApp() {
+    if (!window.confirm("Quit Mucaro AI? It stops on this computer until you double-click Mucaro AI again.")) return;
+    setQuitting(true);
+    try {
+      await api.quit();
+      setStopped(true);
+    } catch (err) {
+      setError(`Quit failed: ${err.message}`);
+    } finally {
+      setQuitting(false);
+    }
+  }
 
   async function retryConnection() {
     setConnection("checking");
@@ -313,6 +328,19 @@ function App() {
     ["settings", "Settings"],
   ];
 
+  if (stopped) {
+    return (
+      <main className="stopped-screen">
+        <section className="panel" role="status">
+          <h1>Mucaro AI has stopped</h1>
+          <p>You can close this tab. Double-click Mucaro AI to start it again.</p>
+        </section>
+      </main>
+    );
+  }
+
+  const quitSupported = Boolean(config?.desktop?.quit_supported);
+
   return (
     <main className="app-shell">
       <aside className="app-nav">
@@ -336,6 +364,9 @@ function App() {
           <span className={`status-dot ${connection}`} aria-hidden="true" />
           <div><strong>{connection === "checking" ? "connecting" : health ? health.status : "offline"}</strong><small>{status}</small></div>
         </div>
+        {quitSupported && (
+          <button className="quit-button" onClick={quitApp} disabled={quitting}>{quitting ? "Quitting..." : "Quit Mucaro AI"}</button>
+        )}
       </aside>
 
       <section className="workspace">
@@ -356,7 +387,7 @@ function App() {
               <strong>Backend not reachable</strong>
               <p>
                 Mucaro could not reach its local service at {api.displayUrl}. Start it on the computer that hosts your
-                sources with <code>python scripts/launch_app.py</code> (or double-click <code>Mucaro AI.command</code>), then retry.
+                sources by double-clicking <code>Mucaro AI</code> (or with <code>python scripts/launch_app.py</code>), then retry.
               </p>
             </div>
             <button onClick={retryConnection}>Retry</button>
@@ -507,6 +538,9 @@ function App() {
             <div className="panel-header"><h2>Workspace & Security</h2><button onClick={saveCurrentWorkspace}>Save Profile</button></div>
             <dl><div><dt>Active</dt><dd>{config?.workspace_profile || "default"}</dd></div><div><dt>Project Root</dt><dd>{config?.project_root || "unknown"}</dd></div><div><dt>Data Dir</dt><dd>{config?.data_dir || "unknown"}</dd></div><div><dt>Profiles</dt><dd>{workspaces.map((workspace) => workspace.name).join(", ") || "none"}</dd></div></dl>
             <div className="token-row"><label>Operator Token<input value={operatorToken} onChange={(event) => setOperatorToken(event.target.value)} type="password" placeholder={config?.auth?.auth_required ? "Required for mutating actions" : "Optional"} /></label><button onClick={saveOperatorToken}>Use Token</button></div>
+            {quitSupported && (
+              <div className="quit-row"><p>Mucaro AI keeps running in the background until you quit it.</p><button onClick={quitApp} disabled={quitting}>{quitting ? "Quitting..." : "Quit Mucaro AI"}</button></div>
+            )}
           </section>
         )}
       </section>

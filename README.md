@@ -4,23 +4,30 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-**Double-click `Mucaro AI.command` (macOS) or `Mucaro AI.cmd` (Windows).** That is the whole setup.
+**Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows).** That is the whole setup.
 
-The first double-click downloads private, checksum-verified copies of Python 3.12 and Node.js
-into this folder (about 200 MB to download, about 700 MB on disk, 2-5 minutes on a typical
-connection), installs everything, builds
-the interface, loads two sample documents, starts the app, and opens it in your browser. Nothing
-needs to be installed beforehand and nothing is written outside the project folder. Later
-double-clicks start the app in seconds and work offline. Keep the window open while you use the
-app; close it (or press `Ctrl+C`) to stop.
+A progress page opens in your browser. The first time, Mucaro AI downloads private,
+checksum-verified copies of Python 3.12 and Node.js into this folder (about 200 MB to download,
+about 700 MB on disk, 2-5 minutes on a typical connection), installs everything, builds the
+interface, and loads two sample documents; then the page turns into the app. Nothing needs to be
+installed beforehand, no terminal window opens, and nothing is written outside the project folder.
+Later double-clicks open the app in seconds and work offline.
+
+Mucaro AI keeps running in the background while you use it. To stop it, click **Quit Mucaro AI**
+(bottom of the sidebar, or under Settings). Double-clicking again while it runs just opens it.
 
 Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, and Linux x86_64
-(run `./"Mucaro AI.command"` from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
-does, its error codes, and how to remove it.
+(run `./scripts/"Mucaro AI.command"` from a terminal). Get the folder with `git clone` (or GitHub
+Desktop): a ZIP download makes macOS and Windows ask for approval before the first run. See
+`docs/ONE_CLICK_SETUP.md` for what the setup does, its error codes, and how to remove it.
+
+If you prefer to watch setup in a window, `scripts/Mucaro AI.command` (macOS) and
+`scripts/Mucaro AI.cmd` (Windows) run the same setup in a Terminal or console window; closing that
+window stops the app.
 
 Settings go in `.env` (created from `.env.example` on first run). The launcher reads it at
 startup; variables already exported in your shell take precedence. If the UI shows **Backend not
-reachable**, double-click the launcher again and press **Retry**.
+reachable**, double-click Mucaro AI again and press **Retry**.
 
 See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
 `docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.

@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import sys
 import time
+import traceback
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
@@ -31,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts import launch_app  # noqa: E402
+from scripts import launch_app, progress_page  # noqa: E402
 
 PYTHON_EXTRAS = "dev,anthropic"
 # Import names that prove the dependency install is usable (runtime, geospatial, live mode, preflight).
@@ -57,6 +58,16 @@ TOTAL_STEPS = 6
 STATE_SCHEMA = "mucaro-one-click-state/1"
 # First start after an install compiles bytecode and loads new native libraries, so allow more than the default 20s.
 LAUNCH_ARGS = ["--auto-port", "--exit-if-running", "--startup-timeout", "120"]
+# Headline and detail shown on the browser progress page (--ui) for each step.
+PAGE_STEPS = {
+    1: ("Installing Python packages", "First run: about 1-2 minutes."),
+    2: ("Installing web interface packages", "First run: under a minute."),
+    3: ("Building the web interface", ""),
+    4: ("Checking settings", ""),
+    5: ("Loading sample documents", ""),
+    6: ("Starting Mucaro AI", "Almost ready..."),
+}
+LAUNCHER_HINT = "start Mucaro AI by double-clicking Mucaro AI.app (macOS) or Mucaro AI.exe (Windows)"
 
 
 class SetupError(Exception):
@@ -175,8 +186,8 @@ def release_lock() -> None:
         shutil.rmtree(lock_dir, ignore_errors=True)
 
 
-def prune_logs(log_dir: Path, keep: int = LOG_KEEP) -> None:
-    for old in sorted(log_dir.glob("setup-*.log"))[:-keep]:
+def prune_logs(log_dir: Path, keep: int = LOG_KEEP, pattern: str = "setup-*.log") -> None:
+    for old in sorted(log_dir.glob(pattern))[:-keep]:
         try:
             old.unlink()
         except OSError:
@@ -253,8 +264,9 @@ def run_with_retries(
 
 
 class OneClickSetup:
-    def __init__(self, log: SetupLog, runtime: Path, pins: dict[str, str]) -> None:
+    def __init__(self, log: SetupLog, runtime: Path, pins: dict[str, str], page: Path | None = None) -> None:
         self.log = log
+        self.page = page
         self.runtime = runtime
         self.pins = pins
         self.state_path = runtime / "state.json"
@@ -268,6 +280,8 @@ class OneClickSetup:
 
     def _step(self, number: int, title: str) -> None:
         self.log.line(f"==> [{number}/{TOTAL_STEPS}] {title}")
+        headline, detail = PAGE_STEPS[number]
+        progress_page.try_write(self.page, "running", step=number, title=headline, detail=detail, log=str(self.log.path or ""))
 
     def _record(self, key: str, value: Any) -> None:
         self.state[key] = value
@@ -275,12 +289,12 @@ class OneClickSetup:
 
     def check_stage0(self) -> None:
         if sys.prefix == sys.base_prefix:
-            raise SetupError("ERROR_NOT_IN_VENV", "start Mucaro AI by double-clicking Mucaro AI.command (macOS) or Mucaro AI.cmd (Windows)")
+            raise SetupError("ERROR_NOT_IN_VENV", LAUNCHER_HINT)
         for label, path in (("uv", self.uv), ("node", self.node), ("npm", self.npm_cli)):
             if not path.is_file():
                 raise SetupError(
                     "ERROR_STAGE0_MISSING",
-                    f"{label} not found at {path}; start Mucaro AI by double-clicking Mucaro AI.command (macOS) or Mucaro AI.cmd (Windows)",
+                    f"{label} not found at {path}; {LAUNCHER_HINT}",
                 )
 
     def python_deps(self) -> None:
@@ -424,6 +438,27 @@ class OneClickSetup:
         return self.ran
 
 
+def _redirect_output_to_run_log(runtime: Path) -> None:
+    """In background mode there is no window: send this process's and its children's output to a run log.
+
+    Mucaro AI.app already redirects to the log it names in MUCARO_RUN_LOG; Mucaro AI.exe runs with a hidden
+    console, so its output is redirected here. The file descriptors are replaced (not just sys.stdout), so the
+    backend started later by launch_app inherits the log too.
+    """
+    if os.environ.get("MUCARO_RUN_LOG"):
+        return
+    log_dir = runtime / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    run_log = log_dir / f"run-{time.strftime('%Y%m%d-%H%M%S')}.log"
+    sys.stdout.flush()
+    sys.stderr.flush()
+    fd = os.open(run_log, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    os.dup2(fd, 1)
+    os.dup2(fd, 2)
+    os.close(fd)
+    os.environ["MUCARO_RUN_LOG"] = str(run_log)
+
+
 def _reconfigure_streams() -> None:
     # Tool output can contain characters the console code page cannot show (Windows cp1252).
     # Line buffering keeps launcher lines in order with the backend's output when stdout is a pipe (CI, logs).
@@ -440,22 +475,32 @@ def main(argv: list[str] | None = None) -> int:
         description="Double-click setup, stage 1. Unrecognized options are passed to scripts/launch_app.py.",
     )
     parser.add_argument("--setup-only", action="store_true", help="Prepare everything, then exit without starting the app.")
+    parser.add_argument(
+        "--ui",
+        action="store_true",
+        help="Background mode for Mucaro AI.app / Mucaro AI.exe: report progress on the browser page, log to a file.",
+    )
     args, launch_args = parser.parse_known_args(argv)
 
     runtime = runtime_dir()
+    page = runtime / "ui" / "progress.html" if args.ui else None
+    if args.ui:
+        _redirect_output_to_run_log(runtime)
+        prune_logs(runtime / "logs", pattern="run-*.log")
     log_env = os.environ.get("MUCARO_SETUP_LOG")
     log_path = Path(log_env) if log_env else runtime / "logs" / f"setup-{time.strftime('%Y%m%d-%H%M%S')}.log"
     log = SetupLog(log_path)
     started = time.monotonic()
     try:
         log.line(f"ONE_CLICK_STAGE1_START python={platform.python_version()} root={ROOT}")
-        ran = OneClickSetup(log, runtime, read_pins()).run()
+        ran = OneClickSetup(log, runtime, read_pins(), page=page).run()
         elapsed = time.monotonic() - started
         if ran:
             log.line(f"ONE_CLICK_SETUP_OK steps={','.join(ran)} elapsed={elapsed:.0f}s")
         else:
             log.line(f"ONE_CLICK_FAST_PATH elapsed={elapsed:.1f}s")
     except SetupError as exc:
+        progress_page.try_write(page, "error", title="Mucaro AI setup did not finish", detail=f"{exc.code}: {exc.detail}", log=str(log_path))
         log.line("")
         log.line(f"{exc.code} {exc.detail}")
         log.line("")
@@ -467,9 +512,15 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     except KeyboardInterrupt:
+        progress_page.try_write(page, "error", title="Mucaro AI setup was interrupted", detail="Double-click Mucaro AI again to continue.", log=str(log_path))
         log.line("")
         log.line("SETUP_INTERRUPTED double-click again to resume where it stopped")
         return 130
+    except Exception as exc:  # noqa: BLE001 - the page must never be left saying "running" after a crash
+        progress_page.try_write(page, "error", title="Mucaro AI setup did not finish", detail=f"ERROR_UNEXPECTED: {exc}", log=str(log_path))
+        log.line(traceback.format_exc())
+        log.line(f"ERROR_UNEXPECTED {exc}")
+        return 1
     finally:
         release_lock()
         log.close()
@@ -479,7 +530,13 @@ def main(argv: list[str] | None = None) -> int:
         print("ONE_CLICK_SETUP_ONLY_OK")
         return 0
     print(f"==> [{TOTAL_STEPS}/{TOTAL_STEPS}] Starting Mucaro AI", flush=True)
-    return launch_app.main(LAUNCH_ARGS + launch_args)
+    if page is None:
+        return launch_app.main(LAUNCH_ARGS + launch_args)
+    headline, detail = PAGE_STEPS[TOTAL_STEPS]
+    progress_page.try_write(page, "running", step=TOTAL_STEPS, title=headline, detail=detail, log=os.environ.get("MUCARO_RUN_LOG", ""))
+    # The progress page switches to the app by itself, so the launcher must not open a second tab.
+    ui_args = ["--no-browser", "--status-file", str(page), "--stop-file", str(runtime / "stop-request")]
+    return launch_app.main(LAUNCH_ARGS + ui_args + launch_args)
 
 
 if __name__ == "__main__":

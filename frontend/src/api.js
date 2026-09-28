@@ -41,6 +41,8 @@ export const api = {
     }
   },
   health: () => request("/health"),
+  // Only available when the app was started by the Mucaro AI.app / Mucaro AI.exe launcher (config.desktop.quit_supported).
+  quit: () => request("/shutdown", { method: "POST", headers: { "X-Mucaro-Action": "quit" } }),
   plan: (payload) => request("/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
   approve: (payload) => request("/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
   sources: () => request("/sources"),
