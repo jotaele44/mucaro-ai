@@ -129,3 +129,24 @@ strong `MUCARO_AI_OPERATOR_TOKEN`, then run `mucaro serve --host <interface>`.
 With U1 fixed, the UI served that way sends requests to the host it was loaded
 from. Enter the operator token under Settings on the device before using
 actions that change data.
+
+## Follow-up (2026-09-28)
+
+Re-audited setup against `main` at `64a097b`, after the double-click setup
+(`Mucaro AI.command` / `Mucaro AI.cmd`, #118) landed. That path pins its own
+Python 3.12 and Node and passes on clean macOS arm64, macOS Intel, Linux, and
+Windows runners (`.github/workflows/one-click-setup.yml`). This supersedes the
+"`bootstrap_windows.ps1` was not executed" blind spot for the primary path. The
+developer bootstrap scripts are still not run in CI.
+
+| ID | Finding | Evidence | Conf. | Status |
+|---|---|---|---|---|
+| S8 | Developer bootstrap accepted any Python ≥ 3.11, but pinned `rasterio==1.4.3` publishes wheels only through CPython 3.13, so a machine with only 3.14 failed inside `pip install` on a GDAL source build | PyPI wheel tags for rasterio 1.4.3: cp39–cp313 | 97% | Fixed: both bootstraps select 3.11–3.13 (`ERROR_PYTHON_UNSUPPORTED` / `ERROR_PYTHON_UNSUPPORTED_OR_MISSING`, pointing to the double-click setup); preflight warns `PYTHON_UNTESTED` on 3.14+ |
+| S9 | README kept a third, stale setup route (unbounded `python3 -m venv`, `py -3.11`, `npm install`, which can rewrite `package-lock.json` and fail the `worktree_clean` gate) | `README.md` | 95% | Fixed: one bounded manual-install section using `npm ci` |
+| S10 | `python scripts/launch_app.py` / `make start` served a stale UI after `git pull`: it rebuilt `frontend/dist` only when missing | `scripts/launch_app.py` | 95% | Fixed: rebuilds when any build input is newer than `dist/index.html` (warns if it cannot); the double-click setup passes `--frontend-verified` because it fingerprints the same inputs |
+| S11 | `repair_npm_registry.sh` still changed the user's global npm registry | `scripts/repair_npm_registry.sh` | 95% | Fixed: the project `.npmrc` and `--registry` flag pin it |
+
+Still open, and not code work: the signed and notarized installer (BLK-SIGN-001,
+needs an Apple Developer ID); live-mode answer length with a real API key
+(queued lead 1); `mucaro serve` and raw `uvicorn` not reading `.env`
+(documented).

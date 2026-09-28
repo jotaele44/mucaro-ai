@@ -70,26 +70,20 @@ python scripts/dev_start.py
 - Not a clone of Dify, AnythingLLM, RAGFlow, Open WebUI, LlamaIndex, or GraphRAG.
 - Not a tool that executes destructive actions without approval.
 
-## Setup
+## Manual install (without the bootstrap)
 
-### macOS/Linux
+Prefer the double-click setup or `scripts/bootstrap_*`. If you install by hand, use Python
+3.11-3.13 (pinned `rasterio` has no wheels for 3.14+) and `npm ci`, which installs exactly what
+`package-lock.json` pins and never rewrites it:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3.12 -m venv .venv                # Windows: py -3.12 -m venv .venv
+source .venv/bin/activate               # Windows: .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+(cd frontend && npm ci)
 python scripts/release_check.py
-```
-
-### Windows PowerShell
-
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-python scripts\release_check.py
+python scripts/launch_app.py            # or python scripts/dev_start.py for hot reload
 ```
 
 ## Optional environment variables
@@ -110,21 +104,6 @@ shell instead.
 - `MUCARO_AI_DEPLOYMENT_PROFILE`: `local` or `production`. Production mode requires a strong operator token and explicit CORS origins.
 - `MUCARO_AI_DISTRIBUTION_CHANNEL`: `local` or `mac_app_store`. The Store channel requires production mode, loopback binding, and disables subprocess, local-worker, and container execution.
 - `MUCARO_AI_ALLOW_PUBLIC_BIND=1`: explicitly permits non-loopback binding in local mode.
-
-## Run backend
-
-```bash
-source .venv/bin/activate
-uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-## Run frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
 
 ## Ingest files
 
