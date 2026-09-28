@@ -6,6 +6,10 @@ import json
 from pathlib import Path
 
 from backend.app.portable_runtime import PortableRuntimeError, verify_portable_macos_app
+from backend.app.portable_runtime_source import PortableRuntimeSourceError, verify_materialized_runtime
+
+ROOT = Path(__file__).resolve().parents[1]
+RUNTIME_MANIFEST = ROOT / "packaging/runtime/macos-x86_64.json"
 
 SCHEMA_VERSION = "mucaro-portable-release-lane/1.0"
 STATUS_OK = "PORTABLE_RELEASE_LANE_VERIFIED"
@@ -45,6 +49,7 @@ def certify_portable_lane(
     previous_manifest = _json(previous_app / "Contents/Resources/portable-manifest.json")
     runtime_receipt_path = runtime_dir / "runtime-provenance.json"
     runtime_receipt = _json(runtime_receipt_path)
+    runtime_verification = verify_materialized_runtime(ROOT, runtime_dir, RUNTIME_MANIFEST)
     clean = _json(clean_machine_receipt)
 
     clean_evidence = clean.get("evidence") if isinstance(clean.get("evidence"), dict) else {}
@@ -52,7 +57,8 @@ def certify_portable_lane(
     checks = {
         "portable_embedded_runtime": (
             current.get("status") == "PORTABLE_APP_VERIFIED"
-            and runtime_receipt.get("status") == "PORTABLE_RUNTIME_VERIFIED"
+            and runtime_receipt.get("status") == "PORTABLE_RUNTIME_SOURCE_READY"
+            and runtime_verification.get("status") == "PORTABLE_RUNTIME_VERIFIED"
             and current_manifest.get("head_sha") == expected_head
         ),
         "portable_install_reinstall_smoke": (
@@ -83,7 +89,9 @@ def certify_portable_lane(
         "runtime": {
             "receipt_path": str(runtime_receipt_path),
             "receipt_sha256": _sha256(runtime_receipt_path),
-            "status": runtime_receipt.get("status"),
+            "source_status": runtime_receipt.get("status"),
+            "verification_status": runtime_verification.get("status"),
+            "verification_failed_checks": runtime_verification.get("failed_checks"),
         },
         "current_app": {
             "path": str(current_app),
@@ -131,7 +139,7 @@ def main() -> int:
             expected_head=args.head,
             output=args.output,
         )
-    except (OSError, ValueError, json.JSONDecodeError, PortableRuntimeError) as exc:
+    except (OSError, ValueError, json.JSONDecodeError, PortableRuntimeError, PortableRuntimeSourceError) as exc:
         print(json.dumps({"status": STATUS_FAILED, "detail": str(exc)}, sort_keys=True))
         return 2
     print(json.dumps(payload, sort_keys=True))
