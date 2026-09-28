@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 
-import backend.app.portable_runtime as portable
 import scripts.certify_portable_release_lane as cert
 
 
@@ -16,7 +15,7 @@ def test_portable_lane_requires_all_release_checks(tmp_path: Path, monkeypatch) 
         )
     runtime.mkdir()
     (runtime / "runtime-provenance.json").write_text(
-        json.dumps({"status": "PORTABLE_RUNTIME_VERIFIED"}) + "\n", encoding="utf-8"
+        json.dumps({"status": "PORTABLE_RUNTIME_SOURCE_READY"}) + "\n", encoding="utf-8"
     )
     clean = tmp_path / "clean.json"
     clean.write_text(json.dumps({
@@ -35,10 +34,6 @@ def test_portable_lane_requires_all_release_checks(tmp_path: Path, monkeypatch) 
     monkeypatch.setattr(cert, "verify_portable_macos_app", lambda app, expected_head=None: {
         "status": "PORTABLE_APP_VERIFIED",
         "manifest_sha256": "c"*64,
-    })
-    monkeypatch.setattr(cert, "verify_materialized_runtime", lambda root, runtime_dir, manifest_path: {
-        "status": "PORTABLE_RUNTIME_VERIFIED",
-        "failed_checks": [],
     })
     monkeypatch.setattr(cert, "verify_materialized_runtime", lambda root, runtime_dir, manifest_path: {
         "status": "PORTABLE_RUNTIME_VERIFIED",
@@ -64,7 +59,7 @@ def test_portable_lane_blocks_same_version_rollback(tmp_path: Path, monkeypatch)
         )
     runtime.mkdir()
     (runtime / "runtime-provenance.json").write_text(
-        json.dumps({"status": "PORTABLE_RUNTIME_VERIFIED"}) + "\n", encoding="utf-8"
+        json.dumps({"status": "PORTABLE_RUNTIME_SOURCE_READY"}) + "\n", encoding="utf-8"
     )
     clean = tmp_path / "clean.json"
     clean.write_text(json.dumps({
@@ -78,6 +73,10 @@ def test_portable_lane_blocks_same_version_rollback(tmp_path: Path, monkeypatch)
     }) + "\n", encoding="utf-8")
     monkeypatch.setattr(cert, "verify_portable_macos_app", lambda app, expected_head=None: {
         "status": "PORTABLE_APP_VERIFIED", "manifest_sha256": "c"*64,
+    })
+    monkeypatch.setattr(cert, "verify_materialized_runtime", lambda root, runtime_dir, manifest_path: {
+        "status": "PORTABLE_RUNTIME_VERIFIED",
+        "failed_checks": [],
     })
     receipt = cert.certify_portable_lane(
         current_app=current, previous_app=previous, runtime_dir=runtime,
