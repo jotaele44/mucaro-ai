@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "704715d4554f5e9e76aef3b31950181928abcacb",
+  "audit_head": "f70ebd8e815bd4f4044b67455c8a33c7ef05789b",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -322,6 +322,24 @@
         "step Confirm runner startup emitted CI_STARTUP_PROBE_OK"
       ],
       "reason": "The dedicated CI Startup Probe was manually dispatched against exact current main HEAD, created its startup-probe job, acquired a hosted runner, executed the runner-startup assertion, and completed successfully. This closes GOV-08 independently of branch protection and governed-release requirements."
+    },
+    {
+      "event_id": "evt-rt09-real-world-corpus-provisional",
+      "requirement_id": "RT-09",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "MERGED_REAL_WORLD_MIXED_FORMAT_CORPUS_WITH_EXACT_BOUND_EVALUATION",
+      "evidence": [
+        "PR#127",
+        "main@f70ebd8e815bd4f4044b67455c8a33c7ef05789b",
+        "branch evidence head@63eb60700ca89ae1d718a3960cf91f250e3d6e88",
+        "GitHub Actions RT09 Real World Retrieval Certification run 36382763249 conclusion=success",
+        "artifact#10952734875 digest=sha256:1eb4198e783fbaa84ae60610c7048d6e889c077aaf59aa70c7db29cebd4badac",
+        "24 sources / 24 queries / 3 formats / 8,277,197 bytes / 4,933 chunks / top-5 expected-source hit rate=1.0",
+        "corpus manifest sha256=8b450c8f3a587d5c39ecc6a9e94480592d5ddb3565021c4373cc65587ae48fb5",
+        "certification report sha256=0249b023d286c9e6332fbd98e633b49797cd98e631c0efcad34c123f0fb3fe6e"
+      ],
+      "reason": "The frozen real-world corpus gate authorizes at most RT-09 OPEN→PROVISIONAL. A 24-document authoritative IETF/W3C/NIST corpus was acquired, hash-frozen, parsed across TXT/HTML/PDF, evaluated against 24 exact source-bound queries with 100% top-5 hit rate, and bound to exact manifest/source/query denominators. RT-10 production-scale stress remains independently unresolved, so PASS is not authorized."
     }
   ]
 }
