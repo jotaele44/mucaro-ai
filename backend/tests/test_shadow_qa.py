@@ -31,3 +31,21 @@ def test_non_frontend_checkpoint_does_not_invent_rendered_pass():
 
     assert state == "AUDIT_ONLY"
     assert "No frontend surface changed" in reason
+
+
+def test_shadow_bootstrap_vectors_are_explicitly_not_applicable():
+    paths = sorted(shadow_qa.SHADOW_BOOTSTRAP_PATHS)
+
+    results = shadow_qa.adversarial_vector_results(paths)
+
+    assert set(results) == set(shadow_qa.REQUIRED_ADVERSARIAL_VECTORS)
+    assert all(result["state"] == "NOT_APPLICABLE" for result in results.values())
+    assert all("Shadow QA infrastructure" in result["reason"] for result in results.values())
+
+
+def test_non_bootstrap_runtime_change_cannot_silently_pass_adversarial_vectors():
+    results = shadow_qa.adversarial_vector_results(["backend/app/response_flow.py"])
+
+    assert set(results) == set(shadow_qa.REQUIRED_ADVERSARIAL_VECTORS)
+    assert all(result["state"] == "UNRESOLVED" for result in results.values())
+    assert all("checkpoint-specific adversarial evidence" in result["reason"] for result in results.values())
