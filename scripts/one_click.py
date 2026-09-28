@@ -56,7 +56,9 @@ LOG_KEEP = 10
 TOTAL_STEPS = 6
 STATE_SCHEMA = "mucaro-one-click-state/1"
 # First start after an install compiles bytecode and loads new native libraries, so allow more than the default 20s.
-LAUNCH_ARGS = ["--auto-port", "--exit-if-running", "--startup-timeout", "120"]
+# --frontend-verified: step 3 already fingerprinted the build inputs, so the launcher must not
+# re-check timestamps (and must never reach for a PATH npm).
+LAUNCH_ARGS = ["--auto-port", "--exit-if-running", "--frontend-verified", "--startup-timeout", "120"]
 
 
 class SetupError(Exception):
@@ -95,14 +97,7 @@ def fingerprint(parts: Iterable[str], files: Iterable[Path] = ()) -> str:
 
 
 def frontend_source_files() -> list[Path]:
-    frontend = ROOT / "frontend"
-    files = [frontend / name for name in ("index.html", "package.json", "package-lock.json", ".npmrc")]
-    files.extend(sorted(frontend.glob("vite.config.*")))
-    for folder in ("src", "public"):
-        base = frontend / folder
-        if base.is_dir():
-            files.extend(sorted(path for path in base.rglob("*") if path.is_file()))
-    return files
+    return launch_app.frontend_source_files(ROOT)
 
 
 def load_state(path: Path) -> dict[str, Any]:
