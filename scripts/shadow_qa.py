@@ -108,6 +108,14 @@ def adversarial_vector_results(paths: list[str]) -> dict[str, dict[str, str]]:
     return {vector: {"state": "UNRESOLVED", "reason": reason} for vector in REQUIRED_ADVERSARIAL_VECTORS}
 
 
+def exit_code_for_state(state: str) -> int:
+    if state == "PASS":
+        return 0
+    if state == "FAIL":
+        return 1
+    return 6
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run bounded MUCARO Shadow QA against an exact frozen checkpoint.")
     parser.add_argument("--base", default="HEAD^", help="Base commit/ref for the changed-surface denominator.")
@@ -235,7 +243,7 @@ def main() -> int:
     out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"SHADOW_RECEIPT {out}")
     print(f"SHADOW_STATE {overall}")
-    return 1 if failed else 0
+    return exit_code_for_state(overall)
 
 
 if __name__ == "__main__":
