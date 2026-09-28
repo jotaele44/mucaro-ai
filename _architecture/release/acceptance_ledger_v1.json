@@ -1862,17 +1862,24 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/retrieval_eval.py"
+        "backend/app/retrieval_eval.py",
+        "_architecture/retrieval_real_world_corpus_v1.json",
+        "scripts/certify_retrieval_real_world_live.py",
+        ".github/workflows/rt09-real-world-cert.yml"
       ],
       "dependencies": [],
-      "positive_gate": null,
+      "positive_gate": ".github/workflows/rt09-real-world-cert.yml",
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/retrieval_real_world_corpus_v1.json",
+        "scripts/certify_retrieval_real_world_live.py",
+        "_architecture/mucaro_v1_denominator_events.json"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N09",
-      "notes": ""
+      "notes": "PR #127 merged a frozen 24-document IETF/W3C/NIST real-world corpus lane. Run 36382763249 passed with 24/24 source-bound queries hitting expected sources in top-5, 3 parser formats, 8,277,197 source bytes and 4,933 chunks; artifact 10952734875 digest sha256:1eb4198e783fbaa84ae60610c7048d6e889c077aaf59aa70c7db29cebd4badac. MATRIX-007 remains PROVISIONAL because its crosswalk also includes RT-10 production-scale stress/scalability, which is not closed by this corpus."
     },
     {
       "requirement_id": "MATRIX-008",
