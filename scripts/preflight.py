@@ -126,6 +126,9 @@ def check_python(strict_imports: bool) -> bool:
     version = sys.version_info
     if version >= (3, 11):
         status_line("OK", "PYTHON_VERSION", platform.python_version())
+        if version >= (3, 14):
+            # Pinned rasterio 1.4.3 publishes wheels only through CPython 3.13.
+            status_line("WARN", "PYTHON_UNTESTED", f"found={platform.python_version()} supported=3.11-3.13")
     else:
         status_line("ERROR", "PYTHON_TOO_OLD", f"found={platform.python_version()} required>=3.11")
         ok = False
