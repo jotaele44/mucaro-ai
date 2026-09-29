@@ -3,6 +3,8 @@ name: One-click setup
 # Runs the real double-click files ("Mucaro AI.command" / "Mucaro AI.cmd") on clean runners.
 # PATH is cut down to OS directories (plus tripwire stubs on macOS/Linux), so the job fails if
 # setup ever depends on a preinstalled Python, Node, npm, or git.
+# The macos-app job opens "Mucaro AI.app" through LaunchServices, as a Finder double-click does,
+# and checks that it sets itself up and opens in its own window with no terminal or browser.
 
 on:
   workflow_dispatch:
@@ -10,9 +12,15 @@ on:
     paths:
       - "Mucaro AI.command"
       - "Mucaro AI.cmd"
+      - "Mucaro AI.app/**"
+      - "Fix-Gatekeeper.command"
       - ".gitattributes"
+      - ".gitignore"
       - "scripts/one_click*"
       - "scripts/launch_app.py"
+      - "scripts/verify_checkout_app.py"
+      - "scripts/verify_macos_app.py"
+      - "backend/app/desktop_shell.py"
       - "scripts/preflight.py"
       - "scripts/ingest_folder.py"
       - "pyproject.toml"
@@ -25,8 +33,10 @@ on:
     paths:
       - "Mucaro AI.command"
       - "Mucaro AI.cmd"
+      - "Mucaro AI.app/**"
       - "scripts/one_click*"
       - "scripts/launch_app.py"
+      - "backend/app/desktop_shell.py"
       - "pyproject.toml"
       - "frontend/package-lock.json"
       - ".github/workflows/one-click-setup.yml"
@@ -89,6 +99,58 @@ jobs:
           name: one-click-logs-${{ matrix.os }}
           path: .mucaro-runtime/logs/
           if-no-files-found: ignore
+
+  macos-app:
+    name: Mucaro AI.app (macOS arm64)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Open Mucaro AI.app the way Finder does (first run, full setup)
+        # LaunchServices starts the app with the login session's environment, not this step's:
+        # no terminal, and no PATH or tools from the runner.
+        run: open "Mucaro AI.app"
+      - name: Wait for the app to set itself up and open
+        run: |
+          mkdir -p "$RUNNER_TEMP/evidence"
+          shot=0
+          for _ in $(seq 1 360); do
+            if [ -s data/instance.json ]; then
+              break
+            fi
+            if [ "$shot" = 0 ] && grep -qs '==> \[2/6\]' .mucaro-runtime/logs/setup-*.log; then
+              # The Mucaro AI window is showing setup progress by now.
+              sleep 5
+              screencapture -x "$RUNNER_TEMP/evidence/first-run-progress.png" || true
+              shot=1
+            fi
+            sleep 5
+          done
+          test -s data/instance.json
+      - name: Verify window, GUI, samples, workflow, quit, and a fast second open
+        run: |
+          .venv/bin/python scripts/verify_checkout_app.py --head "$HEAD_SHA" \
+            --output "$RUNNER_TEMP/evidence/checkout_app_receipt.json"
+      - name: Verify isolation
+        run: |
+          grep -q "^home = $(pwd -P)/.mucaro-runtime/python/" .venv/pyvenv.cfg
+          .venv/bin/python -c "import webview"
+          test -z "$(git status --porcelain)"
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/evidence/logs"
+          cp .mucaro-runtime/logs/*.log "$RUNNER_TEMP/evidence/logs/" 2>/dev/null || true
+          cp data/logs/*.log "$RUNNER_TEMP/evidence/logs/" 2>/dev/null || true
+      - name: Upload screenshots, receipt and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mucaro-ai-app-evidence-${{ env.HEAD_SHA }}
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: warn
 
   windows:
     name: Windows x64

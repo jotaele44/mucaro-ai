@@ -170,6 +170,14 @@
       "classification": "LOW",
       "rationale": "Maintainer-side RT-09 certification only. Redirects are accepted only when the final host remains in the frozen allowlist; response bytes are bounded and exact source identities are hashed before any retrieval-quality claim.",
       "evidence": "scripts/certify_retrieval_real_world_live.py::acquire"
+    },
+    {
+      "rule": "S606",
+      "path": "scripts/one_click_desktop.py",
+      "code": "os.execve(\"/bin/bash\", [\"/bin/bash\", str(ROOT / \"scripts\" / \"one_click.sh\"), \"--desktop\"], self.initial_env)",
+      "classification": "LOW",
+      "rationale": "The Try again button of Mucaro AI.app's error screen re-runs the app's own setup script by absolute path with a fixed argument list and the environment captured at startup; no value from the page, the network or the user reaches the argv. The button is exposed through pywebview's window.expose by exact name and only acts while the error screen is showing.",
+      "evidence": "backend/tests/test_one_click_desktop.py::test_error_screen_buttons_do_nothing_until_the_error_screen_shows"
     }
   ],
   "vulnerability_dispositions": []

@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: bootstrap start setup preflight test validate ingest ask cli serve launch-smoke desktop macos-app macos-app-verify security-gates release-grade release-status release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
+.PHONY: bootstrap start setup preflight test validate ingest ask cli serve launch-smoke desktop app-icon macos-app macos-app-verify security-gates release-grade release-status release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
 
 bootstrap:
 	bash scripts/bootstrap_macos.sh
@@ -39,6 +39,10 @@ launch-smoke:
 # Desktop shell from source (needs the `desktop` extra for the native window).
 desktop:
 	PYTHONPATH=. $(PYTHON) -m backend.app.desktop_shell
+
+# Icon of the double-clickable Mucaro AI.app in this folder (see docs/ONE_CLICK_SETUP.md).
+app-icon:
+	$(PYTHON) scripts/build_app_icon.py
 
 # Mucaro AI.app (macOS arm64; see docs/release/MACOS_APP.md).
 macos-app:

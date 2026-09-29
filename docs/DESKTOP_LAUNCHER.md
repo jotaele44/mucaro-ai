@@ -1,8 +1,8 @@
 # Desktop Launcher Mode
 
-> **Source setup, not a release artifact.** `Mucaro AI.command` / `Mucaro AI.cmd` is the supported
-> way to run Mucaro from a source checkout. Release-grade certification requires two packaged lanes,
-> and neither is this launcher:
+> **Source setup, not a release artifact.** `Mucaro AI.app` (macOS), `Mucaro AI.command` and
+> `Mucaro AI.cmd` in the repository root are the supported ways to run Mucaro from a source
+> checkout. Release-grade certification requires two packaged lanes, and none of these is one:
 >
 > - the native app, `Mucaro AI.app` with its own window: see [release/MACOS_APP.md](release/MACOS_APP.md);
 > - the portable embedded-runtime app: see [PACKAGING_POLICY.md](PACKAGING_POLICY.md#portable-runtime-and-application).
@@ -14,8 +14,11 @@ Desktop Launcher Mode lets Mucaro AI run with one command.
 
 ## Double-click setup and launch
 
-`Mucaro AI.command` (macOS) and `Mucaro AI.cmd` (Windows) set up everything on first use and then
-run `scripts/launch_app.py --auto-port --exit-if-running`. See `docs/ONE_CLICK_SETUP.md`.
+`Mucaro AI.app` (macOS) sets up everything on first use and opens Mucaro AI in its own window,
+with the local service running inside the app (`scripts/one_click_desktop.py`); there is no
+terminal or browser. `Mucaro AI.command` (macOS/Linux) and `Mucaro AI.cmd` (Windows) run the same
+setup in a terminal window and then run `scripts/launch_app.py --auto-port --exit-if-running`. See
+`docs/ONE_CLICK_SETUP.md`.
 
 Launcher options used by the double-click files:
 
@@ -29,6 +32,9 @@ Closing the terminal window (SIGHUP) or SIGTERM stops the backend the same way `
 It starts the private local backend on `127.0.0.1:8000`, serves the built React UI through FastAPI, opens the browser, and stops cleanly with `Ctrl+C`.
 
 ## Double-Click App
+
+For everyday use, open the `Mucaro AI.app` committed in the repository root; it needs no build.
+The generated wrapper below is kept for the packaging checks (`MACOS_APP_BUNDLE_VERIFIED`).
 
 Build a local source-bound macOS Application bundle:
 

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Stage 0 of the double-click setup (started by "Mucaro AI.command").
+# Stage 0 of the double-click setup (started by "Mucaro AI.command", or by
+# Mucaro AI.app with --desktop).
 #
 # Provisions pinned, checksum-verified private runtimes inside .mucaro-runtime/
 # (uv, Node, CPython) and the project .venv, then hands off to
@@ -10,7 +11,15 @@
 # - Never runs python/python3/git/node/npm from PATH. On a Mac without the
 #   Command Line Tools those are stubs in /usr/bin that open an install dialog.
 # - Writes nothing outside the project folder.
+#
+# With --desktop (Mucaro AI.app) there is no terminal: a "getting ready" notice
+# covers a slow first run until the app window opens, and a failure is shown in
+# a dialog that can reveal the log.
 set -euo pipefail
+
+# Mucaro AI.app starts this script without a terminal; make sure the standard streams exist.
+[ -e /dev/fd/1 ] || exec 1>/dev/null
+[ -e /dev/fd/2 ] || exec 2>/dev/null
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
@@ -24,10 +33,81 @@ VENV_PY="${ROOT}/.venv/bin/python"
 MIN_FREE_KB=2000000
 LOG=""
 
+DESKTOP=0
+for arg in ${1+"$@"}; do
+  if [ "${arg}" = "--desktop" ]; then
+    DESKTOP=1
+  fi
+done
+ICON="${MUCARO_APP_BUNDLE:-${ROOT}/Mucaro AI.app}/Contents/Resources/AppIcon.icns"
+NOTICE_PID=""
+
 log_line() {
   printf '%s\n' "$*"
   if [ -n "${LOG}" ]; then
     printf '%s\n' "$*" >>"${LOG}" 2>/dev/null || true
+  fi
+}
+
+# MUCARO_APP_DIALOGS=0 turns the dialogs off for automation.
+desktop_ui() {
+  [ "${DESKTOP}" = 1 ] && [ "${MUCARO_APP_DIALOGS:-1}" != 0 ] && [ -x /usr/bin/osascript ]
+}
+
+# Shown only when setup takes more than a few seconds (a first run); scripts/one_click_desktop.py
+# closes it when the Mucaro AI window appears.
+start_notice() {
+  desktop_ui || return 0
+  (
+    sleep 3
+    exec /usr/bin/osascript \
+      -e 'on run argv' \
+      -e 'set message to "Mucaro AI is getting ready." & return & return & "The first time takes a few minutes and needs an internet connection. Mucaro AI opens by itself when it is ready."' \
+      -e 'try' \
+      -e 'display dialog message buttons {"OK"} default button 1 with title "Mucaro AI" with icon ((POSIX file (item 1 of argv)) as alias) giving up after 1800' \
+      -e 'on error number errorNumber' \
+      -e 'if errorNumber is not -128 then display dialog message buttons {"OK"} default button 1 with title "Mucaro AI" with icon note giving up after 1800' \
+      -e 'end try' \
+      -e 'end run' \
+      "${ICON}"
+  ) >/dev/null 2>&1 &
+  NOTICE_PID=$!
+  export MUCARO_SETUP_NOTICE_PID="${NOTICE_PID}"
+}
+
+stop_notice() {
+  if [ -n "${NOTICE_PID}" ]; then
+    kill "${NOTICE_PID}" 2>/dev/null || true
+    NOTICE_PID=""
+  fi
+}
+
+# A blocking dialog for a failure; offers to reveal the setup log in Finder.
+desktop_alert() {
+  desktop_ui || return 0
+  stop_notice
+  offer_log=0
+  if [ -n "${LOG}" ] && [ -f "${LOG}" ]; then
+    offer_log=1
+  fi
+  choice="$(/usr/bin/osascript \
+    -e 'on run argv' \
+    -e 'set message to item 1 of argv' \
+    -e 'if item 3 of argv is "1" then' \
+    -e 'set choices to {"Show Log", "OK"}' \
+    -e 'else' \
+    -e 'set choices to {"OK"}' \
+    -e 'end if' \
+    -e 'try' \
+    -e 'set answer to display dialog message buttons choices default button "OK" with title "Mucaro AI" with icon ((POSIX file (item 2 of argv)) as alias)' \
+    -e 'on error' \
+    -e 'set answer to display dialog message buttons choices default button "OK" with title "Mucaro AI" with icon caution' \
+    -e 'end try' \
+    -e 'return button returned of answer' \
+    -e 'end run' \
+    "$1" "${ICON}" "${offer_log}" 2>/dev/null)" || true
+  if [ "${choice}" = "Show Log" ]; then
+    /usr/bin/open -R "${LOG}" >/dev/null 2>&1 || true
   fi
 }
 
@@ -41,6 +121,9 @@ fatal() {
   if [ -n "${LOG}" ]; then
     log_line "Details: ${LOG}"
   fi
+  desktop_alert "Mucaro AI setup cannot continue.
+
+${code} $*"
   exit 2
 }
 
@@ -324,6 +407,10 @@ log_line "No input is needed. The first run downloads everything it needs (2-5 m
 log_line "ONE_CLICK_STAGE0_START root=${ROOT} log=${LOG}"
 detect_platform
 log_line "PLATFORM ${PLATFORM_LABEL} uv_target=${UV_TARGET} node=${NODE_PLAT}"
+if [ "${DESKTOP}" = 1 ]; then
+  log_line "DESKTOP_APP_MODE bundle=${MUCARO_APP_BUNDLE:-none}"
+fi
+start_notice
 acquire_lock
 trap release_lock EXIT
 
@@ -336,6 +423,12 @@ if [ "${stage0_rc}" -ne 0 ]; then
   log_line "Mucaro AI setup did not finish (step failed with code ${stage0_rc})."
   log_line "Details: ${LOG}"
   log_line "Nothing outside this folder was changed. Fix the problem named above (usually the internet connection), then double-click again; setup resumes where it stopped."
+  reason="$(grep -E '^ERROR_[A-Z0-9_]+ ' "${LOG}" 2>/dev/null | tail -n 1 || true)"
+  desktop_alert "Mucaro AI could not finish setting up.
+
+${reason:-A setup step failed with code ${stage0_rc}.}
+
+Nothing outside the mucaro-ai folder was changed. Fix the problem named above (usually the internet connection), then open Mucaro AI again: setup resumes where it stopped."
   exit "${stage0_rc}"
 fi
 

@@ -4,23 +4,34 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-**Double-click `Mucaro AI.command` (macOS) or `Mucaro AI.cmd` (Windows).** That is the whole setup.
+**macOS: open `Mucaro AI.app`** (the owl icon in this folder). **Windows: double-click
+`Mucaro AI.cmd`.** That is the whole setup.
 
-The first double-click downloads private, checksum-verified copies of Python 3.12 and Node.js
-into this folder (about 200 MB to download, about 700 MB on disk, 2-5 minutes on a typical
-connection), installs everything, builds
-the interface, loads two sample documents, starts the app, and opens it in your browser. Nothing
-needs to be installed beforehand and nothing is written outside the project folder. Later
-double-clicks start the app in seconds and work offline. Keep the window open while you use the
-app; close it (or press `Ctrl+C`) to stop.
+On a Mac the app sets itself up and opens in its own window with its own Dock icon: no Terminal,
+no browser, and nothing to install first. The first open downloads private, checksum-verified
+copies of Python 3.12 and Node.js into this folder (about 200 MB to download, about 700 MB on
+disk, 2-5 minutes on a typical connection), installs everything, builds the interface, and loads
+two sample documents while the window shows each step. Then the same window becomes Mucaro AI,
+ready to use. Later opens take a few seconds and work offline. Quit it like any app (Cmd+Q, or
+close the window). Keep `Mucaro AI.app` inside this folder; to start it from the Dock, drag it
+onto the Dock.
 
-Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, and Linux x86_64
-(run `./"Mucaro AI.command"` from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
-does, its error codes, and how to remove it.
+On Windows, `Mucaro AI.cmd` runs the same setup in a console window and opens the app in your
+browser; keep that window open while you use the app. `Mucaro AI.command` does the same on a Mac
+(setup output in Terminal, app in the browser) and is the way to run Mucaro AI on Linux
+(`./"Mucaro AI.command"` from a terminal). Everything the setup installs stays in this folder.
 
-Settings go in `.env` (created from `.env.example` on first run). The launcher reads it at
-startup; variables already exported in your shell take precedence. If the UI shows **Backend not
-reachable**, double-click the launcher again and press **Retry**.
+A folder downloaded as a ZIP file is quarantined by macOS, which blocks the app the first time
+("cannot be opened because Apple cannot check it for malicious software"). Double-click
+`Fix-Gatekeeper.command` once, or get the folder with `git clone` or GitHub Desktop, which is
+never quarantined.
+
+Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, and Linux x86_64.
+See `docs/ONE_CLICK_SETUP.md` for what the setup does, its error codes, and how to remove it.
+
+Settings go in `.env` (created from `.env.example` on first run). The app and the launchers read
+it at startup; variables already exported in your shell take precedence. If the UI shows
+**Backend not reachable**, open the app (or the launcher) again and press **Retry**.
 
 See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
 `docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
@@ -288,7 +299,8 @@ Use `mucaro package macos-app --format text` to build a local source-bound
 launches this checkout with the Python executable recorded at build time and
 opens the browser UI through `scripts/launch_app.py`. This is not yet a portable
 signed installer with embedded runtime, reinstall, upgrade, and rollback
-guarantees.
+guarantees. For everyday use, open the `Mucaro AI.app` at the top of this folder
+instead: it needs no build step and opens in its own window.
 
 The portable lane starts by materializing the governed x86_64 macOS runtime,
 then embedding that verified input into an exact-head app bundle:
