@@ -4,7 +4,7 @@
 *.sh text eol=lf
 *.command text eol=lf
 scripts/one_click_pins.env text eol=lf
-# The launcher inside Mucaro AI.app (patterns cannot contain spaces, so match by folder).
+# The launcher inside Start Mucaro AI.app (patterns cannot contain spaces, so match by folder).
 **/Contents/MacOS/* text eol=lf
 # Built launcher assets: byte-exact, checked by scripts/build_launchers.py --check.
 *.exe binary

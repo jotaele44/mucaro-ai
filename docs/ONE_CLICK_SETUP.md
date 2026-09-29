@@ -211,7 +211,8 @@ tripwire stubs for `python`, `python3`, `pip`, `node`, `npm`, `npx`, and `git` f
 | Pinned checksum altered, through the launcher | page in error with `ERROR_CHECKSUM_MISMATCH` and the log path, no refresh loop, lock released; next launch resumed |
 | Progress page renderers (Python, bash 5.2, PowerShell 7.5) | byte-identical output for every state |
 | `scripts/build_launchers.py --check` on Python 3.11 and 3.12 | `.exe`, `.icns`, `.ico` rebuilt byte for byte |
-| `pytest backend/tests` | 744 passed on Python 3.11 and 744 passed on the private 3.12 (plus the 2 PowerShell parity tests with `pwsh`) |
+| `pytest backend/tests` | 1012 passed on Python 3.11 and 1012 passed on 3.12, with `pwsh` on `PATH` (so including the 2 PowerShell parity tests) |
+| Rendered UI QA (`qa/rendered`, Chromium, 1440x900 and 390x844) with the Quit scenario | 100/100 checks: Quit hidden when no launcher supervises the service; offered in the sidebar and Settings when one does; Keep running quits nothing; Quit writes the stop file and shows the stopped screen, which stays; no serious axe findings; no horizontal overflow |
 | shellcheck 0.11 / PowerShell 7.5 parser and PSScriptAnalyzer | clean / 0 parse errors, 0 analyzer errors |
 
 On real macOS (Apple silicon and Intel), Windows x64, and Linux runners, the `One-click setup`
@@ -239,8 +240,9 @@ workflow (`.github/workflows/one-click-setup.yml`):
 ## Queued leads (not changed here)
 
 1. **Signing.** A Developer ID signature with notarization for `Start Mucaro AI.app` and an
-   Authenticode signature for `Start Mucaro AI.exe` would remove the Gatekeeper/SmartScreen prompts for ZIP downloads
-   and the antivirus risk. Needs an Apple Developer account and a code-signing certificate.
+   Authenticode signature for `Start Mucaro AI.exe` would remove the Gatekeeper/SmartScreen prompts
+   for ZIP downloads and the antivirus risk. Needs an Apple Developer account and a code-signing
+   certificate.
 2. **git at runtime.** `backend/app/skill_runtime.py` runs `git rev-parse HEAD` when a skill runs.
    On a Mac without the developer tools that can open the install dialog after setup.
 3. **Python lock file.** `--exclude-newer` freezes resolution by date. A committed lock file
