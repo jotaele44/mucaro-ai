@@ -85,7 +85,15 @@ def certify_clean_machine_macos(
     if current_verify.get("status") != "PORTABLE_APP_VERIFIED" or previous_verify.get("status") != "PORTABLE_APP_VERIFIED":
         raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_PORTABLE_VERIFY", "portable source bundle verification failed")
 
-    previous_head = str(_manifest(previous).get("head_sha"))
+    current_manifest = _manifest(current)
+    previous_manifest = _manifest(previous)
+    current_version = current_manifest.get("release_version")
+    previous_version = previous_manifest.get("release_version")
+    if not isinstance(current_version, str) or not isinstance(previous_version, str) or not current_version or not previous_version:
+        raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_VERSION_MISSING", "both portable apps need a bound release version")
+    if current_version == previous_version:
+        raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_SAME_VERSION", "upgrade and rollback require distinct release versions")
+    previous_head = str(previous_manifest.get("head_sha"))
     if previous_head == expected_head:
         raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_PREVIOUS_HEAD", "previous app must bind to a distinct Git head")
 
@@ -143,6 +151,8 @@ def certify_clean_machine_macos(
         "clean_machine": {
             "install_root": str(root),
             "previous_head": previous_head,
+            "previous_version": previous_version,
+            "current_version": current_version,
             "current_head": expected_head,
             "previous_install": previous_install,
             "current_install": current_install,
