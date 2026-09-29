@@ -22,8 +22,8 @@ COMMAND_FILE = REPO / "Mucaro AI.command"
 CMD_FILE = REPO / "Mucaro AI.cmd"
 STAGE0_SH = REPO / "scripts" / "one_click.sh"
 STAGE0_PS1 = REPO / "scripts" / "one_click_windows.ps1"
-# Mucaro AI.app runs this launcher; Fix-Gatekeeper.command clears a ZIP download's quarantine.
-APP_LAUNCHER = REPO / "Mucaro AI.app" / "Contents" / "MacOS" / "Mucaro AI"
+# Mucaro AI Setup.app runs this launcher; Fix-Gatekeeper.command clears a ZIP download's quarantine.
+APP_LAUNCHER = REPO / "Mucaro AI Setup.app" / "Contents" / "MacOS" / "Mucaro AI"
 GATEKEEPER_FIX = REPO / "Fix-Gatekeeper.command"
 MAC_SHELL_SCRIPTS = (STAGE0_SH, COMMAND_FILE, APP_LAUNCHER, GATEKEEPER_FIX)
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -495,7 +495,7 @@ def test_main_setup_only_does_not_launch(tmp_path, monkeypatch, capsys):
     assert "ONE_CLICK_SETUP_ONLY_OK" in out
 
 
-# --- Mucaro AI.app (desktop mode) hooks -----------------------------------------------------------
+# --- Mucaro AI Setup.app (desktop mode) hooks -----------------------------------------------------------
 
 
 def test_window_library_is_part_of_the_install_on_macos_only():
