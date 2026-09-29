@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/forensic_event.schema.json",
+  "title": "Mucaro Forensic Event 1.0",
+  "description": "Privacy-bounded structured event used by the TGT-035 cross-subsystem forensic trail.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_class",
+    "event_type",
+    "created_at",
+    "origin",
+    "origin_id",
+    "data",
+    "previous_event_sha256",
+    "event_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mucaro-forensic-event/1.0"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^forevent_[a-f0-9]+$"
+    },
+    "event_class": {
+      "enum": [
+        "workflow_transition",
+        "tool_call",
+        "error",
+        "artifact_creation",
+        "permission_change",
+        "model_routing",
+        "source_acquisition"
+      ]
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "origin": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "origin_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 200
+    },
+    "data": {
+      "type": "object"
+    },
+    "previous_event_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
