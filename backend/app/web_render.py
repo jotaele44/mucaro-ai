@@ -109,7 +109,7 @@ def _normalize_actions(
     allow_uploads: bool,
     allow_downloads: bool,
 ) -> list[dict[str, Any]]:
-    if actions in {None, ()}:
+    if actions is None or actions == ():
         return []
     if not isinstance(actions, list):
         raise WebRenderError("ERROR_WEB_RENDER_ACTIONS_INVALID", "actions must be an array")
