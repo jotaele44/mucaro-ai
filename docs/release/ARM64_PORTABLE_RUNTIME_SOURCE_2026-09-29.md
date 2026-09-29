@@ -37,6 +37,32 @@ repository independently downloaded those bytes.
   an explicit `macos-arm64.json` manifest defaults to an architecture-specific
   `macos-arm64` output directory instead of `macos-x86_64`.
 
+## Restartable archive-freeze path
+
+The feature branch adds a fail-closed archive inspector to the supported CLI.
+It reads a supplied `.tar.gz` without extracting it and emits:
+
+- exact archive bytes and SHA-256;
+- single archive root;
+- member / regular-file / symlink counts;
+- total uncompressed regular bytes;
+- a canonical path-sensitive logical-member SHA-256 built from member path,
+  type, uncompressed size/content hash, and symlink target;
+- a canonical path-insensitive payload-multiset SHA-256 built from
+  `{uncompressed bytes, content SHA-256}` records with duplicates preserved.
+
+Inspection rejects multiple roots, path traversal, duplicate members,
+unsupported member types, escaping/broken/cyclic symlinks, and read-size
+mismatches. Future arm64 manifests may bind the two logical hashes in
+`archive_policy`; extraction verifies them when present while retaining
+backward compatibility with the current x86_64 manifest.
+
+The inspector is an evidence generator, not identity by filename: an explicit
+manifest filename only selects a convenient default output directory. An
+explicit `--output-dir` remains authoritative and runtime identity continues
+to be established by frozen source bytes, manifest target fields, dependency
+lock, runtime probe, and tree receipt.
+
 ## What remains OPEN
 
 1. **Independent archive-byte retrieval.** Re-download the upstream asset on a
@@ -50,7 +76,10 @@ repository independently downloaded those bytes.
    - archive root;
    - safe symlink-target closure.
    Do not copy the x86_64 archive-policy counts.
-3. **Dedicated portable dependency lock.** Generate
+3. **Dedicated portable dependency lock.** An off-branch generation attempt on
+   2026-09-29 with uv 0.10.0 could not reach PyPI because the execution
+   environment had no DNS; no lock file was produced and no dependency
+   incompatibility was observed. Generate
    `packaging/runtime/requirements-macos-arm64.lock` from the current
    `pyproject.toml` for **Python 3.13 + aarch64-apple-darwin + wheel-only +
    hashes**. The existing `packaging/macos/requirements-macos-arm64.lock` is
