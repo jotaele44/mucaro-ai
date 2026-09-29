@@ -203,7 +203,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             return {"status": "AUTH_PUBLIC_ROUTE"}
         return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
 
-    app = FastAPI(title="Mucaro AI", version="0.1.23", dependencies=[Depends(require_auth_unless_public)])
+    app = FastAPI(title="Mucaro AI", version="0.1.24", dependencies=[Depends(require_auth_unless_public)])
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
