@@ -3,7 +3,7 @@ name: One-click setup
 # Runs the real double-click files ("Mucaro AI.command" / "Mucaro AI.cmd") on clean runners.
 # PATH is cut down to OS directories (plus tripwire stubs on macOS/Linux), so the job fails if
 # setup ever depends on a preinstalled Python, Node, npm, or git.
-# The macos-app job opens "Mucaro AI.app" through LaunchServices, as a Finder double-click does,
+# The macos-app job opens "Mucaro AI Setup.app" through LaunchServices, as a Finder double-click does,
 # and checks that it sets itself up and opens in its own window with no terminal or browser.
 
 on:
@@ -12,7 +12,7 @@ on:
     paths:
       - "Mucaro AI.command"
       - "Mucaro AI.cmd"
-      - "Mucaro AI.app/**"
+      - "Mucaro AI Setup.app/**"
       - "Fix-Gatekeeper.command"
       - ".gitattributes"
       - ".gitignore"
@@ -33,7 +33,7 @@ on:
     paths:
       - "Mucaro AI.command"
       - "Mucaro AI.cmd"
-      - "Mucaro AI.app/**"
+      - "Mucaro AI Setup.app/**"
       - "scripts/one_click*"
       - "scripts/launch_app.py"
       - "backend/app/desktop_shell.py"
@@ -101,17 +101,17 @@ jobs:
           if-no-files-found: ignore
 
   macos-app:
-    name: Mucaro AI.app (macOS arm64)
+    name: Mucaro AI Setup.app (macOS arm64)
     runs-on: macos-latest
     timeout-minutes: 45
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v7
-      - name: Open Mucaro AI.app the way Finder does (first run, full setup)
+      - name: Open Mucaro AI Setup.app the way Finder does (first run, full setup)
         # LaunchServices starts the app with the login session's environment, not this step's:
         # no terminal, and no PATH or tools from the runner.
-        run: open "Mucaro AI.app"
+        run: open "Mucaro AI Setup.app"
       - name: Wait for the app to set itself up and open
         run: |
           mkdir -p "$RUNNER_TEMP/evidence"
