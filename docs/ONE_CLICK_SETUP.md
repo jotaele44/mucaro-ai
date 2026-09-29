@@ -1,10 +1,10 @@
 # Double-Click Setup
 
-Open `Mucaro AI.app` (macOS) or double-click `Mucaro AI.cmd` (Windows). The first run installs
+Open `Mucaro AI Setup.app` (macOS) or double-click `Mucaro AI.cmd` (Windows). The first run installs
 everything and opens the app; later runs open it in seconds. No input is needed at any point.
 
 On a Mac the app runs without a terminal or a browser and shows Mucaro AI in its own window: see
-[Mucaro AI.app](#mucaro-aiapp-macos). `Mucaro AI.command` runs the same setup in Terminal and
+[Mucaro AI Setup.app](#mucaro-aiapp-macos). `Mucaro AI.command` runs the same setup in Terminal and
 opens the browser; it is also the launcher for Linux.
 
 ## Why it exists
@@ -25,7 +25,7 @@ first-time user:
 ## How it works
 
 ```
-Mucaro AI.app (macOS)      Mucaro AI.command (macOS/Linux)      Mucaro AI.cmd (Windows)
+Mucaro AI Setup.app (macOS)      Mucaro AI.command (macOS/Linux)      Mucaro AI.cmd (Windows)
   Contents/MacOS/Mucaro AI         |                                   |
         | exec --desktop           | exec                              | powershell -ExecutionPolicy Bypass
         v                          v                                   v
@@ -67,9 +67,9 @@ scripts/launch_app.py --auto-port            scripts/one_click_desktop.py
   (`PORT_FALLBACK`). If Mucaro AI is already running, the browser opens and the new window exits
   (`DESKTOP_LAUNCH_REUSED`). Closing the window stops the backend.
 
-## Mucaro AI.app (macOS)
+## Mucaro AI Setup.app (macOS)
 
-`Mucaro AI.app` is committed in this folder, in the same way as the federation apps
+`Mucaro AI Setup.app` is committed in this folder, in the same way as the federation apps
 (`PRII-THEHUB.app` in `thehub-pr`). It is a standard app bundle with the owl icon, and its
 program is a short bash script:
 
@@ -149,7 +149,7 @@ Everything stays inside the project folder:
 | `.mucaro-runtime/logs/setup-*.log` | the last 10 setup logs |
 | `.mucaro-runtime/state.json` | step fingerprints |
 | `.venv`, `frontend/node_modules`, `frontend/dist`, `.env` | project environment, UI build, settings |
-| `data/instance.json`, `data/instance.lock`, `data/logs/`, `data/webview/` | Mucaro AI.app's window state and service log (git-ignored) |
+| `data/instance.json`, `data/instance.lock`, `data/logs/`, `data/webview/` | Mucaro AI Setup.app's window state and service log (git-ignored) |
 
 To remove everything, delete `.mucaro-runtime/` and `.venv/` (and `frontend/node_modules/` and
 `frontend/dist/` if you like). Your documents and answers in `data/` are not affected. Moving the
@@ -172,9 +172,9 @@ downloads (`ERROR_DISK_FULL`).
 | `ERROR_MACOS_TOO_OLD`, `ERROR_PLATFORM_UNSUPPORTED` | see Supported platforms | |
 | `ERROR_SETUP_LOCK_TIMEOUT` | another window has been setting up for over an hour | close it, double-click again |
 | `ERROR_STAGE0_MISSING`, `ERROR_NOT_IN_VENV` | `scripts/one_click.py` was started directly | use the double-click file |
-| `ERROR_DESKTOP_WINDOW_FAILED`, `ERROR_DESKTOP_WINDOW_MISSING` | Mucaro AI.app could not install or load its window library (pywebview) | check the internet connection, open the app again |
-| `ERROR_SETUP_UNEXPECTED` | Mucaro AI.app's setup stopped on an unexpected error | choose Try again; if it repeats, see the log |
-| `ERROR_DESKTOP_START_FAILED` | the local service did not start inside Mucaro AI.app | see the log; `data/logs/startup-error.log` has the reason |
+| `ERROR_DESKTOP_WINDOW_FAILED`, `ERROR_DESKTOP_WINDOW_MISSING` | Mucaro AI Setup.app could not install or load its window library (pywebview) | check the internet connection, open the app again |
+| `ERROR_SETUP_UNEXPECTED` | Mucaro AI Setup.app's setup stopped on an unexpected error | choose Try again; if it repeats, see the log |
+| `ERROR_DESKTOP_START_FAILED` | the local service did not start inside Mucaro AI Setup.app | see the log; `data/logs/startup-error.log` has the reason |
 | `ERROR_DATA_DIR_INVALID` | `MUCARO_AI_DATA_DIR` is not an absolute path | fix it in `.env`, then choose Try again |
 | `ERROR_ALREADY_RUNNING` | another Mucaro AI window is using the same library | switch to it from the Dock |
 | `SETUP_CANCELLED` | the Mucaro AI window was closed during setup | open the app again; setup resumes |
@@ -185,9 +185,9 @@ downloads (`ERROR_DISK_FULL`).
 |---|---|---|---|
 | A ZIP downloaded from GitHub carries the macOS quarantine flag (Windows: Mark-of-the-Web) | Gatekeeper or SmartScreen asks once before the first run. Cloning with `git` or GitHub Desktop avoids it. Removing it for ZIP downloads needs a signed and notarized installer. | T4 | 90% |
 | Project inside `~/Desktop`, `~/Documents`, or `~/Downloads` on macOS | macOS asks once whether Mucaro AI (or Terminal, for `Mucaro AI.command`) may access that folder. `~/Developer` is not affected. | T4 | 85% |
-| Folder downloaded as a ZIP, opened with Mucaro AI.app | macOS blocks the app once, or runs a read-only copy of it that cannot see this folder (App Translocation; the app then says so). Double-click `Fix-Gatekeeper.command` once; if macOS blocks that too, allow it under System Settings, Privacy & Security, Open Anyway. `git clone` or GitHub Desktop avoid it. Removing it needs a signed and notarized app (BLK-SIGN-001). | T4 | 85% |
+| Folder downloaded as a ZIP, opened with Mucaro AI Setup.app | macOS blocks the app once, or runs a read-only copy of it that cannot see this folder (App Translocation; the app then says so). Double-click `Fix-Gatekeeper.command` once; if macOS blocks that too, allow it under System Settings, Privacy & Security, Open Anyway. `git clone` or GitHub Desktop avoid it. Removing it needs a signed and notarized app (BLK-SIGN-001). | T4 | 85% |
 | The app window's web engine | WebKit keeps its caches for the app under `~/Library` (as for any app); everything the setup installs stays in this folder | T4 | 80% |
-| Moving Mucaro AI.app out of the folder | it must stay next to `scripts/`; drag it onto the Dock to start it from there | T1 | 99% |
+| Moving Mucaro AI Setup.app out of the folder | it must stay next to `scripts/`; drag it onto the Dock to start it from there | T1 | 99% |
 | First run needs internet | later runs work offline (verified with the network disabled) | T1 | 99% |
 | Group Policy that enforces a PowerShell execution policy | `-ExecutionPolicy Bypass` cannot override it | T4 | 90% |
 | Corporate TLS inspection | uv and Node use their own certificate stores. Set `SSL_CERT_FILE` / `NODE_EXTRA_CA_CERTS` (or `UV_SYSTEM_CERTS=1`) in the environment. | T4 | 75% |
@@ -224,7 +224,7 @@ is cut down to OS directories (plus the tripwire stubs on macOS and Linux). The 
 `DESKTOP_SMOKE_OK`. It also checks that `.venv` runs the private Python and that setup left no
 tracked changes.
 
-Its `Mucaro AI.app (macOS arm64)` job opens the committed app with `open`, the path a Finder
+Its `Mucaro AI Setup.app (macOS arm64)` job opens the committed app with `open`, the path a Finder
 double-click takes, on a clean runner, so the app gets no terminal and none of the runner's tools.
 It waits for the first-run setup, then `scripts/verify_checkout_app.py` checks:
 
@@ -251,7 +251,7 @@ any OS:
 - No physical Mac or Windows PC was used; macOS and Windows behaviour is proven on GitHub-hosted
   runners, which have developer tools installed. The tripwire stubs show those tools are not used,
   but the Command Line Tools dialog itself was not reproduced.
-- Mucaro AI.app's dialogs, Dock icon and menu name, and its Gatekeeper and folder-access
+- Mucaro AI Setup.app's dialogs, Dock icon and menu name, and its Gatekeeper and folder-access
   behaviour were not seen on a physical Mac. The runner job proves the window, the GUI and the
   quit path through LaunchServices; the dialogs use standard `osascript` `display dialog`.
 - Terminal.app's behaviour when a window is closed was simulated with SIGHUP.
