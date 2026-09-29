@@ -5,7 +5,8 @@ from typing import Any
 
 from .config import Settings, settings
 from .contracts import validate_contract
-from .utils import read_json, update_json, utc_now
+from .observability import append_forensic_event
+from .utils import canonical_sha256, read_json, update_json, utc_now
 
 DIRECTORY_PERMISSIONS_NAME = "directory_permissions.json"
 
@@ -124,6 +125,25 @@ def grant_directory(path: str | Path, cfg: Settings = settings, *, granted_by: s
         grants[:] = kept
 
     update_json(permission_ledger_path(cfg), [], mutate)
+    try:
+        append_forensic_event(
+            "permission_change",
+            "DIRECTORY_PERMISSION_GRANTED",
+            origin="directory_permission_ledger",
+            origin_id=canonical_sha256(canonical_root),
+            data={
+                "canonical_root_sha256": canonical_sha256(canonical_root),
+                "granted_by": granted_by,
+                "status": grant["status"],
+            },
+            cfg=cfg,
+        )
+    except Exception as exc:  # state is committed; surface partial persistence explicitly
+        raise DirectoryPermissionError(
+            "ERROR_PERMISSION_OBSERVABILITY_APPEND_AFTER_COMMIT",
+            "Directory permission grant committed, but forensic history append failed.",
+            path=root,
+        ) from exc
     return grant
 
 
@@ -137,6 +157,27 @@ def revoke_directory(path: str | Path, cfg: Settings = settings) -> dict[str, An
         return removed_count
 
     removed = update_json(permission_ledger_path(cfg), [], mutate)
+    if removed:
+        root_sha256 = canonical_sha256(str(root))
+        try:
+            append_forensic_event(
+                "permission_change",
+                "DIRECTORY_PERMISSION_REVOKED",
+                origin="directory_permission_ledger",
+                origin_id=root_sha256,
+                data={
+                    "canonical_root_sha256": root_sha256,
+                    "removed": removed,
+                    "status": "DIRECTORY_PERMISSION_REVOKED",
+                },
+                cfg=cfg,
+            )
+        except Exception as exc:  # state is committed; surface partial persistence explicitly
+            raise DirectoryPermissionError(
+                "ERROR_PERMISSION_OBSERVABILITY_APPEND_AFTER_COMMIT",
+                "Directory permission revocation committed, but forensic history append failed.",
+                path=root,
+            ) from exc
     return {
         "status": "DIRECTORY_PERMISSION_REVOKED" if removed else "DIRECTORY_PERMISSION_NOT_FOUND",
         "canonical_root": str(root),
