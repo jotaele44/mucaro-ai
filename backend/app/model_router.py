@@ -500,7 +500,16 @@ def _local_answer(
                 payload = json.loads(response.read(4_000_000).decode("utf-8", errors="replace"))
                 parts.append(str(((payload.get("choices") or [{}])[0].get("message") or {}).get("content") or ""))
     except urllib.error.HTTPError as exc:
-        status = "ERROR_LOCAL_MODEL_NOT_INSTALLED" if exc.code == 404 else "ERROR_LOCAL_MODEL_HTTP_ERROR"
+        if exc.code == 404:
+            status = "ERROR_LOCAL_MODEL_NOT_INSTALLED"
+        elif exc.code == 429:
+            status = "ERROR_MODEL_PROVIDER_RATE_LIMIT"
+        elif exc.code in {408, 504}:
+            status = "ERROR_MODEL_PROVIDER_TIMEOUT"
+        elif exc.code >= 500:
+            status = "ERROR_LOCAL_MODEL_UNAVAILABLE"
+        else:
+            status = "ERROR_LOCAL_MODEL_HTTP_ERROR"
         raise ModelProviderError(status, f"Local model server returned HTTP {exc.code} for model {model}.") from exc
     except (urllib.error.URLError, OSError) as exc:
         raise ModelProviderError("ERROR_LOCAL_MODEL_UNAVAILABLE", f"Local model server unreachable at {base_url}: {exc}") from exc
