@@ -195,6 +195,50 @@ def test_runtime_environment_excludes_host_python_and_pip_configuration(monkeypa
     assert env["PYTHONSAFEPATH"] == "1"
 
 
+def test_runtime_manifest_rejects_malformed_archive_identity_digest(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname="fixture"\nversion="1.0"\ndependencies=["example==1.0"]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "runtime.lock").write_text(
+        "example==1.0 \\\n    --hash=sha256:" + "a" * 64 + "\n",
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "runtime.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "archive_policy": {
+                    "logical_members_sha256": "not-a-sha256",
+                    "max_members": 1,
+                    "max_regular_bytes": 1,
+                    "member_count": 1,
+                    "payload_multiset_sha256": "b" * 64,
+                    "regular_file_count": 1,
+                    "symlink_count": 0,
+                    "total_regular_bytes": 1,
+                },
+                "dependency_lock": "runtime.lock",
+                "required_imports": ["example"],
+                "schema_version": "mucaro-portable-runtime-source/1.0",
+                "source": {
+                    "bytes": 1,
+                    "sha256": "a" * 64,
+                    "url": "https://github.com/example/runtime",
+                },
+                "target": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        load_runtime_source_manifest(tmp_path, manifest)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_SOURCE_HASH"
+    assert "logical_members_sha256" in exc.value.detail
+
+
 def test_runtime_lock_must_match_direct_project_dependencies(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text(
         '[project]\nname="fixture"\nversion="1.0"\ndependencies=["example==1.0"]\n',
