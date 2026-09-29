@@ -126,6 +126,40 @@ def test_cli_materializes_portable_runtime_with_explicit_manifest_output(tmp_pat
     assert payload["runtime_dir"] == str(expected_output)
 
 
+def test_cli_portable_runtime_explicit_output_overrides_manifest_name(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    manifest = tmp_path / "packaging" / "runtime" / "macos-arm64.json"
+    explicit_output = tmp_path / "custom" / "runtime"
+
+    def fake_materialize(root: Path, manifest_path: Path, output: Path, *, archive_path: Path | None = None):
+        assert root == tmp_path
+        assert manifest_path == manifest
+        assert output == explicit_output
+        assert archive_path is None
+        return {"status": "PORTABLE_RUNTIME_VERIFIED", "runtime_dir": str(output), "failed_checks": []}
+
+    monkeypatch.setattr(cli, "materialize_portable_runtime", fake_materialize)
+
+    assert (
+        main(
+            [
+                "package",
+                "portable-runtime",
+                "--manifest",
+                str(manifest),
+                "--output-dir",
+                str(explicit_output),
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["runtime_dir"] == str(explicit_output)
+
+
 def test_cli_refuses_portable_app_when_runtime_verification_fails(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     runtime = tmp_path / "runtime"
