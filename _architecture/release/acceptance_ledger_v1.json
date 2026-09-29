@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-27T03:40:07Z",
+  "updated_utc": "2026-09-29T16:51:45Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1544,7 +1544,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N20",
-      "notes": "Both release lanes are required (user decision 2026-09-26, assumption A7). Native app lane: bundle replacement keeps data; schema upgrades are atomic and forward-only; a too-new database fails safely with ERROR_DATABASE_SCHEMA_TOO_NEW. Tested: upgrade, interrupted upgrade (rolled back), compatibility refusal, and app reinstall keeping data (macOS E2E). Portable embedded-runtime lane: the distinct-version upgrade/rollback check and the clean-machine flow are implemented and unit-tested, but no receipt from two distinct packaged portable versions exists yet, so this row is PROVISIONAL rather than PASS."
+      "notes": "Both release lanes are required (user decision 2026-09-26, assumption A7). Native app lane: bundle replacement keeps data; schema upgrades are atomic and forward-only; a too-new database fails safely with ERROR_DATABASE_SCHEMA_TOO_NEW. Tested: upgrade, interrupted upgrade (rolled back), compatibility refusal, and app reinstall keeping data (macOS E2E). Portable embedded-runtime lane: the distinct-version upgrade/rollback check and the clean-machine flow are implemented and unit-tested, but no receipt from two distinct packaged portable versions exists yet, so this row is PROVISIONAL rather than PASS. Architecture (RC-009, docs/RELEASE_SCOPE_2026-09-29.md): portable-lane evidence must come from a native arm64 runtime on Apple Silicon; x86_64 portable runs are compatibility observations only."
     },
     {
       "requirement_id": "TGT-030",
@@ -2114,7 +2114,7 @@
       "state": "BLOCKED",
       "blocker_id": "BLK-PHYS-001",
       "dag_node": "N20",
-      "notes": "Both release lanes are required (A7). Native app lane: build -> verify bundle -> install -> open (LaunchServices) -> verify GUI (window list, screenshot, GUI-connected signal) -> ingest/ask/cite/export -> quit (Apple Event) -> relaunch -> verify state: all pass on a hosted runner. Portable lane benchmark: not yet run end to end. A literal double-click is BLK-PHYS-001."
+      "notes": "Both release lanes are required (A7). Native app lane: build -> verify bundle -> install -> open (LaunchServices) -> verify GUI (window list, screenshot, GUI-connected signal) -> ingest/ask/cite/export -> quit (Apple Event) -> relaunch -> verify state: all pass on a hosted runner. Portable lane benchmark: not yet run end to end. A literal double-click is BLK-PHYS-001. Architecture (RC-009, docs/RELEASE_SCOPE_2026-09-29.md): portable-lane evidence must come from a native arm64 runtime on Apple Silicon; x86_64 portable runs are compatibility observations only."
     },
     {
       "requirement_id": "MATRIX-019",
@@ -2140,7 +2140,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N24",
-      "notes": "The sequence is wired and requires both release lanes (A7). First end-to-end run at 0a806c1 (evidence: release_grade_0a806c1e8c98) with the exact-head native-app build and E2E receipts and the hosted-CI receipt (merge e3cfb5f, tree-equivalent to the head): clean worktree, local release, fresh clone, Python distribution, operator workflow, retrieval and GIS benchmarks, security gates, the packaged app's security profile, source-artifact installability, native-app build and E2E, hosted CI and the final manifest all PASS. Verdict PROVISIONAL, blocked by the four portable-lane gates (no portable inputs produced yet), signed_notarized_installer (BLK-SIGN-001) and release_scope."
+      "notes": "The sequence is wired and requires both release lanes (A7). First end-to-end run at 0a806c1 (evidence: release_grade_0a806c1e8c98) with the exact-head native-app build and E2E receipts and the hosted-CI receipt (merge e3cfb5f, tree-equivalent to the head): clean worktree, local release, fresh clone, Python distribution, operator workflow, retrieval and GIS benchmarks, security gates, the packaged app's security profile, source-artifact installability, native-app build and E2E, hosted CI and the final manifest all PASS. Verdict PROVISIONAL, blocked by the four portable-lane gates (no portable inputs produced yet), signed_notarized_installer (BLK-SIGN-001) and release_scope. Architecture (RC-009, docs/RELEASE_SCOPE_2026-09-29.md): portable-lane evidence must come from a native arm64 runtime on Apple Silicon; x86_64 portable runs are compatibility observations only."
     },
     {
       "requirement_id": "MATRIX-020",
