@@ -172,3 +172,35 @@ def test_invalid_bbox_and_duplicate_span_identity_fail_before_structure() -> Non
     with pytest.raises(OCRStructureError) as exc:
         reconstruct_form(duplicate)
     assert exc.value.status == "ERROR_OCR_STRUCTURE_DUPLICATE_SPAN"
+
+
+def test_multicolumn_requires_vertical_overlap_not_just_x_separation() -> None:
+    spans = [
+        span(0, "Top left one", x=50, y=50, width=180, block=1, line=1),
+        span(1, "Top left two", x=50, y=110, width=180, block=1, line=2),
+        span(2, "Bottom right one", x=500, y=600, width=180, block=2, line=1),
+        span(3, "Bottom right two", x=500, y=660, width=180, block=2, line=2),
+    ]
+    result = reconstruct_multicolumn(spans)
+    assert result["status"] == "OCR_STRUCTURE_UNRESOLVED"
+    assert "COLUMN_VERTICAL_OVERLAP_BELOW_MINIMUM" in result["residue"]
+
+
+def test_supported_structure_is_explicitly_inference_not_identity() -> None:
+    spans = [
+        span(0, "Name:", x=100, y=100, block=1, line=1, word=1),
+        span(1, "Alice", x=300, y=100, block=1, line=1, word=2),
+        span(2, "City:", x=100, y=190, block=1, line=2, word=1),
+        span(3, "Ponce", x=300, y=190, block=1, line=2, word=2),
+    ]
+    result = reconstruct_form(spans)
+    assert result["epistemic_classification"] == "INFERENCE"
+    assert result["certification_state"] == "CANDIDATE_NOT_IDENTITY"
+
+
+def test_malformed_engine_hierarchy_fails_closed() -> None:
+    malformed = span(0, "Name:", x=100, y=100)
+    malformed["line_num"] = "not-an-integer"
+    with pytest.raises(OCRStructureError) as exc:
+        reconstruct_form([malformed, span(1, "Alice", x=300, y=100)])
+    assert exc.value.status == "ERROR_OCR_STRUCTURE_HIERARCHY"
