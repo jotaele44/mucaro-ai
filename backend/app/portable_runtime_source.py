@@ -154,6 +154,13 @@ def load_runtime_source_manifest(root: Path, manifest_path: Path) -> dict[str, A
     ):
         if not isinstance(archive_policy.get(field), int) or archive_policy[field] < 0:
             raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_SOURCE_MANIFEST", f"invalid archive_policy.{field}")
+    for field in ("logical_members_sha256", "payload_multiset_sha256"):
+        value = archive_policy.get(field)
+        if value is not None and not SHA256_RE.fullmatch(str(value)):
+            raise PortableRuntimeSourceError(
+                "ERROR_PORTABLE_RUNTIME_SOURCE_HASH",
+                f"archive_policy.{field}={value}",
+            )
     if archive_policy["member_count"] > archive_policy["max_members"]:
         raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_SOURCE_LIMIT", "member count exceeds policy maximum")
     if archive_policy["total_regular_bytes"] > archive_policy["max_regular_bytes"]:
