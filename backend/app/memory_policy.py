@@ -4,7 +4,7 @@ import hashlib
 import json
 from typing import Any
 
-from .memory import MEMORY_KINDS, active_memory_context
+from .memory import MEMORY_KINDS, MEMORY_SCOPES, active_memory_context, current_workspace_scope_id
 from .config import Settings, settings
 from .contracts import validate_contract
 
@@ -35,6 +35,8 @@ def select_memory_context(
     *,
     items: list[dict[str, Any]] | None = None,
     allowed_kinds: list[str] | None = None,
+    workspace_scope_id: str | None = None,
+    conversation_scope_id: str | None = None,
     max_items: int = DEFAULT_MAX_ITEMS,
     max_chars: int = DEFAULT_MAX_CHARS,
 ) -> dict[str, Any]:
@@ -57,6 +59,10 @@ def select_memory_context(
                 kinds.append(kind)
 
     source_rows = list(items) if items is not None else active_memory_context(cfg)
+    resolved_workspace_scope_id = workspace_scope_id or current_workspace_scope_id(cfg)
+    resolved_conversation_scope_id = (
+        " ".join(str(conversation_scope_id).strip().split()) if conversation_scope_id is not None else None
+    ) or None
     accepted: list[dict[str, Any]] = []
     excluded: list[dict[str, Any]] = []
     seen_content: set[tuple[str, str]] = set()
@@ -69,9 +75,34 @@ def select_memory_context(
         memory_id = row.get("memory_id")
         kind = str(row.get("kind") or "").strip().lower()
         content = _normalize_content(row.get("content"))
+        scope = str(row.get("scope") or "global").strip().lower()
+        raw_scope_id = " ".join(str(row.get("scope_id") or "").strip().split()) or None
         if row.get("enabled") is not True:
             excluded.append({"memory_id": memory_id, "reason": "DISABLED"})
             continue
+        if scope not in MEMORY_SCOPES:
+            excluded.append({"memory_id": memory_id, "reason": "INVALID_SCOPE", "scope": scope})
+            continue
+        if scope == "global" and raw_scope_id is not None:
+            excluded.append({"memory_id": memory_id, "reason": "INVALID_SCOPE_ID", "scope": scope})
+            continue
+        if scope == "workspace":
+            if raw_scope_id is None:
+                excluded.append({"memory_id": memory_id, "reason": "SCOPE_ID_REQUIRED", "scope": scope})
+                continue
+            if raw_scope_id != resolved_workspace_scope_id:
+                excluded.append({"memory_id": memory_id, "reason": "SCOPE_MISMATCH", "scope": scope})
+                continue
+        if scope == "conversation":
+            if raw_scope_id is None:
+                excluded.append({"memory_id": memory_id, "reason": "SCOPE_ID_REQUIRED", "scope": scope})
+                continue
+            if resolved_conversation_scope_id is None:
+                excluded.append({"memory_id": memory_id, "reason": "SCOPE_CONTEXT_MISSING", "scope": scope})
+                continue
+            if raw_scope_id != resolved_conversation_scope_id:
+                excluded.append({"memory_id": memory_id, "reason": "SCOPE_MISMATCH", "scope": scope})
+                continue
         if kind not in kinds:
             excluded.append({"memory_id": memory_id, "reason": "KIND_NOT_ALLOWED"})
             continue
@@ -97,6 +128,8 @@ def select_memory_context(
                 "kind": kind,
                 "content": content,
                 "source": row.get("source"),
+                "scope": scope,
+                "scope_id": raw_scope_id,
                 "created_at": row.get("created_at"),
                 "updated_at": row.get("updated_at"),
                 "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
@@ -107,6 +140,8 @@ def select_memory_context(
         "schema_version": MEMORY_SELECTION_SCHEMA_VERSION,
         "status": "MEMORY_SELECTION_OK",
         "allowed_kinds": kinds,
+        "workspace_scope_id": resolved_workspace_scope_id,
+        "conversation_scope_id": resolved_conversation_scope_id,
         "max_items": max_items,
         "max_chars": max_chars,
         "source_count": len(source_rows),
@@ -122,15 +157,22 @@ def select_memory_context(
             "character_limit_honored": char_count <= max_chars,
             "all_selected_enabled": True,
             "all_selected_kinds_allowed": all(row["kind"] in kinds for row in accepted),
+            "all_selected_scopes_match": all(
+                row["scope"] == "global"
+                or (row["scope"] == "workspace" and row["scope_id"] == resolved_workspace_scope_id)
+                or (row["scope"] == "conversation" and row["scope_id"] == resolved_conversation_scope_id)
+                for row in accepted
+            ),
             "selected_content_unique_by_kind": len({(row["kind"], row["content"].casefold()) for row in accepted}) == len(accepted),
         },
         "limitations": [
             "Memory remains operator-controlled local context and is not source evidence.",
-            "This selector bounds and deduplicates prompt context; it does not infer truth, importance, or sensitivity of a memory item.",
+            "This selector bounds, scope-filters, and deduplicates prompt context; it does not infer truth, importance, or sensitivity of a memory item.",
             "Durable memory provenance beyond the stored source label remains a separate evidence-plane concern.",
         ],
         "falsification_criteria": [
             "disabled memories never enter selected context",
+            "workspace and conversation memories never enter context outside their declared scope",
             "duplicate normalized content within the same kind is included at most once",
             "selected context never exceeds declared item or character ceilings",
             "memory context must not be promoted into cited source evidence",
