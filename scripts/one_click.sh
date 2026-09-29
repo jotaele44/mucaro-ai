@@ -1,6 +1,6 @@
 #!/bin/bash
 # Stage 0 of the double-click setup (started by "Mucaro AI.command", or by
-# Mucaro AI.app with --desktop).
+# Mucaro AI Setup.app with --desktop).
 #
 # Provisions pinned, checksum-verified private runtimes inside .mucaro-runtime/
 # (uv, Node, CPython) and the project .venv, then hands off to
@@ -12,12 +12,12 @@
 #   Command Line Tools those are stubs in /usr/bin that open an install dialog.
 # - Writes nothing outside the project folder.
 #
-# With --desktop (Mucaro AI.app) there is no terminal: a "getting ready" notice
+# With --desktop (Mucaro AI Setup.app) there is no terminal: a "getting ready" notice
 # covers a slow first run until the app window opens, and a failure is shown in
 # a dialog that can reveal the log.
 set -euo pipefail
 
-# Mucaro AI.app starts this script without a terminal; make sure the standard streams exist.
+# Mucaro AI Setup.app starts this script without a terminal; make sure the standard streams exist.
 [ -e /dev/fd/1 ] || exec 1>/dev/null
 [ -e /dev/fd/2 ] || exec 2>/dev/null
 
@@ -39,7 +39,7 @@ for arg in ${1+"$@"}; do
     DESKTOP=1
   fi
 done
-ICON="${MUCARO_APP_BUNDLE:-${ROOT}/Mucaro AI.app}/Contents/Resources/AppIcon.icns"
+ICON="${MUCARO_APP_BUNDLE:-${ROOT}/Mucaro AI Setup.app}/Contents/Resources/AppIcon.icns"
 NOTICE_PID=""
 
 log_line() {
