@@ -13,11 +13,12 @@ from backend.app.retrieval_scale_benchmark import (
     evaluate_queries,
     load_denominator,
 )
+from backend.app.utils import tokenize
 
 
 def test_rt10_denominator_is_frozen_and_arithmetic_closes() -> None:
     denominator = load_denominator()
-    assert denominator["schema_version"] == "MUCARO_RT10_SCALE_BENCHMARK/1.0"
+    assert denominator["schema_version"] == "MUCARO_RT10_SCALE_BENCHMARK/1.1"
     assert denominator["corpus"]["scale_levels"] == [1000, 5000, 10000]
     assert denominator["corpus"]["max_chunks"] == 10000
     assert denominator["query_denominator"] == {
@@ -51,6 +52,18 @@ def test_rt10_generated_denominator_preserves_unique_ids_and_categories() -> Non
         "ambiguous": 16,
         "negative": 24,
     }
+
+
+def test_rt10_negative_queries_are_true_no_context() -> None:
+    denominator = load_denominator()
+    chunks = build_corpus(400)
+    corpus_tokens: set[str] = set()
+    for chunk in chunks:
+        corpus_tokens.update(tokenize(str(chunk["text"])))
+    negatives = [row for row in build_queries(denominator) if row["category"] == "negative"]
+    assert len(negatives) == 24
+    for case in negatives:
+        assert set(tokenize(str(case["query"]))).isdisjoint(corpus_tokens)
 
 
 def test_rt10_small_positive_negative_and_citation_controls_pass() -> None:

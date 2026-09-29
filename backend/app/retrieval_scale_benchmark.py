@@ -17,7 +17,7 @@ from .model_router import generate_answer
 from .retrieval import retrieve
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DENOMINATOR = ROOT / "_architecture" / "retrieval_scale_benchmark_v1.json"
+DEFAULT_DENOMINATOR = ROOT / "_architecture" / "retrieval_scale_benchmark_v1_1.json"
 STATUS_OK = "RT10_SCALE_CERT_PASS"
 STATUS_FAILED = "RT10_SCALE_CERT_FAIL"
 
@@ -46,7 +46,7 @@ def current_git_head(root: Path = ROOT) -> str:
 
 def load_denominator(path: Path = DEFAULT_DENOMINATOR) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    if payload.get("schema_version") != "MUCARO_RT10_SCALE_BENCHMARK/1.0":
+    if payload.get("schema_version") != "MUCARO_RT10_SCALE_BENCHMARK/1.1":
         raise ScaleBenchmarkError("ERROR_SCALE_SCHEMA_VERSION")
     query_denominator = payload.get("query_denominator")
     if not isinstance(query_denominator, dict):
@@ -144,7 +144,7 @@ def build_queries(denominator: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "query_id": f"negative-{offset:02d}",
                 "category": "negative",
-                "query": f"Find absenttoken{offset:02d} that is intentionally not present in the frozen corpus.",
+                "query": f"absenttoken{offset:02d} voidneedle{offset:02d}",
                 "expected_source_ids": [],
             }
         )

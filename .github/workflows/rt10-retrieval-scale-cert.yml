@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - "_architecture/retrieval_scale_benchmark_v1.json"
+      - "_architecture/retrieval_scale_benchmark_v1_1.json"
       - "backend/app/retrieval_scale_benchmark.py"
       - "backend/tests/test_retrieval_scale_benchmark.py"
       - "scripts/certify_retrieval_scale.py"
@@ -13,6 +14,7 @@ on:
     branches: [main]
     paths:
       - "_architecture/retrieval_scale_benchmark_v1.json"
+      - "_architecture/retrieval_scale_benchmark_v1_1.json"
       - "backend/app/retrieval_scale_benchmark.py"
       - "backend/tests/test_retrieval_scale_benchmark.py"
       - "scripts/certify_retrieval_scale.py"
