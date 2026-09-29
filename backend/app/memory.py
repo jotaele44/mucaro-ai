@@ -52,11 +52,22 @@ def _validate_scope(scope: str, scope_id: str | None, cfg: Settings) -> tuple[st
             raise MemoryError("ERROR_MEMORY_SCOPE_ID_FOR_GLOBAL", "Global memory must not declare a scope_id.")
         return normalized, None
     if normalized == "workspace":
-        return normalized, resolved_id or current_workspace_scope_id(cfg)
+        workspace_id = resolved_id or current_workspace_scope_id(cfg)
+        if not workspace_id.startswith("workspace_"):
+            raise MemoryError(
+                "ERROR_MEMORY_WORKSPACE_SCOPE_ID",
+                "Workspace-scoped memory requires a workspace_ stable identifier.",
+            )
+        return normalized, workspace_id
     if resolved_id is None:
         raise MemoryError(
             "ERROR_MEMORY_CONVERSATION_SCOPE_REQUIRED",
             "Conversation-scoped memory requires a conversation scope_id.",
+        )
+    if not resolved_id.startswith("conv_"):
+        raise MemoryError(
+            "ERROR_MEMORY_CONVERSATION_SCOPE_ID",
+            "Conversation-scoped memory requires a conv_ stable identifier.",
         )
     return normalized, resolved_id
 
