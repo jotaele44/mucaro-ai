@@ -38,6 +38,7 @@ from .conversations import (
 )
 from .db import list_payloads
 from .execution_gate import analyze_task
+from .format_registry import query_format_registry, validate_format_registry
 from .gis_crs import reproject_geojson_crs
 from .gis_corpus import validate_real_gis_corpus
 from .gis_export import create_map_export_manifest
@@ -871,6 +872,22 @@ def build_parser() -> argparse.ArgumentParser:
     gis_map_export.add_argument("--renderer-version", required=True, help="Renderer version.")
     gis_map_export.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_map_export.set_defaults(handler=run_gis_map_export_manifest)
+
+    formats = subcommands.add_parser("formats", help="Inspect the declared surface-specific format support registry.")
+    formats_subcommands = formats.add_subparsers(dest="formats_command", required=True)
+
+    formats_list = formats_subcommands.add_parser("list", help="List and validate all declared format manifestations.")
+    formats_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    formats_list.set_defaults(handler=run_formats_list)
+
+    formats_status = formats_subcommands.add_parser(
+        "status",
+        help="Inspect one extension; specify --surface when multiple manifestations exist.",
+    )
+    formats_status.add_argument("extension", help="File extension, with or without a leading dot.")
+    formats_status.add_argument("--surface", help="Optional capability surface such as core_ingestion or gis_vector.")
+    formats_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    formats_status.set_defaults(handler=run_formats_status)
 
     ocr = subcommands.add_parser("ocr", help="Run local OCR analysis with source-image receipts.")
     ocr_subcommands = ocr.add_subparsers(dest="ocr_command", required=True)
@@ -3276,6 +3293,24 @@ def run_gis_map_export_manifest(args: argparse.Namespace, cfg: Settings) -> int:
             renderer_version=args.renderer_version,
         ),
     )
+
+
+def run_formats_list(args: argparse.Namespace, cfg: Settings) -> int:
+    del cfg
+    result = validate_format_registry()
+    emit_payload(result, args.format)
+    return 0 if result.get("status") == "FORMAT_REGISTRY_OK" else 2
+
+
+def run_formats_status(args: argparse.Namespace, cfg: Settings) -> int:
+    del cfg
+    try:
+        result = query_format_registry(args.extension, surface=args.surface)
+    except Exception as exc:
+        emit_error("ERROR_FORMAT_REGISTRY_QUERY", str(exc), args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 2 if result.get("status") in {"FORMAT_REGISTRY_BLOCKED", "FORMAT_REGISTRY_AMBIGUOUS"} else 0
 
 
 def run_ocr_analyze(args: argparse.Namespace, cfg: Settings) -> int:
