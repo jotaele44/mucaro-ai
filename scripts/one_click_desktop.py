@@ -1,6 +1,6 @@
-"""Mucaro AI.app mode of the double-click setup (macOS): setup progress, then the app, in one window.
+"""Mucaro AI Setup.app mode of the double-click setup (macOS): setup progress, then the app, in one window.
 
-Mucaro AI.app runs ``scripts/one_click.sh --desktop``. That provisions the private runtimes (stage 0)
+Mucaro AI Setup.app runs ``scripts/one_click.sh --desktop``. That provisions the private runtimes (stage 0)
 and starts ``scripts/one_click.py --desktop``, which hands over to :func:`run` here:
 
 1. make sure pywebview (the ``desktop`` extra in pyproject.toml) is installed, so a window can open;
@@ -122,7 +122,7 @@ def apply_env_file(env_file: Path | None = None, environ: Any = None) -> None:
 
 
 def app_icon() -> Path:
-    bundle = Path(os.environ.get("MUCARO_APP_BUNDLE") or ROOT / "Mucaro AI.app")
+    bundle = Path(os.environ.get("MUCARO_APP_BUNDLE") or ROOT / "Mucaro AI Setup.app")
     return bundle / "Contents" / "Resources" / "AppIcon.icns"
 
 
@@ -191,7 +191,7 @@ def _is_child(pid: int) -> bool:
 
 
 class DesktopApp:
-    """One run of Mucaro AI.app: the window, the setup worker, then the service inside this process."""
+    """One run of Mucaro AI Setup.app: the window, the setup worker, then the service inside this process."""
 
     def __init__(self, setup: Any, log: Any, *, log_path: Path, data_dir: Path, notice: SetupNotice) -> None:
         self.setup = setup
@@ -352,7 +352,7 @@ class DesktopApp:
     # --- shutdown ----------------------------------------------------------------------------
 
     def restart(self) -> None:
-        """Run the whole launch again in this same process, so macOS still sees Mucaro AI.app (same Dock icon)."""
+        """Run the whole launch again in this same process, so macOS still sees Mucaro AI Setup.app (same Dock icon)."""
         self.stop_service()
         self.log.line("DESKTOP_APP_RETRY")
         self.log.close()
