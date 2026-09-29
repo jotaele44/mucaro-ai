@@ -239,6 +239,7 @@ def test_saved_ocr_report_structure_receipt_binds_input_hash(tmp_path: Path) -> 
     assert result["status"] == "OCR_FORM_RECONSTRUCTION_OK"
     assert result["input_ocr_report"]["sha256"] == __import__("hashlib").sha256(report_path.read_bytes()).hexdigest()
     assert result["structure"]["certification_state"] == "CANDIDATE_NOT_IDENTITY"
+    assert result["invariants"]["structure_span_count_matches_input"] is True
     assert Path(result["receipt_path"]).is_file()
     assert len(result["receipt_sha256"]) == 64
 
