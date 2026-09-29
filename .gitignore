@@ -26,7 +26,7 @@ data/indexes/*
 !data/processed/.gitkeep
 !data/exports/.gitkeep
 !data/indexes/.gitkeep
-# Window state that Mucaro AI.app keeps next to its library in data/
+# Window state that Mucaro AI Setup.app keeps next to its library in data/
 data/instance.json
 data/.instance.json.*
 data/instance.lock
