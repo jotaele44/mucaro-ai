@@ -55,6 +55,7 @@ from .models import (
 from .model_router import list_model_providers
 from .multimodal import MULTIMODAL_SUFFIXES
 from .offline import build_offline_manifest
+from .observability import ForensicTrailError, build_forensic_trail
 from .memory import (
     MemoryError,
     delete_memory_item,
@@ -739,6 +740,13 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/tools/audit")
     def tool_audit() -> dict:
         return list_tool_audit_events(cfg)
+
+    @app.get("/observability/trail")
+    def observability_trail(limit: int = 500) -> dict:
+        try:
+            return build_forensic_trail(cfg, limit=limit)
+        except ForensicTrailError as exc:
+            raise api_error(exc.status, exc.detail, status_code=400) from exc
 
     @app.get("/workspaces")
     def workspaces() -> dict:
