@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import platform
 from pathlib import Path
 
 from backend.app.portable_runtime import PortableRuntimeError, verify_portable_macos_app
@@ -127,8 +129,15 @@ def certify_portable_lane(
             "physical_input_certified": False,
             "signing_notarization_certified": False,
         },
+        "execution_environment": {
+            "github_actions": os.environ.get("GITHUB_ACTIONS") == "true",
+            "platform": platform.system(),
+            "machine": platform.machine(),
+            "runner_os": os.environ.get("RUNNER_OS"),
+            "runner_arch": os.environ.get("RUNNER_ARCH"),
+        },
         "limitations": [
-            "This certifies the credential-free x86_64 portable embedded-runtime packaged lifecycle on the reported hosted macOS runner only.",
+            "This certifies the credential-free x86_64 portable embedded-runtime packaged lifecycle on the executing host only.",
             "It does not independently certify host cleanliness or literal physical-device double-click input.",
             "Developer ID signing, Apple notarization, and the Apple Silicon/arm64 release target remain separate gates.",
         ],

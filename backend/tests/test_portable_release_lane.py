@@ -63,6 +63,9 @@ def test_portable_lane_requires_all_release_checks(tmp_path: Path, monkeypatch) 
     assert receipt["status"] == cert.STATUS_OK
     assert all(receipt["checks"].values())
     assert receipt["release_versions"] == {"current": "0.1.24", "previous": "0.1.23"}
+    assert receipt["execution_environment"]["github_actions"] is False
+    assert receipt["execution_environment"]["platform"]
+    assert receipt["execution_environment"]["machine"]
     assert receipt["checks"]["packaged_lifecycle_macos"] is True
     assert "clean_machine_macos" not in receipt["checks"]
     assert receipt["scope"] == {
