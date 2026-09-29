@@ -1,4 +1,4 @@
-"""Mucaro AI.app, the double-clickable macOS app committed in this folder, and its icon and helper files.
+"""Mucaro AI Setup.app, the double-clickable macOS app committed in this folder, and its icon and helper files.
 
 Runs anywhere: the launcher is a bash script, the icon is checked with the standard library, and
 no dialog is shown (MUCARO_APP_DIALOGS=0; on Linux there is no osascript anyway).
@@ -18,7 +18,7 @@ import scripts.build_app_icon as build_app_icon
 import scripts.build_macos_app as build_macos_app
 
 REPO = Path(__file__).resolve().parents[2]
-BUNDLE = REPO / "Mucaro AI.app"
+BUNDLE = REPO / "Mucaro AI Setup.app"
 CONTENTS = BUNDLE / "Contents"
 LAUNCHER = CONTENTS / "MacOS" / "Mucaro AI"
 ICON = CONTENTS / "Resources" / "AppIcon.icns"
@@ -45,7 +45,7 @@ def test_info_plist_names_the_launcher_and_the_icon():
     assert info["CFBundlePackageType"] == "APPL"
     assert info["CFBundleExecutable"] == LAUNCHER.name and LAUNCHER.is_file()
     assert info["CFBundleIconFile"] == ICON.stem and ICON.is_file()
-    assert info["CFBundleName"] == info["CFBundleDisplayName"] == "Mucaro AI"
+    assert info["CFBundleName"] == info["CFBundleDisplayName"] == "Mucaro AI Setup"
     # Its own identity: the packaged release app is ai.mucaro.app.
     assert info["CFBundleIdentifier"] == "ai.mucaro.launcher" != build_macos_app.BUNDLE_ID
     # The oldest macOS the setup supports (Intel); stage 0 checks the Apple silicon minimum itself.
@@ -63,8 +63,8 @@ def test_bundle_tracks_only_its_four_files():
 
 def test_git_keeps_the_launcher_lf_and_the_icon_binary():
     proc = _git("check-attr", "eol", "binary", "--", LAUNCHER.relative_to(REPO).as_posix(), ICON.relative_to(REPO).as_posix())
-    assert "Mucaro AI.app/Contents/MacOS/Mucaro AI: eol: lf" in proc.stdout
-    assert "Mucaro AI.app/Contents/Resources/AppIcon.icns: binary: set" in proc.stdout
+    assert "Mucaro AI Setup.app/Contents/MacOS/Mucaro AI: eol: lf" in proc.stdout
+    assert "Mucaro AI Setup.app/Contents/Resources/AppIcon.icns: binary: set" in proc.stdout
     assert b"\r\n" not in LAUNCHER.read_bytes()
 
 
