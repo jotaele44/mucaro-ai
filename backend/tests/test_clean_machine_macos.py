@@ -18,7 +18,7 @@ def test_distinct_version_flow_emits_all_required_evidence(tmp_path: Path, monke
     current=tmp_path/"current.app"; previous=tmp_path/"previous.app"
     for app,head in ((current,"a"*40),(previous,"b"*40)):
         (app/"Contents/Resources").mkdir(parents=True)
-        (app/"Contents/Resources/portable-manifest.json").write_text('{"head_sha":"'+head+'"}',encoding="utf-8")
+        (app/"Contents/Resources/portable-manifest.json").write_text('{"head_sha":"'+head+'","release_version":"'+("0.1.23" if app == current else "0.1.22")+'"}',encoding="utf-8")
     monkeypatch.setattr(clean,"verify_portable_macos_app",lambda app,expected_head=None:{"status":"PORTABLE_APP_VERIFIED"})
     calls=[]
     def install(app,*,install_root):
@@ -51,7 +51,7 @@ def test_same_head_previous_version_is_rejected(tmp_path: Path, monkeypatch: pyt
     current=tmp_path/"current.app"; previous=tmp_path/"previous.app"
     for app in (current,previous):
         (app/"Contents/Resources").mkdir(parents=True)
-        (app/"Contents/Resources/portable-manifest.json").write_text('{"head_sha":"'+("a"*40)+'"}',encoding="utf-8")
+        (app/"Contents/Resources/portable-manifest.json").write_text('{"head_sha":"'+("a"*40)+'","release_version":"0.1.23"}',encoding="utf-8")
     monkeypatch.setattr(clean,"verify_portable_macos_app",lambda app,expected_head=None:{"status":"PORTABLE_APP_VERIFIED"})
     with pytest.raises(CleanMachineMacOSError) as exc:
         certify_clean_machine_macos(current,previous,expected_head="a"*40,install_root=tmp_path/"install",platform_name="darwin")
@@ -64,7 +64,7 @@ def test_post_launch_bundle_mutation_blocks_receipt(tmp_path: Path, monkeypatch:
     for app, head in ((current, "a" * 40), (previous, "b" * 40)):
         (app / "Contents/Resources").mkdir(parents=True)
         (app / "Contents/Resources/portable-manifest.json").write_text(
-            json.dumps({"head_sha": head}),
+            json.dumps({"head_sha": head, "release_version": "0.1.23" if app == current else "0.1.22"}),
             encoding="utf-8",
         )
     verification_states = iter(
@@ -103,3 +103,20 @@ def test_post_launch_bundle_mutation_blocks_receipt(tmp_path: Path, monkeypatch:
 
     assert receipt["status"] == "CLEAN_MACHINE_MACOS_BLOCKED"
     assert receipt["evidence"]["post_launch_bundle_immutable"] is False
+
+
+def test_different_head_same_version_is_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    current = tmp_path / "current.app"
+    previous = tmp_path / "previous.app"
+    for app, head in ((current, "a" * 40), (previous, "b" * 40)):
+        (app / "Contents/Resources").mkdir(parents=True)
+        (app / "Contents/Resources/portable-manifest.json").write_text(
+            json.dumps({"head_sha": head, "release_version": "0.1.23"}), encoding="utf-8"
+        )
+    monkeypatch.setattr(clean, "verify_portable_macos_app", lambda app, expected_head=None: {"status": "PORTABLE_APP_VERIFIED"})
+    with pytest.raises(CleanMachineMacOSError) as exc:
+        certify_clean_machine_macos(
+            current, previous, expected_head="a" * 40,
+            install_root=tmp_path / "install", platform_name="darwin"
+        )
+    assert exc.value.status == "ERROR_CLEAN_MACHINE_SAME_VERSION"
