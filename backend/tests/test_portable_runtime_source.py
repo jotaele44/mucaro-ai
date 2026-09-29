@@ -112,7 +112,7 @@ def test_archive_inspector_rejects_member_count_above_bound_before_payload_hashi
         inspect_runtime_archive(archive, max_members=1)
 
     assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT"
-    assert "member_count=2" in exc.value.detail
+    assert "member_count>1" in exc.value.detail
 
 
 def test_archive_inspector_rejects_declared_regular_bytes_above_bound(tmp_path: Path) -> None:
@@ -123,7 +123,7 @@ def test_archive_inspector_rejects_declared_regular_bytes_above_bound(tmp_path: 
         inspect_runtime_archive(archive, max_regular_bytes=9)
 
     assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT"
-    assert "total_regular_bytes=10" in exc.value.detail
+    assert "total_regular_bytes>9" in exc.value.detail
 
 
 def test_extract_uses_manifest_specific_archive_limits(tmp_path: Path) -> None:
