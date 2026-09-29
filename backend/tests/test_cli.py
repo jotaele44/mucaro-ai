@@ -109,6 +109,66 @@ def test_cli_inspects_portable_runtime_archive_without_materializing(tmp_path: P
     assert payload == {"status": "PORTABLE_RUNTIME_ARCHIVE_INSPECTED", **expected}
 
 
+def test_cli_archive_inspection_passes_explicit_safety_bounds(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    archive = tmp_path / "runtime.tar.gz"
+    observed = {}
+
+    def fake_inspect(path: Path, **kwargs):
+        observed["path"] = path
+        observed["kwargs"] = kwargs
+        return {
+            "archive_bytes": 1,
+            "archive_root": "python",
+            "archive_sha256": "a" * 64,
+            "logical_members_sha256": "b" * 64,
+            "member_count": 1,
+            "payload_multiset_sha256": "c" * 64,
+            "regular_file_count": 1,
+            "symlink_count": 0,
+            "total_regular_bytes": 1,
+        }
+
+    monkeypatch.setattr(cli, "inspect_runtime_archive", fake_inspect)
+
+    assert (
+        main(
+            [
+                "package",
+                "portable-runtime",
+                "--inspect-archive",
+                str(archive),
+                "--max-members",
+                "2500",
+                "--max-regular-bytes",
+                "80000000",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    assert observed == {
+        "path": archive,
+        "kwargs": {"max_members": 2500, "max_regular_bytes": 80000000},
+    }
+
+
+def test_cli_archive_inspection_bounds_require_inspection_mode(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    monkeypatch.setattr(
+        cli,
+        "materialize_portable_runtime",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must fail before materialization")),
+    )
+
+    assert main(["package", "portable-runtime", "--max-members", "2500", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["status"] == "ERROR_PORTABLE_RUNTIME_MODE_CONFLICT"
+    assert "--inspect-archive" in payload["detail"]
+
+
 def test_cli_archive_inspection_rejects_conflicting_modes(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     archive = tmp_path / "runtime.tar.gz"
