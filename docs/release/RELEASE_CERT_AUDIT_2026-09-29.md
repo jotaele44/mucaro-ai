@@ -105,7 +105,7 @@ of the rows above can move to PASS on this evidence.
 | F-5 | The packaged app binds loopback only and the backend has no TLS, so a phone cannot reach a released build. | T1 | 95% | DECIDED outside this release. Recorded as SD-012 (unadopted enhancement). |
 | F-6 | The rendered UI had no WebKit evidence. | T1 | 98% | PARTIAL. A Playwright WebKit leg on Linux was added and passed at `9422cd7`. macOS WKWebView and iOS Safari on a device are still unverified. |
 | F-7 | `current_state_snapshot_v1.json` (2026-09-24, `0bf5bf8`) described the app as a source-bound bash wrapper, with no receipts. | T1 | 97% | CLOSED by the snapshot refresh that accompanies this record |
-| F-8 | Two different artifacts are named `Mucaro AI.app`: the PyInstaller release app and the committed checkout launcher in draft PR #133. They differ in data directory and trust semantics. | T2 | 85% | OPEN (naming and positioning decision) |
+| F-8 | The packaged release artifact and the source-checkout bootstrap previously shared the visible name `Mucaro AI.app`. Draft PR #133 now separates them as `Mucaro AI.app` / `ai.mucaro.app` and `Mucaro AI Setup.app` / `ai.mucaro.launcher`, with an explicit regression preventing the checkout app from reusing the packaged name. | T2 | 95% | CANDIDATE-RESOLVED on PR #133 head `20864689ccdd5fb1a0f4df5217418f944c464d85`; remains OPEN on canonical `main` until exact-head execution and merge. |
 | F-9 | Windows and Linux have a source setup but no packaged or signed lane. | T1 | 99% | DECIDED outside this release. Recorded as SD-013 (unadopted enhancement). |
 | F-10 | `validate` fails on open PRs #114 and #117, and the V04 PRs overlap (#106, #108, #117). | T2 | 95% | OPEN |
 
@@ -114,11 +114,13 @@ of the rows above can move to PASS on this evidence.
 | Group | Rows | Count |
 | --- | --- | ---: |
 | Process and conduct: verified by auditing the record at certification | KERNEL-001/005/007–013/015–018/021/022, EXEC-DIRECTIVE-001 | 16 |
-| Workbench vectors | TGT-003 (GIS/OCR/Code/Artifacts workspaces), TGT-004/005/006/007/011/012/013/015/038, MATRIX-005/006/009/013 | 15 |
+| Workbench vectors | TGT-003 (GIS/OCR/Code/Artifacts workspaces), TGT-004/005/006/007/011/012/013/015/038, MATRIX-005/006/009/013 | 14 |
 | Invariants that mostly follow those vectors | INV-001/003/008–013/015/017/019–021, GOAL-003 | 14 |
 | Performance: no frozen thresholds | TGT-020, MATRIX-017 | 2 |
 | Security and recovery | TGT-021, MATRIX-016 | 2 |
 | Linked PR list and detail | MOB-F19 | 1 |
+
+The six group counts above are a partition of the 49 authoritative OPEN rows: `16 + 14 + 14 + 2 + 2 + 1 = 49`. The earlier draft labeled the Workbench group as 15 even though the row text enumerates 14 requirement IDs; the ledger denominator was correct and did not change.
 
 ## 6. Blockers by who can clear them
 
@@ -144,6 +146,6 @@ of the rows above can move to PASS on this evidence.
 
 ## 8. Blind spots
 
-- The PR #132 and #136 portable-lane receipts were judged from the workflow definitions and check conclusions; their uploaded artifacts were not opened.
+- The PR #136 portable-lane artifact `11047195637` was subsequently opened and independently checked: the downloaded artifact SHA-256 matched GitHub's recorded digest, and its receipts bind the x86_64 `0.1.23 -> 0.1.24` packaged lifecycle while explicitly leaving native arm64, clean-host, physical-input and signing gates false. PR #132's uploaded portable-lane artifact remains unopened here.
 - Rosetta and iOS Safari behavior are T4.
 - The KERNEL process rows were not audited, and the 45 KB release contract was not read in full.
