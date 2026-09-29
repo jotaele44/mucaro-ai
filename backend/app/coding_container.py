@@ -12,9 +12,9 @@ from typing import Any
 
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
-from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .container_runtime import ContainerRuntimeError, resolve_container_engine, validate_pinned_image
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 
 LOCAL_IMAGE_ID_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 
