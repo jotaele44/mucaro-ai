@@ -50,11 +50,17 @@ def _validated_spans(spans: list[dict[str, Any]]) -> list[dict[str, Any]]:
         row["span_index"] = span_index
         row["raw_text"] = text
         row["bbox"] = _bbox(raw)
-        row["page_index"] = int(raw.get("page_index", 0))
-        row["block_num"] = int(raw.get("block_num", 0))
-        row["paragraph_num"] = int(raw.get("paragraph_num", 0))
-        row["line_num"] = int(raw.get("line_num", 0))
-        row["word_num"] = int(raw.get("word_num", position + 1))
+        try:
+            row["page_index"] = int(raw.get("page_index", 0))
+            row["block_num"] = int(raw.get("block_num", 0))
+            row["paragraph_num"] = int(raw.get("paragraph_num", 0))
+            row["line_num"] = int(raw.get("line_num", 0))
+            row["word_num"] = int(raw.get("word_num", position + 1))
+        except (TypeError, ValueError) as exc:
+            raise OCRStructureError(
+                "ERROR_OCR_STRUCTURE_HIERARCHY",
+                f"span {span_index} has malformed page/block/paragraph/line/word fields",
+            ) from exc
         normalized.append(row)
     return normalized
 
@@ -103,6 +109,8 @@ def _unresolved(kind: str, spans: list[dict[str, Any]], reasons: list[str]) -> d
         "schema_version": OCR_STRUCTURE_SCHEMA_VERSION,
         "kind": kind,
         "status": "OCR_STRUCTURE_UNRESOLVED",
+        "epistemic_classification": "INFERENCE",
+        "certification_state": "UNRESOLVED",
         "span_count": len(spans),
         "residue": sorted(set(reasons)),
         "invariants": {
@@ -116,12 +124,17 @@ def _horizontal_overlap(left: dict[str, int], right: dict[str, int]) -> int:
     return max(0, min(left["x"] + left["width"], right["x"] + right["width"]) - max(left["x"], right["x"]))
 
 
+def _vertical_overlap(left: dict[str, int], right: dict[str, int]) -> int:
+    return max(0, min(left["y"] + left["height"], right["y"] + right["height"]) - max(left["y"], right["y"]))
+
+
 def reconstruct_multicolumn(
     spans: list[dict[str, Any]],
     *,
     min_columns: int = 2,
     min_lines_per_column: int = 2,
     overlap_ratio: float = 0.20,
+    min_vertical_overlap_ratio: float = 0.25,
 ) -> dict[str, Any]:
     rows = _validated_spans(spans)
     if not _one_page(rows):
@@ -184,6 +197,10 @@ def reconstruct_multicolumn(
     for left, right in zip(columns, columns[1:]):
         if left["bbox"]["x"] + left["bbox"]["width"] > right["bbox"]["x"]:
             reasons.append("COLUMN_BOUNDS_OVERLAP")
+        vertical_overlap = _vertical_overlap(left["bbox"], right["bbox"])
+        minimum_height = min(left["bbox"]["height"], right["bbox"]["height"])
+        if minimum_height <= 0 or vertical_overlap / minimum_height < min_vertical_overlap_ratio:
+            reasons.append("COLUMN_VERTICAL_OVERLAP_BELOW_MINIMUM")
 
     assigned = [index for column in columns for index in column["span_indices"]]
     expected = sorted(row["span_index"] for row in rows)
@@ -196,6 +213,8 @@ def reconstruct_multicolumn(
         "schema_version": OCR_STRUCTURE_SCHEMA_VERSION,
         "kind": "MULTI_COLUMN",
         "status": "OCR_MULTI_COLUMN_OK",
+        "epistemic_classification": "INFERENCE",
+        "certification_state": "CANDIDATE_NOT_IDENTITY",
         "page_index": rows[0]["page_index"],
         "column_count": len(columns),
         "columns": columns,
@@ -331,6 +350,8 @@ def reconstruct_table(
         "schema_version": OCR_STRUCTURE_SCHEMA_VERSION,
         "kind": "TABLE",
         "status": "OCR_TABLE_RECONSTRUCTION_OK",
+        "epistemic_classification": "INFERENCE",
+        "certification_state": "CANDIDATE_NOT_IDENTITY",
         "page_index": rows[0]["page_index"],
         "row_count": len(raw_grid),
         "column_count": len(headers),
@@ -422,6 +443,8 @@ def reconstruct_form(spans: list[dict[str, Any]], *, min_fields: int = 2) -> dic
         "schema_version": OCR_STRUCTURE_SCHEMA_VERSION,
         "kind": "FORM",
         "status": "OCR_FORM_RECONSTRUCTION_OK",
+        "epistemic_classification": "INFERENCE",
+        "certification_state": "CANDIDATE_NOT_IDENTITY",
         "page_index": rows[0]["page_index"],
         "field_count": len(fields),
         "fields": fields,
