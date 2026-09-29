@@ -200,6 +200,47 @@ def _derived_run_events(cfg: Settings) -> list[dict[str, Any]]:
     return events
 
 
+def verify_tool_audit_chain_view(cfg: Settings = settings) -> dict[str, Any]:
+    rows = read_json(cfg.processed_dir / TOOL_AUDIT_NAME, [])
+    events = [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+    previous: str | None = None
+    chained = 0
+    for index, event in enumerate(events):
+        digest = event.get("event_sha256")
+        if not digest:
+            if chained:
+                return {
+                    "status": "TOOL_AUDIT_CHAIN_BROKEN",
+                    "event_count": len(events),
+                    "index": index,
+                    "reason": "UNHASHED_EVENT_AFTER_CHAIN_START",
+                }
+            continue
+        body = {key: value for key, value in event.items() if key != "event_sha256"}
+        if canonical_sha256(body) != digest:
+            return {
+                "status": "TOOL_AUDIT_CHAIN_BROKEN",
+                "event_count": len(events),
+                "index": index,
+                "reason": "EVENT_HASH_MISMATCH",
+            }
+        if event.get("previous_event_sha256") != previous:
+            return {
+                "status": "TOOL_AUDIT_CHAIN_BROKEN",
+                "event_count": len(events),
+                "index": index,
+                "reason": "PREVIOUS_HASH_MISMATCH",
+            }
+        previous = str(digest)
+        chained += 1
+    return {
+        "status": "TOOL_AUDIT_CHAIN_OK",
+        "event_count": len(events),
+        "chained_event_count": chained,
+        "head_sha256": previous,
+    }
+
+
 def _derived_tool_events(cfg: Settings) -> list[dict[str, Any]]:
     rows = read_json(cfg.processed_dir / TOOL_AUDIT_NAME, [])
     events: list[dict[str, Any]] = []
@@ -328,6 +369,7 @@ def build_forensic_trail(cfg: Settings = settings, *, limit: int = 500) -> dict[
         raise ForensicTrailError("ERROR_FORENSIC_LIMIT", "limit must be between 1 and 5000")
 
     native_chain = verify_native_forensic_chain(cfg)
+    tool_chain = verify_tool_audit_chain_view(cfg)
     events = (
         load_native_forensic_events(cfg)
         + _derived_run_events(cfg)
@@ -350,7 +392,11 @@ def build_forensic_trail(cfg: Settings = settings, *, limit: int = 500) -> dict[
         if event_class in counts:
             counts[event_class] += 1
     returned = events[-limit:]
-    status = "FORENSIC_TRAIL_OK" if native_chain["status"] == "FORENSIC_NATIVE_CHAIN_OK" else "FORENSIC_TRAIL_FAIL"
+    status = (
+        "FORENSIC_TRAIL_OK"
+        if native_chain["status"] == "FORENSIC_NATIVE_CHAIN_OK" and tool_chain["status"] == "TOOL_AUDIT_CHAIN_OK"
+        else "FORENSIC_TRAIL_FAIL"
+    )
     return {
         "status": status,
         "schema_version": "mucaro-forensic-trail/1.0",
@@ -362,10 +408,12 @@ def build_forensic_trail(cfg: Settings = settings, *, limit: int = 500) -> dict[
         "events": returned,
         "trail_sha256": canonical_sha256(events),
         "native_event_chain": native_chain,
+        "tool_audit_chain": tool_chain,
         "invariants": {
             "event_count_closes": len(events) == sum(counts.values()),
             "returned_count_closes": len(returned) + (len(events) - len(returned)) == len(events),
             "native_chain_valid": native_chain["status"] == "FORENSIC_NATIVE_CHAIN_OK",
+            "tool_audit_chain_valid": tool_chain["status"] == "TOOL_AUDIT_CHAIN_OK",
             "private_payload_fields_omitted": True,
         },
         "limitations": [
