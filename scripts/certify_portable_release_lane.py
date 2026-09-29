@@ -72,9 +72,9 @@ def certify_portable_lane(
             and previous.get("status") == "PORTABLE_APP_VERIFIED"
             and clean_evidence.get("rollback") is True
         ),
-        "clean_machine_macos": (
+        "packaged_lifecycle_macos": (
             clean.get("schema_version") == "mucaro-external-release-evidence/1.0"
-            and clean.get("status") == "CLEAN_MACHINE_MACOS_VERIFIED"
+            and clean.get("status") == "PACKAGED_LIFECYCLE_VERIFIED"
             and clean_evidence.get("launch") is True
             and clean_evidence.get("representative_workflow") is True
         ),
@@ -103,15 +103,22 @@ def certify_portable_lane(
             "manifest_sha256": previous.get("manifest_sha256"),
             "status": previous.get("status"),
         },
-        "clean_machine_receipt": {
+        "packaged_lifecycle_receipt": {
             "path": str(clean_machine_receipt),
             "sha256": _sha256(clean_machine_receipt),
             "status": clean.get("status"),
         },
+        "scope": {
+            "runtime_manifest": str(RUNTIME_MANIFEST.relative_to(ROOT)),
+            "runtime_architecture": "x86_64",
+            "clean_host_certified": False,
+            "physical_input_certified": False,
+            "signing_notarization_certified": False,
+        },
         "limitations": [
-            "This certifies the credential-free portable embedded-runtime release lane only.",
-            "Developer ID signing and Apple notarization remain separate external gates.",
-            "A hosted runner is an isolated fresh runner, but literal physical-device double-click evidence remains a separate release requirement.",
+            "This certifies the credential-free x86_64 portable embedded-runtime packaged lifecycle on the reported hosted macOS runner only.",
+            "It does not independently certify host cleanliness or literal physical-device double-click input.",
+            "Developer ID signing, Apple notarization, and the Apple Silicon/arm64 release target remain separate gates.",
         ],
     }
     if output is not None:
