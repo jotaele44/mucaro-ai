@@ -22,6 +22,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -47,6 +49,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rendered-qa-${{ matrix.browser }}-${{ github.sha }}
+          name: rendered-qa-${{ matrix.browser }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/rendered-qa-${{ matrix.browser }}
           if-no-files-found: warn
