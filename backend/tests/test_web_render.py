@@ -208,6 +208,9 @@ def test_interaction_receipt_redacts_fill_select_and_javascript_inputs(
         ],
     )
     interaction_text = str(result["receipt"]["interaction"]["action_plan"])
+    assert "#name" not in interaction_text
+    assert "#choice" not in interaction_text
+    assert result["receipt"]["interaction"]["action_plan"][0]["selector_sha256"] == render._sha256_text("#name")
     assert raw_fill not in interaction_text
     assert raw_select not in interaction_text
     assert raw_script not in interaction_text
