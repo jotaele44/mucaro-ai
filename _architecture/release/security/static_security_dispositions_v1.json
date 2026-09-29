@@ -170,6 +170,14 @@
       "classification": "LOW",
       "rationale": "Maintainer-side RT-09 certification only. Redirects are accepted only when the final host remains in the frozen allowlist; response bytes are bounded and exact source identities are hashed before any retrieval-quality claim.",
       "evidence": "scripts/certify_retrieval_real_world_live.py::acquire"
+    },
+    {
+      "rule": "S310",
+      "path": "scripts/resolve_shadow_baseline.py",
+      "code": "with urllib.request.urlopen(request, timeout=30) as response:",
+      "classification": "LOW",
+      "rationale": "Maintainer-side Shadow QA baseline resolution only. Requests are confined to the fixed https://api.github.com host; repository input is constrained to owner/name, the workflow identifier is URL-encoded, and the scoped GitHub Actions token is used only for read-only workflow-run metadata.",
+      "evidence": "backend/tests/test_shadow_baseline.py"
     }
   ],
   "vulnerability_dispositions": []
