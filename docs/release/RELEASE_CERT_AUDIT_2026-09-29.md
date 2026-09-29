@@ -109,7 +109,7 @@ of the rows above can move to PASS on this evidence.
 | F-7 | `current_state_snapshot_v1.json` (2026-09-24, `0bf5bf8`) described the app as a source-bound bash wrapper, with no receipts. | T1 | 97% | CLOSED by the snapshot refresh that accompanies this record |
 | F-8 | The packaged release artifact and the source-checkout bootstrap previously shared the visible name `Mucaro AI.app`. Draft PR #133 now separates them as `Mucaro AI.app` / `ai.mucaro.app` and `Mucaro AI Setup.app` / `ai.mucaro.launcher`, with an explicit regression preventing the checkout app from reusing the packaged name. | T2 | 95% | CANDIDATE-RESOLVED on PR #133 head `20864689ccdd5fb1a0f4df5217418f944c464d85`; remains OPEN on canonical `main` until exact-head execution and merge. |
 | F-9 | Windows and Linux have a source setup but no packaged or signed lane. | T1 | 99% | DECIDED outside this release. Recorded as SD-013 (unadopted enhancement). |
-| F-10 | `validate` fails on open PRs #114 and #117, and the V04 PRs overlap (#106, #108, #117). | T2 | 95% | OPEN |
+| F-10 | Open workstream branches overlap but are not one duplicate set. PR #117 contains all three commits from #114, plus V02 checkpoint hardening and its V04 model-failover delta. PRs #106, #108 and #117 are mutually diverged: #106 is the narrow provider-attempt identity slice; #108 is the larger provider-failover + V05 tool-integrity slice; #117 is the mixed permission/checkpoint/model-failover aggregate. | T2 | 99% | OPEN. Preserve unique deltas; do not merge #117 as if it were an independent V04-only branch. Rebase/reconstruct the required work on current main, then supersede only branches whose unique delta is preserved elsewhere. |
 
 ## 5. OPEN residue (49 rows)
 
