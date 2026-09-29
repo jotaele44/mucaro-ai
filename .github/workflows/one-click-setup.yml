@@ -1,0 +1,133 @@
+name: One-click setup
+
+# Runs the real double-click files ("Mucaro AI.command" / "Mucaro AI.cmd") on clean runners.
+# PATH is cut down to OS directories (plus tripwire stubs on macOS/Linux), so the job fails if
+# setup ever depends on a preinstalled Python, Node, npm, or git.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "Mucaro AI.command"
+      - "Mucaro AI.cmd"
+      - ".gitattributes"
+      - "scripts/one_click*"
+      - "scripts/launch_app.py"
+      - "scripts/preflight.py"
+      - "scripts/ingest_folder.py"
+      - "pyproject.toml"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
+      - ".github/workflows/one-click-setup.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "Mucaro AI.command"
+      - "Mucaro AI.cmd"
+      - "scripts/one_click*"
+      - "scripts/launch_app.py"
+      - "pyproject.toml"
+      - "frontend/package-lock.json"
+      - ".github/workflows/one-click-setup.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  posix:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macOS arm64
+          - os: macos-15-intel
+            label: macOS Intel
+          - os: ubuntu-latest
+            label: Linux x86_64
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prepare clean user environment
+        run: |
+          mkdir -p "$RUNNER_TEMP/home" "$RUNNER_TEMP/stubs"
+          for tool in python python3 pip pip3 node npm npx git; do
+            printf '#!/bin/sh\necho "%s $*" >> "%s/tripwire.txt"\nexit 99\n' "$tool" "$RUNNER_TEMP" > "$RUNNER_TEMP/stubs/$tool"
+            chmod +x "$RUNNER_TEMP/stubs/$tool"
+          done
+      - name: First double-click (full setup, smoke launch)
+        run: |
+          set -o pipefail
+          env -i HOME="$RUNNER_TEMP/home" PATH="$RUNNER_TEMP/stubs:/usr/bin:/bin:/usr/sbin:/sbin" TERM=dumb LANG=en_US.UTF-8 CI=true \
+            "./Mucaro AI.command" --smoke-test --no-browser 2>&1 | tee "$RUNNER_TEMP/run1.log"
+          grep -q "ONE_CLICK_SETUP_OK" "$RUNNER_TEMP/run1.log"
+          grep -q "DESKTOP_SMOKE_OK" "$RUNNER_TEMP/run1.log"
+      - name: Second double-click (fast path)
+        run: |
+          set -o pipefail
+          start=$(date +%s)
+          env -i HOME="$RUNNER_TEMP/home" PATH="$RUNNER_TEMP/stubs:/usr/bin:/bin:/usr/sbin:/sbin" TERM=dumb LANG=en_US.UTF-8 CI=true \
+            "./Mucaro AI.command" --smoke-test --no-browser 2>&1 | tee "$RUNNER_TEMP/run2.log"
+          elapsed=$(( $(date +%s) - start ))
+          echo "second run took ${elapsed}s"
+          grep -q "ONE_CLICK_FAST_PATH" "$RUNNER_TEMP/run2.log"
+          grep -q "DESKTOP_SMOKE_OK" "$RUNNER_TEMP/run2.log"
+          test "$elapsed" -lt 90
+      - name: Verify isolation
+        run: |
+          if [ -s "$RUNNER_TEMP/tripwire.txt" ]; then echo "setup ran a PATH tool:"; cat "$RUNNER_TEMP/tripwire.txt"; exit 1; fi
+          grep -q "^home = $(pwd -P)/.mucaro-runtime/python/" .venv/pyvenv.cfg
+          test -z "$(ls -A "$RUNNER_TEMP/home")"
+          test -z "$(git status --porcelain)"
+      - name: Upload setup logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: one-click-logs-${{ matrix.os }}
+          path: .mucaro-runtime/logs/
+          if-no-files-found: ignore
+
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: First double-click (full setup, smoke launch)
+        shell: cmd
+        run: |
+          set "PATH=%SystemRoot%\System32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SystemRoot%\System32\WindowsPowerShell\v1.0"
+          call "Mucaro AI.cmd" --smoke-test --no-browser > "%RUNNER_TEMP%\run1.log" 2>&1
+          set "RC=%ERRORLEVEL%"
+          type "%RUNNER_TEMP%\run1.log"
+          if not "%RC%"=="0" exit /b %RC%
+          findstr /c:"ONE_CLICK_SETUP_OK" "%RUNNER_TEMP%\run1.log" || exit /b 1
+          findstr /c:"DESKTOP_SMOKE_OK" "%RUNNER_TEMP%\run1.log" || exit /b 1
+      - name: Second double-click (fast path)
+        shell: cmd
+        run: |
+          set "PATH=%SystemRoot%\System32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SystemRoot%\System32\WindowsPowerShell\v1.0"
+          call "Mucaro AI.cmd" --smoke-test --no-browser > "%RUNNER_TEMP%\run2.log" 2>&1
+          set "RC=%ERRORLEVEL%"
+          type "%RUNNER_TEMP%\run2.log"
+          if not "%RC%"=="0" exit /b %RC%
+          findstr /c:"ONE_CLICK_FAST_PATH" "%RUNNER_TEMP%\run2.log" || exit /b 1
+          findstr /c:"DESKTOP_SMOKE_OK" "%RUNNER_TEMP%\run2.log" || exit /b 1
+      - name: Verify isolation
+        shell: pwsh
+        run: |
+          $cfg = Get-Content .venv\pyvenv.cfg | Where-Object { $_ -match '^home\s*=' }
+          $expected = (Join-Path (Get-Location).Path ".mucaro-runtime\python\")
+          if (-not ($cfg -replace '^home\s*=\s*', '').StartsWith($expected, [StringComparison]::OrdinalIgnoreCase)) { throw "venv is not on the private Python: $cfg" }
+          $dirty = git status --porcelain
+          if ($dirty) { throw "setup left tracked changes:`n$dirty" }
+      - name: Upload setup logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: one-click-logs-windows
+          path: .mucaro-runtime/logs/
+          if-no-files-found: ignore

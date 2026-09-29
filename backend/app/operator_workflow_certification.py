@@ -268,7 +268,7 @@ def build_operator_workflow_certification(
                 approved.get("status") == "TOOL_CALL_APPROVED"
                 and executed.get("status") == "TOOL_CALL_EXECUTED"
                 and executed.get("result", {}).get("status") == "SOURCE_LIBRARY_STATUS_OK"
-                and tool_events == ["TOOL_CALL_REQUESTED", "TOOL_CALL_APPROVED", "TOOL_CALL_EXECUTED"]
+                and tool_events == ["TOOL_CALL_REQUESTED", "TOOL_CALL_APPROVED", "TOOL_CALL_STARTED", "TOOL_CALL_EXECUTED"]
             )
             checks.append(
                 _check(

@@ -1,0 +1,409 @@
+{
+  "schema_version": "MUCARO_RT09_REAL_WORLD_CORPUS_DENOMINATOR/1.0",
+  "corpus_id": "mucaro-rt09-standards-public-records-v1",
+  "scope": "24 authoritative standards/public-record documents across IETF, W3C and NIST",
+  "thresholds": {
+    "min_sources": 24,
+    "min_queries": 24,
+    "min_formats": 3,
+    "min_total_bytes": 2000000
+  },
+  "acquisition": {
+    "max_source_bytes": 12000000,
+    "timeout_seconds": 45,
+    "allowed_hosts": [
+      "www.rfc-editor.org",
+      "www.w3.org",
+      "nvlpubs.nist.gov"
+    ],
+    "redirects_must_remain_allowed_host": true
+  },
+  "sources": [
+    {
+      "source_id": "rfc9110",
+      "path": "rfc9110.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc9110.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc9111",
+      "path": "rfc9111.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc9111.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc9112",
+      "path": "rfc9112.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc9112.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc9113",
+      "path": "rfc9113.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc9113.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc9000",
+      "path": "rfc9000.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc9000.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc8446",
+      "path": "rfc8446.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc8446.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc8259",
+      "path": "rfc8259.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc8259.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc6455",
+      "path": "rfc6455.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc6455.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc7519",
+      "path": "rfc7519.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc7519.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc6749",
+      "path": "rfc6749.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc6749.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc3986",
+      "path": "rfc3986.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc3986.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc3987",
+      "path": "rfc3987.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc3987.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc5322",
+      "path": "rfc5322.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc5322.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc2045",
+      "path": "rfc2045.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc2045.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc2046",
+      "path": "rfc2046.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc2046.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc6531",
+      "path": "rfc6531.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc6531.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc6376",
+      "path": "rfc6376.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc6376.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc7208",
+      "path": "rfc7208.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc7208.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc6265",
+      "path": "rfc6265.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc6265.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "rfc7239",
+      "path": "rfc7239.txt",
+      "url": "https://www.rfc-editor.org/rfc/rfc7239.txt",
+      "source_format": "txt",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "wcag22",
+      "path": "wcag22.html",
+      "url": "https://www.w3.org/TR/WCAG22/",
+      "source_format": "html",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "csscolor4",
+      "path": "css-color-4.html",
+      "url": "https://www.w3.org/TR/css-color-4/",
+      "source_format": "html",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "nist_ai_rmf",
+      "path": "nist-ai-rmf-1.0.pdf",
+      "url": "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf",
+      "source_format": "pdf",
+      "origin": "public_record",
+      "synthetic": false
+    },
+    {
+      "source_id": "nist_csf2",
+      "path": "nist-csf-2.0.pdf",
+      "url": "https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf",
+      "source_format": "pdf",
+      "origin": "public_record",
+      "synthetic": false
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "rt09-q01",
+      "query": "HTTP Semantics RFC 9110",
+      "expected_source_ids": [
+        "rfc9110"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q02",
+      "query": "HTTP Caching RFC 9111",
+      "expected_source_ids": [
+        "rfc9111"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q03",
+      "query": "HTTP/1.1 RFC 9112",
+      "expected_source_ids": [
+        "rfc9112"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q04",
+      "query": "HTTP/2 RFC 9113",
+      "expected_source_ids": [
+        "rfc9113"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q05",
+      "query": "QUIC UDP-Based Multiplexed and Secure Transport RFC 9000",
+      "expected_source_ids": [
+        "rfc9000"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q06",
+      "query": "TLS Protocol Version 1.3 RFC 8446",
+      "expected_source_ids": [
+        "rfc8446"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q07",
+      "query": "JSON Data Interchange Format RFC 8259",
+      "expected_source_ids": [
+        "rfc8259"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q08",
+      "query": "WebSocket Protocol RFC 6455",
+      "expected_source_ids": [
+        "rfc6455"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q09",
+      "query": "JSON Web Token JWT RFC 7519",
+      "expected_source_ids": [
+        "rfc7519"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q10",
+      "query": "OAuth 2.0 Authorization Framework RFC 6749",
+      "expected_source_ids": [
+        "rfc6749"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q11",
+      "query": "Uniform Resource Identifier Generic Syntax RFC 3986",
+      "expected_source_ids": [
+        "rfc3986"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q12",
+      "query": "Internationalized Resource Identifiers RFC 3987",
+      "expected_source_ids": [
+        "rfc3987"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q13",
+      "query": "Internet Message Format RFC 5322",
+      "expected_source_ids": [
+        "rfc5322"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q14",
+      "query": "MIME Part One Internet Message Bodies RFC 2045",
+      "expected_source_ids": [
+        "rfc2045"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q15",
+      "query": "RFC 2046 Freed Borenstein Multipurpose Internet Mail Extensions MIME Part Two Media Types",
+      "expected_source_ids": [
+        "rfc2046"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q16",
+      "query": "SMTP Extension Internationalized Email RFC 6531",
+      "expected_source_ids": [
+        "rfc6531"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q17",
+      "query": "DomainKeys Identified Mail DKIM Signatures RFC 6376",
+      "expected_source_ids": [
+        "rfc6376"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q18",
+      "query": "Sender Policy Framework SPF RFC 7208",
+      "expected_source_ids": [
+        "rfc7208"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q19",
+      "query": "HTTP State Management Mechanism RFC 6265",
+      "expected_source_ids": [
+        "rfc6265"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q20",
+      "query": "Forwarded HTTP Extension RFC 7239",
+      "expected_source_ids": [
+        "rfc7239"
+      ],
+      "category": "txt"
+    },
+    {
+      "query_id": "rt09-q21",
+      "query": "Web Content Accessibility Guidelines WCAG 2.2",
+      "expected_source_ids": [
+        "wcag22"
+      ],
+      "category": "html"
+    },
+    {
+      "query_id": "rt09-q22",
+      "query": "CSS Color Module Level 4",
+      "expected_source_ids": [
+        "csscolor4"
+      ],
+      "category": "html"
+    },
+    {
+      "query_id": "rt09-q23",
+      "query": "Artificial Intelligence Risk Management Framework AI RMF 1.0",
+      "expected_source_ids": [
+        "nist_ai_rmf"
+      ],
+      "category": "pdf"
+    },
+    {
+      "query_id": "rt09-q24",
+      "query": "NIST Cybersecurity Framework CSF 2.0",
+      "expected_source_ids": [
+        "nist_csf2"
+      ],
+      "category": "pdf"
+    }
+  ]
+}

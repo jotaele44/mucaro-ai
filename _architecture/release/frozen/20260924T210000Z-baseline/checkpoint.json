@@ -1,0 +1,27 @@
+{
+  "denominator": {
+    "arithmetic_closes": true,
+    "by_scope": {
+      "EXTERNALLY_BLOCKED": 1,
+      "IN_SCOPE": 136,
+      "NOT_APPLICABLE": 1
+    },
+    "by_state": {
+      "BLOCKED": 2,
+      "FAIL": 0,
+      "NOT_APPLICABLE": 1,
+      "OPEN": 118,
+      "PASS": 12,
+      "PROVISIONAL": 5
+    },
+    "total": 138
+  },
+  "files": {
+    "blocker_ledger_v1.json": "bc30e78280bc07b5e963d44a8092dbc21d012b4085c0c2c49355d67e25c81554",
+    "contradiction_ledger_v1.json": "ccda917efbff1dcab38517f97d766f2fb030ca31d5afb402f454959d704c56b1",
+    "release_scope_manifest_v1.json": "a152463af6f57e9e12600c5c1b53a91fe11c4d709fa68cc5466ce7fdc8918227",
+    "scope_delta_ledger_v1.json": "cfb0e600adc28f3d32ce68525f4101857d663a1f82ad5c2a7bd5169df1d7b71c"
+  },
+  "frozen_utc": "2026-09-24T20:43:49Z",
+  "label": "20260924T210000Z-baseline"
+}

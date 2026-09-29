@@ -85,9 +85,17 @@ def certify_clean_machine_macos(
     if current_verify.get("status") != "PORTABLE_APP_VERIFIED" or previous_verify.get("status") != "PORTABLE_APP_VERIFIED":
         raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_PORTABLE_VERIFY", "portable source bundle verification failed")
 
-    previous_head = str(_manifest(previous).get("head_sha"))
+    current_manifest = _manifest(current)
+    previous_manifest = _manifest(previous)
+    current_version = current_manifest.get("release_version")
+    previous_version = previous_manifest.get("release_version")
+    if not isinstance(current_version, str) or not isinstance(previous_version, str) or not current_version or not previous_version:
+        raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_VERSION_MISSING", "both portable apps need a bound release version")
+    previous_head = str(previous_manifest.get("head_sha"))
     if previous_head == expected_head:
         raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_PREVIOUS_HEAD", "previous app must bind to a distinct Git head")
+    if current_version == previous_version:
+        raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_SAME_VERSION", "upgrade and rollback require distinct release versions")
 
     root.mkdir(parents=True, exist_ok=True)
     previous_install = install_portable_macos_app(previous, install_root=root)
@@ -96,8 +104,12 @@ def certify_clean_machine_macos(
     launcher = installed / "Contents/MacOS/mucaro-ai"
     app_root = installed / "Contents/Resources/app"
     embedded_python = installed / "Contents/Resources/runtime/bin/python3"
-    env = os.environ.copy()
+    env = {key: value for key, value in os.environ.items() if not key.startswith("PYTHON")}
     env["PYTHONPATH"] = os.pathsep.join([str(app_root), str(app_root / "backend")])
+    env["PYTHONNOUSERSITE"] = "1"
+    env["PYTHONSAFEPATH"] = "1"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["MUCARO_AI_DATA_DIR"] = str(root / "user-data")
 
     launch = _run(
         [str(launcher), "--smoke-test", "--no-browser", "--skip-build", "--port", str(port)],
@@ -106,11 +118,19 @@ def certify_clean_machine_macos(
         runner=runner,
     )
     workflow = _run(
-        [str(embedded_python), str(app_root / "scripts/certify_operator_workflow.py")],
+        [str(embedded_python), "-s", "-P", "-B", str(app_root / "scripts/certify_operator_workflow.py")],
         cwd=app_root,
         env=env,
         runner=runner,
     )
+    try:
+        post_launch_verify = verify_portable_macos_app(installed, expected_head=expected_head)
+    except PortableRuntimeError as exc:
+        post_launch_verify = {
+            "status": "PORTABLE_APP_VERIFY_FAILED",
+            "failed_checks": [exc.status],
+            "detail": exc.detail,
+        }
     rollback = rollback_portable_macos_app(install_root=root)
     rollback_head = str(rollback.get("installation", {}).get("head_sha") or "")
     reinstall = install_portable_macos_app(current, install_root=root)
@@ -120,6 +140,7 @@ def certify_clean_machine_macos(
         "install": current_install.get("status") == "PORTABLE_INSTALL_OK",
         "launch": launch["status"] == "PASS",
         "representative_workflow": workflow["status"] == "PASS",
+        "post_launch_bundle_immutable": post_launch_verify.get("status") == "PORTABLE_APP_VERIFIED",
         "reinstall": reinstall.get("status") == "PORTABLE_INSTALL_OK" and reinstalled_head == expected_head,
         "rollback": rollback.get("status") == "PORTABLE_ROLLBACK_OK" and rollback_head == previous_head,
     }
@@ -130,22 +151,25 @@ def certify_clean_machine_macos(
         "clean_machine": {
             "install_root": str(root),
             "previous_head": previous_head,
+            "previous_version": previous_version,
+            "current_version": current_version,
             "current_head": expected_head,
             "previous_install": previous_install,
             "current_install": current_install,
             "launch": launch,
             "representative_workflow": workflow,
+            "post_launch_bundle_verification": post_launch_verify,
             "rollback": rollback,
             "reinstall": reinstall,
         },
-        "basis": "distinct-version install/launch/workflow/rollback/reinstall executed with the embedded portable runtime on macOS",
+        "basis": "packaged lifecycle executed with the embedded portable runtime on macOS; host cleanliness has not been established",
         "limitations": [
             "The operator must run this on a genuinely clean macOS machine for the receipt to qualify as clean-machine evidence.",
             "This function cannot independently prove the machine was clean before execution; release procedure must preserve host identity and setup evidence.",
             "Signing/notarization is a separate external gate.",
         ],
     }
-    receipt["status"] = "CLEAN_MACHINE_MACOS_VERIFIED" if all(evidence.values()) else "CLEAN_MACHINE_MACOS_BLOCKED"
+    receipt["status"] = "PACKAGED_LIFECYCLE_VERIFIED" if all(evidence.values()) else "PACKAGED_LIFECYCLE_BLOCKED"
     if output_path is not None:
         target = Path(output_path).expanduser().resolve()
         target.parent.mkdir(parents=True, exist_ok=True)

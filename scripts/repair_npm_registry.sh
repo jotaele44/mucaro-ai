@@ -30,7 +30,7 @@ fund=false
 audit=true
 NPMRC
 
-npm config set registry https://registry.npmjs.org/
+# The registry is pinned by frontend/.npmrc and the --registry flag; the user's global npm config is left untouched.
 npm cache verify
 cd frontend
 rm -rf node_modules

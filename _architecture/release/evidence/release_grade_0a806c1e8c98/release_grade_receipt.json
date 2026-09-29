@@ -1,0 +1,253 @@
+{
+  "command": [
+    "/home/user/mucaro-ai/.venv/bin/python",
+    "scripts/certify_release_grade.py",
+    "--macos-build-receipt",
+    "/tmp/claude-0/-home-user-mucaro-ai/aad4a389-683b-5739-b0f1-bc1961836c92/scratchpad/ev0a8/build_receipt.json",
+    "--macos-e2e-receipt",
+    "/tmp/claude-0/-home-user-mucaro-ai/aad4a389-683b-5739-b0f1-bc1961836c92/scratchpad/ev0a8/e2e_receipt.json",
+    "--hosted-ci-receipt",
+    "/tmp/claude-0/-home-user-mucaro-ai/aad4a389-683b-5739-b0f1-bc1961836c92/scratchpad/ci0a8/hosted_ci_evidence.json"
+  ],
+  "created_utc": "2026-09-26T20:26:54Z",
+  "head_sha": "0a806c1e8c98cc159568fea898a76a30189b0d1c",
+  "payload": {
+    "blocking_gates": [
+      "clean_machine_macos",
+      "distinct_version_upgrade_rollback",
+      "portable_embedded_runtime",
+      "portable_install_reinstall_smoke",
+      "release_scope",
+      "signed_notarized_installer"
+    ],
+    "certification_rule": "every mandatory gate must be PASS and the release-scope terminal rule must hold; BLOCKED and FAIL both prohibit release-grade certification",
+    "final_release_manifest": {
+      "path": "data/exports/release_manifests/final_release_manifest-0a806c1e8c98.json",
+      "sha256": "7732133bc44c37e094e2453de177b0ad310e39f1f24ffaac63b5a5a49d7564ad"
+    },
+    "gate_sources": {
+      "developer_environment_security": "informational only: the certifier's own shell, not the shipped configuration",
+      "hosted_ci_current_head": "hosted CI receipt for this head, or for a merge commit whose tree equals it",
+      "security_profile": "runtime security report of the packaged app in the exact-head macOS E2E receipt"
+    },
+    "gates": [
+      {
+        "command": null,
+        "detail": "clean",
+        "name": "clean_worktree",
+        "status": "PASS"
+      },
+      {
+        "command": [
+          "/home/user/mucaro-ai/.venv/bin/python",
+          "scripts/certify_release.py"
+        ],
+        "detail": "CERTIFY_RELEASE_OK",
+        "name": "local_release",
+        "status": "PASS"
+      },
+      {
+        "command": [
+          "/home/user/mucaro-ai/.venv/bin/python",
+          "scripts/certify_fresh_clone.py",
+          "--ref",
+          "0a806c1e8c98cc159568fea898a76a30189b0d1c"
+        ],
+        "detail": "FRESH_CLONE_CERT_OK path=/tmp/mucaro-ai-fresh-clone-onkh35_v/mucaro-ai",
+        "name": "fresh_clone",
+        "status": "PASS"
+      },
+      {
+        "command": [
+          "/home/user/mucaro-ai/.venv/bin/python",
+          "scripts/certify_python_distribution.py"
+        ],
+        "detail": "PYTHON_DIST_CERT_OK wheel=/home/user/mucaro-ai/data/exports/python_dist/mucaro_ai-0.1.23-py3-none-any.whl sdist=/home/user/mucaro-ai/data/exports/python_dist/mucaro_ai-0.1.23.tar.gz",
+        "name": "python_distribution",
+        "status": "PASS"
+      },
+      {
+        "command": [
+          "/home/user/mucaro-ai/.venv/bin/python",
+          "scripts/certify_operator_workflow.py"
+        ],
+        "detail": "PASS tool_approval_execution_audit events=TOOL_CALL_REQUESTED,TOOL_CALL_APPROVED,TOOL_CALL_STARTED,TOOL_CALL_EXECUTED",
+        "name": "representative_operator_workflow",
+        "status": "PASS"
+      },
+      {
+        "command": [
+          "/home/user/mucaro-ai/.venv/bin/python",
+          "scripts/certify_retrieval_quality.py"
+        ],
+        "detail": "RETRIEVAL_QUALITY_CERT_OK",
+        "name": "retrieval_benchmark",
+        "status": "PASS"
+      },
+      {
+        "command": [
+          "/home/user/mucaro-ai/.venv/bin/python",
+          "scripts/certify_gis_quality.py"
+        ],
+        "detail": "PASS raster_d8_flow raster_d8_missing_complete_neighborhood_fails_closed observed=ERROR_GIS_D8_NO_COMPLETE_NEIGHBORHOOD expected=ERROR_GIS_D8_NO_COMPLETE_NEIGHBORHOOD",
+        "name": "gis_benchmark",
+        "status": "PASS"
+      },
+      {
+        "command": [
+          "/home/user/mucaro-ai/.venv/bin/python",
+          "scripts/certify_security_gates.py"
+        ],
+        "detail": "SECURITY_GATES_PASS",
+        "name": "security_gates",
+        "status": "PASS"
+      },
+      {
+        "command": null,
+        "detail": "packaged app: production profile, SECURITY_OK, cors=['http://127.0.0.1:49189']",
+        "name": "security_profile",
+        "status": "PASS"
+      },
+      {
+        "command": [
+          "/home/user/mucaro-ai/.venv/bin/python",
+          "scripts/mucaro.py",
+          "security",
+          "status",
+          "--host",
+          "127.0.0.1",
+          "--format",
+          "json"
+        ],
+        "detail": "profile=local status=SECURITY_WARN",
+        "name": "developer_environment_security",
+        "status": "INFO"
+      },
+      {
+        "command": [
+          "/home/user/mucaro-ai/.venv/bin/python",
+          "scripts/mucaro.py",
+          "package",
+          "build",
+          "--format",
+          "json"
+        ],
+        "detail": "}",
+        "name": "package_build",
+        "status": "PASS"
+      },
+      {
+        "command": [
+          "/home/user/mucaro-ai/.venv/bin/python",
+          "scripts/certify_source_artifact.py",
+          "/home/user/mucaro-ai/data/exports/packages/mucaro-ai-0.1.23-0a806c1e8c98-artifact-manifest.json"
+        ],
+        "detail": "SOURCE_ARTIFACT_CERT_OK path=/tmp/mucaro-ai-source-artifact-i198rooh/mucaro-ai-0.1.23",
+        "name": "source_artifact_installability",
+        "status": "PASS"
+      },
+      {
+        "command": null,
+        "detail": "MACOS_APP_BUILD_OK sha256=ccd63d49ccbbbc213d25f7c941437d471b9c8def9777ccd20bbbb2f5c4235661",
+        "name": "macos_app_build",
+        "status": "PASS"
+      },
+      {
+        "command": null,
+        "detail": "MACOS_APP_E2E_PASS sha256=387d8cb7fbe43a286bdce1a8b03073948c748e447c7ba49d46282b75768b4e6d",
+        "name": "macos_app_e2e",
+        "status": "PASS"
+      },
+      {
+        "command": null,
+        "detail": "required external evidence receipt not supplied",
+        "name": "signed_notarized_installer",
+        "status": "BLOCKED"
+      },
+      {
+        "command": null,
+        "detail": "--portable-runtime-dir not supplied",
+        "name": "portable_embedded_runtime",
+        "status": "BLOCKED"
+      },
+      {
+        "command": null,
+        "detail": "portable app or --portable-install-root unavailable",
+        "name": "portable_install_reinstall_smoke",
+        "status": "BLOCKED"
+      },
+      {
+        "command": null,
+        "detail": "current/previous portable apps and install root are required",
+        "name": "distinct_version_upgrade_rollback",
+        "status": "BLOCKED"
+      },
+      {
+        "command": null,
+        "detail": "required external evidence receipt not supplied",
+        "name": "clean_machine_macos",
+        "status": "BLOCKED"
+      },
+      {
+        "command": null,
+        "detail": "tested merge e3cfb5fc03df has the same tree as 0a806c1e8c98; sha256=344bf89ad5894dfe129f40970bb9e5afc269572e6161b6d28eb85cfa6a8e9c7f",
+        "name": "hosted_ci_current_head",
+        "status": "PASS"
+      },
+      {
+        "command": null,
+        "detail": "data/exports/release_manifests/final_release_manifest-0a806c1e8c98.json sha256=7732133bc44c37e094e2453de177b0ad310e39f1f24ffaac63b5a5a49d7564ad missing=none",
+        "name": "final_release_manifest",
+        "status": "PASS"
+      },
+      {
+        "command": null,
+        "detail": "MUCARO_AI_RELEASE_STATUS_PROVISIONAL residue={\"active_blockers\": [\"BLK-LLM-001\", \"BLK-PHYS-001\", \"BLK-SIGN-001\", \"BLK-SPEC-001\", \"BLK-WEB-001\"], \"blocked\": [\"KERNEL-003\", \"MATRIX-018\", \"TGT-001\", \"TGT-009\", \"TGT-026\", \"TGT-028\"], \"externally_blocked\": [\"TGT-027\"], \"open\": [\"EXEC-DIRECTIVE-001\", \"GOAL-003\", \"INV-001\", \"INV-003\", \"INV-008\", \"INV-009\", \"INV-010\", \"INV-011\", \"INV-012\", \"INV-013\", \"INV-015\", \"INV-017\", \"INV-019\", \"INV-020\", \"INV-021\", \"KERNEL-001\", \"KERNEL-005\", \"KERNEL-007\", \"KERNEL-008\", \"KERNEL-009\", \"KERNEL-010\", \"KERNEL-011\", \"KERNEL-012\", \"KERNEL-013\", \"KERNEL-015\", \"KERNEL-016\", \"KERNEL-017\", \"KERNEL-018\", \"KERNEL-021\", \"KERNEL-022\", \"MATRIX-005\", \"MATRIX-006\", \"MATRIX-007\", \"MATRIX-009\", \"MATRIX-013\", \"MATRIX-016\", \"MATRIX-017\", \"MOB-F19\", \"TGT-003\", \"TGT-004\", \"TGT-005\", \"TGT-006\", \"TGT-007\", \"TGT-011\", \"TGT-012\", \"TGT-013\", \"TGT-015\", \"TGT-020\", \"TGT-021\", \"TGT-038\"], \"open_specification_bindings\": [\"Mucaro AI Release-Grade Workbench Specification\"], \"provisional\": [\"GOAL-001\", \"GOAL-002\", \"INV-004\", \"INV-005\", \"INV-007\", \"INV-018\", \"INV-022\", \"MATRIX-008\", \"MATRIX-010\", \"MATRIX-015\", \"MATRIX-019\", \"MATRIX-020\", \"MOB-F01\", \"MOB-F15\", \"MOB-F20\", \"TGT-002\", \"TGT-008\", \"TGT-014\", \"TGT-016\", \"TGT-019\", \"TGT-024\", \"TGT-029\", \"TGT-034\", \"TGT-035\", \"TGT-036\"]}",
+        "name": "release_scope",
+        "status": "BLOCKED"
+      }
+    ],
+    "lane_decision": "Both release lanes are required for release-grade certification (user decision 2026-09-26).",
+    "release_lanes": {
+      "native_app": [
+        "macos_app_build",
+        "macos_app_e2e",
+        "security_profile"
+      ],
+      "portable_runtime": [
+        "portable_embedded_runtime",
+        "portable_install_reinstall_smoke",
+        "distinct_version_upgrade_rollback",
+        "clean_machine_macos"
+      ]
+    },
+    "release_scope_status": "MUCARO_AI_RELEASE_STATUS_PROVISIONAL",
+    "release_status_line": "MUCARO AI RELEASE STATUS = PROVISIONAL",
+    "required_gate_names": [
+      "clean_worktree",
+      "local_release",
+      "fresh_clone",
+      "python_distribution",
+      "representative_operator_workflow",
+      "retrieval_benchmark",
+      "gis_benchmark",
+      "security_gates",
+      "package_build",
+      "source_artifact_installability",
+      "macos_app_build",
+      "macos_app_e2e",
+      "security_profile",
+      "portable_embedded_runtime",
+      "portable_install_reinstall_smoke",
+      "distinct_version_upgrade_rollback",
+      "clean_machine_macos",
+      "signed_notarized_installer",
+      "hosted_ci_current_head",
+      "final_release_manifest",
+      "release_scope"
+    ]
+  },
+  "receipt_type": "release_grade",
+  "schema_version": "mucaro_release_receipt_v1",
+  "status": "MUCARO_AI_RELEASE_GRADE_BLOCKED"
+}

@@ -1,6 +1,30 @@
 # Desktop Launcher Mode
 
+> **Source setup, not a release artifact.** `Mucaro AI.command` / `Mucaro AI.cmd` is the supported
+> way to run Mucaro from a source checkout. Release-grade certification requires two packaged lanes,
+> and neither is this launcher:
+>
+> - the native app, `Mucaro AI.app` with its own window: see [release/MACOS_APP.md](release/MACOS_APP.md);
+> - the portable embedded-runtime app: see [PACKAGING_POLICY.md](PACKAGING_POLICY.md#portable-runtime-and-application).
+>
+> The source-bound bundle below needs a checkout and a Python environment, and opens the system
+> browser (contradiction RC-006, adjudicated).
+
 Desktop Launcher Mode lets Mucaro AI run with one command.
+
+## Double-click setup and launch
+
+`Mucaro AI.command` (macOS) and `Mucaro AI.cmd` (Windows) set up everything on first use and then
+run `scripts/launch_app.py --auto-port --exit-if-running`. See `docs/ONE_CLICK_SETUP.md`.
+
+Launcher options used by the double-click files:
+
+| Option | Behavior |
+|---|---|
+| `--auto-port` | If the port is used by another program, use the next free port (up to 20 higher) and print `PORT_FALLBACK from=... to=...` |
+| `--exit-if-running` | If a healthy Mucaro AI backend is already running, open it in the browser, print `DESKTOP_LAUNCH_REUSED`, and exit 0 |
+
+Closing the terminal window (SIGHUP) or SIGTERM stops the backend the same way `Ctrl+C` does.
 
 It starts the private local backend on `127.0.0.1:8000`, serves the built React UI through FastAPI, opens the browser, and stops cleanly with `Ctrl+C`.
 

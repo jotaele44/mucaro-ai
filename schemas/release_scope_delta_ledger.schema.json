@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/release_scope_delta_ledger.schema.json",
+  "title": "Mucaro Release Scope Delta Ledger 1.0",
+  "description": "KERNEL-019 scope deltas. REQUIRED_BY_EXISTING_SCOPE and DEFECT_REVEALED enter the denominator; ENHANCEMENT only when adopted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "deltas"],
+  "properties": {
+    "schema_version": {"const": "mucaro-release-scope-delta-ledger/1.0"},
+    "deltas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["delta_id", "classification", "title", "discovered_by", "evidence", "adopted", "parent_requirement_ids"],
+        "properties": {
+          "delta_id": {"type": "string", "pattern": "^SD-[0-9]{3}$"},
+          "classification": {"enum": ["REQUIRED_BY_EXISTING_SCOPE", "DEFECT_REVEALED", "ENHANCEMENT"]},
+          "title": {"type": "string", "minLength": 1},
+          "discovered_by": {"type": "string", "minLength": 1},
+          "evidence": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "adopted": {"type": "boolean"},
+          "adoption_authority": {"type": ["string", "null"]},
+          "parent_requirement_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

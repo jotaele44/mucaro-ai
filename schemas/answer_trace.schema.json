@@ -8,7 +8,7 @@
   "properties": {
     "run_id": {"type": "string", "pattern": "^run_[a-f0-9]+$"},
     "query": {"type": "string", "minLength": 1},
-    "model_provider": {"type": "string", "enum": ["mock", "anthropic"]},
+    "model_provider": {"type": "string", "enum": ["mock", "anthropic", "openai_compatible_local"]},
     "model_name": {"type": "string", "minLength": 1},
     "prompt_template_id": {"type": "string", "minLength": 1},
     "retrieval_strategy": {"type": "string", "minLength": 1},
