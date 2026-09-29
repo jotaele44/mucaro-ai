@@ -91,11 +91,11 @@ def certify_clean_machine_macos(
     previous_version = previous_manifest.get("release_version")
     if not isinstance(current_version, str) or not isinstance(previous_version, str) or not current_version or not previous_version:
         raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_VERSION_MISSING", "both portable apps need a bound release version")
-    if current_version == previous_version:
-        raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_SAME_VERSION", "upgrade and rollback require distinct release versions")
     previous_head = str(previous_manifest.get("head_sha"))
     if previous_head == expected_head:
         raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_PREVIOUS_HEAD", "previous app must bind to a distinct Git head")
+    if current_version == previous_version:
+        raise CleanMachineMacOSError("ERROR_CLEAN_MACHINE_SAME_VERSION", "upgrade and rollback require distinct release versions")
 
     root.mkdir(parents=True, exist_ok=True)
     previous_install = install_portable_macos_app(previous, install_root=root)
