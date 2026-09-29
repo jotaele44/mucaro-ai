@@ -40,6 +40,19 @@ MSG_COMPOUND_FILE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 MSG_TEXT_SEGMENT_LIMIT = 80
 DOCX_XML_BYTE_LIMIT = 32 * 1024 * 1024
 ZIP_TEXT_MEMBER_SUFFIXES = {".csv", ".json", ".md", ".txt"}
+SUPPORTED_PARSER_SUFFIXES = {
+    ".txt",
+    ".md",
+    ".csv",
+    ".json",
+    ".html",
+    ".htm",
+    ".docx",
+    ".zip",
+    ".eml",
+    ".msg",
+    ".pdf",
+} | MULTIMODAL_SUFFIXES
 ZIP_TEXT_MEMBER_BYTE_LIMIT = 2 * 1024 * 1024
 ZIP_TEXT_TOTAL_BYTE_LIMIT = 20 * 1024 * 1024
 
@@ -192,6 +205,11 @@ def _base_result(path: Path, *, parser: str, mime_type: str, warnings: list[str]
 def parse_file(path: Path) -> dict[str, Any]:
     mime = detect_mime(path)
     suffix = path.suffix.lower()
+    if suffix not in SUPPORTED_PARSER_SUFFIXES:
+        raise ParseError(
+            f"PARSE_FAILED:{path.name}:unsupported format {suffix or '<no extension>'}",
+            status="ERROR_UNSUPPORTED_FORMAT",
+        )
     try:
         check_signature(path)
     except SignatureError as exc:
@@ -219,11 +237,12 @@ def parse_file(path: Path) -> dict[str, Any]:
             return _parse_pdf(path)
         if suffix in MULTIMODAL_SUFFIXES:
             return parse_multimodal_metadata(path, mime_type=mime)
-        raw = path.read_text(encoding="utf-8", errors="replace")
-        return {
-            "text": raw,
-            **_base_result(path, parser="text_fallback", mime_type=mime, warnings=["UNKNOWN_EXTENSION_TEXT_FALLBACK"]),
-        }
+        raise ParseError(
+            f"PARSE_FAILED:{path.name}:declared parser dispatch missing for {suffix}",
+            status="ERROR_PARSER_DISPATCH_MISSING",
+        )
+    except ParseError:
+        raise
     except ArchiveSafetyError as exc:
         raise ParseError(f"PARSE_FAILED:{path.name}:{exc}", status=exc.status) from exc
     except ElementTree.ParseError as exc:
