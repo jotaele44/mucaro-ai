@@ -9,7 +9,7 @@ double-clicks go straight to launch and an interrupted setup resumes where it st
 
 Only the standard library is used before the Python dependencies are installed.
 
-With ``--desktop`` (Mucaro AI.app on macOS) the steps run behind the app's own window instead; see
+With ``--desktop`` (Mucaro AI Setup.app on macOS) the steps run behind the app's own window instead; see
 ``scripts/one_click_desktop.py``.
 """
 
@@ -38,7 +38,7 @@ if str(ROOT) not in sys.path:
 from scripts import launch_app  # noqa: E402
 
 PYTHON_EXTRAS = "dev,anthropic"
-# pywebview (the `desktop` extra) gives Mucaro AI.app its own window; only macOS uses it.
+# pywebview (the `desktop` extra) gives Mucaro AI Setup.app its own window; only macOS uses it.
 DESKTOP_EXTRAS = PYTHON_EXTRAS + ",desktop"
 # Import names that prove the dependency install is usable (runtime, geospatial, live mode, preflight).
 KEY_MODULES = (
@@ -74,7 +74,7 @@ class SetupError(Exception):
         self.detail = detail
 
 
-# Set when the Mucaro AI.app window is closed during setup: the running command is stopped, no new
+# Set when the Mucaro AI Setup.app window is closed during setup: the running command is stopped, no new
 # command starts, and nothing is retried.
 CANCELLED = threading.Event()
 _ACTIVE: set[subprocess.Popen[bytes]] = set()
@@ -271,7 +271,7 @@ def _stop_process(proc: subprocess.Popen[bytes], timeout: float = 5.0) -> None:
 
 
 def terminate_active(timeout: float = 5.0) -> None:
-    """Stop setup at once (the Mucaro AI.app window was closed): end the running command, start nothing new."""
+    """Stop setup at once (the Mucaro AI Setup.app window was closed): end the running command, start nothing new."""
     CANCELLED.set()
     with _ACTIVE_LOCK:
         running = list(_ACTIVE)
@@ -315,7 +315,7 @@ class OneClickSetup:
         self.log = log
         self.runtime = runtime
         self.pins = pins
-        # Mucaro AI.app shows each step in its window (scripts/one_click_desktop.py).
+        # Mucaro AI Setup.app shows each step in its window (scripts/one_click_desktop.py).
         self.on_step = on_step
         self.state_path = runtime / "state.json"
         self.state = load_state(self.state_path)
@@ -508,7 +508,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--desktop",
         action="store_true",
-        help="Mucaro AI.app (macOS): show setup progress and then the app in its own window, with no terminal or browser.",
+        help="Mucaro AI Setup.app (macOS): show setup progress and then the app in its own window, with no terminal or browser.",
     )
     args, launch_args = parser.parse_known_args(argv)
 
@@ -521,7 +521,7 @@ def main(argv: list[str] | None = None) -> int:
             from scripts import one_click_desktop
 
             return one_click_desktop.run(log, log_path=log_path, runtime=runtime, pins=read_pins())
-        log.line("DESKTOP_MODE_UNAVAILABLE Mucaro AI.app needs macOS; continuing with the browser launcher")
+        log.line("DESKTOP_MODE_UNAVAILABLE Mucaro AI Setup.app needs macOS; continuing with the browser launcher")
     started = time.monotonic()
     try:
         log.line(f"ONE_CLICK_STAGE1_START python={platform.python_version()} root={ROOT}")
