@@ -4,7 +4,7 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-**macOS: open `Mucaro AI.app`** (the owl icon in this folder). **Windows: double-click
+**macOS: open `Mucaro AI Setup.app`** (the owl icon in this folder). **Windows: double-click
 `Mucaro AI.cmd`.** That is the whole setup.
 
 On a Mac the app sets itself up and opens in its own window with its own Dock icon: no Terminal,
@@ -13,7 +13,7 @@ copies of Python 3.12 and Node.js into this folder (about 200 MB to download, ab
 disk, 2-5 minutes on a typical connection), installs everything, builds the interface, and loads
 two sample documents while the window shows each step. Then the same window becomes Mucaro AI,
 ready to use. Later opens take a few seconds and work offline. Quit it like any app (Cmd+Q, or
-close the window). Keep `Mucaro AI.app` inside this folder; to start it from the Dock, drag it
+close the window). Keep `Mucaro AI Setup.app` inside this folder; to start it from the Dock, drag it
 onto the Dock.
 
 On Windows, `Mucaro AI.cmd` runs the same setup in a console window and opens the app in your
@@ -278,7 +278,7 @@ Use `mucaro package macos-app --format text` to build a local source-bound
 launches this checkout with the Python executable recorded at build time and
 opens the browser UI through `scripts/launch_app.py`. This is not yet a portable
 signed installer with embedded runtime, reinstall, upgrade, and rollback
-guarantees. For everyday use, open the `Mucaro AI.app` at the top of this folder
+guarantees. For source-checkout use, open the `Mucaro AI Setup.app` at the top of this folder
 instead: it needs no build step and opens in its own window.
 
 The portable lane starts by materializing the governed x86_64 macOS runtime,
