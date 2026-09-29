@@ -257,6 +257,19 @@ def verify_portable_macos_app(app_path: Path, *, expected_head: str | None = Non
     def check(name: str, ok: bool, detail: str) -> None:
         checks.append({"name": name, "status": "PASS" if ok else "FAIL", "detail": detail})
 
+    package_metadata = resources / "app" / "pyproject.toml"
+    try:
+        package_version = tomllib.loads(package_metadata.read_text(encoding="utf-8"))["project"]["version"]
+    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError):
+        package_version = None
+    check(
+        "release_version_matches_package",
+        isinstance(payload.get("release_version"), str)
+        and bool(payload["release_version"])
+        and payload["release_version"] == package_version,
+        f"manifest={payload.get('release_version')!r} package={package_version!r}",
+    )
+
     runtime_python = app_path / _safe_relative(payload["runtime"]["python_path"])
     frontend_index = app_path / _safe_relative(payload["application"]["frontend_index"])
     entrypoint = app_path / _safe_relative(payload["application"]["entrypoint"])
