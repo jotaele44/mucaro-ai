@@ -218,11 +218,159 @@ def _safe_symlink_target(member_name: str, link_name: str, archive_root: str) ->
     return Path(*relative.parts)
 
 
+def inspect_runtime_archive(archive_path: Path) -> dict[str, Any]:
+    """Inspect one runtime tarball without extracting it.
+
+    The report is suitable for freezing archive-policy evidence. It derives the
+    single archive root from member paths, rejects unsafe/duplicate/unsupported
+    members and unresolved or cyclic symlinks, hashes every regular member, and
+    records both path-sensitive logical identity and a path-insensitive payload
+    multiset identity.
+    """
+    archive_path = archive_path.resolve()
+    try:
+        archive = tarfile.open(archive_path, "r:gz")  # noqa: SIM115 - closed by the adjacent context manager
+    except (OSError, tarfile.TarError) as exc:
+        raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE", str(exc)) from exc
+
+    with archive:
+        members = archive.getmembers()
+        if not members:
+            raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE", "archive has no members")
+        unsupported = [member for member in members if not (member.isfile() or member.issym())]
+        if unsupported:
+            raise PortableRuntimeSourceError(
+                "ERROR_PORTABLE_RUNTIME_ARCHIVE_TYPE",
+                ",".join(member.name for member in unsupported[:10]),
+            )
+
+        roots: set[str] = set()
+        for member in members:
+            parsed = PurePosixPath(member.name)
+            if parsed.is_absolute() or ".." in parsed.parts or not parsed.parts:
+                raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE_PATH", member.name)
+            roots.add(parsed.parts[0])
+        if len(roots) != 1:
+            raise PortableRuntimeSourceError(
+                "ERROR_PORTABLE_RUNTIME_ARCHIVE_ROOT",
+                ",".join(sorted(roots)),
+            )
+        archive_root = next(iter(roots))
+        if not archive_root or "/" in archive_root:
+            raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE_ROOT", archive_root)
+
+        logical_rows: list[dict[str, Any]] = []
+        payload_rows: list[dict[str, Any]] = []
+        destinations: set[str] = set()
+        regular_paths: set[str] = set()
+        links: dict[str, str] = {}
+
+        for member in members:
+            relative = _safe_archive_member(member.name, archive_root).as_posix()
+            if relative in destinations:
+                raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE_DUPLICATE", member.name)
+            destinations.add(relative)
+            if member.isfile():
+                source = archive.extractfile(member)
+                if source is None:
+                    raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE_READ", member.name)
+                digest = hashlib.sha256()
+                observed_bytes = 0
+                with source:
+                    for block in iter(lambda: source.read(1024 * 1024), b""):
+                        digest.update(block)
+                        observed_bytes += len(block)
+                if observed_bytes != member.size:
+                    raise PortableRuntimeSourceError(
+                        "ERROR_PORTABLE_RUNTIME_ARCHIVE_READ",
+                        f"{member.name}: expected={member.size} observed={observed_bytes}",
+                    )
+                sha256 = digest.hexdigest()
+                logical_rows.append(
+                    {
+                        "bytes": member.size,
+                        "path": relative,
+                        "sha256": sha256,
+                        "type": "file",
+                    }
+                )
+                payload_rows.append({"bytes": member.size, "sha256": sha256})
+                regular_paths.add(relative)
+            else:
+                target = _safe_symlink_target(member.name, member.linkname, archive_root).as_posix()
+                logical_rows.append({"path": relative, "target": target, "type": "symlink"})
+                links[relative] = target
+
+        for start in sorted(links):
+            seen: set[str] = set()
+            target = start
+            while target in links:
+                if target in seen:
+                    raise PortableRuntimeSourceError(
+                        "ERROR_PORTABLE_RUNTIME_SYMLINK_TARGET",
+                        f"cyclic symlink chain from {start}",
+                    )
+                seen.add(target)
+                target = links[target]
+            if target not in regular_paths:
+                raise PortableRuntimeSourceError(
+                    "ERROR_PORTABLE_RUNTIME_SYMLINK_TARGET",
+                    f"{start} -> {target}",
+                )
+
+        logical_rows.sort(key=lambda row: row["path"])
+        payload_rows.sort(key=lambda row: (row["bytes"], row["sha256"]))
+        regular = [member for member in members if member.isfile()]
+        symlinks = [member for member in members if member.issym()]
+        return {
+            "archive_bytes": archive_path.stat().st_size,
+            "archive_root": archive_root,
+            "archive_sha256": _sha256(archive_path),
+            "logical_members_sha256": _canonical_sha256(logical_rows),
+            "member_count": len(members),
+            "payload_multiset_sha256": _canonical_sha256(payload_rows),
+            "regular_file_count": len(regular),
+            "symlink_count": len(symlinks),
+            "total_regular_bytes": sum(member.size for member in regular),
+        }
+
+
 def extract_runtime_archive(archive_path: Path, destination: Path, manifest: dict[str, Any]) -> dict[str, int]:
     archive_root = str(manifest["target"].get("archive_root") or "")
     policy = manifest["archive_policy"]
     if not archive_root or PurePosixPath(archive_root).is_absolute() or "/" in archive_root:
         raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE_ROOT", archive_root)
+
+    inspection = inspect_runtime_archive(archive_path)
+    if inspection["archive_root"] != archive_root:
+        raise PortableRuntimeSourceError(
+            "ERROR_PORTABLE_RUNTIME_ARCHIVE_ROOT",
+            f"expected={archive_root} observed={inspection['archive_root']}",
+        )
+    for field in ("member_count", "regular_file_count", "symlink_count", "total_regular_bytes"):
+        if inspection[field] != policy[field]:
+            raise PortableRuntimeSourceError(
+                "ERROR_PORTABLE_RUNTIME_ARCHIVE_IDENTITY",
+                f"{field}: expected={policy[field]} observed={inspection[field]}",
+            )
+    for field in ("logical_members_sha256", "payload_multiset_sha256"):
+        expected = policy.get(field)
+        if expected is not None and inspection[field] != expected:
+            raise PortableRuntimeSourceError(
+                "ERROR_PORTABLE_RUNTIME_ARCHIVE_IDENTITY",
+                f"{field}: expected={expected} observed={inspection[field]}",
+            )
+    if inspection["member_count"] > policy["max_members"] or inspection["total_regular_bytes"] > policy["max_regular_bytes"]:
+        raise PortableRuntimeSourceError(
+            "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT",
+            json.dumps(
+                {
+                    "member_count": inspection["member_count"],
+                    "total_regular_bytes": inspection["total_regular_bytes"],
+                },
+                sort_keys=True,
+            ),
+        )
     try:
         archive = tarfile.open(archive_path, "r:gz")  # noqa: SIM115 - closed by the adjacent context manager
     except (OSError, tarfile.TarError) as exc:
@@ -232,26 +380,12 @@ def extract_runtime_archive(archive_path: Path, destination: Path, manifest: dic
         members = archive.getmembers()
         regular = [member for member in members if member.isfile()]
         symlinks = [member for member in members if member.issym()]
-        unsupported = [member for member in members if not (member.isfile() or member.issym())]
         counts = {
-            "member_count": len(members),
-            "regular_file_count": len(regular),
-            "symlink_count": len(symlinks),
-            "total_regular_bytes": sum(member.size for member in regular),
+            "member_count": inspection["member_count"],
+            "regular_file_count": inspection["regular_file_count"],
+            "symlink_count": inspection["symlink_count"],
+            "total_regular_bytes": inspection["total_regular_bytes"],
         }
-        for field, observed in counts.items():
-            if observed != policy[field]:
-                raise PortableRuntimeSourceError(
-                    "ERROR_PORTABLE_RUNTIME_ARCHIVE_IDENTITY",
-                    f"{field}: expected={policy[field]} observed={observed}",
-                )
-        if len(members) > policy["max_members"] or counts["total_regular_bytes"] > policy["max_regular_bytes"]:
-            raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT", json.dumps(counts, sort_keys=True))
-        if unsupported:
-            raise PortableRuntimeSourceError(
-                "ERROR_PORTABLE_RUNTIME_ARCHIVE_TYPE",
-                ",".join(member.name for member in unsupported[:10]),
-            )
 
         destinations: dict[str, Path] = {}
         for member in members:
