@@ -27,6 +27,33 @@ The byte count and digest above are upstream GitHub asset metadata. They bind th
 candidate asset identity, but they do **not** by themselves prove that this
 repository independently downloaded those bytes.
 
+
+## Same-day upstream freshness adjudication
+
+A 2026-09-29 source-head check found a newer immutable upstream release,
+`20260929`, published after this vector originally bound `20260901`. The
+same CPython 3.13.15 install-only architecture pair exists there:
+
+| Release | Architecture | Bytes | SHA-256 |
+| --- | --- | ---: | --- |
+| `20260901` | arm64 / aarch64 | `25293188` | `b9054a9d3d54f4cb5573d44907fddb29874b08909bde73f29f2868cf872223ee` |
+| `20260901` | x86_64 | `25037769` | `49f0d97f506b855eed60b74a8ac138595c5b39799a6aa5e0d7ca8abe1019a4d4` |
+| `20260929` | arm64 / aarch64 | `25334687` | `003d459a75ff6949a6590812b1e02a65e849b5b2a9f47c421010138ec643a11c` |
+| `20260929` | x86_64 | `25052332` | `54e9da9571fd13655096dbfbd2f18a04ff90fe0051c135cb6547d6e76c3db507` |
+
+**Decision for this bounded certification vector: retain `20260901`.** The
+existing governed x86_64 manifest and packaged-lifecycle evidence are already
+bound to `20260901`; using the matching arm64 asset isolates architecture
+rather than changing both architecture and upstream release at once. Adopting
+`20260929` would be a separate two-architecture runtime-refresh vector and
+would require renewed x86_64 source/runtime/lifecycle evidence as well. This is
+a reproducibility/parity decision, not a claim that `20260901` is newer,
+safer, or otherwise superior.
+
+The source choice therefore does not float with upstream `latest`. A future
+runtime-refresh vector may deliberately move both architectures together after
+this arm64 parity lane is closed.
+
 ## What is closed
 
 - A matching CPython 3.13.15 native Apple-Silicon upstream asset exists.
@@ -74,7 +101,10 @@ lock, runtime probe, and tree receipt.
 
 1. **Independent archive-byte retrieval.** Re-download the upstream asset on a
    permitted execution surface and require observed byte count and SHA-256 to
-   equal the frozen metadata above.
+   equal the frozen metadata above. The connected GitHub metadata surface can
+   enumerate the asset but does not expose binary release-asset download; the
+   available public-web transport returned an unusable signed release-asset
+   redirect, so no candidate bytes were obtained in this session.
 2. **Archive logical geometry.** Compute and freeze:
    - member count;
    - regular-file count;
