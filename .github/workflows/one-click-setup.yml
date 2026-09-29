@@ -1,24 +1,25 @@
 name: One-click setup
 
-# Runs the real double-click launchers on clean runners:
-# - Mucaro AI.app through LaunchServices (`open`), Mucaro AI.exe through Start-Process: first-run setup
-#   (smoke launch), then a background start, a second double-click while running, and the Quit endpoint.
-# - The console fallbacks scripts/Mucaro AI.command and scripts/Mucaro AI.cmd with PATH cut down to OS
-#   directories (plus tripwire stubs on macOS/Linux), so setup can never depend on a preinstalled
-#   Python, Node, npm, or git.
+# Runs the real double-click files on clean runners:
+# - Start Mucaro AI.app through LaunchServices (`open`) and Start Mucaro AI.exe through Start-Process (no
+#   terminal window): first-run setup (smoke launch), then a background start, a second double-click while
+#   running, and the Quit endpoint.
+# - "Mucaro AI.command" / "Mucaro AI.cmd" (the same setup in a Terminal/console window). PATH is cut down to OS
+#   directories (plus tripwire stubs on macOS/Linux), so the job fails if setup ever depends on a
+#   preinstalled Python, Node, npm, or git.
 # - scripts/build_launchers.py --check: the committed .exe and icons are exactly what their source builds.
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "Mucaro AI.app/**"
-      - "Mucaro AI.exe"
+      - "Start Mucaro AI.app/**"
+      - "Start Mucaro AI.exe"
+      - "Mucaro AI.command"
+      - "Mucaro AI.cmd"
       - ".gitattributes"
       - "packaging/launchers/**"
       - "packaging/icons/**"
-      - "scripts/Mucaro AI.command"
-      - "scripts/Mucaro AI.cmd"
       - "scripts/one_click*"
       - "scripts/progress_page*"
       - "scripts/build_launchers.py"
@@ -27,14 +28,17 @@ on:
       - "scripts/ingest_folder.py"
       - "backend/app/main.py"
       - "pyproject.toml"
-      - "frontend/**"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
       - ".github/workflows/one-click-setup.yml"
   push:
     branches:
       - main
     paths:
-      - "Mucaro AI.app/**"
-      - "Mucaro AI.exe"
+      - "Start Mucaro AI.app/**"
+      - "Start Mucaro AI.exe"
+      - "Mucaro AI.command"
+      - "Mucaro AI.cmd"
       - "packaging/launchers/**"
       - "scripts/one_click*"
       - "scripts/progress_page*"
@@ -47,8 +51,8 @@ permissions:
   contents: read
 
 jobs:
-  macos-app:
-    name: ${{ matrix.label }} (Mucaro AI.app)
+  start-app:
+    name: ${{ matrix.label }} (Start Mucaro AI.app)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -64,7 +68,7 @@ jobs:
       - name: First double-click through LaunchServices (full setup, smoke launch)
         timeout-minutes: 20
         run: |
-          open -W "Mucaro AI.app" --args --smoke-test --no-browser
+          open -W "Start Mucaro AI.app" --args --smoke-test --no-browser
           cat .mucaro-runtime/logs/run-*.log
           grep -q "ONE_CLICK_SETUP_OK" .mucaro-runtime/logs/run-*.log
           grep -q "DESKTOP_SMOKE_OK" .mucaro-runtime/logs/run-*.log
@@ -74,7 +78,7 @@ jobs:
         timeout-minutes: 5
         run: |
           set -u
-          open "Mucaro AI.app" --args --no-browser
+          open "Start Mucaro AI.app" --args --no-browser
           for i in $(seq 1 120); do curl -sf http://127.0.0.1:8000/health >/dev/null && break; sleep 1; done
           curl -sf http://127.0.0.1:8000/health
           sleep 2
@@ -82,7 +86,7 @@ jobs:
           grep -q 'url=http://127.0.0.1:8000' .mucaro-runtime/ui/progress.html
           test "$(curl -sf http://127.0.0.1:8000/config | .venv/bin/python -c 'import json,sys; print(json.load(sys.stdin)["desktop"]["quit_supported"])')" = "True"
           # A second double-click while running goes straight to the running app.
-          open "Mucaro AI.app" --args --no-browser
+          open "Start Mucaro AI.app" --args --no-browser
           for i in $(seq 1 60); do grep -qs "DESKTOP_LAUNCH_REUSED" .mucaro-runtime/logs/run-*.log && break; sleep 1; done
           grep -q "DESKTOP_LAUNCH_REUSED" .mucaro-runtime/logs/run-*.log
           # Quit button.
@@ -97,14 +101,14 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: app-logs-${{ matrix.os }}
+          name: start-app-logs-${{ matrix.os }}
           path: |
             .mucaro-runtime/logs/
             .mucaro-runtime/ui/
           if-no-files-found: ignore
 
-  windows-exe:
-    name: Windows x64 (Mucaro AI.exe)
+  start-exe:
+    name: Windows x64 (Start Mucaro AI.exe)
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -114,9 +118,9 @@ jobs:
         shell: pwsh
         run: |
           $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem"
-          $p = Start-Process -FilePath ".\Mucaro AI.exe" -ArgumentList "--smoke-test", "--no-browser" -Wait -PassThru
+          $p = Start-Process -FilePath ".\Start Mucaro AI.exe" -ArgumentList "--smoke-test", "--no-browser" -Wait -PassThru
           Get-Content .mucaro-runtime\logs\setup-*.log, .mucaro-runtime\logs\run-*.log
-          if ($p.ExitCode -ne 0) { throw "Mucaro AI.exe exited with $($p.ExitCode)" }
+          if ($p.ExitCode -ne 0) { throw "Start Mucaro AI.exe exited with $($p.ExitCode)" }
           if (-not (Select-String -Quiet -Path .mucaro-runtime\logs\setup-*.log -Pattern "ONE_CLICK_SETUP_OK")) { throw "setup did not finish" }
           if (-not (Select-String -Quiet -Path .mucaro-runtime\logs\run-*.log -Pattern "DESKTOP_SMOKE_OK")) { throw "smoke launch did not finish" }
           if (-not (Select-String -Quiet -Path .mucaro-runtime\ui\progress.html -Pattern 'class="state-stopped"' -SimpleMatch)) { throw "progress page not stopped" }
@@ -126,14 +130,14 @@ jobs:
         run: |
           $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem"
           function Test-Health { try { Invoke-RestMethod -TimeoutSec 2 http://127.0.0.1:8000/health | Out-Null; $true } catch { $false } }
-          Start-Process -FilePath ".\Mucaro AI.exe" -ArgumentList "--no-browser"
+          Start-Process -FilePath ".\Start Mucaro AI.exe" -ArgumentList "--no-browser"
           for ($i = 0; $i -lt 120 -and -not (Test-Health); $i++) { Start-Sleep 1 }
           if (-not (Test-Health)) { Get-Content .mucaro-runtime\logs\*.log; throw "backend did not start" }
           Start-Sleep 2
           $page = Get-Content -Raw .mucaro-runtime\ui\progress.html
           if (-not $page.Contains('class="state-ready"')) { throw "progress page not ready" }
           if (-not (Invoke-RestMethod http://127.0.0.1:8000/config).desktop.quit_supported) { throw "quit not supported" }
-          Start-Process -FilePath ".\Mucaro AI.exe" -ArgumentList "--no-browser"
+          Start-Process -FilePath ".\Start Mucaro AI.exe" -ArgumentList "--no-browser"
           for ($i = 0; $i -lt 60 -and -not (Select-String -Quiet -Path .mucaro-runtime\logs\run-*.log -Pattern "DESKTOP_LAUNCH_REUSED"); $i++) { Start-Sleep 1 }
           if (-not (Select-String -Quiet -Path .mucaro-runtime\logs\run-*.log -Pattern "DESKTOP_LAUNCH_REUSED")) { throw "second launch did not reuse the running app" }
           Invoke-RestMethod -Method Post -Headers @{ "X-Mucaro-Action" = "quit" } http://127.0.0.1:8000/shutdown | Out-Null
@@ -149,7 +153,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: exe-logs-windows
+          name: start-exe-logs-windows
           path: |
             .mucaro-runtime/logs/
             .mucaro-runtime/ui/
@@ -163,11 +167,11 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Rebuild Mucaro AI.exe and icons from source and compare
+      - name: Rebuild Start Mucaro AI.exe and icons from source and compare
         run: python scripts/build_launchers.py --check
 
   posix:
-    name: ${{ matrix.label }} (console fallback)
+    name: ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -189,19 +193,19 @@ jobs:
             printf '#!/bin/sh\necho "%s $*" >> "%s/tripwire.txt"\nexit 99\n' "$tool" "$RUNNER_TEMP" > "$RUNNER_TEMP/stubs/$tool"
             chmod +x "$RUNNER_TEMP/stubs/$tool"
           done
-      - name: First run (full setup, smoke launch)
+      - name: First double-click (full setup, smoke launch)
         run: |
           set -o pipefail
           env -i HOME="$RUNNER_TEMP/home" PATH="$RUNNER_TEMP/stubs:/usr/bin:/bin:/usr/sbin:/sbin" TERM=dumb LANG=en_US.UTF-8 CI=true \
-            "./scripts/Mucaro AI.command" --smoke-test --no-browser 2>&1 | tee "$RUNNER_TEMP/run1.log"
+            "./Mucaro AI.command" --smoke-test --no-browser 2>&1 | tee "$RUNNER_TEMP/run1.log"
           grep -q "ONE_CLICK_SETUP_OK" "$RUNNER_TEMP/run1.log"
           grep -q "DESKTOP_SMOKE_OK" "$RUNNER_TEMP/run1.log"
-      - name: Second run (fast path)
+      - name: Second double-click (fast path)
         run: |
           set -o pipefail
           start=$(date +%s)
           env -i HOME="$RUNNER_TEMP/home" PATH="$RUNNER_TEMP/stubs:/usr/bin:/bin:/usr/sbin:/sbin" TERM=dumb LANG=en_US.UTF-8 CI=true \
-            "./scripts/Mucaro AI.command" --smoke-test --no-browser 2>&1 | tee "$RUNNER_TEMP/run2.log"
+            "./Mucaro AI.command" --smoke-test --no-browser 2>&1 | tee "$RUNNER_TEMP/run2.log"
           elapsed=$(( $(date +%s) - start ))
           echo "second run took ${elapsed}s"
           grep -q "ONE_CLICK_FAST_PATH" "$RUNNER_TEMP/run2.log"
@@ -225,26 +229,26 @@ jobs:
           if-no-files-found: ignore
 
   windows:
-    name: Windows x64 (console fallback)
+    name: Windows x64
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - name: First run (full setup, smoke launch)
+      - name: First double-click (full setup, smoke launch)
         shell: cmd
         run: |
           set "PATH=%SystemRoot%\System32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SystemRoot%\System32\WindowsPowerShell\v1.0"
-          call "scripts\Mucaro AI.cmd" --smoke-test --no-browser > "%RUNNER_TEMP%\run1.log" 2>&1
+          call "Mucaro AI.cmd" --smoke-test --no-browser > "%RUNNER_TEMP%\run1.log" 2>&1
           set "RC=%ERRORLEVEL%"
           type "%RUNNER_TEMP%\run1.log"
           if not "%RC%"=="0" exit /b %RC%
           findstr /c:"ONE_CLICK_SETUP_OK" "%RUNNER_TEMP%\run1.log" || exit /b 1
           findstr /c:"DESKTOP_SMOKE_OK" "%RUNNER_TEMP%\run1.log" || exit /b 1
-      - name: Second run (fast path)
+      - name: Second double-click (fast path)
         shell: cmd
         run: |
           set "PATH=%SystemRoot%\System32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SystemRoot%\System32\WindowsPowerShell\v1.0"
-          call "scripts\Mucaro AI.cmd" --smoke-test --no-browser > "%RUNNER_TEMP%\run2.log" 2>&1
+          call "Mucaro AI.cmd" --smoke-test --no-browser > "%RUNNER_TEMP%\run2.log" 2>&1
           set "RC=%ERRORLEVEL%"
           type "%RUNNER_TEMP%\run2.log"
           if not "%RC%"=="0" exit /b %RC%

@@ -57,7 +57,9 @@ LOG_KEEP = 10
 TOTAL_STEPS = 6
 STATE_SCHEMA = "mucaro-one-click-state/1"
 # First start after an install compiles bytecode and loads new native libraries, so allow more than the default 20s.
-LAUNCH_ARGS = ["--auto-port", "--exit-if-running", "--startup-timeout", "120"]
+# --frontend-verified: step 3 already fingerprinted the build inputs, so the launcher must not
+# re-check timestamps (and must never reach for a PATH npm).
+LAUNCH_ARGS = ["--auto-port", "--exit-if-running", "--frontend-verified", "--startup-timeout", "120"]
 # Headline and detail shown on the browser progress page (--ui) for each step.
 PAGE_STEPS = {
     1: ("Installing Python packages", "First run: about 1-2 minutes."),
@@ -67,7 +69,10 @@ PAGE_STEPS = {
     5: ("Loading sample documents", ""),
     6: ("Starting Mucaro AI", "Almost ready..."),
 }
-LAUNCHER_HINT = "start Mucaro AI by double-clicking Mucaro AI.app (macOS) or Mucaro AI.exe (Windows)"
+LAUNCHER_HINT = (
+    "start Mucaro AI by double-clicking Start Mucaro AI.app or Mucaro AI.command (macOS), "
+    "or Start Mucaro AI.exe or Mucaro AI.cmd (Windows)"
+)
 
 
 class SetupError(Exception):
@@ -106,14 +111,7 @@ def fingerprint(parts: Iterable[str], files: Iterable[Path] = ()) -> str:
 
 
 def frontend_source_files() -> list[Path]:
-    frontend = ROOT / "frontend"
-    files = [frontend / name for name in ("index.html", "package.json", "package-lock.json", ".npmrc")]
-    files.extend(sorted(frontend.glob("vite.config.*")))
-    for folder in ("src", "public"):
-        base = frontend / folder
-        if base.is_dir():
-            files.extend(sorted(path for path in base.rglob("*") if path.is_file()))
-    return files
+    return launch_app.frontend_source_files(ROOT)
 
 
 def load_state(path: Path) -> dict[str, Any]:
@@ -234,7 +232,10 @@ def run_logged(cmd: list[str], *, log: SetupLog, cwd: Path | None = None, env: M
     except OSError as exc:
         log.line(f"ERROR_COMMAND_START {exc}")
         return 127
-    assert proc.stdout is not None
+    if proc.stdout is None:
+        log.line("ERROR_COMMAND_START stdout pipe unavailable")
+        proc.kill()
+        return 127
     for chunk in iter(proc.stdout.readline, b""):
         log.raw(chunk.decode("utf-8", errors="replace"))
     return proc.wait()
@@ -441,7 +442,7 @@ class OneClickSetup:
 def _redirect_output_to_run_log(runtime: Path) -> None:
     """In background mode there is no window: send this process's and its children's output to a run log.
 
-    Mucaro AI.app already redirects to the log it names in MUCARO_RUN_LOG; Mucaro AI.exe runs with a hidden
+    Start Mucaro AI.app already redirects to the log it names in MUCARO_RUN_LOG; Start Mucaro AI.exe runs with a hidden
     console, so its output is redirected here. The file descriptors are replaced (not just sys.stdout), so the
     backend started later by launch_app inherits the log too.
     """
@@ -478,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--ui",
         action="store_true",
-        help="Background mode for Mucaro AI.app / Mucaro AI.exe: report progress on the browser page, log to a file.",
+        help="Background mode for Start Mucaro AI.app / Start Mucaro AI.exe: report progress on the browser page, log to a file.",
     )
     args, launch_args = parser.parse_known_args(argv)
 
@@ -512,7 +513,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     except KeyboardInterrupt:
-        progress_page.try_write(page, "error", title="Mucaro AI setup was interrupted", detail="Double-click Mucaro AI again to continue.", log=str(log_path))
+        progress_page.try_write(page, "error", title="Mucaro AI setup was interrupted", detail="Double-click Start Mucaro AI again to continue.", log=str(log_path))
         log.line("")
         log.line("SETUP_INTERRUPTED double-click again to resume where it stopped")
         return 130

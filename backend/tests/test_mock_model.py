@@ -24,7 +24,7 @@ def test_default_model_is_mock_even_when_api_key_exists(monkeypatch):
 def test_model_provider_registry_reports_mock_ready():
     providers = {provider["name"]: provider for provider in list_model_providers()}
 
-    assert set(providers) == {"mock", "anthropic"}
+    assert set(providers) == {"mock", "anthropic", "openai_compatible_local"}
     assert providers["mock"]["status"] == "MODEL_PROVIDER_READY"
     assert providers["mock"]["default_model"] == "mock-cited-synthesizer-v1"
     assert providers["mock"]["warnings"] == []

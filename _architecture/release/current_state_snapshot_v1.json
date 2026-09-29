@@ -1,0 +1,101 @@
+{
+  "build": {
+    "frontend_build": "pass",
+    "frontend_dist_present": true
+  },
+  "captured_utc": "2026-09-24T20:42:34Z",
+  "connected_resources": [
+    "GitHub MCP (jotaele44/mucaro-ai)",
+    "Google Drive (read/search)",
+    "Hugging Face Hub"
+  ],
+  "credentials": [
+    {
+      "name": "ANTHROPIC_API_KEY",
+      "present": false,
+      "purpose": "remote model provider (Anthropic)"
+    },
+    {
+      "name": "MUCARO_BRAVE_SEARCH_API_KEY",
+      "present": false,
+      "purpose": "governed live web search"
+    },
+    {
+      "name": "MUCARO_AI_OPERATOR_TOKEN",
+      "present": false,
+      "purpose": "local operator token"
+    },
+    {
+      "name": "APPLE_DEVELOPER_ID_APPLICATION",
+      "present": false,
+      "purpose": "macOS Developer ID code signing identity"
+    },
+    {
+      "name": "APPLE_NOTARY_KEYCHAIN_PROFILE",
+      "present": false,
+      "purpose": "macOS notarization credentials"
+    },
+    {
+      "name": "GITHUB_TOKEN",
+      "present": true,
+      "purpose": "hosted governance API access"
+    }
+  ],
+  "dependency_locks": [
+    {
+      "lock_kind": "top_level_pins_transitive_unpinned",
+      "path": "pyproject.toml",
+      "sha256": "89dc5a7177b084aa87aebe49a11b1eac2981c0d390a282f911501d0d665f9ab8"
+    },
+    {
+      "lock_kind": "top_level_pins_transitive_unpinned",
+      "path": "backend/requirements.txt",
+      "sha256": "f9e7843b766bb24bb739a33c13451bc3bd01405f67e5b5767633f2c670666058"
+    },
+    {
+      "lock_kind": "full_transitive_lock",
+      "path": "frontend/package-lock.json",
+      "sha256": "33b0175718c736f62d782ab66927f37f70f21883285d6a91e99530c8ba3464a6"
+    }
+  ],
+  "known_boundaries": [
+    "FastAPI backend in-process on loopback; React/Vite frontend served from frontend/dist",
+    "Local data under data/ (SQLite + JSON ledgers); no workspace isolation",
+    "Tool registry is approval-gated; GIS/OCR/coding extras are CLI/library-only",
+    "Model providers: mock (default) and anthropic (live-mode + key gated)",
+    "macOS .app is a source-bound bash wrapper that opens the system browser",
+    "Agent environment: Linux container; no macOS host; tesseract absent; docker present"
+  ],
+  "receipts": [],
+  "repository": {
+    "branch": "claude/inspiring-brahmagupta-6opmt3",
+    "dirty_paths": [
+      "backend/app/cli.py",
+      "_architecture/release/",
+      "backend/app/release_scope.py",
+      "docs/release/",
+      "schemas/release_acceptance_ledger.schema.json",
+      "schemas/release_blocker_ledger.schema.json",
+      "schemas/release_contradiction_ledger.schema.json",
+      "schemas/release_dag.schema.json",
+      "schemas/release_scope_delta_ledger.schema.json",
+      "schemas/release_scope_manifest.schema.json",
+      "schemas/release_state_snapshot.schema.json"
+    ],
+    "head_sha": "0bf5bf88a9088042688f1d77af5ad3dad144afce",
+    "path": "/home/user/mucaro-ai"
+  },
+  "runtime": {
+    "architecture": "x86_64",
+    "node": "v22.22.2",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v37",
+    "python": "3.11.15",
+    "python_executable_kind": "virtualenv"
+  },
+  "schema_version": "mucaro-release-state-snapshot/1.0",
+  "tests": {
+    "backend_pytest": "663 passed, 246 warnings in 37.61s (baseline HEAD 0bf5bf8, before implementation changes)",
+    "recorded": true
+  }
+}

@@ -1,5 +1,5 @@
 /*
- * Mucaro AI.exe - Windows launcher for the double-click setup.
+ * Start Mucaro AI.exe - Windows launcher for the double-click source setup.
  *
  * Starts scripts\one_click_windows.ps1 --ui from the folder that contains this .exe, with
  * CREATE_NO_WINDOW: PowerShell and everything it starts share one console that has no window,
@@ -7,7 +7,7 @@
  * a fresh launcher (if Mucaro AI is already running, the progress page goes straight to it).
  * With --smoke-test (automated checks only) it waits and returns the setup's exit code.
  *
- * Built reproducibly by scripts/build_launchers.py (pinned zig); the committed Mucaro AI.exe must
+ * Built reproducibly by scripts/build_launchers.py (pinned zig); the committed Start Mucaro AI.exe must
  * match packaging/launchers/windows/BUILD_SHA256.
  */
 #define WIN32_LEAN_AND_MEAN
@@ -57,7 +57,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR ansi_args, int 
 
     if (swprintf(script, BIG, L"%ls\\scripts\\one_click_windows.ps1", root) < 0 ||
         GetFileAttributesW(script) == INVALID_FILE_ATTRIBUTES) {
-        fail(L"Keep Mucaro AI.exe inside the mucaro-ai folder. It could not find the project files next to it.");
+        fail(L"Keep Start Mucaro AI.exe inside the mucaro-ai folder. It could not find the project files next to it.");
         return 2;
     }
 

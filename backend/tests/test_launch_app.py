@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 import sys
 import tarfile
@@ -28,6 +29,49 @@ def test_launch_app_self_test():
     )
     assert proc.returncode == 0
     assert "LAUNCH_APP_SELF_TEST_OK" in proc.stdout
+
+
+def test_launch_environment_replaces_host_python_controls(monkeypatch):
+    monkeypatch.setenv("PYTHONPATH", "/untrusted/path")
+    monkeypatch.setenv("PYTHONHOME", "/untrusted/home")
+    monkeypatch.setenv("PYTHONSTARTUP", "/untrusted/startup.py")
+
+    env = launch_app.build_env()
+
+    assert env["PYTHONPATH"] == f"{launch_app.ROOT}{launch_app.os.pathsep}{launch_app.ROOT / 'backend'}"
+    assert "PYTHONHOME" not in env
+    assert "PYTHONSTARTUP" not in env
+    assert env["PYTHONNOUSERSITE"] == "1"
+    assert env["PYTHONSAFEPATH"] == "1"
+
+
+def test_launch_environment_loads_app_settings_but_rejects_python_controls_from_env_file(monkeypatch, tmp_path):
+    (tmp_path / ".env").write_text(
+        "MUCARO_AI_LIVE_MODE=1\nPYTHONHOME=/untrusted/file-home\nPYTHONPATH=/untrusted/file-path\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+
+    env = launch_app.build_env()
+
+    assert env["MUCARO_AI_LIVE_MODE"] == "1"
+    assert "PYTHONHOME" not in env
+    assert env["PYTHONPATH"] == f"{tmp_path}{launch_app.os.pathsep}{tmp_path / 'backend'}"
+
+
+def test_backend_process_uses_isolated_path_flags(monkeypatch):
+    observed = {}
+
+    def fake_popen(command, *, cwd, env):
+        observed.update(command=command, cwd=cwd, env=env)
+        return object()
+
+    monkeypatch.setattr(launch_app.subprocess, "Popen", fake_popen)
+    launch_app.start_backend(8123)
+
+    assert observed["command"][1:4] == ["-s", "-P", "-B"]
+    assert observed["env"]["PYTHONNOUSERSITE"] == "1"
+    assert observed["env"]["PYTHONSAFEPATH"] == "1"
 
 
 def test_package_desktop_self_test():
@@ -116,6 +160,22 @@ def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
     assert "PASS package_artifact manifest_member_count=1" in output
     assert "PASS package_artifact_verify manifest_member_count=1" in output
     assert "CERTIFY_RELEASE_OK" in output
+    assert (
+        "python_runtime_lock_audit",
+        [
+            sys.executable,
+            "-m",
+            "pip_audit",
+            "-r",
+            "packaging/runtime/requirements-macos-x86_64.lock",
+            "--no-deps",
+            "--disable-pip",
+            "--strict",
+            "--progress-spinner",
+            "off",
+        ],
+        certify_release.ROOT,
+    ) in calls
 
 
 def test_certify_release_npm_audit_uses_working_node_fallback(monkeypatch):
@@ -523,9 +583,111 @@ def test_launch_app_reports_missing_frontend_deps(tmp_path, monkeypatch):
     assert str(exc.value) == "ERROR_FRONTEND_DEPS_MISSING run: cd frontend && npm ci"
 
 
+
+def _frontend_tree(root: Path, *, node_modules: bool = True, source_newer: bool = True) -> Path:
+    frontend = root / "frontend"
+    (frontend / "src").mkdir(parents=True)
+    (frontend / "dist").mkdir()
+    (frontend / "package.json").write_text("{}", encoding="utf-8")
+    source = frontend / "src" / "App.jsx"
+    source.write_text("export default 1;\n", encoding="utf-8")
+    dist_index = frontend / "dist" / "index.html"
+    dist_index.write_text("<html></html>\n", encoding="utf-8")
+    if node_modules:
+        (frontend / "node_modules").mkdir()
+    built, edited = (1_000_000, 2_000_000) if source_newer else (2_000_000, 1_000_000)
+    os.utime(dist_index, (built, built))
+    for path in (source, frontend / "package.json"):
+        os.utime(path, (edited, edited))
+    return frontend
+
+
+def _record_builds(monkeypatch, *, npm: str | None = "/usr/bin/npm") -> list:
+    builds = []
+    monkeypatch.setattr(launch_app.shutil, "which", lambda name: npm if name == "npm" else None)
+    monkeypatch.setattr(launch_app, "run_checked", lambda cmd, **kwargs: builds.append((cmd, kwargs.get("cwd"))))
+    return builds
+
+
+def test_launch_app_rebuilds_stale_frontend_dist(tmp_path, monkeypatch, capsys):
+    frontend = _frontend_tree(tmp_path)
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    builds = _record_builds(monkeypatch)
+
+    launch_app.ensure_frontend_dist()
+
+    assert builds == [(["npm", "run", "build"], frontend)]
+    assert "FRONTEND_DIST_STALE_REBUILT" in capsys.readouterr().out
+
+
+def test_launch_app_keeps_fresh_frontend_dist(tmp_path, monkeypatch, capsys):
+    _frontend_tree(tmp_path, source_newer=False)
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    builds = _record_builds(monkeypatch)
+
+    launch_app.ensure_frontend_dist()
+
+    assert builds == []
+    assert "OK_FRONTEND_DIST" in capsys.readouterr().out
+
+
+def test_launch_app_trusts_verified_frontend_dist(tmp_path, monkeypatch):
+    _frontend_tree(tmp_path)
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    builds = _record_builds(monkeypatch)
+
+    launch_app.ensure_frontend_dist(verified=True)
+
+    assert builds == []
+
+
+@pytest.mark.parametrize(
+    "skip_build, node_modules, npm",
+    [(True, True, "/usr/bin/npm"), (False, False, "/usr/bin/npm"), (False, True, None)],
+)
+def test_launch_app_only_warns_when_stale_dist_cannot_be_rebuilt(tmp_path, monkeypatch, capsys, skip_build, node_modules, npm):
+    _frontend_tree(tmp_path, node_modules=node_modules)
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    builds = _record_builds(monkeypatch, npm=npm)
+
+    launch_app.ensure_frontend_dist(skip_build=skip_build)
+
+    output = capsys.readouterr().out
+    assert builds == []
+    assert "WARN_FRONTEND_DIST_STALE" in output
+    assert "OK_FRONTEND_DIST" in output
+
+
+
+def test_launch_app_serves_previous_dist_when_rebuild_fails(tmp_path, monkeypatch, capsys):
+    _frontend_tree(tmp_path)
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    monkeypatch.setattr(launch_app.shutil, "which", lambda name: "/usr/bin/npm")
+
+    def failing_build(cmd, **kwargs):
+        raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(launch_app, "run_checked", failing_build)
+
+    launch_app.ensure_frontend_dist()
+
+    output = capsys.readouterr().out
+    assert "WARN_FRONTEND_REBUILD_FAILED" in output
+    assert "OK_FRONTEND_DIST" in output
+
+def test_launch_app_frontend_verified_flag_reaches_dist_check(monkeypatch):
+    calls = []
+    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False, verified=False: calls.append(verified))
+    monkeypatch.setattr(launch_app, "port_open", lambda port: True)
+    monkeypatch.setattr(launch_app, "health_ok", lambda port: False)
+
+    launch_app.main(["--smoke-test", "--no-browser", "--port", "54321", "--frontend-verified"])
+
+    assert calls == [True]
+
 def test_launch_app_rejects_non_mucaro_port_conflict(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["launch_app.py", "--smoke-test", "--no-browser", "--port", "54321"])
-    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False: None)
+    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False, verified=False: None)
     monkeypatch.setattr(launch_app, "port_open", lambda port: True)
     monkeypatch.setattr(launch_app, "health_ok", lambda port: False)
 

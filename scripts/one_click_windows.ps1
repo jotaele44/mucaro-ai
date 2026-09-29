@@ -1,6 +1,6 @@
-# Stage 0 of the double-click setup on Windows. Started by "Mucaro AI.exe" with --ui (no console window;
+# Stage 0 of the double-click setup on Windows. Started by "Start Mucaro AI.exe" with --ui (no console window;
 # progress is shown on the browser page .mucaro-runtime\ui\progress.html) or by the console fallback
-# "scripts\Mucaro AI.cmd".
+# "Mucaro AI.cmd".
 #
 # Provisions pinned, checksum-verified private runtimes inside .mucaro-runtime\
 # (uv, Node, CPython) and the project .venv, then hands off to scripts\one_click.py,
@@ -331,7 +331,7 @@ $env:MUCARO_SETUP_LOCK_TOKEN = $script:LockToken
 $env:MUCARO_SETUP_LOG = $script:Log
 
 # one_click.py releases the lock before it starts the app; Exit-Lock below only covers a crash.
-# With --ui this process has a console without a window (Mucaro AI.exe starts it with CREATE_NO_WINDOW),
+# With --ui this process has a console without a window (Start Mucaro AI.exe starts it with CREATE_NO_WINDOW),
 # and python.exe and everything it starts inherit that console, so no window ever appears.
 & $VenvPy (Join-Path $Root "scripts\one_click.py") @ScriptArgs
 $rc = $LASTEXITCODE

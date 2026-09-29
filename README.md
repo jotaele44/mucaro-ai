@@ -4,7 +4,8 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-**Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows).** That is the whole setup.
+**Double-click `Start Mucaro AI.app` (macOS) or `Start Mucaro AI.exe` (Windows).** That is the whole
+setup.
 
 A progress page opens in your browser. The first time, Mucaro AI downloads private,
 checksum-verified copies of Python 3.12 and Node.js into this folder (about 200 MB to download,
@@ -16,18 +17,21 @@ Later double-clicks open the app in seconds and work offline.
 Mucaro AI keeps running in the background while you use it. To stop it, click **Quit Mucaro AI**
 (bottom of the sidebar, or under Settings). Double-clicking again while it runs just opens it.
 
+To watch setup in a window instead, double-click `Mucaro AI.command` (macOS) or `Mucaro AI.cmd`
+(Windows): they run the same setup in a Terminal or console window. Keep that window open while you
+use the app; close it (or press `Ctrl+C`) to stop.
+
 Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, and Linux x86_64
-(run `./scripts/"Mucaro AI.command"` from a terminal). Get the folder with `git clone` (or GitHub
-Desktop): a ZIP download makes macOS and Windows ask for approval before the first run. See
+(run `./"Mucaro AI.command"` from a terminal). Get the folder with `git clone` (or GitHub Desktop):
+a ZIP download makes macOS and Windows ask for approval before the first run. See
 `docs/ONE_CLICK_SETUP.md` for what the setup does, its error codes, and how to remove it.
 
-If you prefer to watch setup in a window, `scripts/Mucaro AI.command` (macOS) and
-`scripts/Mucaro AI.cmd` (Windows) run the same setup in a Terminal or console window; closing that
-window stops the app.
+These files run Mucaro AI from this source folder. The native macOS app (`Mucaro AI.app`, with its
+own window and no browser) is a separate release build: see `docs/release/MACOS_APP.md`.
 
 Settings go in `.env` (created from `.env.example` on first run). The launcher reads it at
 startup; variables already exported in your shell take precedence. If the UI shows **Backend not
-reachable**, double-click Mucaro AI again and press **Retry**.
+reachable**, double-click the launcher again and press **Retry**.
 
 See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
 `docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
@@ -77,26 +81,20 @@ python scripts/dev_start.py
 - Not a clone of Dify, AnythingLLM, RAGFlow, Open WebUI, LlamaIndex, or GraphRAG.
 - Not a tool that executes destructive actions without approval.
 
-## Setup
+## Manual install (without the bootstrap)
 
-### macOS/Linux
+Prefer the double-click setup or `scripts/bootstrap_*`. If you install by hand, use Python
+3.11-3.13 (pinned `rasterio` has no wheels for 3.14+) and `npm ci`, which installs exactly what
+`package-lock.json` pins and never rewrites it:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3.12 -m venv .venv                # Windows: py -3.12 -m venv .venv
+source .venv/bin/activate               # Windows: .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+(cd frontend && npm ci)
 python scripts/release_check.py
-```
-
-### Windows PowerShell
-
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-python scripts\release_check.py
+python scripts/launch_app.py            # or python scripts/dev_start.py for hot reload
 ```
 
 ## Optional environment variables
@@ -117,21 +115,6 @@ shell instead.
 - `MUCARO_AI_DEPLOYMENT_PROFILE`: `local` or `production`. Production mode requires a strong operator token and explicit CORS origins.
 - `MUCARO_AI_DISTRIBUTION_CHANNEL`: `local` or `mac_app_store`. The Store channel requires production mode, loopback binding, and disables subprocess, local-worker, and container execution.
 - `MUCARO_AI_ALLOW_PUBLIC_BIND=1`: explicitly permits non-loopback binding in local mode.
-
-## Run backend
-
-```bash
-source .venv/bin/activate
-uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-## Run frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
 
 ## Ingest files
 
@@ -296,6 +279,26 @@ launches this checkout with the Python executable recorded at build time and
 opens the browser UI through `scripts/launch_app.py`. This is not yet a portable
 signed installer with embedded runtime, reinstall, upgrade, and rollback
 guarantees.
+
+The portable lane starts by materializing the governed x86_64 macOS runtime,
+then embedding that verified input into an exact-head app bundle:
+
+```bash
+mucaro package portable-runtime --format text
+mucaro package portable-runtime \
+  --verify data/exports/portable_runtimes/macos-x86_64 \
+  --format text
+mucaro package portable-macos-app \
+  --runtime-dir data/exports/portable_runtimes/macos-x86_64 \
+  --format text
+```
+
+Runtime acquisition verifies the pinned upstream archive size and SHA-256,
+safe archive paths and types, the frozen logical member counts, a hash-locked
+wheel-only dependency graph, importability, relocation, and exclusion of host
+user-site packages. This tracked runtime source is architecture-specific; it is
+not arm64, universal-binary, signing, notarization, sandbox, or App Store
+evidence.
 
 The browser app includes the same permission workflow in the Directory Access panel.
 

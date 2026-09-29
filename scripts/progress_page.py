@@ -1,6 +1,6 @@
 """Render the setup progress page shown by the double-click launchers.
 
-The page lives at ``.mucaro-runtime/ui/progress.html``. ``Mucaro AI.app`` and ``Mucaro AI.exe`` open it in
+The page lives at ``.mucaro-runtime/ui/progress.html``. ``Start Mucaro AI.app`` and ``Start Mucaro AI.exe`` open it in
 the default browser before setup starts; each setup step rewrites it. While setup runs it reloads itself
 every second (meta refresh), and once the app is ready it redirects to the app. It has no JavaScript,
 so it behaves the same for ``file://`` pages in every browser.

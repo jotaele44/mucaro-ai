@@ -10,7 +10,7 @@
 # - Never runs python/python3/git/node/npm from PATH. On a Mac without the
 #   Command Line Tools those are stubs in /usr/bin that open an install dialog.
 # - Writes nothing outside the project folder.
-# With --ui (passed by Mucaro AI.app), every step and failure also updates the browser progress page
+# With --ui (passed by Start Mucaro AI.app), every step and failure also updates the browser progress page
 # .mucaro-runtime/ui/progress.html; the flag is passed on to scripts/one_click.py.
 set -euo pipefail
 
@@ -123,7 +123,7 @@ detect_platform() {
       PLATFORM_LABEL="Linux ${arch}"
       ;;
     *)
-      fatal ERROR_PLATFORM_UNSUPPORTED "${os_name} is not supported by this launcher; on Windows double-click \"Mucaro AI.exe\""
+      fatal ERROR_PLATFORM_UNSUPPORTED "${os_name} is not supported by this launcher; on Windows double-click \"Start Mucaro AI.exe\""
       ;;
   esac
   uv_hash_var="UV_SHA256_$(printf '%s' "${UV_TARGET}" | tr '-' '_')"

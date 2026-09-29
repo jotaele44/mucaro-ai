@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/directory_grant.schema.json",
+  "title": "Mucaro Directory Grant 1.0",
+  "description": "PERMISSION contract: filesystem read grant bound to a canonical root.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "requested_path", "canonical_root", "granted_at", "granted_by", "reason"],
+  "properties": {
+    "status": {"const": "DIRECTORY_PERMISSION_GRANTED"},
+    "requested_path": {"type": "string", "minLength": 1},
+    "canonical_root": {"type": "string", "minLength": 2},
+    "granted_at": {"type": "string", "minLength": 1},
+    "granted_by": {"type": "string", "minLength": 1},
+    "reason": {"type": "string"}
+  }
+}

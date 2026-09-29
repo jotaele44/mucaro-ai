@@ -15,9 +15,8 @@ import scripts.one_click as one_click
 import scripts.preflight as preflight
 
 REPO = Path(__file__).resolve().parents[2]
-# Console fallbacks; the everyday launchers are Mucaro AI.app and Mucaro AI.exe (test_desktop_launchers.py).
-COMMAND_FILE = REPO / "scripts" / "Mucaro AI.command"
-CMD_FILE = REPO / "scripts" / "Mucaro AI.cmd"
+COMMAND_FILE = REPO / "Mucaro AI.command"
+CMD_FILE = REPO / "Mucaro AI.cmd"
 STAGE0_SH = REPO / "scripts" / "one_click.sh"
 STAGE0_PS1 = REPO / "scripts" / "one_click_windows.ps1"
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -81,7 +80,7 @@ def test_command_file_is_executable_in_git():
     if shutil.which("git") is None:
         pytest.skip("git not installed")
     proc = subprocess.run(
-        ["git", "ls-files", "-s", "--", "scripts/Mucaro AI.command", "scripts/one_click.sh"],
+        ["git", "ls-files", "-s", "--", COMMAND_FILE.name, "scripts/one_click.sh"],
         cwd=REPO,
         text=True,
         capture_output=True,
@@ -138,8 +137,7 @@ def test_windows_entry_files_are_ascii_and_cmd_uses_crlf():
     assert "*.cmd text eol=crlf" in (REPO / ".gitattributes").read_text(encoding="utf-8")
     cmd = data.decode("ascii")
     assert "-ExecutionPolicy Bypass" in cmd
-    assert r'cd /d "%~dp0.."' in cmd
-    assert r'"%~dp0one_click_windows.ps1"' in cmd
+    assert r"scripts\one_click_windows.ps1" in cmd
     assert "if not defined CI pause" in cmd
 
 
@@ -513,7 +511,7 @@ class FakeProc:
 def _fake_backend(monkeypatch, *, busy_ports: set[int], healthy_ports: set[int] = frozenset()):
     started = []
     stopped = []
-    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False: None)
+    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False, verified=False: None)
     monkeypatch.setattr(launch_app, "port_open", lambda port: port in busy_ports or port in started)
     monkeypatch.setattr(launch_app, "health_ok", lambda port: port in healthy_ports or port in started)
     monkeypatch.setattr(launch_app, "start_backend", lambda port, extra_env=None: started.append(port) or FakeProc())

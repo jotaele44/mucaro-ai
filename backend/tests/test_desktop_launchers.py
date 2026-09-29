@@ -14,16 +14,14 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-import scripts.launch_app as launch_app
-import scripts.one_click as one_click
-import scripts.progress_page as progress_page
 from backend.app.main import create_app
 from backend.tests.test_api import make_settings
+from scripts import launch_app, one_click, progress_page
 
 REPO = Path(__file__).resolve().parents[2]
-APP = REPO / "Mucaro AI.app"
+APP = REPO / "Start Mucaro AI.app"
 APP_LAUNCHER = APP / "Contents" / "MacOS" / "mucaro-launcher"
-EXE = REPO / "Mucaro AI.exe"
+EXE = REPO / "Start Mucaro AI.exe"
 WINDOWS_SRC = REPO / "packaging" / "launchers" / "windows"
 PAGE_SH = REPO / "scripts" / "progress_page.sh"
 PS1 = REPO / "scripts" / "one_click_windows.ps1"
@@ -62,11 +60,12 @@ def _git_modes(*paths: str) -> dict[str, str] | None:
 # --- where the launchers live -------------------------------------------------------------------
 
 
-def test_top_folder_has_exactly_the_two_double_click_launchers():
-    launchers = sorted(path.name for path in REPO.iterdir() if path.name.startswith("Mucaro AI"))
-    assert launchers == ["Mucaro AI.app", "Mucaro AI.exe"]
-    assert (REPO / "scripts" / "Mucaro AI.command").is_file()
-    assert (REPO / "scripts" / "Mucaro AI.cmd").is_file()
+def test_top_folder_has_the_four_double_click_launchers():
+    # Start Mucaro AI.app/.exe run the source setup with no terminal window; Mucaro AI.command/.cmd run the
+    # same setup in a Terminal/console window (the supported source setup). The native release app
+    # (docs/release/MACOS_APP.md) is built by CI, never committed, so no top-level "Mucaro AI.app" exists.
+    launchers = sorted(path.name for path in REPO.iterdir() if "Mucaro AI" in path.name)
+    assert launchers == ["Mucaro AI.cmd", "Mucaro AI.command", "Start Mucaro AI.app", "Start Mucaro AI.exe"]
 
 
 # --- macOS app bundle -----------------------------------------------------------------------------
@@ -76,6 +75,9 @@ def test_app_bundle_info_plist_matches_launcher_and_project():
     info = plistlib.loads((APP / "Contents" / "Info.plist").read_bytes())
 
     assert info["CFBundlePackageType"] == "APPL"
+    assert info["CFBundleName"] == info["CFBundleDisplayName"] == "Start Mucaro AI"
+    # Distinct from the native release app, so macOS never treats one as the other.
+    assert info["CFBundleIdentifier"] == "ai.mucaro.source-launcher"
     assert (APP / "Contents" / "MacOS" / info["CFBundleExecutable"]) == APP_LAUNCHER
     assert info["CFBundleShortVersionString"] == info["CFBundleVersion"] == _project_version()
     assert info["LSUIElement"] is True
@@ -85,10 +87,10 @@ def test_app_bundle_info_plist_matches_launcher_and_project():
 
 
 def test_app_launcher_is_executable_in_git():
-    modes = _git_modes("Mucaro AI.app/Contents/MacOS/mucaro-launcher")
+    modes = _git_modes("Start Mucaro AI.app/Contents/MacOS/mucaro-launcher")
     if modes is None:
         pytest.skip("not a git checkout")
-    assert modes == {"Mucaro AI.app/Contents/MacOS/mucaro-launcher": "100755"}
+    assert modes == {"Start Mucaro AI.app/Contents/MacOS/mucaro-launcher": "100755"}
 
 
 @pytest.mark.skipif(BASH is None, reason="bash not installed")
@@ -139,7 +141,7 @@ def test_windows_launcher_is_a_small_x64_gui_executable():
 
 def test_windows_launcher_matches_its_recorded_build_hash():
     recorded = (WINDOWS_SRC / "BUILD_SHA256").read_text(encoding="utf-8").split()
-    assert recorded[1:] == ["Mucaro", "AI.exe"]
+    assert recorded[1:] == ["Start", "Mucaro", "AI.exe"]
     assert hashlib.sha256(EXE.read_bytes()).hexdigest() == recorded[0]
 
 
@@ -151,6 +153,7 @@ def test_windows_launcher_source_starts_hidden_setup():
     assert "-WindowStyle" not in source
     rc = (WINDOWS_SRC / "mucaro_launcher.rc").read_text(encoding="utf-8")
     assert f'VALUE "ProductVersion", "{_project_version()}"' in rc
+    assert 'VALUE "OriginalFilename", "Start Mucaro AI.exe"' in rc
     ico = (REPO / "packaging" / "icons" / "mucaro.ico").read_bytes()
     reserved, kind, count = struct.unpack_from("<HHH", ico, 0)
     assert (reserved, kind) == (0, 1) and count >= 6
@@ -308,7 +311,7 @@ class RunningProc:
 def _fake_backend(monkeypatch, *, busy_ports=frozenset()):
     started: list[tuple[int, dict]] = []
     stopped: list[int] = []
-    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False: None)
+    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False, verified=False: None)
     monkeypatch.setattr(launch_app, "port_open", lambda port: port in busy_ports or any(p == port for p, _ in started))
     monkeypatch.setattr(launch_app, "health_ok", lambda port: any(p == port for p, _ in started))
     monkeypatch.setattr(launch_app, "start_backend", lambda port, extra_env=None: started.append((port, extra_env or {})) or RunningProc())

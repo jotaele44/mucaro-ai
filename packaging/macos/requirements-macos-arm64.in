@@ -1,0 +1,19 @@
+# Inputs for the hashed macOS arm64 build lock (TGT-028). Regenerate with:
+#   uv pip compile packaging/macos/requirements-macos-arm64.in --generate-hashes \
+#     --python-platform aarch64-apple-darwin --python-version 3.11 \
+#     -o packaging/macos/requirements-macos-arm64.lock
+# Keep these pins identical to pyproject.toml (checked by backend/tests/test_macos_packaging.py).
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.48.0
+pydantic==2.13.4
+python-multipart==0.0.32
+jsonschema==4.26.0
+pypdf==6.19.0
+shapely==2.1.2
+pyproj==3.7.2
+rasterio==1.4.3
+geographiclib==2.1
+pywebview==6.2.1
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.7

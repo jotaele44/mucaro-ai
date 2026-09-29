@@ -2,7 +2,7 @@
 
 ## Recommended: double-click
 
-Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows). No other step is needed.
+Double-click `Start Mucaro AI.app` (macOS) or `Start Mucaro AI.exe` (Windows). No other step is needed.
 
 A progress page opens in your browser and follows each step; when the app is ready the page turns
 into Mucaro AI. The first run prepares everything inside the project folder:
@@ -26,9 +26,9 @@ fix it (usually the internet connection) and double-click again: setup resumes w
 Mucaro AI keeps running in the background. Stop it with **Quit Mucaro AI** at the bottom of the
 sidebar (or under Settings).
 
-To watch setup in a window instead, run `scripts/Mucaro AI.command` (macOS/Linux) or
-`scripts/Mucaro AI.cmd` (Windows); the markers above appear there, and closing the window stops the
-app. Details and error codes: `docs/ONE_CLICK_SETUP.md`.
+To watch setup in a window instead, double-click `Mucaro AI.command` (macOS/Linux) or
+`Mucaro AI.cmd` (Windows); the markers above appear there, and closing the window stops the app.
+Details and error codes: `docs/ONE_CLICK_SETUP.md`.
 
 ## Manual developer path (macOS)
 
@@ -56,7 +56,7 @@ source .venv/bin/activate
 python scripts/launch_app.py
 ```
 
-Or double-click `Mucaro AI.app`, or run `make start`. The launcher builds
+Or double-click `Mucaro AI.command`, or run `make start`. The launcher builds
 `frontend/dist` if it is missing, starts the backend on `127.0.0.1:8000`, opens
 the browser, and stops everything on `Ctrl+C`. It reads `.env`; variables
 exported in your shell take precedence.
@@ -157,7 +157,8 @@ Common failures:
 | `ERROR_MACOS_TOO_OLD` / `ERROR_PLATFORM_UNSUPPORTED` | Double-click setup: see the supported platforms in `docs/ONE_CLICK_SETUP.md` |
 | `ERROR_PYTHON_MISSING` | Install Python 3.11+ (`brew install python@3.12` or python.org) |
 | `ERROR_PYTHON_TOO_OLD` | Bootstrap found only an older Python; install 3.11+ and rerun |
-| `ERROR_PYTHON_TOO_OLD_OR_MISSING` | Windows: install Python 3.11+ from python.org with "Add to PATH" |
+| `ERROR_PYTHON_UNSUPPORTED` | Developer bootstrap found only Python 3.14+; install 3.11-3.13, or use the double-click setup (it brings Python 3.12) |
+| `ERROR_PYTHON_UNSUPPORTED_OR_MISSING` | Windows developer bootstrap: install Python 3.11-3.13 from python.org with "Add to PATH", or double-click `Mucaro AI.cmd` |
 | `PYTHON_TOO_OLD` | Use Python 3.11+ explicitly |
 | `BOOTSTRAP_FAILED step=...` | Windows: the named step failed; its output is printed just above |
 | `ENV_MODEL_RETIRED` (warning) | Your `.env` pins a retired model; set `MUCARO_AI_MODEL=claude-sonnet-5` |

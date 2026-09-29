@@ -2,8 +2,8 @@
 """Build the committed desktop launcher assets from source, reproducibly.
 
 Outputs (all committed):
-- ``Mucaro AI.exe``                                 Windows launcher (C, packaging/launchers/windows/)
-- ``Mucaro AI.app/Contents/Resources/AppIcon.icns`` macOS app icon
+- ``Start Mucaro AI.exe``                                 Windows launcher (C, packaging/launchers/windows/)
+- ``Start Mucaro AI.app/Contents/Resources/AppIcon.icns`` macOS app icon
 - ``packaging/icons/mucaro.ico``                    Windows icon (embedded in the .exe)
 - ``packaging/launchers/windows/BUILD_SHA256``      expected hash of the .exe
 
@@ -28,8 +28,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REQUIREMENTS = ROOT / "packaging" / "launchers" / "build-requirements.txt"
 WINDOWS_SRC = ROOT / "packaging" / "launchers" / "windows"
-EXE = ROOT / "Mucaro AI.exe"
-ICNS = ROOT / "Mucaro AI.app" / "Contents" / "Resources" / "AppIcon.icns"
+EXE = ROOT / "Start Mucaro AI.exe"
+ICNS = ROOT / "Start Mucaro AI.app" / "Contents" / "Resources" / "AppIcon.icns"
 ICO = ROOT / "packaging" / "icons" / "mucaro.ico"
 EXE_HASH_FILE = WINDOWS_SRC / "BUILD_SHA256"
 ZIG_FLAGS = [
@@ -147,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
         scratch = Path(tmp)
         if not args.check:
             build_all(EXE, ICNS, ICO, scratch)
-            EXE_HASH_FILE.write_text(f"{sha256(EXE)}  Mucaro AI.exe\n", encoding="utf-8")
+            EXE_HASH_FILE.write_text(f"{sha256(EXE)}  Start Mucaro AI.exe\n", encoding="utf-8")
             for path in (EXE, ICNS, ICO):
                 print(f"BUILT {path.relative_to(ROOT)} sha256={sha256(path)} bytes={path.stat().st_size}")
             print("LAUNCHERS_BUILD_OK")

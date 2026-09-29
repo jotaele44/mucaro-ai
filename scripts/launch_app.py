@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -24,11 +25,13 @@ BACKEND_APP = "backend.app.main:app"
 
 
 def build_env() -> dict[str, str]:
-    # Shell-exported variables win over values from the project .env file.
-    env = merge_env_file(os.environ, ROOT / ".env")
-    existing = env.get("PYTHONPATH", "")
-    paths = [str(ROOT), str(ROOT / "backend")]
-    env["PYTHONPATH"] = os.pathsep.join(paths + ([existing] if existing else []))
+    # Load Mucaro settings from .env, then replace every host-controlled Python setting.
+    merged = merge_env_file(os.environ, ROOT / ".env")
+    env = {key: value for key, value in merged.items() if not key.startswith("PYTHON")}
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT), str(ROOT / "backend")])
+    env["PYTHONNOUSERSITE"] = "1"
+    env["PYTHONSAFEPATH"] = "1"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     return env
 
 
@@ -60,10 +63,43 @@ def run_checked(cmd: list[str], *, cwd: Path = ROOT, env: dict[str, str] | None 
     subprocess.run(cmd, cwd=cwd, env=env or build_env(), check=True)
 
 
-def ensure_frontend_dist(skip_build: bool = False) -> None:
+def frontend_source_files(root: Path) -> list[Path]:
+    """Every input the frontend build reads. Shared with scripts/one_click.py's build fingerprint."""
+    frontend = root / "frontend"
+    files = [frontend / name for name in ("index.html", "package.json", "package-lock.json", ".npmrc")]
+    files.extend(sorted(frontend.glob("vite.config.*")))
+    for folder in ("src", "public"):
+        base = frontend / folder
+        if base.is_dir():
+            files.extend(sorted(path for path in base.rglob("*") if path.is_file()))
+    return files
+
+
+def frontend_dist_is_stale(dist_index: Path) -> bool:
+    built_at = dist_index.stat().st_mtime
+    return any(path.is_file() and path.stat().st_mtime > built_at for path in frontend_source_files(ROOT))
+
+
+def ensure_frontend_dist(skip_build: bool = False, verified: bool = False) -> None:
     dist_index = ROOT / "frontend" / "dist" / "index.html"
     if dist_index.exists():
-        print(f"OK_FRONTEND_DIST {dist_index}")
+        # verified: the caller (the double-click setup) already fingerprinted the build inputs.
+        if verified or not frontend_dist_is_stale(dist_index):
+            print(f"OK_FRONTEND_DIST {dist_index}")
+            return
+        if skip_build or not (ROOT / "frontend" / "node_modules").exists() or shutil.which("npm") is None:
+            print("WARN_FRONTEND_DIST_STALE frontend sources changed after the last build; run: cd frontend && npm ci && npm run build")
+            print(f"OK_FRONTEND_DIST {dist_index}")
+            return
+        print("FRONTEND_DIST_STALE frontend sources changed after the last build; rebuilding")
+        try:
+            run_checked(["npm", "run", "build"], cwd=ROOT / "frontend")
+        except (OSError, subprocess.CalledProcessError) as exc:
+            # A stale interface is better than no interface: keep serving the previous build.
+            print(f"WARN_FRONTEND_REBUILD_FAILED {exc}; serving the previous build")
+            print(f"OK_FRONTEND_DIST {dist_index}")
+            return
+        print(f"FRONTEND_DIST_STALE_REBUILT {dist_index}")
         return
     if skip_build:
         raise SystemExit("ERROR_FRONTEND_DIST_MISSING run: cd frontend && npm ci && npm run build")
@@ -91,6 +127,9 @@ def wait_for_health(port: int, timeout_seconds: float) -> bool:
 def start_backend(port: int, extra_env: dict[str, str] | None = None) -> subprocess.Popen:
     cmd = [
         sys.executable,
+        "-s",
+        "-P",
+        "-B",
         "-m",
         "uvicorn",
         BACKEND_APP,
@@ -182,6 +221,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--skip-build", action="store_true", help="Do not build frontend/dist if missing.")
+    parser.add_argument(
+        "--frontend-verified",
+        action="store_true",
+        help="The caller already verified frontend/dist is current (the double-click setup fingerprints it); skip the staleness check.",
+    )
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--smoke-test", action="store_true", help="Start, verify, stop, and exit without opening a long-running session.")
     parser.add_argument("--hold-seconds", type=float, default=0.5, help="Seconds to hold a successful smoke-test backend before stopping.")
@@ -199,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--status-file",
         type=Path,
-        help="Progress page to update (ready/error/stopped); used by the Mucaro AI.app and Mucaro AI.exe launchers.",
+        help="Progress page to update (ready/error/stopped); used by the Start Mucaro AI.app and Start Mucaro AI.exe launchers.",
     )
     parser.add_argument(
         "--stop-file",
@@ -241,7 +285,7 @@ def _stop_requested(stop_file: Path | None) -> bool:
 
 def _launch(args: argparse.Namespace) -> int:
     print(f"DESKTOP_LAUNCH_START root={ROOT}")
-    ensure_frontend_dist(skip_build=args.skip_build)
+    ensure_frontend_dist(skip_build=args.skip_build, verified=args.frontend_verified)
     backend_env = {"MUCARO_AI_STOP_FILE": str(args.stop_file)} if args.stop_file else {}
 
     port = args.port
@@ -252,7 +296,7 @@ def _launch(args: argparse.Namespace) -> int:
                 args,
                 5,
                 f"ERROR_PORT_IN_USE_NON_MUCARO_AI port={port} no free port up to {port + 20}",
-                f"Ports {port}-{port + 20} are all used by other programs. Close one of them and double-click Mucaro AI again.",
+                f"Ports {port}-{port + 20} are all used by other programs. Close one of them and double-click Start Mucaro AI again.",
             )
         print(f"PORT_FALLBACK from={port} to={fallback}")
         port = fallback
@@ -268,7 +312,7 @@ def _launch(args: argparse.Namespace) -> int:
                     args,
                     5,
                     f"ERROR_PORT_IN_USE_NON_MUCARO_AI port={port}",
-                    f"Port {port} is used by another program. Close it and double-click Mucaro AI again.",
+                    f"Port {port} is used by another program. Close it and double-click Start Mucaro AI again.",
                 )
         else:
             # A stop request left over from an earlier session must not stop this one. Only cleared when

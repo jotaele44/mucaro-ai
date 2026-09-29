@@ -1,0 +1,311 @@
+{
+  "active_blockers": [
+    "BLK-LLM-001",
+    "BLK-PHYS-001",
+    "BLK-SIGN-001",
+    "BLK-SPEC-001",
+    "BLK-WEB-001"
+  ],
+  "application_artifact": {
+    "build_number": "336",
+    "bundle_tree_sha256": "c49807e5122977d171816d26a9910b6cae9838eaf3ed82c67005412a74019a88",
+    "minimum_os": "14.0",
+    "receipt": {
+      "path": "/tmp/claude-0/-home-user-mucaro-ai/aad4a389-683b-5739-b0f1-bc1961836c92/scratchpad/ev0a8/build_receipt.json",
+      "receipt_type": null,
+      "sha256": "ccd63d49ccbbbc213d25f7c941437d471b9c8def9777ccd20bbbb2f5c4235661",
+      "status": "MACOS_APP_BUILD_OK"
+    },
+    "state": "PRESENT",
+    "version": "0.1.23",
+    "zip": "Mucaro-AI-0.1.23-336-macos-arm64.zip",
+    "zip_sha256": "461747538a90bd0be34d38e076ba53730a5dea6b8da308a0499d87d09dbef4ef"
+  },
+  "benchmark_versions": [
+    {
+      "bytes": 11770,
+      "path": "backend/tests/fixtures/retrieval_eval.json",
+      "sha256": "74bf6cf8df3c4a8e2019c093d43f8b315c632170e984226f9e4b91cccfd7a867"
+    },
+    {
+      "bytes": 22172,
+      "path": "backend/tests/fixtures/retrieval_eval_large.json",
+      "sha256": "964e6d65e4b4b70157bce4c6f52302d65c5d4df909555989e3658544ca3d1b22"
+    },
+    {
+      "bytes": 15096,
+      "path": "backend/tests/fixtures/retrieval_eval_mixed_formats.json",
+      "sha256": "0800cc1657043fe6ecb3cd08c8b0e335fb43545c7d130b20090ea1bb8d0ef608"
+    },
+    {
+      "bytes": 9181,
+      "path": "backend/tests/fixtures/answer_trace_eval.json",
+      "sha256": "b2c40652d43e3be7ab85bfa4f8eb18d7bc33e9b1eb9dcef9be9860bfea85cc7d"
+    },
+    {
+      "bytes": 88168,
+      "path": "backend/tests/fixtures/gis_eval.json",
+      "sha256": "55aa4d00b4d6e5fb2905d490917048891664a79bca003ec358d81b6a748d31ab"
+    }
+  ],
+  "capabilities": {
+    "requires_network": [
+      "tool:web.fetch",
+      "tool:web.fetch_session",
+      "tool:web.search"
+    ],
+    "source": "packaged app offline manifest (macOS E2E receipt)",
+    "supported": [
+      "answer.cited",
+      "exports",
+      "gis.vector_raster",
+      "ingest.files",
+      "memory",
+      "model:mock",
+      "retrieve.local",
+      "tool:coding.diff",
+      "tool:coding.patch_apply",
+      "tool:coding.patch_check",
+      "tool:coding.read_file",
+      "tool:coding.repo_status",
+      "tool:memory.list",
+      "tool:product.audit",
+      "tool:source_library.status",
+      "tool:workspace_profiles.list"
+    ],
+    "unsupported_in_this_build": [
+      "model:anthropic",
+      "model:openai_compatible_local",
+      "ocr.image",
+      "ocr.pdf_render",
+      "tool:web.render"
+    ]
+  },
+  "complete_except_blocked": true,
+  "created_utc": "2026-09-26T20:26:54Z",
+  "dependency_locks": [
+    {
+      "bytes": 1248,
+      "path": "pyproject.toml",
+      "sha256": "e1d22308f4a9e5155a735d00f78c61073d316819e44af2c25fc79f06fe7e0c49"
+    },
+    {
+      "bytes": 640,
+      "path": "packaging/macos/requirements-macos-arm64.in",
+      "sha256": "b8dd3ed2e64ddc28ad675c783ef882ed5540e363900e0b4f84ed65a2809a2e1c"
+    },
+    {
+      "bytes": 51745,
+      "path": "packaging/macos/requirements-macos-arm64.lock",
+      "sha256": "d4e75fbd89cdcd046598c443951482c4af286666a9935ae0a823fff554d8b48e"
+    },
+    {
+      "bytes": 41794,
+      "path": "packaging/runtime/requirements-macos-x86_64.lock",
+      "sha256": "3ce843ba46d01d13ea678709feaab5d6a1db2865cad6a9307d0f9e8599e15652"
+    },
+    {
+      "bytes": 1627,
+      "path": "scripts/one_click_pins.env",
+      "sha256": "7f996d76de446d581c5b47de60e7736d78c20892ca3b401960080262e0fdd9ca"
+    },
+    {
+      "bytes": 221,
+      "path": "backend/requirements.txt",
+      "sha256": "f9e7843b766bb24bb739a33c13451bc3bd01405f67e5b5767633f2c670666058"
+    },
+    {
+      "bytes": 56751,
+      "path": "frontend/package-lock.json",
+      "sha256": "33b0175718c736f62d782ab66927f37f70f21883285d6a91e99530c8ba3464a6"
+    },
+    {
+      "bytes": 3104,
+      "path": "qa/rendered/package-lock.json",
+      "sha256": "7101ca6ef39d328f51d133df72b075ebfa2c9db95a709eebbf57c9c7d8c8f2c1"
+    }
+  ],
+  "installer": {
+    "reason": "the distributable is the ditto zip of the .app (no .pkg/.dmg in the release class)",
+    "state": "NOT_APPLICABLE"
+  },
+  "ledgers": [
+    {
+      "bytes": 45693,
+      "path": "_architecture/release/release_scope_manifest_v1.json",
+      "sha256": "2ff45de43cb8f107387577b3442a8e8362f55a0c4e4427feafef3823c7e9c6f9"
+    },
+    {
+      "bytes": 113961,
+      "path": "_architecture/release/acceptance_ledger_v1.json",
+      "sha256": "37e868dc33c2a7cc8b719695b3a510ab1b1eee31011a74c20c3709467eb8637a"
+    },
+    {
+      "bytes": 16404,
+      "path": "_architecture/release/release_dag_v1.json",
+      "sha256": "c7c909a0b2b0a2bacdc979838387efbd8347f75f4b5858231fe9b98579933956"
+    },
+    {
+      "bytes": 4534,
+      "path": "_architecture/release/blocker_ledger_v1.json",
+      "sha256": "bc30e78280bc07b5e963d44a8092dbc21d012b4085c0c2c49355d67e25c81554"
+    },
+    {
+      "bytes": 8076,
+      "path": "_architecture/release/contradiction_ledger_v1.json",
+      "sha256": "b4241e3ff2879a1fec9de2c421ed4ca90980c0318c6fbde586254769160e33cc"
+    },
+    {
+      "bytes": 5428,
+      "path": "_architecture/release/scope_delta_ledger_v1.json",
+      "sha256": "cfb0e600adc28f3d32ce68525f4101857d663a1f82ad5c2a7bd5169df1d7b71c"
+    }
+  ],
+  "missing_entries": [],
+  "notarization_receipt": {
+    "blocker": "BLK-SIGN-001",
+    "reason": "notarization and stapling requires an Apple Developer ID account",
+    "state": "BLOCKED"
+  },
+  "provenance": {
+    "build_host": {
+      "mac_ver": "14.8.9",
+      "machine": "arm64",
+      "platform": "darwin",
+      "python": "3.11.9"
+    },
+    "build_inputs": {
+      "frontend_index_sha256": "46d660ce015ee037d2a0d4ff646244f3a78587e695209a9505f2c06810224cc4",
+      "lock_sha256": "d4e75fbd89cdcd046598c443951482c4af286666a9935ae0a823fff554d8b48e",
+      "spec_sha256": "38d2d304c60a601e11285233d708f22daea9925bfc091496431918ffcb345916"
+    },
+    "builder": "scripts/build_macos_app.py",
+    "e2e_receipt": {
+      "path": "/tmp/claude-0/-home-user-mucaro-ai/aad4a389-683b-5739-b0f1-bc1961836c92/scratchpad/ev0a8/e2e_receipt.json",
+      "receipt_type": null,
+      "sha256": "387d8cb7fbe43a286bdce1a8b03073948c748e447c7ba49d46282b75768b4e6d",
+      "status": "MACOS_APP_E2E_PASS"
+    }
+  },
+  "requirement_manifest": {
+    "bytes": 45693,
+    "denominator": {
+      "arithmetic_closes": true,
+      "by_scope": {
+        "EXTERNALLY_BLOCKED": 1,
+        "IN_SCOPE": 136,
+        "NOT_APPLICABLE": 1
+      },
+      "by_state": {
+        "BLOCKED": 7,
+        "FAIL": 0,
+        "NOT_APPLICABLE": 1,
+        "OPEN": 50,
+        "PASS": 55,
+        "PROVISIONAL": 25
+      },
+      "total": 138
+    },
+    "path": "_architecture/release/release_scope_manifest_v1.json",
+    "sha256": "2ff45de43cb8f107387577b3442a8e8362f55a0c4e4427feafef3823c7e9c6f9"
+  },
+  "sbom": {
+    "gui_bundle": {
+      "components": 114,
+      "path": "data/exports/security/0a806c1e8c98/sbom-gui.cdx.json",
+      "required_components": 3,
+      "sha256": "957ad451ed365cb186c80c65b6098cfd20a3df2174d1ac2c8455a3c8a0b36463"
+    },
+    "python_macos_arm64": {
+      "components": 45,
+      "path": "data/exports/security/0a806c1e8c98/sbom-python-macos-arm64.cdx.json",
+      "required_components": 45,
+      "sha256": "e1c914a65be208a62830abc239cf54c48569b3ccfece2861829828b72a1ca5df"
+    }
+  },
+  "schema_version": "mucaro-final-release-manifest/1.0",
+  "security_receipts": {
+    "path": "data/exports/release_receipts/security_gates-0a806c1e8c98.json",
+    "receipt_type": "security_gates",
+    "sha256": "74752cf2e50a12ec4e6556f36b73172b2b7a65e3e300a7c839327a83ed316c78",
+    "status": "SECURITY_GATES_PASS"
+  },
+  "signing_receipt": {
+    "blocker": "BLK-SIGN-001",
+    "reason": "Developer ID signing requires an Apple Developer ID account",
+    "state": "BLOCKED"
+  },
+  "source_revision": "0a806c1e8c98cc159568fea898a76a30189b0d1c",
+  "source_tree_sha": "72acf32c14e570c943fcfbe836e55912158ff271",
+  "specifications": [
+    {
+      "path": "docs/release/MUCARO_RELEASE_ENGINEERING_CONTRACT_V1.md",
+      "sha256": "5d031f20011bc04dae796ae9edda25bcf6e004e65f85124f0de99a0f4b079ad5",
+      "spec_id": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
+      "verified": true
+    },
+    {
+      "path": "docs/release/MOBILE_INTERACTION_EXTRACTION_V1.md",
+      "sha256": "9a13a192fc51a4419dbee8bc1cfb43a5939e0c94d1e90e6a3fa096967f4558ab",
+      "spec_id": "MOBILE_INTERACTION_EXTRACTION_V1",
+      "verified": true
+    },
+    {
+      "blocker": "BLK-SPEC-001",
+      "spec_id": "Mucaro AI Release-Grade Workbench Specification",
+      "state": "BLOCKED"
+    }
+  ],
+  "test_receipts": [
+    {
+      "path": "data/exports/release_receipts/answer_trace_quality-0a806c1e8c98.json",
+      "receipt_type": "answer_trace_quality",
+      "sha256": "3c12fb2a5fdaa0105612a911ffe343c5106f394ff0bc65091dee85ae79c253ee",
+      "status": "ANSWER_TRACE_QUALITY_CERT_OK"
+    },
+    {
+      "path": "data/exports/release_receipts/fresh_clone-0a806c1e8c98.json",
+      "receipt_type": "fresh_clone",
+      "sha256": "4654a89f85f0a5582fe443f2fe7baca04a6da7a00e323c0b0bcac8da318f1db1",
+      "status": "FRESH_CLONE_CERT_OK"
+    },
+    {
+      "path": "data/exports/release_receipts/gis_quality-0a806c1e8c98.json",
+      "receipt_type": "gis_quality",
+      "sha256": "c6f3acdaa362c6a59c8f91d2c34c500e0142aed94cde0e6b7a7b19604862b1a1",
+      "status": "GIS_QUALITY_CERT_OK"
+    },
+    {
+      "path": "data/exports/release_receipts/local_release-0a806c1e8c98.json",
+      "receipt_type": "local_release",
+      "sha256": "3d137da42f0717d0e737de492ffbecde21d7f4cbfd3dba6743f96260efcc0b9a",
+      "status": "CERTIFY_RELEASE_OK"
+    },
+    {
+      "path": "data/exports/release_receipts/operator_workflow-0a806c1e8c98.json",
+      "receipt_type": "operator_workflow",
+      "sha256": "ae4d184f6e33611043aa7f59984037b89014707bed4dee31db2ae47789e2c196",
+      "status": "OPERATOR_WORKFLOW_CERT_OK"
+    },
+    {
+      "path": "data/exports/release_receipts/python_dist-0a806c1e8c98.json",
+      "receipt_type": "python_dist",
+      "sha256": "c2df149dcca597f8c5586a7fe8b2ec6995d8a2ab7d7ebe884211e87864bb4bb3",
+      "status": "PYTHON_DIST_CERT_OK"
+    },
+    {
+      "path": "data/exports/release_receipts/retrieval_quality-0a806c1e8c98.json",
+      "receipt_type": "retrieval_quality",
+      "sha256": "53174cab6adf64d1bd480c9a42a7e696b004188568a035f7163687aa8bec62d4",
+      "status": "RETRIEVAL_QUALITY_CERT_OK"
+    },
+    {
+      "path": "data/exports/release_receipts/source_artifact-0a806c1e8c98.json",
+      "receipt_type": "source_artifact",
+      "sha256": "e780cd4fa1f00abbdd4fa11ef672bb633ed10585d40274ed2e4ae4a57b0e8338",
+      "status": "SOURCE_ARTIFACT_CERT_OK"
+    }
+  ],
+  "unresolved_material_contradictions": [],
+  "worktree_clean": true
+}

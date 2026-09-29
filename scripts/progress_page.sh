@@ -1,6 +1,6 @@
 #!/bin/bash
 # Bash renderer for the setup progress page (see scripts/progress_page.py, the reference copy).
-# Sourced by "Mucaro AI.app/Contents/MacOS/mucaro-launcher" and scripts/one_click.sh.
+# Sourced by "Start Mucaro AI.app/Contents/MacOS/mucaro-launcher" and scripts/one_click.sh.
 # Usage: progress_page_write <page> <state> <step> <title> <detail> [log] [url]
 # Bash 3.2 compatible. Never fails the caller: rendering problems are ignored.
 
