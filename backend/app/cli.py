@@ -89,6 +89,7 @@ from .ingestion import (
 )
 from .contracts import contract_errors, list_contracts
 from .offline import build_offline_manifest
+from .observability import ForensicTrailError, build_forensic_trail
 from .macos_app_store import build_macos_app_store_readiness
 from .parser import ParseError
 from .memory import (
@@ -1086,6 +1087,13 @@ def build_parser() -> argparse.ArgumentParser:
     security_status.add_argument("--host", default=None, help="Optional bind host to evaluate.")
     security_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     security_status.set_defaults(handler=run_security_status)
+
+    observability = subcommands.add_parser("observability", help="Inspect the privacy-bounded cross-subsystem forensic trail.")
+    observability_subcommands = observability.add_subparsers(dest="observability_command", required=True)
+    observability_trail = observability_subcommands.add_parser("trail", help="Merge canonical execution records into one forensic view.")
+    observability_trail.add_argument("--limit", type=int, default=500, help="Return the most recent 1-5000 event manifestations.")
+    observability_trail.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    observability_trail.set_defaults(handler=run_observability_trail)
 
     index = subcommands.add_parser("index", help="Inspect retrieval index health.")
     index_subcommands = index.add_subparsers(dest="index_command", required=True)
@@ -8273,6 +8281,16 @@ def run_security_status(args: argparse.Namespace, cfg: Settings) -> int:
     result = build_security_report(cfg, bind_host=args.host)
     emit_payload(result, args.format)
     return 0 if result.get("status") != "SECURITY_FAIL" else 2
+
+
+def run_observability_trail(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = build_forensic_trail(cfg, limit=args.limit)
+    except ForensicTrailError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if result.get("status") == "FORENSIC_TRAIL_OK" else 2
 
 
 def run_index_status(args: argparse.Namespace, cfg: Settings) -> int:
