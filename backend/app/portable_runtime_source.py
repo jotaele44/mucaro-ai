@@ -253,20 +253,29 @@ def inspect_runtime_archive(
         raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE", str(exc)) from exc
 
     with archive:
-        members = archive.getmembers()
+        members: list[tarfile.TarInfo] = []
+        total_declared_regular_bytes = 0
+        for member in archive:
+            members.append(member)
+            if len(members) > max_members:
+                raise PortableRuntimeSourceError(
+                    "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT",
+                    f"member_count>{max_members}",
+                )
+            if member.isfile():
+                if member.size < 0:
+                    raise PortableRuntimeSourceError(
+                        "ERROR_PORTABLE_RUNTIME_ARCHIVE_READ",
+                        f"{member.name}: negative declared size",
+                    )
+                total_declared_regular_bytes += member.size
+                if total_declared_regular_bytes > max_regular_bytes:
+                    raise PortableRuntimeSourceError(
+                        "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT",
+                        f"total_regular_bytes>{max_regular_bytes}",
+                    )
         if not members:
             raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE", "archive has no members")
-        if len(members) > max_members:
-            raise PortableRuntimeSourceError(
-                "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT",
-                f"member_count={len(members)} max_members={max_members}",
-            )
-        total_declared_regular_bytes = sum(member.size for member in members if member.isfile())
-        if total_declared_regular_bytes > max_regular_bytes:
-            raise PortableRuntimeSourceError(
-                "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT",
-                f"total_regular_bytes={total_declared_regular_bytes} max_regular_bytes={max_regular_bytes}",
-            )
         unsupported = [member for member in members if not (member.isfile() or member.issym())]
         if unsupported:
             raise PortableRuntimeSourceError(
