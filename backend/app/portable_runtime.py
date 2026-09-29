@@ -101,6 +101,14 @@ def _safe_relative(value: str) -> Path:
     return Path(*parsed.parts)
 
 
+def _nested_app_bundle(value: str) -> bool:
+    """A tracked app bundle, such as the source-checkout launcher Mucaro AI Setup.app.
+
+    It stays out of Contents/Resources: an unsigned app nested in the package fails deep signature
+    verification, and opening it would run the checkout setup against this read-only bundle."""
+    return any(part.endswith(".app") for part in PurePosixPath(value).parts[:-1])
+
+
 def build_portable_macos_app(
     root: Path,
     runtime_dir: Path,
@@ -147,7 +155,7 @@ def build_portable_macos_app(
     copied_tracked: list[str] = []
     for rel in tracked:
         source = root / _safe_relative(rel)
-        if not source.is_file():
+        if not source.is_file() or _nested_app_bundle(rel):
             continue
         target = app_target / rel
         target.parent.mkdir(parents=True, exist_ok=True)

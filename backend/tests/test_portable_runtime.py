@@ -65,6 +65,23 @@ def test_portable_bundle_is_bundle_relative_and_hash_verified(tmp_path: Path) ->
     assert verify_portable_macos_app(app)["status"] == "PORTABLE_APP_VERIFIED"
 
 
+def test_portable_bundle_leaves_out_tracked_app_bundles(tmp_path: Path) -> None:
+    # The source-checkout launcher must not become a second, unsigned app inside the package.
+    root, runtime = fixture_project(tmp_path)
+    launcher = root / "Mucaro AI Setup.app" / "Contents" / "MacOS" / "Mucaro AI"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("#!/bin/bash\n", encoding="utf-8")
+    (root / "Mucaro AI Setup.app" / "Contents" / "Info.plist").write_text("<plist/>\n", encoding="utf-8")
+    git(root, "add", "Mucaro AI Setup.app")
+    git(root, "commit", "-m", "checkout launcher")
+
+    report = build_portable_macos_app(root, runtime, output_dir=root / "out")
+    assert report["status"] == "PORTABLE_APP_VERIFIED"
+    app_root = Path(report["app_path"]) / "Contents" / "Resources" / "app"
+    assert (app_root / "backend" / "marker.py").is_file()
+    assert not list(app_root.rglob("*.app"))
+
+
 def test_runtime_symlink_fails_closed(tmp_path: Path) -> None:
     root, runtime = fixture_project(tmp_path)
     target = runtime / "lib" / "runtime.txt"
