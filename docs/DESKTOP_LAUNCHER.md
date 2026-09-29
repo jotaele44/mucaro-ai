@@ -1,6 +1,6 @@
 # Desktop Launcher Mode
 
-> **Source setup, not a release artifact.** `Mucaro AI.app` (macOS), `Mucaro AI.command` and
+> **Source setup, not a release artifact.** `Mucaro AI Setup.app` (macOS), `Mucaro AI.command` and
 > `Mucaro AI.cmd` in the repository root are the supported ways to run Mucaro from a source
 > checkout. Release-grade certification requires two packaged lanes, and none of these is one:
 >
@@ -14,7 +14,7 @@ Desktop Launcher Mode lets Mucaro AI run with one command.
 
 ## Double-click setup and launch
 
-`Mucaro AI.app` (macOS) sets up everything on first use and opens Mucaro AI in its own window,
+`Mucaro AI Setup.app` (macOS) sets up everything on first use and opens Mucaro AI in its own window,
 with the local service running inside the app (`scripts/one_click_desktop.py`); there is no
 terminal or browser. `Mucaro AI.command` (macOS/Linux) and `Mucaro AI.cmd` (Windows) run the same
 setup in a terminal window and then run `scripts/launch_app.py --auto-port --exit-if-running`. See
@@ -33,7 +33,7 @@ It starts the private local backend on `127.0.0.1:8000`, serves the built React 
 
 ## Double-Click App
 
-For everyday use, open the `Mucaro AI.app` committed in the repository root; it needs no build.
+For source-checkout use, open the `Mucaro AI Setup.app` committed in the repository root; it needs no build.
 The generated wrapper below is kept for the packaging checks (`MACOS_APP_BUNDLE_VERIFIED`).
 
 Build a local source-bound macOS Application bundle:
