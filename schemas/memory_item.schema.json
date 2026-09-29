@@ -88,10 +88,7 @@
       "if": {
         "properties": {
           "scope": {
-            "enum": [
-              "workspace",
-              "conversation"
-            ]
+            "const": "workspace"
           }
         },
         "required": [
@@ -103,7 +100,30 @@
           "scope_id": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 160
+            "maxLength": 160,
+            "pattern": "^workspace_[A-Za-z0-9]+$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "conversation"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scope_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^conv_[A-Za-z0-9]+$"
           }
         }
       }
