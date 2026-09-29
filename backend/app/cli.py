@@ -1057,6 +1057,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="preference",
         help="Memory item type.",
     )
+    memory_remember.add_argument(
+        "--scope",
+        choices=["global", "workspace", "conversation"],
+        default="global",
+        help="Memory applicability scope. Workspace defaults to the active workspace; conversation requires --scope-id.",
+    )
+    memory_remember.add_argument("--scope-id", help="Explicit workspace profile ID or conversation ID for scoped memory.")
     memory_remember.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     memory_remember.set_defaults(handler=run_memory_remember)
 
@@ -8238,7 +8245,14 @@ def run_memory_list(args: argparse.Namespace, cfg: Settings) -> int:
 
 def run_memory_remember(args: argparse.Namespace, cfg: Settings) -> int:
     try:
-        result = remember_memory_item(" ".join(args.content), cfg, kind=args.kind, source="cli")
+        result = remember_memory_item(
+            " ".join(args.content),
+            cfg,
+            kind=args.kind,
+            source="cli",
+            scope=args.scope,
+            scope_id=args.scope_id,
+        )
     except MemoryError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
