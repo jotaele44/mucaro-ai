@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""End-to-end check of the double-clickable ``Mucaro AI.app`` in a checkout (macOS CI).
+"""End-to-end check of the double-clickable ``Mucaro AI Setup.app`` in a checkout (macOS CI).
 
-The CI job first opens the app through LaunchServices (``open "Mucaro AI.app"``, the path a Finder
+The CI job first opens the app through LaunchServices (``open "Mucaro AI Setup.app"``, the path a Finder
 double-click takes) on a clean runner and waits until the first-run setup has created ``.venv``.
 This script then runs with ``.venv/bin/python`` (whose pywebview dependencies provide Quartz for the
 window check) and proves, against the app that is already running:
@@ -155,7 +155,7 @@ def blocking(receipt: dict[str, Any]) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--app", type=Path, default=ROOT / "Mucaro AI.app")
+    parser.add_argument("--app", type=Path, default=ROOT / "Mucaro AI Setup.app")
     parser.add_argument("--data-dir", type=Path, default=ROOT / "data", help="The library the app opens (default: data/).")
     parser.add_argument("--runtime", type=Path, default=ROOT / ".mucaro-runtime")
     parser.add_argument("--first-timeout", type=float, default=600.0, help="Seconds to wait for the already opened app.")
@@ -167,7 +167,7 @@ def main() -> int:
     started = datetime.now(UTC).isoformat()
     try:
         if sys.platform != "darwin":
-            raise VerificationError("Mucaro AI.app verification needs macOS")
+            raise VerificationError("Mucaro AI Setup.app verification needs macOS")
         receipt = verify(args.app.resolve(), args.data_dir.resolve(), args.runtime.resolve(), args.output, args.first_timeout)
         failures = blocking(receipt)
     except (VerificationError, subprocess.SubprocessError, OSError, KeyError) as exc:
