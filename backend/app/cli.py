@@ -117,6 +117,7 @@ from .portable_runtime import (
 )
 from .portable_runtime_source import (
     PortableRuntimeSourceError,
+    inspect_runtime_archive,
     materialize_portable_runtime,
     verify_materialized_runtime,
 )
@@ -1153,6 +1154,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--archive",
         type=Path,
         help="Optional predownloaded archive; its exact size and SHA-256 must match the source manifest.",
+    )
+    package_portable_runtime.add_argument(
+        "--inspect-archive",
+        type=Path,
+        help=(
+            "Inspect one runtime tar.gz without extraction or materialization; emits exact byte/hash, "
+            "archive geometry, logical-member hash, and payload-multiset hash."
+        ),
     )
     package_portable_runtime.add_argument(
         "--output-dir",
@@ -3586,7 +3595,26 @@ def run_package_app_store_audit(args: argparse.Namespace, cfg: Settings) -> int:
 def run_package_portable_runtime(args: argparse.Namespace, cfg: Settings) -> int:
     manifest = args.manifest or (cfg.project_root / "packaging" / "runtime" / "macos-x86_64.json")
     try:
-        if args.verify is not None:
+        if args.inspect_archive is not None:
+            conflicting = [
+                name
+                for name, value in (
+                    ("--manifest", args.manifest),
+                    ("--archive", args.archive),
+                    ("--output-dir", args.output_dir),
+                    ("--verify", args.verify),
+                )
+                if value is not None
+            ]
+            if conflicting:
+                emit_error(
+                    "ERROR_PORTABLE_RUNTIME_MODE_CONFLICT",
+                    "--inspect-archive cannot be combined with " + ",".join(conflicting),
+                    args.format,
+                )
+                return 2
+            report = {"status": "PORTABLE_RUNTIME_ARCHIVE_INSPECTED", **inspect_runtime_archive(args.inspect_archive)}
+        elif args.verify is not None:
             report = verify_materialized_runtime(cfg.project_root, args.verify, manifest)
         else:
             default_runtime_name = "macos-x86_64" if args.manifest is None else manifest.stem
@@ -3601,7 +3629,7 @@ def run_package_portable_runtime(args: argparse.Namespace, cfg: Settings) -> int
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(report, args.format)
-    return 0 if report["status"] == "PORTABLE_RUNTIME_VERIFIED" else 2
+    return 0 if report["status"] in {"PORTABLE_RUNTIME_VERIFIED", "PORTABLE_RUNTIME_ARCHIVE_INSPECTED"} else 2
 
 
 def run_package_portable_macos_app(args: argparse.Namespace, cfg: Settings) -> int:
