@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import statistics
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
+
+from .config import Settings, settings
+from .utils import write_json
 
 OCR_STRUCTURE_SCHEMA_VERSION = "mucaro-ocr-structure/1.0"
 
@@ -461,4 +467,77 @@ def reconstruct_form(spans: list[dict[str, Any]], *, min_fields: int = 2) -> dic
             "Checkbox semantics, radio groups, unlabeled fields, multiline values and spatial label/value pairing without a colon remain unresolved.",
             "Raw label and value strings are preserved; canonical labels are used only for duplicate detection.",
         ],
+    }
+
+
+def reconstruct_ocr_report(
+    report_path: str | Path,
+    *,
+    kind: str,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    source_path = Path(report_path).expanduser().resolve()
+    try:
+        raw = source_path.read_bytes()
+        report = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise OCRStructureError("ERROR_OCR_STRUCTURE_REPORT_READ", str(source_path)) from exc
+    if not isinstance(report, dict) or report.get("schema_version") != "mucaro_ocr_report_v1":
+        raise OCRStructureError(
+            "ERROR_OCR_STRUCTURE_REPORT_SCHEMA",
+            "structure input must be a saved mucaro_ocr_report_v1 image OCR receipt",
+        )
+    spans = report.get("spans")
+    if not isinstance(spans, list) or not spans:
+        raise OCRStructureError("ERROR_OCR_STRUCTURE_REPORT_SPANS", "saved OCR receipt contains no structure spans")
+
+    dispatch = {
+        "multi_column": reconstruct_multicolumn,
+        "table": reconstruct_table,
+        "form": reconstruct_form,
+    }
+    if kind not in dispatch:
+        raise OCRStructureError("ERROR_OCR_STRUCTURE_KIND", f"unsupported structure kind: {kind}")
+    structure = dispatch[kind](spans)
+    report_sha256 = hashlib.sha256(raw).hexdigest()
+    structure_identity = hashlib.sha256(
+        f"{report_sha256}:{kind}:{OCR_STRUCTURE_SCHEMA_VERSION}".encode("utf-8")
+    ).hexdigest()[:24]
+    cfg.ensure_dirs()
+    out_dir = cfg.export_dir / "ocr_structures"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    output_path = out_dir / f"ocrstructure_{structure_identity}.json"
+    receipt = {
+        "schema_version": "mucaro-ocr-structure-receipt/1.0",
+        "structure_id": f"ocrstructure_{structure_identity}",
+        "status": structure.get("status"),
+        "kind": kind,
+        "input_ocr_report": {
+            "path": str(source_path),
+            "sha256": report_sha256,
+            "report_id": report.get("report_id"),
+            "source_sha256": report.get("source", {}).get("sha256")
+            if isinstance(report.get("source"), dict)
+            else None,
+            "engine": report.get("engine"),
+        },
+        "structure": structure,
+        "invariants": {
+            "input_report_sha256_present": len(report_sha256) == 64,
+            "input_report_schema_bound": True,
+            "structure_kind_exact": structure.get("kind") == kind.upper(),
+            "structure_span_count_matches_input": structure.get("span_count", len(spans)) == len(spans),
+        },
+        "limitations": [
+            "The structure receipt is derived from an existing OCR receipt and does not rerun OCR.",
+            "A reconstruction status records bounded algorithm resolution, not universal semantic correctness.",
+            "CANDIDATE_NOT_IDENTITY and UNRESOLVED states remain binding until independent executed benchmark evidence supports promotion.",
+        ],
+    }
+    write_json(output_path, receipt)
+    receipt_sha256 = hashlib.sha256(output_path.read_bytes()).hexdigest()
+    return {
+        **receipt,
+        "receipt_path": str(output_path),
+        "receipt_sha256": receipt_sha256,
     }
