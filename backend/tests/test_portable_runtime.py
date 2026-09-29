@@ -25,10 +25,11 @@ def fixture_project(root: Path) -> tuple[Path, Path]:
     (root / "scripts" / "launch_app.py").write_text("print('launch')\n", encoding="utf-8")
     (root / "frontend" / "dist").mkdir(parents=True)
     (root / "frontend" / "dist" / "index.html").write_text("<html>Mucaro</html>\n", encoding="utf-8")
+    (root / "pyproject.toml").write_text('[project]\\nname = "mucaro-ai"\\nversion = "0.1.23"\\n', encoding="utf-8")
     git(root, "init")
     git(root, "config", "user.email", "mucaro-tests@example.invalid")
     git(root, "config", "user.name", "Mucaro Tests")
-    git(root, "add", "backend/marker.py", "scripts/launch_app.py")
+    git(root, "add", "backend/marker.py", "scripts/launch_app.py", "pyproject.toml")
     git(root, "commit", "-m", "fixture")
 
     runtime = root / "runtime-input"
@@ -118,3 +119,17 @@ def test_portable_bundle_binds_runtime_provenance_receipt(tmp_path: Path) -> Non
     tampered = verify_portable_macos_app(Path(report["app_path"]))
     assert tampered["status"] == "PORTABLE_APP_VERIFY_FAILED"
     assert "runtime_provenance_receipt" in tampered["failed_checks"]
+
+
+def test_portable_manifest_version_must_match_bundled_metadata(tmp_path: Path) -> None:
+    root, runtime = fixture_project(tmp_path)
+    report = build_portable_macos_app(root, runtime, output_dir=root / "out")
+    app = Path(report["app_path"])
+    manifest = app / "Contents/Resources/portable-manifest.json"
+    import json
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["release_version"] = "9.9.9"
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    result = verify_portable_macos_app(app)
+    assert result["status"] == "PORTABLE_APP_VERIFY_FAILED"
+    assert "release_version_matches_package" in result["failed_checks"]
