@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.config import Settings
+import backend.app.main as main_module
 from backend.app.main import create_app
 from backend.app.memory import (
     MemoryError,
@@ -65,6 +66,15 @@ def test_scope_combinations_fail_closed(tmp_path: Path) -> None:
     assert unsupported.value.status == "ERROR_MEMORY_SCOPE_UNSUPPORTED"
 
 
+    with pytest.raises(MemoryError) as bad_workspace:
+        remember_memory_item("Bad workspace.", cfg, scope="workspace", scope_id="default")
+    assert bad_workspace.value.status == "ERROR_MEMORY_WORKSPACE_SCOPE_ID"
+
+    with pytest.raises(MemoryError) as bad_conversation:
+        remember_memory_item("Bad conversation.", cfg, scope="conversation", scope_id="conversation-one")
+    assert bad_conversation.value.status == "ERROR_MEMORY_CONVERSATION_SCOPE_ID"
+
+
 def test_legacy_rows_are_exposed_as_global_without_rewriting_until_mutation(tmp_path: Path) -> None:
     cfg = cfg_for(tmp_path)
     cfg.ensure_dirs()
@@ -96,6 +106,36 @@ def test_legacy_rows_are_exposed_as_global_without_rewriting_until_mutation(tmp_
     assert "scope_migration" not in persisted
     assert persisted["scope"] == "global"
     assert persisted["scope_id"] is None
+
+
+def test_malformed_stored_scope_is_visible_but_cannot_be_enabled(tmp_path: Path) -> None:
+    cfg = cfg_for(tmp_path)
+    cfg.ensure_dirs()
+    path = cfg.processed_dir / "assistant_memory.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "memory_id": "mem_bad123",
+                    "kind": "fact",
+                    "content": "Malformed scoped row.",
+                    "enabled": False,
+                    "source": "legacy",
+                    "scope": "workspace",
+                    "scope_id": None,
+                    "created_at": "2026-01-01T00:00:00Z",
+                    "updated_at": "2026-01-01T00:00:00Z",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    listed = list_memory_items(cfg)["memories"][0]
+    assert listed["scope"] == "invalid"
+    assert listed["scope_migration"] == "INVALID_STORED_SCOPE"
+    result = set_memory_enabled("mem_bad123", True, cfg)
+    assert result == {"status": "ERROR_MEMORY_SCOPE_INVALID", "memory_id": "mem_bad123"}
 
 
 def scoped_rows(workspace_id: str) -> list[dict]:
@@ -174,3 +214,54 @@ def test_api_memory_scope_is_inspectable_and_workspace_scope_is_bound(tmp_path: 
         ("workspace", current_workspace_scope_id(cfg)),
         ("conversation", "conv_example"),
     }
+
+
+
+def test_answer_routes_bind_only_the_applicable_conversation_scope(tmp_path: Path, monkeypatch) -> None:
+    cfg = cfg_for(tmp_path)
+    captured: list[str | None] = []
+
+    def fake_answer_question(*_args, **kwargs):
+        captured.append(kwargs.get("conversation_scope_id"))
+        return {
+            "run_id": "run_scope_test",
+            "answer": "Scoped answer.",
+            "citation_status": "CITATION_OK",
+            "retrieval_strategy": "none",
+            "cited_chunk_ids": [],
+            "source_ids": [],
+            "validation_flags": [],
+        }
+
+    monkeypatch.setattr(main_module, "answer_question", fake_answer_question)
+    client = TestClient(create_app(cfg))
+
+    direct = client.post("/ask", json={"query": "Direct question"})
+    assert direct.status_code == 200
+    assert captured[-1] is None
+
+    conversation = client.post("/conversations", json={"title": "Scoped chat"}).json()
+    conversation_id = conversation["conversation_id"]
+    scoped = client.post(
+        f"/conversations/{conversation_id}/ask",
+        json={"query": "Conversation question"},
+    )
+    assert scoped.status_code == 200
+    assert captured[-1] == conversation_id
+
+
+def test_api_rejects_non_stable_conversation_scope_id(tmp_path: Path) -> None:
+    client = TestClient(create_app(cfg_for(tmp_path)))
+
+    response = client.post(
+        "/memory",
+        json={
+            "content": "Bad conversation scope.",
+            "kind": "fact",
+            "scope": "conversation",
+            "scope_id": "not-a-conversation-id",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["status"] == "ERROR_MEMORY_CONVERSATION_SCOPE_ID"
