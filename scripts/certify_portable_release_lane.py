@@ -23,7 +23,7 @@ def _sha256(path: Path) -> str:
 def _json(path: Path) -> dict:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError(f"{path}: expected JSON object")
+        raise TypeError(f"{path}: expected JSON object")
     return payload
 
 
@@ -53,7 +53,10 @@ def certify_portable_lane(
     clean = _json(clean_machine_receipt)
 
     clean_evidence = clean.get("evidence") if isinstance(clean.get("evidence"), dict) else {}
+    clean_lifecycle = clean.get("clean_machine") if isinstance(clean.get("clean_machine"), dict) else {}
     previous_head = str(previous_manifest.get("head_sha") or "")
+    current_version = str(current_manifest.get("release_version") or "")
+    previous_version = str(previous_manifest.get("release_version") or "")
     checks = {
         "portable_embedded_runtime": (
             current.get("status") == "PORTABLE_APP_VERIFIED"
@@ -69,8 +72,13 @@ def certify_portable_lane(
         "distinct_version_upgrade_rollback": (
             bool(previous_head)
             and previous_head != expected_head
+            and bool(current_version)
+            and bool(previous_version)
+            and previous_version != current_version
             and previous.get("status") == "PORTABLE_APP_VERIFIED"
             and clean_evidence.get("rollback") is True
+            and clean_lifecycle.get("current_version") == current_version
+            and clean_lifecycle.get("previous_version") == previous_version
         ),
         "packaged_lifecycle_macos": (
             clean.get("schema_version") == "mucaro-external-release-evidence/1.0"
@@ -85,6 +93,10 @@ def certify_portable_lane(
         "status": STATUS_OK if all(checks.values()) else STATUS_FAILED,
         "head_sha": expected_head,
         "previous_head_sha": previous_head,
+        "release_versions": {
+            "current": current_version,
+            "previous": previous_version,
+        },
         "checks": checks,
         "runtime": {
             "receipt_path": str(runtime_receipt_path),
@@ -146,7 +158,7 @@ def main() -> int:
             expected_head=args.head,
             output=args.output,
         )
-    except (OSError, ValueError, json.JSONDecodeError, PortableRuntimeError, PortableRuntimeSourceError) as exc:
+    except (OSError, TypeError, ValueError, json.JSONDecodeError, PortableRuntimeError, PortableRuntimeSourceError) as exc:
         print(json.dumps({"status": STATUS_FAILED, "detail": str(exc)}, sort_keys=True))
         return 2
     print(json.dumps(payload, sort_keys=True))
