@@ -643,7 +643,14 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.post("/memory")
     def remember(req: MemoryCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
         try:
-            return remember_memory_item(req.content, cfg, kind=req.kind, source="api")
+            return remember_memory_item(
+                req.content,
+                cfg,
+                kind=req.kind,
+                source="api",
+                scope=req.scope,
+                scope_id=req.scope_id,
+            )
         except MemoryError as exc:
             raise api_error(exc.status, exc.detail, status_code=400) from exc
 
