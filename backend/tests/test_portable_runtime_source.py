@@ -76,6 +76,68 @@ def test_archive_inspector_freezes_logical_and_payload_identity(tmp_path: Path) 
     assert report["logical_members_sha256"] != report["payload_multiset_sha256"]
 
 
+def _mode_archive(path: Path, mode: int) -> None:
+    with tarfile.open(path, "w:gz") as archive:
+        member = tarfile.TarInfo("python/bin/python3")
+        payload = b"same-payload"
+        member.size = len(payload)
+        member.mode = mode
+        archive.addfile(member, io.BytesIO(payload))
+
+
+def test_archive_logical_identity_includes_file_mode_but_payload_identity_does_not(tmp_path: Path) -> None:
+    executable = tmp_path / "executable.tar.gz"
+    plain = tmp_path / "plain.tar.gz"
+    _mode_archive(executable, 0o755)
+    _mode_archive(plain, 0o644)
+
+    executable_report = inspect_runtime_archive(executable)
+    plain_report = inspect_runtime_archive(plain)
+
+    assert executable_report["payload_multiset_sha256"] == plain_report["payload_multiset_sha256"]
+    assert executable_report["logical_members_sha256"] != plain_report["logical_members_sha256"]
+
+
+def test_archive_inspector_rejects_member_count_above_bound_before_payload_hashing(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    _archive(
+        archive,
+        [
+            ("python/a", b"a", None),
+            ("python/b", b"b", None),
+        ],
+    )
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        inspect_runtime_archive(archive, max_members=1)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT"
+    assert "member_count=2" in exc.value.detail
+
+
+def test_archive_inspector_rejects_declared_regular_bytes_above_bound(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    _archive(archive, [("python/data", b"0123456789", None)])
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        inspect_runtime_archive(archive, max_regular_bytes=9)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT"
+    assert "total_regular_bytes=10" in exc.value.detail
+
+
+def test_extract_uses_manifest_specific_archive_limits(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    manifest = _archive(archive, [("python/bin/python3", b"python", None)])
+    manifest["archive_policy"]["max_regular_bytes"] = 5
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        extract_runtime_archive(archive, tmp_path / "runtime", manifest)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT"
+    assert not (tmp_path / "runtime").exists()
+
+
 def test_archive_inspector_rejects_multiple_roots(tmp_path: Path) -> None:
     archive = tmp_path / "runtime.tar.gz"
     _archive(
