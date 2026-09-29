@@ -120,3 +120,11 @@ def test_rehydration_rejects_tampered_turn_role_with_unchanged_ids() -> None:
 def test_context_identity_is_stable_for_unchanged_conversation() -> None:
     conversation = _conversation()
     assert build_context_state(conversation)["context_state_id"] == build_context_state(deepcopy(conversation))["context_state_id"]
+
+
+def test_context_identity_keeps_turn_fields_apart() -> None:
+    # Moving text across the role/content boundary is a rewrite too, even around separator characters.
+    shifted, original = _conversation(), _conversation()
+    shifted["turns"][1].update(role="assistant\x1fmessage", content="1")
+    original["turns"][1].update(role="assistant", content="message\x1f1")
+    assert build_context_state(shifted)["context_state_id"] != build_context_state(original)["context_state_id"]

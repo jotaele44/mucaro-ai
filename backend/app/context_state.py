@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from typing import Any
 
 from .utils import stable_id, utc_now
@@ -33,7 +34,8 @@ def _turn_ref(turn: dict[str, Any]) -> dict[str, Any]:
 
 def _turn_digest(turn: dict[str, Any]) -> str:
     # Bind identity to what the turn says, not just its id: a rewritten turn must not validate.
-    payload = "\x1f".join(str(turn.get(key, "")) for key in ("turn_id", "role", "content"))
+    # A JSON array keeps the fields apart even when a value contains a separator character.
+    payload = json.dumps([str(turn.get(key, "")) for key in ("turn_id", "role", "content")], ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
