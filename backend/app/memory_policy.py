@@ -90,12 +90,18 @@ def select_memory_context(
             if raw_scope_id is None:
                 excluded.append({"memory_id": memory_id, "reason": "SCOPE_ID_REQUIRED", "scope": scope})
                 continue
+            if not raw_scope_id.startswith("workspace_"):
+                excluded.append({"memory_id": memory_id, "reason": "INVALID_SCOPE_ID", "scope": scope})
+                continue
             if raw_scope_id != resolved_workspace_scope_id:
                 excluded.append({"memory_id": memory_id, "reason": "SCOPE_MISMATCH", "scope": scope})
                 continue
         if scope == "conversation":
             if raw_scope_id is None:
                 excluded.append({"memory_id": memory_id, "reason": "SCOPE_ID_REQUIRED", "scope": scope})
+                continue
+            if not raw_scope_id.startswith("conv_"):
+                excluded.append({"memory_id": memory_id, "reason": "INVALID_SCOPE_ID", "scope": scope})
                 continue
             if resolved_conversation_scope_id is None:
                 excluded.append({"memory_id": memory_id, "reason": "SCOPE_CONTEXT_MISSING", "scope": scope})
