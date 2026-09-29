@@ -2,7 +2,7 @@
 
 ## Recommended: double-click
 
-Open `Mucaro AI.app` (macOS) or double-click `Mucaro AI.cmd` (Windows). No other step is needed.
+Open `Mucaro AI Setup.app` (macOS) or double-click `Mucaro AI.cmd` (Windows). No other step is needed.
 On a Mac the app shows the steps below in its own window and then turns into Mucaro AI, with no
 Terminal or browser. `Mucaro AI.command` (macOS/Linux) and `Mucaro AI.cmd` show them in a
 terminal window and open the app in the browser.
@@ -17,11 +17,11 @@ The first run prepares everything inside the project folder and then opens the a
 | 3. Web interface build | `FRONTEND_BUILD_OK` | builds | rebuilt only when `frontend/` changed |
 | 4. `.env` and readiness check | `PREFLIGHT_OK` | runs | `PREFLIGHT_CACHED` |
 | 5. Sample documents | `INGEST_FOLDER_OK` | loads `data/input` samples (skipped if you already have sources) | `SAMPLES_CACHED` |
-| 6. Start and open the app (Mucaro AI.app: in its window; otherwise the browser) | `DESKTOP_APP_READY` / `BACKEND_READY` | | |
+| 6. Start and open the app (Mucaro AI Setup.app: in its window; otherwise the browser) | `DESKTOP_APP_READY` / `BACKEND_READY` | | |
 
 `ONE_CLICK_SETUP_OK` marks a run that did setup work; `ONE_CLICK_FAST_PATH` marks a run that had
 nothing to do. If port 8000 is taken by another program the launcher moves to the next free port
-(`PORT_FALLBACK`); Mucaro AI.app always uses a free random port. If Mucaro AI is already running,
+(`PORT_FALLBACK`); Mucaro AI Setup.app always uses a free random port. If Mucaro AI is already running,
 a second double-click just brings it up (`DESKTOP_LAUNCH_REUSED`). If setup stops, the window names
 the problem and the log file; fix it (usually the internet connection) and choose **Try again** in
 the app, or double-click the launcher again: setup resumes where it stopped. Details and error
