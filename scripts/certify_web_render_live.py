@@ -32,12 +32,12 @@ def main() -> int:
     upload_path = cfg.input_dir / "web09-cert-upload.txt"
     upload_path.write_text("WEB09-UPLOAD-CERT\n", encoding="utf-8")
     fill_value = "mucaro-form-value"
-    select_value = "b"
+    select_value = "web09-choice-beta-unique"
     setup_script = """
 document.body.innerHTML = `
   <main id="fixture">
     <input id="name" type="text">
-    <select id="choice"><option value="a">A</option><option value="b">B</option></select>
+    <select id="choice"><option value="a">A</option><option value="web09-choice-beta-unique">B</option></select>
     <input id="agree" type="checkbox">
     <input id="upload" type="file">
     <button id="toggle" type="button">Toggle</button>
@@ -53,7 +53,7 @@ document.querySelector("#toggle").addEventListener("click", () => {
 const ok =
   document.body.dataset.clicked === "yes" &&
   document.querySelector("#name").value === "mucaro-form-value" &&
-  document.querySelector("#choice").value === "b" &&
+  document.querySelector("#choice").value === "web09-choice-beta-unique" &&
   document.querySelector("#agree").checked === true &&
   document.querySelector("#upload").files.length === 1;
 document.body.dataset.cert = ok ? "interaction-complete" : "interaction-failed";
