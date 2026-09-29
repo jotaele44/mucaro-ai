@@ -427,6 +427,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             allow_live=req.allow_live,
             require_offline=req.require_offline,
             conversation_context=conversation_context,
+            conversation_scope_id=conversation_id,
             cfg=cfg,
         )
         try:
