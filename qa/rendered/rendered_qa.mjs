@@ -2,7 +2,7 @@
 // backend at desktop and iPhone widths, saves screenshots, runs axe, and writes a receipt.
 // Usage: node rendered_qa.mjs [--python PATH] [--out DIR]
 import AxeBuilder from "@axe-core/playwright";
-import { chromium, devices } from "playwright";
+import { chromium, webkit, devices } from "playwright";
 import { spawn, execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -15,6 +15,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
 const args = process.argv.slice(2);
 const argValue = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
+const browserName = argValue("--browser", "chromium");
+if (!["chromium", "webkit"].includes(browserName)) throw new Error(`Unsupported browser: ${browserName}`);
+const browserType = browserName === "webkit" ? webkit : chromium;
 const python = argValue("--python", existsSync(path.join(ROOT, ".venv/bin/python")) ? path.join(ROOT, ".venv/bin/python") : "python3");
 const head = (() => {
   try {
@@ -453,7 +456,7 @@ let browserVersion = null;
 try {
   if (!(await waitForHealth(base))) throw new Error(`backend did not start:\n${backend.log()}`);
   await seed(base);
-  const browser = await chromium.launch();
+  const browser = await browserType.launch();
   browserVersion = browser.version();
   axeResults.push(...(await scenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } })));
   const iphone = devices["iPhone 13"];
@@ -480,7 +483,7 @@ const receipt = {
   worktree_clean: dirtyPaths.length === 0,
   dirty_paths: dirtyPaths,
   created_utc: new Date().toISOString(),
-  browser: `chromium ${browserVersion}`,
+  browser: `${browserName} ${browserVersion}`,
   viewports: { desktop: "1440x900", iphone: "390x844 (iPhone 13 profile, touch, DPR 3)" },
   checks,
   passed: checks.filter((row) => row.pass).length,
@@ -488,8 +491,8 @@ const receipt = {
   axe: axeResults,
   screenshots: shots,
   limitations: [
-    "Rendered in Chromium (Playwright); the packaged macOS app uses WKWebView, whose rendering is verified separately on a macOS runner.",
-    "iPhone width is emulated in Chromium, not rendered by iOS Safari.",
+    `Rendered in Playwright ${browserName}; this does not execute the packaged WKWebView window.`,
+    "iPhone width is emulated on a desktop browser engine, not rendered by iOS Safari on a phone.",
   ],
 };
 writeFileSync(path.join(outDir, "receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`);

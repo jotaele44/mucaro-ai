@@ -85,8 +85,10 @@ REQUIRED_ADVERSARIAL_VECTORS = [
 
 SHADOW_BOOTSTRAP_PATHS = {
     ".github/workflows/shadow-qa.yml",
+    "backend/tests/test_shadow_baseline.py",
     "backend/tests/test_shadow_qa.py",
     "docs/SHADOW_QA.md",
+    "scripts/resolve_shadow_baseline.py",
     "scripts/shadow_qa.py",
 }
 

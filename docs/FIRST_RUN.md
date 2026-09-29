@@ -154,7 +154,8 @@ Common failures:
 | `ERROR_MACOS_TOO_OLD` / `ERROR_PLATFORM_UNSUPPORTED` | Double-click setup: see the supported platforms in `docs/ONE_CLICK_SETUP.md` |
 | `ERROR_PYTHON_MISSING` | Install Python 3.11+ (`brew install python@3.12` or python.org) |
 | `ERROR_PYTHON_TOO_OLD` | Bootstrap found only an older Python; install 3.11+ and rerun |
-| `ERROR_PYTHON_TOO_OLD_OR_MISSING` | Windows: install Python 3.11+ from python.org with "Add to PATH" |
+| `ERROR_PYTHON_UNSUPPORTED` | Developer bootstrap found only Python 3.14+; install 3.11-3.13, or use the double-click setup (it brings Python 3.12) |
+| `ERROR_PYTHON_UNSUPPORTED_OR_MISSING` | Windows developer bootstrap: install Python 3.11-3.13 from python.org with "Add to PATH", or double-click `Mucaro AI.cmd` |
 | `PYTHON_TOO_OLD` | Use Python 3.11+ explicitly |
 | `BOOTSTRAP_FAILED step=...` | Windows: the named step failed; its output is printed just above |
 | `ENV_MODEL_RETIRED` (warning) | Your `.env` pins a retired model; set `MUCARO_AI_MODEL=claude-sonnet-5` |

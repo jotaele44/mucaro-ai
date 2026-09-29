@@ -21,6 +21,26 @@ Every Shadow run MUST bind to:
 
 Never audit mutable `main` without first resolving and recording a commit SHA.
 
+## Cumulative baseline rule
+
+Automatic main-push Shadow runs do **not** use the immediately previous commit
+as their baseline. They resolve the newest successful **main-push** Shadow QA
+run whose head is a strict ancestor of the requested checkpoint. Failed,
+blocked, or provisional checkpoints therefore cannot silently become a future
+baseline and cannot make unresolved changed surfaces disappear from the next
+denominator.
+
+The resolver writes a separate machine-readable baseline receipt containing
+the selected run ID, run URL, exact base SHA, exact checkpoint SHA, source, and
+retrieval time. Resolution fails closed if the GitHub Actions query fails, no
+successful ancestor can be established, an identifier is malformed, or the
+selected base is not an ancestor of the checkpoint.
+
+A workflow-dispatch operator may supply an explicit base SHA for replay or
+adjudication. The override must be a full 40-character SHA, must differ from
+the checkpoint, and must be a verified ancestor. An override is recorded as
+such and is never presented as automatic latest-success selection.
+
 ## Finding classes
 
 - **DEFECT**: clear violation of an existing requirement, invariant, schema, contract, or expected behavior.

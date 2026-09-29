@@ -172,6 +172,14 @@
       "evidence": "scripts/certify_retrieval_real_world_live.py::acquire"
     },
     {
+      "rule": "S310",
+      "path": "scripts/resolve_shadow_baseline.py",
+      "code": "with urllib.request.urlopen(request, timeout=30) as response:",
+      "classification": "LOW",
+      "rationale": "Maintainer-side Shadow QA baseline resolution only. Requests are confined to the fixed https://api.github.com host; repository input is constrained to owner/name, the workflow identifier is URL-encoded, and the scoped GitHub Actions token is used only for read-only workflow-run metadata.",
+      "evidence": "backend/tests/test_shadow_baseline.py"
+    },
+    {
       "rule": "S606",
       "path": "scripts/one_click_desktop.py",
       "code": "os.execve(\"/bin/bash\", [\"/bin/bash\", str(ROOT / \"scripts\" / \"one_click.sh\"), \"--desktop\"], self.initial_env)",
