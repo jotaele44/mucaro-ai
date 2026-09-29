@@ -1,5 +1,5 @@
 #!/bin/bash
-# Mucaro AI.app (macOS): Finder runs this file when the app is opened.
+# Mucaro AI Setup.app (macOS): Finder runs this source-checkout bootstrap app.
 #
 # It finds the mucaro-ai folder around the app and hands over to the double-click setup
 # (scripts/one_click.sh --desktop). The first run prepares everything inside the folder, then
@@ -41,13 +41,13 @@ case "${BUNDLE}" in
 To fix it:
 1. Move the mucaro-ai folder out of Downloads (your home folder is a good place).
 2. Double-click Fix-Gatekeeper.command in that folder.
-3. Open Mucaro AI.app again."
+3. Open Mucaro AI Setup.app again."
     exit 1
     ;;
 esac
 
 if [ ! -f "${ROOT}/scripts/one_click.sh" ]; then
-  alert "Mucaro AI.app has to stay inside its mucaro-ai folder, next to the scripts folder.
+  alert "Mucaro AI Setup.app has to stay inside its mucaro-ai folder, next to the scripts folder.
 
 It is now in: ${ROOT}
 
