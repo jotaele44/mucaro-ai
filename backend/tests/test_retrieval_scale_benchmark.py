@@ -165,3 +165,19 @@ def test_rt10_difficult_queries_use_conjunctive_clues_with_partial_distractors()
     report = evaluate_queries(chunks, difficult, strategy="hybrid", top_k=5)
     assert report["metrics"]["expected_source_hit_rate"] == 1.0
     assert report["metrics"]["expected_binding_recall"] == 1.0
+
+
+def test_rt10_generated_manifests_are_deterministic() -> None:
+    denominator = load_denominator()
+    queries_a = build_queries(denominator)
+    queries_b = build_queries(denominator)
+    chunks_a = build_corpus(1000)
+    chunks_b = build_corpus(1000)
+    from backend.app.retrieval_scale_benchmark import stable_hash
+
+    assert stable_hash(queries_a) == stable_hash(queries_b)
+    assert stable_hash(chunks_a) == stable_hash(chunks_b)
+
+    mutated = json.loads(json.dumps(chunks_b))
+    mutated[0]["text"] += " drift"
+    assert stable_hash(chunks_a) != stable_hash(mutated)

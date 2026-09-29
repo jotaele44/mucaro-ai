@@ -447,8 +447,9 @@ def run_scale_benchmark(
         for level in levels
     ]
     max_chunks = int(scale_override or denominator["corpus"]["max_chunks"])
+    full_chunks = build_corpus(max_chunks)
     full_eval = evaluate_queries(
-        build_corpus(max_chunks),
+        full_chunks,
         queries,
         strategy=strategy,
         top_k=top_k,
@@ -479,6 +480,19 @@ def run_scale_benchmark(
         "head_sha": current_git_head(),
         "benchmark_id": denominator["benchmark_id"],
         "denominator_sha256": hashlib.sha256(denominator_bytes).hexdigest(),
+        "corpus_manifest_sha256": stable_hash(
+            [
+                {
+                    "chunk_id": row["chunk_id"],
+                    "source_id": row["source_id"],
+                    "chunk_index": row["chunk_index"],
+                    "source_format": row["source_format"],
+                    "text": row["text"],
+                }
+                for row in full_chunks
+            ]
+        ),
+        "query_manifest_sha256": stable_hash(queries),
         "denominator": {
             "query_denominator": denominator["query_denominator"],
             "scale_levels": denominator["corpus"]["scale_levels"],
