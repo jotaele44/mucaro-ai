@@ -36,7 +36,7 @@ def test_distinct_version_flow_emits_all_required_evidence(tmp_path: Path, monke
         runner_calls.append((command,cwd,env))
         return subprocess.CompletedProcess(command,0,stdout="ok")
     receipt=certify_clean_machine_macos(current,previous,expected_head="a"*40,install_root=tmp_path/"install",platform_name="darwin",runner=runner)
-    assert receipt["status"] == "CLEAN_MACHINE_MACOS_VERIFIED"
+    assert receipt["status"] == "PACKAGED_LIFECYCLE_VERIFIED"
     assert all(receipt["evidence"].values())
     assert calls == [("install","b"*40),("install","a"*40),("install","a"*40)]
     workflow_command, _, workflow_env = runner_calls[1]
@@ -101,7 +101,7 @@ def test_post_launch_bundle_mutation_blocks_receipt(tmp_path: Path, monkeypatch:
         runner=runner,
     )
 
-    assert receipt["status"] == "CLEAN_MACHINE_MACOS_BLOCKED"
+    assert receipt["status"] == "PACKAGED_LIFECYCLE_BLOCKED"
     assert receipt["evidence"]["post_launch_bundle_immutable"] is False
 
 
