@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/tool_audit_event.schema.json",
+  "title": "Mucaro Tool Audit Event 1.0",
+  "description": "PERMISSION contract: append-only audit event for tool governance decisions.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["event_id", "event", "tool_name", "status", "actor", "created_at"],
+  "properties": {
+    "event_id": {"type": "string", "pattern": "^toolevent_[a-f0-9]+$"},
+    "event": {"enum": ["TOOL_REQUEST_REJECTED", "TOOL_CALL_REQUESTED", "TOOL_CALL_APPROVED", "TOOL_CALL_DENIED", "TOOL_CALL_CANCELLED", "TOOL_CALL_STARTED", "TOOL_CALL_EXECUTED", "TOOL_CALL_FAILED", "TOOL_CALL_INTERRUPTED"]},
+    "tool_call_id": {"type": "string"},
+    "tool_name": {"type": "string"},
+    "status": {"type": "string", "minLength": 1},
+    "actor": {"type": "string", "minLength": 1},
+    "reason": {"type": ["string", "null"]},
+    "result_status": {"type": ["string", "null"]},
+    "created_at": {"type": "string"},
+    "previous_event_sha256": {"type": ["string", "null"]},
+    "event_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

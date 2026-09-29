@@ -54,7 +54,8 @@ def execute_with_provider_checkpoint(
             "checkpoint": paused,
         }
     current = get_checkpoint(checkpoint_id, cfg)
-    assert current is not None
+    if current is None:
+        raise ProviderRecoveryError("ERROR_PROVIDER_CHECKPOINT_MISSING", "checkpoint disappeared during provider execution")
     if (current["session_id"], current["run_id"], current["checkpoint_id"]) != identity:
         raise ProviderRecoveryError("ERROR_PROVIDER_IDENTITY_DRIFT", "provider execution changed session/run/checkpoint identity")
     return {"status": "PROVIDER_EXECUTION_OK", "result": result, "checkpoint": current}

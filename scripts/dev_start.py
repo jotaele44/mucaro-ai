@@ -11,10 +11,15 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from backend.app.env_file import merge_env_file  # noqa: E402
 
 
 def build_env() -> dict[str, str]:
-    env = os.environ.copy()
+    # Shell-exported variables win over values from the project .env file.
+    env = merge_env_file(os.environ, ROOT / ".env")
     existing = env.get("PYTHONPATH", "")
     paths = [str(ROOT), str(ROOT / "backend")]
     env["PYTHONPATH"] = os.pathsep.join(paths + ([existing] if existing else []))

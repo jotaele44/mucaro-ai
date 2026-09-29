@@ -30,3 +30,7 @@ frontend/node_modules/
 frontend/dist/
 _references/*
 !_references/.gitkeep
+qa/rendered/node_modules/
+
+# Private runtimes and state created by the double-click setup (Mucaro AI.command / Mucaro AI.cmd)
+.mucaro-runtime/

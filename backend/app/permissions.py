@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings, settings
-from .utils import read_json, utc_now, write_json
+from .contracts import validate_contract
+from .utils import read_json, update_json, utc_now
 
 DIRECTORY_PERMISSIONS_NAME = "directory_permissions.json"
 
@@ -103,31 +104,39 @@ def grant_directory(path: str | Path, cfg: Settings = settings, *, granted_by: s
             path=root,
         )
     cfg.ensure_dirs()
-    grants = load_directory_grants(cfg)
     canonical_root = str(root)
-    grants = [grant for grant in grants if grant.get("canonical_root") != canonical_root]
-    grant = {
-        "status": "DIRECTORY_PERMISSION_GRANTED",
-        "requested_path": str(resolved),
-        "canonical_root": canonical_root,
-        "granted_at": utc_now(),
-        "granted_by": granted_by,
-        "reason": reason or "",
-    }
-    grants.append(grant)
-    grants.sort(key=lambda item: str(item.get("canonical_root", "")))
-    write_json(permission_ledger_path(cfg), grants)
+    grant = validate_contract(
+        "directory_grant",
+        {
+            "status": "DIRECTORY_PERMISSION_GRANTED",
+            "requested_path": str(resolved),
+            "canonical_root": canonical_root,
+            "granted_at": utc_now(),
+            "granted_by": granted_by,
+            "reason": reason or "",
+        },
+    )
+
+    def mutate(grants: list[Any]) -> None:
+        kept = [item for item in grants if isinstance(item, dict) and item.get("canonical_root") != canonical_root]
+        kept.append(grant)
+        kept.sort(key=lambda item: str(item.get("canonical_root", "")))
+        grants[:] = kept
+
+    update_json(permission_ledger_path(cfg), [], mutate)
     return grant
 
 
 def revoke_directory(path: str | Path, cfg: Settings = settings) -> dict[str, Any]:
     resolved = resolve_existing_path(path)
     root = directory_root_for(resolved)
-    ledger = permission_ledger_path(cfg)
-    grants = load_directory_grants(cfg)
-    kept = [grant for grant in grants if grant.get("canonical_root") != str(root)]
-    removed = len(grants) - len(kept)
-    write_json(ledger, kept)
+    def mutate(grants: list[Any]) -> int:
+        kept = [grant for grant in grants if not (isinstance(grant, dict) and grant.get("canonical_root") == str(root))]
+        removed_count = len(grants) - len(kept)
+        grants[:] = kept
+        return removed_count
+
+    removed = update_json(permission_ledger_path(cfg), [], mutate)
     return {
         "status": "DIRECTORY_PERMISSION_REVOKED" if removed else "DIRECTORY_PERMISSION_NOT_FOUND",
         "canonical_root": str(root),

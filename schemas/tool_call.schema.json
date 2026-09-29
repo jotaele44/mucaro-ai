@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/tool_call.schema.json",
+  "title": "Mucaro Tool Call 1.0",
+  "description": "PERMISSION/EXECUTION contract: an approval-gated tool call. Terminal states carry who decided and when.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["tool_call_id", "tool_name", "arguments", "status", "requested_by", "created_at"],
+  "properties": {
+    "tool_call_id": {"type": "string", "pattern": "^toolcall_[a-f0-9]+$"},
+    "tool_name": {"type": "string", "minLength": 1},
+    "arguments": {"type": "object"},
+    "arguments_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "status": {"enum": ["PENDING_APPROVAL", "APPROVED", "DENIED", "CANCELLED", "RUNNING", "EXECUTED", "FAILED", "INTERRUPTED"]},
+    "requested_by": {"type": "string", "minLength": 1},
+    "reason": {"type": ["string", "null"]},
+    "created_at": {"type": "string"},
+    "approved_by": {"type": ["string", "null"]},
+    "approved_at": {"type": ["string", "null"]},
+    "denied_by": {"type": ["string", "null"]},
+    "denied_at": {"type": ["string", "null"]},
+    "executed_at": {"type": ["string", "null"]},
+    "executed_by": {"type": ["string", "null"]},
+    "result": {"type": ["object", "null"]}
+  },
+  "allOf": [
+    {"if": {"properties": {"status": {"enum": ["APPROVED", "RUNNING"]}}}, "then": {"properties": {"approved_by": {"type": "string"}, "approved_at": {"type": "string"}}}},
+    {"if": {"properties": {"status": {"const": "DENIED"}}}, "then": {"properties": {"denied_by": {"type": "string"}, "denied_at": {"type": "string"}}}},
+    {"if": {"properties": {"status": {"enum": ["EXECUTED", "FAILED"]}}}, "then": {"required": ["executed_at", "result"], "properties": {"approved_by": {"type": "string"}, "executed_at": {"type": "string"}, "result": {"type": "object"}}}}
+  ]
+}

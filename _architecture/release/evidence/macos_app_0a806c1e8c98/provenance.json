@@ -1,0 +1,33 @@
+{
+  "schema_version": "mucaro-evidence-provenance/1.0",
+  "source": "GitHub Actions workflow 'macOS app' (.github/workflows/macos-app.yml), pull_request event on jotaele44/mucaro-ai#110",
+  "workflow_run_id": 36268886550,
+  "job_id": 108478899218,
+  "runner": "macos-14 (arm64)",
+  "evidence_artifact": {
+    "artifact_id": 10914832131,
+    "name": "macos-app-evidence-0a806c1e8c98cc159568fea898a76a30189b0d1c",
+    "sha256": "339d8a228828ef0fa0101cee8611206fccc146b5b5b1c72fa461746bb20deb75"
+  },
+  "app_artifact": {
+    "artifact_id": 10914936809,
+    "name": "mucaro-ai-macos-arm64-0a806c1e8c98cc159568fea898a76a30189b0d1c",
+    "zip_sha256_from_build_receipt": "461747538a90bd0be34d38e076ba53730a5dea6b8da308a0499d87d09dbef4ef"
+  },
+  "tested_commit": "0a806c1e8c98cc159568fea898a76a30189b0d1c",
+  "tested_commit_note": "The workflow checks out the pull-request head itself; both receipts carry head_sha 0a806c1 exactly. The evidence is committed one commit later, as for 948fda4.",
+  "files": {
+    "build_receipt.json": "ccd63d49ccbbbc213d25f7c941437d471b9c8def9777ccd20bbbb2f5c4235661",
+    "e2e_receipt.json": "387d8cb7fbe43a286bdce1a8b03073948c748e447c7ba49d46282b75768b4e6d",
+    "window.png": "c11575e80f15c38eea48fcf1957f2a01a7403b0f3e9d27d4d793ac45515b5468"
+  },
+  "notes": {
+    "window.png": "Byte-identical to the 948fda4 capture (same SHA-256). The empty-state window at 1280x840 with a fine pointer did not change between the two heads; the merge's touch-first CSS applies only at widths up to 900px or with a coarse pointer. The file was taken from this run's evidence artifact, whose digest matches the one GitHub recorded.",
+    "security": "First real-macOS run carrying the packaged app's runtime security report: production profile, production_ready, SECURITY_OK, CORS limited to the app's own origin."
+  },
+  "omitted": {
+    "bundle_manifest.json": "per-file hash list; its digest is build_receipt.json bundle.tree_sha256",
+    "pyinstaller.log": "kept in the CI artifact",
+    "service.log": "empty in this run; kept in the CI artifact"
+  }
+}

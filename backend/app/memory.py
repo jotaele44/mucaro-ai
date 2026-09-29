@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from .config import Settings, settings
-from .utils import read_json, stable_id, utc_now, write_json
+from .contracts import validate_contract
+from .utils import read_json, stable_id, update_json, utc_now
 
 MEMORY_NAME = "assistant_memory.json"
 MEMORY_KINDS = {"preference", "profile", "instruction", "fact"}
@@ -38,8 +39,8 @@ def _load_memory(cfg: Settings) -> list[dict[str, Any]]:
     return [row for row in rows if isinstance(row, dict) and isinstance(row.get("memory_id"), str)]
 
 
-def _write_memory(rows: list[dict[str, Any]], cfg: Settings) -> None:
-    write_json(_memory_path(cfg), rows)
+def _valid_rows(rows: list[Any]) -> list[dict[str, Any]]:
+    return [row for row in rows if isinstance(row, dict) and isinstance(row.get("memory_id"), str)]
 
 
 def list_memory_items(cfg: Settings = settings, *, include_disabled: bool = True) -> dict[str, Any]:
@@ -86,9 +87,8 @@ def remember_memory_item(
         "created_at": now,
         "updated_at": now,
     }
-    rows = _load_memory(cfg)
-    rows.append(row)
-    _write_memory(rows, cfg)
+    validate_contract("memory_item", row)
+    update_json(_memory_path(cfg), [], lambda rows: rows.append(row))
     return {"status": "MEMORY_SAVED", "memory": row}
 
 
@@ -97,27 +97,33 @@ def set_memory_enabled(
     enabled: bool,
     cfg: Settings = settings,
 ) -> dict[str, Any]:
-    rows = _load_memory(cfg)
-    for index, row in enumerate(rows):
-        if row.get("memory_id") == memory_id:
-            updated = {**row, "enabled": enabled, "updated_at": utc_now()}
-            rows[index] = updated
-            _write_memory(rows, cfg)
-            return {"status": "MEMORY_UPDATED", "memory": updated}
-    return {"status": "ERROR_MEMORY_NOT_FOUND", "memory_id": memory_id}
+    def mutate(rows: list[Any]) -> dict[str, Any] | None:
+        for index, row in enumerate(rows):
+            if isinstance(row, dict) and row.get("memory_id") == memory_id:
+                updated = validate_contract("memory_item", {**row, "enabled": enabled, "updated_at": utc_now()})
+                rows[index] = updated
+                return updated
+        return None
+
+    updated = update_json(_memory_path(cfg), [], mutate)
+    if updated is None:
+        return {"status": "ERROR_MEMORY_NOT_FOUND", "memory_id": memory_id}
+    return {"status": "MEMORY_UPDATED", "memory": updated}
 
 
 def delete_memory_item(memory_id: str, cfg: Settings = settings) -> dict[str, Any]:
-    rows = _load_memory(cfg)
-    kept = [row for row in rows if row.get("memory_id") != memory_id]
-    removed = len(rows) - len(kept)
-    if removed:
-        _write_memory(kept, cfg)
+    def mutate(rows: list[Any]) -> tuple[int, int]:
+        valid = _valid_rows(rows)
+        kept = [row for row in valid if row.get("memory_id") != memory_id]
+        rows[:] = kept
+        return len(valid) - len(kept), len(kept)
+
+    removed, remaining = update_json(_memory_path(cfg), [], mutate)
     return {
         "status": "MEMORY_DELETE_OK" if removed else "ERROR_MEMORY_NOT_FOUND",
         "memory_id": memory_id,
         "removed": removed,
-        "remaining_memories": len(kept),
+        "remaining_memories": remaining,
     }
 
 
