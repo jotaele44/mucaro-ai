@@ -116,6 +116,8 @@ from .portable_runtime import (
     verify_portable_macos_app,
 )
 from .portable_runtime_source import (
+    DEFAULT_INSPECT_MAX_MEMBERS,
+    DEFAULT_INSPECT_MAX_REGULAR_BYTES,
     PortableRuntimeSourceError,
     inspect_runtime_archive,
     materialize_portable_runtime,
@@ -1161,6 +1163,22 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Inspect one runtime tar.gz without extraction or materialization; emits exact byte/hash, "
             "archive geometry, logical-member hash, and payload-multiset hash."
+        ),
+    )
+    package_portable_runtime.add_argument(
+        "--max-members",
+        type=int,
+        help=(
+            "Inspection-only member ceiling; defaults to "
+            f"{DEFAULT_INSPECT_MAX_MEMBERS} from the governed x86_64 runtime policy."
+        ),
+    )
+    package_portable_runtime.add_argument(
+        "--max-regular-bytes",
+        type=int,
+        help=(
+            "Inspection-only regular-file byte ceiling; defaults to "
+            f"{DEFAULT_INSPECT_MAX_REGULAR_BYTES} from the governed x86_64 runtime policy."
         ),
     )
     package_portable_runtime.add_argument(
@@ -3613,7 +3631,22 @@ def run_package_portable_runtime(args: argparse.Namespace, cfg: Settings) -> int
                     args.format,
                 )
                 return 2
-            report = {"status": "PORTABLE_RUNTIME_ARCHIVE_INSPECTED", **inspect_runtime_archive(args.inspect_archive)}
+            inspect_kwargs: dict[str, int] = {}
+            if args.max_members is not None:
+                inspect_kwargs["max_members"] = args.max_members
+            if args.max_regular_bytes is not None:
+                inspect_kwargs["max_regular_bytes"] = args.max_regular_bytes
+            report = {
+                "status": "PORTABLE_RUNTIME_ARCHIVE_INSPECTED",
+                **inspect_runtime_archive(args.inspect_archive, **inspect_kwargs),
+            }
+        elif args.max_members is not None or args.max_regular_bytes is not None:
+            emit_error(
+                "ERROR_PORTABLE_RUNTIME_MODE_CONFLICT",
+                "--max-members and --max-regular-bytes require --inspect-archive",
+                args.format,
+            )
+            return 2
         elif args.verify is not None:
             report = verify_materialized_runtime(cfg.project_root, args.verify, manifest)
         else:
