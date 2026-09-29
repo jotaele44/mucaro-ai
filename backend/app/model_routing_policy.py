@@ -151,6 +151,8 @@ def plan_model_route(
         for row in eligible_rows:
             if row["provider"] == selected["provider"]:
                 continue
+            if row["provider"] == "mock" and selected["provider"] != "mock" and not allow_offline_failover:
+                continue
             if selected["live"] and not row["live"] and not allow_offline_failover:
                 continue
             failover_order.append({"provider": row["provider"], "model": row["default_model"]})
@@ -195,6 +197,10 @@ def plan_model_route(
                 next(candidate for candidate in candidates if candidate["provider"] == row["provider"])["live"]
                 for row in failover_order
             ),
+            "no_implicit_mock_fallback": selected is None
+            or selected["provider"] == "mock"
+            or allow_offline_failover
+            or all(row["provider"] != "mock" for row in failover_order),
         },
         "limitations": [
             "Routing is policy selection over registered providers; it does not estimate answer quality or cost from unobserved future outputs.",
@@ -207,6 +213,7 @@ def plan_model_route(
             "never report READY for a provider whose readiness status is not MODEL_PROVIDER_READY",
             "constraint conflicts fail closed",
             "never add an offline fallback behind a live provider without explicit allow_offline_failover=true",
+            "never add mock as a fallback behind another provider without explicit allow_offline_failover=true",
         ],
     }
     payload["route_sha256"] = _stable_hash(payload)
