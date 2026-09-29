@@ -22,7 +22,7 @@ EVENT_CLASSES = (
     "model_routing",
     "source_acquisition",
 )
-_NATIVE_EVENT_CLASSES = {"permission_change", "source_acquisition"}
+_NATIVE_EVENT_CLASSES = {"permission_change"}
 _EPOCH = "1970-01-01T00:00:00Z"
 
 
@@ -370,7 +370,7 @@ def build_forensic_trail(cfg: Settings = settings, *, limit: int = 500) -> dict[
         },
         "limitations": [
             "Event counts are source manifestations, not canonical action identities; one action may appear in more than one authoritative stream.",
-            "Historical source-acquisition and permission-change events begin when this forensic event ledger is deployed; current pre-existing state is represented separately as a state manifestation.",
+            "Permission-change history begins when this forensic event ledger is deployed; current pre-existing grants are represented separately as state manifestations.",\n            "Source acquisition is derived from canonical retained source manifests and their ingestion timestamps; repeated ingestion of the same stable source identity is not reconstructed as a distinct historical event.",
             "The composite trail is a deterministic read model. Canonical run, tool, source, permission and answer-trace stores remain authoritative for their own record types.",
             "Run-event rows are not independently hash-chained; only native forensic history and the existing tool-audit stream have chain semantics.",
         ],
