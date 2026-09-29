@@ -204,3 +204,85 @@ def test_malformed_engine_hierarchy_fails_closed() -> None:
     with pytest.raises(OCRStructureError) as exc:
         reconstruct_form([malformed, span(1, "Alice", x=300, y=100)])
     assert exc.value.status == "ERROR_OCR_STRUCTURE_HIERARCHY"
+
+
+def test_saved_ocr_report_structure_receipt_binds_input_hash(tmp_path: Path) -> None:
+    from backend.app.config import Settings
+    from backend.app.ocr_structure import reconstruct_ocr_report
+
+    cfg = Settings(
+        project_root=tmp_path,
+        data_dir=tmp_path / "data",
+        input_dir=tmp_path / "data/input",
+        processed_dir=tmp_path / "data/processed",
+        export_dir=tmp_path / "data/exports",
+        index_dir=tmp_path / "data/indexes",
+        sqlite_path=tmp_path / "data/processed/test.sqlite3",
+        default_model_provider="mock",
+        default_model_name="mock",
+    )
+    report_path = tmp_path / "form-report.json"
+    payload = {
+        "schema_version": "mucaro_ocr_report_v1",
+        "report_id": "ocrreport_fixture",
+        "source": {"sha256": "a" * 64},
+        "engine": {"name": "tesseract", "version": "fixture"},
+        "spans": [
+            span(0, "Name:", x=100, y=100, block=1, line=1, word=1),
+            span(1, "Alice", x=300, y=100, block=1, line=1, word=2),
+            span(2, "City:", x=100, y=190, block=1, line=2, word=1),
+            span(3, "Ponce", x=300, y=190, block=1, line=2, word=2),
+        ],
+    }
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+    result = reconstruct_ocr_report(report_path, kind="form", cfg=cfg)
+    assert result["status"] == "OCR_FORM_RECONSTRUCTION_OK"
+    assert result["input_ocr_report"]["sha256"] == __import__("hashlib").sha256(report_path.read_bytes()).hexdigest()
+    assert result["structure"]["certification_state"] == "CANDIDATE_NOT_IDENTITY"
+    assert Path(result["receipt_path"]).is_file()
+    assert len(result["receipt_sha256"]) == 64
+
+
+def test_saved_ocr_report_rejects_wrong_schema_and_unresolved_returns_receipt(tmp_path: Path) -> None:
+    from backend.app.config import Settings
+    from backend.app.ocr_structure import OCRStructureError, reconstruct_ocr_report
+
+    cfg = Settings(
+        project_root=tmp_path,
+        data_dir=tmp_path / "data",
+        input_dir=tmp_path / "data/input",
+        processed_dir=tmp_path / "data/processed",
+        export_dir=tmp_path / "data/exports",
+        index_dir=tmp_path / "data/indexes",
+        sqlite_path=tmp_path / "data/processed/test.sqlite3",
+        default_model_provider="mock",
+        default_model_name="mock",
+    )
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"schema_version": "wrong", "spans": []}), encoding="utf-8")
+    with pytest.raises(OCRStructureError) as exc:
+        reconstruct_ocr_report(bad, kind="form", cfg=cfg)
+    assert exc.value.status == "ERROR_OCR_STRUCTURE_REPORT_SCHEMA"
+
+    single = tmp_path / "single.json"
+    single.write_text(
+        json.dumps(
+            {
+                "schema_version": "mucaro_ocr_report_v1",
+                "report_id": "ocrreport_single",
+                "source": {"sha256": "b" * 64},
+                "engine": {"name": "tesseract"},
+                "spans": [
+                    span(0, "One", x=50, y=50, line=1),
+                    span(1, "Two", x=50, y=120, line=2),
+                    span(2, "Three", x=50, y=190, line=3),
+                    span(3, "Four", x=50, y=260, line=4),
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    unresolved = reconstruct_ocr_report(single, kind="multi_column", cfg=cfg)
+    assert unresolved["status"] == "OCR_STRUCTURE_UNRESOLVED"
+    assert unresolved["structure"]["certification_state"] == "UNRESOLVED"
+    assert Path(unresolved["receipt_path"]).is_file()
