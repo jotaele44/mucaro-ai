@@ -1,0 +1,178 @@
+{
+  "schema_version": "MUCARO_FORMAT_REGISTRY/1.0",
+  "registry_id": "mucaro-declared-format-registry-v1",
+  "purpose": "Surface-specific declared format support. Same suffixes on different capability surfaces are separate manifestations and are never collapsed by name alone.",
+  "states": ["SUPPORTED", "PARTIALLY_SUPPORTED", "UNSUPPORTED"],
+  "entries": [
+    {
+      "registry_id": "core-text",
+      "surface": "core_ingestion",
+      "extensions": [".txt", ".md"],
+      "state": "SUPPORTED",
+      "capabilities": ["ingest", "text_extract", "chunk", "retrieve"],
+      "source_bindings": ["backend/app/parser.py:text_utf8", "backend/app/ingestion.py:FOLDER_SUPPORTED_SUFFIXES"],
+      "limitations": []
+    },
+    {
+      "registry_id": "core-structured-text",
+      "surface": "core_ingestion",
+      "extensions": [".csv", ".json"],
+      "state": "SUPPORTED",
+      "capabilities": ["ingest", "structured_text_extract", "chunk", "retrieve"],
+      "source_bindings": ["backend/app/parser.py:_parse_csv|_parse_json", "backend/app/ingestion.py:FOLDER_SUPPORTED_SUFFIXES"],
+      "limitations": ["Generic JSON ingestion is distinct from the GIS GeoJSON interpretation surface."]
+    },
+    {
+      "registry_id": "core-html",
+      "surface": "core_ingestion",
+      "extensions": [".html", ".htm"],
+      "state": "SUPPORTED",
+      "capabilities": ["ingest", "visible_text_extract", "link_metadata", "chunk", "retrieve"],
+      "source_bindings": ["backend/app/parser.py:_parse_html"],
+      "limitations": ["Script/style/template content is excluded from retrieval text."]
+    },
+    {
+      "registry_id": "core-docx",
+      "surface": "core_ingestion",
+      "extensions": [".docx"],
+      "state": "SUPPORTED",
+      "capabilities": ["ingest", "text_extract", "chunk", "retrieve"],
+      "source_bindings": ["backend/app/parser.py:_parse_docx"],
+      "limitations": ["Complex Word layout fidelity is not claimed."]
+    },
+    {
+      "registry_id": "core-pdf",
+      "surface": "core_ingestion",
+      "extensions": [".pdf"],
+      "state": "PARTIALLY_SUPPORTED",
+      "capabilities": ["ingest", "born_digital_text_extract", "chunk", "retrieve"],
+      "source_bindings": ["backend/app/parser.py:_parse_pdf"],
+      "limitations": ["Scanned/image-only pages require the separate PDF OCR surface.", "Semantic table/form reconstruction is not implied by text extraction."]
+    },
+    {
+      "registry_id": "core-archive",
+      "surface": "core_ingestion",
+      "extensions": [".zip"],
+      "state": "PARTIALLY_SUPPORTED",
+      "capabilities": ["ingest", "bounded_archive_inspect", "text_member_extract"],
+      "source_bindings": ["backend/app/parser.py:_parse_zip|ZIP_TEXT_MEMBER_SUFFIXES"],
+      "limitations": ["Only declared text-like archive members are extracted.", "Archive safety ceilings and traversal checks are binding."]
+    },
+    {
+      "registry_id": "core-email",
+      "surface": "core_ingestion",
+      "extensions": [".eml", ".msg"],
+      "state": "PARTIALLY_SUPPORTED",
+      "capabilities": ["ingest", "message_text_extract", "text_attachment_extract"],
+      "source_bindings": ["backend/app/parser.py:_parse_eml|_parse_msg|EMAIL_ATTACHMENT_TEXT_SUFFIXES"],
+      "limitations": ["Unsupported binary attachments remain explicit skipped residue.", "MSG structured-property extraction is bounded and does not claim full Outlook fidelity."]
+    },
+    {
+      "registry_id": "core-image-metadata",
+      "surface": "core_ingestion",
+      "extensions": [".png", ".jpg", ".jpeg", ".gif", ".webp"],
+      "state": "PARTIALLY_SUPPORTED",
+      "capabilities": ["ingest", "metadata_inspect"],
+      "source_bindings": ["backend/app/multimodal.py:IMAGE_SUFFIXES"],
+      "limitations": ["Core ingestion is metadata-only; printed-text OCR is a separate surface.", "Semantic image understanding is not provided by core ingestion."]
+    },
+    {
+      "registry_id": "core-audio-metadata",
+      "surface": "core_ingestion",
+      "extensions": [".wav", ".mp3", ".m4a"],
+      "state": "PARTIALLY_SUPPORTED",
+      "capabilities": ["ingest", "metadata_inspect"],
+      "source_bindings": ["backend/app/multimodal.py:AUDIO_SUFFIXES"],
+      "limitations": ["No speech recognition or semantic audio understanding is claimed."]
+    },
+    {
+      "registry_id": "core-video-metadata",
+      "surface": "core_ingestion",
+      "extensions": [".mp4", ".mov", ".webm"],
+      "state": "PARTIALLY_SUPPORTED",
+      "capabilities": ["ingest", "metadata_inspect"],
+      "source_bindings": ["backend/app/multimodal.py:VIDEO_SUFFIXES"],
+      "limitations": ["No semantic video understanding or transcription is claimed."]
+    },
+    {
+      "registry_id": "ocr-image",
+      "surface": "ocr_image",
+      "extensions": [".png", ".jpg", ".jpeg", ".gif", ".webp"],
+      "state": "PARTIALLY_SUPPORTED",
+      "capabilities": ["printed_text_ocr", "confidence", "source_coordinate_spans"],
+      "source_bindings": ["backend/app/ocr_analysis.py:IMAGE_SUFFIXES|analyze_image_ocr"],
+      "limitations": ["Handwriting and representative difficult-scan accuracy remain separately uncertified.", "Layout/table/form structure requires the separate OCR structure surface."]
+    },
+    {
+      "registry_id": "ocr-pdf",
+      "surface": "ocr_pdf",
+      "extensions": [".pdf"],
+      "state": "PARTIALLY_SUPPORTED",
+      "capabilities": ["page_render", "page_ocr", "page_lineage"],
+      "source_bindings": ["backend/app/ocr_pdf.py:analyze_pdf_ocr"],
+      "limitations": ["Semantic document structure and handwriting are not implied by page OCR."]
+    },
+    {
+      "registry_id": "gis-vector-geojson",
+      "surface": "gis_vector",
+      "extensions": [".geojson", ".json"],
+      "state": "SUPPORTED",
+      "capabilities": ["manifest_inspect", "bounded_vector_operations"],
+      "source_bindings": ["backend/app/gis_vector_formats.py:SUPPORTED_VECTOR_FORMATS", "backend/app/gis_processing.py"],
+      "limitations": ["The file must satisfy the applicable GeoJSON contract; generic JSON is not silently treated as GeoJSON."]
+    },
+    {
+      "registry_id": "gis-vector-container",
+      "surface": "gis_vector",
+      "extensions": [".gpkg", ".shp"],
+      "state": "PARTIALLY_SUPPORTED",
+      "capabilities": ["manifest_inspect", "source_identity"],
+      "source_bindings": ["backend/app/gis_vector_formats.py:SUPPORTED_VECTOR_FORMATS"],
+      "limitations": ["GeoPackage inspection is metadata-first.", "Shapefile identity includes sidecar manifestations.", "Broad cross-format conversion is not claimed."]
+    },
+    {
+      "registry_id": "gis-raster-geotiff",
+      "surface": "gis_raster",
+      "extensions": [".tif", ".tiff"],
+      "state": "SUPPORTED",
+      "capabilities": ["inspect", "sample", "clip", "resample", "zonal_analysis", "terrain", "bounded_hydrology"],
+      "source_bindings": ["backend/app/gis_raster.py:rasterio.open|GTiff"],
+      "limitations": ["Declared support is the bounded GeoTIFF/rasterio plane; other rasterio-readable formats are not implicitly declared."]
+    },
+    {
+      "registry_id": "unsupported-office",
+      "surface": "core_ingestion",
+      "extensions": [".xlsx", ".pptx", ".odt", ".rtf"],
+      "state": "UNSUPPORTED",
+      "capabilities": [],
+      "source_bindings": ["backend/app/ingestion.py:FOLDER_SUPPORTED_SUFFIXES"],
+      "limitations": ["Unsupported files fail closed rather than falling back to replacement-decoded text."]
+    },
+    {
+      "registry_id": "unsupported-config-markup",
+      "surface": "core_ingestion",
+      "extensions": [".yaml", ".yml", ".xml"],
+      "state": "UNSUPPORTED",
+      "capabilities": [],
+      "source_bindings": ["backend/app/ingestion.py:FOLDER_SUPPORTED_SUFFIXES"],
+      "limitations": ["No generic parser is declared for these suffixes."]
+    }
+  ],
+  "unknown_extension": {
+    "surface": "core_ingestion",
+    "state": "UNSUPPORTED",
+    "behavior": "ERROR_UNSUPPORTED_FORMAT",
+    "rule": "Unknown extensions never fall back to replacement-decoded text."
+  },
+  "invariants": [
+    "state vocabulary is exactly SUPPORTED|PARTIALLY_SUPPORTED|UNSUPPORTED",
+    "registry IDs are unique",
+    "surface+extension manifestations are unique",
+    "every accepted core-ingestion suffix is declared exactly once on core_ingestion",
+    "multimodal metadata suffixes remain PARTIALLY_SUPPORTED on core_ingestion",
+    "OCR image suffixes equal the image suffix allowlist",
+    "GIS vector suffixes equal the GIS vector format allowlist",
+    "unknown core-ingestion extensions fail closed",
+    "source taxonomy does not imply cross-surface format identity"
+  ]
+}

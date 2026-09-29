@@ -1,0 +1,48 @@
+name: Format Registry Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "_architecture/format_registry_v1.json"
+      - "backend/app/format_registry.py"
+      - "backend/app/parser.py"
+      - "backend/app/cli.py"
+      - "backend/tests/test_format_registry.py"
+      - "backend/tests/test_format_registry_cert.py"
+      - "scripts/certify_format_registry.py"
+      - ".github/workflows/format-registry-cert.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "_architecture/format_registry_v1.json"
+      - "backend/app/format_registry.py"
+      - "backend/app/parser.py"
+      - "scripts/certify_format_registry.py"
+      - ".github/workflows/format-registry-cert.yml"
+
+jobs:
+  certify-format-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install Mucaro
+        run: python -m pip install -e ".[dev]"
+      - name: Run format registry and parser regressions
+        run: python -m pytest backend/tests/test_format_registry.py backend/tests/test_format_registry_cert.py backend/tests/test_parser.py backend/tests/test_ingestion_safety.py -q
+      - name: Execute format registry certification
+        env:
+          MUCARO_FORMAT_RECEIPT: ${{ runner.temp }}/mucaro-format-registry.json
+        run: python scripts/certify_format_registry.py --output "$MUCARO_FORMAT_RECEIPT"
+      - name: Upload format registry evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: format-registry-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mucaro-format-registry.json
+          if-no-files-found: warn
+          archive: false
