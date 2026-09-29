@@ -20,7 +20,7 @@ def test_portable_lane_requires_all_release_checks(tmp_path: Path, monkeypatch) 
     clean = tmp_path / "clean.json"
     clean.write_text(json.dumps({
         "schema_version": "mucaro-external-release-evidence/1.0",
-        "status": "CLEAN_MACHINE_MACOS_VERIFIED",
+        "status": "PACKAGED_LIFECYCLE_VERIFIED",
         "head_sha": "a"*40,
         "evidence": {
             "install": True,
@@ -46,6 +46,15 @@ def test_portable_lane_requires_all_release_checks(tmp_path: Path, monkeypatch) 
     )
     assert receipt["status"] == cert.STATUS_OK
     assert all(receipt["checks"].values())
+    assert receipt["checks"]["packaged_lifecycle_macos"] is True
+    assert "clean_machine_macos" not in receipt["checks"]
+    assert receipt["scope"] == {
+        "runtime_manifest": "packaging/runtime/macos-x86_64.json",
+        "runtime_architecture": "x86_64",
+        "clean_host_certified": False,
+        "physical_input_certified": False,
+        "signing_notarization_certified": False,
+    }
 
 
 def test_portable_lane_blocks_same_version_rollback(tmp_path: Path, monkeypatch) -> None:
@@ -64,7 +73,7 @@ def test_portable_lane_blocks_same_version_rollback(tmp_path: Path, monkeypatch)
     clean = tmp_path / "clean.json"
     clean.write_text(json.dumps({
         "schema_version": "mucaro-external-release-evidence/1.0",
-        "status": "CLEAN_MACHINE_MACOS_VERIFIED",
+        "status": "PACKAGED_LIFECYCLE_VERIFIED",
         "head_sha": "a"*40,
         "evidence": {
             "install": True, "launch": True, "representative_workflow": True,
