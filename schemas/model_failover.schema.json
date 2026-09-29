@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/model_failover.schema.json",
+  "title": "Mucaro Model Failover Receipt 1.0",
+  "type": "object",
+  "required": ["schema_version", "status", "attempts"],
+  "properties": {
+    "schema_version": {"const": "mucaro-model-failover/1.0"},
+    "status": {"enum": ["FAILOVER_OK", "FAILOVER_EXHAUSTED", "FAILOVER_HARD_FAILURE", "FAILOVER_NO_PROVIDERS"]},
+    "interruption": {"type": "boolean"},
+    "failed_over": {"type": "boolean"},
+    "error_status": {"type": "string"},
+    "attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attempt", "provider", "model", "status", "detail", "started_at", "duration_ms"],
+        "properties": {
+          "attempt": {"type": "integer", "minimum": 1},
+          "provider": {"type": "string", "minLength": 1},
+          "model": {"type": ["string", "null"]},
+          "status": {"type": "string", "minLength": 1},
+          "detail": {"type": "string"},
+          "started_at": {"type": "string", "minLength": 1},
+          "duration_ms": {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  }
+}
