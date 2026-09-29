@@ -22,10 +22,13 @@ def make_source(root: Path, marker: str) -> Path:
     (project / "scripts" / "launch_app.py").write_text("print('launch')\n", encoding="utf-8")
     (project / "frontend" / "dist").mkdir(parents=True)
     (project / "frontend" / "dist" / "index.html").write_text(f"<html>{marker}</html>\n", encoding="utf-8")
+    (project / "pyproject.toml").write_text(
+        '[project]\\nname = "mucaro-ai"\\nversion = "0.1.23"\\n', encoding="utf-8"
+    )
     git(project, "init")
     git(project, "config", "user.email", "mucaro-tests@example.invalid")
     git(project, "config", "user.name", "Mucaro Tests")
-    git(project, "add", "backend/marker.py", "scripts/launch_app.py")
+    git(project, "add", "backend/marker.py", "scripts/launch_app.py", "pyproject.toml")
     git(project, "commit", "-m", marker)
 
     runtime = project / "runtime"
