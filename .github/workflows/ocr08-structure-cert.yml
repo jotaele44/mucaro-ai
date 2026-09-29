@@ -6,7 +6,9 @@ on:
     paths:
       - "_architecture/ocr08_structure_benchmark_v1.json"
       - "backend/app/ocr_structure.py"
+      - "backend/app/cli.py"
       - "backend/tests/test_ocr_structure.py"
+      - "backend/tests/test_cli.py"
       - "backend/tests/test_ocr08_structure_live_cert.py"
       - "scripts/certify_ocr08_structure_live.py"
       - ".github/workflows/ocr08-structure-cert.yml"
@@ -36,7 +38,7 @@ jobs:
           python -m pip install -e ".[dev]"
           python -m pip install "Pillow==11.3.0"
       - name: Run OCR08 structure regressions
-        run: python -m pytest backend/tests/test_ocr_structure.py backend/tests/test_ocr08_structure_live_cert.py -q
+        run: python -m pytest backend/tests/test_ocr_structure.py backend/tests/test_ocr08_structure_live_cert.py backend/tests/test_cli.py -q
       - name: Execute live OCR08 structure certification
         env:
           MUCARO_OCR08_RECEIPT: ${{ runner.temp }}/mucaro-ocr08-structure.json
