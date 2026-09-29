@@ -40,7 +40,7 @@ launch-smoke:
 desktop:
 	PYTHONPATH=. $(PYTHON) -m backend.app.desktop_shell
 
-# Icon of the double-clickable Mucaro AI.app in this folder (see docs/ONE_CLICK_SETUP.md).
+# Icon of the double-clickable Mucaro AI Setup.app in this folder (see docs/ONE_CLICK_SETUP.md).
 app-icon:
 	$(PYTHON) scripts/build_app_icon.py
 
