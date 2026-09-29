@@ -1144,7 +1144,10 @@ def build_parser() -> argparse.ArgumentParser:
     package_portable_runtime.add_argument(
         "--manifest",
         type=Path,
-        help="Runtime source manifest; defaults to the governed x86_64 macOS manifest.",
+        help=(
+            "Runtime source manifest; defaults to the governed x86_64 macOS manifest. "
+            "When supplied explicitly, the default output directory is derived from the manifest filename."
+        ),
     )
     package_portable_runtime.add_argument(
         "--archive",
@@ -3586,7 +3589,8 @@ def run_package_portable_runtime(args: argparse.Namespace, cfg: Settings) -> int
         if args.verify is not None:
             report = verify_materialized_runtime(cfg.project_root, args.verify, manifest)
         else:
-            output_dir = args.output_dir or (cfg.export_dir / "portable_runtimes" / "macos-x86_64")
+            default_runtime_name = "macos-x86_64" if args.manifest is None else manifest.stem
+            output_dir = args.output_dir or (cfg.export_dir / "portable_runtimes" / default_runtime_name)
             report = materialize_portable_runtime(
                 cfg.project_root,
                 manifest,
