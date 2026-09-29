@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path, PurePosixPath
+import tomllib
 from typing import Any
 
 PORTABLE_APP_SCHEMA_VERSION = "mucaro-portable-app/1.0"
@@ -200,6 +201,7 @@ exec "${PYTHON_EXECUTABLE}" -E -s -P -B scripts/launch_app.py "$@"
         "schema_version": PORTABLE_APP_SCHEMA_VERSION,
         "status": "PORTABLE_APP_SOURCE_READY",
         "head_sha": _git_head(root),
+        "release_version": tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"],
         "runtime": {
             "python_path": f"Contents/Resources/runtime/{runtime_python_rel.as_posix()}",
             "source_member_count": len(runtime_source_rows),
