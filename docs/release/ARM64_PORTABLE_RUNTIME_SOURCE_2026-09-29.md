@@ -47,13 +47,20 @@ It reads a supplied `.tar.gz` without extracting it and emits:
 - member / regular-file / symlink counts;
 - total uncompressed regular bytes;
 - a canonical path-sensitive logical-member SHA-256 built from member path,
-  type, uncompressed size/content hash, and symlink target;
+  type, regular-file mode, uncompressed size/content hash, and symlink target;
 - a canonical path-insensitive payload-multiset SHA-256 built from
   `{uncompressed bytes, content SHA-256}` records with duplicates preserved.
 
 Inspection rejects multiple roots, path traversal, duplicate members,
-unsupported member types, escaping/broken/cyclic symlinks, and read-size
-mismatches. Future arm64 manifests may bind the two logical hashes in
+unsupported member types, escaping/broken/cyclic symlinks, read-size
+mismatches, and archive geometry above explicit inspection bounds. Before any
+regular-file payload is hashed, the inspector rejects member count or declared
+regular-byte totals above its ceiling. Its standalone CLI defaults are 2,000
+members and 70,000,000 regular bytes, inherited from the existing governed
+x86_64 manifest as a safety baseline only; they are **not** observations of the
+arm64 asset. The CLI exposes explicit inspection-only overrides, while
+manifest-driven extraction always uses that manifest's own maxima. Future
+arm64 manifests may bind the two logical hashes in
 `archive_policy`; extraction verifies them when present while retaining
 backward compatibility with the current x86_64 manifest.
 
@@ -74,8 +81,12 @@ lock, runtime probe, and tree receipt.
    - symlink count;
    - total uncompressed regular bytes;
    - archive root;
+   - regular-file modes inside the logical-member identity;
+   - path-sensitive logical-member SHA-256;
+   - path-insensitive payload-multiset SHA-256;
    - safe symlink-target closure.
-   Do not copy the x86_64 archive-policy counts.
+   Do not copy the x86_64 archive-policy counts or treat the standalone
+   inspection safety ceilings as observed arm64 geometry.
 3. **Dedicated portable dependency lock.** An off-branch generation attempt on
    2026-09-29 with uv 0.10.0 could not reach PyPI because the execution
    environment had no DNS; no lock file was produced and no dependency
