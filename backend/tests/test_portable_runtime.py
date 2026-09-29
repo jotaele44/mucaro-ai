@@ -25,7 +25,7 @@ def fixture_project(root: Path) -> tuple[Path, Path]:
     (root / "scripts" / "launch_app.py").write_text("print('launch')\n", encoding="utf-8")
     (root / "frontend" / "dist").mkdir(parents=True)
     (root / "frontend" / "dist" / "index.html").write_text("<html>Mucaro</html>\n", encoding="utf-8")
-    (root / "pyproject.toml").write_text('[project]\\nname = "mucaro-ai"\\nversion = "0.1.23"\\n', encoding="utf-8")
+    (root / "pyproject.toml").write_text('[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n', encoding="utf-8")
     git(root, "init")
     git(root, "config", "user.email", "mucaro-tests@example.invalid")
     git(root, "config", "user.name", "Mucaro Tests")
