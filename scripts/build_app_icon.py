@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the icon of the double-clickable ``Mucaro AI.app`` (``Contents/Resources/AppIcon.icns``).
+"""Build the icon of the double-clickable ``Mucaro AI Setup.app`` (``Contents/Resources/AppIcon.icns``).
 
 The artwork is the múcaro owl drawn by ``scripts/build_macos_app.py:render_icon_png``, the same
 icon as the packaged release app. Every size macOS asks for is rendered on its own (sharper than
@@ -26,7 +26,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.build_macos_app import render_icon_png  # noqa: E402
 
-ICNS_PATH = ROOT / "Mucaro AI.app" / "Contents" / "Resources" / "AppIcon.icns"
+ICNS_PATH = ROOT / "Mucaro AI Setup.app" / "Contents" / "Resources" / "AppIcon.icns"
 # PNG-based ICNS element types (macOS 10.7 and later) and the pixel size each one holds.
 # ic11-ic14 and ic10 are the @2x (Retina) variants of the 16, 32, 128, 256 and 512 point sizes.
 ICNS_TYPES = (
@@ -132,7 +132,7 @@ def check(data: bytes) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Build or check the Mucaro AI.app icon.")
+    parser = argparse.ArgumentParser(description="Build or check the Mucaro AI Setup.app icon.")
     parser.add_argument("--check", action="store_true", help="Verify the committed icon instead of writing it.")
     parser.add_argument("--output", type=Path, default=ICNS_PATH, help="Where to write the icon (default: the app bundle).")
     args = parser.parse_args(argv)
