@@ -140,6 +140,10 @@ document.body.dataset.cert;
         == ["evaluate", "fill", "select", "check", "upload", "click", "download_click", "evaluate"],
         "all_actions_executed": action_statuses == ["ACTION_OK"] * 8,
         "form_and_click_state_verified": b"interaction-complete" in dom_bytes and b'interaction-failed' not in dom_bytes,
+        "raw_selectors_omitted_from_action_plan": all(
+            selector not in action_plan_text
+            for selector in ("#name", "#choice", "#agree", "#upload", "#toggle", "#download")
+        ),
         "raw_fill_value_omitted_from_action_plan": fill_value not in action_plan_text,
         "raw_select_value_omitted_from_action_plan": select_value not in action_plan_text,
         "javascript_source_omitted_from_action_plan": setup_script not in action_plan_text
