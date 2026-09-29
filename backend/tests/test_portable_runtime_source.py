@@ -14,6 +14,7 @@ from backend.app.portable_runtime_source import (
     _parse_lock,
     _validate_archive_bytes,
     extract_runtime_archive,
+    inspect_runtime_archive,
     load_runtime_source_manifest,
 )
 
@@ -48,6 +49,74 @@ def _archive(path: Path, entries: list[tuple[str, bytes | None, str | None]]) ->
             "max_regular_bytes": 1024,
         },
     }
+
+
+def test_archive_inspector_freezes_logical_and_payload_identity(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    _archive(
+        archive,
+        [
+            ("python/bin/python3", b"#!/bin/sh\nexit 0\n", None),
+            ("python/lib/example.dat", b"payload", None),
+            ("python/bin/python", None, "python3"),
+        ],
+    )
+
+    report = inspect_runtime_archive(archive)
+
+    assert report["archive_root"] == "python"
+    assert report["archive_bytes"] == archive.stat().st_size
+    assert report["archive_sha256"] == hashlib.sha256(archive.read_bytes()).hexdigest()
+    assert report["member_count"] == 3
+    assert report["regular_file_count"] == 2
+    assert report["symlink_count"] == 1
+    assert report["total_regular_bytes"] == 24
+    assert len(report["logical_members_sha256"]) == 64
+    assert len(report["payload_multiset_sha256"]) == 64
+    assert report["logical_members_sha256"] != report["payload_multiset_sha256"]
+
+
+def test_archive_inspector_rejects_multiple_roots(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    _archive(
+        archive,
+        [
+            ("python/bin/python3", b"python", None),
+            ("other/file", b"other", None),
+        ],
+    )
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        inspect_runtime_archive(archive)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_ROOT"
+
+
+def test_archive_inspector_rejects_broken_symlink(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    _archive(
+        archive,
+        [
+            ("python/bin/python3", b"python", None),
+            ("python/bin/python", None, "missing"),
+        ],
+    )
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        inspect_runtime_archive(archive)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_SYMLINK_TARGET"
+
+
+def test_extract_rejects_frozen_logical_manifest_drift(tmp_path: Path) -> None:
+    archive = tmp_path / "runtime.tar.gz"
+    manifest = _archive(archive, [("python/bin/python3", b"python", None)])
+    manifest["archive_policy"]["logical_members_sha256"] = "0" * 64
+
+    with pytest.raises(PortableRuntimeSourceError) as exc:
+        extract_runtime_archive(archive, tmp_path / "runtime", manifest)
+
+    assert exc.value.status == "ERROR_PORTABLE_RUNTIME_ARCHIVE_IDENTITY"
 
 
 def test_archive_symlink_is_contained_and_materialized(tmp_path: Path) -> None:
