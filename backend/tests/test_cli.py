@@ -81,6 +81,66 @@ def test_cli_help_lists_serve(capsys):
     assert "serve" in output
 
 
+def test_cli_inspects_portable_runtime_archive_without_materializing(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    archive = tmp_path / "runtime.tar.gz"
+    archive.write_bytes(b"fixture")
+    expected = {
+        "archive_bytes": 7,
+        "archive_root": "python",
+        "archive_sha256": "a" * 64,
+        "logical_members_sha256": "b" * 64,
+        "member_count": 2,
+        "payload_multiset_sha256": "c" * 64,
+        "regular_file_count": 1,
+        "symlink_count": 1,
+        "total_regular_bytes": 17,
+    }
+
+    monkeypatch.setattr(cli, "inspect_runtime_archive", lambda path: expected if path == archive else {})
+    monkeypatch.setattr(
+        cli,
+        "materialize_portable_runtime",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not materialize")),
+    )
+
+    assert main(["package", "portable-runtime", "--inspect-archive", str(archive), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {"status": "PORTABLE_RUNTIME_ARCHIVE_INSPECTED", **expected}
+
+
+def test_cli_archive_inspection_rejects_conflicting_modes(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    archive = tmp_path / "runtime.tar.gz"
+    verify = tmp_path / "runtime"
+
+    monkeypatch.setattr(
+        cli,
+        "inspect_runtime_archive",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("conflict must fail before inspection")),
+    )
+
+    assert (
+        main(
+            [
+                "package",
+                "portable-runtime",
+                "--inspect-archive",
+                str(archive),
+                "--verify",
+                str(verify),
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["status"] == "ERROR_PORTABLE_RUNTIME_MODE_CONFLICT"
+    assert "--verify" in payload["detail"]
+
+
 def test_cli_materializes_portable_runtime_with_governed_defaults(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     expected_output = tmp_path / "data" / "exports" / "portable_runtimes" / "macos-x86_64"
