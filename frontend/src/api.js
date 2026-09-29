@@ -79,7 +79,13 @@ async function request(path, options = {}) {
     const detail = payload.detail ?? payload;
     const status = typeof detail === "object" ? detail.status || String(res.status) : String(res.status);
     const message = typeof detail === "object" ? detail.detail || status : String(detail);
-    const category = res.status === 401 || res.status === 403 ? "PERMISSION_DENIED" : res.status === 404 ? "SOURCE_UNAVAILABLE" : undefined;
+    const fallbackCategory =
+      res.status === 401 || res.status === 403
+        ? "PERMISSION_DENIED"
+        : res.status === 404
+          ? "SOURCE_UNAVAILABLE"
+          : undefined;
+    const category = typeof detail === "object" ? detail.category || fallbackCategory : fallbackCategory;
     throw new ApiError(status, message, category, payload);
   }
   return res.json();
