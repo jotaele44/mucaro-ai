@@ -23,7 +23,7 @@ def make_source(root: Path, marker: str) -> Path:
     (project / "frontend" / "dist").mkdir(parents=True)
     (project / "frontend" / "dist" / "index.html").write_text(f"<html>{marker}</html>\n", encoding="utf-8")
     (project / "pyproject.toml").write_text(
-        '[project]\\nname = "mucaro-ai"\\nversion = "0.1.23"\\n', encoding="utf-8"
+        '[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n', encoding="utf-8"
     )
     git(project, "init")
     git(project, "config", "user.email", "mucaro-tests@example.invalid")
