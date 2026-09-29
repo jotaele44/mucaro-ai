@@ -25,6 +25,8 @@ RUNTIME_RECEIPT_NAME = "runtime-provenance.json"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 LOCK_REQUIREMENT_RE = re.compile(r"^([A-Za-z0-9_.-]+)==([^\s\\]+)", re.MULTILINE)
 PROJECT_REQUIREMENT_RE = re.compile(r"^([A-Za-z0-9_.-]+)==([^\s;]+)$")
+DEFAULT_INSPECT_MAX_MEMBERS = 2000
+DEFAULT_INSPECT_MAX_REGULAR_BYTES = 70_000_000
 
 
 class PortableRuntimeSourceError(RuntimeError):
@@ -225,15 +227,25 @@ def _safe_symlink_target(member_name: str, link_name: str, archive_root: str) ->
     return Path(*relative.parts)
 
 
-def inspect_runtime_archive(archive_path: Path) -> dict[str, Any]:
+def inspect_runtime_archive(
+    archive_path: Path,
+    *,
+    max_members: int = DEFAULT_INSPECT_MAX_MEMBERS,
+    max_regular_bytes: int = DEFAULT_INSPECT_MAX_REGULAR_BYTES,
+) -> dict[str, Any]:
     """Inspect one runtime tarball without extracting it.
 
     The report is suitable for freezing archive-policy evidence. It derives the
     single archive root from member paths, rejects unsafe/duplicate/unsupported
     members and unresolved or cyclic symlinks, hashes every regular member, and
     records both path-sensitive logical identity and a path-insensitive payload
-    multiset identity.
+    multiset identity. Inspection is bounded before member payloads are read.
     """
+    if max_members <= 0 or max_regular_bytes <= 0:
+        raise PortableRuntimeSourceError(
+            "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT",
+            f"invalid inspection limits: max_members={max_members} max_regular_bytes={max_regular_bytes}",
+        )
     archive_path = archive_path.resolve()
     try:
         archive = tarfile.open(archive_path, "r:gz")  # noqa: SIM115 - closed by the adjacent context manager
@@ -244,6 +256,17 @@ def inspect_runtime_archive(archive_path: Path) -> dict[str, Any]:
         members = archive.getmembers()
         if not members:
             raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE", "archive has no members")
+        if len(members) > max_members:
+            raise PortableRuntimeSourceError(
+                "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT",
+                f"member_count={len(members)} max_members={max_members}",
+            )
+        total_declared_regular_bytes = sum(member.size for member in members if member.isfile())
+        if total_declared_regular_bytes > max_regular_bytes:
+            raise PortableRuntimeSourceError(
+                "ERROR_PORTABLE_RUNTIME_ARCHIVE_LIMIT",
+                f"total_regular_bytes={total_declared_regular_bytes} max_regular_bytes={max_regular_bytes}",
+            )
         unsupported = [member for member in members if not (member.isfile() or member.issym())]
         if unsupported:
             raise PortableRuntimeSourceError(
@@ -296,6 +319,7 @@ def inspect_runtime_archive(archive_path: Path) -> dict[str, Any]:
                 logical_rows.append(
                     {
                         "bytes": member.size,
+                        "mode": member.mode & 0o777,
                         "path": relative,
                         "sha256": sha256,
                         "type": "file",
@@ -348,7 +372,11 @@ def extract_runtime_archive(archive_path: Path, destination: Path, manifest: dic
     if not archive_root or PurePosixPath(archive_root).is_absolute() or "/" in archive_root:
         raise PortableRuntimeSourceError("ERROR_PORTABLE_RUNTIME_ARCHIVE_ROOT", archive_root)
 
-    inspection = inspect_runtime_archive(archive_path)
+    inspection = inspect_runtime_archive(
+        archive_path,
+        max_members=policy["max_members"],
+        max_regular_bytes=policy["max_regular_bytes"],
+    )
     if inspection["archive_root"] != archive_root:
         raise PortableRuntimeSourceError(
             "ERROR_PORTABLE_RUNTIME_ARCHIVE_ROOT",
