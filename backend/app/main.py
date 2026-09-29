@@ -22,7 +22,7 @@ from .conversations import (
     rename_conversation,
 )
 from .db import init_db, list_payloads, upsert_payload
-from .error_categories import classify_http_error
+from .error_categories import ERROR_CATEGORIES, classify_http_error
 from .execution_gate import analyze_task, approve_execution
 from .ingestion import (
     FOLDER_SUPPORTED_SUFFIXES,
@@ -127,6 +127,8 @@ def api_error(status: str, detail: str, *, status_code: int = 400, **extra: obje
         "detail": detail,
     }
     payload.update(extra)
+    if payload.get("category") not in ERROR_CATEGORIES:
+        payload["category"] = classify_http_error(status, status_code)
     return HTTPException(status_code=status_code, detail=payload)
 
 
@@ -135,8 +137,9 @@ def _categorized_http_payload(status_code: int, detail: object) -> dict[str, obj
         payload = dict(detail)
         status = str(payload.get("status") or f"ERROR_HTTP_{status_code}")
         message = payload.get("detail")
+        category = payload.get("category")
         payload["status"] = status
-        payload["category"] = str(payload.get("category") or classify_http_error(status, status_code))
+        payload["category"] = category if category in ERROR_CATEGORIES else classify_http_error(status, status_code)
         payload["detail"] = str(message) if message is not None else status
         return payload
     status = f"ERROR_HTTP_{status_code}"
