@@ -1,4 +1,4 @@
-"""Mucaro AI.app desktop mode (scripts/one_click_desktop.py), with pywebview replaced by a fake window."""
+"""Mucaro AI Setup.app desktop mode (scripts/one_click_desktop.py), with pywebview replaced by a fake window."""
 
 from __future__ import annotations
 
@@ -176,7 +176,7 @@ def test_window_shows_progress_then_loads_the_app_with_a_launch_token(tmp_path, 
     assert seen_while_open["security"]["status"] == "SECURITY_OK"
 
     # The Dock shows the owl; the web view keeps its storage next to the library.
-    assert web.start_options["icon"] == str(REPO / "Mucaro AI.app" / "Contents" / "Resources" / "AppIcon.icns")
+    assert web.start_options["icon"] == str(REPO / "Mucaro AI Setup.app" / "Contents" / "Resources" / "AppIcon.icns")
     assert web.start_options["private_mode"] is False
     assert web.start_options["storage_path"] == str(tmp_path / "data" / "webview")
 
