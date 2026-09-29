@@ -194,6 +194,25 @@ def main() -> int:
             row["id"]: row["status"] == expected_statuses.get(row["id"])
             for row in case_results
         }
+        positive_ids = {"OCR08-01", "OCR08-02", "OCR08-03"}
+        negative_ids = {"OCR08-N01", "OCR08-N02", "OCR08-N03"}
+        positive_pass_rate = sum(case_matches[case_id] for case_id in positive_ids) / len(positive_ids)
+        negative_fail_closed_rate = sum(case_matches[case_id] for case_id in negative_ids) / len(negative_ids)
+        positive_span_accounting_rate = sum(
+            row.get("invariants", {}).get("all_input_spans_classified") is True
+            for row in (multi, table, form)
+        ) / 3
+        metrics = {
+            "positive_case_pass_rate": positive_pass_rate,
+            "negative_fail_closed_rate": negative_fail_closed_rate,
+            "span_accounting_rate": positive_span_accounting_rate,
+        }
+        thresholds = benchmark["thresholds"]
+        threshold_failures = [
+            name
+            for name, value in metrics.items()
+            if value < float(thresholds[name])
+        ]
 
         invariants = {
             "multi_ocr_ok": multi_ocr["status"] == "OCR_ANALYSIS_OK",
@@ -234,6 +253,7 @@ def main() -> int:
             and len({row["id"] for row in case_results}) == 6
             and set(row["id"] for row in case_results) == set(expected_statuses),
             "all_six_expected_states_match": all(case_matches.values()),
+            "threshold_arithmetic_closed": not threshold_failures,
         }
         result = {
             "schema_version": "mucaro-ocr08-structure-live-cert/1.0",
@@ -247,6 +267,8 @@ def main() -> int:
             },
             "case_results": case_results,
             "case_matches": case_matches,
+            "metrics": metrics,
+            "threshold_failures": threshold_failures,
             "fixtures": {
                 "multi_column_sha256": _sha(multi_path),
                 "table_sha256": _sha(table_path),
