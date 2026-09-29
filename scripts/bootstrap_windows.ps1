@@ -16,24 +16,41 @@ function Invoke-Checked {
     }
 }
 
-$versionCheck = "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)"
+# Supported: 3.11-3.13. Pinned rasterio 1.4.3 publishes no wheels for 3.14+, so pip would try a GDAL source build.
+$versionCheck = "import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] < (3, 14) else 1)"
+
+# Probing a runtime that is not installed writes to stderr; with ErrorActionPreference=Stop,
+# Windows PowerShell 5.1 turns redirected native stderr into a terminating error, so relax it here.
+function Test-PythonCandidate {
+    param([string]$Command, [string[]]$Arguments)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $Command @Arguments -c $versionCheck 2>$null | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
 $pythonCmd = $null
 $pythonArgs = @()
 if (Get-Command py -ErrorAction SilentlyContinue) {
-    & py -3 -c $versionCheck
-    if ($LASTEXITCODE -eq 0) {
-        $pythonCmd = "py"
-        $pythonArgs = @("-3")
+    foreach ($selector in @("-3.13", "-3.12", "-3.11")) {
+        if (Test-PythonCandidate "py" @($selector)) {
+            $pythonCmd = "py"
+            $pythonArgs = @($selector)
+            break
+        }
     }
 }
 if (-not $pythonCmd -and (Get-Command python -ErrorAction SilentlyContinue)) {
-    & python -c $versionCheck
-    if ($LASTEXITCODE -eq 0) {
+    if (Test-PythonCandidate "python" @()) {
         $pythonCmd = "python"
     }
 }
 if (-not $pythonCmd) {
-    Write-Host "ERROR_PYTHON_TOO_OLD_OR_MISSING install Python 3.11+ from python.org (enable 'Add to PATH') and rerun"
+    Write-Host "ERROR_PYTHON_UNSUPPORTED_OR_MISSING install Python 3.11-3.13 from python.org (enable 'Add to PATH') and rerun, or double-click ""Mucaro AI.cmd"", which brings its own Python 3.12"
     exit 2
 }
 $pythonVersion = & $pythonCmd @pythonArgs -c "import platform; print(platform.python_version())"

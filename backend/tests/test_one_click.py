@@ -511,7 +511,7 @@ class FakeProc:
 def _fake_backend(monkeypatch, *, busy_ports: set[int], healthy_ports: set[int] = frozenset()):
     started = []
     stopped = []
-    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False: None)
+    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False, verified=False: None)
     monkeypatch.setattr(launch_app, "port_open", lambda port: port in busy_ports or port in started)
     monkeypatch.setattr(launch_app, "health_ok", lambda port: port in healthy_ports or port in started)
     monkeypatch.setattr(launch_app, "start_backend", lambda port: started.append(port) or FakeProc())
