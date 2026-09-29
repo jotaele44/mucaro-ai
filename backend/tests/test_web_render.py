@@ -116,3 +116,146 @@ def test_render_rejects_oversized_dom(tmp_path: Path, monkeypatch: pytest.Monkey
             max_dom_bytes=1024,
         )
     assert exc.value.status == "ERROR_WEB_RENDER_DOM_TOO_LARGE"
+
+
+def test_interactions_require_explicit_permission(tmp_path: Path) -> None:
+    with pytest.raises(WebRenderError) as exc:
+        render_web_page(
+            "https://example.com",
+            cfg=make_settings(tmp_path),
+            allow_rendered_browser=True,
+            actions=[{"type": "click", "selector": "#go"}],
+        )
+    assert exc.value.status == "ERROR_WEB_RENDER_INTERACTIONS_NOT_ALLOWED"
+
+
+def test_javascript_actions_require_separate_permission(tmp_path: Path) -> None:
+    with pytest.raises(WebRenderError) as exc:
+        render_web_page(
+            "https://example.com",
+            cfg=make_settings(tmp_path),
+            allow_rendered_browser=True,
+            allow_interactions=True,
+            actions=[{"type": "evaluate", "script": "document.title"}],
+        )
+    assert exc.value.status == "ERROR_WEB_RENDER_JAVASCRIPT_NOT_ALLOWED"
+
+
+def test_upload_rejects_path_outside_input_directory(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    outside = tmp_path / "outside.txt"
+    outside.write_text("not permitted", encoding="utf-8")
+    with pytest.raises(WebRenderError) as exc:
+        render_web_page(
+            "https://example.com",
+            cfg=cfg,
+            allow_rendered_browser=True,
+            allow_interactions=True,
+            allow_uploads=True,
+            actions=[{"type": "upload", "selector": "#upload", "path": str(outside)}],
+        )
+    assert exc.value.status == "ERROR_WEB_RENDER_UPLOAD_PATH"
+
+
+def test_private_subrequest_is_blocked_without_persisting_raw_url() -> None:
+    blocked = []
+    allowed = render._browser_request_allowed("http://127.0.0.1/private?token=secret", blocked)
+    assert allowed is False
+    assert blocked[0]["host"] == "127.0.0.1"
+    assert len(blocked[0]["url_sha256"]) == 64
+    assert "token" not in str(blocked[0])
+
+
+def test_interaction_receipt_redacts_fill_select_and_javascript_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_fill = "non-secret-form-value"
+    raw_select = "choice-b"
+    raw_script = "document.body.dataset.cert='ok'; 'ok'"
+
+    def fake(url, timeout_ms, **kwargs):
+        assert kwargs["actions"][0]["value"] == raw_fill
+        assert kwargs["actions"][1]["value"] == raw_select
+        assert kwargs["actions"][2]["script"] == raw_script
+        return {
+            "engine": "playwright_chromium",
+            "engine_version": "fixture-2",
+            "final_url": "https://example.com/final",
+            "http_status": 200,
+            "title": "Fixture",
+            "dom_bytes": b"<html><body data-cert='ok'></body></html>",
+            "screenshot_bytes": b"PNG-FIXTURE",
+            "action_results": [
+                {"index": 0, "type": "fill", "status": "ACTION_OK"},
+                {"index": 1, "type": "select", "status": "ACTION_OK"},
+                {"index": 2, "type": "evaluate", "status": "ACTION_OK", "result_sha256": "a" * 64},
+            ],
+            "blocked_requests": [],
+        }
+
+    monkeypatch.setattr(render, "_render_with_playwright", fake)
+    result = render_web_page(
+        "https://example.com",
+        cfg=make_settings(tmp_path),
+        allow_rendered_browser=True,
+        allow_interactions=True,
+        allow_javascript_actions=True,
+        actions=[
+            {"type": "fill", "selector": "#name", "value": raw_fill},
+            {"type": "select", "selector": "#choice", "value": raw_select},
+            {"type": "evaluate", "script": raw_script},
+        ],
+    )
+    interaction_text = str(result["receipt"]["interaction"]["action_plan"])
+    assert raw_fill not in interaction_text
+    assert raw_select not in interaction_text
+    assert raw_script not in interaction_text
+    assert result["receipt"]["interaction"]["action_count"] == 3
+    assert result["receipt"]["invariants"]["raw_action_values_omitted_from_action_receipt"] is True
+
+
+def test_download_bytes_are_saved_and_hash_bound(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = b"download-fixture"
+
+    def fake(url, timeout_ms, **kwargs):
+        return {
+            "engine": "playwright_chromium",
+            "engine_version": "fixture-2",
+            "final_url": url,
+            "http_status": 200,
+            "title": "Fixture",
+            "dom_bytes": b"<html></html>",
+            "screenshot_bytes": b"PNG-FIXTURE",
+            "action_results": [
+                {
+                    "index": 0,
+                    "type": "download_click",
+                    "status": "ACTION_OK",
+                    "download": {
+                        "suggested_filename": "../unsafe name.txt",
+                        "size_bytes": len(payload),
+                        "sha256": "placeholder",
+                        "source_scheme": "data",
+                    },
+                    "_download_bytes": payload,
+                }
+            ],
+            "blocked_requests": [],
+        }
+
+    monkeypatch.setattr(render, "_render_with_playwright", fake)
+    result = render_web_page(
+        "https://example.com",
+        cfg=make_settings(tmp_path),
+        allow_rendered_browser=True,
+        allow_interactions=True,
+        allow_downloads=True,
+        actions=[{"type": "download_click", "selector": "#download"}],
+    )
+    download = result["receipt"]["interaction"]["downloads"][0]
+    path = Path(download["path"])
+    assert path.is_file()
+    assert path.read_bytes() == payload
+    assert len(download["sha256"]) == 64
+    assert path.name.endswith("unsafe_name.txt")

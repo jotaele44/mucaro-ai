@@ -206,6 +206,12 @@ def _web_render(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
             allow_rendered_browser=arguments.get("allow_rendered_browser") is True,
             timeout_ms=arguments.get("timeout_ms", 20_000),
             max_dom_bytes=arguments.get("max_dom_bytes", 2_000_000),
+            actions=arguments.get("actions"),
+            allow_interactions=arguments.get("allow_interactions") is True,
+            allow_javascript_actions=arguments.get("allow_javascript_actions") is True,
+            allow_uploads=arguments.get("allow_uploads") is True,
+            allow_downloads=arguments.get("allow_downloads") is True,
+            max_download_bytes=arguments.get("max_download_bytes", 20_000_000),
         )
     except WebRenderError as exc:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
@@ -297,7 +303,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
     ),
     "web.render": ToolDefinition(
         name="web.render",
-        description="Render one explicitly approved public HTTP(S) page in an optional headless browser and save DOM/screenshot provenance; rendered output is not citation-ready by default.",
+        description="Render and, when separately permitted, interact with one explicitly approved public HTTP(S) page in a fresh headless browser; save DOM/screenshot/action provenance while keeping rendered output non-citation-ready by default.",
         mutates_state=True,
         requires_approval=True,
         network="remote",
