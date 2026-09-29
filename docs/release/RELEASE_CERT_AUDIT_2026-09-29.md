@@ -109,7 +109,7 @@ of the rows above can move to PASS on this evidence.
 | F-7 | `current_state_snapshot_v1.json` (2026-09-24, `0bf5bf8`) described the app as a source-bound bash wrapper, with no receipts. | T1 | 97% | CLOSED by the snapshot refresh that accompanies this record |
 | F-8 | The packaged release artifact and the source-checkout bootstrap previously shared the visible name `Mucaro AI.app`. Draft PR #133 now separates them as `Mucaro AI.app` / `ai.mucaro.app` and `Mucaro AI Setup.app` / `ai.mucaro.launcher`, with an explicit regression preventing the checkout app from reusing the packaged name. | T2 | 95% | CANDIDATE-RESOLVED on PR #133 head `20864689ccdd5fb1a0f4df5217418f944c464d85`; remains OPEN on canonical `main` until exact-head execution and merge. |
 | F-9 | Windows and Linux have a source setup but no packaged or signed lane. | T1 | 99% | DECIDED outside this release. Recorded as SD-013 (unadopted enhancement). |
-| F-10 | Open workstream branches overlap but are not one duplicate set. PR #117 contains all three commits from #114, plus V02 checkpoint hardening and its V04 model-failover delta. PRs #106, #108 and #117 are mutually diverged: #106 is the narrow provider-attempt identity slice; #108 is the larger provider-failover + V05 tool-integrity slice; #117 is the mixed permission/checkpoint/model-failover aggregate. Historical #114/#117 CI executed and failed only the coding-profile lint row (Ruff I001 in `backend/app/coding_container.py` import order); that exact source defect is repaired on #114 head `4b5e34b4f4d16daf0bb97c2c1c9cc14d8e8a9c8c` and #117 head `2d66f878ea51a64747913f996c1eb871c20e727f`. Fresh hosted jobs remain zero-step failures. | T2 | 99% | OPEN. Treat #114 as the clean permission-engine slice; preserve #117 only as a carrier of its unique V04 model-failover delta until that delta is reconstructed on current main. Keep #106 and #108 separate because their commits are not ancestral to #117. Supersede a branch only after its unique delta is preserved elsewhere and executed. |
+| F-10 | Open workstream branches overlap but are not one duplicate set. PR #117 contains all three commits from #114, plus V02 checkpoint hardening and its V04 model-failover delta. PRs #106, #108 and #117 are mutually diverged. The unique V04 model-failover behavior has now been reconstructed cleanly on current main in draft PR #145, head `d3bd0cca8a39340848b3349e305d21f9b73e15ad`, without #114/V02/#106/#108 history; #117 was converted back to DRAFT. Historical #114/#117 CI executed and failed only the coding-profile lint row (Ruff I001 in `backend/app/coding_container.py` import order); that source defect is repaired on #114 head `4b5e34b4f4d16daf0bb97c2c1c9cc14d8e8a9c8c` and #117 head `2d66f878ea51a64747913f996c1eb871c20e727f`. Fresh #114/#117/#145 hosted jobs remain zero-step failures under BLK-ACTIONS-001. | T2 | 99% | CANDIDATE-RESOLVED structurally. #114 remains the clean permission-engine slice. #145 is the clean V04 replacement candidate. #106 and #108 remain separate because their commits are not ancestral to #117. #117 may be closed as superseded only after #145 executes real nonzero-step gates and preserves the unique V04 behavior; canonical main remains OPEN until then. |
 
 ## 5. OPEN residue (49 rows)
 
@@ -138,13 +138,14 @@ The six group counts above are a partition of the 49 authoritative OPEN rows: `1
 - a separately provisioned host for the packaged lifecycle (F-4)
 - WKWebView and VoiceOver evidence on macOS (TGT-036, MATRIX-015)
 - the 49 OPEN rows
-- red PRs #114 and #117
+- #114 permission-engine source repair and #145 clean V04 reconstruction are both waiting on nonzero-step hosted execution under BLK-ACTIONS-001; #117 is preserved as draft historical/unique-delta evidence
 
 ## 7. Critical path
 
-1. **Inputs:** BLK-SPEC-001 and BLK-PHYS-001 decisions, then the Apple signing credentials.
-2. **Engineering:** the arm64 portable lane and the separately provisioned lifecycle host, then the OPEN and PROVISIONAL rows in DAG order (N02 → N25).
-3. **Freeze:** freeze one commit and re-run every gate on it. That covers both packaged lanes, the signed-installer receipt and hosted CI, followed by the final release manifest.
+1. **Infrastructure:** clear BLK-ACTIONS-001 by restoring GitHub-hosted runner admission; the first valid evidence must execute at least one workflow step.
+2. **Inputs:** BLK-SPEC-001 and BLK-PHYS-001 decisions, then the Apple signing credentials.
+3. **Engineering:** validate #114 and #145 on real runners, then complete the arm64 portable lane and the separately provisioned lifecycle host, followed by the OPEN and PROVISIONAL rows in DAG order (N02 → N25).
+4. **Freeze:** freeze one commit and re-run every gate on it. That covers both packaged lanes, the signed-installer receipt and hosted CI, followed by the final release manifest.
 
 ## 8. Blind spots
 
