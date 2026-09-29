@@ -162,14 +162,14 @@ def certify_clean_machine_macos(
             "rollback": rollback,
             "reinstall": reinstall,
         },
-        "basis": "distinct-version install/launch/workflow/bundle-integrity/rollback/reinstall executed with the embedded portable runtime on macOS",
+        "basis": "packaged lifecycle executed with the embedded portable runtime on macOS; host cleanliness has not been established",
         "limitations": [
             "The operator must run this on a genuinely clean macOS machine for the receipt to qualify as clean-machine evidence.",
             "This function cannot independently prove the machine was clean before execution; release procedure must preserve host identity and setup evidence.",
             "Signing/notarization is a separate external gate.",
         ],
     }
-    receipt["status"] = "CLEAN_MACHINE_MACOS_VERIFIED" if all(evidence.values()) else "CLEAN_MACHINE_MACOS_BLOCKED"
+    receipt["status"] = "PACKAGED_LIFECYCLE_VERIFIED" if all(evidence.values()) else "PACKAGED_LIFECYCLE_BLOCKED"
     if output_path is not None:
         target = Path(output_path).expanduser().resolve()
         target.parent.mkdir(parents=True, exist_ok=True)
