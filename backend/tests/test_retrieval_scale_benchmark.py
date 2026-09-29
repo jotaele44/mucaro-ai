@@ -18,7 +18,7 @@ from backend.app.utils import tokenize
 
 def test_rt10_denominator_is_frozen_and_arithmetic_closes() -> None:
     denominator = load_denominator()
-    assert denominator["schema_version"] == "MUCARO_RT10_SCALE_BENCHMARK/1.1"
+    assert denominator["schema_version"] == "MUCARO_RT10_SCALE_BENCHMARK/1.2"
     assert denominator["corpus"]["scale_levels"] == [1000, 5000, 10000]
     assert denominator["corpus"]["max_chunks"] == 10000
     assert denominator["query_denominator"] == {
@@ -140,3 +140,28 @@ def test_rt10_threshold_falsification_is_detected() -> None:
         wall_seconds=1.0,
     )
     assert "expected_source_hit_rate<min_expected_source_hit_rate" in failures
+
+
+def test_rt10_difficult_queries_use_conjunctive_clues_with_partial_distractors() -> None:
+    denominator = load_denominator()
+    chunks = build_corpus(1000)
+    by_source = {str(row["source_id"]): row for row in chunks}
+    difficult = [row for row in build_queries(denominator) if row["category"] == "difficult"]
+    assert len(difficult) == 16
+    for offset, case in enumerate(difficult):
+        query_tokens = set(tokenize(str(case["query"])))
+        assert not any(token.startswith("zxq") for token in query_tokens)
+        clue_a = f"cluea{offset:02d}"
+        clue_b = f"clueb{offset:02d}"
+        assert {clue_a, clue_b} <= query_tokens
+
+        target_tokens = set(tokenize(str(by_source[f"rt10_source_{200 + offset:05d}"]["text"])))
+        decoy_a_tokens = set(tokenize(str(by_source[f"rt10_source_{400 + offset:05d}"]["text"])))
+        decoy_b_tokens = set(tokenize(str(by_source[f"rt10_source_{500 + offset:05d}"]["text"])))
+        assert {clue_a, clue_b} <= target_tokens
+        assert clue_a in decoy_a_tokens and clue_b not in decoy_a_tokens
+        assert clue_b in decoy_b_tokens and clue_a not in decoy_b_tokens
+
+    report = evaluate_queries(chunks, difficult, strategy="hybrid", top_k=5)
+    assert report["metrics"]["expected_source_hit_rate"] == 1.0
+    assert report["metrics"]["expected_binding_recall"] == 1.0

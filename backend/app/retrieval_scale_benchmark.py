@@ -17,7 +17,7 @@ from .model_router import generate_answer
 from .retrieval import retrieve
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DENOMINATOR = ROOT / "_architecture" / "retrieval_scale_benchmark_v1_1.json"
+DEFAULT_DENOMINATOR = ROOT / "_architecture" / "retrieval_scale_benchmark_v1_2.json"
 STATUS_OK = "RT10_SCALE_CERT_PASS"
 STATUS_FAILED = "RT10_SCALE_CERT_FAIL"
 
@@ -46,7 +46,7 @@ def current_git_head(root: Path = ROOT) -> str:
 
 def load_denominator(path: Path = DEFAULT_DENOMINATOR) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    if payload.get("schema_version") != "MUCARO_RT10_SCALE_BENCHMARK/1.1":
+    if payload.get("schema_version") != "MUCARO_RT10_SCALE_BENCHMARK/1.2":
         raise ScaleBenchmarkError("ERROR_SCALE_SCHEMA_VERSION")
     query_denominator = payload.get("query_denominator")
     if not isinstance(query_denominator, dict):
@@ -71,12 +71,22 @@ def load_denominator(path: Path = DEFAULT_DENOMINATOR) -> dict[str, Any]:
 def _chunk_text(index: int) -> str:
     ambiguous_group = index // 2 if index < 32 else -1
     ambiguous_terms = f" ambig{ambiguous_group:02d} pairtoken{ambiguous_group:02d}" if ambiguous_group >= 0 else ""
+
+    difficult_terms = ""
+    if 200 <= index < 216:
+        offset = index - 200
+        difficult_terms = f" cluea{offset:02d} clueb{offset:02d}"
+    elif 400 <= index < 416:
+        difficult_terms = f" cluea{index - 400:02d}"
+    elif 500 <= index < 516:
+        difficult_terms = f" clueb{index - 500:02d}"
+
     return (
         f"Benchmark record {index:05d}. "
         f"Stable retrieval identity zxq{index:05d}. "
         f"Group grp{index % 100:03d}. "
         "This deterministic local corpus measures bounded retrieval latency, binding recall, and citation traceability."
-        f"{ambiguous_terms}"
+        f"{ambiguous_terms}{difficult_terms}"
     )
 
 
@@ -117,8 +127,8 @@ def build_queries(denominator: dict[str, Any]) -> list[dict[str, Any]]:
                 "query_id": f"difficult-{offset:02d}",
                 "category": "difficult",
                 "query": (
-                    "Within the bounded latency and citation-traceability benchmark, "
-                    f"locate zxq{index:05d} while ignoring generic group language."
+                    "Which benchmark record jointly binds "
+                    f"cluea{offset:02d} and clueb{offset:02d} under bounded citation traceability?"
                 ),
                 "expected_source_ids": [f"rt10_source_{index:05d}"],
             }
