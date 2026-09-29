@@ -160,6 +160,29 @@ def test_live_route_adds_only_ready_allowed_offline_fallbacks_when_opted_in(monk
     assert route["invariants"]["failover_order_selected_first"] is True
 
 
+def test_local_route_never_falls_back_to_mock_without_explicit_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("backend.app.model_routing_policy.list_model_providers", _ready_providers)
+    route = plan_model_route(
+        task_type="cited_qa",
+        preferred_provider="openai_compatible_local",
+    )
+    assert route["failover_order"] == [
+        {"provider": "openai_compatible_local", "model": "local"},
+    ]
+    assert route["invariants"]["no_implicit_mock_fallback"] is True
+
+    opted_in = plan_model_route(
+        task_type="cited_qa",
+        preferred_provider="openai_compatible_local",
+        allow_offline_failover=True,
+    )
+    assert [row["provider"] for row in opted_in["failover_order"]] == [
+        "openai_compatible_local",
+        "mock",
+    ]
+    assert opted_in["route_sha256"] != route["route_sha256"]
+
+
 @pytest.mark.parametrize(
     "script",
     [
