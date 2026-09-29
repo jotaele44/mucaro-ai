@@ -526,7 +526,9 @@ def reconstruct_ocr_report(
             "input_report_sha256_present": len(report_sha256) == 64,
             "input_report_schema_bound": True,
             "structure_kind_exact": structure.get("kind") == kind.upper(),
-            "structure_span_count_matches_input": structure.get("span_count", len(spans)) == len(spans),
+            "structure_span_count_matches_input": (
+                structure.get("invariants", {}).get("input_span_count", structure.get("span_count")) == len(spans)
+            ),
         },
         "limitations": [
             "The structure receipt is derived from an existing OCR receipt and does not rerun OCR.",
