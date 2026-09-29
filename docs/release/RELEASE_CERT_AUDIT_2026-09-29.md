@@ -22,7 +22,7 @@ PROVISIONAL. Scope decisions are in `docs/RELEASE_SCOPE_2026-09-29.md`.
 
 `MUCARO AI RELEASE STATUS = PROVISIONAL`, recomputed from the ledgers (T1).
 
-| State | Rows | Share of 137 in scope |
+| State | Rows | Share of 137 applicable rows |
 | --- | ---: | ---: |
 | PASS | 55 | 40.1% |
 | OPEN | 49 | 35.8% |
@@ -30,6 +30,8 @@ PROVISIONAL. Scope decisions are in `docs/RELEASE_SCOPE_2026-09-29.md`.
 | BLOCKED | 7 | 5.1% |
 | FAIL | 0 | 0% |
 | NOT_APPLICABLE | 1 | n/a |
+
+The percentage denominator is 137 applicable rows: 136 rows have `scope_state=IN_SCOPE` and TGT-027 is `EXTERNALLY_BLOCKED` but remains a required release row. LEARN-GATE-001 is the single `NOT_APPLICABLE` row and is excluded from the percentage denominator.
 
 Four of the nine terminal-rule conditions hold. These five do not:
 - bound specification
