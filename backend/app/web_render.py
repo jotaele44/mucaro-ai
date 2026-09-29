@@ -218,7 +218,9 @@ def _action_plan_receipt(action: dict[str, Any]) -> dict[str, Any]:
         "wait_after_ms": int(action.get("wait_after_ms", 0)),
     }
     if "selector" in action:
-        receipt["selector"] = str(action["selector"])
+        selector = str(action["selector"])
+        receipt["selector_length"] = len(selector)
+        receipt["selector_sha256"] = _sha256_text(selector)
     if action["type"] in {"fill", "select"}:
         value = str(action.get("value", ""))
         receipt["value_length"] = len(value)
