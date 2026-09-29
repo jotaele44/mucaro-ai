@@ -4,7 +4,7 @@ Open `Mucaro AI Setup.app` (macOS) or double-click `Mucaro AI.cmd` (Windows). Th
 everything and opens the app; later runs open it in seconds. No input is needed at any point.
 
 On a Mac the app runs without a terminal or a browser and shows Mucaro AI in its own window: see
-[Mucaro AI Setup.app](#mucaro-aiapp-macos). `Mucaro AI.command` runs the same setup in Terminal and
+[Mucaro AI Setup.app](#mucaro-ai-setupapp-macos). `Mucaro AI.command` runs the same setup in Terminal and
 opens the browser; it is also the launcher for Linux.
 
 ## Why it exists

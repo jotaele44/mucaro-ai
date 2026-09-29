@@ -16,6 +16,7 @@ import pytest
 
 import scripts.build_app_icon as build_app_icon
 import scripts.build_macos_app as build_macos_app
+from backend.app import packaging, portable_install
 
 REPO = Path(__file__).resolve().parents[2]
 BUNDLE = REPO / "Mucaro AI Setup.app"
@@ -53,6 +54,16 @@ def test_info_plist_names_the_launcher_and_the_icon():
     assert info["NSHighResolutionCapable"] is True
     assert info["NSAppTransportSecurity"] == {"NSAllowsLocalNetworking": True}
     assert (CONTENTS / "PkgInfo").read_bytes() == b"APPL????"
+
+
+def test_checkout_app_never_takes_the_packaged_release_app_name():
+    # Mucaro AI.app is the packaged release app (PyInstaller lane, portable install name); this is the
+    # source-checkout setup. Finder, LaunchServices and release evidence must never mix the two up.
+    info = plistlib.loads((CONTENTS / "Info.plist").read_bytes())
+    packaged_folders = {packaging.MACOS_APP_BUNDLE_NAME, portable_install.DEFAULT_INSTALL_NAME, f"{build_macos_app.APP_NAME}.app"}
+
+    assert BUNDLE.name not in packaged_folders
+    assert build_macos_app.APP_NAME not in {info["CFBundleName"], info["CFBundleDisplayName"]}
 
 
 def test_bundle_tracks_only_its_four_files():
