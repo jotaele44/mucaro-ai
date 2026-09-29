@@ -74,8 +74,15 @@ def _normalize_stored_row(row: dict[str, Any], cfg: Settings) -> dict[str, Any]:
         normalized["scope_id"] = None
         normalized["scope_migration"] = "LEGACY_DEFAULT_GLOBAL"
         return normalized
+    stored_scope = str(scope).strip().lower()
+    stored_scope_id = " ".join(str(normalized.get("scope_id") or "").strip().split()) or None
+    if stored_scope in {"workspace", "conversation"} and stored_scope_id is None:
+        normalized["scope"] = "invalid"
+        normalized["scope_id"] = None
+        normalized["scope_migration"] = "INVALID_STORED_SCOPE"
+        return normalized
     try:
-        resolved_scope, resolved_scope_id = _validate_scope(str(scope), normalized.get("scope_id"), cfg)
+        resolved_scope, resolved_scope_id = _validate_scope(stored_scope, stored_scope_id, cfg)
     except MemoryError:
         normalized["scope"] = "invalid"
         normalized["scope_id"] = normalized.get("scope_id")
@@ -162,6 +169,11 @@ def set_memory_enabled(
         for index, row in enumerate(rows):
             if isinstance(row, dict) and row.get("memory_id") == memory_id:
                 canonical = _normalize_stored_row(row, cfg)
+                if canonical.get("scope_migration") == "INVALID_STORED_SCOPE":
+                    return {
+                        "_error_status": "ERROR_MEMORY_SCOPE_INVALID",
+                        "memory_id": memory_id,
+                    }
                 canonical.pop("scope_migration", None)
                 updated = validate_contract("memory_item", {**canonical, "enabled": enabled, "updated_at": utc_now()})
                 rows[index] = updated
@@ -171,6 +183,8 @@ def set_memory_enabled(
     updated = update_json(_memory_path(cfg), [], mutate)
     if updated is None:
         return {"status": "ERROR_MEMORY_NOT_FOUND", "memory_id": memory_id}
+    if updated.get("_error_status"):
+        return {"status": updated["_error_status"], "memory_id": memory_id}
     return {"status": "MEMORY_UPDATED", "memory": updated}
 
 
