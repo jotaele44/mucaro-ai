@@ -172,6 +172,20 @@ def test_step_in_flight_survives_crash_and_completion_is_idempotent(tmp_path: Pa
     assert replay.value.status == "ERROR_CHECKPOINT_STEP_ALREADY_COMPLETED"
 
 
+def test_completing_a_step_twice_writes_nothing(tmp_path: Path) -> None:
+    from backend.app.agent_checkpoints import begin_step, complete_step
+
+    cfg = make_settings(tmp_path)
+    created = _executing(cfg, pending_steps=[{"id": "fetch"}])
+    begin_step(created["checkpoint_id"], step_id="fetch", idempotency_key="k-1", cfg=cfg)
+    done = complete_step(created["checkpoint_id"], idempotency_key="k-1", cfg=cfg)
+    again = complete_step(created["checkpoint_id"], idempotency_key="k-1", cfg=cfg)
+    # A true no-op keeps the sequence, so whoever holds it for a compare-and-swap does not lose.
+    assert again == done == get_checkpoint(created["checkpoint_id"], cfg)
+    after = transition_checkpoint(created["checkpoint_id"], state="EXECUTING", expected_sequence=done["sequence"], cfg=cfg)
+    assert after["sequence"] == done["sequence"] + 1
+
+
 def test_cannot_complete_with_step_in_flight(tmp_path: Path) -> None:
     from backend.app.agent_checkpoints import begin_step
 

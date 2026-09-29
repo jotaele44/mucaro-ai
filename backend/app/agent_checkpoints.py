@@ -137,9 +137,10 @@ def list_checkpoints(cfg: Settings = settings) -> list[dict[str, Any]]:
     return list_payloads("agent_checkpoints", cfg.sqlite_path)
 
 
-def _mutate(checkpoint_id: str, change: Callable[[dict[str, Any]], dict[str, Any]], cfg: Settings, *, expected_sequence: int | None = None) -> dict[str, Any]:
+def _mutate(checkpoint_id: str, change: Callable[[dict[str, Any]], dict[str, Any] | None], cfg: Settings, *, expected_sequence: int | None = None) -> dict[str, Any]:
     """Atomic read-modify-write. BEGIN IMMEDIATE serializes writers across threads and processes, so
-    two concurrent transitions cannot both act on the same prior state."""
+    two concurrent transitions cannot both act on the same prior state. A change that returns None
+    writes nothing: the stored checkpoint, its sequence included, stays as it was."""
     init_db(cfg.sqlite_path)
     conn = get_connection(cfg.sqlite_path)
     conn.isolation_level = None
@@ -152,6 +153,9 @@ def _mutate(checkpoint_id: str, change: Callable[[dict[str, Any]], dict[str, Any
         if expected_sequence is not None and current["sequence"] != expected_sequence:
             raise CheckpointError("ERROR_CHECKPOINT_CONFLICT", f"expected sequence {expected_sequence}, found {current['sequence']}")
         updated = change(dict(current))
+        if updated is None:
+            conn.execute("ROLLBACK")
+            return current
         updated["sequence"] = int(current["sequence"]) + 1
         updated["updated_at"] = utc_now()
         _validate_payload(updated, cfg)
@@ -252,9 +256,9 @@ def begin_step(checkpoint_id: str, *, step_id: str, idempotency_key: str, cfg: S
 
 def complete_step(checkpoint_id: str, *, idempotency_key: str, result: dict[str, Any] | None = None, cfg: Settings = settings) -> dict[str, Any]:
     """Finish the in-flight step. Completing the same idempotency key twice is a no-op, not a duplicate."""
-    def change(current: dict[str, Any]) -> dict[str, Any]:
+    def change(current: dict[str, Any]) -> dict[str, Any] | None:
         if any(done.get("idempotency_key") == idempotency_key for done in current["completed_steps"]):
-            return current
+            return None
         flight = current.get("in_flight_step")
         if not flight or flight["idempotency_key"] != idempotency_key:
             raise CheckpointError("ERROR_CHECKPOINT_STEP_NOT_IN_FLIGHT", idempotency_key)
