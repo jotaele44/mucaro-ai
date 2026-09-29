@@ -841,7 +841,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.23\n"
+    assert output == "mucaro 0.1.24\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
