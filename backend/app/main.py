@@ -659,6 +659,13 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         result = set_memory_enabled(memory_id, req.enabled, cfg)
         if result["status"] == "ERROR_MEMORY_NOT_FOUND":
             raise api_error("ERROR_MEMORY_NOT_FOUND", "Memory item not found.", status_code=404, memory_id=memory_id)
+        if result["status"] == "ERROR_MEMORY_SCOPE_INVALID":
+            raise api_error(
+                "ERROR_MEMORY_SCOPE_INVALID",
+                "Stored memory scope is malformed and must be repaired before mutation.",
+                status_code=409,
+                memory_id=memory_id,
+            )
         return result
 
     @app.delete("/memory/{memory_id}")
