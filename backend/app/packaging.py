@@ -53,7 +53,7 @@ OPTIONAL_GENERATED_OUTPUTS = [
 DISTRIBUTION_MANIFEST_SCHEMA_VERSION = "mucaro_distribution_manifest_v1"
 DISTRIBUTION_MANIFEST_DIR = Path("data") / "exports" / "distribution_manifests"
 MACOS_APP_BUNDLE_SCHEMA_VERSION = "mucaro_macos_app_bundle_v1"
-MACOS_APP_BUNDLE_NAME = "Mucaro AI.app"
+MACOS_APP_BUNDLE_NAME = "Mucaro AI Setup.app"
 MACOS_APP_BUNDLE_DIR = Path("data") / "exports" / "desktop_apps"
 REQUIRED_DISTRIBUTION_RECEIPTS = [
     ("local_release", "CERTIFY_RELEASE_OK"),
