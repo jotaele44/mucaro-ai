@@ -237,7 +237,7 @@ def test_ocr_tool_rejects_unbounded_timeout_before_subsystem_execution(tmp_path:
     )
     requested = request_tool_call(
         "ocr.analyze_image",
-        {"path": str(source), "timeout_seconds": 121},
+        {"path": str(source), "timeout_seconds": 91},
         cfg=cfg,
         requested_by="test",
     )
