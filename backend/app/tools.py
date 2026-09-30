@@ -35,6 +35,7 @@ TOOL_CALL_STATUSES = ("PENDING_APPROVAL", "APPROVED", "DENIED", "CANCELLED", "RU
 # Wall-clock bound for one in-process handler (MATRIX-011 TIMEOUT). Remote tools also carry their own
 # network timeouts; this bound covers everything else (slow disks, huge repositories, stuck parsers).
 DEFAULT_TOOL_TIMEOUT_SECONDS = 120.0
+OCR_TOOL_MAX_TIMEOUT_SECONDS = 90
 
 
 class ToolRuntimeError(RuntimeError):
@@ -139,8 +140,16 @@ def _ocr_analyze_image(arguments: dict[str, Any], cfg: Settings) -> dict[str, An
         raise ToolRuntimeError("ERROR_OCR_LANGUAGE_INVALID", "OCR language must be a string.")
     if not isinstance(layout_mode, str):
         raise ToolRuntimeError("ERROR_OCR_LAYOUT_INVALID", "OCR layout_mode must be a string.")
-    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool) or timeout_seconds <= 0 or timeout_seconds > 120:
-        raise ToolRuntimeError("ERROR_OCR_TIMEOUT_INVALID", "OCR timeout_seconds must be an integer from 1 through 120.")
+    if (
+        not isinstance(timeout_seconds, int)
+        or isinstance(timeout_seconds, bool)
+        or timeout_seconds <= 0
+        or timeout_seconds > OCR_TOOL_MAX_TIMEOUT_SECONDS
+    ):
+        raise ToolRuntimeError(
+            "ERROR_OCR_TIMEOUT_INVALID",
+            f"OCR timeout_seconds must be an integer from 1 through {OCR_TOOL_MAX_TIMEOUT_SECONDS}.",
+        )
     try:
         return analyze_image_ocr(
             path,
