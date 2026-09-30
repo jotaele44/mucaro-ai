@@ -2,7 +2,7 @@
 
 ## Recommended: double-click
 
-On macOS, double-click `Mucaro AI.app` beside `pyproject.toml`. Setup runs quietly, then the
+On macOS, double-click `Mucaro AI Setup.app` beside `pyproject.toml`. Setup runs quietly, then the
 native app window opens. Keep the whole checkout together when moving it. `Mucaro AI.command`
 is a legacy console launcher and opens Terminal. Windows uses `Mucaro AI.cmd`.
 
