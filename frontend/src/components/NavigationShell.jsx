@@ -23,7 +23,7 @@ export function NavigationShell({ view, contextOpen, setContextOpen, conversatio
     "sources-title": "sectionOverview", "sources-import": "sectionImport", "sources-list": "sectionLibrary",
     "memory-title": "sectionOverview", "memory-add": "sectionAdd", "memory-list": "sectionSaved",
     "prov-title": "sectionOverview", "prov-actions": "sectionAudit",
-    "settings-title": "sectionOverview", "settings-model": "sectionModel", "settings-retrieval": "sectionRetrieval", "settings-access": "sectionAccess",
+    "settings-title": "sectionOverview", "settings-appearance": "appearance", "settings-model": "sectionModel", "settings-retrieval": "sectionRetrieval", "settings-access": "sectionAccess",
   };
 
   function jump(target) {
