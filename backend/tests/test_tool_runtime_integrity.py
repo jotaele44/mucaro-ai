@@ -15,30 +15,25 @@ from backend.app.tools import (
     ToolDefinition,
     ToolRuntimeError,
     approve_tool_call,
+    arguments_digest,
+    deny_tool_call,
     list_tool_audit_events,
     list_tool_calls,
-    recover_tool_call,
     request_tool_call,
     run_tool_call,
+    verify_tool_audit_chain,
 )
 from backend.app.utils import read_json, write_json
+from backend.tests.test_api import make_settings
 
 REPO = Path(__file__).resolve().parents[2]
-SENSITIVE = "sensitive-handler-content"
 
 
-def make_settings(root: Path) -> Settings:
-    return Settings(
-        project_root=root,
-        data_dir=root / "data",
-        input_dir=root / "data" / "input",
-        processed_dir=root / "data" / "processed",
-        export_dir=root / "data" / "exports",
-        index_dir=root / "data" / "indexes",
-        sqlite_path=root / "data" / "processed" / "test.sqlite3",
-        default_model_provider="mock",
-        default_model_name="mock",
-    )
+@pytest.fixture()
+def cfg(tmp_path: Path) -> Settings:
+    settings = make_settings(tmp_path)
+    settings.ensure_dirs()
+    return settings
 
 
 def register_probe(monkeypatch: pytest.MonkeyPatch, handler) -> list[dict]:
@@ -62,12 +57,16 @@ def register_probe(monkeypatch: pytest.MonkeyPatch, handler) -> list[dict]:
     return calls
 
 
-def tamper_arguments(cfg: Settings, tool_call_id: str, arguments: dict) -> None:
+def edit_ledger(cfg: Settings, tool_call_id: str, **fields) -> None:
     path = cfg.processed_dir / TOOL_CALLS_NAME
     calls = read_json(path, [])
     for call in calls:
         if call["tool_call_id"] == tool_call_id:
-            call["arguments"] = arguments
+            for key, value in fields.items():
+                if value is None:
+                    call.pop(key, None)
+                else:
+                    call[key] = value
     write_json(path, calls)
 
 
@@ -79,45 +78,44 @@ def audit_events(cfg: Settings) -> list[str]:
     return [event["event"] for event in list_tool_audit_events(cfg)["events"]]
 
 
-def test_success_path_binds_arguments_and_keeps_audit_sequence(tmp_path: Path) -> None:
-    cfg = make_settings(tmp_path)
+def test_success_path_keeps_the_argument_digest_and_audit_sequence(cfg: Settings) -> None:
     requested = request_tool_call("source_library.status", {"b": 2, "a": 1}, cfg=cfg, requested_by="test")
     tool_call_id = requested["tool_call"]["tool_call_id"]
-    binding = requested["tool_call"]["binding_sha256"]
-    assert len(binding) == 64
+    assert requested["tool_call"]["arguments_sha256"] == arguments_digest({"a": 1, "b": 2})
 
-    approved = approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
-    assert approved["tool_call"]["approved_binding_sha256"] == binding
-
+    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
     executed = run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
 
     assert executed["tool_call"]["status"] == "EXECUTED"
-    assert executed["tool_call"]["started_at"]
     assert ledger_call(cfg, tool_call_id) == executed["tool_call"]
-    assert audit_events(cfg) == ["TOOL_CALL_REQUESTED", "TOOL_CALL_APPROVED", "TOOL_CALL_EXECUTED"]
+    assert audit_events(cfg) == ["TOOL_CALL_REQUESTED", "TOOL_CALL_APPROVED", "TOOL_CALL_STARTED", "TOOL_CALL_EXECUTED"]
+    assert verify_tool_audit_chain(cfg)["status"] == "TOOL_AUDIT_CHAIN_OK"
 
 
-def test_arguments_changed_before_approval_are_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    cfg = make_settings(tmp_path)
+def test_arguments_changed_before_approval_are_never_approved(cfg: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
     calls = register_probe(monkeypatch, lambda arguments, cfg: {"status": "PROBE_OK"})
-    tool_call_id = request_tool_call("test.probe", {"url": "https://example.com"}, cfg=cfg)["tool_call"]["tool_call_id"]
-    tamper_arguments(cfg, tool_call_id, {"url": "https://attacker.invalid"})
+    requested = request_tool_call("test.probe", {"url": "https://example.com"}, cfg=cfg)["tool_call"]
+    tool_call_id = requested["tool_call_id"]
+    edit_ledger(cfg, tool_call_id, arguments={"url": "https://attacker.invalid"})
 
-    with pytest.raises(ToolRuntimeError) as exc:
-        approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
+    # The UI sends back the digest the ledger shows; that no longer vouches for the arguments.
+    for expected in (None, requested["arguments_sha256"]):
+        with pytest.raises(ToolRuntimeError) as exc:
+            approve_tool_call(tool_call_id, cfg=cfg, approved_by="test", expected_arguments_sha256=expected)
+        assert exc.value.status == "ERROR_TOOL_BINDING_MISMATCH"
 
-    assert exc.value.status == "ERROR_TOOL_BINDING_MISMATCH"
     assert ledger_call(cfg, tool_call_id)["status"] == "PENDING_APPROVAL"
-    assert audit_events(cfg)[-1] == "TOOL_CALL_BINDING_REJECTED"
+    assert audit_events(cfg) == ["TOOL_CALL_REQUESTED"]
+    # The operator can still close the call.
+    assert deny_tool_call(tool_call_id, cfg=cfg)["tool_call"]["status"] == "DENIED"
     assert calls == []
 
 
-def test_arguments_changed_after_approval_never_execute(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    cfg = make_settings(tmp_path)
+def test_arguments_changed_after_approval_never_execute(cfg: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
     calls = register_probe(monkeypatch, lambda arguments, cfg: {"status": "PROBE_OK"})
     tool_call_id = request_tool_call("test.probe", {"url": "https://example.com"}, cfg=cfg)["tool_call"]["tool_call_id"]
     approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
-    tamper_arguments(cfg, tool_call_id, {"url": "https://attacker.invalid"})
+    edit_ledger(cfg, tool_call_id, arguments={"url": "https://attacker.invalid"})
 
     with pytest.raises(ToolRuntimeError) as exc:
         run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
@@ -128,116 +126,36 @@ def test_arguments_changed_after_approval_never_execute(tmp_path: Path, monkeypa
     assert failed["status"] == "FAILED"
     assert failed["result"]["status"] == "ERROR_TOOL_BINDING_MISMATCH"
     assert audit_events(cfg)[-1] == "TOOL_CALL_FAILED"
-
-
-def test_legacy_approval_without_binding_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    cfg = make_settings(tmp_path)
-    calls = register_probe(monkeypatch, lambda arguments, cfg: {"status": "PROBE_OK"})
-    tool_call_id = request_tool_call("test.probe", {}, cfg=cfg)["tool_call"]["tool_call_id"]
-    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
-    path = cfg.processed_dir / TOOL_CALLS_NAME
-    ledger = read_json(path, [])
-    for call in ledger:
-        call.pop("binding_sha256", None)
-        call.pop("approved_binding_sha256", None)
-    write_json(path, ledger)
-
-    with pytest.raises(ToolRuntimeError) as exc:
-        run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
-
-    assert exc.value.status == "ERROR_TOOL_APPROVAL_BINDING_MISSING"
-    assert calls == []
-    assert ledger_call(cfg, tool_call_id)["status"] == "FAILED"
-
-
-def test_unexpected_handler_exception_is_recorded_and_not_rerunnable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    cfg = make_settings(tmp_path)
-
-    def broken(arguments, cfg):
-        raise ValueError(SENSITIVE)
-
-    calls = register_probe(monkeypatch, broken)
-    tool_call_id = request_tool_call("test.probe", {}, cfg=cfg)["tool_call"]["tool_call_id"]
-    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
-
-    with pytest.raises(ToolRuntimeError) as exc:
-        run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
-
-    assert exc.value.status == "ERROR_TOOL_HANDLER_EXCEPTION"
-    assert isinstance(exc.value.__cause__, ValueError)
-    failed = ledger_call(cfg, tool_call_id)
-    assert failed["status"] == "FAILED"
-    assert failed["result"] == {"status": "ERROR_TOOL_HANDLER_EXCEPTION", "detail": "ValueError"}
-    assert SENSITIVE not in json.dumps(list_tool_calls(cfg)) + json.dumps(list_tool_audit_events(cfg))
-    assert audit_events(cfg)[-1] == "TOOL_CALL_FAILED"
+    assert "TOOL_CALL_STARTED" not in audit_events(cfg)
+    assert verify_tool_audit_chain(cfg)["status"] == "TOOL_AUDIT_CHAIN_OK"
 
     with pytest.raises(ToolRuntimeError) as rerun:
         run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
     assert rerun.value.status == "ERROR_TOOL_CALL_NOT_APPROVED"
-    assert len(calls) == 1
+    assert calls == []
 
 
-def test_interrupted_execution_is_never_repeated_and_recovers_explicitly(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    cfg = make_settings(tmp_path)
+def test_call_without_an_argument_digest_fails_closed(cfg: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = register_probe(monkeypatch, lambda arguments, cfg: {"status": "PROBE_OK"})
+    pending = request_tool_call("test.probe", {}, cfg=cfg)["tool_call"]["tool_call_id"]
+    approved = request_tool_call("test.probe", {"n": 1}, cfg=cfg)["tool_call"]["tool_call_id"]
+    approve_tool_call(approved, cfg=cfg, approved_by="test")
+    edit_ledger(cfg, pending, arguments_sha256=None)
+    edit_ledger(cfg, approved, arguments_sha256=None)
 
-    class ProcessKilled(BaseException):
-        pass
+    with pytest.raises(ToolRuntimeError) as not_approved:
+        approve_tool_call(pending, cfg=cfg, approved_by="test")
+    assert not_approved.value.status == "ERROR_TOOL_BINDING_MISSING"
+    with pytest.raises(ToolRuntimeError) as not_run:
+        run_tool_call(approved, cfg=cfg, executed_by="test")
+    assert not_run.value.status == "ERROR_TOOL_BINDING_MISSING"
 
-    def killed(arguments, cfg):
-        raise ProcessKilled()
-
-    calls = register_probe(monkeypatch, killed)
-    tool_call_id = request_tool_call("test.probe", {"side_effect": "once"}, cfg=cfg)["tool_call"]["tool_call_id"]
-    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
-
-    with pytest.raises(ProcessKilled):
-        run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
-
-    in_flight = ledger_call(cfg, tool_call_id)
-    assert in_flight["status"] == "EXECUTING"
-    assert in_flight["started_at"]
-    assert audit_events(cfg) == ["TOOL_CALL_REQUESTED", "TOOL_CALL_APPROVED"]
-
-    with pytest.raises(ToolRuntimeError) as rerun:
-        run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
-    assert rerun.value.status == "ERROR_TOOL_CALL_IN_FLIGHT"
-    assert len(calls) == 1
-
-    recovered = recover_tool_call(tool_call_id, cfg=cfg, recovered_by="test", reason="worker died")
-    assert recovered["tool_call"]["status"] == "INTERRUPTED"
-    assert recovered["tool_call"]["recovered_by"] == "test"
-    assert audit_events(cfg)[-1] == "TOOL_CALL_INTERRUPTED"
-
-    with pytest.raises(ToolRuntimeError) as after:
-        run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
-    assert after.value.status == "ERROR_TOOL_CALL_INTERRUPTED"
-    with pytest.raises(ToolRuntimeError) as again:
-        recover_tool_call(tool_call_id, cfg=cfg)
-    assert again.value.status == "ERROR_TOOL_CALL_NOT_IN_FLIGHT"
-    assert len(calls) == 1
+    assert ledger_call(cfg, pending)["status"] == "PENDING_APPROVAL"
+    assert ledger_call(cfg, approved)["status"] == "FAILED"
+    assert calls == []
 
 
-def test_recover_rejects_calls_that_are_not_in_flight(tmp_path: Path) -> None:
-    cfg = make_settings(tmp_path)
-    tool_call_id = request_tool_call("source_library.status", {}, cfg=cfg)["tool_call"]["tool_call_id"]
-
-    with pytest.raises(ToolRuntimeError) as pending:
-        recover_tool_call(tool_call_id, cfg=cfg)
-    assert pending.value.status == "ERROR_TOOL_CALL_NOT_IN_FLIGHT"
-
-    approve_tool_call(tool_call_id, cfg=cfg)
-    run_tool_call(tool_call_id, cfg=cfg)
-    with pytest.raises(ToolRuntimeError) as executed:
-        recover_tool_call(tool_call_id, cfg=cfg)
-    assert executed.value.status == "ERROR_TOOL_CALL_NOT_IN_FLIGHT"
-
-
-def test_calls_requested_while_a_handler_runs_are_preserved(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    cfg = make_settings(tmp_path)
+def test_calls_requested_while_a_handler_runs_are_preserved(cfg: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
     requested_during: list[str] = []
 
     def requests_another_call(arguments, cfg):
@@ -254,8 +172,10 @@ def test_calls_requested_while_a_handler_runs_are_preserved(tmp_path: Path, monk
 
 
 def _run(root: Path, code: str, *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    # The repository stays the project root (contract schemas live there); only the data moves.
     env = os.environ.copy()
-    env["MUCARO_AI_ROOT"] = str(root)
+    env.pop("MUCARO_AI_ROOT", None)
+    env["MUCARO_AI_DATA_DIR"] = str(root / "data")
     env["PYTHONPATH"] = str(REPO)
     return subprocess.run(
         [sys.executable, "-c", code],
@@ -267,7 +187,7 @@ def _run(root: Path, code: str, *, check: bool = True) -> subprocess.CompletedPr
     )
 
 
-def test_process_death_mid_handler_is_recovered_in_a_fresh_process(tmp_path: Path) -> None:
+def test_process_death_mid_handler_is_reconciled_in_a_fresh_process(tmp_path: Path) -> None:
     writer = _run(
         tmp_path,
         """
@@ -289,7 +209,7 @@ run_tool_call(tool_call_id, cfg=cfg)
 """,
         check=False,
     )
-    assert writer.returncode == 17
+    assert writer.returncode == 17, writer.stderr
     tool_call_id = writer.stdout.strip()
 
     reader = _run(
@@ -297,20 +217,27 @@ run_tool_call(tool_call_id, cfg=cfg)
         f"""
 import json
 from backend.app.config import Settings
-from backend.app.tools import ToolRuntimeError, list_tool_calls, recover_tool_call, run_tool_call
+from backend.app.tools import ToolRuntimeError, list_tool_calls, reconcile_interrupted_tool_calls, run_tool_call
 cfg = Settings.load()
-before = list_tool_calls(cfg)["tool_calls"][0]
-try:
-    run_tool_call("{tool_call_id}", cfg=cfg)
-    refused = None
-except ToolRuntimeError as exc:
-    refused = exc.status
-recovered = recover_tool_call("{tool_call_id}", cfg=cfg, recovered_by="fresh-process")
-print(json.dumps({{"before": before["status"], "refused": refused, "after": recovered["tool_call"]["status"]}}))
+
+def refusal():
+    try:
+        run_tool_call("{tool_call_id}", cfg=cfg)
+    except ToolRuntimeError as exc:
+        return exc.status
+    return None
+
+before = list_tool_calls(cfg)["tool_calls"][0]["status"]
+while_running = refusal()
+reconciled = reconcile_interrupted_tool_calls(cfg)["interrupted"]
+after = list_tool_calls(cfg)["tool_calls"][0]["status"]
+print(json.dumps({{"before": before, "while_running": while_running, "reconciled": reconciled, "after": after, "rerun": refusal()}}))
 """,
     )
     assert json.loads(reader.stdout) == {
-        "before": "EXECUTING",
-        "refused": "ERROR_TOOL_CALL_IN_FLIGHT",
+        "before": "RUNNING",
+        "while_running": "ERROR_TOOL_CALL_ALREADY_RUNNING",
+        "reconciled": [tool_call_id],
         "after": "INTERRUPTED",
+        "rerun": "ERROR_TOOL_CALL_NOT_APPROVED",
     }

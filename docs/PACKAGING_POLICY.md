@@ -96,6 +96,45 @@ all referenced receipt and artifact hashes. This command does not publish,
 upload, sign, notarize, or mark hosted governance as passing; it preserves the
 local distribution handoff boundary.
 
+## Portable Runtime And Application
+
+The portable lane separates runtime provenance from application assembly. The
+governed x86_64 macOS source manifest and wheel-only dependency lock are:
+
+- `packaging/runtime/macos-x86_64.json`
+- `packaging/runtime/requirements-macos-x86_64.lock`
+
+Materialize and verify the runtime before building an application:
+
+```bash
+PYTHONPATH=.:backend python3 scripts/mucaro.py package portable-runtime --format text
+PYTHONPATH=.:backend python3 scripts/mucaro.py package portable-runtime \
+  --verify data/exports/portable_runtimes/macos-x86_64 --format text
+PYTHONPATH=.:backend python3 scripts/mucaro.py package portable-macos-app \
+  --runtime-dir data/exports/portable_runtimes/macos-x86_64 --format text
+```
+
+The materializer accepts only the exact HTTPS archive, byte count, SHA-256,
+logical member counts, regular-file bytes, and contained relative symlinks
+declared by the source manifest. It converts admitted links to ordinary files,
+installs only hash-locked wheels, removes generated console scripts containing
+temporary shebang paths, verifies every locked distribution and required
+import, rejects host user-site discovery, and writes `runtime-provenance.json`
+inside the generated runtime. The output directory must not already exist, so
+an incomplete or different runtime cannot be silently overwritten.
+
+Portable application assembly rejects tracked working-tree changes before it
+copies source files. Its launcher disables host user-site packages and unsafe
+implicit Python paths, prevents bytecode writes, and keeps mutable data outside
+the application bundle under the user's Application Support directory. The
+portable verifier hashes every runtime and application member, and macOS launch
+certification repeats that verification after launch and a representative
+workflow. These controls prove the materialized runtime and bundle-relative
+source artifact only. Current coverage is x86_64 macOS; arm64, universal-binary
+construction, independently witnessed clean-machine execution, signing,
+notarization, App Sandbox behavior, and App Store processing remain separate
+gates.
+
 ## Release Gates
 
 Before a governed release tag, the operator must have:
@@ -106,6 +145,7 @@ Before a governed release tag, the operator must have:
 - `PACKAGE_ARTIFACT_READY` for the same source state
 - `PACKAGE_ARTIFACT_VERIFIED` for the generated artifact manifest
 - `SOURCE_ARTIFACT_CERT_OK` for the generated artifact manifest
+- `PORTABLE_RUNTIME_VERIFIED` for the architecture-specific embedded runtime
 - `DISTRIBUTION_MANIFEST_VERIFIED` for the local handoff manifest
 - hosted GitHub Actions success for the exact pushed SHA
 - branch protection and tag binding reviewed for the release scope

@@ -113,13 +113,19 @@ export function DirectoryIntake({ onIngested }) {
         <h2>Directory Access</h2>
         <span className="badge">{permissionStatus}</span>
       </div>
+      <p className="hint">
+        Enter a folder path on the computer running the Mucaro backend. Access is granted per folder and can be revoked below.
+      </p>
       <div className="path-form">
         <label>
-          Local path
+          Folder path on the host computer
           <input
             value={path}
             onChange={(e) => setPath(e.target.value)}
-            placeholder="/Users/name/Documents/mucaro-sources"
+            placeholder="~/Documents/mucaro-sources"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
           />
         </label>
         <label>

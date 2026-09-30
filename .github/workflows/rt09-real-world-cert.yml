@@ -1,0 +1,40 @@
+name: RT09 Real World Retrieval Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "_architecture/retrieval_real_world_corpus_v1.json"
+      - "scripts/certify_retrieval_real_world_live.py"
+      - "backend/tests/test_rt09_real_world_corpus.py"
+      - ".github/workflows/rt09-real-world-cert.yml"
+  push:
+    branches: [main]
+    paths:
+      - "_architecture/retrieval_real_world_corpus_v1.json"
+      - "scripts/certify_retrieval_real_world_live.py"
+      - ".github/workflows/rt09-real-world-cert.yml"
+
+jobs:
+  certify-real-world-corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install Mucaro
+        run: python -m pip install -e ".[dev]"
+      - name: Validate RT09 denominator
+        run: python -m pytest backend/tests/test_rt09_real_world_corpus.py backend/tests/test_retrieval_corpus_certification.py backend/tests/test_retrieval_corpus_materializer.py -q
+      - name: Acquire and certify real-world corpus
+        env:
+          RT09_OUT: ${{ runner.temp }}/rt09
+        run: python scripts/certify_retrieval_real_world_live.py --output-dir "$RT09_OUT"
+      - name: Upload frozen RT09 evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rt09-real-world-corpus-${{ github.sha }}
+          path: ${{ runner.temp }}/rt09
+          archive: true

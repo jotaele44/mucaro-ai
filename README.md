@@ -2,31 +2,48 @@
 
 Local-first prototype for a custom LLM workflow with file ingestion, source lineage, cited retrieval, mock/Claude model routing, and a Planning-to-Execution Gate.
 
-## Fastest first run
+## Quick start
 
-### macOS/Linux
+**On macOS, double-click `Mucaro AI.app` in this checkout.** It runs setup quietly and opens
+Mucaro in its own native window. Keep the app next to `pyproject.toml`; move the whole folder
+together. No Terminal or browser opens. The `.command` file is a legacy console launcher.
+Windows continues to use `Mucaro AI.cmd`.
+
+The first double-click downloads private, checksum-verified copies of Python 3.12 and Node.js
+into this folder (about 200 MB to download, about 700 MB on disk, 2-5 minutes on a typical
+connection), installs everything, builds
+the interface, loads two sample documents, and starts the app. On macOS, setup output is saved
+in `.mucaro-runtime/logs/` and failures appear in a dialog. Nothing
+needs to be installed beforehand and nothing is written outside the project folder. Later
+double-clicks reuse completed setup steps and can work offline. Close the native window to stop
+the backend it started. API calls and remote fetches still require internet access.
+
+Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, and Linux x86_64
+(run `./"Mucaro AI.command"` from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
+does, its error codes, and how to remove it.
+
+Settings go in `.env` (created from `.env.example` on first run). The launcher reads it at
+startup; variables already exported in your shell take precedence. If the UI shows **Backend not
+reachable**, double-click the launcher again and press **Retry**.
+
+See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
+`docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
+
+### Developer setup (manual)
+
+Requirements: Python 3.11-3.13 and Node 20+ already installed.
 
 ```bash
 cd mucaro-ai
-bash scripts/bootstrap_macos.sh
+bash scripts/bootstrap_macos.sh        # macOS/Linux
+# .\scripts\bootstrap_windows.ps1      # Windows PowerShell
+source .venv/bin/activate
+python scripts/launch_app.py           # or: make start
 ```
 
-Expected final markers:
-
-```text
-PREFLIGHT_OK
-RELEASE_CHECK_OK
-BOOTSTRAP_OK
-```
-
-### Windows PowerShell
-
-```powershell
-cd mucaro-ai
-.\scripts\bootstrap_windows.ps1
-```
-
-See `docs/FIRST_RUN.md` for step-by-step startup and error recovery.
+Expected bootstrap markers: `PREFLIGHT_OK`, `RELEASE_CHECK_OK`, `BOOTSTRAP_OK`. The bootstrap and
+the double-click setup share `.venv`; the double-click setup rebuilds it on its private Python
+3.12 if it finds a venv made from another interpreter.
 
 ## Safe startup helpers
 
@@ -57,31 +74,28 @@ python scripts/dev_start.py
 - Not a clone of Dify, AnythingLLM, RAGFlow, Open WebUI, LlamaIndex, or GraphRAG.
 - Not a tool that executes destructive actions without approval.
 
-## Setup
+## Manual install (without the bootstrap)
 
-### macOS/Linux
+Prefer the double-click setup or `scripts/bootstrap_*`. If you install by hand, use Python
+3.11-3.13 (pinned `rasterio` has no wheels for 3.14+) and `npm ci`, which installs exactly what
+`package-lock.json` pins and never rewrites it:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3.12 -m venv .venv                # Windows: py -3.12 -m venv .venv
+source .venv/bin/activate               # Windows: .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+(cd frontend && npm ci)
 python scripts/release_check.py
-```
-
-### Windows PowerShell
-
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-python scripts\release_check.py
+python scripts/launch_app.py            # or python scripts/dev_start.py for hot reload
 ```
 
 ## Optional environment variables
 
-Copy `.env.example` to `.env` and fill only what you need.
+Copy `.env.example` to `.env` and fill only what you need. `scripts/launch_app.py`
+and `scripts/dev_start.py` load `.env` automatically (shell-exported values win);
+when running `uvicorn` or `mucaro serve` directly, export the variables in your
+shell instead.
 
 - `ANTHROPIC_API_KEY`: required for Anthropic mode when `MUCARO_AI_LIVE_MODE=1`.
 - `MUCARO_AI_LIVE_MODE=1`: permits live Anthropic calls. Default is deterministic mock mode.
@@ -94,21 +108,6 @@ Copy `.env.example` to `.env` and fill only what you need.
 - `MUCARO_AI_DEPLOYMENT_PROFILE`: `local` or `production`. Production mode requires a strong operator token and explicit CORS origins.
 - `MUCARO_AI_DISTRIBUTION_CHANNEL`: `local` or `mac_app_store`. The Store channel requires production mode, loopback binding, and disables subprocess, local-worker, and container execution.
 - `MUCARO_AI_ALLOW_PUBLIC_BIND=1`: explicitly permits non-loopback binding in local mode.
-
-## Run backend
-
-```bash
-source .venv/bin/activate
-uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-## Run frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
 
 ## Ingest files
 
@@ -269,10 +268,30 @@ receipts for the archive and every member.
 
 Use `mucaro package macos-app --format text` to build a local source-bound
 `Mucaro AI.app` under `data/exports/desktop_apps`. Double-clicking that app
-launches this checkout with the Python executable recorded at build time and
-opens the browser UI through `scripts/launch_app.py`. This is not yet a portable
+launches this checkout through silent setup and opens the native window. It provisions private
+runtimes on first use. This is not yet a portable
 signed installer with embedded runtime, reinstall, upgrade, and rollback
 guarantees.
+
+The portable lane starts by materializing the governed x86_64 macOS runtime,
+then embedding that verified input into an exact-head app bundle:
+
+```bash
+mucaro package portable-runtime --format text
+mucaro package portable-runtime \
+  --verify data/exports/portable_runtimes/macos-x86_64 \
+  --format text
+mucaro package portable-macos-app \
+  --runtime-dir data/exports/portable_runtimes/macos-x86_64 \
+  --format text
+```
+
+Runtime acquisition verifies the pinned upstream archive size and SHA-256,
+safe archive paths and types, the frozen logical member counts, a hash-locked
+wheel-only dependency graph, importability, relocation, and exclusion of host
+user-site packages. This tracked runtime source is architecture-specific; it is
+not arm64, universal-binary, signing, notarization, sandbox, or App Store
+evidence.
 
 The browser app includes the same permission workflow in the Directory Access panel.
 
@@ -409,3 +428,13 @@ Then rerun:
 ```bash
 bash scripts/bootstrap_macos.sh
 ```
+
+<!-- PROJECT-OPERATING-CONTRACT:START -->
+## Current development and certification contract
+
+Mucaro AI is being developed as a local-first, conversation-centered orchestration environment with durable Run/Event/Action/Evidence/Receipt history, source lineage, memory, planning gates, isolated coding execution, controlled mutation, and reproducible verification.
+
+The orchestration-kernel v1 substrate is append-only. DEMO_CANDIDATE fixtures are not execution evidence. Current priority is Git path-identity hardening, isolated coding/container execution, patch preimage/HEAD/dirty-state revalidation with rollback, test/lint/type/build receipts, branch/commit/PR safety, retrieval/OCR/GIS/browser/model/memory closure, conversation-first UI, and zero-setup packaged desktop delivery.
+
+Certification requires a fresh-clone → install → build → test → security → representative workflows → package → reinstall/rollback chain with preserved evidence. Script success alone is not release certification. Passed artifacts survive downstream failure and provisional behavior must not be used to train reusable automation.
+<!-- PROJECT-OPERATING-CONTRACT:END -->

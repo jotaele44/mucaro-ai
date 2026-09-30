@@ -253,3 +253,51 @@ def test_tool_runtime_web_search_stays_fail_closed_without_live_permission(monke
     with pytest.raises(ToolRuntimeError) as exc:
         run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
     assert exc.value.status == "ERROR_WEB_SEARCH_LIVE_NOT_ALLOWED"
+
+
+def test_a_hung_handler_times_out_and_is_never_recorded_as_executed(tmp_path: Path, monkeypatch):
+    import threading
+    from dataclasses import replace
+
+    from backend.app import tools as tools_module
+    from backend.app.error_categories import classify_error
+
+    cfg = make_settings(tmp_path)
+    release = threading.Event()
+    finished = threading.Event()
+
+    def hung_handler(arguments, cfg):
+        release.wait(10)
+        finished.set()
+        return {"status": "LATE_RESULT"}
+
+    slow = replace(tools_module.TOOL_REGISTRY["coding.patch_apply"], handler=hung_handler, timeout_seconds=0.2)
+    monkeypatch.setitem(tools_module.TOOL_REGISTRY, "coding.patch_apply", slow)
+    call_id = request_tool_call("coding.patch_apply", {"patch": "x"}, cfg=cfg, requested_by="test")["tool_call"]["tool_call_id"]
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(call_id, cfg=cfg, executed_by="test")
+    assert exc.value.status == "ERROR_TOOL_TIMEOUT"
+    assert classify_error(exc.value.status) == "TOOL_FAILURE"
+
+    call = next(row for row in list_tool_calls(cfg)["tool_calls"] if row["tool_call_id"] == call_id)
+    assert call["status"] == "FAILED"
+    assert call["result"]["handler_abandoned"] is True
+    assert call["result"]["side_effects"] == "UNKNOWN"  # a mutating tool may still finish after the timeout
+
+    # The abandoned handler finishing later changes nothing: its result is discarded.
+    release.set()
+    assert finished.wait(5)
+    call = next(row for row in list_tool_calls(cfg)["tool_calls"] if row["tool_call_id"] == call_id)
+    assert call["status"] == "FAILED" and call["result"]["status"] == "ERROR_TOOL_TIMEOUT"
+    events = [row for row in list_tool_audit_events(cfg)["events"] if row.get("tool_call_id") == call_id]
+    assert [row["event"] for row in events][-2:] == ["TOOL_CALL_STARTED", "TOOL_CALL_FAILED"]
+    assert events[-1]["status"] == "ERROR_TOOL_TIMEOUT"
+    assert not any(row["event"] == "TOOL_CALL_EXECUTED" for row in events)
+
+
+def test_remote_timeouts_stay_remote_service_errors():
+    from backend.app.error_categories import classify_error
+
+    assert classify_error("ERROR_WEB_FETCH_TIMEOUT") == "REMOTE_SERVICE_UNAVAILABLE"
