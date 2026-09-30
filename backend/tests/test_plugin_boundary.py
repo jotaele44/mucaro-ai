@@ -173,3 +173,38 @@ def test_offline_flag_rejects_ambiguous_string(store):
     with pytest.raises(PluginBoundaryError) as exc:
         inspect_plugin(root, store, policy=policy(), offline="False")
     status(exc, "INVALID_OFFLINE_FLAG")
+
+
+def test_empty_store_rejects_ambiguous_offline_setting(store):
+    with pytest.raises(PluginBoundaryError) as exc:
+        inspect_store(store, policy=policy(), offline="False")
+    status(exc, "INVALID_OFFLINE_FLAG")
+
+
+def test_symlinked_ancestor_to_store_rejected(store, tmp_path):
+    alias = tmp_path / "alias"
+    alias.symlink_to(store, target_is_directory=True)
+    nested = alias / "child"
+    nested.mkdir()
+    with pytest.raises(PluginBoundaryError) as exc:
+        inspect_plugin(nested, alias, policy=policy())
+    status(exc, "INVALID_PLUGIN_ROOT")
+
+
+def test_casefold_collision_rejected_without_selecting_winner(store):
+    root, _ = make_plugin(store)
+    (root / "Guide.txt").write_text("one")
+    (root / "guide.txt").write_text("two")
+    if len([p for p in root.iterdir() if p.name.lower() == "guide.txt"]) < 2:
+        pytest.skip("Case-insensitive test filesystem cannot represent collision")
+    with pytest.raises(PluginBoundaryError) as exc:
+        inspect_plugin(root, store, policy=policy())
+    status(exc, "AMBIGUOUS_MEMBER_CASE")
+
+
+def test_unknown_policy_fails_closed_even_without_requested_capabilities(store):
+    root, _ = make_plugin(store)
+    bad = CapabilityPolicy.build(policy_id="bad", allowed=["unrecognized.capability"])
+    result = inspect_plugin(root, store, policy=bad)
+    assert result["status"] == "BLOCKED"
+    assert result["capability_decision"]["status"] == "DENIED"
