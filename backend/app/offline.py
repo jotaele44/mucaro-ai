@@ -14,6 +14,7 @@ import importlib.util
 import shutil
 from typing import Any
 
+from .config import Settings, settings
 from .model_router import list_model_providers
 from .tools import TOOL_REGISTRY
 
@@ -65,7 +66,7 @@ def _row(capability: str, description: str, remote: bool, dependency: str | None
     }
 
 
-def build_offline_manifest(*, system_offline: bool = False) -> dict[str, Any]:
+def build_offline_manifest(*, system_offline: bool = False, cfg: Settings = settings) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     for capability_id, description, dependency in _CORE_CAPABILITIES:
         present = dependency is None or shutil.which(dependency) is not None
@@ -74,7 +75,7 @@ def build_offline_manifest(*, system_offline: bool = False) -> dict[str, Any]:
         module = _TOOL_PYTHON_DEPENDENCIES.get(tool.name)
         present = module is None or _module_present(module)
         rows.append(_row(f"tool:{tool.name}", tool.description, tool.network != "none", module, present, system_offline))
-    for provider in list_model_providers():
+    for provider in list_model_providers(cfg):
         remote = provider.get("locality") == "remote"
         local_server = provider["name"] == "openai_compatible_local"
         if local_server:
