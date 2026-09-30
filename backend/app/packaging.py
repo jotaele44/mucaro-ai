@@ -12,8 +12,9 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .macos_app_store import build_macos_app_store_readiness
+from .contracts import ContractViolation, validate_contract
 from .execution_records import build_artifact_identity
+from .macos_app_store import build_macos_app_store_readiness
 from .release_receipts import load_release_receipt, receipt_path
 
 
@@ -21,6 +22,9 @@ ROOT = Path(__file__).resolve().parents[2]
 PYTHON_PACKAGE_NAME = "mucaro-ai"
 FRONTEND_PACKAGE_NAME = "mucaro-ai-frontend"
 CLI_ENTRYPOINT = "backend.app.cli:main"
+SOURCE_ARTIFACT_FORMAT_V1 = "source_zip_with_json_manifest_v1"
+SOURCE_ARTIFACT_FORMAT_V2 = "source_zip_with_json_manifest_v2"
+CURRENT_SOURCE_ARTIFACT_FORMAT = SOURCE_ARTIFACT_FORMAT_V2
 
 REQUIRED_PACKAGE_INPUTS = [
     "pyproject.toml",
@@ -679,7 +683,7 @@ def build_release_artifacts(
     manifest = {
         "artifact_identity": artifact_identity,
         "status": "PACKAGE_ARTIFACT_READY",
-        "artifact_format": "source_zip_with_json_manifest_v1",
+        "artifact_format": CURRENT_SOURCE_ARTIFACT_FORMAT,
         "project_root": str(root),
         "package_name": PYTHON_PACKAGE_NAME,
         "version": version,
@@ -754,7 +758,7 @@ def verify_release_artifact(
             "manifest_identity",
             "PASS"
             if (
-                artifact_format == "source_zip_with_json_manifest_v1"
+                artifact_format in {SOURCE_ARTIFACT_FORMAT_V1, SOURCE_ARTIFACT_FORMAT_V2}
                 and package_name == PYTHON_PACKAGE_NAME
                 and isinstance(version, str)
                 and isinstance(head_sha, str)
@@ -778,19 +782,25 @@ def verify_release_artifact(
     archive_path = _resolve_package_path(manifest_path.parent, Path(archive_value)) if isinstance(archive_value, str) else None
     checks.append(_check("archive_path", "PASS" if archive_path and archive_path.exists() else "FAIL", str(archive_path or archive_value)))
     artifact_identity = manifest.get("artifact_identity")
+    identity_required = artifact_format == SOURCE_ARTIFACT_FORMAT_V2
     identity_ok = isinstance(artifact_identity, dict)
     if identity_ok:
         try:
-            from .contracts import validate_contract
-
             validate_contract("artifact_identity", artifact_identity)
-        except Exception:
+        except ContractViolation:
             identity_ok = False
+    legacy_v1_without_identity = artifact_format == SOURCE_ARTIFACT_FORMAT_V1 and artifact_identity is None
     checks.append(
         _check(
             "artifact_identity_contract",
-            "PASS" if identity_ok else "FAIL",
-            str((artifact_identity or {}).get("artifact_id") if isinstance(artifact_identity, dict) else "missing"),
+            "PASS" if identity_ok or legacy_v1_without_identity else "FAIL",
+            (
+                str(artifact_identity.get("artifact_id"))
+                if isinstance(artifact_identity, dict)
+                else "legacy_v1_not_required"
+                if legacy_v1_without_identity
+                else "missing_required_v2_identity"
+            ),
         )
     )
 
@@ -837,6 +847,8 @@ def verify_release_artifact(
                     f"identity_sha={artifact_identity.get('sha256')} actual_sha={archive_sha}",
                 )
             )
+        elif identity_required:
+            checks.append(_check("artifact_identity_bytes", "FAIL", "required v2 artifact identity missing"))
         checks.append(
             _check(
                 "archive_sha256",

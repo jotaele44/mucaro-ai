@@ -9,7 +9,7 @@ governance lane.
 
 ## Current Artifact
 
-The supported artifact format is `source_zip_with_json_manifest_v1`.
+The current artifact format is `source_zip_with_json_manifest_v2`, which adds a schema-validated `artifact_identity` bound to the source ZIP SHA-256 and byte size. The verifier remains backward-compatible with historical `source_zip_with_json_manifest_v1` manifests, where that identity field was not required.
 
 Build it from a clean Git worktree:
 
@@ -36,6 +36,7 @@ Each artifact manifest records:
 - package name and version
 - Git `HEAD` SHA
 - source ZIP path, size, and SHA-256
+- schema-validated artifact identity bound to the ZIP bytes (v2)
 - manifest path and SHA-256
 - tracked member count
 - per-member path, size, and SHA-256

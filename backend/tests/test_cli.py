@@ -1943,7 +1943,7 @@ def test_cli_package_build_writes_source_artifact_manifest(tmp_path: Path, capsy
     assert artifact.exists()
     assert manifest.exists()
     manifest_payload = json.loads(manifest.read_text(encoding="utf-8"))
-    assert manifest_payload["artifact_format"] == "source_zip_with_json_manifest_v1"
+    assert manifest_payload["artifact_format"] == "source_zip_with_json_manifest_v2"
     assert manifest_payload["head_sha"]
     assert manifest_payload["member_count"] >= 1
     assert {member["path"] for member in manifest_payload["members"]} >= {"pyproject.toml", "README.md"}
@@ -1955,6 +1955,31 @@ def test_cli_package_build_writes_source_artifact_manifest(tmp_path: Path, capsy
     assert verify_payload["manifest"]["head_sha"] == manifest_payload["head_sha"]
     assert verify_checks["current_head_binding"]["status"] == "PASS"
     assert verify_checks["archive_member_hashes"]["status"] == "PASS"
+
+
+def test_cli_package_verify_accepts_historical_v1_without_artifact_identity(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    commit_fixture_repo(tmp_path)
+    output_dir = tmp_path / "artifacts"
+
+    assert main(["package", "build", "--output-dir", str(output_dir), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    manifest_path = Path(payload["manifest"]["path"])
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifact_format"] = "source_zip_with_json_manifest_v1"
+    manifest.pop("artifact_identity", None)
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    assert main(["package", "verify", str(manifest_path), "--format", "json"], cfg=cfg) == 0
+    verified = json.loads(capsys.readouterr().out)
+    checks = {check["name"]: check for check in verified["checks"]}
+    assert verified["status"] == "PACKAGE_ARTIFACT_VERIFIED"
+    assert checks["artifact_identity_contract"] == {
+        "name": "artifact_identity_contract",
+        "status": "PASS",
+        "detail": "legacy_v1_not_required",
+    }
 
 
 def test_cli_package_distribution_manifest_builds_and_verifies_current_head_handoff(tmp_path: Path, capsys):
