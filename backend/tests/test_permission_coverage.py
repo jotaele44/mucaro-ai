@@ -180,14 +180,20 @@ def test_web_fetch_denied_on_unsupported_channel_before_network(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    import socket
     import urllib.request
 
     from backend.app.web_browsing import WebBrowsingError, fetch_web_snapshot
 
     monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("DNS reached before permission denial")),
+    )
+    monkeypatch.setattr(
         urllib.request,
         "build_opener",
-        lambda *a, **k: (_ for _ in ()).throw(AssertionError("network reached")),
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("HTTP opener reached before permission denial")),
     )
     with pytest.raises(WebBrowsingError) as exc:
         fetch_web_snapshot("https://example.com/", cfg=_cfg(tmp_path, "sideload"))
