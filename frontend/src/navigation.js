@@ -17,6 +17,7 @@ export const ROUTES = Object.freeze([
   ] },
   { id: "settings", label: "Settings", icon: "settings", context: [
     { label: "Settings overview", target: "settings-title" },
+    { label: "Appearance", target: "settings-appearance" },
     { label: "Answer model", target: "settings-model" },
     { label: "Retrieval", target: "settings-retrieval" },
     { label: "Local access", target: "settings-access" },
