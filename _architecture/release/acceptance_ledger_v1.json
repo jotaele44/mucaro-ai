@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-27T03:40:07Z",
+  "updated_utc": "2026-09-30T00:38:57Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1317,17 +1317,19 @@
       "requirement_id": "TGT-020",
       "requirement_text": "Performance",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "_architecture/release/performance_budget_v1.json"
+      ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
-      "benchmark": null,
+      "benchmark": "_architecture/release/performance_budget_v1.json",
       "evidence_refs": [],
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N21",
-      "notes": "No frozen performance thresholds."
+      "notes": "Prospective thresholds defined in performance_budget_v1.json; fixtures, exact-head measurements and hardware-bound receipts remain OPEN. Definition is not execution evidence."
     },
     {
       "requirement_id": "TGT-021",
@@ -2081,17 +2083,19 @@
       "requirement_id": "MATRIX-017",
       "requirement_text": "Performance benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "_architecture/release/performance_budget_v1.json"
+      ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
-      "benchmark": null,
+      "benchmark": "_architecture/release/performance_budget_v1.json",
       "evidence_refs": [],
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N21",
-      "notes": ""
+      "notes": "Prospective thresholds defined in performance_budget_v1.json; fixtures, exact-head measurements and hardware-bound receipts remain OPEN. Definition is not execution evidence."
     },
     {
       "requirement_id": "MATRIX-018",
