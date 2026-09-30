@@ -1,18 +1,20 @@
 # Desktop Launcher Mode
 
-> **Source setup, not a release artifact.** `Mucaro AI.command` / `Mucaro AI.cmd` is the supported
-> way to run Mucaro from a source checkout. Release-grade certification requires two packaged lanes,
+> **Source setup, not a release artifact.** Double-click the tracked `Mucaro AI.app` beside
+> `pyproject.toml` on macOS. It runs setup quietly and opens a native window without Terminal or
+> a browser. Release-grade certification requires two packaged lanes,
 > and neither is this launcher:
 >
 > - the native app, `Mucaro AI.app` with its own window: see [release/MACOS_APP.md](release/MACOS_APP.md);
 > - the portable embedded-runtime app: see [PACKAGING_POLICY.md](PACKAGING_POLICY.md#portable-runtime-and-application).
 >
-> The source-bound bundle below needs a checkout and a Python environment, and opens the system
-> browser (contradiction RC-006, adjudicated).
+> The source-bound bundle needs the checkout and provisions its own Python environment. It is
+> distinct from the signed, embedded-runtime release app. Native Finder/WKWebView behavior
+> still requires verification on macOS; Linux regression tests do not certify it.
 
 Desktop Launcher Mode lets Mucaro AI run with one command.
 
-## Double-click setup and launch
+## Legacy console setup and launch
 
 `Mucaro AI.command` (macOS) and `Mucaro AI.cmd` (Windows) set up everything on first use and then
 run `scripts/launch_app.py --auto-port --exit-if-running`. See `docs/ONE_CLICK_SETUP.md`.
@@ -48,8 +50,10 @@ The generated app is:
 data/exports/desktop_apps/Mucaro AI.app
 ```
 
-Double-clicking that app launches this checked-out source tree with the Python
-executable recorded at build time, then runs `scripts/launch_app.py`.
+Double-clicking that app runs `scripts/native_start.sh`, which redirects output into logs and
+starts `scripts/one_click.sh --native`. Setup installs the desktop extra and checks Cocoa/WebKit
+imports before launching. No pre-existing Python environment is required. A failed setup or
+launch produces one dialog and leaves its log available for troubleshooting.
 
 Verify an existing bundle with:
 
