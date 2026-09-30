@@ -4,8 +4,9 @@ import ast
 import hashlib
 import json
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from .tools import TOOL_REGISTRY, ToolDefinition
 
