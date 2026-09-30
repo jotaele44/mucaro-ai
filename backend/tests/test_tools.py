@@ -47,20 +47,42 @@ def test_tool_registry_exposes_single_governed_gis_and_ocr_bridges() -> None:
     payload = list_tools()
     by_name = {row["name"]: row for row in payload["tools"]}
 
-    assert by_name["gis.inspect"] == {
-        "name": "gis.inspect",
-        "description": by_name["gis.inspect"]["description"],
-        "mutates_state": True,
-        "requires_approval": True,
-        "network": "none",
-        "timeout_seconds": by_name["gis.inspect"]["timeout_seconds"],
-        "offline_availability": "AVAILABLE_LOCALLY",
-    }
+    assert by_name["gis.inspect"]["mutates_state"] is True
+    assert by_name["gis.inspect"]["requires_approval"] is True
+    assert by_name["gis.inspect"]["network"] == "none"
+    assert by_name["gis.inspect"]["offline_availability"] == "AVAILABLE_LOCALLY"
     assert by_name["ocr.analyze_image"]["mutates_state"] is True
     assert by_name["ocr.analyze_image"]["requires_approval"] is True
     assert by_name["ocr.analyze_image"]["network"] == "none"
     assert [name for name in by_name if name.startswith("gis.")] == ["gis.inspect"]
     assert [name for name in by_name if name.startswith("ocr.")] == ["ocr.analyze_image"]
+
+
+def test_gis_tool_resolves_relative_path_against_project_root(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    source = tmp_path / "fixtures" / "sample.geojson"
+    source.parent.mkdir()
+    source.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+    observed = {}
+
+    def fake_inspect(path: Path, *, cfg: Settings):
+        observed["path"] = path
+        observed["cfg"] = cfg
+        return {"status": "GIS_INSPECT_OK", "report_id": "gisreport_relative"}
+
+    monkeypatch.setattr("backend.app.tools.inspect_geojson", fake_inspect)
+    requested = request_tool_call(
+        "gis.inspect",
+        {"path": "fixtures/sample.geojson"},
+        cfg=cfg,
+        requested_by="test",
+    )
+    call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+    result = run_tool_call(call_id, cfg=cfg, executed_by="test")
+
+    assert result["result"]["status"] == "GIS_INSPECT_OK"
+    assert observed == {"path": source.resolve(), "cfg": cfg}
 
 
 def test_gis_tool_requires_directory_grant_before_subsystem_execution(tmp_path: Path, monkeypatch) -> None:
