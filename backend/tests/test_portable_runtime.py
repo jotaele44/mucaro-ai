@@ -88,6 +88,23 @@ def test_portable_bundle_leaves_out_tracked_app_bundles(tmp_path: Path) -> None:
     assert checks["application_exclusion_receipt"] == "PASS"
 
 
+def test_portable_bundle_excludes_case_insensitive_app_suffix(tmp_path: Path) -> None:
+    root, runtime = fixture_project(tmp_path)
+    tracked_app = root / "Legacy.APP" / "Contents"
+    tracked_app.mkdir(parents=True)
+    (tracked_app / "Info.plist").write_text("<plist/>\n", encoding="utf-8")
+    git(root, "add", "Legacy.APP/Contents/Info.plist")
+    git(root, "commit", "-m", "add uppercase app fixture")
+
+    report = build_portable_macos_app(root, runtime, output_dir=root / "out")
+
+    assert report["status"] == "PORTABLE_APP_VERIFIED"
+    app = Path(report["app_path"])
+    assert not (app / "Contents" / "Resources" / "app" / "Legacy.APP").exists()
+    manifest = json.loads((app / "Contents" / "Resources" / "portable-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["application"]["excluded_tracked_app_bundles"] == ["Legacy.APP"]
+
+
 def test_portable_verifier_accepts_legacy_v1_manifest_without_exclusion_receipt(tmp_path: Path) -> None:
     root, runtime = fixture_project(tmp_path)
     report = build_portable_macos_app(root, runtime, output_dir=root / "out")
