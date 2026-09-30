@@ -43,11 +43,13 @@ def test_finder_setup_is_silent_and_forces_native_window(tmp_path, code):
 @pytest.mark.skipif(os.name == "nt", reason="macOS shell entry point")
 def test_source_app_is_bound_to_silent_launcher_and_can_move_with_checkout(tmp_path):
     root = tmp_path / "moved checkout"
-    app = root / "Mucaro AI.app"
-    shutil.copytree(ROOT / "Mucaro AI.app", app)
+    app = root / "Mucaro AI Setup.app"
+    shutil.copytree(ROOT / "Mucaro AI Setup.app", app)
     info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
     assert info["CFBundlePackageType"] == "APPL"
     assert info["CFBundleIdentifier"] == "ai.mucaro.source-launcher"
+    assert info["CFBundleName"] == "Mucaro AI Setup"
+    assert info["CFBundleDisplayName"] == "Mucaro AI Setup"
     exe = app / "Contents/MacOS" / info["CFBundleExecutable"]
     assert os.access(exe, os.X_OK)
     (root / "scripts").mkdir()
