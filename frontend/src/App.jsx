@@ -90,6 +90,14 @@ export function App() {
     return () => window.clearInterval(timer);
   }, []);
 
+  // An open phone drawer must not leave the workspace inert after a resize to desktop.
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 761px) and (min-height: 551px), (min-width: 761px) and (pointer: fine)");
+    const restore = () => { if (desktop.matches) setNavOpen(false); };
+    desktop.addEventListener("change", restore);
+    return () => desktop.removeEventListener("change", restore);
+  }, []);
+
   // Mobile navigation is dismissible without a pointer. Restore focus to its opener.
   useEffect(() => {
     if (!navOpen) return undefined;
