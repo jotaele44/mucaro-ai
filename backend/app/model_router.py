@@ -12,7 +12,9 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
+from .config import Settings, settings
 from .injection_guard import neutralize_fence
+from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
 
 
 class ModelProviderError(RuntimeError):
@@ -224,9 +226,11 @@ def generate_answer(
     conversation_context: list[dict[str, Any]] | None = None,
     memory_context: list[dict[str, Any]] | None = None,
     on_text_delta: Callable[[str], None] | None = None,
+    cfg: Settings = settings,
 ) -> dict[str, Any]:
     spec = get_model_provider_spec(model_provider)
     if spec.name == LOCAL_PROVIDER:
+        _require_model_invoke(spec, cfg)
         return _local_answer(
             query,
             retrieved_chunks,
@@ -263,6 +267,7 @@ def generate_answer(
             conversation_context=conversation_context or [],
             memory_context=memory_context or [],
         )
+    _require_model_invoke(spec, cfg)
     return _anthropic_answer(
         query,
         retrieved_chunks,
@@ -271,6 +276,21 @@ def generate_answer(
         conversation_context=conversation_context or [],
         memory_context=memory_context or [],
     )
+
+
+def _require_model_invoke(spec: ModelProviderSpec, cfg: Settings) -> None:
+    try:
+        require_permission(
+            PermissionRequest(
+                capability="model.invoke",
+                subject=f"model_router.generate_answer:{spec.name}",
+                target=spec.name,
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise ModelProviderError(exc.status, exc.detail) from exc
 
 
 def _fallback_or_error(
