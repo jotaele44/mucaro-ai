@@ -34,7 +34,7 @@ export function ProvenanceWorkspace() {
           </dd>
         </dl>
       )}
-      <ul className="tool-list">
+      <ul id="prov-actions" className="tool-list">
         {calls.map((call) => (
           <li key={call.tool_call_id} className="tool-row">
             <div className="tool-row-head">
