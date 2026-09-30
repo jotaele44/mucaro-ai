@@ -380,6 +380,7 @@ async function scenario(browser, base, viewport, contextOptions) {
     const beforeWidth = await navigation.evaluate((el) => el.getBoundingClientRect().width);
     await page.getByRole("button", { name: "Collapse contextual sidebar" }).click();
     await page.getByRole("button", { name: "Expand contextual sidebar" }).waitFor();
+    await page.waitForFunction(() => document.querySelector(".sidebar").getBoundingClientRect().width <= 70);
     const collapsedWidth = await navigation.evaluate((el) => el.getBoundingClientRect().width);
     check("collapsing context retains primary rail", viewport,
       collapsedWidth <= 70 && beforeWidth > 200 &&
