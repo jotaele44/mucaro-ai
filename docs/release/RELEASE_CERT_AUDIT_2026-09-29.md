@@ -154,6 +154,10 @@ Static file-overlap review on 2026-09-30 found:
 
 Therefore #158 is independently mergeable from the V06/V04 stack once executed gates pass. #139 has no identified semantic conflict with V06, but it must still be restacked/replayed after V06 lands so its exact-head test evidence covers the combined CLI tree. This is source compatibility only, not execution PASS.
 
+## 6.2 Hosted-runner cause boundary — 2026-09-30 refresh
+
+A fresh public-status check on 2026-09-30 found GitHub **Actions operational** and no public incident reported for September 30 (`https://www.githubstatus.com/`). The connected GitHub integration can read workflow runs/jobs but does not expose repository Actions-permission, hosted-runner eligibility, billing/minutes, or quota endpoints. Therefore the account/repository-specific cause of the universal zero-step failures remains **UNKNOWN**. Billing/quota and repository/account policy remain hypotheses only. Do not spend certification runs on retries unless runner admission state changes.
+
 ## 7. Critical path
 
 1. **Infrastructure:** clear BLK-ACTIONS-001 by restoring GitHub-hosted runner admission; the first valid evidence must execute at least one workflow step.
