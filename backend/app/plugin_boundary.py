@@ -10,6 +10,7 @@ import json
 import os
 import re
 import stat
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -86,10 +87,12 @@ def _files(plugin: Path) -> tuple[list[dict[str, Any]], list[str]]:
         for name in dirs + names:
             path = Path(current) / name
             relative = path.relative_to(plugin).as_posix()
-            portable_key = relative.casefold()
+            portable_key = unicodedata.normalize("NFC", relative).casefold()
             previous = seen_portable_paths.setdefault(portable_key, relative)
             if previous != relative:
-                raise PluginBoundaryError("AMBIGUOUS_MEMBER_CASE", "Member paths collide on case-insensitive devices")
+                status = ("AMBIGUOUS_MEMBER_CASE" if previous.casefold() == relative.casefold()
+                          else "AMBIGUOUS_MEMBER_UNICODE")
+                raise PluginBoundaryError(status, "Member paths collide after portable path normalization")
             if (len(relative) > MAX_MEMBER_PATH_LENGTH or any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF
                                                         for c in relative)):
                 raise PluginBoundaryError("INVALID_PLUGIN_MEMBER", "Unsafe or excessive member path")
