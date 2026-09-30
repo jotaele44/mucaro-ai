@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -48,6 +49,32 @@ BACKGROUND = (27, 36, 51, 255)
 TUFT = (201, 163, 107, 255)
 EYE = (242, 230, 207, 255)
 BEAK = (224, 168, 74, 255)
+
+SUPPORTED_BUILD_SYSTEM = "Linux"
+SUPPORTED_BUILD_MACHINE = "x86_64"
+SUPPORTED_BUILD_PYTHONS = {(3, 11), (3, 12)}
+
+
+def build_host_error(
+    *,
+    system: str | None = None,
+    machine: str | None = None,
+    python_version: tuple[int, int] | None = None,
+) -> str | None:
+    actual_system = system or platform.system()
+    actual_machine = machine or platform.machine()
+    actual_python = python_version or sys.version_info[:2]
+    if (
+        actual_system == SUPPORTED_BUILD_SYSTEM
+        and actual_machine == SUPPORTED_BUILD_MACHINE
+        and actual_python in SUPPORTED_BUILD_PYTHONS
+    ):
+        return None
+    return (
+        "ERROR_LAUNCHER_BUILD_HOST_UNSUPPORTED "
+        "expected=Linux/x86_64/Python-3.11-or-3.12 "
+        f"actual={actual_system}/{actual_machine}/Python-{actual_python[0]}.{actual_python[1]}"
+    )
 
 
 def install_tools(target: Path) -> None:
@@ -142,6 +169,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--check", action="store_true", help="Rebuild in a temp folder and compare with the committed files.")
     args = parser.parse_args(argv)
+
+    host_error = build_host_error()
+    if host_error:
+        print(host_error, file=sys.stderr)
+        return 2
 
     with tempfile.TemporaryDirectory(prefix="mucaro-launchers-") as tmp:
         scratch = Path(tmp)

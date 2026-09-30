@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.main import create_app
 from backend.tests.test_api import make_settings
-from scripts import launch_app, one_click, progress_page
+from scripts import build_launchers, launch_app, one_click, progress_page
 
 REPO = Path(__file__).resolve().parents[2]
 APP = REPO / "Start Mucaro AI.app"
@@ -163,6 +163,22 @@ def test_build_requirements_are_hash_pinned():
     lines = (REPO / "packaging" / "launchers" / "build-requirements.txt").read_text(encoding="utf-8")
     assert "ziglang==0.16.0" in lines and "pillow==12.3.0" in lines
     assert len(re.findall(r"--hash=sha256:[0-9a-f]{64}", lines)) >= 3
+
+
+def test_launcher_builder_fails_closed_outside_its_frozen_build_host():
+    assert build_launchers.build_host_error(system="Linux", machine="x86_64", python_version=(3, 12)) is None
+
+    for system, machine, python_version in (
+        ("Darwin", "x86_64", (3, 12)),
+        ("Linux", "aarch64", (3, 12)),
+        ("Linux", "x86_64", (3, 13)),
+    ):
+        error = build_launchers.build_host_error(system=system, machine=machine, python_version=python_version)
+        assert error == (
+            "ERROR_LAUNCHER_BUILD_HOST_UNSUPPORTED "
+            "expected=Linux/x86_64/Python-3.11-or-3.12 "
+            f"actual={system}/{machine}/Python-{python_version[0]}.{python_version[1]}"
+        )
 
 
 # --- progress page --------------------------------------------------------------------------------
