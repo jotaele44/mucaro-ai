@@ -273,3 +273,17 @@ def test_unicode_normalization_collision_rejected_without_merging(store):
     with pytest.raises(PluginBoundaryError) as exc:
         inspect_plugin(root, store, policy=policy())
     status(exc, "AMBIGUOUS_MEMBER_UNICODE")
+
+
+def test_valid_store_candidate_binding_uses_nested_snapshot_identity(store):
+    root, _ = make_plugin(store)
+    individual = inspect_plugin(root, store, policy=policy())
+    audit = inspect_store(store, policy=policy())
+    assert audit["arithmetic_closes"] and audit["retained_count"] == 1
+    candidate = audit["candidates"][0]
+    assert "root_name" not in candidate  # status envelope is not the snapshot identity
+    assert candidate["snapshot"]["root_name"] == root.name
+    assert candidate["snapshot_sha256"] == individual["snapshot_sha256"]
+    assert authorize_snapshot(root, store, policy=policy(),
+                              expected_sha256=individual["snapshot_sha256"],
+                              explicit_operator_approval=True)["status"] == "APPROVED_SNAPSHOT_ONLY"
