@@ -395,6 +395,53 @@ async function scenario(browser, base, viewport, contextOptions) {
     (await tablist.getByRole("tab", { name: "Sources", exact: true }).count()) === 0 &&
     (await tablist.getByRole("tab", { name: "Settings", exact: true }).getAttribute("aria-selected")) === "true");
 
+  // Imported GUI integration: bundled real owl thumbnail, local palette and truthful UI controls.
+  const brand = page.locator(".brand-owl").first();
+  check("owl icon uses bundled offline data and is present", viewport,
+    (await brand.count()) === 1 &&
+    (await brand.getAttribute("src")).startsWith("data:image/webp;base64,"));
+  const appearance = page.locator("#settings-appearance");
+  check("appearance is a real Settings panel, not a second page", viewport,
+    (await appearance.count()) === 1 &&
+    (await tablist.getByRole("tab", { name: "Appearance" }).count()) === 0);
+  await appearance.getByRole("radio", { name: "Dark", exact: true }).check();
+  await page.waitForFunction(() => document.documentElement.dataset.mucaroTheme === "dark");
+  check("explicit dark mode overrides current system theme", viewport, true);
+  await appearance.getByRole("radio", { name: "Light", exact: true }).check();
+  await page.waitForFunction(() => document.documentElement.dataset.mucaroTheme === "light");
+  check("explicit light mode overrides current system theme", viewport, true);
+  await appearance.getByRole("radio", { name: "System", exact: true }).check();
+
+  if (viewport === "iphone") {
+    await appearance.getByRole("button", { name: "🇵🇷 Español" }).click();
+    check("settings locale switches to Spanish without duplicating page identity", viewport,
+      (await page.getByRole("heading", { name: "Settings" }).count()) === 1 &&
+      (await tablist.getByRole("tab", { name: "Ajustes" }).count()) === 1);
+    await appearance.getByRole("button", { name: "🇺🇸 English" }).click();
+  } else {
+    await page.getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Switch language to Spanish" }).click();
+    check("rail flag reflects active locale", viewport,
+      (await page.getByRole("button", { name: "Cambiar idioma a inglés" }).count()) === 1 &&
+      (await tablist.getByRole("tab", { name: "Ajustes" }).count()) === 1);
+    await page.getByRole("button", { name: "Cambiar idioma a inglés" }).click();
+    await page.getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Múcaro owl" }).click();
+    const owl = page.getByRole("region", { name: "Múcaro owl controls" });
+    await owl.waitFor();
+    check("owl runtime is source-labeled rather than inferred from conversation text", viewport,
+      (await owl.locator(".mucaro-pet-state").count()) === 1);
+    await owl.getByRole("checkbox", { name: "Float over workspace" }).check();
+    check("owl can float with local image and no sprite CDN", viewport,
+      (await page.locator(".mucaro-floating-pet").count()) === 1);
+    await owl.getByRole("button", { name: "Dock in sidebar" }).click();
+    await owl.getByRole("button", { name: "Close owl controls" }).click();
+  }
+  check("no remote font or hosted-image stylesheet dependency", viewport,
+    await page.evaluate(() => [...document.styleSheets].every((sheet) =>
+      !/fonts\\.googleapis\\.com|_cdn\\/static/.test(sheet.href || ""))));
+  await shot(page, viewport, "17-gui-draft-integration");
+
   if (viewport === "iphone") {
     check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
     // iOS zooms into fields under 16px on focus; touch targets need 44px (Apple HIG).
