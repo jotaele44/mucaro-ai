@@ -58,6 +58,28 @@ def test_unknown_origin_is_denied(cfg: Settings) -> None:
     assert evaluate(_req("model.invoke", origin="root"), cfg=cfg).decision == DENY
 
 
+def test_denied_unknown_origin_remains_contract_serializable(cfg: Settings) -> None:
+    payload = evaluate(_req("model.invoke", origin="root"), cfg=cfg).as_dict()
+    assert payload["decision"] == DENY
+    assert payload["origin"] == "root"
+    assert "unknown request origin" in payload["reasons"][0]
+
+
+def test_denied_unknown_capability_remains_contract_serializable(cfg: Settings) -> None:
+    payload = evaluate(_req(""), cfg=cfg).as_dict()
+    assert payload["decision"] == DENY
+    assert payload["capability"] == ""
+    assert "unknown capability" in payload["reasons"][0]
+
+
+def test_blank_subject_is_denied_and_contract_serializable(cfg: Settings) -> None:
+    decision = evaluate(PermissionRequest(capability="model.invoke", subject="   "), cfg=cfg)
+    payload = decision.as_dict()
+    assert payload["decision"] == DENY
+    assert payload["subject"] == "   "
+    assert payload["reasons"] == ["permission request subject must be non-empty"]
+
+
 def test_read_only_capability_is_allowed(cfg: Settings) -> None:
     assert evaluate(_req("model.invoke"), cfg=cfg).decision == ALLOW
 
@@ -185,7 +207,14 @@ def test_decisions_validate_against_published_schema(cfg: Settings) -> None:
     import jsonschema
 
     schema = json.loads((Path(__file__).resolve().parents[2] / "schemas" / "permission_decision.schema.json").read_text())
-    for request in (_req("model.invoke"), _req("git.mutate", origin="planning"), _req("teleport.anywhere")):
+    for request in (
+        _req("model.invoke"),
+        _req("git.mutate", origin="planning"),
+        _req("teleport.anywhere"),
+        _req("model.invoke", origin="root"),
+        _req(""),
+        PermissionRequest(capability="model.invoke", subject="   "),
+    ):
         jsonschema.validate(evaluate(request, cfg=cfg).as_dict(), schema)
 
 
