@@ -319,6 +319,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_ocr_analyze_image,
+        timeout_seconds=150.0,
     ),
     "coding.repo_status": ToolDefinition(
         name="coding.repo_status",

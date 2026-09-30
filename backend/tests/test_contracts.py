@@ -388,7 +388,7 @@ def test_advanced_gis_ocr_and_coding_have_governed_tool_registry_homes():
 
 
 def test_gis_tool_refuses_ungranted_external_path(cfg, tmp_path):
-    outside = tmp_path.parent / "external-geo.json"
+    outside = tmp_path.parent / f"{tmp_path.name}-external-geo.json"
     outside.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
     call = request_tool_call("gis.inspect_geojson", {"path": str(outside)}, cfg=cfg)["tool_call"]
     approve_tool_call(call["tool_call_id"], cfg=cfg)
@@ -398,7 +398,7 @@ def test_gis_tool_refuses_ungranted_external_path(cfg, tmp_path):
 
 
 def test_gis_tool_uses_granted_path_and_governed_handler(cfg, tmp_path, monkeypatch):
-    outside = tmp_path.parent / "granted-geo.json"
+    outside = tmp_path.parent / f"{tmp_path.name}-granted-geo.json"
     outside.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
     grant_directory(outside, cfg, granted_by="test")
     seen = {}
@@ -432,3 +432,6 @@ def test_ocr_tool_validates_runtime_arguments_before_handler(cfg, monkeypatch):
     assert exc.value.status == "ERROR_OCR_TIMEOUT_INVALID"
     assert called == []
 
+
+def test_ocr_tool_outer_deadline_exceeds_max_inner_subprocess_budget():
+    assert TOOL_REGISTRY["ocr.analyze_image"].timeout_seconds > 130

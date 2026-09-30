@@ -1733,12 +1733,13 @@
         "backend/tests/test_contracts.py::test_advanced_gis_ocr_and_coding_have_governed_tool_registry_homes",
         "backend/tests/test_contracts.py::test_gis_tool_refuses_ungranted_external_path",
         "backend/tests/test_contracts.py::test_gis_tool_uses_granted_path_and_governed_handler",
-        "backend/tests/test_contracts.py::test_ocr_tool_validates_runtime_arguments_before_handler"
+        "backend/tests/test_contracts.py::test_ocr_tool_validates_runtime_arguments_before_handler",
+        "backend/tests/test_contracts.py::test_ocr_tool_outer_deadline_exceeds_max_inner_subprocess_budget"
       ],
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "Coding was already governed. Source implementation now gives GIS inspection and image OCR canonical approval-gated registry homes, both constrained by the existing directory-grant boundary; invalid OCR runtime arguments fail before handler execution. State remains OPEN pending executed registry/permission regressions and broader coherence adjudication."
+      "notes": "Coding was already governed. This branch gives GIS inspection and image OCR canonical approval-gated registry homes constrained by the existing directory-grant boundary. OCR's outer governed-tool deadline is 150s, exceeding its 10s runtime probe plus maximum 120s OCR subprocess budget. TGT-038 remains OPEN pending executed registry/permission regressions and reconciliation with the V05 committed tool denominator in PR #108 after merge order is known."
     },
     {
       "requirement_id": "MATRIX-001",
