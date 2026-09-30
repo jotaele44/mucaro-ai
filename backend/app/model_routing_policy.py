@@ -38,6 +38,7 @@ def plan_model_route(
     required_modalities: list[str] | None = None,
     min_context_tokens: int | None = None,
     system_offline: bool = False,
+    allow_offline_failover: bool = False,
     cfg: Settings = settings,
 ) -> dict[str, Any]:
     """Select a provider under explicit constraints (TGT-010, MATRIX-012).
@@ -146,6 +147,18 @@ def plan_model_route(
         selected["default_model"] if selected else None
     )
     route_status = "MODEL_ROUTE_READY" if selected else "MODEL_ROUTE_BLOCKED"
+    failover_order: list[dict[str, Any]] = []
+    if selected is not None:
+        failover_order.append({"provider": selected["provider"], "model": selected_model})
+        for row in eligible_rows:
+            if row["provider"] == selected["provider"]:
+                continue
+            if row["provider"] == "mock" and selected["provider"] != "mock" and not allow_offline_failover:
+                continue
+            if selected["live"] and not row["live"] and not allow_offline_failover:
+                continue
+            failover_order.append({"provider": row["provider"], "model": row["default_model"]})
+
     payload: dict[str, Any] = {
         "schema_version": MODEL_ROUTING_SCHEMA_VERSION,
         "status": route_status,
@@ -161,11 +174,13 @@ def plan_model_route(
             "required_modalities": modalities_needed,
             "min_context_tokens": min_context_tokens,
             "system_offline": system_offline,
+            "allow_offline_failover": allow_offline_failover,
         },
         "selected_provider": selected_provider,
         "selected_model": selected_model,
         "selection_reason": selection_reason,
         "candidates": candidates,
+        "failover_order": failover_order,
         "invariants": {
             "selected_provider_is_allowed": selected_provider is None or selected_provider in allowed,
             "no_implicit_live_escalation": selected is None or not selected["live"] or allow_live,
@@ -173,6 +188,21 @@ def plan_model_route(
             "live_constraint_honored": not require_live or selected is None or selected["live"],
             "selected_provider_ready": selected is None or selected["provider_status"] == "MODEL_PROVIDER_READY",
             "no_remote_provider_while_offline": not system_offline or selected is None or selected.get("locality") != "remote",
+            "failover_order_selected_first": selected is None
+            or bool(failover_order)
+            and failover_order[0]["provider"] == selected_provider,
+            "failover_order_within_allowlist": all(row["provider"] in allowed for row in failover_order),
+            "no_implicit_offline_failover_from_live": selected is None
+            or not selected["live"]
+            or allow_offline_failover
+            or all(
+                next(candidate for candidate in candidates if candidate["provider"] == row["provider"])["live"]
+                for row in failover_order
+            ),
+            "no_implicit_mock_fallback": selected is None
+            or selected["provider"] == "mock"
+            or allow_offline_failover
+            or all(row["provider"] != "mock" for row in failover_order),
         },
         "limitations": [
             "Routing is policy selection over registered providers; it does not estimate answer quality or cost from unobserved future outputs.",
@@ -184,6 +214,8 @@ def plan_model_route(
             "never select a live provider without explicit live permission",
             "never report READY for a provider whose readiness status is not MODEL_PROVIDER_READY",
             "constraint conflicts fail closed",
+            "never add an offline fallback behind a live provider without explicit allow_offline_failover=true",
+            "never add mock as a fallback behind another provider without explicit allow_offline_failover=true",
         ],
     }
     payload["route_sha256"] = _stable_hash(payload)
