@@ -4,7 +4,7 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-**On macOS, double-click `Mucaro AI.app` in this checkout.** It runs setup quietly and opens
+**On macOS, double-click `Mucaro AI Setup.app` in this checkout.** It runs setup quietly and opens
 Mucaro in its own native window. Keep the app next to `pyproject.toml`; move the whole folder
 together. No Terminal or browser opens. The `.command` file is a legacy console launcher.
 Windows continues to use `Mucaro AI.cmd`.
