@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { UI_DEFAULTS, normalizeUIPrefs, readUIPrefs, writeUIPrefs, effectiveTheme, uiText, uiFlag, PET_SIZES, viewportPoint, normalizeViewportPoint } from "./uiPreferences.js";
-import { derivePetRuntime, observationSignature } from "./petRuntime.js";
+import { derivePetRuntime, observationSignature, isReportableRunObservation } from "./petRuntime.js";
 
 test("invalid or malformed persisted preferences fail closed", () => {
   for (const raw of [null, "bad", ["es"], 3, { theme: "blue", language: "xx", pet: { size: "giant", position: { x: Infinity, y: 2 } } }]) {
@@ -52,4 +52,16 @@ test("health failure has precedence over stale run status", () => {
 test("runtime observation identity is explicit, not nearest-state inference", () => {
   assert.equal(observationSignature({runId:"r1",runState:"RUNNING"}),"r1:RUNNING");
   assert.equal(observationSignature({runId:"r1"}),null); assert.equal(observationSignature(null),null);
+});
+
+test("hydrated terminal history is not treated as a fresh owl event", () => {
+  assert.equal(isReportableRunObservation("r1","COMPLETED",new Set()),false);
+  assert.equal(isReportableRunObservation("r1","FAILED",new Set()),false);
+  assert.equal(isReportableRunObservation("r1","RUNNING",new Set()),true);
+  assert.equal(isReportableRunObservation("r1","COMPLETED",new Set(["r1"])),true);
+  assert.equal(isReportableRunObservation("r1","INVENTED",new Set(["r1"])),false);
+});
+test("terminal owl states expire while active backend states do not", () => {
+  assert.equal(derivePetRuntime("ok",{runId:"r1",runState:"COMPLETED",observedAt:1000},22001).state,"IDLE");
+  assert.equal(derivePetRuntime("ok",{runId:"r1",runState:"RUNNING",observedAt:1000},999999).state,"WORK");
 });
