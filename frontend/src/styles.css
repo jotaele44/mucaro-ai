@@ -1099,3 +1099,234 @@ html {
     min-height: 44px;
   }
 }
+
+
+/* Three-region navigation: a permanent desktop rail, independently collapsible
+   context sidebar, and ephemeral content tabs. Built entirely from local assets. */
+.app {
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+.app .sidebar {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  width: 328px;
+  min-width: 0;
+  padding: 0;
+  background: var(--surface-2);
+  overflow: hidden;
+  transition: width 0.2s ease;
+}
+.app.context-closed .sidebar {
+  width: 64px;
+}
+.primary-rail {
+  flex: 0 0 64px;
+  width: 64px;
+  min-width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: calc(12px + env(safe-area-inset-top)) 8px calc(12px + env(safe-area-inset-bottom));
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.rail-pages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rail-pages li {
+  display: flex;
+  justify-content: center;
+}
+.rail-brand,
+.rail-button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  min-height: 46px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+.rail-brand {
+  font-weight: 750;
+  font-size: 20px;
+  color: var(--accent);
+}
+.rail-button:hover,
+.rail-brand:hover {
+  background: var(--surface);
+}
+.rail-button[aria-current="page"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--border);
+}
+.rail-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+.rail-spacer {
+  flex: 1 1 auto;
+}
+.context-sidebar {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  padding: 16px 12px calc(16px + env(safe-area-inset-bottom));
+}
+.context-header {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  font-size: 18px;
+  padding: 0 6px;
+}
+.context-sidebar .conversation-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.context-sections {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.context-sections ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.context-sections button {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+.context-sections button:hover {
+  background: var(--surface);
+}
+.context-closed .context-sidebar {
+  display: none;
+}
+.workspace-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  gap: 4px;
+  min-height: 48px;
+  padding: 6px 12px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  scrollbar-width: thin;
+}
+.workspace-tab-entry {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 95px;
+  max-width: 236px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.workspace-tab-entry:has(.workspace-tab[aria-selected="true"]) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.workspace-tab {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 6px 7px 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.close-tab {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 20px;
+}
+.close-tab:hover {
+  background: var(--surface);
+}
+.workspace-panels {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.workspace-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.workspace-pane[hidden] {
+  display: none !important;
+}
+.workspace-pane > .workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+@media (min-width: 761px) and (max-width: 950px) {
+  .app.context-open .sidebar { width: 280px; }
+}
+@media (max-width: 760px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .app .sidebar,
+  .app.context-closed .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(360px, 96vw);
+    max-width: 96vw;
+    transform: translateX(-102%);
+    transition: transform 0.2s ease;
+    z-index: 40;
+  }
+  .app.nav-open .sidebar {
+    transform: none;
+    box-shadow: var(--shadow);
+  }
+  /* The mobile overlay always exposes page context even if desktop context was collapsed. */
+  .app.context-closed .context-sidebar {
+    display: flex;
+  }
+  .context-sidebar {
+    padding-top: calc(16px + env(safe-area-inset-top));
+  }
+  .workspace-tabs {
+    padding: 5px 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app .sidebar { transition: none; }
+}
