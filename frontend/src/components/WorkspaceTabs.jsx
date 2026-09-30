@@ -1,10 +1,11 @@
 import React from "react";
 import { ROUTES } from "../navigation.js";
+import { uiText } from "../uiPreferences.js";
 
-export function WorkspaceTabs({ tabs, activeKey, conversations, onSelect, onClose }) {
+export function WorkspaceTabs({ tabs, activeKey, conversations, onSelect, onClose, locale = "en" }) {
   function title(tab) {
-    if (tab.view !== "chat") return ROUTES.find((item) => item.id === tab.view)?.label || tab.view;
-    if (!tab.conversationId) return "New chat";
+    if (tab.view !== "chat") return uiText(locale, tab.view);
+    if (!tab.conversationId) return uiText(locale, "newChat");
     return conversations.find((row) => row.conversation_id === tab.conversationId)?.title || "Conversation";
   }
 
