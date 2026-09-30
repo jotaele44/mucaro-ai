@@ -200,7 +200,7 @@ def authorize_snapshot(path: Path, store: Path, *, policy: CapabilityPolicy, exp
         raise PluginBoundaryError("PLUGIN_STORE_CONSERVATION_FAILURE", "Store audit did not close")
     if result["snapshot"]["plugin_id"] in audited["duplicate_ids"]:
         raise PluginBoundaryError("DUPLICATE_PLUGIN_ID", "Store has multiple candidates for the declared plugin ID")
-    current = [row for row in audited["candidates"] if row.get("root_name") == path.name]
+    current = [row for row in audited["candidates"] if row.get("snapshot", {}).get("root_name") == path.name]
     if len(current) != 1 or current[0].get("snapshot_sha256") != expected_sha256:
         raise PluginBoundaryError("STALE_PLUGIN_SNAPSHOT", "Store re-inspection changed the target")
     if current[0]["status"] != "INSPECTED_FOR_APPROVAL":
