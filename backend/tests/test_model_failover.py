@@ -213,3 +213,74 @@ def test_failover_contract_rejects_success_without_provider_identity() -> None:
                 "result": {},
             },
         )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "schema_version": "mucaro-model-failover/1.0",
+            "status": "FAILOVER_OK",
+            "provider": "primary",
+            "model": "m1",
+            "result": {},
+            "failed_over": False,
+            "attempts": [
+                {
+                    "attempt": 1,
+                    "provider": "primary",
+                    "model": "m1",
+                    "status": "OK",
+                    "detail": "",
+                    "started_at": "2026-09-30T00:00:00Z",
+                    "duration_ms": 1,
+                }
+            ],
+            "interruption": False,
+        },
+        {
+            "schema_version": "mucaro-model-failover/1.0",
+            "status": "FAILOVER_EXHAUSTED",
+            "error_status": DOWN,
+            "detail": "down",
+            "interruption": True,
+            "attempts": [
+                {
+                    "attempt": 1,
+                    "provider": "primary",
+                    "model": "m1",
+                    "status": DOWN,
+                    "detail": "down",
+                    "started_at": "2026-09-30T00:00:00Z",
+                    "duration_ms": 1,
+                }
+            ],
+            "provider": "primary",
+        },
+        {
+            "schema_version": "mucaro-model-failover/1.0",
+            "status": "FAILOVER_NO_PROVIDERS",
+            "attempts": [],
+            "interruption": False,
+            "error_status": "ERROR_SHOULD_NOT_EXIST",
+        },
+    ],
+)
+def test_failover_contract_rejects_status_incompatible_fields(payload: dict) -> None:
+    with pytest.raises(ContractViolation):
+        validate_contract("model_failover", payload)
+
+
+def test_failover_contract_requires_an_attempt_for_executed_terminal_states() -> None:
+    with pytest.raises(ContractViolation):
+        validate_contract(
+            "model_failover",
+            {
+                "schema_version": "mucaro-model-failover/1.0",
+                "status": "FAILOVER_HARD_FAILURE",
+                "error_status": HARD,
+                "detail": "hard",
+                "interruption": False,
+                "attempts": [],
+            },
+        )
