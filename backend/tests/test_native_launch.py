@@ -43,11 +43,13 @@ def test_finder_setup_is_silent_and_forces_native_window(tmp_path, code):
 @pytest.mark.skipif(os.name == "nt", reason="macOS shell entry point")
 def test_source_app_is_bound_to_silent_launcher_and_can_move_with_checkout(tmp_path):
     root = tmp_path / "moved checkout"
-    app = root / "Mucaro AI.app"
-    shutil.copytree(ROOT / "Mucaro AI.app", app)
+    app = root / "Mucaro AI Setup.app"
+    shutil.copytree(ROOT / "Mucaro AI Setup.app", app)
     info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
     assert info["CFBundlePackageType"] == "APPL"
     assert info["CFBundleIdentifier"] == "ai.mucaro.source-launcher"
+    assert info["CFBundleName"] == "Mucaro AI Setup"
+    assert info["CFBundleDisplayName"] == "Mucaro AI Setup"
     exe = app / "Contents/MacOS" / info["CFBundleExecutable"]
     assert os.access(exe, os.X_OK)
     (root / "scripts").mkdir()
@@ -56,6 +58,24 @@ def test_source_app_is_bound_to_silent_launcher_and_can_move_with_checkout(tmp_p
     proc = subprocess.run(["/bin/bash", str(exe)], capture_output=True, check=False)
     assert proc.returncode == 0
     assert result.read_text() == str(root)
+
+
+
+def test_source_and_packaged_release_bundle_identities_are_distinct():
+    from backend.app.packaging import MACOS_APP_BUNDLE_NAME
+
+    source_app = ROOT / "Mucaro AI Setup.app"
+    source_info = plistlib.loads((source_app / "Contents/Info.plist").read_bytes())
+    release_spec = (ROOT / "packaging/macos/mucaro.spec").read_text(encoding="utf-8")
+    release_builder = (ROOT / "scripts/build_macos_app.py").read_text(encoding="utf-8")
+
+    assert source_app.is_dir()
+    assert not (ROOT / "Mucaro AI.app").exists()
+    assert MACOS_APP_BUNDLE_NAME == "Mucaro AI Setup.app"
+    assert source_info["CFBundleIdentifier"] == "ai.mucaro.source-launcher"
+    assert 'name="Mucaro AI.app"' in release_spec
+    assert 'BUNDLE_ID = "ai.mucaro.app"' in release_builder
+    assert source_info["CFBundleDisplayName"] != "Mucaro AI"
 
 
 @pytest.fixture
