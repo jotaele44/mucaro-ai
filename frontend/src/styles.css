@@ -1375,3 +1375,203 @@ html {
 @media (max-width: 760px), (max-height: 550px) and (pointer: coarse) {
   .context-toggle { display: none; }
 }
+
+/* GUI_DRAFT_DESIGN_TOKENS_V1
+   Frozen palette adapted from uploaded Floot prototype; use installed platform
+   fonts offline instead of fetching Google Fonts. No inherited global resets. */
+:root[data-mucaro-theme="light"] {
+  --bg: #edf1f1; --surface: #f7f9f8; --surface-2: #e5eae9;
+  --text: #182224; --muted: #687779; --border: #cfd9d7;
+  --accent: #087f83; --accent-text: #f7ffff; --accent-soft: #cceeed;
+  --danger: #b33a43; --danger-soft: #fbe9ea;
+  --warn: #9a6612; --warn-soft: #fdf3dc;
+  --user-bubble: #e1eeee; --focus: #087f83;
+  --shadow: 0 12px 32px rgba(18, 34, 36, 0.12);
+  color-scheme: light;
+}
+:root[data-mucaro-theme="dark"] {
+  --bg: #0f1719; --surface: #151f21; --surface-2: #202d2f;
+  --text: #dfe8e7; --muted: #8ea09f; --border: #2d3c3e;
+  --accent: #54c5c3; --accent-text: #092426; --accent-soft: #173d40;
+  --danger: #e0767d; --danger-soft: #3a1f21;
+  --warn: #d4a653; --warn-soft: #3a2f16;
+  --user-bubble: #18393b; --focus: #54c5c3;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
+  color-scheme: dark;
+}
+:root {
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+.app {
+  background: var(--bg);
+  color: var(--text);
+}
+.app .primary-rail {
+  background: #182224;
+  color: #eef4f3;
+  border-right: 1px solid rgba(238, 244, 243, 0.16);
+}
+:root[data-mucaro-theme="dark"] .app .primary-rail { background: #0b1113; }
+.app .rail-button, .app .rail-brand {
+  color: inherit;
+  border-radius: 12px;
+}
+.app .rail-brand {
+  padding: 0;
+  background: none;
+  overflow: hidden;
+}
+.app .rail-button:hover, .app .rail-brand:hover {
+  background: rgba(238, 244, 243, 0.1);
+}
+.app .rail-button[aria-current="page"] {
+  background: #173d40;
+  color: #8ee5e2;
+  border-color: rgba(142, 229, 226, 0.3);
+  box-shadow: inset 2px 0 #54c5c3;
+}
+.brand-owl {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 42px;
+  max-height: 42px;
+  object-fit: contain;
+  border-radius: 50%;
+}
+.rail-pet-button .brand-owl { max-width: 30px; max-height: 30px; }
+.rail-pet-button[data-pet-state="NOTIFY"] {
+  outline: 2px solid #d4a653;
+  outline-offset: -2px;
+}
+.rail-pet-button[data-pet-state="WORK"] .brand-owl {
+  box-shadow: 0 0 0 2px #54c5c3;
+}
+.rail-locale-button { font-size: 25px; }
+.app .context-sidebar {
+  background: var(--surface-2);
+  border-right: 1px solid var(--border);
+}
+.app .context-header strong {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.app .workspace-tab-entry {
+  box-shadow: none;
+  border-radius: 8px;
+}
+.app .workspace-tab-entry:has(.workspace-tab[aria-selected="true"]) {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.app .main { background: var(--bg); }
+.context-edge-handle {
+  position: fixed;
+  top: 50%;
+  left: 322px;
+  transform: translateY(-50%);
+  z-index: 25;
+  width: 35px;
+  height: 55px;
+  min-height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 0 10px 10px 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: left 0.2s ease;
+}
+.context-edge-handle span {
+  font-size: 18px;
+  line-height: 1;
+}
+.app.context-closed .context-edge-handle { left: 62px; }
+.appearance-group { display: flex; flex-direction: column; gap: 8px; }
+.appearance-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.appearance-option {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 12px; min-height: 44px;
+  border-radius: 9px; border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer;
+}
+.appearance-option:has(input:checked), .appearance-option[aria-pressed="true"] {
+  background: var(--accent-soft); border-color: var(--accent);
+  font-weight: 650;
+}
+.mucaro-floating-pet {
+  position: fixed;
+  z-index: 31;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 50%;
+  user-select: none;
+  touch-action: none;
+  cursor: grab;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, .22);
+}
+.mucaro-floating-pet img {
+  display: block;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  pointer-events: none;
+  object-fit: cover;
+}
+.mucaro-floating-pet[data-dragging="true"] { cursor: grabbing; }
+.mucaro-floating-pet[data-pet-state="NOTIFY"] {
+  outline: 3px solid var(--warn);
+  outline-offset: 2px;
+}
+.mucaro-floating-pet[data-pet-state="WORK"][data-motion="true"] img {
+  animation: mucaro-observed-work-pulse 1.5s ease-in-out infinite;
+}
+@keyframes mucaro-observed-work-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+.mucaro-pet-panel {
+  position: fixed;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  right: calc(18px + env(safe-area-inset-right));
+  z-index: 55;
+  width: min(336px, calc(100vw - 28px));
+  max-height: min(620px, calc(100dvh - 30px));
+  padding: 14px 16px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mucaro-pet-panel header, .mucaro-pet-state {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.mucaro-pet-panel header strong { font-size: 17px; }
+.mucaro-pet-state { justify-content: flex-start; background: var(--surface-2); padding: 10px; border-radius: 8px; }
+.mucaro-pet-state img { border-radius: 50%; }
+.mucaro-pet-state[data-pet-state="NOTIFY"] { border-left: 3px solid var(--warn); }
+.mucaro-pet-panel .switch { min-height: 44px; }
+.mucaro-pet-panel .field { margin: 0; }
+.mucaro-pet-panel p { margin: 0; }
+@media (min-width: 761px) and (max-width: 950px) {
+  .app.context-open .context-edge-handle { left: 274px; }
+}
+@media (max-width: 760px), (max-height: 550px) and (pointer: coarse) {
+  .context-edge-handle { display: none; }
+  .app .primary-rail { overflow-y: auto; overflow-x: hidden; }
+  .mucaro-pet-panel { bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .mucaro-floating-pet { z-index: 30; }
+  .app.nav-open .mucaro-floating-pet { pointer-events: none; opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .context-edge-handle { transition: none; }
+  .mucaro-floating-pet img { animation: none !important; }
+}
