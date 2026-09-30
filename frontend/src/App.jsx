@@ -9,6 +9,9 @@ import { MemoryWorkspace } from "./components/workspaces/MemoryWorkspace.jsx";
 import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace.jsx";
 import { SettingsWorkspace } from "./components/workspaces/SettingsWorkspace.jsx";
 import { SourcesWorkspace } from "./components/workspaces/SourcesWorkspace.jsx";
+import { MucaroPet } from "./components/MucaroPet.jsx";
+import { derivePetRuntime } from "./petRuntime.js";
+import { effectiveTheme, normalizeUIPrefs, readUIPrefs, writeUIPrefs } from "./uiPreferences.js";
 
 const MOBILE_NAV_QUERY = "(max-width: 760px), (max-height: 550px) and (pointer: coarse)";
 const DEFAULT_OPTIONS = { model_provider: "mock", retrieval_strategy: "hybrid", allow_live: false, top_k: 5 };
@@ -47,6 +50,11 @@ export function App() {
   const [message, setMessage] = useState("");
   const [health, setHealth] = useState({ state: "checking" });
   const [ready, setReady] = useState(false);
+  const [uiPrefs, setUiPrefs] = useState(readUIPrefs);
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const [petPanelOpen, setPetPanelOpen] = useState(false);
+  const [petObservation, setPetObservation] = useState(null);
+  const observationsRef = useRef(new Map());
   // An in-flight send may finish after the user has opened/closed another tab.
   // Refs prevent a stale async ChatView callback from overwriting newer navigation.
   const tabsRef = useRef(tabs);
@@ -124,6 +132,19 @@ export function App() {
     return () => document.removeEventListener("keydown", dismiss);
   }, [navOpen]);
 
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => setSystemDark(query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    writeUIPrefs(uiPrefs);
+    document.documentElement.dataset.mucaroTheme = effectiveTheme(uiPrefs.theme, systemDark);
+    document.documentElement.lang = uiPrefs.language;
+  }, [uiPrefs, systemDark]);
+
   useEffect(() => persist("mucaro.options", options), [options]);
   useEffect(() => persist("mucaro.nav.tabs.v1", tabs), [tabs]);
   useEffect(() => persist("mucaro.nav.active.v1", activeTabKey), [activeTabKey]);
@@ -150,17 +171,31 @@ export function App() {
     }
   }
 
+  const recordRuntime = useCallback((tabKey, observation) => {
+    if (!tabsRef.current.some((tab) => tab.key === tabKey)) return;
+    observationsRef.current.set(tabKey, observation);
+    if (selectedRef.current === tabKey) setPetObservation(observation);
+  }, []);
+
+  function toggleLanguage() {
+    setUiPrefs((previous) => normalizeUIPrefs({ ...previous, language: previous.language === "es" ? "en" : "es" }));
+  }
+
   function commitNavigation(nextTabs, nextKey) {
     tabsRef.current = nextTabs;
     selectedRef.current = nextKey;
     setTabs(nextTabs);
     setActiveTabKey(nextKey);
+    const active = nextTabs.find((tab) => tab.key === nextKey);
+    setPetObservation(active?.view === "chat" ? observationsRef.current.get(nextKey) || null : null);
   }
 
   function activateTab(key) {
     if (!tabsRef.current.some((tab) => tab.key === key)) return;
     selectedRef.current = key;
     setActiveTabKey(key);
+    const active = tabsRef.current.find((tab) => tab.key === key);
+    setPetObservation(active?.view === "chat" ? observationsRef.current.get(key) || null : null);
     focusTabAfterMobileNavigation(key);
     setNavOpen(false);
   }
@@ -202,6 +237,7 @@ export function App() {
   }
 
   function closeWorkspaceTab(key) {
+    observationsRef.current.delete(key);
     const outcome = removeTab(tabsRef.current, key, selectedRef.current);
     commitNavigation(outcome.tabs, outcome.key);
   }
@@ -214,6 +250,7 @@ export function App() {
       return;
     }
     if (id == null) {
+      observationsRef.current.delete(key);
       const remaining = currentTabs.filter((tab) => tab.key !== key);
       const fresh = remaining.find((tab) => tab.key === "chat:new") || makeTab("chat");
       const nextTabs = remaining.some((tab) => tab.key === fresh.key) ? remaining : [...remaining, fresh];
@@ -222,6 +259,10 @@ export function App() {
     }
     const outcome = adoptConversation(currentTabs, key, id);
     if (!outcome) return announce("Unable to bind the new conversation to its tab.");
+    if (observationsRef.current.has(key)) {
+      observationsRef.current.set(outcome.key, observationsRef.current.get(key));
+      observationsRef.current.delete(key);
+    }
     commitNavigation(outcome.tabs, selectedRef.current === key ? outcome.key : selectedRef.current);
     loadConversations();
   }
@@ -241,6 +282,10 @@ export function App() {
         onTasks={showTasks}
         onCloseMobile={() => setNavOpen(false)}
         inactive={mobileOverlay && !navOpen}
+        locale={uiPrefs.language}
+        onToggleLanguage={toggleLanguage}
+        onPetOpen={() => setPetPanelOpen(true)}
+        petState={derivePetRuntime(health.state, petObservation).state}
       />
       <div className="nav-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
       <main id="main" className="main" tabIndex={-1} inert={mobileOverlay && navOpen}>
@@ -261,6 +306,7 @@ export function App() {
           conversations={conversations}
           onSelect={activateTab}
           onClose={closeWorkspaceTab}
+          locale={uiPrefs.language}
         />
         {ready && (
           <div className="workspace-panels">
@@ -283,18 +329,28 @@ export function App() {
                     announce={announce}
                     modes={modes}
                     defaultOptions={options}
+                    onRuntimeEvent={(observation) => recordRuntime(tab.key, observation)}
                   />
                 )}
                 {tab.view === "sources" && <SourcesWorkspace announce={announce} />}
                 {tab.view === "memory" && <MemoryWorkspace announce={announce} />}
                 {tab.view === "provenance" && <ProvenanceWorkspace />}
-                {tab.view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions} announce={announce} />}
+                {tab.view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions}
+                    uiPrefs={uiPrefs} onUIPrefsChange={(next) => setUiPrefs(normalizeUIPrefs(next))}
+                    announce={announce} />}
               </div>
             ))}
           </div>
         )}
       </main>
       {tasksOpen && <TasksDrawer onClose={closeTasks} />}
+      <MucaroPet prefs={uiPrefs.pet}
+        onChange={(pet) => setUiPrefs((old) => normalizeUIPrefs({ ...old, pet }))}
+        runtime={derivePetRuntime(health.state, petObservation)}
+        locale={uiPrefs.language}
+        open={petPanelOpen}
+        onOpenChange={setPetPanelOpen}
+      />
       <div className="sr-only" role="status" aria-live="polite">{message}</div>
     </div>
   );
