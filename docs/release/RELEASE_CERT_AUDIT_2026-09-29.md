@@ -143,6 +143,17 @@ The six group counts above are a partition of the 49 authoritative OPEN rows: `1
 - the 49 OPEN rows
 - #158 canonical F-8 repair, #161 complete V06 permission reconstruction, #145 clean V04 reconstruction, and the V06↔V04 combined integration gate are waiting on nonzero-step hosted execution under BLK-ACTIONS-001; #114 and #117 are preserved as draft historical/unique-delta evidence
 
+## 6.1 Candidate merge-order compatibility
+
+Static file-overlap review on 2026-09-30 found:
+
+- **#158 F-8 vs #161 V06:** 0 overlapping files.
+- **#158 F-8 vs #163 V04-on-V06:** 0 overlapping files.
+- **#158 F-8 vs #139 arm64 prep:** one overlap, `backend/tests/test_cli.py`; the hunks are disjoint (source-wrapper expectations vs portable-runtime CLI tests).
+- **#161 V06 vs #139 arm64 prep:** one overlap, `backend/app/cli.py`; the hunks are disjoint (subprocess permission gating vs portable-runtime parser/handler additions).
+
+Therefore #158 is independently mergeable from the V06/V04 stack once executed gates pass. #139 has no identified semantic conflict with V06, but it must still be restacked/replayed after V06 lands so its exact-head test evidence covers the combined CLI tree. This is source compatibility only, not execution PASS.
+
 ## 7. Critical path
 
 1. **Infrastructure:** clear BLK-ACTIONS-001 by restoring GitHub-hosted runner admission; the first valid evidence must execute at least one workflow step.
