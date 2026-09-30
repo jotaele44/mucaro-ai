@@ -40,10 +40,12 @@ def test_governance_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ledger_path.write_text(json.dumps({"rows": [{"state": "OPEN"}]}), encoding="utf-8")
     head = "a" * 40
     monkeypatch.setattr(governance, "ROOT", root)
-    monkeypatch.setattr(governance, "_git", lambda *args:
-        ("b" * 40 if failure == "wrong_head" else head)
-        if args == ("rev-parse", "HEAD") else (" M tracked.txt" if failure == "dirty" else "")
-    )
+    def fake_git(*args: str) -> str:
+        if args == ("rev-parse", "HEAD"):
+            return "b" * 40 if failure == "wrong_head" else head
+        return " M tracked.txt" if failure == "dirty" else ""
+
+    monkeypatch.setattr(governance, "_git", fake_git)
     by_state = {state: int(state == "OPEN") for state in governance.REQUIREMENT_STATES}
     if failure == "denominator":
         by_state["OPEN"] = 0
