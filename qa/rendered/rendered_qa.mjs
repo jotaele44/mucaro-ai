@@ -413,11 +413,11 @@ async function scenario(browser, base, viewport, contextOptions) {
   await appearance.getByRole("radio", { name: "System", exact: true }).check();
 
   if (viewport === "iphone") {
-    await appearance.getByRole("button", { name: "🇵🇷 Español" }).click();
+    await appearance.getByRole("button", { name: "Español" }).click();
     check("settings locale switches to Spanish without duplicating page identity", viewport,
       (await page.getByRole("heading", { name: "Settings" }).count()) === 1 &&
       (await tablist.getByRole("tab", { name: "Ajustes" }).count()) === 1);
-    await appearance.getByRole("button", { name: "🇺🇸 English" }).click();
+    await appearance.getByRole("button", { name: "English" }).click();
   } else {
     await page.getByRole("navigation", { name: "Primary" })
       .getByRole("button", { name: "Switch language to Spanish" }).click();
@@ -438,8 +438,11 @@ async function scenario(browser, base, viewport, contextOptions) {
     await owl.getByRole("button", { name: "Close owl controls" }).click();
   }
   check("no remote font or hosted-image stylesheet dependency", viewport,
-    await page.evaluate(() => [...document.styleSheets].every((sheet) =>
-      !/fonts\\.googleapis\\.com|_cdn\\/static/.test(sheet.href || ""))));
+    await page.evaluate(() => {
+      const prohibited = new RegExp("fonts[.]googleapis[.]com|_cdn/static");
+      return [...document.styleSheets].every((sheet) => !prohibited.test(sheet.href || "")) &&
+        performance.getEntriesByType("resource").every((entry) => !prohibited.test(entry.name));
+    }));
   await shot(page, viewport, "17-gui-draft-integration");
 
   if (viewport === "iphone") {
