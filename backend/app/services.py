@@ -71,6 +71,7 @@ def answer_question(
             allow_live=allow_live,
             require_offline=require_offline,
             require_citations=True,
+            cfg=cfg,
         )
     except ModelRoutingError as exc:
         if not allow_mock_fallback:
@@ -87,6 +88,7 @@ def answer_question(
             allow_live=False,
             require_offline=True,
             require_citations=True,
+            cfg=cfg,
         )
         model_route["fallback_reason"] = exc.status
 
