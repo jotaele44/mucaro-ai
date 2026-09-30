@@ -231,7 +231,7 @@ def main(argv: list[str] | None = None) -> int:
         "--native",
         action="store_true",
         help="Show the app in its own native window instead of the system browser, and report failures in a dialog "
-        "(what Mucaro AI.app runs; there is no Terminal to read them in).",
+        "(what the tracked Mucaro AI Setup.app runs; there is no Terminal to read them in).",
     )
     parser.add_argument("--skip-build", action="store_true", help="Do not build frontend/dist if missing.")
     parser.add_argument(
