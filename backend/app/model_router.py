@@ -103,16 +103,16 @@ def get_model_provider_spec(model_provider: str | None) -> ModelProviderSpec:
         raise ModelProviderError("ERROR_UNSUPPORTED_MODEL_PROVIDER", provider) from exc
 
 
-def list_model_providers() -> list[dict[str, Any]]:
-    return [_provider_status(spec) for spec in MODEL_PROVIDER_SPECS.values()]
+def list_model_providers(cfg: Settings = settings) -> list[dict[str, Any]]:
+    return [_provider_status(spec, cfg) for spec in MODEL_PROVIDER_SPECS.values()]
 
 
 def model_provider_names() -> tuple[str, ...]:
     return tuple(MODEL_PROVIDER_SPECS)
 
 
-def model_provider_status(model_provider: str | None = None) -> dict[str, Any]:
-    return _provider_status(get_model_provider_spec(model_provider))
+def model_provider_status(model_provider: str | None = None, cfg: Settings = settings) -> dict[str, Any]:
+    return _provider_status(get_model_provider_spec(model_provider), cfg)
 
 
 def local_model_settings() -> dict[str, Any]:
@@ -158,7 +158,7 @@ def _probe_local_server(base_url: str, model: str) -> dict[str, Any]:
     return result
 
 
-def _provider_status(spec: ModelProviderSpec) -> dict[str, Any]:
+def _provider_status(spec: ModelProviderSpec, cfg: Settings) -> dict[str, Any]:
     live_mode_enabled = os.getenv("MUCARO_AI_LIVE_MODE") == "1"
     api_key_configured = bool(os.getenv(spec.api_key_env)) if spec.api_key_env else None
     dependency_available = (
@@ -187,14 +187,29 @@ def _provider_status(spec: ModelProviderSpec) -> dict[str, Any]:
             status = "MODEL_PROVIDER_NOT_READY"
             warnings.append("LOCAL_MODEL_URL_NOT_LOOPBACK")
         else:
-            probe = _probe_local_server(local_cfg["base_url"], local_cfg["model"])
-            local.update({"reachable": probe["reachable"], "installed_models": probe["models"][:50]})
-            if not probe["reachable"]:
+            try:
+                require_permission(
+                    PermissionRequest(
+                        capability="model.invoke",
+                        subject="model_router.provider_status:openai_compatible_local",
+                        target=spec.name,
+                        origin="operator",
+                    ),
+                    cfg=cfg,
+                )
+            except PermissionEngineError as exc:
                 status = "MODEL_PROVIDER_NOT_READY"
-                warnings.append("LOCAL_MODEL_SERVER_UNREACHABLE")
-            elif not probe["model_installed"]:
-                status = "MODEL_PROVIDER_NOT_READY"
-                warnings.append(f"LOCAL_MODEL_NOT_INSTALLED:{local_cfg['model']}")
+                warnings.append(f"MODEL_INVOKE_PERMISSION:{exc.status}")
+                local.update({"reachable": None, "installed_models": []})
+            else:
+                probe = _probe_local_server(local_cfg["base_url"], local_cfg["model"])
+                local.update({"reachable": probe["reachable"], "installed_models": probe["models"][:50]})
+                if not probe["reachable"]:
+                    status = "MODEL_PROVIDER_NOT_READY"
+                    warnings.append("LOCAL_MODEL_SERVER_UNREACHABLE")
+                elif not probe["model_installed"]:
+                    status = "MODEL_PROVIDER_NOT_READY"
+                    warnings.append(f"LOCAL_MODEL_NOT_INSTALLED:{local_cfg['model']}")
     return {
         "locality": spec.locality,
         "modalities": list(spec.modalities),
