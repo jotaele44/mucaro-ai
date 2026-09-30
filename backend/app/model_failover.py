@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .contracts import validate_contract
 from .model_router import ModelProviderError
 from .provider_recovery import PROVIDER_INTERRUPTION_STATUSES
 from .utils import utc_now
@@ -23,6 +24,10 @@ NEXT_PROVIDER_STATUSES = RETRY_STATUSES | frozenset(
         "ERROR_LOCAL_MODEL_EMPTY_RESPONSE",
     }
 )
+
+
+def _validated_receipt(payload: dict[str, Any]) -> dict[str, Any]:
+    return validate_contract("model_failover", payload)
 
 
 @dataclass(frozen=True)
@@ -54,12 +59,12 @@ def run_with_failover(
     policy = policy or FailoverPolicy()
     attempts: list[dict[str, Any]] = []
     if not chain:
-        return {
+        return _validated_receipt({
             "schema_version": FAILOVER_SCHEMA_VERSION,
             "status": "FAILOVER_NO_PROVIDERS",
             "attempts": attempts,
             "interruption": False,
-        }
+        })
 
     last_status = ""
     last_detail = ""
@@ -94,19 +99,19 @@ def run_with_failover(
                     continue
                 if exc.status in NEXT_PROVIDER_STATUSES:
                     break
-                return {
+                return _validated_receipt({
                     "schema_version": FAILOVER_SCHEMA_VERSION,
                     "status": "FAILOVER_HARD_FAILURE",
                     "error_status": exc.status,
                     "detail": exc.detail,
                     "attempts": attempts,
                     "interruption": False,
-                }
+                })
 
             attempts.append(
                 _record(len(attempts) + 1, provider, model, "OK", "", started_at, started, monotonic)
             )
-            return {
+            return _validated_receipt({
                 "schema_version": FAILOVER_SCHEMA_VERSION,
                 "status": "FAILOVER_OK",
                 "provider": provider,
@@ -114,17 +119,17 @@ def run_with_failover(
                 "result": result,
                 "attempts": attempts,
                 "failed_over": len({attempt["provider"] for attempt in attempts}) > 1,
-            }
+            })
 
     failed = [attempt["status"] for attempt in attempts]
-    return {
+    return _validated_receipt({
         "schema_version": FAILOVER_SCHEMA_VERSION,
         "status": "FAILOVER_EXHAUSTED",
         "error_status": last_status,
         "detail": last_detail,
         "attempts": attempts,
         "interruption": bool(failed) and all(status in PROVIDER_INTERRUPTION_STATUSES for status in failed),
-    }
+    })
 
 
 def _record(
