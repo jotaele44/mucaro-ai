@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
-import jsonschema
 import pytest
 
+from backend.app.contracts import ContractViolation, list_contracts, validate_contract
 from backend.app.model_failover import FailoverPolicy, run_with_failover
 from backend.app.model_router import ModelProviderError
 from backend.app.model_routing_policy import plan_model_route
@@ -191,9 +188,28 @@ def test_local_route_never_falls_back_to_mock_without_explicit_opt_in(monkeypatc
         {"primary": [HARD], "secondary": []},
     ],
 )
-def test_failover_receipts_validate_against_published_schema(script) -> None:
-    schema = json.loads(
-        (Path(__file__).resolve().parents[2] / "schemas" / "model_failover.schema.json").read_text()
-    )
+def test_failover_receipts_validate_as_complete_canonical_contracts(script) -> None:
     out, _, _ = run(script)
-    jsonschema.validate({key: value for key, value in out.items() if key != "result"}, schema)
+    assert validate_contract("model_failover", out) is out
+
+
+def test_model_failover_is_registered_in_model_routing_contract_family() -> None:
+    contracts = list_contracts()
+    routing = next(row for row in contracts["families"] if row["family"] == "MODEL_ROUTING")
+    kinds = {row["kind"] for row in routing["record_kinds"]}
+    assert "model_failover" in kinds
+    assert next(row for row in routing["record_kinds"] if row["kind"] == "model_failover")["schema_present"] is True
+
+
+def test_failover_contract_rejects_success_without_provider_identity() -> None:
+    with pytest.raises(ContractViolation):
+        validate_contract(
+            "model_failover",
+            {
+                "schema_version": "mucaro-model-failover/1.0",
+                "status": "FAILOVER_OK",
+                "attempts": [],
+                "failed_over": False,
+                "result": {},
+            },
+        )
