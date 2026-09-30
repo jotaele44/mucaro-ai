@@ -40,7 +40,7 @@ Residue:
 - externally blocked (1): `TGT-027`
 - provisional (26): 26 requirements (see `mucaro release scope status`)
 - open (49): 49 requirements (see `mucaro release scope status`)
-- active blockers: `BLK-LLM-001`, `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-SPEC-001`, `BLK-WEB-001`
+- active blockers: `BLK-ACTIONS-001`, `BLK-LLM-001`, `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-SPEC-001`, `BLK-WEB-001`
 - unresolved material contradictions: none
 - open specification bindings: Mucaro AI Release-Grade Workbench Specification
 <!-- END GENERATED: release-scope-status -->
