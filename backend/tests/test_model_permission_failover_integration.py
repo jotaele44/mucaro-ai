@@ -7,7 +7,7 @@ import pytest
 
 from backend.app.config import Settings
 from backend.app.model_failover import FailoverPolicy, run_with_failover
-from backend.app.model_router import ModelProviderError, generate_answer
+from backend.app.model_router import generate_answer
 from backend.app.services import answer_question
 
 
