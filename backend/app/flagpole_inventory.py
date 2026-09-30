@@ -52,9 +52,10 @@ def generate(repo: Path, ref: str = "HEAD") -> dict[str, Any]:
     repo = repo.resolve()
     if ref != "HEAD" and not SHA_RE.match(ref):
         raise ValueError(f"ref must be HEAD or a full lowercase commit SHA: {ref!r}")
-    source_sha = _git(repo, "rev-parse", ref)
-    tree_sha = _git(repo, "rev-parse", f"{ref}^{{tree}}")
-    raw = _git(repo, "ls-tree", "-r", "-l", "--full-tree", ref)
+    # Resolve once, to a commit: a tree or blob SHA is not a source commit, and HEAD must not move between calls.
+    source_sha = _git(repo, "rev-parse", "--verify", f"{ref}^{{commit}}")
+    tree_sha = _git(repo, "rev-parse", f"{source_sha}^{{tree}}")
+    raw = _git(repo, "ls-tree", "-r", "-l", "--full-tree", source_sha)
     files: list[dict[str, Any]] = []
     for line in raw.splitlines():
         meta, path = line.split("\t", 1)

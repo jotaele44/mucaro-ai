@@ -161,6 +161,16 @@ def test_receipt_rejects_unknown_and_malformed_sha(tiny_repo: Path) -> None:
     assert "RECEIPT_SHA_INVALID" in verify_receipt(tiny_repo, malformed)
 
 
+def test_receipt_source_must_be_a_commit(tiny_repo: Path) -> None:
+    receipt = generate(tiny_repo)
+    tree = receipt["tree_sha"]
+    with pytest.raises(subprocess.CalledProcessError):
+        generate(tiny_repo, ref=tree)
+    forged = {**receipt, "source_sha": tree}
+    forged["inventory_sha256"] = hashlib.sha256(_canonical_payload(forged)).hexdigest()
+    assert "RECEIPT_SHA_UNKNOWN" in verify_receipt(tiny_repo, forged)
+
+
 def test_dirty_paths_reports_modified_and_untracked(tiny_repo: Path) -> None:
     assert dirty_paths(tiny_repo) == []
     (tiny_repo / "a.py").write_text("changed\n")
