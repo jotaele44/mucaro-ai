@@ -7,10 +7,12 @@ import pytest
 
 from backend.app.capability_policy import KNOWN_CAPABILITIES, CapabilityPolicy
 from backend.app.config import Settings
+from backend.app.contracts import ContractViolation, list_contracts
 from backend.app.permission_engine import (
     ALLOW,
     ASK,
     DENY,
+    PermissionDecision,
     PermissionEngineError,
     PermissionRequest,
     evaluate,
@@ -192,3 +194,25 @@ def test_git_capabilities_inherit_subprocess_denial_on_app_store(cfg: Settings, 
     decision = evaluate(_req(capability, origin="operator"), cfg=replace(cfg, distribution_channel="mac_app_store"))
     assert decision.decision == DENY
     assert "Mac App Store" in decision.reasons[0]
+
+
+
+def test_permission_decision_is_registered_in_canonical_permission_contract_family() -> None:
+    contracts = list_contracts()
+    permission = next(row for row in contracts["families"] if row["family"] == "PERMISSION")
+    kinds = {row["kind"] for row in permission["record_kinds"]}
+    assert "permission_decision" in kinds
+    assert next(row for row in permission["record_kinds"] if row["kind"] == "permission_decision")["schema_present"] is True
+
+
+def test_permission_decision_serialization_fails_closed_on_contract_drift() -> None:
+    malformed = PermissionDecision(
+        decision="BROKEN",
+        capability="model.invoke",
+        subject="test",
+        target=None,
+        origin="operator",
+        reasons=(),
+    )
+    with pytest.raises(ContractViolation):
+        malformed.as_dict()
