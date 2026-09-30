@@ -53,7 +53,7 @@ OPTIONAL_GENERATED_OUTPUTS = [
 DISTRIBUTION_MANIFEST_SCHEMA_VERSION = "mucaro_distribution_manifest_v1"
 DISTRIBUTION_MANIFEST_DIR = Path("data") / "exports" / "distribution_manifests"
 MACOS_APP_BUNDLE_SCHEMA_VERSION = "mucaro_macos_app_bundle_v1"
-MACOS_APP_BUNDLE_NAME = "Mucaro AI.app"
+MACOS_APP_BUNDLE_NAME = "Mucaro AI Setup.app"
 MACOS_APP_BUNDLE_DIR = Path("data") / "exports" / "desktop_apps"
 REQUIRED_DISTRIBUTION_RECEIPTS = [
     ("local_release", "CERTIFY_RELEASE_OK"),
@@ -263,9 +263,9 @@ exec /bin/bash scripts/native_start.sh "${{REPO_ROOT}}" "$@"
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>Mucaro AI</string>
+  <string>Mucaro AI Setup</string>
   <key>CFBundleDisplayName</key>
-  <string>Mucaro AI</string>
+  <string>Mucaro AI Setup</string>
   <key>CFBundleExecutable</key>
   <string>mucaro-ai</string>
   <key>CFBundleIdentifier</key>
@@ -337,6 +337,7 @@ def verify_macos_app_bundle(app_path: Path, *, root: Path = ROOT) -> dict[str, A
     receipt_path = contents / "Resources" / "mucaro-app-receipt.json"
     checks: list[dict[str, str]] = [
         _check("app_bundle_exists", "PASS" if app_path.exists() and app_path.is_dir() else "FAIL", str(app_path)),
+        _check("bundle_name", "PASS" if app_path.name == MACOS_APP_BUNDLE_NAME else "FAIL", app_path.name),
         _check("bundle_extension", "PASS" if app_path.name.endswith(".app") else "FAIL", app_path.name),
         _check("contents_dir", "PASS" if contents.exists() and contents.is_dir() else "FAIL", str(contents)),
         _check("info_plist", "PASS" if plist_path.exists() else "FAIL", str(plist_path)),
@@ -356,6 +357,8 @@ def verify_macos_app_bundle(app_path: Path, *, root: Path = ROOT) -> dict[str, A
     if plist_path.exists():
         plist_text = plist_path.read_text(encoding="utf-8", errors="replace")
         checks.append(_check("plist_executable_binding", "PASS" if "<string>mucaro-ai</string>" in plist_text else "FAIL", "CFBundleExecutable=mucaro-ai"))
+        checks.append(_check("plist_source_bundle_id", "PASS" if "<string>ai.mucaro.source-launcher</string>" in plist_text else "FAIL", "CFBundleIdentifier=ai.mucaro.source-launcher"))
+        checks.append(_check("plist_source_display_name", "PASS" if "<string>Mucaro AI Setup</string>" in plist_text else "FAIL", "CFBundleDisplayName=Mucaro AI Setup"))
         checks.append(_check("plist_package_type", "PASS" if "<string>APPL</string>" in plist_text else "FAIL", "CFBundlePackageType=APPL"))
 
     if executable_path.exists():
