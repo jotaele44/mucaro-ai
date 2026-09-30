@@ -21,6 +21,30 @@ machine-readable files are authoritative; this page does not record states.
 Schemas live in `schemas/release_*.schema.json`; the validator is
 `backend/app/release_scope.py`.
 
+## Final-commit governance receipt
+
+The tracked `current_state_snapshot_v1.json` captures the 2026-09-24
+environment and is historical. A file committed inside the repository cannot
+bind its own final commit SHA. Capture the final release state after the final
+merge in a separate receipt:
+
+```bash
+python scripts/capture_final_governance.py \
+  --expected-head "$(git rev-parse HEAD)" \
+  --output "/tmp/mucaro-final-governance/receipt.json"
+```
+
+`.github/workflows/final-governance.yml` performs the same capture for an
+explicit full SHA only when it is also the current `origin/main`. The receipt
+records the exact head, ledger SHA-256, all six state counts and arithmetic,
+host state and credential *presence* only. It fails on dirty worktrees,
+invalid scope and denominator mismatch. A later commit requires a new receipt.
+The current ledger has 138 rows: 55 PASS, 49 OPEN, 26 PROVISIONAL,
+7 BLOCKED, and 1 NOT_APPLICABLE, computed from the ledger at main
+`6f89848afc627097b171ed981afc0af8bdff40fd`; this is a bounded
+observation, not the future final-release denominator. Hosted execution is
+BLOCKED while BLK-ACTIONS-001 prevents runner admission.
+
 ## Commands
 
 ```bash
