@@ -120,6 +120,7 @@ def answer_question(
             conversation_context=conversation_context or [],
             memory_context=selected_memory_context,
             on_text_delta=on_text_delta,
+            cfg=cfg,
         )
     except ModelProviderError as exc:
         return {
