@@ -339,6 +339,7 @@ def verify_macos_app_bundle(app_path: Path, *, root: Path = ROOT) -> dict[str, A
         _check("app_bundle_exists", "PASS" if app_path.exists() and app_path.is_dir() else "FAIL", str(app_path)),
         _check("bundle_name", "PASS" if app_path.name == MACOS_APP_BUNDLE_NAME else "FAIL", app_path.name),
         _check("bundle_extension", "PASS" if app_path.name.endswith(".app") else "FAIL", app_path.name),
+        _check("bundle_name", "PASS" if app_path.name == MACOS_APP_BUNDLE_NAME else "FAIL", app_path.name),
         _check("contents_dir", "PASS" if contents.exists() and contents.is_dir() else "FAIL", str(contents)),
         _check("info_plist", "PASS" if plist_path.exists() else "FAIL", str(plist_path)),
         _check("launcher_executable", "PASS" if executable_path.exists() and os.access(executable_path, os.X_OK) else "FAIL", str(executable_path)),
