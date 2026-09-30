@@ -1330,3 +1330,43 @@ html {
 @media (prefers-reduced-motion: reduce) {
   .app .sidebar { transition: none; }
 }
+
+
+/* iPhone landscape can exceed a width-only phone breakpoint. Keep its
+   navigation as an overlay rather than consuming the reading workspace. */
+@media (max-height: 550px) and (pointer: coarse) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .app.context-open .sidebar,
+  .app.context-closed .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(360px, 96vw);
+    max-width: 96vw;
+    z-index: 40;
+    transform: translateX(-102%);
+    transition: transform 0.2s ease;
+  }
+  .app.nav-open .sidebar { transform: none; box-shadow: var(--shadow); }
+  .app.context-closed .context-sidebar { display: flex; }
+  .app.nav-open .nav-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgba(0, 0, 0, 0.35);
+  }
+  .mobile-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .primary-rail { gap: 2px; padding: 4px 6px; }
+  .rail-pages { gap: 1px; }
+  .rail-button, .rail-brand { width: 44px; height: 44px; min-height: 44px; }
+}
+@media (max-width: 900px), (pointer: coarse) {
+  .close-tab { width: 44px; min-height: 44px; }
+}
