@@ -1,8 +1,8 @@
 """Ratchet: user/model-reachable process/network primitives must go through permission_engine.
 
 EXEMPT is intentionally narrow and audited. Release/certification tooling and loopback desktop
-plumbing are outside model/skill execution; the live model provider remains an explicit tracked
-residue until model.invoke is permission-gated.
+plumbing are outside model/skill execution. Real model-provider transport is permission-gated
+through the same facade as process and public-network capabilities.
 """
 from __future__ import annotations
 
@@ -36,7 +36,6 @@ EXEMPT = {
     "gis_eval.py": "certification harness spawning the project's own CLI",
     "macos_app_store.py": "release tooling",
     "macos_distribution.py": "release tooling",
-    "model_router.py": "model provider transport; explicit strict-xfail tracks missing model.invoke permission gate",
     "packaging.py": "release tooling",
     "portable_runtime.py": "release tooling",
     "portable_runtime_source.py": "release/runtime acquisition tooling",
@@ -81,6 +80,7 @@ def test_user_reachable_migrated_call_sites_are_gated() -> None:
         "coding_workspace.py",
         "container_runtime.py",
         "local_worker.py",
+        "model_router.py",
         "ocr_analysis.py",
         "ocr_pdf.py",
         "web_browsing.py",
@@ -242,7 +242,7 @@ def test_cli_gh_runner_requires_network_capability_and_is_denied_on_unsupported_
     assert (ok, detail.startswith("ERROR_PERMISSION_DENIED")) == (False, True)
 
 
-@pytest.mark.xfail(strict=True, reason="model.invoke permission gate remains a separate unresolved integration")
-def test_live_model_call_is_gated_by_model_invoke_permission() -> None:
+def test_model_provider_transport_is_gated_by_model_invoke_permission() -> None:
     text = (APP_DIR / "model_router.py").read_text(encoding="utf-8")
     assert FACADE_IMPORT.search(text)
+    assert 'capability="model.invoke"' in text
