@@ -245,3 +245,29 @@ def test_permission_decision_serialization_fails_closed_on_contract_drift() -> N
     )
     with pytest.raises(ContractViolation):
         malformed.as_dict()
+
+
+def test_non_denial_decision_cannot_use_unknown_origin() -> None:
+    malformed = PermissionDecision(
+        decision=ALLOW,
+        capability="model.invoke",
+        subject="test",
+        target=None,
+        origin="root",
+        reasons=(),
+    )
+    with pytest.raises(ContractViolation):
+        malformed.as_dict()
+
+
+def test_non_denial_decision_requires_nonempty_identity_fields() -> None:
+    malformed = PermissionDecision(
+        decision=ALLOW,
+        capability="",
+        subject="",
+        target=None,
+        origin="operator",
+        reasons=(),
+    )
+    with pytest.raises(ContractViolation):
+        malformed.as_dict()
