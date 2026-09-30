@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/model_route_decision.schema.json",
+  "title": "Mucaro Model Route Decision 1.0",
+  "description": "MODEL ROUTING contract: an inspectable, hashed routing decision whose invariants must all hold.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "status", "task_type", "constraints", "selected_provider", "selection_reason", "candidates", "invariants", "route_sha256"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^mucaro-model-routing/"},
+    "status": {"enum": ["MODEL_ROUTE_READY", "MODEL_ROUTE_BLOCKED"]},
+    "task_type": {"type": "string", "minLength": 1},
+    "constraints": {"type": "object"},
+    "selected_provider": {"type": ["string", "null"]},
+    "selected_model": {"type": ["string", "null"]},
+    "selection_reason": {"type": ["string", "null"]},
+    "candidates": {
+      "type": "array",
+      "items": {"type": "object", "required": ["provider", "eligible", "reasons"], "properties": {"eligible": {"type": "boolean"}, "reasons": {"type": "array", "items": {"type": "string"}}}}
+    },
+    "invariants": {"type": "object", "additionalProperties": {"const": true}},
+    "route_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

@@ -79,6 +79,7 @@ from .gis_eval import (
 from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
 from .ingestion import (
+    IngestLimitError,
     delete_source,
     get_index_status,
     get_sources,
@@ -87,7 +88,10 @@ from .ingestion import (
     ingest_web_snapshot,
     reindex_sources,
 )
+from .contracts import contract_errors, list_contracts
+from .offline import build_offline_manifest
 from .macos_app_store import build_macos_app_store_readiness
+from .parser import ParseError
 from .memory import (
     MemoryError,
     delete_memory_item,
@@ -112,6 +116,11 @@ from .portable_runtime import (
     build_portable_macos_app,
     verify_portable_macos_app,
 )
+from .portable_runtime_source import (
+    PortableRuntimeSourceError,
+    materialize_portable_runtime,
+    verify_materialized_runtime,
+)
 from .portable_install import (
     PortableInstallError,
     install_portable_macos_app,
@@ -126,6 +135,14 @@ from .permissions import (
 )
 from .product_audit import build_product_audit, build_product_roadmap
 from .release_receipts import find_release_receipt, list_release_receipts, load_release_receipt, summarize_release_receipts
+from .release_scope import (
+    capture_state_snapshot,
+    compute_release_status,
+    freeze_release_scope,
+    validate_release_scope,
+    write_state_snapshot,
+    write_status_doc,
+)
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .retrieval_eval import DEFAULT_FIXTURE, build_retrieval_eval_report, format_retrieval_eval_text
 from .retrieval_quality_certification import (
@@ -146,12 +163,14 @@ from .services import answer_question
 from .tools import (
     ToolRuntimeError,
     approve_tool_call,
+    cancel_tool_call,
     deny_tool_call,
     list_tool_audit_events,
     list_tool_calls,
     list_tools,
     request_tool_call,
     run_tool_call,
+    verify_tool_audit_chain,
 )
 from .validation import validate_project_json
 
@@ -968,12 +987,14 @@ def build_parser() -> argparse.ArgumentParser:
     tools_approve = tools_subcommands.add_parser("approve", help="Approve one pending tool-call request.")
     tools_approve.add_argument("tool_call_id", help="Tool call identifier.")
     tools_approve.add_argument("--reason", help="Optional approval reason.")
+    tools_approve.add_argument("--arguments-sha256", help="Bind the approval to this argument digest (refuses stale views).")
     tools_approve.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tools_approve.set_defaults(handler=run_tools_approve)
 
     tools_deny = tools_subcommands.add_parser("deny", help="Deny one pending tool-call request.")
     tools_deny.add_argument("tool_call_id", help="Tool call identifier.")
     tools_deny.add_argument("--reason", help="Optional denial reason.")
+    tools_deny.add_argument("--arguments-sha256", help="Bind the denial to this argument digest (refuses stale views).")
     tools_deny.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tools_deny.set_defaults(handler=run_tools_deny)
 
@@ -981,6 +1002,34 @@ def build_parser() -> argparse.ArgumentParser:
     tools_run.add_argument("tool_call_id", help="Tool call identifier.")
     tools_run.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tools_run.set_defaults(handler=run_tools_run)
+
+    tools_cancel = tools_subcommands.add_parser("cancel", help="Cancel a pending or approved tool call that has not started.")
+    tools_cancel.add_argument("tool_call_id", help="Tool call identifier.")
+    tools_cancel.add_argument("--reason", help="Optional cancellation reason.")
+    tools_cancel.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tools_cancel.set_defaults(handler=run_tools_cancel)
+
+    tools_verify = tools_subcommands.add_parser("verify-audit", help="Verify the tool audit hash chain.")
+    tools_verify.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tools_verify.set_defaults(handler=run_tools_verify_audit)
+
+    offline = subcommands.add_parser("offline", help="Report which capabilities work without a network.")
+    offline_subcommands = offline.add_subparsers(dest="offline_command", required=True)
+    offline_manifest = offline_subcommands.add_parser("manifest", help="Classify capabilities for offline use.")
+    offline_manifest.add_argument("--assume-offline", action="store_true", help="Report states as if the network were unavailable.")
+    offline_manifest.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    offline_manifest.set_defaults(handler=run_offline_manifest)
+
+    contracts = subcommands.add_parser("contracts", help="Inspect and validate the common governed contracts.")
+    contracts_subcommands = contracts.add_subparsers(dest="contracts_command", required=True)
+    contracts_list = contracts_subcommands.add_parser("list", help="List contract families and their schemas.")
+    contracts_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    contracts_list.set_defaults(handler=run_contracts_list)
+    contracts_validate = contracts_subcommands.add_parser("validate", help="Validate a JSON record against a contract kind.")
+    contracts_validate.add_argument("kind", help="Record kind, e.g. citation_record or tool_call.")
+    contracts_validate.add_argument("path", help="JSON file holding one record.")
+    contracts_validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    contracts_validate.set_defaults(handler=run_contracts_validate)
 
     tools_audit = tools_subcommands.add_parser("audit", help="List tool runtime audit events.")
     tools_audit.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
@@ -1108,11 +1157,43 @@ def build_parser() -> argparse.ArgumentParser:
     )
     package_app_store_audit.set_defaults(handler=run_package_app_store_audit)
 
+    package_portable_runtime = package_subcommands.add_parser(
+        "portable-runtime",
+        help="Materialize or verify a hash-locked relocatable macOS Python runtime.",
+    )
+    package_portable_runtime.add_argument(
+        "--manifest",
+        type=Path,
+        help="Runtime source manifest; defaults to the governed x86_64 macOS manifest.",
+    )
+    package_portable_runtime.add_argument(
+        "--archive",
+        type=Path,
+        help="Optional predownloaded archive; its exact size and SHA-256 must match the source manifest.",
+    )
+    package_portable_runtime.add_argument(
+        "--output-dir",
+        type=Path,
+        help="New runtime directory; defaults under data/exports/portable_runtimes.",
+    )
+    package_portable_runtime.add_argument(
+        "--verify",
+        type=Path,
+        help="Verify an existing materialized runtime instead of creating one.",
+    )
+    package_portable_runtime.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    package_portable_runtime.set_defaults(handler=run_package_portable_runtime)
+
     package_portable_app = package_subcommands.add_parser(
         "portable-macos-app",
         help="Build or verify a macOS app containing a relocatable embedded runtime payload.",
     )
     package_portable_app.add_argument("--runtime-dir", type=Path, help="Prevalidated relocatable runtime tree to embed.")
+    package_portable_app.add_argument(
+        "--runtime-manifest",
+        type=Path,
+        help="Runtime source manifest; defaults to the governed x86_64 macOS manifest.",
+    )
     package_portable_app.add_argument("--runtime-python", default="bin/python3", help="Runtime-relative Python executable path.")
     package_portable_app.add_argument("--output-dir", type=Path, default=None, help="Directory where the portable app should be built.")
     package_portable_app.add_argument("--verify", type=Path, help="Verify an existing portable .app bundle instead of building one.")
@@ -1381,6 +1462,40 @@ def build_parser() -> argparse.ArgumentParser:
     release_receipt.add_argument("receipt_id", help="Receipt file stem or JSON filename under data/exports/release_receipts.")
     release_receipt.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     release_receipt.set_defaults(handler=run_release_receipt_show)
+
+    release_scope = release_subcommands.add_parser(
+        "scope", help="Validate the release scope manifest, ledgers and certification verdict."
+    )
+    release_scope_subcommands = release_scope.add_subparsers(dest="release_scope_command", required=True)
+    release_scope_validate = release_scope_subcommands.add_parser(
+        "validate", help="Validate manifest, acceptance ledger, DAG, blockers, contradictions and scope deltas."
+    )
+    release_scope_validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_scope_validate.set_defaults(handler=run_release_scope_validate)
+    release_scope_status = release_scope_subcommands.add_parser(
+        "status", help="Compute the release verdict under the terminal certification rule."
+    )
+    release_scope_status.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_scope_status.add_argument(
+        "--write-doc", action="store_true", help="Regenerate the computed status block in docs/RELEASE_STATUS.md."
+    )
+    release_scope_status.set_defaults(handler=run_release_scope_status)
+    release_scope_snapshot = release_scope_subcommands.add_parser(
+        "snapshot", help="Capture a current-state snapshot (credential presence only, never values)."
+    )
+    release_scope_snapshot.add_argument("--output", help="Write to this path instead of the committed snapshot path.")
+    release_scope_snapshot.add_argument("--pytest-summary", help="Recorded backend test result line, e.g. '663 passed'.")
+    release_scope_snapshot.add_argument("--frontend-build", choices=["pass", "fail", "not_run"], default="not_run")
+    release_scope_snapshot.add_argument("--connected-resource", action="append", default=[], help="Connected resource name.")
+    release_scope_snapshot.add_argument("--boundary", action="append", default=[], help="Known architectural boundary.")
+    release_scope_snapshot.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_scope_snapshot.set_defaults(handler=run_release_scope_snapshot)
+    release_scope_freeze = release_scope_subcommands.add_parser(
+        "freeze", help="Write an immutable ledger checkpoint used to detect silent scope loss."
+    )
+    release_scope_freeze.add_argument("label", help="Checkpoint label, e.g. 20260924T210000Z-baseline.")
+    release_scope_freeze.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    release_scope_freeze.set_defaults(handler=run_release_scope_freeze)
 
     permissions = subcommands.add_parser("permissions", help="Manage user-directory access grants.")
     permissions_subcommands = permissions.add_subparsers(dest="permission_command", required=True)
@@ -2661,6 +2776,15 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         print(payload["answer"])
     elif "files_ingested" in payload:
         print(f"files_ingested={payload['files_ingested']}")
+        if "entries_seen" in payload:
+            print(
+                f"entries_seen={payload['entries_seen']} skipped={len(payload.get('skipped', []))} "
+                f"failed={len(payload.get('failed', []))}"
+            )
+        for row in payload.get("skipped", []):
+            print(f"SKIPPED {row.get('name')} {row.get('reason')}")
+        for row in payload.get("failed", []):
+            print(f"FAILED {row.get('name')} {row.get('status')}")
     elif "source" in payload:
         source = payload["source"]
         print(f"source_id={source.get('source_id')} chunks_added={payload.get('chunks_added', 0)}")
@@ -3527,6 +3651,26 @@ def run_package_app_store_audit(args: argparse.Namespace, cfg: Settings) -> int:
     return 0
 
 
+def run_package_portable_runtime(args: argparse.Namespace, cfg: Settings) -> int:
+    manifest = args.manifest or (cfg.project_root / "packaging" / "runtime" / "macos-x86_64.json")
+    try:
+        if args.verify is not None:
+            report = verify_materialized_runtime(cfg.project_root, args.verify, manifest)
+        else:
+            output_dir = args.output_dir or (cfg.export_dir / "portable_runtimes" / "macos-x86_64")
+            report = materialize_portable_runtime(
+                cfg.project_root,
+                manifest,
+                output_dir,
+                archive_path=args.archive,
+            )
+    except PortableRuntimeSourceError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(report, args.format)
+    return 0 if report["status"] == "PORTABLE_RUNTIME_VERIFIED" else 2
+
+
 def run_package_portable_macos_app(args: argparse.Namespace, cfg: Settings) -> int:
     try:
         if args.verify is not None:
@@ -3536,13 +3680,35 @@ def run_package_portable_macos_app(args: argparse.Namespace, cfg: Settings) -> i
                 emit_error("ERROR_PORTABLE_RUNTIME_REQUIRED", "--runtime-dir is required when building.", args.format)
                 return 2
             output_dir = args.output_dir or (cfg.export_dir / "portable_apps")
+            runtime_manifest = args.runtime_manifest or (
+                cfg.project_root / "packaging" / "runtime" / "macos-x86_64.json"
+            )
+            runtime_provenance = verify_materialized_runtime(
+                cfg.project_root,
+                args.runtime_dir,
+                runtime_manifest,
+            )
+            if runtime_provenance["status"] != "PORTABLE_RUNTIME_VERIFIED":
+                emit_error(
+                    "ERROR_PORTABLE_RUNTIME_VERIFY",
+                    ",".join(runtime_provenance["failed_checks"]),
+                    args.format,
+                )
+                return 2
             report = build_portable_macos_app(
                 cfg.project_root,
                 args.runtime_dir,
                 output_dir=output_dir,
                 runtime_python=args.runtime_python,
+                runtime_provenance={
+                    "dependency_lock_sha256": runtime_provenance["dependency_lock_sha256"],
+                    "receipt_sha256": runtime_provenance["receipt_sha256"],
+                    "runtime_tree": runtime_provenance["runtime_tree"],
+                    "source_manifest_sha256": runtime_provenance["source_manifest_sha256"],
+                    "status": runtime_provenance["status"],
+                },
             )
-    except PortableRuntimeError as exc:
+    except (PortableRuntimeError, PortableRuntimeSourceError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(report, args.format)
@@ -6303,6 +6469,68 @@ def run_release_receipts(args: argparse.Namespace, cfg: Settings) -> int:
     return 0
 
 
+def _emit_release_scope_text(payload: dict[str, Any]) -> None:
+    print(payload.get("status"))
+    if payload.get("release_status_line"):
+        print(payload["release_status_line"])
+    denominator = payload.get("denominator") or {}
+    if denominator:
+        states = denominator.get("by_state", {})
+        print(f"denominator={denominator.get('total')} " + " ".join(f"{key}={value}" for key, value in states.items()))
+        print(f"arithmetic_closes={denominator.get('arithmetic_closes')}")
+    for name, value in (payload.get("conditions") or {}).items():
+        print(f"condition {name}={value}")
+    for name, ids in (payload.get("residue") or {}).items():
+        print(f"residue {name}={len(ids)} {','.join(ids)}")
+    for error in payload.get("errors", []):
+        print(f"{error['code']} {error['detail']}")
+
+
+def run_release_scope_validate(args: argparse.Namespace, cfg: Settings) -> int:
+    payload = validate_release_scope(cfg.project_root)
+    if args.format == "json":
+        emit_payload(payload, "json")
+    else:
+        _emit_release_scope_text(payload)
+    return 0 if payload["status"] == "RELEASE_SCOPE_VALID" else 1
+
+
+def run_release_scope_status(args: argparse.Namespace, cfg: Settings) -> int:
+    payload = compute_release_status(cfg.project_root)
+    if getattr(args, "write_doc", False) and payload["status"] != "MUCARO_AI_RELEASE_SCOPE_INVALID":
+        payload["status_doc"] = str(write_status_doc(cfg.project_root, payload))
+    if args.format == "json":
+        emit_payload(payload, "json")
+    else:
+        _emit_release_scope_text({**payload, "errors": payload["validation"].get("errors", [])})
+    return 0 if payload["status"] != "MUCARO_AI_RELEASE_SCOPE_INVALID" else 1
+
+
+def run_release_scope_snapshot(args: argparse.Namespace, cfg: Settings) -> int:
+    tests = {"recorded": bool(args.pytest_summary), "backend_pytest": args.pytest_summary}
+    build = {
+        "frontend_build": args.frontend_build,
+        "frontend_dist_present": (cfg.project_root / "frontend" / "dist" / "index.html").is_file(),
+    }
+    snapshot = capture_state_snapshot(
+        cfg.project_root,
+        tests=tests,
+        build=build,
+        connected_resources=args.connected_resource,
+        known_boundaries=args.boundary,
+    )
+    path = write_state_snapshot(cfg.project_root, snapshot, Path(args.output) if args.output else None)
+    payload = {"status": "RELEASE_STATE_SNAPSHOT_OK", "path": str(path), "snapshot": snapshot}
+    emit_payload(payload if args.format == "json" else {"status": payload["status"]}, args.format)
+    return 0
+
+
+def run_release_scope_freeze(args: argparse.Namespace, cfg: Settings) -> int:
+    index = freeze_release_scope(cfg.project_root, args.label)
+    emit_payload({"status": "RELEASE_SCOPE_FROZEN", **index}, args.format)
+    return 0
+
+
 def run_release_receipt_show(args: argparse.Namespace, cfg: Settings) -> int:
     payload = find_release_receipt(cfg.project_root, args.receipt_id)
     if payload is None:
@@ -6850,6 +7078,45 @@ def _run_summary(latest: dict[str, Any] | None, jobs_count: int | None = None) -
     }
 
 
+def _git_branch_for_head(cfg: Settings, head_sha: str | None) -> tuple[bool, str]:
+    branch_ok, branch = _git_output(cfg, ["branch", "--show-current"])
+    if branch_ok and branch:
+        return True, branch
+    if not head_sha:
+        return False, ""
+
+    remote_ok, remote_ref = _git_output(cfg, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+    if not remote_ok or not remote_ref.startswith("origin/"):
+        return False, ""
+    remote_head_ok, remote_head = _git_output(cfg, ["rev-parse", remote_ref])
+    if not remote_head_ok or remote_head != head_sha:
+        return False, ""
+    return True, remote_ref.removeprefix("origin/")
+
+
+def _git_upstream_for_head(
+    cfg: Settings,
+    head_sha: str | None,
+    branch: str | None,
+) -> tuple[bool, str]:
+    upstream_ok, upstream = _git_output(
+        cfg,
+        ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+    )
+    if upstream_ok and upstream:
+        return True, upstream
+    if not head_sha or not branch:
+        return False, ""
+
+    remote_ok, remote_ref = _git_output(cfg, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+    if not remote_ok or remote_ref != f"origin/{branch}":
+        return False, ""
+    remote_head_ok, remote_head = _git_output(cfg, ["rev-parse", remote_ref])
+    if not remote_head_ok or remote_head != head_sha:
+        return False, ""
+    return True, remote_ref
+
+
 def _run_evidence(latest: dict[str, Any]) -> str:
     parts = []
     if latest.get("databaseId"):
@@ -6882,6 +7149,41 @@ def _classify_latest_run(
     if status == "completed":
         return _certification_gate(name, "FAIL", f"{status} {conclusion or 'unknown'} {run_head}{jobs_detail}{evidence_detail}")
     return _certification_gate(name, "WARN", f"{status} {conclusion or 'pending'} {run_head}{jobs_detail}{evidence_detail}")
+
+
+def _classify_startup_probe(
+    *,
+    ci_latest: dict[str, Any] | None,
+    ci_jobs_count: int | None,
+    probe_latest: dict[str, Any] | None,
+    probe_error: str | None,
+    head_sha: str | None,
+    probe_jobs_count: int | None,
+) -> dict[str, str]:
+    exact_head_ci_passed = bool(
+        head_sha
+        and ci_latest
+        and ci_latest.get("headSha") == head_sha
+        and ci_latest.get("status") == "completed"
+        and ci_latest.get("conclusion") == "success"
+        and isinstance(ci_jobs_count, int)
+        and ci_jobs_count > 0
+    )
+    if exact_head_ci_passed:
+        probe_evidence = _run_evidence(probe_latest) if probe_latest else ""
+        suffix = f"; latest_probe {probe_evidence}" if probe_evidence else ""
+        return _certification_gate(
+            "startup_probe",
+            "PASS",
+            f"NOT_REQUIRED exact-head CI passed with jobs={ci_jobs_count}{suffix}",
+        )
+    return _classify_latest_run(
+        name="startup_probe",
+        latest=probe_latest,
+        error=probe_error,
+        head_sha=head_sha,
+        jobs_count=probe_jobs_count,
+    )
 
 
 def _github_actions_support_summary(
@@ -6946,8 +7248,8 @@ def build_github_actions_diagnostic_status(
     workflow_name: str = "CI",
     probe_workflow_name: str = "CI Startup Probe",
 ) -> dict[str, Any]:
-    branch_ok, branch = _git_output(cfg, ["branch", "--show-current"])
     head_ok, head_sha = _git_output(cfg, ["rev-parse", "HEAD"])
+    branch_ok, branch = _git_branch_for_head(cfg, head_sha if head_ok else None)
     remote_ok, remote_url = _git_output(cfg, ["remote", "get-url", "origin"])
     repo = _github_repo_from_origin(remote_url if remote_ok else None)
     checks: list[dict[str, str]] = []
@@ -7083,12 +7385,13 @@ def build_github_actions_diagnostic_status(
     if probe_jobs_error and probe_latest:
         checks.append(_certification_gate("probe_jobs_lookup", "WARN", probe_jobs_error))
     checks.append(
-        _classify_latest_run(
-            name="startup_probe",
-            latest=probe_latest,
-            error=probe_error,
+        _classify_startup_probe(
+            ci_latest=ci_latest,
+            ci_jobs_count=ci_jobs_count,
+            probe_latest=probe_latest,
+            probe_error=probe_error,
             head_sha=head_sha if head_ok else None,
-            jobs_count=probe_jobs_count,
+            probe_jobs_count=probe_jobs_count,
         )
     )
 
@@ -7238,11 +7541,15 @@ def build_certification_status(
     doctor = build_doctor_report(cfg)
     validation = validate_project_json(cfg)
 
-    branch_ok, branch = _git_output(cfg, ["branch", "--show-current"])
     head_ok, head_sha = _git_output(cfg, ["rev-parse", "HEAD"])
+    branch_ok, branch = _git_branch_for_head(cfg, head_sha if head_ok else None)
     status_ok, worktree_status = _git_output(cfg, ["status", "--short"])
     tags_ok, tags_output = _git_output(cfg, ["tag", "--points-at", "HEAD"])
-    upstream_ok, upstream = _git_output(cfg, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+    upstream_ok, upstream = _git_upstream_for_head(
+        cfg,
+        head_sha if head_ok else None,
+        branch if branch_ok else None,
+    )
     remote_ok, remote_url = _git_output(cfg, ["remote", "get-url", "origin"])
 
     tags_at_head = [line for line in tags_output.splitlines() if line.strip()] if tags_ok else []
@@ -7872,7 +8179,13 @@ def run_tools_request(args: argparse.Namespace, cfg: Settings) -> int:
 
 def run_tools_approve(args: argparse.Namespace, cfg: Settings) -> int:
     try:
-        result = approve_tool_call(args.tool_call_id, cfg=cfg, approved_by="cli", reason=args.reason)
+        result = approve_tool_call(
+            args.tool_call_id,
+            cfg=cfg,
+            approved_by="cli",
+            reason=args.reason,
+            expected_arguments_sha256=args.arguments_sha256,
+        )
     except ToolRuntimeError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
@@ -7882,7 +8195,13 @@ def run_tools_approve(args: argparse.Namespace, cfg: Settings) -> int:
 
 def run_tools_deny(args: argparse.Namespace, cfg: Settings) -> int:
     try:
-        result = deny_tool_call(args.tool_call_id, cfg=cfg, denied_by="cli", reason=args.reason)
+        result = deny_tool_call(
+            args.tool_call_id,
+            cfg=cfg,
+            denied_by="cli",
+            reason=args.reason,
+            expected_arguments_sha256=args.arguments_sha256,
+        )
     except ToolRuntimeError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
@@ -7898,6 +8217,59 @@ def run_tools_run(args: argparse.Namespace, cfg: Settings) -> int:
         return 2
     emit_payload(result, args.format)
     return 0
+
+
+def run_tools_cancel(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = cancel_tool_call(args.tool_call_id, cfg=cfg, cancelled_by="cli", reason=args.reason)
+    except ToolRuntimeError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_tools_verify_audit(args: argparse.Namespace, cfg: Settings) -> int:
+    result = verify_tool_audit_chain(cfg)
+    emit_payload(result, args.format)
+    return 0 if result["status"] == "TOOL_AUDIT_CHAIN_OK" else 1
+
+
+def run_offline_manifest(args: argparse.Namespace, cfg: Settings) -> int:
+    payload = build_offline_manifest(system_offline=args.assume_offline)
+    if args.format == "text":
+        print(payload["status"])
+        print(" ".join(f"{key}={value}" for key, value in payload["counts"].items()))
+        for row in payload["capabilities"]:
+            print(f"{row['state_now']} {row['capability']}")
+        return 0
+    emit_payload(payload, args.format)
+    return 0
+
+
+def run_contracts_list(args: argparse.Namespace, cfg: Settings) -> int:
+    payload = list_contracts(cfg.project_root if (cfg.project_root / "schemas").is_dir() else None)
+    if args.format == "text":
+        print(payload["status"])
+        for family in payload["families"]:
+            kinds = ",".join(row["kind"] for row in family["record_kinds"])
+            print(f"{family['family']} {kinds}")
+        return 0
+    emit_payload(payload, args.format)
+    return 0
+
+
+def run_contracts_validate(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        record = json.loads(Path(args.path).read_text(encoding="utf-8"))
+        errors = contract_errors(args.kind, record)
+    except KeyError as exc:
+        raise MucaroCLIError("ERROR_CONTRACT_KIND_UNKNOWN", args.kind) from exc
+    except json.JSONDecodeError as exc:
+        raise MucaroCLIError("ERROR_CONTRACT_JSON_INVALID", str(exc)) from exc
+    payload = {"status": "CONTRACT_VALID" if not errors else "ERROR_CONTRACT_VIOLATION", "kind": args.kind, "errors": errors}
+    emit_payload(payload, args.format)
+    return 0 if not errors else 1
 
 
 def run_tools_audit(args: argparse.Namespace, cfg: Settings) -> int:
@@ -8078,6 +8450,9 @@ def main(argv: Sequence[str] | None = None, cfg: Settings = settings) -> int:
         return 2
     except DirectoryPermissionError as exc:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
+        return 2
+    except (ParseError, IngestLimitError) as exc:
+        emit_error(exc.status, str(exc), getattr(args, "format", "json"))
         return 2
     except ValueError as exc:
         emit_error("ERROR_INVALID_INPUT", str(exc), getattr(args, "format", "json"))

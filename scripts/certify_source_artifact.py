@@ -186,6 +186,8 @@ def main() -> int:
                 "kept": args.keep,
                 "error_type": type(exc).__name__,
                 "error": str(exc),
+                # The failing step's own output, so a failure can be diagnosed from the receipt alone.
+                "error_output_tail": str(getattr(exc, "output", "") or "")[-4000:],
             },
         )
         print(f"SOURCE_ARTIFACT_RECEIPT {receipt.relative_to(ROOT)}")

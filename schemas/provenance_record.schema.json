@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/provenance_record.schema.json",
+  "title": "Mucaro Provenance Record 1.0",
+  "description": "PROVENANCE contract (INV-018): where a source manifestation came from and how it was processed. Byte identity is not semantic identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_kind", "source_locator", "retrieval_utc", "raw_byte_sha256", "raw_byte_count", "processing", "identity_basis", "trust"],
+  "properties": {
+    "schema_version": {"const": "mucaro-provenance/1.0"},
+    "source_kind": {"enum": ["LOCAL_FILE", "UPLOAD", "WEB_SNAPSHOT", "ARCHIVE_MEMBER", "DERIVED"]},
+    "source_locator": {"type": "string", "minLength": 1},
+    "service_or_repository": {"type": ["string", "null"]},
+    "layer_or_query": {"type": ["string", "null"]},
+    "retrieval_utc": {"type": "string", "minLength": 1},
+    "source_refresh_date": {"type": ["string", "null"]},
+    "page_or_offset": {"type": ["string", "null"]},
+    "raw_byte_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "raw_byte_count": {"type": "integer", "minimum": 0},
+    "schema_identity": {"type": ["string", "null"]},
+    "row_or_feature_count": {"type": ["integer", "null"], "minimum": 0},
+    "processing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["processor", "processor_version"],
+      "properties": {"processor": {"type": "string", "minLength": 1}, "processor_version": {"type": "string", "minLength": 1}, "parameters": {"type": "object"}}
+    },
+    "identity_basis": {"type": "array", "minItems": 1, "items": {"enum": ["BYTE_IDENTITY", "LOGICAL_IDENTITY", "SCHEMA_IDENTITY", "GEOMETRIC_IDENTITY", "SOURCE_MANIFESTATION_IDENTITY"]}},
+    "trust": {"enum": ["OPERATOR_AUTHORED", "UNTRUSTED_CONTENT"]}
+  }
+}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from .config import Settings, settings
@@ -8,6 +9,8 @@ from .db import delete_payload, init_db, list_payloads, upsert_payload
 from .utils import stable_id, utc_now
 
 DEFAULT_TITLE = "New chat"
+# Serializes read-modify-write of a conversation row within this process.
+_CONVERSATION_LOCK = threading.RLock()
 MAX_CONTEXT_TURNS = 8
 MAX_CONTEXT_CHARS = 2400
 
@@ -93,11 +96,43 @@ def build_conversation_context(conversation: dict[str, Any]) -> list[dict[str, A
     return build_model_context(state)
 
 
+def append_turns(
+    conversation_id: str,
+    turns: list[dict[str, Any]],
+    cfg: Settings = settings,
+    *,
+    title_hint: str | None = None,
+) -> dict[str, Any]:
+    """Append pre-built turns; turn IDs already present are not duplicated (idempotent replay)."""
+    with _CONVERSATION_LOCK:
+        conversation = get_conversation(conversation_id, cfg)
+        if conversation is None:
+            raise KeyError(conversation_id)
+        existing = {turn.get("turn_id") for turn in conversation.get("turns", [])}
+        new_turns = [turn for turn in turns if turn.get("turn_id") not in existing]
+        conversation["turns"] = list(conversation.get("turns", [])) + new_turns
+        if conversation.get("title") == DEFAULT_TITLE and title_hint:
+            conversation["title"] = _title_from_query(title_hint)
+        conversation["updated_at"] = utc_now()
+        upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
+        return conversation
+
+
 def append_answer_turn(
     conversation_id: str,
     query: str,
     answer_trace: dict[str, Any],
     cfg: Settings = settings,
+) -> dict[str, Any]:
+    with _CONVERSATION_LOCK:
+        return _append_answer_turn(conversation_id, query, answer_trace, cfg)
+
+
+def _append_answer_turn(
+    conversation_id: str,
+    query: str,
+    answer_trace: dict[str, Any],
+    cfg: Settings,
 ) -> dict[str, Any]:
     conversation = get_conversation(conversation_id, cfg)
     if conversation is None:

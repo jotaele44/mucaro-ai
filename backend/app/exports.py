@@ -4,11 +4,16 @@ import csv
 from typing import Any
 
 from .config import Settings, settings
+from .contracts import validate_contract
 from .utils import write_json
 
 
 def export_answer_trace(answer_trace: dict[str, Any], cfg: Settings = settings) -> dict[str, str]:
     cfg.ensure_dirs()
+    # CITATION contract: a trace and every citation record must validate before any export is written.
+    validate_contract("answer_trace", answer_trace)
+    for record in answer_trace.get("cited_chunks", []):
+        validate_contract("citation_record", record)
     run_id = answer_trace["run_id"]
     json_path = cfg.export_dir / f"{run_id}.answer_trace.json"
     md_path = cfg.export_dir / f"{run_id}.answer_trace.md"
