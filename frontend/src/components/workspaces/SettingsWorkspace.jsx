@@ -27,7 +27,7 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
       </header>
       {error && <p className="error-card" role="alert">{error.status}: {error.message}</p>}
 
-      <fieldset className="panel">
+      <fieldset id="settings-model" className="panel">
         <legend>Answer model</legend>
         {models.map((model) => (
           <label key={model.name} className="option">
@@ -51,7 +51,7 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
         </label>
       </fieldset>
 
-      <fieldset className="panel">
+      <fieldset id="settings-retrieval" className="panel">
         <legend>Retrieval</legend>
         <label className="field">
           <span>Strategy</span>
@@ -61,7 +61,7 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
         </label>
       </fieldset>
 
-      <fieldset className="panel">
+      <fieldset id="settings-access" className="panel">
         <legend>Local access token</legend>
         {api.tokenIsLaunchManaged() ? (
           <p className="muted small">The Mucaro app created a fresh token for this launch and uses it automatically. Nothing to set here.</p>
