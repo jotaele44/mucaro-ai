@@ -51,6 +51,7 @@ export function App() {
   // Refs prevent a stale async ChatView callback from overwriting newer navigation.
   const tabsRef = useRef(tabs);
   const selectedRef = useRef(activeTabKey);
+  const tasksFromMobileRef = useRef(false);
   tabsRef.current = tabs;
   selectedRef.current = activeTabKey;
 
@@ -134,6 +135,20 @@ export function App() {
   useEffect(() => {
     if (activeTab.view === "chat") persist("mucaro.activeConversation", activeTab.conversationId);
   }, [activeTab.key, activeTab.view, activeTab.conversationId]);
+
+  function showTasks() {
+    tasksFromMobileRef.current = mobileOverlay && navOpen;
+    setTasksOpen(true);
+    setNavOpen(false);
+  }
+
+  function closeTasks() {
+    setTasksOpen(false);
+    if (tasksFromMobileRef.current) {
+      tasksFromMobileRef.current = false;
+      window.requestAnimationFrame(() => document.querySelector(".mobile-bar .icon-button")?.focus());
+    }
+  }
 
   function commitNavigation(nextTabs, nextKey) {
     tabsRef.current = nextTabs;
@@ -223,7 +238,7 @@ export function App() {
         setFilter={setFilter}
         onSelect={selectWorkspace}
         onConversation={openConversation}
-        onTasks={() => { setTasksOpen(true); setNavOpen(false); }}
+        onTasks={showTasks}
         onCloseMobile={() => setNavOpen(false)}
         inactive={mobileOverlay && !navOpen}
       />
@@ -264,7 +279,7 @@ export function App() {
                     conversationId={tab.conversationId}
                     onConversationCreated={(id) => conversationTransition(tab.key, id)}
                     onConversationsChanged={loadConversations}
-                    onOpenTasks={() => setTasksOpen(true)}
+                    onOpenTasks={showTasks}
                     announce={announce}
                     modes={modes}
                     defaultOptions={options}
@@ -279,7 +294,7 @@ export function App() {
           </div>
         )}
       </main>
-      {tasksOpen && <TasksDrawer onClose={() => setTasksOpen(false)} />}
+      {tasksOpen && <TasksDrawer onClose={closeTasks} />}
       <div className="sr-only" role="status" aria-live="polite">{message}</div>
     </div>
   );
