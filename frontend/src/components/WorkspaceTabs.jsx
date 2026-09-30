@@ -33,7 +33,7 @@ export function WorkspaceTabs({ tabs, activeKey, conversations, onSelect, onClos
               document.getElementById("tab-" + tabs[next].mountId)?.focus();
             }}
           >{title(tab)}</button>
-          <button type="button" className="close-tab" aria-label={"Close " + title(tab) + " tab"} title={"Close " + title(tab) + " tab"} onClick={() => onClose(tab.key)}>×</button>
+          <button type="button" className="close-tab" aria-label={"Close " + title(tab) + " tab"} title={"Close " + title(tab) + " tab"} onClick={() => { onClose(tab.key); window.requestAnimationFrame(() => document.querySelector(".workspace-tab[aria-selected=\"true\"]")?.focus()); }}>×</button>
         </div>
       ))}
     </div>
