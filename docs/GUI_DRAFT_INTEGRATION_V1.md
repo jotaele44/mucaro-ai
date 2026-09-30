@@ -67,3 +67,11 @@ These route *names* support only a set comparison; they do not establish functio
 `scripts/test_audit_gui_draft.py` — exact GitHub blob SHA-1 after explicit original-file SKIP handling `d3b56f3b05437d305d59079bd336e66b55c58b55`.
 
 Both were verified identical to locally executed source versions. Unavailable originals in downstream CI are marked SKIPPED, not source-PASS. The complete source manifest and local audit receipts remain separately versioned files, not inferred from Git commit digests.
+
+## Frozen in-chat evidence bundle
+
+The separately generated **derived** download package `mucaro_gui_intake_evidence_20260930.zip` has SHA-256 `96c1b9def9aa36082312908e7ab70e67777b5615665cd4a2fc66bcb0e9c340c0`, 566,215 total bytes and 10 non-directory members. Its inner manifest lists each member's path, uncompressed size and hash; the manifest's own SHA-256 is `cbea2680e3795562796a2c5afb58a2731f87a00b8c42b6968d359b9eebd7d9dd`. This bundle is a newly serialized derivative and must not be mistaken for the original ZIP's byte identity. Its inclusion is for restartability; the user-provided ZIP and original JPEG are present as exact byte-preserved members. The local regression receipt records eight completed Python fixtures.
+
+## Subsequent GitHub-hosted runner observation (intermediate PR snapshot only)
+
+At PR head `e655661cf3fee2d5556cb1f91977eadbcd29ea6c`, the GitHub connector returned completed/failure jobs for rendered Chromium (`109946577336`), rendered WebKit (`109946577564`), CI validate (`109946580858`), macOS build (`109946577487`) and one-click setup Windows (`109946577580`). Every inspected job returned **zero steps**. The selected CI job's log endpoint returned 404 `BlobNotFound`. This is bounded evidence of the existing runner-admission failure **on that commit at that time**, not a frontend test result and not proof of the cause. New PR commits require a separate exact-head rerun/adjudication.
