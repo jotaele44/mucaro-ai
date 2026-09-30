@@ -1763,6 +1763,9 @@ def test_cli_package_macos_app_builds_and_verifies_bundle(tmp_path: Path, capsys
     write_package_fixture(tmp_path)
     (tmp_path / "frontend" / "dist").mkdir(parents=True)
     (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
+    (tmp_path / "scripts").mkdir(exist_ok=True)
+    for name in ("native_start.sh", "one_click.sh", "one_click.py"):
+        (tmp_path / "scripts" / name).write_text("# launcher\n", encoding="utf-8")
     output_dir = tmp_path / "desktop-apps"
 
     assert (
@@ -1788,7 +1791,7 @@ def test_cli_package_macos_app_builds_and_verifies_bundle(tmp_path: Path, capsys
     assert main(["package", "macos-app", "--verify", payload["app_path"], "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "MACOS_APP_BUNDLE_VERIFIED" in text_output
-    assert "PASS launcher_points_to_launch_app" in text_output
+    assert "PASS launcher_points_to_native_start" in text_output
 
 
 def test_cli_package_status_fails_on_version_mismatch(tmp_path: Path, capsys):
