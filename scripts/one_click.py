@@ -33,7 +33,7 @@ if str(ROOT) not in sys.path:
 
 from scripts import launch_app  # noqa: E402
 
-PYTHON_EXTRAS = "dev,anthropic"
+PYTHON_EXTRAS = "dev,anthropic,desktop" if sys.platform == "darwin" else "dev,anthropic"
 # Import names that prove the dependency install is usable (runtime, geospatial, live mode, preflight).
 KEY_MODULES = (
     "fastapi",
@@ -50,7 +50,7 @@ KEY_MODULES = (
     "anthropic",
     "httpx",
     "pytest",
-)
+) + (("webview", "AppKit", "Foundation", "WebKit") if sys.platform == "darwin" else ())
 NPM_REGISTRY = "https://registry.npmjs.org/"
 LOG_KEEP = 10
 TOTAL_STEPS = 6
@@ -171,11 +171,12 @@ def release_lock() -> None:
 
 
 def prune_logs(log_dir: Path, keep: int = LOG_KEEP) -> None:
-    for old in sorted(log_dir.glob("setup-*.log"))[:-keep]:
-        try:
-            old.unlink()
-        except OSError:
-            pass
+    for pattern in ("setup-*.log", "launch-*.log"):
+        for old in sorted(log_dir.glob(pattern))[:-keep]:
+            try:
+                old.unlink()
+            except OSError:
+                pass
 
 
 class SetupLog:
@@ -273,12 +274,12 @@ class OneClickSetup:
 
     def check_stage0(self) -> None:
         if sys.prefix == sys.base_prefix:
-            raise SetupError("ERROR_NOT_IN_VENV", "start Mucaro AI by double-clicking Mucaro AI.command (macOS) or Mucaro AI.cmd (Windows)")
+            raise SetupError("ERROR_NOT_IN_VENV", "start Mucaro AI by double-clicking Mucaro AI.app (macOS) or Mucaro AI.cmd (Windows)")
         for label, path in (("uv", self.uv), ("node", self.node), ("npm", self.npm_cli)):
             if not path.is_file():
                 raise SetupError(
                     "ERROR_STAGE0_MISSING",
-                    f"{label} not found at {path}; start Mucaro AI by double-clicking Mucaro AI.command (macOS) or Mucaro AI.cmd (Windows)",
+                    f"{label} not found at {path}; start Mucaro AI by double-clicking Mucaro AI.app (macOS) or Mucaro AI.cmd (Windows)",
                 )
 
     def python_deps(self) -> None:
