@@ -28,7 +28,7 @@ def test_governance_receipt_binds_head_and_conserves_rows(tmp_path: Path, monkey
     assert receipt["acceptance_ledger"]["rows"] == 2
     assert receipt["acceptance_ledger"]["counts"] == by_state
     assert receipt["head_sha"] == head
-    assert receipt["status"] == "GOVERNANCE_CAPTURE_VALID_RELEASE_OPEN"
+    assert receipt["status"] == "GOVERNANCE_CAPTURE_VALID"
     assert json.loads(output.read_text(encoding="utf-8")) == receipt
 
 
