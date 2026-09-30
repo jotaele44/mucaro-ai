@@ -121,7 +121,10 @@
         "unrelated CI run 36643530930 job 109661104259: failure, zero executed steps",
         "unrelated CI run 36643523897 job 109661081061: failure, zero executed steps",
         "unrelated macOS app run 36643515928 job 109661055456: failure, zero executed steps",
-        "GitHub public status on 2026-09-29 reported Actions operational and no incident; this does not identify the account-specific cause"
+        "GitHub public status on 2026-09-29 reported Actions operational and no incident; this does not identify the account-specific cause",
+        "2026-09-30 PR #150 head e5d486fc53c93d81d274739e29e00ae811f85965: CI run 36737793172 job 109963955403, macOS run 36737793091 job 109963955463, Rendered UI run 36737793224 jobs 109963955450/109963955724; all zero executed steps",
+        "2026-09-30 PR #151 head e5699b60c842530e54e45ddebab4d466cfd735df: CI run 36738206842 job 109965381426, macOS run 36738206992 job 109965381902, Rendered UI run 36738206893 jobs 109965381195/109965381603; all zero executed steps",
+        "_architecture/release/evidence/actions_runner_admission_20260930.json"
       ],
       "what_would_unblock": "Restore GitHub-hosted runner admission, then execute PR #138 v1.2 unchanged on its exact head. The first valid run must execute steps and emit benchmark evidence; a zero-step retry is not unblocking evidence.",
       "dependent_nodes": [
@@ -130,7 +133,8 @@
       "independent_work_remaining": [
         "Preserve PR #138 v1.2 source and thresholds unchanged.",
         "Continue release work outside N09 where evidence does not depend on GitHub-hosted runner execution.",
-        "Verify account Actions usage/billing/policy in GitHub UI when operator access is available; do not infer the cause from zero-step jobs alone."
+        "Verify account Actions usage/billing/policy in GitHub UI when operator access is available; do not infer the cause from zero-step jobs alone.",
+        "Preserve PR #150 and PR #151 exact source heads without state promotion until hosted execution resumes."
       ],
       "status": "ACTIVE",
       "resolution": null

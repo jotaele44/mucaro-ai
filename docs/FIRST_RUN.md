@@ -2,7 +2,9 @@
 
 ## Recommended: double-click
 
-Double-click `Mucaro AI.command` (macOS) or `Mucaro AI.cmd` (Windows). No other step is needed.
+On macOS, double-click `Mucaro AI.app` beside `pyproject.toml`. Setup runs quietly, then the
+native app window opens. Keep the whole checkout together when moving it. `Mucaro AI.command`
+is a legacy console launcher and opens Terminal. Windows uses `Mucaro AI.cmd`.
 
 The first run prepares everything inside the project folder and then opens the app:
 
@@ -14,12 +16,13 @@ The first run prepares everything inside the project folder and then opens the a
 | 3. Web interface build | `FRONTEND_BUILD_OK` | builds | rebuilt only when `frontend/` changed |
 | 4. `.env` and readiness check | `PREFLIGHT_OK` | runs | `PREFLIGHT_CACHED` |
 | 5. Sample documents | `INGEST_FOLDER_OK` | loads `data/input` samples (skipped if you already have sources) | `SAMPLES_CACHED` |
-| 6. Start and open the browser | `BACKEND_READY` | | |
+| 6. Start and open the native window (macOS) | `BACKEND_READY`, `OPENING_NATIVE_WINDOW` | | |
 
 `ONE_CLICK_SETUP_OK` marks a run that did setup work; `ONE_CLICK_FAST_PATH` marks a run that had
 nothing to do. If port 8000 is taken by another program the app moves to the next free port
 (`PORT_FALLBACK`). If Mucaro AI is already running, a second double-click just opens it
-(`DESKTOP_LAUNCH_REUSED`). If setup stops, the window names the problem and the log file; fix it
+(`DESKTOP_LAUNCH_REUSED`). The markers above are written to logs rather than shown in a console.
+If setup stops, a dialog names the log file; fix it
 (usually the internet connection) and double-click again: setup resumes where it stopped. Details
 and error codes: `docs/ONE_CLICK_SETUP.md`.
 
