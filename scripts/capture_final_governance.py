@@ -50,9 +50,7 @@ def capture_governance(expected_head: str, output: Path) -> dict:
         raise ValueError("snapshot head or dirty-state mismatch")
     receipt = {
         "schema_version": "mucaro-final-head-governance/1.0",
-        "status": "GOVERNANCE_CAPTURE_VALID_RELEASE_OPEN"
-        if status["status"] != "MUCARO_AI_RELEASE_GRADE_CERTIFIED"
-        else "GOVERNANCE_CAPTURE_VALID_RELEASE_CERTIFIED",
+        "status": "GOVERNANCE_CAPTURE_VALID",
         "head_sha": actual_head,
         "acceptance_ledger": {
             "path": LEDGER.as_posix(),
