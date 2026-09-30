@@ -7,10 +7,10 @@
   "properties":{
     "schema_version":{"const":"mucaro-permission-decision/1.0"},
     "decision":{"enum":["ALLOW","ASK","DENY"]},
-    "capability":{"type":"string","minLength":1},
-    "subject":{"type":"string","minLength":1},
+    "capability":{"type":"string"},
+    "subject":{"type":"string"},
     "target":{"type":["string","null"]},
-    "origin":{"enum":["operator","planning","agent"]},
+    "origin":{"type":"string"},
     "reasons":{"type":"array","items":{"type":"string"}}
   },
   "allOf":[
