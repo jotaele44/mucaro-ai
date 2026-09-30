@@ -13,6 +13,7 @@ PROVIDER_INTERRUPTION_STATUSES = {
     "ERROR_MODEL_PROVIDER_UNAVAILABLE",
     "ERROR_MODEL_PROVIDER_RATE_LIMIT",
     "ERROR_MODEL_PROVIDER_TIMEOUT",
+    "ERROR_LOCAL_MODEL_UNAVAILABLE",
 }
 
 
@@ -21,6 +22,28 @@ class ProviderRecoveryError(RuntimeError):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+
+
+def pause_provider_checkpoint(
+    checkpoint_id: str,
+    *,
+    provider: str,
+    model: str | None,
+    provider_error: str,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    paused = transition_checkpoint(
+        checkpoint_id,
+        state="PAUSED_PROVIDER",
+        pause_reason=f"{provider}:{provider_error}",
+        cfg=cfg,
+    )
+    paused["provider"] = provider
+    paused["model"] = model
+    from .db import upsert_payload
+
+    upsert_payload("agent_checkpoints", "checkpoint_id", paused, cfg.sqlite_path)
+    return paused
 
 
 def execute_with_provider_checkpoint(
@@ -40,17 +63,13 @@ def execute_with_provider_checkpoint(
     except ModelProviderError as exc:
         if exc.status not in PROVIDER_INTERRUPTION_STATUSES:
             raise
-        paused = transition_checkpoint(
+        paused = pause_provider_checkpoint(
             checkpoint_id,
-            state="PAUSED_PROVIDER",
-            pause_reason=f"{provider}:{exc.status}",
+            provider=provider,
+            model=model,
+            provider_error=exc.status,
             cfg=cfg,
         )
-        paused["provider"] = provider
-        paused["model"] = model
-        # Persist provider/model annotations without changing canonical identity.
-        from .db import upsert_payload
-        upsert_payload("agent_checkpoints", "checkpoint_id", paused, cfg.sqlite_path)
         return {
             "status": "PAUSED_PROVIDER",
             "provider_error": exc.status,
