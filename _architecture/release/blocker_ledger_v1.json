@@ -106,6 +106,34 @@
       ],
       "status": "ACTIVE",
       "resolution": null
+    },
+    {
+      "blocker_id": "BLK-ACTIONS-001",
+      "blocked_node": "N09",
+      "reason": "GitHub-hosted Actions jobs for the active RT-10/MATRIX-007 certification vector are created but terminate before runner execution, with zero executed steps and no job logs. The same zero-step admission failure is reproduced by unrelated Linux and macOS workflows in the repository.",
+      "external_dependency": "GitHub Actions runner admission for this private repository/account must become available. The exact account-specific cause remains UNKNOWN because billing and sensitive Actions settings are not exposed through the connected GitHub tool.",
+      "evidence": [
+        "PR #138 exact head 81b7a2d1128f4c20331b2ef46ce7ac9b4f7eced7",
+        "RT10 run 36643492834 job 109660981702: failure, zero executed steps, no log blob",
+        "CI run 36643492787 job 109660981494: failure, zero executed steps, no log blob",
+        "macOS app run 36643492852 job 109660982065: failure, zero executed steps, no log blob",
+        "unrelated CI run 36643574731 job 109661244135: failure, zero executed steps",
+        "unrelated CI run 36643530930 job 109661104259: failure, zero executed steps",
+        "unrelated CI run 36643523897 job 109661081061: failure, zero executed steps",
+        "unrelated macOS app run 36643515928 job 109661055456: failure, zero executed steps",
+        "GitHub public status on 2026-09-29 reported Actions operational and no incident; this does not identify the account-specific cause"
+      ],
+      "what_would_unblock": "Restore GitHub-hosted runner admission, then execute PR #138 v1.2 unchanged on its exact head. The first valid run must execute steps and emit benchmark evidence; a zero-step retry is not unblocking evidence.",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "Preserve PR #138 v1.2 source and thresholds unchanged.",
+        "Continue release work outside N09 where evidence does not depend on GitHub-hosted runner execution.",
+        "Verify account Actions usage/billing/policy in GitHub UI when operator access is available; do not infer the cause from zero-step jobs alone."
+      ],
+      "status": "ACTIVE",
+      "resolution": null
     }
   ]
 }
