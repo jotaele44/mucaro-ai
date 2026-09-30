@@ -113,7 +113,31 @@
           "model",
           "result",
           "failed_over"
-        ]
+        ],
+        "properties": {
+          "attempts": {
+            "minItems": 1
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "interruption"
+              ]
+            },
+            {
+              "required": [
+                "error_status"
+              ]
+            },
+            {
+              "required": [
+                "detail"
+              ]
+            }
+          ]
+        }
       }
     },
     {
@@ -135,7 +159,36 @@
           "error_status",
           "detail",
           "interruption"
-        ]
+        ],
+        "properties": {
+          "attempts": {
+            "minItems": 1
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "provider"
+              ]
+            },
+            {
+              "required": [
+                "model"
+              ]
+            },
+            {
+              "required": [
+                "result"
+              ]
+            },
+            {
+              "required": [
+                "failed_over"
+              ]
+            }
+          ]
+        }
       }
     },
     {
@@ -157,6 +210,40 @@
           "attempts": {
             "maxItems": 0
           }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "provider"
+              ]
+            },
+            {
+              "required": [
+                "model"
+              ]
+            },
+            {
+              "required": [
+                "result"
+              ]
+            },
+            {
+              "required": [
+                "failed_over"
+              ]
+            },
+            {
+              "required": [
+                "error_status"
+              ]
+            },
+            {
+              "required": [
+                "detail"
+              ]
+            }
+          ]
         }
       }
     }
