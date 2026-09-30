@@ -1370,3 +1370,8 @@ html {
 @media (max-width: 900px), (pointer: coarse) {
   .close-tab { width: 44px; min-height: 44px; }
 }
+
+/* Mobile overlay always exposes context; the desktop-only collapse control is hidden. */
+@media (max-width: 760px), (max-height: 550px) and (pointer: coarse) {
+  .context-toggle { display: none; }
+}
