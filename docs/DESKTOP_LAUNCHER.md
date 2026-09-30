@@ -1,6 +1,6 @@
 # Desktop Launcher Mode
 
-> **Source setup, not a release artifact.** Double-click the tracked `Mucaro AI.app` beside
+> **Source setup, not a release artifact.** Double-click the tracked `Mucaro AI Setup.app` beside
 > `pyproject.toml` on macOS. It runs setup quietly and opens a native window without Terminal or
 > a browser. Release-grade certification requires two packaged lanes,
 > and neither is this launcher:
@@ -47,7 +47,7 @@ MACOS_APP_BUNDLE_READY
 The generated app is:
 
 ```text
-data/exports/desktop_apps/Mucaro AI.app
+data/exports/desktop_apps/Mucaro AI Setup.app
 ```
 
 Double-clicking that app runs `scripts/native_start.sh`, which redirects output into logs and
