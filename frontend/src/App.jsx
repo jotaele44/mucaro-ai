@@ -10,6 +10,7 @@ import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace
 import { SettingsWorkspace } from "./components/workspaces/SettingsWorkspace.jsx";
 import { SourcesWorkspace } from "./components/workspaces/SourcesWorkspace.jsx";
 import { MucaroPet } from "./components/MucaroPet.jsx";
+import { MUCARO_BRAND_ICON } from "./brandLogo.js";
 import { derivePetRuntime } from "./petRuntime.js";
 import { effectiveTheme, normalizeUIPrefs, readUIPrefs, writeUIPrefs } from "./uiPreferences.js";
 
@@ -143,6 +144,7 @@ export function App() {
     writeUIPrefs(uiPrefs);
     document.documentElement.dataset.mucaroTheme = effectiveTheme(uiPrefs.theme, systemDark);
     document.documentElement.lang = uiPrefs.language;
+    document.querySelector('link[rel="icon"]')?.setAttribute("href", MUCARO_BRAND_ICON);
   }, [uiPrefs, systemDark]);
 
   useEffect(() => persist("mucaro.options", options), [options]);
