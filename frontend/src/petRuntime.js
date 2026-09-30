@@ -36,3 +36,10 @@ export function observationSignature(observation) {
   return typeof observation?.runId === "string" && typeof observation?.runState === "string"
     ? observation.runId + ":" + observation.runState : null;
 }
+
+export function isReportableRunObservation(runId, runState, streamedRunIds) {
+  if (typeof runId !== "string" || !runId.trim() || !Object.hasOwn(PET_RUNTIME_STATES, runState)) return false;
+  // Hydrated terminal history is evidence of past activity, not a fresh runtime event.
+  return ["RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT"].includes(runState)
+    || Boolean(streamedRunIds?.has(runId));
+}
