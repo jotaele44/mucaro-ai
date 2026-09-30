@@ -208,3 +208,57 @@ def test_unknown_policy_fails_closed_even_without_requested_capabilities(store):
     result = inspect_plugin(root, store, policy=bad)
     assert result["status"] == "BLOCKED"
     assert result["capability_decision"]["status"] == "DENIED"
+
+
+def test_duplicate_id_blocks_individual_approval(store):
+    original, _ = make_plugin(store, folder="original")
+    inspected = inspect_plugin(original, store, policy=policy())
+    make_plugin(store, folder="different_folder")
+    with pytest.raises(PluginBoundaryError) as exc:
+        authorize_snapshot(original, store, policy=policy(), expected_sha256=inspected["snapshot_sha256"],
+                           explicit_operator_approval=True)
+    status(exc, "DUPLICATE_PLUGIN_ID")
+
+
+def test_snapshot_binds_policy_entitlements_not_just_policy_name(store):
+    original, _ = make_plugin(store, capabilities=["filesystem.read"])
+    original_policy = policy("filesystem.read")
+    old = inspect_plugin(original, store, policy=original_policy)["snapshot_sha256"]
+    changed_policy = policy("filesystem.read", "filesystem.write")
+    assert changed_policy.policy_id == original_policy.policy_id
+    assert inspect_plugin(original, store, policy=changed_policy)["snapshot_sha256"] != old
+    with pytest.raises(PluginBoundaryError) as exc:
+        authorize_snapshot(original, store, policy=changed_policy, expected_sha256=old,
+                           explicit_operator_approval=True)
+    status(exc, "STALE_PLUGIN_SNAPSHOT")
+
+
+def test_snapshot_binds_empty_directories_not_just_file_hashes(store):
+    original, _ = make_plugin(store)
+    old = inspect_plugin(original, store, policy=policy())["snapshot_sha256"]
+    (original / "empty-subdirectory").mkdir()
+    with pytest.raises(PluginBoundaryError) as exc:
+        authorize_snapshot(original, store, policy=policy(), expected_sha256=old,
+                           explicit_operator_approval=True)
+    status(exc, "STALE_PLUGIN_SNAPSHOT")
+
+
+def test_plugin_store_child_denominator_is_bounded_without_truncation(store):
+    from backend.app.plugin_boundary import MAX_STORE_CHILDREN
+    for count in range(MAX_STORE_CHILDREN + 1):
+        (store / f"ignored-{count:04}.txt").touch()
+    with pytest.raises(PluginBoundaryError) as exc:
+        inspect_store(store, policy=policy())
+    status(exc, "PLUGIN_STORE_RESOURCE_LIMIT")
+
+
+def test_single_plugin_approval_rechecks_store_denominator(store):
+    original, _ = make_plugin(store)
+    old = inspect_plugin(original, store, policy=policy())["snapshot_sha256"]
+    from backend.app.plugin_boundary import MAX_STORE_CHILDREN
+    for count in range(MAX_STORE_CHILDREN):
+        (store / f"ignored-{count:04}.txt").touch()
+    with pytest.raises(PluginBoundaryError) as exc:
+        authorize_snapshot(original, store, policy=policy(), expected_sha256=old,
+                           explicit_operator_approval=True)
+    status(exc, "PLUGIN_STORE_RESOURCE_LIMIT")
