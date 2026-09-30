@@ -1381,7 +1381,7 @@ html {
    fonts offline instead of fetching Google Fonts. No inherited global resets. */
 :root[data-mucaro-theme="light"] {
   --bg: #edf1f1; --surface: #f7f9f8; --surface-2: #e5eae9;
-  --text: #182224; --muted: #687779; --border: #cfd9d7;
+  --text: #182224; --muted: #647477; --border: #cfd9d7; /* adjusted from draft for AA contrast */
   --accent: #087f83; --accent-text: #f7ffff; --accent-soft: #cceeed;
   --danger: #b33a43; --danger-soft: #fbe9ea;
   --warn: #9a6612; --warn-soft: #fdf3dc;
