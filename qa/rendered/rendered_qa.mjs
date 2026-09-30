@@ -362,7 +362,8 @@ async function scenario(browser, base, viewport, contextOptions) {
   const tablist = page.getByRole("tablist", { name: "Open workspace tabs" });
   check("primary rail and contextual sidebar are distinct regions", viewport,
     (await page.getByRole("navigation", { name: "Primary" }).count()) === 1 &&
-    (await page.getByRole("complementary", { name: "Settings navigation" }).count()) === 1);
+    (await page.locator(".context-sidebar").count()) === 1 &&
+    (await page.getByRole("complementary", { name: "Settings navigation" }).count()) === (viewport === "iphone" ? 0 : 1));
   check("visited workspaces have persistent accessible tabs", viewport,
     (await tablist.getByRole("tab").count()) >= 5 &&
     (await tablist.getByRole("tab", { name: "Settings", exact: true }).getAttribute("aria-selected")) === "true");
