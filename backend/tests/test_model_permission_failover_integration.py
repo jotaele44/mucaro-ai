@@ -167,3 +167,54 @@ def test_permission_denial_never_pauses_checkpoint_as_provider_outage(
 
     assert result["status"] == "ERROR_PERMISSION_DENIED"
     assert result["model_attempts"][0]["status"] == "ERROR_PERMISSION_DENIED"
+
+
+def test_approval_required_status_is_terminal_for_failover(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import backend.app.model_router as router
+
+    cfg = _cfg(tmp_path)
+    calls: list[str] = []
+
+    def approval_required(spec, _cfg):
+        calls.append(spec.name)
+        raise router.ModelProviderError(
+            "ERROR_PERMISSION_APPROVAL_REQUIRED",
+            "explicit approval required",
+        )
+
+    monkeypatch.setattr(router, "_require_model_invoke", approval_required)
+    monkeypatch.setattr(
+        router,
+        "_local_answer",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("local transport reached")),
+    )
+    monkeypatch.setattr(
+        router,
+        "_mock_answer",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("mock fallback reached")),
+    )
+
+    result = run_with_failover(
+        [
+            {"provider": "openai_compatible_local", "model": "local"},
+            {"provider": "mock", "model": "mock"},
+        ],
+        lambda provider, model: generate_answer(
+            "q",
+            CHUNKS,
+            model_provider=provider,
+            model_name=model,
+            cfg=cfg,
+        ),
+        policy=FailoverPolicy(max_attempts_per_provider=2, backoff_seconds=(0.0,)),
+    )
+
+    assert result["status"] == "FAILOVER_HARD_FAILURE"
+    assert result["error_status"] == "ERROR_PERMISSION_APPROVAL_REQUIRED"
+    assert result["interruption"] is False
+    assert len(result["attempts"]) == 1
+    assert result["attempts"][0]["provider"] == "openai_compatible_local"
+    assert calls == ["openai_compatible_local"]
