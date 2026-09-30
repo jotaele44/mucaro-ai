@@ -163,7 +163,10 @@ def run_container_worker(
         cpus=cpus,
         pids_limit=pids_limit,
     )
-    for capability in ("subprocess.execute", *((("network.public_http",)) if network_allowed else ())):
+    required_permissions = ["subprocess.execute"]
+    if network_allowed:
+        required_permissions.append("network.public_http")
+    for capability in required_permissions:
         try:
             require(
                 PermissionRequest(capability=capability, subject=skill_id, target=engine_path, origin="operator"),
