@@ -172,12 +172,12 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
   const observedRunId = activeRun?.runId || views[views.length - 1]?.runId || null;
 
   useEffect(() => {
-    if (!onRuntimeEvent || !lastStatus || !observedRunId) return;
+    if (!onRuntimeEvent || !lastStatus || !observedRunId || conversation?.conversation_id !== conversationId) return;
     const signature = observedRunId + ":" + lastStatus;
     if (signature === lastReportedRuntime.current) return;
     lastReportedRuntime.current = signature;
     onRuntimeEvent({ runId: observedRunId, runState: lastStatus, observedAt: Date.now() });
-  }, [lastStatus, observedRunId, onRuntimeEvent]);
+  }, [lastStatus, observedRunId, conversation?.conversation_id, conversationId, onRuntimeEvent]);
 
   useEffect(() => {
     const node = feedRef.current;
