@@ -1,0 +1,103 @@
+{
+  "schema_version": "mucaro-performance-budget/1.0",
+  "status": "THRESHOLDS_DEFINED_EXECUTION_OPEN",
+  "authority": "TGT-020 and MATRIX-017; prospective release target, not observed performance",
+  "hardware": {
+    "class": "Apple Silicon macOS 14+ arm64",
+    "memory_gib_min": 16,
+    "storage_free_gib_min": 10,
+    "architecture": "arm64",
+    "model": "Record exact chip and memory in receipt; no cross-machine latency equivalence"
+  },
+  "method": {
+    "cold_samples": 5,
+    "warm_samples": 30,
+    "warmup_samples": 5,
+    "percentile": "nearest-rank p95",
+    "measure": "monotonic wall clock from action to usable result",
+    "failure_policy": "Any missing sample, error, timeout, mismatched fixture hash or hardware class fails the applicable gate",
+    "isolation": "Use the signed release artifact on a clean supported Mac for final desktop claims; record OS, chip, power mode, browser, app/version/commit/artifact hashes"
+  },
+  "fixtures": [
+    {
+      "id": "startup",
+      "action": "launch installed app to first authorized, interactive view",
+      "input": "fresh profile and existing empty profile, separately",
+      "threshold": {
+        "cold_p95_ms": 30000,
+        "warm_p95_ms": 10000
+      }
+    },
+    {
+      "id": "interaction",
+      "action": "tap navigation and open a saved conversation until settled",
+      "input": "100 conversations with 20 turns each; 390x844 responsive view and desktop view separately",
+      "threshold": {
+        "p95_ms": 200,
+        "max_ms": 500
+      }
+    },
+    {
+      "id": "file_ingestion",
+      "action": "ingest text/PDF fixture until indexed and source count reconciles",
+      "input": "10 MiB UTF-8 text plus 20-page text PDF; freeze fixture hashes",
+      "threshold": {
+        "p95_ms": 30000,
+        "peak_rss_mib": 2048
+      }
+    },
+    {
+      "id": "retrieval",
+      "action": "hybrid retrieval over 10000 chunks, top_k=5",
+      "input": "RT-10 v1.2 corpus and 80-query denominator; use PR #138 only after exact-head execution",
+      "threshold": {
+        "p95_ms": 5000,
+        "single_query_max_ms": 10000,
+        "peak_rss_mib": 1536,
+        "expected_source_hit_rate_min": 1
+      }
+    },
+    {
+      "id": "ocr",
+      "action": "OCR 10 raster pages and emit source-bound text",
+      "input": "300 dpi, English/Spanish page set with varied layout; freeze source and gold text hashes and OCR engine",
+      "threshold": {
+        "p95_ms_per_page": 5000,
+        "peak_rss_mib": 2048
+      }
+    },
+    {
+      "id": "gis",
+      "action": "clip/reproject/validate one supported vector fixture and one raster fixture",
+      "input": "100000 polygon features and 1024x1024 raster, CRS/geometry/schema frozen; confirm output equivalence",
+      "threshold": {
+        "p95_ms_per_operation": 30000,
+        "peak_rss_mib": 3072
+      }
+    },
+    {
+      "id": "local_inference",
+      "action": "generate 128 output tokens after 512 input tokens with local model",
+      "input": "pin an openly redistributable 3B class Q4 model file hash and engine build before execution; if unavailable remain OPEN",
+      "threshold": {
+        "p95_time_to_first_token_ms": 5000,
+        "throughput_tokens_per_second_min": 8
+      }
+    },
+    {
+      "id": "artifact_generation",
+      "action": "export cited answer and provenance receipt",
+      "input": "100 citations and 20 source bindings; compare generated schema and logical hashes",
+      "threshold": {
+        "p95_ms": 5000,
+        "peak_rss_mib": 1024
+      }
+    }
+  ],
+  "limitations": [
+    "These are prospective budgets, not measurements or PASS evidence.",
+    "Fixture creation and exact hashes remain OPEN where stated.",
+    "A synthetic RT-10 result cannot certify real-world OCR, GIS, mobile Safari, or signed desktop performance.",
+    "Threshold changes require a versioned replacement and cannot be selected after looking at final-run results."
+  ]
+}
