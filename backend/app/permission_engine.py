@@ -128,6 +128,8 @@ def evaluate(
     """
     policy = policy or default_policy()
     channel = distribution_channel if distribution_channel is not None else cfg.distribution_channel
+    if not request.subject.strip():
+        return _decision(request, DENY, ["permission request subject must be non-empty"])
     if request.origin not in ORIGINS:
         return _decision(request, DENY, [f"unknown request origin: {request.origin}"])
     if request.capability not in KNOWN_CAPABILITIES:
