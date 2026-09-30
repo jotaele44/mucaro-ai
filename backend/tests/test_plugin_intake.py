@@ -148,3 +148,16 @@ def test_symlink_archive_not_accepted(tmp_path):
     target.symlink_to(external)
     assert list_plugins(cfg)["plugins"][0]["integrity"] == "FAIL"
     failed(lambda: stage_plugin(original, cfg=cfg), "ERROR_PLUGIN_ARCHIVE_CORRUPT")
+
+
+def test_invalid_contribution_type_is_clean_denial(tmp_path):
+    cfg = settings(tmp_path)
+    failed(lambda: stage_plugin(package(manifest(contributions=[{"kind": ["reference"], "path": "notes.md"}])), cfg=cfg),
+           "ERROR_PLUGIN_CONTRIBUTION_INVALID")
+
+
+def test_malformed_registry_json_is_clean_denial(tmp_path):
+    cfg = settings(tmp_path)
+    cfg.ensure_dirs()
+    (cfg.processed_dir / "plugin_registry_v1.json").write_text("{broken", encoding="utf-8")
+    failed(lambda: list_plugins(cfg), "ERROR_PLUGIN_REGISTRY_INVALID")
