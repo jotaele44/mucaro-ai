@@ -93,6 +93,31 @@ def answer_question(
         model_route["fallback_reason"] = exc.status
 
     if model_route["status"] != "MODEL_ROUTE_READY":
+        preferred_candidate = next(
+            (
+                row
+                for row in model_route.get("candidates", [])
+                if row.get("provider") == preferred_provider
+            ),
+            None,
+        )
+        permission_warning = next(
+            (
+                str(warning)
+                for warning in (preferred_candidate or {}).get("warnings", [])
+                if str(warning).startswith("MODEL_INVOKE_PERMISSION:")
+            ),
+            None,
+        )
+        if permission_warning is not None:
+            permission_status = permission_warning.split(":", 1)[1]
+            return {
+                "status": permission_status,
+                "query": normalized_query,
+                "retrieved_chunks": retrieved,
+                "detail": "model.invoke permission denied before provider readiness transport",
+                "model_route": model_route,
+            }
         if allow_mock_fallback and model_route.get("selected_provider") != "mock":
             model_route = plan_model_route(
                 task_type="cited_qa",
