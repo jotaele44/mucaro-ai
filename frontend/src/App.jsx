@@ -90,6 +90,20 @@ export function App() {
     return () => window.clearInterval(timer);
   }, []);
 
+  // Mobile navigation is dismissible without a pointer. Restore focus to its opener.
+  useEffect(() => {
+    if (!navOpen) return undefined;
+    document.querySelector(".rail-brand")?.focus();
+    function dismiss(event) {
+      if (event.key === "Escape") {
+        setNavOpen(false);
+        window.requestAnimationFrame(() => document.querySelector(".mobile-bar .icon-button")?.focus());
+      }
+    }
+    document.addEventListener("keydown", dismiss);
+    return () => document.removeEventListener("keydown", dismiss);
+  }, [navOpen]);
+
   useEffect(() => persist("mucaro.options", options), [options]);
   useEffect(() => persist("mucaro.nav.tabs.v1", tabs), [tabs]);
   useEffect(() => persist("mucaro.nav.active.v1", activeTabKey), [activeTabKey]);
@@ -166,7 +180,7 @@ export function App() {
         onCloseMobile={() => setNavOpen(false)}
       />
       <div className="nav-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
-      <main id="main" className="main" tabIndex={-1}>
+      <main id="main" className="main" tabIndex={-1} inert={navOpen}>
         <div className="mobile-bar">
           <button type="button" className="icon-button" aria-label="Open navigation" aria-expanded={navOpen} onClick={() => setNavOpen(true)}>☰</button>
           <span className="brand-inline">Mucaro</span>
