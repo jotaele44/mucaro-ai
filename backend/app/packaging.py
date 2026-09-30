@@ -13,6 +13,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .macos_app_store import build_macos_app_store_readiness
+from .execution_records import build_artifact_identity
 from .release_receipts import load_release_receipt, receipt_path
 
 
@@ -667,7 +668,16 @@ def build_release_artifacts(
                     "sha256": hashlib.sha256(data).hexdigest(),
                 }
             )
+    artifact_identity = build_artifact_identity(
+        archive_path,
+        artifact_type="EXPORT",
+        logical_identity=f"{PYTHON_PACKAGE_NAME}:{version}:{head_sha}:source",
+        producer="backend.app.packaging.build_release_artifacts",
+        producer_version=version,
+        source_path_or_uri=str(archive_path),
+    )
     manifest = {
+        "artifact_identity": artifact_identity,
         "status": "PACKAGE_ARTIFACT_READY",
         "artifact_format": "source_zip_with_json_manifest_v1",
         "project_root": str(root),
@@ -767,6 +777,22 @@ def verify_release_artifact(
     archive_value = manifest.get("archive_path")
     archive_path = _resolve_package_path(manifest_path.parent, Path(archive_value)) if isinstance(archive_value, str) else None
     checks.append(_check("archive_path", "PASS" if archive_path and archive_path.exists() else "FAIL", str(archive_path or archive_value)))
+    artifact_identity = manifest.get("artifact_identity")
+    identity_ok = isinstance(artifact_identity, dict)
+    if identity_ok:
+        try:
+            from .contracts import validate_contract
+
+            validate_contract("artifact_identity", artifact_identity)
+        except Exception:
+            identity_ok = False
+    checks.append(
+        _check(
+            "artifact_identity_contract",
+            "PASS" if identity_ok else "FAIL",
+            str((artifact_identity or {}).get("artifact_id") if isinstance(artifact_identity, dict) else "missing"),
+        )
+    )
 
     manifest_member_count = manifest.get("member_count")
     members_is_list = isinstance(members, list)
@@ -800,6 +826,17 @@ def verify_release_artifact(
     if archive_path and archive_path.exists():
         archive_sha = _sha256_file(archive_path)
         archive_size = archive_path.stat().st_size
+        if isinstance(artifact_identity, dict):
+            checks.append(
+                _check(
+                    "artifact_identity_bytes",
+                    "PASS"
+                    if artifact_identity.get("sha256") == archive_sha
+                    and artifact_identity.get("byte_size") == archive_size
+                    else "FAIL",
+                    f"identity_sha={artifact_identity.get('sha256')} actual_sha={archive_sha}",
+                )
+            )
         checks.append(
             _check(
                 "archive_sha256",

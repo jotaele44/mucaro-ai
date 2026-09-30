@@ -21,12 +21,7 @@ from backend.app.contracts import (
 )
 from backend.app.exports import export_answer_trace
 from backend.app.ingestion import ingest_file
-from backend.app.execution_records import (
-    write_agent_checkpoint,
-    write_artifact_identity,
-    write_execution_contract,
-    write_run_manifest,
-)
+from backend.app.execution_records import build_artifact_identity, build_execution_contract, build_run_manifest
 from backend.app.main import create_app
 from backend.app.memory import list_memory_items, remember_memory_item
 from backend.app.memory_policy import select_memory_context
@@ -113,83 +108,69 @@ def test_real_producer_payloads_satisfy_contracts(cfg):
     validate_contract("release_receipt", json.loads(receipt.read_text(encoding="utf-8")))
 
 
-def test_missing_common_contract_producers_validate_and_persist(cfg):
-    execution = write_execution_contract(
+def test_common_contract_builders_validate_without_filesystem_record_ids(cfg):
+    execution = build_execution_contract(
+        execution_id="exec_alpha",
         skill_id="skill.alpha",
         skill_version="1.0.0",
         skill_digest="sha256:" + "a" * 64,
         runtime="IN_PROCESS",
-        cfg=cfg,
-    )["execution_contract"]
+        status="OPEN",
+        started_at="2026-09-30T00:00:00Z",
+    )
     validate_contract("execution_contract", execution)
 
-    run = write_run_manifest(task_id="task.alpha", state="PLANNING", cfg=cfg)["run_manifest"]
-    validate_contract("run_manifest", run)
-
-    checkpoint = write_agent_checkpoint(
-        session_id="session_alpha",
-        run_id=run["run_id"],
-        objective="verify common contract producers",
+    run = build_run_manifest(
+        run_id="../not-a-path-because-it-is-data-only",
+        task_id="task.alpha",
         state="PLANNING",
-        source_sha="b" * 40,
-        sequence=0,
-        cfg=cfg,
-    )["agent_checkpoint"]
-    validate_contract("agent_checkpoint", checkpoint)
+        started_at="2026-09-30T00:00:00Z",
+    )
+    validate_contract("run_manifest", run)
+    assert not (cfg.project_root.parent / "not-a-path-because-it-is-data-only.json").exists()
 
     artifact = cfg.project_root / "artifact.bin"
     artifact.write_bytes(b"contract-bound artifact")
-    identity = write_artifact_identity(
+    identity = build_artifact_identity(
         artifact,
         artifact_type="DERIVED",
         logical_identity="unit-test-artifact",
         producer="test_contracts",
         producer_version="1",
-        cfg=cfg,
-    )["artifact_identity"]
+    )
     validate_contract("artifact_identity", identity)
     assert identity["byte_size"] == len(b"contract-bound artifact")
     assert identity["sha256"] == __import__("hashlib").sha256(b"contract-bound artifact").hexdigest()
 
-    written = sorted((cfg.processed_dir / "contracts").glob("*.json"))
-    assert len(written) == 4
 
-
-def test_common_contract_producers_fail_closed_before_persist(cfg):
+def test_invalid_common_contract_builder_inputs_fail_closed(cfg):
     with pytest.raises(ContractViolation):
-        write_execution_contract(
+        build_execution_contract(
+            execution_id="exec_bad",
             skill_id="skill.bad",
             skill_version="1",
             skill_digest="not-a-digest",
             runtime="IN_PROCESS",
-            cfg=cfg,
+            status="OPEN",
+            started_at="2026-09-30T00:00:00Z",
         )
     with pytest.raises(ContractViolation):
-        write_run_manifest(task_id="task.bad", state="TELEPORTED", cfg=cfg)
-    with pytest.raises(ContractViolation):
-        write_agent_checkpoint(
-            session_id="session_bad",
+        build_run_manifest(
             run_id="run_bad",
-            objective="bad checkpoint",
-            state="PLANNING",
-            source_sha="not-a-sha",
-            sequence=0,
-            cfg=cfg,
+            task_id="task.bad",
+            state="TELEPORTED",
+            started_at="2026-09-30T00:00:00Z",
         )
-
     artifact = cfg.project_root / "bad-artifact.bin"
     artifact.write_bytes(b"x")
     with pytest.raises(ContractViolation):
-        write_artifact_identity(
+        build_artifact_identity(
             artifact,
             artifact_type="UNKNOWN",
             logical_identity="bad-artifact",
             producer="test_contracts",
             producer_version="1",
-            cfg=cfg,
         )
-    record_dir = cfg.processed_dir / "contracts"
-    assert not record_dir.exists() or not list(record_dir.glob("*.json"))
 
 
 # --- negative: violations are rejected -------------------------------------------
@@ -463,3 +444,36 @@ def test_concurrent_ledger_writers_do_not_lose_updates(cfg):
         thread.join()
     assert len(load_directory_grants(cfg)) == 6
     assert not list(Path(cfg.processed_dir).glob(".*.tmp"))
+
+def test_skill_execution_persists_validated_execution_contract(cfg):
+    from backend.app.skill_runtime import activate_skill, execute_skill, mount_skill
+
+    mount_skill("mucaro/intelligence-plane-health", cfg=cfg)
+    activate_skill("mucaro/intelligence-plane-health", cfg=cfg)
+    execution = execute_skill("mucaro/intelligence-plane-health", cfg=cfg)["execution"]
+    assert execution["execution_contract"]["execution_id"] == execution["execution_id"]
+    validate_contract("execution_contract", execution["execution_contract"])
+
+
+def test_package_builder_embeds_artifact_identity_contract(tmp_path, monkeypatch):
+    from backend.app import packaging
+
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n[project.scripts]\nmucaro = "backend.app.cli:main"\n',
+        encoding="utf-8",
+    )
+    (root / "README.md").write_text("hello", encoding="utf-8")
+    monkeypatch.setattr(packaging, "build_package_status", lambda root: {"status": "PACKAGE_READY", "checks": []})
+    calls = {
+        ("rev-parse", "HEAD"): (True, "a" * 40),
+        ("status", "--short"): (True, ""),
+        ("ls-files",): (True, "pyproject.toml\nREADME.md\n"),
+    }
+    monkeypatch.setattr(packaging, "_git_output", lambda root, args: calls[tuple(args)])
+    result = packaging.build_release_artifacts(root)
+    manifest = json.loads(Path(result["manifest"]["path"]).read_text(encoding="utf-8"))
+    validate_contract("artifact_identity", manifest["artifact_identity"])
+    assert manifest["artifact_identity"]["sha256"] == result["artifact"]["sha256"]
+    assert manifest["artifact_identity"]["byte_size"] == result["artifact"]["size_bytes"]
