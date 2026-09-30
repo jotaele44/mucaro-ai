@@ -10,6 +10,7 @@ import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace
 import { SettingsWorkspace } from "./components/workspaces/SettingsWorkspace.jsx";
 import { SourcesWorkspace } from "./components/workspaces/SourcesWorkspace.jsx";
 
+const MOBILE_NAV_QUERY = "(max-width: 760px), (max-height: 550px) and (pointer: coarse)";
 const DEFAULT_OPTIONS = { model_provider: "mock", retrieval_strategy: "hybrid", allow_live: false, top_k: 5 };
 
 function stored(key, fallback) {
@@ -39,6 +40,7 @@ export function App() {
   const [conversations, setConversations] = useState([]);
   const [filter, setFilter] = useState("");
   const [navOpen, setNavOpen] = useState(false);
+  const [mobileOverlay, setMobileOverlay] = useState(() => window.matchMedia(MOBILE_NAV_QUERY).matches);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [modes, setModes] = useState(null);
   const [options, setOptions] = useState(() => ({ ...DEFAULT_OPTIONS, ...stored("mucaro.options", {}) }));
@@ -96,12 +98,15 @@ export function App() {
     return () => window.clearInterval(timer);
   }, []);
 
-  // An open phone drawer must not leave the workspace inert after a resize to desktop.
+  // Match the CSS overlay breakpoint, including short coarse-pointer landscape screens.
   useEffect(() => {
-    const desktop = window.matchMedia("(min-width: 761px) and (min-height: 551px), (min-width: 761px) and (pointer: fine)");
-    const restore = () => { if (desktop.matches) setNavOpen(false); };
-    desktop.addEventListener("change", restore);
-    return () => desktop.removeEventListener("change", restore);
+    const query = window.matchMedia(MOBILE_NAV_QUERY);
+    const sync = () => {
+      setMobileOverlay(query.matches);
+      if (!query.matches) setNavOpen(false);
+    };
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
   }, []);
 
   // Mobile navigation is dismissible without a pointer. Restore focus to its opener.
@@ -141,7 +146,16 @@ export function App() {
     if (!tabsRef.current.some((tab) => tab.key === key)) return;
     selectedRef.current = key;
     setActiveTabKey(key);
+    focusTabAfterMobileNavigation(key);
     setNavOpen(false);
+  }
+
+  function focusTabAfterMobileNavigation(key) {
+    if (!mobileOverlay || !navOpen) return;
+    window.requestAnimationFrame(() => {
+      const selected = tabsRef.current.find((tab) => tab.key === key);
+      if (selected) document.getElementById("tab-" + selected.mountId)?.focus();
+    });
   }
 
   function openWorkspaceTab(tab) {
@@ -151,6 +165,7 @@ export function App() {
       return;
     }
     commitNavigation(outcome.tabs, outcome.key);
+    focusTabAfterMobileNavigation(outcome.key);
     setNavOpen(false);
   }
 
@@ -210,9 +225,10 @@ export function App() {
         onConversation={openConversation}
         onTasks={() => { setTasksOpen(true); setNavOpen(false); }}
         onCloseMobile={() => setNavOpen(false)}
+        inactive={mobileOverlay && !navOpen}
       />
       <div className="nav-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
-      <main id="main" className="main" tabIndex={-1} inert={navOpen}>
+      <main id="main" className="main" tabIndex={-1} inert={mobileOverlay && navOpen}>
         <div className="mobile-bar">
           <button type="button" className="icon-button" aria-label="Open navigation" aria-controls="navigation-shell" aria-expanded={navOpen} onClick={() => setNavOpen(true)}>☰</button>
           <span className="brand-inline">Mucaro</span>
