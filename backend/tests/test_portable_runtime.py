@@ -82,8 +82,28 @@ def test_portable_bundle_leaves_out_tracked_app_bundles(tmp_path: Path) -> None:
     application = manifest["application"]
     assert application["excluded_tracked_app_bundle_count"] == 1
     assert application["excluded_tracked_app_bundles"] == ["Mucaro AI Setup.app"]
-    assert all(".app/" not in row["path"] for row in application["members"])
-    assert all(row["name"] != "application_excludes_nested_app_bundles" or row["status"] == "PASS" for row in report["checks"])
+    assert all(".app/" not in row["path"].lower() for row in application["members"])
+    checks = {row["name"]: row["status"] for row in report["checks"]}
+    assert checks["application_excludes_nested_app_bundles"] == "PASS"
+    assert checks["application_exclusion_receipt"] == "PASS"
+
+
+def test_portable_verifier_accepts_legacy_v1_manifest_without_exclusion_receipt(tmp_path: Path) -> None:
+    root, runtime = fixture_project(tmp_path)
+    report = build_portable_macos_app(root, runtime, output_dir=root / "out")
+    app = Path(report["app_path"])
+    manifest_path = app / "Contents" / "Resources" / "portable-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["application"].pop("excluded_tracked_app_bundle_count")
+    manifest["application"].pop("excluded_tracked_app_bundles")
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    result = verify_portable_macos_app(app)
+
+    assert result["status"] == "PORTABLE_APP_VERIFIED"
+    checks = {row["name"]: row for row in result["checks"]}
+    assert checks["application_exclusion_receipt"]["status"] == "PASS"
+    assert checks["application_exclusion_receipt"]["detail"] == "legacy_v1_manifest_without_exclusion_receipt"
 
 
 def test_portable_verifier_rejects_manifest_declared_nested_app_bundle(tmp_path: Path) -> None:
