@@ -94,13 +94,18 @@ def _memory_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     return list_memory_items(cfg, include_disabled=include_disabled)
 
 
-def _require_tool_filesystem_read(path: str, cfg: Settings, *, subject: str) -> None:
+def _resolve_tool_input_path(value: str, cfg: Settings) -> Path:
+    path = Path(value).expanduser()
+    return path.resolve() if path.is_absolute() else (cfg.project_root / path).resolve()
+
+
+def _require_tool_filesystem_read(path: Path, cfg: Settings, *, subject: str) -> None:
     try:
         require_permission(
             PermissionRequest(
                 capability="filesystem.read",
                 subject=subject,
-                target=path,
+                target=str(path),
                 origin="operator",
             ),
             cfg=cfg,
@@ -110,20 +115,22 @@ def _require_tool_filesystem_read(path: str, cfg: Settings, *, subject: str) -> 
 
 
 def _gis_inspect(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
-    path = arguments.get("path")
-    if not isinstance(path, str) or not path.strip():
+    value = arguments.get("path")
+    if not isinstance(value, str) or not value.strip():
         raise ToolRuntimeError("ERROR_GIS_TOOL_PATH_REQUIRED", "gis.inspect requires a non-empty path argument.")
+    path = _resolve_tool_input_path(value, cfg)
     _require_tool_filesystem_read(path, cfg, subject="tools.gis.inspect")
     try:
-        return inspect_geojson(Path(path), cfg=cfg)
+        return inspect_geojson(path, cfg=cfg)
     except GISProcessingError as exc:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
 def _ocr_analyze_image(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
-    path = arguments.get("path")
-    if not isinstance(path, str) or not path.strip():
+    value = arguments.get("path")
+    if not isinstance(value, str) or not value.strip():
         raise ToolRuntimeError("ERROR_OCR_TOOL_PATH_REQUIRED", "ocr.analyze_image requires a non-empty path argument.")
+    path = _resolve_tool_input_path(value, cfg)
     _require_tool_filesystem_read(path, cfg, subject="tools.ocr.analyze_image")
     language = arguments.get("language", "eng")
     layout_mode = arguments.get("layout_mode", "auto")
@@ -136,7 +143,7 @@ def _ocr_analyze_image(arguments: dict[str, Any], cfg: Settings) -> dict[str, An
         raise ToolRuntimeError("ERROR_OCR_TIMEOUT_INVALID", "OCR timeout_seconds must be an integer from 1 through 120.")
     try:
         return analyze_image_ocr(
-            Path(path),
+            path,
             cfg=cfg,
             language=language,
             layout_mode=layout_mode,
