@@ -9,3 +9,5 @@
 **Later dependency gates:** a dedicated runtime isolation adapter (platform-specific guarantees documented, not claimed), operator opt-in/approve/disable/revoke, per-call policy/directory/network enforcement, prompt-injection trust boundary, auditable API/UI lifecycle, native desktop/mobile packaging and exact-release-head replay. Do not merge with unfinished Work state or draft GUI without conflict inspection.
 
 **Test boundary:** `backend/tests/test_plugin_intake.py` covers initial positive/negative behaviors. Passing an isolated harness does not certify full-repo, rendered UI, Apple/WebKit or packaged runtimes.
+
+**Local operator entrypoint (same inert boundary):** `python -m backend.app.plugin_cli list` enumerates staged packages and rechecks archive integrity. `python -m backend.app.plugin_cli stage ./package.zip --expected-sha256 <digest>` checks existing directory permission **before opening the source ZIP**, reads at most the package limit, and stages with an explicit local CLI receipt. There is no automatic execution or network request. This entrypoint is for local operators; graphical/plugin-API integration is still OPEN.
