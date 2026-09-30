@@ -101,6 +101,7 @@ def answer_question(
                 allow_live=False,
                 require_offline=True,
                 require_citations=True,
+                cfg=cfg,
             )
             model_route["fallback_reason"] = "PRIMARY_ROUTE_BLOCKED"
         else:
