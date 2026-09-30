@@ -124,8 +124,48 @@ def test_answer_pipeline_denies_local_provider_before_readiness_probe(
         persist=False,
     )
 
-    assert result["status"] == "ERROR_MODEL_ROUTE_BLOCKED"
+    assert result["status"] == "ERROR_PERMISSION_DENIED"
     local = next(row for row in result["model_route"]["candidates"] if row["provider"] == "openai_compatible_local")
     assert local["eligible"] is False
     assert "PROVIDER_STATUS:MODEL_PROVIDER_NOT_READY" in local["reasons"]
     assert "MODEL_INVOKE_PERMISSION:ERROR_PERMISSION_DENIED" in local["warnings"]
+
+
+def test_answer_pipeline_permission_denial_never_triggers_mock_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import backend.app.model_router as router
+    import backend.app.services as services
+
+    cfg = _cfg(tmp_path, "sideload")
+    monkeypatch.setattr(
+        router,
+        "_probe_local_server",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("local readiness transport reached")),
+    )
+    monkeypatch.setattr(services, "get_chunks", lambda _cfg: CHUNKS)
+    monkeypatch.setattr(
+        services,
+        "retrieve",
+        lambda *args, **kwargs: {
+            "status": "RETRIEVAL_OK",
+            "retrieved_chunks": CHUNKS,
+        },
+    )
+    monkeypatch.setattr(
+        services,
+        "generate_answer",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("fallback provider execution reached")),
+    )
+
+    result = answer_question(
+        "q",
+        model_provider="openai_compatible_local",
+        allow_mock_fallback=True,
+        cfg=cfg,
+        persist=False,
+    )
+
+    assert result["status"] == "ERROR_PERMISSION_DENIED"
+    assert result["model_route"]["status"] == "MODEL_ROUTE_BLOCKED"
