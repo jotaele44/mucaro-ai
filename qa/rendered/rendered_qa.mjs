@@ -358,6 +358,41 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "16-settings");
   axeRuns.push(await axe(page, viewport, "settings"));
 
+  // Three-region regression: rail navigation must not destroy sibling tab state.
+  const tablist = page.getByRole("tablist", { name: "Open workspace tabs" });
+  check("primary rail and contextual sidebar are distinct regions", viewport,
+    (await page.getByRole("navigation", { name: "Primary" }).count()) === 1 &&
+    (await page.getByRole("complementary", { name: "Settings navigation" }).count()) === 1);
+  check("visited workspaces have persistent accessible tabs", viewport,
+    (await tablist.getByRole("tab").count()) >= 5 &&
+    (await tablist.getByRole("tab", { name: "Settings", exact: true }).getAttribute("aria-selected")) === "true");
+  await tablist.getByRole("tab", { name: "Sources", exact: true }).click();
+  await page.getByRole("heading", { name: "Sources" }).waitFor();
+  check("source selection survives switching workspace tabs", viewport,
+    (await page.locator(".source-row.selected").count()) === 1);
+  await tablist.getByRole("tab", { name: "Memory", exact: true }).click();
+  await page.getByText("Prefer tables for comparisons").waitFor();
+  check("memory workspace survives switching tabs", viewport, true);
+  await tablist.getByRole("tab", { name: "Settings", exact: true }).click();
+  await page.getByText("What works offline").waitFor();
+  if (viewport !== "iphone") {
+    const navigation = page.locator(".sidebar");
+    const beforeWidth = await navigation.evaluate((el) => el.getBoundingClientRect().width);
+    await page.getByRole("button", { name: "Collapse contextual sidebar" }).click();
+    await page.getByRole("button", { name: "Expand contextual sidebar" }).waitFor();
+    const collapsedWidth = await navigation.evaluate((el) => el.getBoundingClientRect().width);
+    check("collapsing context retains primary rail", viewport,
+      collapsedWidth <= 70 && beforeWidth > 200 &&
+      (await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).count()) === 1);
+    await page.getByRole("button", { name: "Expand contextual sidebar" }).click();
+  }
+  check("tab close does not switch unrelated active workspace", viewport,
+    (await tablist.getByRole("tab", { name: "Settings", exact: true }).getAttribute("aria-selected")) === "true");
+  await page.getByRole("button", { name: "Close Sources tab" }).click();
+  check("closing inactive tab conserves active tab", viewport,
+    (await tablist.getByRole("tab", { name: "Sources", exact: true }).count()) === 0 &&
+    (await tablist.getByRole("tab", { name: "Settings", exact: true }).getAttribute("aria-selected")) === "true");
+
   if (viewport === "iphone") {
     check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
     // iOS zooms into fields under 16px on focus; touch targets need 44px (Apple HIG).
