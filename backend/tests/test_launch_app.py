@@ -97,7 +97,7 @@ def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     result = build_macos_app_bundle(tmp_path, output_dir=tmp_path / "apps", python_executable=sys.executable)
 
     assert result["status"] == "MACOS_APP_BUNDLE_READY"
-    app_path = tmp_path / "apps" / "Mucaro AI.app"
+    app_path = tmp_path / "apps" / "Mucaro AI Setup.app"
     executable = app_path / "Contents" / "MacOS" / "mucaro-ai"
     receipt = app_path / "Contents" / "Resources" / "mucaro-app-receipt.json"
     assert app_path.is_dir()
@@ -106,6 +106,10 @@ def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     assert "scripts/native_start.sh" in executable.read_text(encoding="utf-8")
     assert '"$@"' in executable.read_text(encoding="utf-8")
     assert json.loads(receipt.read_text(encoding="utf-8"))["scope"] == "source_bound_local_macos_app_wrapper"
+    plist = (app_path / "Contents" / "Info.plist").read_text(encoding="utf-8")
+    assert "Mucaro AI Setup" in plist
+    assert "ai.mucaro.source-launcher" in plist
+    assert app_path.name != "Mucaro AI.app"
 
     verification = verify_macos_app_bundle(app_path, root=tmp_path)
     assert verification["status"] == "MACOS_APP_BUNDLE_VERIFIED"
