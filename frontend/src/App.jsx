@@ -214,7 +214,7 @@ export function App() {
       <div className="nav-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
       <main id="main" className="main" tabIndex={-1} inert={navOpen}>
         <div className="mobile-bar">
-          <button type="button" className="icon-button" aria-label="Open navigation" aria-expanded={navOpen} onClick={() => setNavOpen(true)}>☰</button>
+          <button type="button" className="icon-button" aria-label="Open navigation" aria-controls="navigation-shell" aria-expanded={navOpen} onClick={() => setNavOpen(true)}>☰</button>
           <span className="brand-inline">Mucaro</span>
         </div>
         {health.state === "error" && (
