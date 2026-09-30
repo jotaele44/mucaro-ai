@@ -19,11 +19,15 @@ export function NavigationShell({ view, contextOpen, setContextOpen, conversatio
   const visible = conversations.filter((row) => String(row.title || "").toLowerCase().includes(filter.trim().toLowerCase()));
 
   function jump(target) {
-    document.getElementById(target)?.scrollIntoView({ block: "start", behavior: "auto" });
+    const element = document.getElementById(target);
+    if (!element) return;
+    element.scrollIntoView({ block: "start", behavior: "auto" });
+    element.setAttribute("tabindex", "-1");
     onCloseMobile();
+    window.requestAnimationFrame(() => element.focus({ preventScroll: true }));
   }
   return (
-    <div className="sidebar">
+    <div id="navigation-shell" className="sidebar">
       <nav className="primary-rail" aria-label="Primary">
         <button type="button" className="rail-brand" aria-label="Home — Chat" title="Mucaro home" onClick={() => onSelect("chat")}><span aria-hidden="true">M</span></button>
         <ul className="rail-pages">
