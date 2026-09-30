@@ -159,6 +159,20 @@ def test_verify_source_wrapper_rejects_partial_display_name_collision(tmp_path):
     assert "plist_source_name" in failed
 
 
+def test_verify_source_wrapper_rejects_release_identity_in_receipt(tmp_path):
+    app_path = _build_source_wrapper_fixture(tmp_path)
+    receipt_path = app_path / "Contents" / "Resources" / "mucaro-app-receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["bundle_name"] = "Mucaro AI.app"
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    verification = verify_macos_app_bundle(app_path, root=tmp_path)
+
+    assert verification["status"] == "MACOS_APP_BUNDLE_VERIFY_FAILED"
+    failed = {row["name"] for row in verification["checks"] if row["status"] == "FAIL"}
+    assert "receipt_source_bundle_name" in failed
+
+
 def test_verify_macos_app_bundle_rejects_release_identity_on_source_wrapper(tmp_path):
     (tmp_path / "scripts").mkdir()
     (tmp_path / "frontend" / "dist").mkdir(parents=True)
