@@ -54,6 +54,8 @@ DISTRIBUTION_MANIFEST_SCHEMA_VERSION = "mucaro_distribution_manifest_v1"
 DISTRIBUTION_MANIFEST_DIR = Path("data") / "exports" / "distribution_manifests"
 MACOS_APP_BUNDLE_SCHEMA_VERSION = "mucaro_macos_app_bundle_v1"
 MACOS_APP_BUNDLE_NAME = "Mucaro AI Setup.app"
+MACOS_APP_DISPLAY_NAME = "Mucaro AI Setup"
+MACOS_APP_BUNDLE_ID = "ai.mucaro.source-launcher"
 MACOS_APP_BUNDLE_DIR = Path("data") / "exports" / "desktop_apps"
 REQUIRED_DISTRIBUTION_RECEIPTS = [
     ("local_release", "CERTIFY_RELEASE_OK"),
@@ -263,13 +265,13 @@ exec /bin/bash scripts/native_start.sh "${{REPO_ROOT}}" "$@"
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>Mucaro AI</string>
+  <string>{MACOS_APP_DISPLAY_NAME}</string>
   <key>CFBundleDisplayName</key>
-  <string>Mucaro AI</string>
+  <string>{MACOS_APP_DISPLAY_NAME}</string>
   <key>CFBundleExecutable</key>
   <string>mucaro-ai</string>
   <key>CFBundleIdentifier</key>
-  <string>ai.mucaro.source-launcher</string>
+  <string>{MACOS_APP_BUNDLE_ID}</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -357,6 +359,20 @@ def verify_macos_app_bundle(app_path: Path, *, root: Path = ROOT) -> dict[str, A
         plist_text = plist_path.read_text(encoding="utf-8", errors="replace")
         checks.append(_check("plist_executable_binding", "PASS" if "<string>mucaro-ai</string>" in plist_text else "FAIL", "CFBundleExecutable=mucaro-ai"))
         checks.append(_check("plist_package_type", "PASS" if "<string>APPL</string>" in plist_text else "FAIL", "CFBundlePackageType=APPL"))
+        checks.append(
+            _check(
+                "plist_source_name",
+                "PASS" if f"<string>{MACOS_APP_DISPLAY_NAME}</string>" in plist_text else "FAIL",
+                f"CFBundleName/DisplayName={MACOS_APP_DISPLAY_NAME}",
+            )
+        )
+        checks.append(
+            _check(
+                "plist_source_bundle_id",
+                "PASS" if f"<string>{MACOS_APP_BUNDLE_ID}</string>" in plist_text else "FAIL",
+                f"CFBundleIdentifier={MACOS_APP_BUNDLE_ID}",
+            )
+        )
 
     if executable_path.exists():
         launcher_text = executable_path.read_text(encoding="utf-8", errors="replace")
