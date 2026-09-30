@@ -43,7 +43,7 @@ def run_frontend_build(env: dict[str, str]) -> None:
 
 def main() -> int:
     env = os.environ.copy()
-    env["PYTHONPATH"] = f"{ROOT}:{ROOT / 'backend'}"
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT), str(ROOT / "backend")])
     sample = ROOT / "data" / "input" / "sample_source_lineage.md"
     sample.parent.mkdir(parents=True, exist_ok=True)
     sample.write_text(

@@ -44,20 +44,18 @@ def execute_with_provider_checkpoint(
             checkpoint_id,
             state="PAUSED_PROVIDER",
             pause_reason=f"{provider}:{exc.status}",
+            provider=provider,
+            model=model,
             cfg=cfg,
         )
-        paused["provider"] = provider
-        paused["model"] = model
-        # Persist provider/model annotations without changing canonical identity.
-        from .db import upsert_payload
-        upsert_payload("agent_checkpoints", "checkpoint_id", paused, cfg.sqlite_path)
         return {
             "status": "PAUSED_PROVIDER",
             "provider_error": exc.status,
             "checkpoint": paused,
         }
     current = get_checkpoint(checkpoint_id, cfg)
-    assert current is not None
+    if current is None:
+        raise ProviderRecoveryError("ERROR_PROVIDER_CHECKPOINT_MISSING", "checkpoint disappeared during provider execution")
     if (current["session_id"], current["run_id"], current["checkpoint_id"]) != identity:
         raise ProviderRecoveryError("ERROR_PROVIDER_IDENTITY_DRIFT", "provider execution changed session/run/checkpoint identity")
     return {"status": "PROVIDER_EXECUTION_OK", "result": result, "checkpoint": current}
@@ -75,13 +73,9 @@ def resume_with_provider(
         raise ProviderRecoveryError("ERROR_CHECKPOINT_NOT_FOUND", checkpoint_id)
     identity = (before["session_id"], before["run_id"], before["checkpoint_id"])
     try:
-        resumed = resume_checkpoint(checkpoint_id, cfg)
+        resumed = resume_checkpoint(checkpoint_id, cfg, provider=provider, model=model)
     except CheckpointError as exc:
         raise ProviderRecoveryError(exc.status, exc.detail) from exc
-    resumed["provider"] = provider
-    resumed["model"] = model
-    from .db import upsert_payload
-    upsert_payload("agent_checkpoints", "checkpoint_id", resumed, cfg.sqlite_path)
     after_identity = (resumed["session_id"], resumed["run_id"], resumed["checkpoint_id"])
     if after_identity != identity:
         raise ProviderRecoveryError("ERROR_PROVIDER_IDENTITY_DRIFT", "provider switch changed canonical run identity")

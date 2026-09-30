@@ -81,6 +81,49 @@ def test_cli_help_lists_serve(capsys):
     assert "serve" in output
 
 
+def test_cli_materializes_portable_runtime_with_governed_defaults(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    expected_output = tmp_path / "data" / "exports" / "portable_runtimes" / "macos-x86_64"
+
+    def fake_materialize(root: Path, manifest: Path, output: Path, *, archive_path: Path | None = None):
+        assert root == tmp_path
+        assert manifest == tmp_path / "packaging" / "runtime" / "macos-x86_64.json"
+        assert output == expected_output
+        assert archive_path is None
+        return {"status": "PORTABLE_RUNTIME_VERIFIED", "runtime_dir": str(output), "failed_checks": []}
+
+    monkeypatch.setattr(cli, "materialize_portable_runtime", fake_materialize)
+
+    assert main(["package", "portable-runtime", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "PORTABLE_RUNTIME_VERIFIED"
+    assert payload["runtime_dir"] == str(expected_output)
+
+
+def test_cli_refuses_portable_app_when_runtime_verification_fails(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+
+    monkeypatch.setattr(
+        cli,
+        "verify_materialized_runtime",
+        lambda *args, **kwargs: {
+            "status": "PORTABLE_RUNTIME_VERIFY_FAILED",
+            "failed_checks": ["runtime_tree"],
+        },
+    )
+
+    def forbidden_builder(*args, **kwargs):
+        raise AssertionError("portable app builder must not run")
+
+    monkeypatch.setattr(cli, "build_portable_macos_app", forbidden_builder)
+
+    assert main(["package", "portable-macos-app", "--runtime-dir", str(runtime)], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().err)
+    assert payload == {"status": "ERROR_PORTABLE_RUNTIME_VERIFY", "detail": "runtime_tree"}
+
+
 def test_cli_capabilities_contracts_reports_expanded_scope(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
@@ -305,7 +348,7 @@ def test_cli_sources_ingest_web_snapshot(tmp_path: Path, capsys):
                 "retrieval_utc": "2026-09-10T00:00:01Z",
                 "http_status": 200,
                 "content_type": "text/html; charset=utf-8",
-                "content_sha256": "contenthash",
+                "content_sha256": "27063147d74d8ad4df1af70a0b7cd1585c6db476543a4b5f27f7347dade5ab4e",
                 "content_size_bytes": 64,
                 "content_base64": "",
                 "parser_name": "web_snapshot_preview_v1",
@@ -741,13 +784,13 @@ def test_cli_models_list_reports_provider_registry(tmp_path: Path, capsys, monke
 
     assert payload["status"] == "MODEL_PROVIDERS_OK"
     providers = {provider["name"]: provider for provider in payload["providers"]}
-    assert set(providers) == {"mock", "anthropic"}
+    assert set(providers) == {"mock", "anthropic", "openai_compatible_local"}
     assert providers["mock"]["status"] == "MODEL_PROVIDER_READY"
     assert providers["anthropic"]["status"] == "MODEL_PROVIDER_DISABLED"
 
     assert main(["models", "list", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
-    assert "providers=2" in text_output
+    assert "providers=3" in text_output
     assert "MODEL_PROVIDER_READY mock" in text_output
     assert "MODEL_PROVIDER_DISABLED anthropic" in text_output
 
@@ -1631,6 +1674,8 @@ mucaro = "backend.app.cli:main"
         "_architecture/schemas/macos-app-store-malware-scan.schema.json",
         "packaging/macos/MucaroAI-AppStore.entitlements",
         "packaging/macos/PrivacyInfo.xcprivacy",
+        "packaging/runtime/macos-x86_64.json",
+        "packaging/runtime/requirements-macos-x86_64.lock",
     ]:
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -3559,6 +3604,43 @@ def test_github_governance_fails_when_current_head_ci_fails(tmp_path: Path, monk
     assert github["latest_ci"]["startup_layer"] == "before_jobs"
 
 
+def test_detached_head_resolves_exact_remote_default_branch(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    head_sha = "a" * 40
+
+    def fake_git_output(_cfg: Settings, args: list[str]):
+        outputs = {
+            ("branch", "--show-current"): (True, ""),
+            ("symbolic-ref", "--short", "refs/remotes/origin/HEAD"): (True, "origin/main"),
+            ("rev-parse", "origin/main"): (True, head_sha),
+        }
+        return outputs.get(tuple(args), (False, "unexpected command"))
+
+    monkeypatch.setattr(cli, "_git_output", fake_git_output)
+
+    assert cli._git_branch_for_head(cfg, head_sha) == (True, "main")
+    assert cli._git_upstream_for_head(cfg, head_sha, "main") == (True, "origin/main")
+    assert cli._git_branch_for_head(cfg, "b" * 40) == (False, "")
+    assert cli._git_upstream_for_head(cfg, "b" * 40, "main") == (False, "")
+    assert cli._git_upstream_for_head(cfg, head_sha, "release") == (False, "")
+
+
+def test_exact_head_ci_with_jobs_supersedes_stale_startup_probe():
+    head_sha = "a" * 40
+    gate = cli._classify_startup_probe(
+        ci_latest={"databaseId": 11, "status": "completed", "conclusion": "success", "headSha": head_sha},
+        ci_jobs_count=1,
+        probe_latest={"databaseId": 22, "status": "completed", "conclusion": "success", "headSha": "b" * 40},
+        probe_error=None,
+        head_sha=head_sha,
+        probe_jobs_count=1,
+    )
+
+    assert gate["status"] == "PASS"
+    assert "NOT_REQUIRED exact-head CI passed with jobs=1" in gate["detail"]
+    assert "run_id=22" in gate["detail"]
+
+
 def test_cli_certify_github_actions_isolates_startup_layer(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     head_sha = "a" * 40
@@ -5177,6 +5259,7 @@ def test_cli_tools_require_approval_and_audit_execution(tmp_path: Path, capsys):
     assert [event["event"] for event in audit["events"]] == [
         "TOOL_CALL_REQUESTED",
         "TOOL_CALL_APPROVED",
+        "TOOL_CALL_STARTED",
         "TOOL_CALL_EXECUTED",
     ]
 
@@ -5228,7 +5311,7 @@ def test_cli_certify_operator_workflow_exercises_local_boundary(tmp_path: Path, 
     assert payload["summary"]["failed"] == 0
     assert payload["summary"]["source_count"] == 2
     assert payload["summary"]["run_count"] == 1
-    assert payload["summary"]["tool_audit_event_count"] == 3
+    assert payload["summary"]["tool_audit_event_count"] == 4
     assert payload["summary"]["trace_export_count"] == 3
     assert payload["receipt"] == "data/exports/release_receipts/operator_workflow-UNKNOWN_HEAD.json"
     by_name = {check["name"]: check for check in payload["checks"]}
