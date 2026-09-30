@@ -4,6 +4,7 @@ import hashlib
 import json
 from typing import Any
 
+from .config import Settings, settings
 from .contracts import validate_contract
 from .model_router import list_model_providers, normalize_model_provider
 
@@ -37,6 +38,7 @@ def plan_model_route(
     required_modalities: list[str] | None = None,
     min_context_tokens: int | None = None,
     system_offline: bool = False,
+    cfg: Settings = settings,
 ) -> dict[str, Any]:
     """Select a provider under explicit constraints (TGT-010, MATRIX-012).
 
@@ -52,7 +54,7 @@ def plan_model_route(
     if require_live and not allow_live:
         raise ModelRoutingError("ERROR_MODEL_ROUTING_LIVE_NOT_ALLOWED", "Live routing requires explicit allow_live=true")
 
-    provider_rows = {row["name"]: row for row in list_model_providers()}
+    provider_rows = {row["name"]: row for row in list_model_providers(cfg)}
     known = set(provider_rows)
     if allowed_providers is None:
         allowed = sorted(known)
