@@ -55,7 +55,6 @@ export function NavigationShell({ view, contextOpen, setContextOpen, conversatio
         <button type="button" className="rail-button rail-locale-button" aria-label={uiText(locale, "langSwitch")} title={uiText(locale, "langSwitch")} onClick={onToggleLanguage}>
           <span aria-hidden="true">{uiFlag(locale)}</span>
         </button>
-        <button type="button" className="rail-button context-toggle" aria-label={uiText(locale, contextOpen ? "collapse" : "expand")} aria-expanded={contextOpen} title={contextOpen ? "Collapse sidebar" : "Expand sidebar"} onClick={() => setContextOpen(!contextOpen)}><Icon type="toggle" /></button>
       </nav>
 
       <aside className="context-sidebar" aria-label={route.label + " navigation"}>
