@@ -22,6 +22,7 @@ MAX_PLUGIN_FILES = 128
 MAX_PLUGIN_DIRS = 128
 MAX_MEMBER_PATH_LENGTH = 240
 MAX_PLUGIN_BYTES = 10 * 1024 * 1024
+MAX_STORE_CHILDREN = 256
 _PLUGIN_ID = re.compile(r"[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+\Z", re.ASCII)
 _VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z", re.ASCII)
 _FILENAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z", re.ASCII)
@@ -69,8 +70,9 @@ def _root_entry(path: Path, store: Path) -> None:
         raise PluginBoundaryError("INVALID_PLUGIN_ROOT", "Plugin root must be a real directory, not a symlink")
 
 
-def _files(plugin: Path) -> list[dict[str, Any]]:
+def _files(plugin: Path) -> tuple[list[dict[str, Any]], list[str]]:
     members: list[dict[str, Any]] = []
+    directory_paths: list[str] = []
     total = 0
     directories = 0
     seen_portable_paths: dict[str, str] = {}
@@ -78,6 +80,7 @@ def _files(plugin: Path) -> list[dict[str, Any]]:
         dirs.sort()
         names.sort()
         directories += len(dirs)
+        directory_paths.extend((Path(current) / name).relative_to(plugin).as_posix() for name in dirs)
         if directories > MAX_PLUGIN_DIRS:
             raise PluginBoundaryError("PLUGIN_RESOURCE_LIMIT", "Directory count limit exceeded")
         for name in dirs + names:
@@ -109,7 +112,7 @@ def _files(plugin: Path) -> list[dict[str, Any]]:
             if path.stat().st_size != size:
                 raise PluginBoundaryError("PLUGIN_MUTATED_DURING_SCAN", relative)
             members.append({"path": relative, "bytes": size, "sha256": digest.hexdigest()})
-    return sorted(members, key=lambda row: row["path"])
+    return sorted(members, key=lambda row: row["path"]), sorted(directory_paths)
 
 
 def _parse_manifest(raw: bytes) -> dict[str, Any]:
@@ -150,7 +153,7 @@ def inspect_plugin(path: Path, store: Path, *, policy: CapabilityPolicy, offline
     if not isinstance(offline, bool):
         raise PluginBoundaryError("INVALID_OFFLINE_FLAG", "Offline mode must be boolean")
     _root_entry(path, store)
-    members = _files(path)
+    members, directory_paths = _files(path)
     manifest_member = next((m for m in members if m["path"] == MANIFEST_NAME), None)
     if manifest_member is None:
         raise PluginBoundaryError("MANIFEST_MISSING", MANIFEST_NAME)
@@ -164,9 +167,13 @@ def inspect_plugin(path: Path, store: Path, *, policy: CapabilityPolicy, offline
                                      requested_capabilities=manifest["capabilities"])
     denied_offline = offline and manifest["network"] != "none"
     status = "INSPECTED_FOR_APPROVAL" if decision.authorized and not denied_offline else "BLOCKED"
+    policy_snapshot = {"policy_id": policy.policy_id, "allowed": sorted(policy.allowed),
+                       "denied": sorted(policy.denied)}
     body = {"schema_version": SCHEMA_VERSION, "plugin_id": manifest["id"], "version": manifest["version"],
             "root_name": path.name, "manifest_sha256": manifest_member["sha256"], "members": members,
-            "policy_id": policy.policy_id, "requested_capabilities": sorted(manifest["capabilities"]),
+            "directories": directory_paths, "policy_id": policy.policy_id,
+            "policy_sha256": _canonical_sha256(policy_snapshot),
+            "requested_capabilities": sorted(manifest["capabilities"]),
             "network": manifest["network"], "offline": offline}
     return {"status": status, "snapshot_sha256": _canonical_sha256(body), "snapshot": body,
             "capability_decision": decision.as_dict(), "offline_denied": denied_offline,
@@ -185,6 +192,16 @@ def authorize_snapshot(path: Path, store: Path, *, policy: CapabilityPolicy, exp
         raise PluginBoundaryError("STALE_PLUGIN_SNAPSHOT", "Plugin bytes, policy, or offline setting changed")
     if result["status"] != "INSPECTED_FOR_APPROVAL":
         raise PluginBoundaryError("PLUGIN_NOT_AUTHORIZED", "Policy or offline gate denied plugin")
+    audited = inspect_store(store, policy=policy, offline=offline)
+    if not audited["arithmetic_closes"]:
+        raise PluginBoundaryError("PLUGIN_STORE_CONSERVATION_FAILURE", "Store audit did not close")
+    if result["snapshot"]["plugin_id"] in audited["duplicate_ids"]:
+        raise PluginBoundaryError("DUPLICATE_PLUGIN_ID", "Store has multiple candidates for the declared plugin ID")
+    current = [row for row in audited["candidates"] if row.get("root_name") == path.name]
+    if len(current) != 1 or current[0].get("snapshot_sha256") != expected_sha256:
+        raise PluginBoundaryError("STALE_PLUGIN_SNAPSHOT", "Store re-inspection changed the target")
+    if current[0]["status"] != "INSPECTED_FOR_APPROVAL":
+        raise PluginBoundaryError("PLUGIN_NOT_AUTHORIZED", "Store re-inspection denied the target")
     return {**result, "status": "APPROVED_SNAPSHOT_ONLY", "execution_certified": False}
 
 
@@ -197,6 +214,8 @@ def inspect_store(store: Path, *, policy: CapabilityPolicy, offline: bool = True
     receipts: list[dict[str, Any]] = []
     excluded_regular_files = 0
     children = sorted(store.iterdir(), key=lambda p: p.name)
+    if len(children) > MAX_STORE_CHILDREN:
+        raise PluginBoundaryError("PLUGIN_STORE_RESOURCE_LIMIT", "Plugin store child count limit exceeded")
     for child in children:
         if child.is_file() and not child.is_symlink():
             excluded_regular_files += 1
