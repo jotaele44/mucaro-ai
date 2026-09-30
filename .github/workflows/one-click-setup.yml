@@ -9,7 +9,7 @@ on:
   pull_request:
     paths:
       - "Mucaro AI.command"
-      - "Mucaro AI.app/**"
+      - "Mucaro AI Setup.app/**"
       - "scripts/native_start.sh"
       - "scripts/native_window.py"
       - "backend/tests/test_native_launch.py"
@@ -28,7 +28,7 @@ on:
       - main
     paths:
       - "Mucaro AI.command"
-      - "Mucaro AI.app/**"
+      - "Mucaro AI Setup.app/**"
       - "scripts/native_start.sh"
       - "scripts/native_window.py"
       - "Mucaro AI.cmd"
@@ -87,7 +87,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           env -i HOME="$RUNNER_TEMP/home" PATH="$RUNNER_TEMP/stubs:/usr/bin:/bin:/usr/sbin:/sbin" LANG=en_US.UTF-8 CI=true \
-            "./Mucaro AI.app/Contents/MacOS/mucaro-ai" --smoke-test --no-browser > "$RUNNER_TEMP/silent-app.log" 2>&1
+            "./Mucaro AI Setup.app/Contents/MacOS/mucaro-ai" --smoke-test --no-browser > "$RUNNER_TEMP/silent-app.log" 2>&1
           test ! -s "$RUNNER_TEMP/silent-app.log"
           grep -q "DESKTOP_SMOKE_OK" .mucaro-runtime/logs/launch-*.log
           grep -q "DESKTOP_BACKEND_PORT_CLOSED" .mucaro-runtime/logs/launch-*.log
