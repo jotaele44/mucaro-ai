@@ -66,7 +66,7 @@ export function SourcesWorkspace({ announce }) {
           {sources.length} source{sources.length === 1 ? "" : "s"} · index {index?.status || "unknown"}
         </p>
       </header>
-      <div className="workspace-actions">
+      <div id="sources-import" className="workspace-actions">
         <label className="primary-button file-button">
           {busy ? "Adding…" : "Add a file"}
           <input type="file" onChange={upload} disabled={busy} className="sr-only" />
@@ -81,7 +81,7 @@ export function SourcesWorkspace({ announce }) {
         <DirectoryIntake onIngested={load} />
       </details>
       {!sources.length && <p className="empty-state muted">No sources yet. Add files or a folder; answers will cite them.</p>}
-      <ul className="source-list">
+      <ul id="sources-list" className="source-list">
         {sources.map((source) => (
           <li key={source.source_id}>
             <button type="button" className={`source-row ${selected === source.source_id ? "selected" : ""}`} onClick={() => setSelected(source.source_id)} aria-expanded={selected === source.source_id}>
