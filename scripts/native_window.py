@@ -1,6 +1,6 @@
 """The native Mucaro AI window and the few pieces of user feedback a launch without a Terminal needs.
 
-Used by ``scripts/launch_app.py --native`` (what ``Mucaro AI.app`` runs). The window is
+Used by ``scripts/launch_app.py --native`` (what the tracked ``Mucaro AI Setup.app`` runs). The window is
 pywebview/WKWebView, so no browser is involved, and this module never falls back to one:
 if the window cannot open, the caller reports it with a dialog instead.
 """
