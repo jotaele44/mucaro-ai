@@ -17,6 +17,7 @@ from typing import Any
 from urllib.parse import urldefrag, urlparse
 
 from .config import Settings, settings
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .utils import read_json, stable_id, utc_now, write_json
 
 WEB_SNAPSHOT_SCHEMA_VERSION = "mucaro_web_snapshot_v1"
@@ -596,6 +597,18 @@ def fetch_web_snapshot(
     cfg.ensure_dirs()
     policy = policy or WebFetchPolicy()
     checked = validate_web_fetch_url(url, allow_private_hosts=policy.allow_private_hosts)
+    try:
+        require(
+            PermissionRequest(
+                capability="network.public_http",
+                subject="web_browsing.fetch",
+                target=str(checked["fetch_url"]),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise WebBrowsingError(exc.status, exc.detail) from exc
     requested_at = utc_now()
     redirect_chain: list[dict[str, Any]] = []
     opener = _governed_opener(policy, _GovernedRedirectHandler(policy, redirect_chain))
