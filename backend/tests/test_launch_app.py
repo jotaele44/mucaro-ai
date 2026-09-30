@@ -97,7 +97,7 @@ def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     result = build_macos_app_bundle(tmp_path, output_dir=tmp_path / "apps", python_executable=sys.executable)
 
     assert result["status"] == "MACOS_APP_BUNDLE_READY"
-    app_path = tmp_path / "apps" / "Mucaro AI.app"
+    app_path = tmp_path / "apps" / "Mucaro AI Setup.app"
     executable = app_path / "Contents" / "MacOS" / "mucaro-ai"
     receipt = app_path / "Contents" / "Resources" / "mucaro-app-receipt.json"
     assert app_path.is_dir()
