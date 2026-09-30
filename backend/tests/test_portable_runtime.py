@@ -65,6 +65,52 @@ def test_portable_bundle_is_bundle_relative_and_hash_verified(tmp_path: Path) ->
     assert verify_portable_macos_app(app)["status"] == "PORTABLE_APP_VERIFIED"
 
 
+def test_portable_bundle_leaves_out_tracked_app_bundles(tmp_path: Path) -> None:
+    root, runtime = fixture_project(tmp_path)
+    tracked_app = root / "Mucaro AI Setup.app" / "Contents"
+    tracked_app.mkdir(parents=True)
+    (tracked_app / "Info.plist").write_text("<plist/>\n", encoding="utf-8")
+    git(root, "add", "Mucaro AI Setup.app/Contents/Info.plist")
+    git(root, "commit", "-m", "add source app fixture")
+
+    report = build_portable_macos_app(root, runtime, output_dir=root / "out")
+
+    assert report["status"] == "PORTABLE_APP_VERIFIED"
+    app = Path(report["app_path"])
+    assert not (app / "Contents" / "Resources" / "app" / "Mucaro AI Setup.app").exists()
+    manifest = json.loads((app / "Contents" / "Resources" / "portable-manifest.json").read_text(encoding="utf-8"))
+    application = manifest["application"]
+    assert application["excluded_tracked_app_bundle_count"] == 1
+    assert application["excluded_tracked_app_bundles"] == ["Mucaro AI Setup.app"]
+    assert all(".app/" not in row["path"] for row in application["members"])
+    assert all(row["name"] != "application_excludes_nested_app_bundles" or row["status"] == "PASS" for row in report["checks"])
+
+
+def test_portable_verifier_rejects_manifest_declared_nested_app_bundle(tmp_path: Path) -> None:
+    root, runtime = fixture_project(tmp_path)
+    report = build_portable_macos_app(root, runtime, output_dir=root / "out")
+    app = Path(report["app_path"])
+    nested = app / "Contents" / "Resources" / "app" / "Injected.app" / "Contents"
+    nested.mkdir(parents=True)
+    injected = nested / "Info.plist"
+    injected.write_text("<plist/>\n", encoding="utf-8")
+
+    manifest_path = app / "Contents" / "Resources" / "portable-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rel = injected.relative_to(app / "Contents" / "Resources" / "app").as_posix()
+    manifest["application"]["members"].append(
+        {"path": rel, "bytes": injected.stat().st_size, "sha256": hashlib.sha256(injected.read_bytes()).hexdigest()}
+    )
+    manifest["application"]["members"].sort(key=lambda row: row["path"])
+    manifest["application"]["member_count"] = len(manifest["application"]["members"])
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    result = verify_portable_macos_app(app)
+
+    assert result["status"] == "PORTABLE_APP_VERIFY_FAILED"
+    assert "application_excludes_nested_app_bundles" in result["failed_checks"]
+
+
 def test_runtime_symlink_fails_closed(tmp_path: Path) -> None:
     root, runtime = fixture_project(tmp_path)
     target = runtime / "lib" / "runtime.txt"
@@ -126,7 +172,6 @@ def test_portable_manifest_version_must_match_bundled_metadata(tmp_path: Path) -
     report = build_portable_macos_app(root, runtime, output_dir=root / "out")
     app = Path(report["app_path"])
     manifest = app / "Contents/Resources/portable-manifest.json"
-    import json
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     payload["release_version"] = "9.9.9"
     manifest.write_text(json.dumps(payload), encoding="utf-8")
