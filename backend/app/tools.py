@@ -10,8 +10,11 @@ from .coding_patch import validate_patch_proposal
 from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
 from .contracts import validate_contract
+from .gis_processing import GISProcessingError, inspect_geojson
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
+from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
 from .product_audit import build_product_audit
 from .utils import canonical_sha256, read_json, stable_id, update_json, utc_now
 from .web_browsing import (
@@ -88,6 +91,58 @@ def _workspace_profiles(arguments: dict[str, Any], cfg: Settings) -> dict[str, A
 def _memory_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     include_disabled = bool(arguments.get("include_disabled", True))
     return list_memory_items(cfg, include_disabled=include_disabled)
+
+
+def _require_tool_filesystem_read(path: str, cfg: Settings, *, subject: str) -> None:
+    try:
+        require_permission(
+            PermissionRequest(
+                capability="filesystem.read",
+                subject=subject,
+                target=path,
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _gis_inspect(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    path = arguments.get("path")
+    if not isinstance(path, str) or not path.strip():
+        raise ToolRuntimeError("ERROR_GIS_TOOL_PATH_REQUIRED", "gis.inspect requires a non-empty path argument.")
+    _require_tool_filesystem_read(path, cfg, subject="tools.gis.inspect")
+    try:
+        return inspect_geojson(Path(path), cfg=cfg)
+    except GISProcessingError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _ocr_analyze_image(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    path = arguments.get("path")
+    if not isinstance(path, str) or not path.strip():
+        raise ToolRuntimeError("ERROR_OCR_TOOL_PATH_REQUIRED", "ocr.analyze_image requires a non-empty path argument.")
+    _require_tool_filesystem_read(path, cfg, subject="tools.ocr.analyze_image")
+    language = arguments.get("language", "eng")
+    layout_mode = arguments.get("layout_mode", "auto")
+    timeout_seconds = arguments.get("timeout_seconds", 30)
+    if not isinstance(language, str):
+        raise ToolRuntimeError("ERROR_OCR_LANGUAGE_INVALID", "OCR language must be a string.")
+    if not isinstance(layout_mode, str):
+        raise ToolRuntimeError("ERROR_OCR_LAYOUT_INVALID", "OCR layout_mode must be a string.")
+    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool) or timeout_seconds <= 0 or timeout_seconds > 120:
+        raise ToolRuntimeError("ERROR_OCR_TIMEOUT_INVALID", "OCR timeout_seconds must be an integer from 1 through 120.")
+    try:
+        return analyze_image_ocr(
+            Path(path),
+            cfg=cfg,
+            language=language,
+            layout_mode=layout_mode,
+            timeout_seconds=timeout_seconds,
+        )
+    except OCRAnalysisError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
 def _coding_repo_status(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
@@ -259,6 +314,20 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_memory_list,
+    ),
+    "gis.inspect": ToolDefinition(
+        name="gis.inspect",
+        description="Inspect one explicitly approved local GeoJSON FeatureCollection and emit a provenance-bound geometry/topology report without transforming the source.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_gis_inspect,
+    ),
+    "ocr.analyze_image": ToolDefinition(
+        name="ocr.analyze_image",
+        description="Run explicitly approved local image OCR through the governed filesystem and subprocess permission boundaries and emit a provenance-bound OCR report.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_ocr_analyze_image,
     ),
     "coding.repo_status": ToolDefinition(
         name="coding.repo_status",
