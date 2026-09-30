@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import plistlib
 import subprocess
 import sys
 import tarfile
@@ -106,9 +107,39 @@ def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     assert "scripts/native_start.sh" in executable.read_text(encoding="utf-8")
     assert '"$@"' in executable.read_text(encoding="utf-8")
     assert json.loads(receipt.read_text(encoding="utf-8"))["scope"] == "source_bound_local_macos_app_wrapper"
+    info = plistlib.loads((app_path / "Contents" / "Info.plist").read_bytes())
+    assert info["CFBundleName"] == "Mucaro AI Setup"
+    assert info["CFBundleDisplayName"] == "Mucaro AI Setup"
+    assert info["CFBundleIdentifier"] == "ai.mucaro.source-launcher"
 
     verification = verify_macos_app_bundle(app_path, root=tmp_path)
     assert verification["status"] == "MACOS_APP_BUNDLE_VERIFIED"
+
+
+def test_verify_macos_app_bundle_rejects_release_identity_on_source_wrapper(tmp_path):
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "frontend" / "dist").mkdir(parents=True)
+    for name in ("native_start.sh", "one_click.sh", "one_click.py"):
+        (tmp_path / "scripts" / name).write_text("# launcher\n", encoding="utf-8")
+    (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n',
+        encoding="utf-8",
+    )
+    result = build_macos_app_bundle(tmp_path, output_dir=tmp_path / "apps")
+    app_path = Path(result["app_path"])
+    plist_path = app_path / "Contents" / "Info.plist"
+    plist = plistlib.loads(plist_path.read_bytes())
+    plist["CFBundleName"] = "Mucaro AI"
+    plist["CFBundleDisplayName"] = "Mucaro AI"
+    plist["CFBundleIdentifier"] = "ai.mucaro.app"
+    plist_path.write_bytes(plistlib.dumps(plist))
+
+    verification = verify_macos_app_bundle(app_path, root=tmp_path)
+
+    assert verification["status"] == "MACOS_APP_BUNDLE_VERIFY_FAILED"
+    failed = {row["name"] for row in verification["checks"] if row["status"] == "FAIL"}
+    assert {"plist_source_name", "plist_source_bundle_id"} <= failed
 
 
 def test_verify_macos_app_bundle_rejects_missing_bundle(tmp_path):
