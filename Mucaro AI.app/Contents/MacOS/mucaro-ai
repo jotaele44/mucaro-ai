@@ -1,4 +1,0 @@
-#!/bin/bash
-# Keep this source launcher next to pyproject.toml; move the whole checkout together.
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd -P)" || exit 2
-exec /bin/bash "${ROOT}/scripts/native_start.sh" "${ROOT}" "$@"
