@@ -67,7 +67,7 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
   );
 }
 
-export function ChatView({ conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions }) {
+export function ChatView({ conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, onRuntimeEvent, announce, modes, defaultOptions }) {
   const [conversation, setConversation] = useState(null);
   const [runs, setRuns] = useState(new Map());
   const [summaries, setSummaries] = useState([]);
@@ -80,6 +80,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
   const refreshRef = useRef(null);
   const feedRef = useRef(null);
   const stick = useRef(true);
+  const lastReportedRuntime = useRef(null);
 
   const loadRun = useCallback(async (runId) => {
     const payload = await api.runEvents(runId);
@@ -139,6 +140,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
   refreshRef.current = refresh;
 
   useEffect(() => {
+    lastReportedRuntime.current = null;
     for (const controller of streams.current.values()) controller.abort();
     streams.current.clear();
     setRuns(new Map());
@@ -167,6 +169,15 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
   const activeRun = views.find((view) => ["RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT"].includes(view.state));
   const queued = summaries.filter((row) => row.state === "QUEUED");
   const lastStatus = activeRun ? activeRun.state : views.length ? views[views.length - 1].state : null;
+  const observedRunId = activeRun?.runId || views[views.length - 1]?.runId || null;
+
+  useEffect(() => {
+    if (!onRuntimeEvent || !lastStatus || !observedRunId) return;
+    const signature = observedRunId + ":" + lastStatus;
+    if (signature === lastReportedRuntime.current) return;
+    lastReportedRuntime.current = signature;
+    onRuntimeEvent({ runId: observedRunId, runState: lastStatus, observedAt: Date.now() });
+  }, [lastStatus, observedRunId, onRuntimeEvent]);
 
   useEffect(() => {
     const node = feedRef.current;
