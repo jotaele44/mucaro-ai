@@ -262,3 +262,14 @@ def test_single_plugin_approval_rechecks_store_denominator(store):
         authorize_snapshot(original, store, policy=policy(), expected_sha256=old,
                            explicit_operator_approval=True)
     status(exc, "PLUGIN_STORE_RESOURCE_LIMIT")
+
+
+def test_unicode_normalization_collision_rejected_without_merging(store):
+    root, _ = make_plugin(store)
+    (root / "caf\u00e9.txt").write_text("NFC", encoding="utf-8")
+    (root / "cafe\u0301.txt").write_text("NFD", encoding="utf-8")
+    if len([p for p in root.iterdir() if p.name.startswith("caf")]) < 2:
+        pytest.skip("This filesystem normalizes canonically equivalent filenames")
+    with pytest.raises(PluginBoundaryError) as exc:
+        inspect_plugin(root, store, policy=policy())
+    status(exc, "AMBIGUOUS_MEMBER_UNICODE")
