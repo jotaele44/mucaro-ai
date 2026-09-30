@@ -116,6 +116,49 @@ def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     assert verification["status"] == "MACOS_APP_BUNDLE_VERIFIED"
 
 
+def _build_source_wrapper_fixture(tmp_path: Path) -> Path:
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "frontend" / "dist").mkdir(parents=True)
+    for name in ("native_start.sh", "one_click.sh", "one_click.py"):
+        (tmp_path / "scripts" / name).write_text("# launcher\n", encoding="utf-8")
+    (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n',
+        encoding="utf-8",
+    )
+    result = build_macos_app_bundle(tmp_path, output_dir=tmp_path / "apps")
+    assert result["status"] == "MACOS_APP_BUNDLE_READY"
+    return Path(result["app_path"])
+
+
+def test_verify_source_wrapper_rejects_release_filename_even_with_source_plist(tmp_path):
+    app_path = _build_source_wrapper_fixture(tmp_path)
+    release_named = app_path.with_name("Mucaro AI.app")
+    app_path.rename(release_named)
+
+    verification = verify_macos_app_bundle(release_named, root=tmp_path)
+
+    assert verification["status"] == "MACOS_APP_BUNDLE_VERIFY_FAILED"
+    failed = {row["name"] for row in verification["checks"] if row["status"] == "FAIL"}
+    assert "source_bundle_filename" in failed
+    assert "receipt_app_path" in failed
+
+
+def test_verify_source_wrapper_rejects_partial_display_name_collision(tmp_path):
+    app_path = _build_source_wrapper_fixture(tmp_path)
+    plist_path = app_path / "Contents" / "Info.plist"
+    plist = plistlib.loads(plist_path.read_bytes())
+    assert plist["CFBundleName"] == "Mucaro AI Setup"
+    plist["CFBundleDisplayName"] = "Mucaro AI"
+    plist_path.write_bytes(plistlib.dumps(plist))
+
+    verification = verify_macos_app_bundle(app_path, root=tmp_path)
+
+    assert verification["status"] == "MACOS_APP_BUNDLE_VERIFY_FAILED"
+    failed = {row["name"] for row in verification["checks"] if row["status"] == "FAIL"}
+    assert "plist_source_name" in failed
+
+
 def test_verify_macos_app_bundle_rejects_release_identity_on_source_wrapper(tmp_path):
     (tmp_path / "scripts").mkdir()
     (tmp_path / "frontend" / "dist").mkdir(parents=True)
