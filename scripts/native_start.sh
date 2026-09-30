@@ -11,12 +11,12 @@ failure_dialog() {
 }
 
 if ! mkdir -p "${ROOT}/.mucaro-runtime/logs"; then
-  failure_dialog "Mucaro AI cannot write to its folder. Move the entire mucaro-ai folder somewhere writable and open Mucaro AI.app again."
+  failure_dialog "Mucaro AI cannot write to its folder. Move the entire mucaro-ai folder somewhere writable and open Mucaro AI Setup.app again."
   exit 2
 fi
 LOG="${ROOT}/.mucaro-runtime/logs/launch-$(date +%Y%m%d-%H%M%S)-$$.log"
 if ! touch "${LOG}"; then
-  failure_dialog "Mucaro AI cannot create its startup log. Check that its folder is writable, then reopen Mucaro AI.app."
+  failure_dialog "Mucaro AI cannot create its startup log. Check that its folder is writable, then reopen Mucaro AI Setup.app."
   exit 2
 fi
 exec </dev/null >>"${LOG}" 2>&1
@@ -34,6 +34,6 @@ wait "${child}"
 code=$?
 trap - TERM INT HUP
 if [ "${code}" -ne 0 ]; then
-  failure_dialog "Mucaro AI could not start (code ${code}). Details are in: ${LOG}. Open Mucaro AI.app again to retry; setup resumes where it stopped."
+  failure_dialog "Mucaro AI could not start (code ${code}). Details are in: ${LOG}. Open Mucaro AI Setup.app again to retry; setup resumes where it stopped."
 fi
 exit "${code}"
