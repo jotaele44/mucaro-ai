@@ -542,7 +542,8 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/contracts.py"
+        "backend/app/contracts.py",
+        "backend/app/execution_records.py"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -554,7 +555,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "Same residue as TGT-016."
+      "notes": "Common-contract source residue is implemented through canonical fail-closed producers for the previously schema-only execution/artifact records. State remains PROVISIONAL pending executed positive and negative gates."
     },
     {
       "requirement_id": "INV-006",
@@ -1227,7 +1228,8 @@
       "implementation_state": "PARTIAL",
       "implementation_refs": [
         "backend/app/contracts.py",
-        "schemas/"
+        "schemas/",
+        "backend/app/execution_records.py"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -1241,7 +1243,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "All nine families have schemas and a registry; runtime enforcement at source, provenance, grant, tool call/audit, citation/answer trace, memory, routing and receipt boundaries. OPEN: runtime enforcement for execution_contract/run_manifest/agent_checkpoint/artifact_identity producers."
+      "notes": "All nine families have schemas and a registry. Source implementation now includes fail-closed producers for execution_contract, run_manifest, agent_checkpoint and artifact_identity, in addition to existing runtime enforcement at source, provenance, grant, tool call/audit, citation/answer trace, memory, routing and receipt boundaries. Execution evidence remains required before PASS."
     },
     {
       "requirement_id": "TGT-017",
