@@ -20,11 +20,12 @@ def make_archive(path, entries, compression=zipfile.ZIP_STORED, timestamp=(2025,
 class FrozenIntakeTests(unittest.TestCase):
     def test_known_uploaded_corpus(self):
         path=Path('/mnt/data/Mucaro AI.zip')
-        if path.is_file():
-            receipt=audit.audit_archive(path)
-            self.assertEqual(receipt['archive_sha256'],audit.EXPECTED_GUI_ZIP_SHA256)
-            self.assertEqual(receipt['payload_manifest_sha256'],audit.EXPECTED_PAYLOAD_MANIFEST_SHA256)
-            self.assertEqual(receipt['member_count'],137)
+        if not path.is_file():
+            self.skipTest('Original user attachment is not included in the repository checkout')
+        receipt=audit.audit_archive(path)
+        self.assertEqual(receipt['archive_sha256'],audit.EXPECTED_GUI_ZIP_SHA256)
+        self.assertEqual(receipt['payload_manifest_sha256'],audit.EXPECTED_PAYLOAD_MANIFEST_SHA256)
+        self.assertEqual(receipt['member_count'],137)
     def test_exact_byte_identity(self):
         with TemporaryDirectory() as d:
             p=Path(d)/'x.zip';make_archive(p,[('a.txt',b'a')]);r=audit.audit_archive(p)
