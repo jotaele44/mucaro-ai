@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from backend.app.config import Settings
+from backend.app.permissions import grant_directory
 from backend.app.tools import (
     ToolRuntimeError,
     approve_tool_call,
@@ -40,6 +41,191 @@ def test_tool_runtime_lists_allowlisted_tools():
     assert by_name["web.fetch"]["mutates_state"] is True
     assert by_name["web.fetch_session"]["requires_approval"] is True
     assert by_name["web.fetch_session"]["mutates_state"] is True
+
+
+def test_tool_registry_exposes_single_governed_gis_and_ocr_bridges() -> None:
+    payload = list_tools()
+    by_name = {row["name"]: row for row in payload["tools"]}
+
+    assert by_name["gis.inspect"] == {
+        "name": "gis.inspect",
+        "description": by_name["gis.inspect"]["description"],
+        "mutates_state": True,
+        "requires_approval": True,
+        "network": "none",
+        "timeout_seconds": by_name["gis.inspect"]["timeout_seconds"],
+        "offline_availability": "AVAILABLE_LOCALLY",
+    }
+    assert by_name["ocr.analyze_image"]["mutates_state"] is True
+    assert by_name["ocr.analyze_image"]["requires_approval"] is True
+    assert by_name["ocr.analyze_image"]["network"] == "none"
+    assert [name for name in by_name if name.startswith("gis.")] == ["gis.inspect"]
+    assert [name for name in by_name if name.startswith("ocr.")] == ["ocr.analyze_image"]
+
+
+def test_gis_tool_requires_directory_grant_before_subsystem_execution(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    external = tmp_path.parent / f"{tmp_path.name}-gis-external"
+    external.mkdir()
+    source = external / "sample.geojson"
+    source.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+
+    monkeypatch.setattr(
+        "backend.app.tools.inspect_geojson",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("GIS subsystem must not run before grant")),
+    )
+
+    requested = request_tool_call("gis.inspect", {"path": str(source)}, cfg=cfg, requested_by="test")
+    call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(call_id, cfg=cfg, executed_by="test")
+
+    assert exc.value.status == "ERROR_PERMISSION_DENIED"
+    call = next(row for row in list_tool_calls(cfg)["tool_calls"] if row["tool_call_id"] == call_id)
+    assert call["status"] == "FAILED"
+    assert call["result"]["status"] == "ERROR_PERMISSION_DENIED"
+
+
+def test_gis_tool_executes_after_grant_and_propagates_settings(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    external = tmp_path.parent / f"{tmp_path.name}-gis-granted"
+    external.mkdir()
+    source = external / "sample.geojson"
+    source.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+    grant_directory(external, cfg, granted_by="test", reason="TGT-038 regression")
+    observed = {}
+
+    def fake_inspect(path: Path, *, cfg: Settings):
+        observed["path"] = path
+        observed["cfg"] = cfg
+        return {"status": "GIS_INSPECT_OK", "report_id": "gisreport_test"}
+
+    monkeypatch.setattr("backend.app.tools.inspect_geojson", fake_inspect)
+    requested = request_tool_call("gis.inspect", {"path": str(source)}, cfg=cfg, requested_by="test")
+    call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+    executed = run_tool_call(call_id, cfg=cfg, executed_by="test")
+
+    assert executed["status"] == "TOOL_CALL_EXECUTED"
+    assert executed["result"]["status"] == "GIS_INSPECT_OK"
+    assert observed == {"path": source, "cfg": cfg}
+
+
+def test_ocr_tool_requires_directory_grant_before_subsystem_execution(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    external = tmp_path.parent / f"{tmp_path.name}-ocr-external"
+    external.mkdir()
+    source = external / "sample.png"
+    source.write_bytes(b"not-an-image")
+
+    monkeypatch.setattr(
+        "backend.app.tools.analyze_image_ocr",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("OCR subsystem must not run before grant")),
+    )
+    requested = request_tool_call("ocr.analyze_image", {"path": str(source)}, cfg=cfg, requested_by="test")
+    call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(call_id, cfg=cfg, executed_by="test")
+
+    assert exc.value.status == "ERROR_PERMISSION_DENIED"
+
+
+def test_ocr_tool_executes_after_grant_and_propagates_bounded_arguments(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    external = tmp_path.parent / f"{tmp_path.name}-ocr-granted"
+    external.mkdir()
+    source = external / "sample.png"
+    source.write_bytes(b"fixture")
+    grant_directory(external, cfg, granted_by="test", reason="TGT-038 regression")
+    observed = {}
+
+    def fake_ocr(path: Path, *, cfg: Settings, language: str, layout_mode: str, timeout_seconds: int):
+        observed.update(
+            path=path,
+            cfg=cfg,
+            language=language,
+            layout_mode=layout_mode,
+            timeout_seconds=timeout_seconds,
+        )
+        return {"status": "OCR_ANALYSIS_OK", "report_id": "ocrreport_test"}
+
+    monkeypatch.setattr("backend.app.tools.analyze_image_ocr", fake_ocr)
+    requested = request_tool_call(
+        "ocr.analyze_image",
+        {"path": str(source), "language": "eng", "layout_mode": "auto", "timeout_seconds": 45},
+        cfg=cfg,
+        requested_by="test",
+    )
+    call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+    executed = run_tool_call(call_id, cfg=cfg, executed_by="test")
+
+    assert executed["result"]["status"] == "OCR_ANALYSIS_OK"
+    assert observed == {
+        "path": source,
+        "cfg": cfg,
+        "language": "eng",
+        "layout_mode": "auto",
+        "timeout_seconds": 45,
+    }
+
+
+def test_gis_and_ocr_tool_errors_preserve_typed_statuses(tmp_path: Path, monkeypatch) -> None:
+    from backend.app.gis_processing import GISProcessingError
+    from backend.app.ocr_analysis import OCRAnalysisError
+
+    cfg = make_settings(tmp_path)
+    gis_source = tmp_path / "bad.geojson"
+    gis_source.write_text("{}", encoding="utf-8")
+    ocr_source = tmp_path / "bad.png"
+    ocr_source.write_bytes(b"x")
+
+    monkeypatch.setattr(
+        "backend.app.tools.inspect_geojson",
+        lambda *args, **kwargs: (_ for _ in ()).throw(GISProcessingError("ERROR_GIS_TEST", "gis failure")),
+    )
+    monkeypatch.setattr(
+        "backend.app.tools.analyze_image_ocr",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OCRAnalysisError("ERROR_OCR_TEST", "ocr failure")),
+    )
+
+    for tool_name, path, expected in (
+        ("gis.inspect", gis_source, "ERROR_GIS_TEST"),
+        ("ocr.analyze_image", ocr_source, "ERROR_OCR_TEST"),
+    ):
+        requested = request_tool_call(tool_name, {"path": str(path)}, cfg=cfg, requested_by="test")
+        call_id = requested["tool_call"]["tool_call_id"]
+        approve_tool_call(call_id, cfg=cfg, approved_by="test")
+        with pytest.raises(ToolRuntimeError) as exc:
+            run_tool_call(call_id, cfg=cfg, executed_by="test")
+        assert exc.value.status == expected
+
+
+def test_ocr_tool_rejects_unbounded_timeout_before_subsystem_execution(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    source = tmp_path / "sample.png"
+    source.write_bytes(b"x")
+    monkeypatch.setattr(
+        "backend.app.tools.analyze_image_ocr",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("invalid arguments must fail before OCR")),
+    )
+    requested = request_tool_call(
+        "ocr.analyze_image",
+        {"path": str(source), "timeout_seconds": 121},
+        cfg=cfg,
+        requested_by="test",
+    )
+    call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(call_id, cfg=cfg, executed_by="test")
+
+    assert exc.value.status == "ERROR_OCR_TIMEOUT_INVALID"
 
 
 def test_tool_runtime_requires_approval_before_execution(tmp_path: Path):
