@@ -232,7 +232,7 @@ Observed success markers:
   current distribution blockers through the supported CLI boundary while
   `scripts/package_desktop.py` remains the desktop-package manifest entrypoint.
 - `mucaro package macos-app` builds or verifies a source-bound local
-  `Mucaro AI.app` bundle under `data/exports/desktop_apps`. The bundle launches
+  `Mucaro AI Setup.app` bundle under `data/exports/desktop_apps`. The bundle launches
   this checkout with the recorded Python executable and delegates to
   `scripts/launch_app.py`; portable signed installer, embedded runtime,
   no-setup reinstall, upgrade, and rollback remain open.
