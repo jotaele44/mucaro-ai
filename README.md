@@ -4,7 +4,7 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-**On macOS, double-click `Mucaro AI.app` in this checkout.** It runs setup quietly and opens
+**On macOS, double-click `Mucaro AI Setup.app` in this checkout.** It runs setup quietly and opens
 Mucaro in its own native window. Keep the app next to `pyproject.toml`; move the whole folder
 together. No Terminal or browser opens. The `.command` file is a legacy console launcher.
 Windows continues to use `Mucaro AI.cmd`.
@@ -267,7 +267,7 @@ tracked source files, refuses dirty worktrees by default, and records SHA-256
 receipts for the archive and every member.
 
 Use `mucaro package macos-app --format text` to build a local source-bound
-`Mucaro AI.app` under `data/exports/desktop_apps`. Double-clicking that app
+`Mucaro AI Setup.app` under `data/exports/desktop_apps`. Double-clicking that app
 launches this checkout through silent setup and opens the native window. It provisions private
 runtimes on first use. This is not yet a portable
 signed installer with embedded runtime, reinstall, upgrade, and rollback
