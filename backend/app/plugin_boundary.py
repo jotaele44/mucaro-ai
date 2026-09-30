@@ -78,7 +78,9 @@ def _files(plugin: Path) -> list[dict[str, Any]]:
                 raise PluginBoundaryError("INVALID_PLUGIN_MEMBER", "Unsafe or excessive member path")
             kind = path.lstat().st_mode
             if stat.S_ISLNK(kind) or not (stat.S_ISDIR(kind) or stat.S_ISREG(kind)):
-                raise PluginBoundaryError("INVALID_PLUGIN_MEMBER", f"Symlink/special member: {path.relative_to(plugin)}")
+                raise PluginBoundaryError(
+                    "INVALID_PLUGIN_MEMBER", f"Symlink/special member: {path.relative_to(plugin)}"
+                )
         for name in names:
             path = Path(current) / name
             relative = path.relative_to(plugin).as_posix()
