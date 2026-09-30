@@ -231,7 +231,7 @@
       "dependencies": [
         "N07"
       ],
-      "state": "OPEN",
+      "state": "BLOCKED",
       "risk": "MEDIUM",
       "user_value": "HIGH",
       "downstream_unlock_value": "MEDIUM",
@@ -239,8 +239,8 @@
       "evidence_required": [
         "frozen retrieval benchmark with thresholds"
       ],
-      "blocker": null,
-      "notes": ""
+      "blocker": "BLK-ACTIONS-001",
+      "notes": "RT-10/MATRIX-007 exact-head execution is blocked by repository-wide GitHub-hosted runner admission failure: jobs are created but execute zero steps. Source/threshold redesign is not authorized by this blocker."
     },
     {
       "node_id": "N10",
