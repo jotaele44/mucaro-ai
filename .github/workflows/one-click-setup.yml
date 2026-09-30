@@ -9,6 +9,10 @@ on:
   pull_request:
     paths:
       - "Mucaro AI.command"
+      - "Mucaro AI.app/**"
+      - "scripts/native_start.sh"
+      - "scripts/native_window.py"
+      - "backend/tests/test_native_launch.py"
       - "Mucaro AI.cmd"
       - ".gitattributes"
       - "scripts/one_click*"
@@ -24,6 +28,9 @@ on:
       - main
     paths:
       - "Mucaro AI.command"
+      - "Mucaro AI.app/**"
+      - "scripts/native_start.sh"
+      - "scripts/native_window.py"
       - "Mucaro AI.cmd"
       - "scripts/one_click*"
       - "scripts/launch_app.py"
@@ -76,6 +83,15 @@ jobs:
           grep -q "ONE_CLICK_FAST_PATH" "$RUNNER_TEMP/run2.log"
           grep -q "DESKTOP_SMOKE_OK" "$RUNNER_TEMP/run2.log"
           test "$elapsed" -lt 90
+      - name: Silent source app smoke (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          env -i HOME="$RUNNER_TEMP/home" PATH="$RUNNER_TEMP/stubs:/usr/bin:/bin:/usr/sbin:/sbin" LANG=en_US.UTF-8 CI=true \
+            "./Mucaro AI.app/Contents/MacOS/mucaro-ai" --smoke-test --no-browser > "$RUNNER_TEMP/silent-app.log" 2>&1
+          test ! -s "$RUNNER_TEMP/silent-app.log"
+          grep -q "DESKTOP_SMOKE_OK" .mucaro-runtime/logs/launch-*.log
+          grep -q "DESKTOP_BACKEND_PORT_CLOSED" .mucaro-runtime/logs/launch-*.log
+          .venv/bin/python -c "import webview, AppKit, Foundation, WebKit"
       - name: Verify isolation
         run: |
           if [ -s "$RUNNER_TEMP/tripwire.txt" ]; then echo "setup ran a PATH tool:"; cat "$RUNNER_TEMP/tripwire.txt"; exit 1; fi
