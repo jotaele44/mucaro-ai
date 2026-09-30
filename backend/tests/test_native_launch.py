@@ -40,6 +40,11 @@ def test_finder_setup_is_silent_and_forces_native_window(tmp_path, code):
     assert "setup error" in logs[0].read_text()
 
 
+def test_source_checkout_reserves_release_app_name_for_packaged_artifacts() -> None:
+    assert not (ROOT / "Mucaro AI.app").exists()
+    assert (ROOT / "Mucaro AI Setup.app").is_dir()
+
+
 @pytest.mark.skipif(os.name == "nt", reason="macOS shell entry point")
 def test_source_app_is_bound_to_silent_launcher_and_can_move_with_checkout(tmp_path):
     root = tmp_path / "moved checkout"
