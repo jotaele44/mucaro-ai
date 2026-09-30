@@ -108,7 +108,7 @@ def _tracked_app_bundle_root(value: str) -> str | None:
     prefix: list[str] = []
     for part in parsed.parts:
         prefix.append(part)
-        if part.endswith(".app"):
+        if part.lower().endswith(".app"):
             return PurePosixPath(*prefix).as_posix()
     return None
 
@@ -307,12 +307,23 @@ def verify_portable_macos_app(app_path: Path, *, expected_head: str | None = Non
         not nested_app_members,
         f"nested_app_members={nested_app_members}",
     )
+    exclusion_receipt_present = (
+        "excluded_tracked_app_bundles" in payload["application"]
+        or "excluded_tracked_app_bundle_count" in payload["application"]
+    )
     check(
         "application_exclusion_receipt",
-        isinstance(excluded_app_bundles, list)
-        and excluded_app_count == len(excluded_app_bundles)
-        and all(isinstance(item, str) and item.endswith(".app") for item in excluded_app_bundles),
-        f"count={excluded_app_count} bundles={excluded_app_bundles}",
+        not exclusion_receipt_present
+        or (
+            isinstance(excluded_app_bundles, list)
+            and excluded_app_count == len(excluded_app_bundles)
+            and all(isinstance(item, str) and item.lower().endswith(".app") for item in excluded_app_bundles)
+        ),
+        (
+            "legacy_v1_manifest_without_exclusion_receipt"
+            if not exclusion_receipt_present
+            else f"count={excluded_app_count} bundles={excluded_app_bundles}"
+        ),
     )
     check("runtime_python", runtime_python.is_file() and os.access(runtime_python, os.X_OK), str(runtime_python))
     check("frontend_index", frontend_index.is_file(), str(frontend_index))
