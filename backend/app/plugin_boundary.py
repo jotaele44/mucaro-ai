@@ -49,9 +49,18 @@ def _canonical_sha256(value: Any) -> str:
                                     ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
+def _reject_symlink_ancestors(path: Path) -> None:
+    if not path.is_absolute():
+        raise PluginBoundaryError("INVALID_PLUGIN_ROOT", "Expected absolute path")
+    for candidate in (path, *path.parents):
+        if candidate.is_symlink():
+            raise PluginBoundaryError("INVALID_PLUGIN_ROOT", "Symlinked ancestor or root is not allowed")
+
+
 def _root_entry(path: Path, store: Path) -> None:
     # A plugin must be one immediate, real directory child of the operator's store.
-    # Resolve the store only; never resolve the child before rejecting symlinks.
+    _reject_symlink_ancestors(store)
+    _reject_symlink_ancestors(path)
     if not store.is_dir() or store.is_symlink():
         raise PluginBoundaryError("INVALID_PLUGIN_STORE", "Store must be an existing, non-symlink directory")
     if not path.is_absolute() or not store.is_absolute() or path.parent != store:
@@ -64,6 +73,7 @@ def _files(plugin: Path) -> list[dict[str, Any]]:
     members: list[dict[str, Any]] = []
     total = 0
     directories = 0
+    seen_portable_paths: dict[str, str] = {}
     for current, dirs, names in os.walk(plugin, topdown=True, followlinks=False):
         dirs.sort()
         names.sort()
@@ -73,6 +83,10 @@ def _files(plugin: Path) -> list[dict[str, Any]]:
         for name in dirs + names:
             path = Path(current) / name
             relative = path.relative_to(plugin).as_posix()
+            portable_key = relative.casefold()
+            previous = seen_portable_paths.setdefault(portable_key, relative)
+            if previous != relative:
+                raise PluginBoundaryError("AMBIGUOUS_MEMBER_CASE", "Member paths collide on case-insensitive devices")
             if (len(relative) > MAX_MEMBER_PATH_LENGTH or any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF
                                                         for c in relative)):
                 raise PluginBoundaryError("INVALID_PLUGIN_MEMBER", "Unsafe or excessive member path")
@@ -175,6 +189,9 @@ def authorize_snapshot(path: Path, store: Path, *, policy: CapabilityPolicy, exp
 
 
 def inspect_store(store: Path, *, policy: CapabilityPolicy, offline: bool = True) -> dict[str, Any]:
+    if not isinstance(offline, bool):
+        raise PluginBoundaryError("INVALID_OFFLINE_FLAG", "Offline mode must be boolean")
+    _reject_symlink_ancestors(store)
     if not store.is_absolute() or not store.is_dir() or store.is_symlink():
         raise PluginBoundaryError("INVALID_PLUGIN_STORE", "Store must be a real absolute directory")
     receipts: list[dict[str, Any]] = []
