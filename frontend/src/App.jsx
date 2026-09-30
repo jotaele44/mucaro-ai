@@ -12,7 +12,7 @@ import { SourcesWorkspace } from "./components/workspaces/SourcesWorkspace.jsx";
 import { MucaroPet } from "./components/MucaroPet.jsx";
 import { MUCARO_BRAND_ICON } from "./brandLogo.js";
 import { derivePetRuntime } from "./petRuntime.js";
-import { effectiveTheme, normalizeUIPrefs, readUIPrefs, writeUIPrefs } from "./uiPreferences.js";
+import { effectiveTheme, normalizeUIPrefs, readUIPrefs, uiText, writeUIPrefs } from "./uiPreferences.js";
 
 const MOBILE_NAV_QUERY = "(max-width: 760px), (max-height: 550px) and (pointer: coarse)";
 const DEFAULT_OPTIONS = { model_provider: "mock", retrieval_strategy: "hybrid", allow_live: false, top_k: 5 };
@@ -289,6 +289,10 @@ export function App() {
         onPetOpen={() => setPetPanelOpen(true)}
         petState={derivePetRuntime(health.state, petObservation).state}
       />
+      <button type="button" className="context-edge-handle"
+        aria-label={uiText(uiPrefs.language, contextOpen ? "collapse" : "expand")}
+        aria-expanded={contextOpen} aria-controls="navigation-shell"
+        onClick={() => setContextOpen(!contextOpen)}><span aria-hidden="true">☰</span></button>
       <div className="nav-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
       <main id="main" className="main" tabIndex={-1} inert={mobileOverlay && navOpen}>
         <div className="mobile-bar">
