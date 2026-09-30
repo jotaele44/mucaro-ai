@@ -94,7 +94,8 @@ def _validate_manifest(manifest: Any, members: set[str]) -> dict[str, Any]:
         raise PluginIntakeError("ERROR_PLUGIN_CONTRIBUTIONS_INVALID")
     seen: set[str] = set()
     for entry in contributions:
-        if not isinstance(entry, dict) or set(entry) != {"kind", "path"} or entry["kind"] not in {"reference", "prompt_template", "schema"}:
+        if (not isinstance(entry, dict) or set(entry) != {"kind", "path"} or
+                not isinstance(entry["kind"], str) or entry["kind"] not in {"reference", "prompt_template", "schema"}):
             raise PluginIntakeError("ERROR_PLUGIN_CONTRIBUTION_INVALID")
         path = entry["path"]
         if not isinstance(path, str) or path not in members or path == "mucaro-plugin.json" or path in seen:
@@ -110,7 +111,10 @@ def _validate_manifest(manifest: Any, members: set[str]) -> dict[str, Any]:
 
 
 def _read_registry(cfg: Settings) -> list[dict[str, Any]]:
-    payload = read_json(cfg.processed_dir / REGISTRY_FILE, [])
+    try:
+        payload = read_json(cfg.processed_dir / REGISTRY_FILE, [])
+    except (OSError, ValueError, TypeError) as exc:
+        raise PluginIntakeError("ERROR_PLUGIN_REGISTRY_INVALID", type(exc).__name__) from exc
     if not isinstance(payload, list) or any(not isinstance(x, dict) for x in payload):
         raise PluginIntakeError("ERROR_PLUGIN_REGISTRY_INVALID")
     required = {"plugin_id", "version", "archive_sha256", "state", "member_manifest_sha256", "member_manifest"}
