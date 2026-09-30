@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, streamRunEvents } from "../api.js";
 import { ACTIVE_STATES, deriveRun, transcriptText } from "../feed.js";
+import { isReportableRunObservation } from "../petRuntime.js";
 import { Composer } from "./Composer.jsx";
 import { EvidencePanel } from "./EvidencePanel.jsx";
 import { RichText } from "./RichText.jsx";
@@ -81,6 +82,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
   const feedRef = useRef(null);
   const stick = useRef(true);
   const lastReportedRuntime = useRef(null);
+  const liveRunIds = useRef(new Set());
 
   const loadRun = useCallback(async (runId) => {
     const payload = await api.runEvents(runId);
@@ -97,6 +99,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
         runId,
         after,
         (event) => {
+          liveRunIds.current.add(runId);
           setRuns((previous) => {
             const entry = previous.get(runId);
             if (!entry || entry.events.some((row) => row.seq === event.seq)) return previous;
@@ -173,6 +176,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
 
   useEffect(() => {
     if (!onRuntimeEvent || !lastStatus || !observedRunId || conversation?.conversation_id !== conversationId) return;
+    if (!isReportableRunObservation(observedRunId, lastStatus, liveRunIds.current)) return;
     const signature = observedRunId + ":" + lastStatus;
     if (signature === lastReportedRuntime.current) return;
     lastReportedRuntime.current = signature;
@@ -204,6 +208,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
       if (creating) id = (await api.createConversation(prompt.slice(0, 60))).conversation_id;
       const key = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const result = await api.sendMessage(id, { prompt, mode, idempotency_key: key, options: defaultOptions });
+      liveRunIds.current.add(result.run.run_id);
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
       if (creating) onConversationCreated(id);
       else {
