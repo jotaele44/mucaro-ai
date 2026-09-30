@@ -19,8 +19,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.app.env_file import merge_env_file  # noqa: E402
+from scripts import native_window  # noqa: E402
 
 BACKEND_APP = "backend.app.main:app"
+WINDOW_PID_FILE = ROOT / ".mucaro-runtime" / "window.pid"
+WINDOW_STORAGE_DIR = ROOT / ".mucaro-runtime" / "webview"
 
 
 def build_env() -> dict[str, str]:
@@ -217,6 +220,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Launch Mucaro AI as a desktop-style local app.")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument(
+        "--native",
+        action="store_true",
+        help="Show the app in its own native window instead of the system browser (what Mucaro AI.app runs).",
+    )
     parser.add_argument("--skip-build", action="store_true", help="Do not build frontend/dist if missing.")
     parser.add_argument(
         "--frontend-verified",
@@ -281,7 +289,21 @@ def _launch(args: argparse.Namespace) -> int:
                 return 7
             print(f"BACKEND_READY {health_url(port)}")
 
-        if not args.no_browser:
+        if args.native and not args.smoke_test:
+            if proc is None and args.exit_if_running and native_window.activate_existing_window(WINDOW_PID_FILE):
+                print(f"DESKTOP_LAUNCH_REUSED {url}")
+                return 0
+            print(f"OPENING_NATIVE_WINDOW {url}", flush=True)
+            try:
+                native_window.run_window(url, storage_dir=WINDOW_STORAGE_DIR, pid_file=WINDOW_PID_FILE)
+            except ImportError as exc:
+                # Never fall back to a browser: the app is meant to be self-contained.
+                print(f"ERROR_NATIVE_WINDOW_UNAVAILABLE {exc}", file=sys.stderr)
+                return 10
+            print("DESKTOP_WINDOW_CLOSED")
+            return 0
+
+        if not args.no_browser and not args.native:
             print(f"OPENING_BROWSER {url}")
             webbrowser.open(url)
 

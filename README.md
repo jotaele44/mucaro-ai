@@ -4,7 +4,9 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-**Double-click `Mucaro AI.command` (macOS) or `Mucaro AI.cmd` (Windows).** That is the whole setup.
+**macOS: double-click `Mucaro AI.app`.** It sets itself up silently (no Terminal, no browser; a notification says when the first-run download starts, 2-5 minutes) and opens Mucaro AI in its own window. Close the window to quit. Problems appear in a dialog; the log is `.mucaro-runtime/logs/app-launch.log`. Keep the app inside the mucaro-ai folder.
+
+**Windows / Linux / terminal users:** double-click `Mucaro AI.cmd` (Windows) or run `Mucaro AI.command`; these still use a console window and your browser.
 
 The first double-click downloads private, checksum-verified copies of Python 3.12 and Node.js
 into this folder (about 200 MB to download, about 700 MB on disk, 2-5 minutes on a typical

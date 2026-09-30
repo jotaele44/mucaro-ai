@@ -1,0 +1,33 @@
+#!/bin/bash
+# Mucaro AI.app: double-click to set up (first run only) and open Mucaro AI in its own window.
+# No Terminal and no browser: all output goes to .mucaro-runtime/logs/app-launch.log, progress and
+# failures are shown as macOS notifications and dialogs. This app must stay inside the mucaro-ai folder.
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
+cd "${ROOT}" || exit 2
+mkdir -p "${ROOT}/.mucaro-runtime/logs" 2>/dev/null
+LOG="${ROOT}/.mucaro-runtime/logs/app-launch.log"
+
+osa() { /usr/bin/osascript -e "$1" -- "$2" >/dev/null 2>&1 </dev/null || true; }
+notify() { osa 'on run argv
+display notification (item 1 of argv) with title "Mucaro AI"
+end run' "$1"; }
+alert() { osa 'on run argv
+display dialog (item 1 of argv) with title "Mucaro AI" buttons {"OK"} default button "OK" with icon caution
+end run' "$1"; }
+
+if [ ! -x "${ROOT}/.venv/bin/python" ] || [ ! -d "${ROOT}/frontend/dist" ]; then
+  notify "Setting up for the first time. This takes 2-5 minutes; the window opens by itself."
+fi
+
+{ printf '\n=== %s launch ===\n' "$(date)"; } >>"${LOG}" 2>&1
+/bin/bash "${ROOT}/scripts/one_click.sh" --native >>"${LOG}" 2>&1 </dev/null
+rc=$?
+if [ "${rc}" -ne 0 ] && [ "${rc}" -ne 130 ] && [ "${rc}" -ne 143 ]; then
+  alert "Mucaro AI could not start (code ${rc}).
+
+Details: ${LOG}
+
+Open Mucaro AI again to retry; setup resumes where it stopped."
+fi
+exit "${rc}"

@@ -33,7 +33,8 @@ if str(ROOT) not in sys.path:
 
 from scripts import launch_app  # noqa: E402
 
-PYTHON_EXTRAS = "dev,anthropic"
+# macOS also gets the native window (pywebview) so the app never needs a browser.
+PYTHON_EXTRAS = "dev,anthropic" + (",desktop" if sys.platform == "darwin" else "")
 # Import names that prove the dependency install is usable (runtime, geospatial, live mode, preflight).
 KEY_MODULES = (
     "fastapi",
@@ -50,7 +51,7 @@ KEY_MODULES = (
     "anthropic",
     "httpx",
     "pytest",
-)
+) + (("webview",) if sys.platform == "darwin" else ())
 NPM_REGISTRY = "https://registry.npmjs.org/"
 LOG_KEEP = 10
 TOTAL_STEPS = 6
