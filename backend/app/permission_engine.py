@@ -6,6 +6,7 @@ from typing import Iterable
 
 from .capability_policy import KNOWN_CAPABILITIES, CapabilityPolicy, evaluate_capabilities
 from .config import Settings, settings
+from .contracts import validate_contract
 from .distribution_policy import (
     APP_STORE_DENIED_CAPABILITIES,
     MAC_APP_STORE_DISTRIBUTION_CHANNEL,
@@ -78,7 +79,7 @@ class PermissionDecision:
         return self.decision == ALLOW
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        payload = {
             "schema_version": PERMISSION_DECISION_SCHEMA_VERSION,
             "decision": self.decision,
             "capability": self.capability,
@@ -87,6 +88,7 @@ class PermissionDecision:
             "origin": self.origin,
             "reasons": list(self.reasons),
         }
+        return validate_contract("permission_decision", payload)
 
 
 def default_policy() -> CapabilityPolicy:
