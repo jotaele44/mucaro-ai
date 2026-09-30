@@ -10,11 +10,18 @@ export const PET_RUNTIME_STATES = Object.freeze({
   CANCELLED: "IDLE",
   QUEUED: "IDLE",
 });
-export function derivePetRuntime(healthState, observation) {
+export function derivePetRuntime(healthState, observation, now = Date.now()) {
   if (healthState === "error") return { state: "NOTIFY", label: "Local service unreachable", source: "health" };
   if (healthState !== "ok") return { state: "IDLE", label: "Waiting for local service", source: "health" };
   const key = observation?.runState;
   const id = observation?.runId;
+  // Terminal indications expire; never display an old success as live activity.
+  // An active run does not expire merely because its latest state was unchanged.
+  if (!["RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT", "QUEUED"].includes(key)
+    && typeof observation?.observedAt === "number"
+    && Number.isFinite(observation.observedAt)
+    && now - observation.observedAt > 20_000)
+    return { state: "IDLE", label: "Ready", source: "local" };
   if (typeof id !== "string" || !id.trim() || !Object.hasOwn(PET_RUNTIME_STATES, key))
     return { state: "IDLE", label: "Ready", source: "local" };
   const labels = {
