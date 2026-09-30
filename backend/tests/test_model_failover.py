@@ -103,7 +103,7 @@ def test_policy_rejects_invalid_attempts_and_negative_backoff() -> None:
         FailoverPolicy(backoff_seconds=(-1.0,))
 
 
-def _ready_providers() -> list[dict]:
+def _ready_providers(*_args, **_kwargs) -> list[dict]:
     base = {
         "requires_live_mode": False,
         "api_key_env": None,
