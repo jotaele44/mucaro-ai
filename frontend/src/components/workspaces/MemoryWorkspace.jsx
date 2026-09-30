@@ -40,7 +40,7 @@ export function MemoryWorkspace({ announce }) {
         <p className="muted small">Memory is context about you, used only when enabled. It never approves actions and is never cited as evidence.</p>
       </header>
       {error && <p className="error-card" role="alert">{error.status}: {error.message}</p>}
-      <form className="inline-form" onSubmit={add}>
+      <form id="memory-add" className="inline-form" onSubmit={add}>
         <label className="field grow">
           <span>Remember</span>
           <input value={content} onChange={(event) => setContent(event.target.value)} maxLength={800} placeholder="Prefer tables for comparisons" />
@@ -57,7 +57,7 @@ export function MemoryWorkspace({ announce }) {
         <button type="submit" className="primary-button" disabled={!content.trim()}>Save</button>
       </form>
       {!rows.length && <p className="empty-state muted">Nothing remembered.</p>}
-      <ul className="memory-list">
+      <ul id="memory-list" className="memory-list">
         {rows.map((row) => (
           <li key={row.memory_id} className={row.enabled ? "" : "disabled-row"}>
             <div className="grow">
