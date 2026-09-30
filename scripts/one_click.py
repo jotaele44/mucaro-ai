@@ -274,12 +274,12 @@ class OneClickSetup:
 
     def check_stage0(self) -> None:
         if sys.prefix == sys.base_prefix:
-            raise SetupError("ERROR_NOT_IN_VENV", "start Mucaro AI by double-clicking Mucaro AI.app (macOS) or Mucaro AI.cmd (Windows)")
+            raise SetupError("ERROR_NOT_IN_VENV", "start Mucaro AI by double-clicking Mucaro AI Setup.app (macOS) or Mucaro AI.cmd (Windows)")
         for label, path in (("uv", self.uv), ("node", self.node), ("npm", self.npm_cli)):
             if not path.is_file():
                 raise SetupError(
                     "ERROR_STAGE0_MISSING",
-                    f"{label} not found at {path}; start Mucaro AI by double-clicking Mucaro AI.app (macOS) or Mucaro AI.cmd (Windows)",
+                    f"{label} not found at {path}; start Mucaro AI by double-clicking Mucaro AI Setup.app (macOS) or Mucaro AI.cmd (Windows)",
                 )
 
     def python_deps(self) -> None:
