@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { ChatView } from "./components/ChatView.jsx";
 import { NavigationShell } from "./components/NavigationShell.jsx";
@@ -45,6 +45,12 @@ export function App() {
   const [message, setMessage] = useState("");
   const [health, setHealth] = useState({ state: "checking" });
   const [ready, setReady] = useState(false);
+  // An in-flight send may finish after the user has opened/closed another tab.
+  // Refs prevent a stale async ChatView callback from overwriting newer navigation.
+  const tabsRef = useRef(tabs);
+  const selectedRef = useRef(activeTabKey);
+  tabsRef.current = tabs;
+  selectedRef.current = activeTabKey;
 
   const announce = useCallback((text) => {
     setMessage("");
@@ -124,20 +130,35 @@ export function App() {
     if (activeTab.view === "chat") persist("mucaro.activeConversation", activeTab.conversationId);
   }, [activeTab.key, activeTab.view, activeTab.conversationId]);
 
+  function commitNavigation(nextTabs, nextKey) {
+    tabsRef.current = nextTabs;
+    selectedRef.current = nextKey;
+    setTabs(nextTabs);
+    setActiveTabKey(nextKey);
+  }
+
+  function activateTab(key) {
+    if (!tabsRef.current.some((tab) => tab.key === key)) return;
+    selectedRef.current = key;
+    setActiveTabKey(key);
+    setNavOpen(false);
+  }
+
   function openWorkspaceTab(tab) {
-    const outcome = addTab(tabs, tab);
+    const outcome = addTab(tabsRef.current, tab);
     if (outcome.rejected) {
       announce("Ten tabs are open. Close a tab before opening another.");
       return;
     }
-    setTabs(outcome.tabs);
-    setActiveTabKey(outcome.key);
+    commitNavigation(outcome.tabs, outcome.key);
     setNavOpen(false);
   }
 
   function selectWorkspace(id) {
     if (id === "chat") {
-      const recent = activeTab.view === "chat" ? activeTab : tabs.slice().reverse().find((tab) => tab.view === "chat");
+      const currentTabs = tabsRef.current;
+      const recent = currentTabs.find((tab) => tab.key === selectedRef.current && tab.view === "chat")
+        || currentTabs.slice().reverse().find((tab) => tab.view === "chat");
       openWorkspaceTab(recent || makeTab("chat"));
     } else {
       openWorkspaceTab(makeTab(id));
@@ -151,24 +172,27 @@ export function App() {
   }
 
   function closeWorkspaceTab(key) {
-    const outcome = removeTab(tabs, key, activeTabKey);
-    setTabs(outcome.tabs);
-    setActiveTabKey(outcome.key);
+    const outcome = removeTab(tabsRef.current, key, selectedRef.current);
+    commitNavigation(outcome.tabs, outcome.key);
   }
 
   function conversationTransition(key, id) {
-    if (id == null) {
-      // A deleted conversation cannot remain in the tab model or restore on restart.
-      const remaining = tabs.filter((tab) => tab.key !== key);
-      const fresh = remaining.find((tab) => tab.key === "chat:new") || makeTab("chat");
-      setTabs(remaining.some((tab) => tab.key === fresh.key) ? remaining : [...remaining, fresh]);
-      setActiveTabKey(fresh.key);
+    const currentTabs = tabsRef.current;
+    if (!currentTabs.some((tab) => tab.key === key)) {
+      // Delayed result for an intentionally closed tab: preserve server data but no UI resurrection.
+      loadConversations();
       return;
     }
-    const outcome = adoptConversation(tabs, key, id);
+    if (id == null) {
+      const remaining = currentTabs.filter((tab) => tab.key !== key);
+      const fresh = remaining.find((tab) => tab.key === "chat:new") || makeTab("chat");
+      const nextTabs = remaining.some((tab) => tab.key === fresh.key) ? remaining : [...remaining, fresh];
+      commitNavigation(nextTabs, selectedRef.current === key ? fresh.key : selectedRef.current);
+      return;
+    }
+    const outcome = adoptConversation(currentTabs, key, id);
     if (!outcome) return announce("Unable to bind the new conversation to its tab.");
-    setTabs(outcome.tabs);
-    setActiveTabKey(outcome.key);
+    commitNavigation(outcome.tabs, selectedRef.current === key ? outcome.key : selectedRef.current);
     loadConversations();
   }
   return (
@@ -204,7 +228,7 @@ export function App() {
           tabs={tabs}
           activeKey={activeTabKey}
           conversations={conversations}
-          onSelect={(key) => { setActiveTabKey(key); setNavOpen(false); }}
+          onSelect={activateTab}
           onClose={closeWorkspaceTab}
         />
         {ready && (
