@@ -378,3 +378,57 @@ def test_concurrent_ledger_writers_do_not_lose_updates(cfg):
         thread.join()
     assert len(load_directory_grants(cfg)) == 6
     assert not list(Path(cfg.processed_dir).glob(".*.tmp"))
+
+def test_advanced_gis_ocr_and_coding_have_governed_tool_registry_homes():
+    assert "gis.inspect_geojson" in TOOL_REGISTRY
+    assert "ocr.analyze_image" in TOOL_REGISTRY
+    assert "coding.repo_status" in TOOL_REGISTRY
+    for name in ("gis.inspect_geojson", "ocr.analyze_image", "coding.repo_status"):
+        assert TOOL_REGISTRY[name].requires_approval is True
+
+
+def test_gis_tool_refuses_ungranted_external_path(cfg, tmp_path):
+    outside = tmp_path.parent / "external-geo.json"
+    outside.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+    call = request_tool_call("gis.inspect_geojson", {"path": str(outside)}, cfg=cfg)["tool_call"]
+    approve_tool_call(call["tool_call_id"], cfg=cfg)
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(call["tool_call_id"], cfg=cfg)
+    assert exc.value.status == "ERROR_DIRECTORY_PERMISSION_REQUIRED"
+
+
+def test_gis_tool_uses_granted_path_and_governed_handler(cfg, tmp_path, monkeypatch):
+    outside = tmp_path.parent / "granted-geo.json"
+    outside.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+    grant_directory(outside, cfg, granted_by="test")
+    seen = {}
+
+    def fake_inspect(path, *, cfg):
+        seen["path"] = str(path)
+        return {"status": "GIS_INSPECT_OK"}
+
+    monkeypatch.setattr(tools_module, "inspect_geojson", fake_inspect)
+    call = request_tool_call("gis.inspect_geojson", {"path": str(outside)}, cfg=cfg)["tool_call"]
+    approve_tool_call(call["tool_call_id"], cfg=cfg)
+    result = run_tool_call(call["tool_call_id"], cfg=cfg)
+    assert result["result"]["status"] == "GIS_INSPECT_OK"
+    assert seen["path"] == str(outside.resolve())
+
+
+def test_ocr_tool_validates_runtime_arguments_before_handler(cfg, monkeypatch):
+    image = cfg.project_root / "image.png"
+    image.write_bytes(b"not-used-because-handler-is-mocked")
+    called = []
+
+    def fake_ocr(path, **kwargs):
+        called.append((path, kwargs))
+        return {"status": "OCR_ANALYSIS_OK"}
+
+    monkeypatch.setattr(tools_module, "analyze_image_ocr", fake_ocr)
+    call = request_tool_call("ocr.analyze_image", {"path": str(image), "timeout_seconds": 0}, cfg=cfg)["tool_call"]
+    approve_tool_call(call["tool_call_id"], cfg=cfg)
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(call["tool_call_id"], cfg=cfg)
+    assert exc.value.status == "ERROR_OCR_TIMEOUT_INVALID"
+    assert called == []
+
