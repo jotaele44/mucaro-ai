@@ -99,7 +99,10 @@ def run_local_worker(
         raise LocalWorkerError("ERROR_LOCAL_WORKER_REQUEST_TOO_LARGE", str(len(request_bytes)))
 
     preexec_fn, resource_limit_names = _resource_limiter(max_memory_mb, max_cpu_seconds)
-    for capability in ("subprocess.execute", *((("network.public_http",)) if network_allowed else ())):
+    required_permissions = ["subprocess.execute"]
+    if network_allowed:
+        required_permissions.append("network.public_http")
+    for capability in required_permissions:
         try:
             require(
                 PermissionRequest(capability=capability, subject=skill_id, target="local_worker", origin="operator"),
