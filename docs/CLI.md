@@ -1048,10 +1048,9 @@ before a release or distribution decision.
 
 Use `mucaro package macos-app --format text` to build a local double-clickable
 `Mucaro AI Setup.app` bundle under `data/exports/desktop_apps`. The bundle is a
-source-bound wrapper: it launches this checked-out repository with the Python
-executable recorded at build time, then runs `scripts/launch_app.py`, which
-starts the local backend and opens the browser UI. Use `mucaro package
-macos-app --verify data/exports/desktop_apps/Mucaro\ AI.app --format text` to
+source-bound wrapper: it launches this checked-out repository through the silent
+setup path, which provisions its private runtime and opens the native window.
+Use `mucaro package macos-app --verify data/exports/desktop_apps/Mucaro\ AI\ Setup.app --format text` to
 verify the bundle structure, executable bit, Info.plist binding, receipt, and
 launcher target. This is not yet a portable signed installer with embedded
 runtime, reinstall, upgrade, and rollback guarantees, and it is explicitly not
