@@ -73,13 +73,20 @@ export const PET_SIZES = Object.freeze({ small: 44, medium: 56, large: 72 });
 export function viewportPoint(position, width, height, size) {
   const w = Math.max(0, Number.isFinite(width) ? width : 0);
   const h = Math.max(0, Number.isFinite(height) ? height : 0);
-  const margin = 8;
-  const maxX = Math.max(0, w - size - 2 * margin);
-  const maxY = Math.max(0, h - size - 2 * margin);
-  return { x: margin + (bounded(position?.x) ?? 1) * maxX, y: margin + (bounded(position?.y) ?? 0.5) * maxY };
+  const s = Math.max(0, Number.isFinite(size) ? size : 0);
+  const gapX = Math.min(8, Math.max(0, (w - s) / 2));
+  const gapY = Math.min(8, Math.max(0, (h - s) / 2));
+  const maxX = Math.max(0, w - s - 2 * gapX), maxY = Math.max(0, h - s - 2 * gapY);
+  return { x: gapX + (bounded(position?.x) ?? 1) * maxX, y: gapY + (bounded(position?.y) ?? 0.5) * maxY };
 }
 export function normalizeViewportPoint(x, y, width, height, size) {
-  const maxX = Math.max(0, width - size - 16), maxY = Math.max(0, height - size - 16);
-  return { x: maxX > 0 ? Math.min(1, Math.max(0, (x - 8) / maxX)) : 0,
-    y: maxY > 0 ? Math.min(1, Math.max(0, (y - 8) / maxY)) : 0 };
+  const w = Math.max(0, Number.isFinite(width) ? width : 0);
+  const h = Math.max(0, Number.isFinite(height) ? height : 0);
+  const s = Math.max(0, Number.isFinite(size) ? size : 0);
+  const gapX = Math.min(8, Math.max(0, (w - s) / 2));
+  const gapY = Math.min(8, Math.max(0, (h - s) / 2));
+  const maxX = Math.max(0, w - s - 2 * gapX), maxY = Math.max(0, h - s - 2 * gapY);
+  const clamp = (v) => Math.min(1, Math.max(0, v));
+  return { x: maxX > 0 && Number.isFinite(x) ? clamp((x - gapX) / maxX) : 0,
+    y: maxY > 0 && Number.isFinite(y) ? clamp((y - gapY) / maxY) : 0 };
 }
