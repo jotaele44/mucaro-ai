@@ -1,19 +1,101 @@
 {
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "$id":"https://mucaro.local/schemas/permission_decision.schema.json",
-  "title":"Mucaro Permission Decision 1.0",
-  "type":"object","additionalProperties":false,
-  "required":["schema_version","decision","capability","subject","target","origin","reasons"],
-  "properties":{
-    "schema_version":{"const":"mucaro-permission-decision/1.0"},
-    "decision":{"enum":["ALLOW","ASK","DENY"]},
-    "capability":{"type":"string","minLength":1},
-    "subject":{"type":"string","minLength":1},
-    "target":{"type":["string","null"]},
-    "origin":{"enum":["operator","planning","agent"]},
-    "reasons":{"type":"array","items":{"type":"string"}}
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/permission_decision.schema.json",
+  "title": "Mucaro Permission Decision 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "decision",
+    "capability",
+    "subject",
+    "target",
+    "origin",
+    "reasons"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mucaro-permission-decision/1.0"
+    },
+    "decision": {
+      "enum": [
+        "ALLOW",
+        "ASK",
+        "DENY"
+      ]
+    },
+    "capability": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "target": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "origin": {
+      "type": "string"
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
   },
-  "allOf":[
-    {"if":{"properties":{"decision":{"enum":["ASK","DENY"]}}},"then":{"properties":{"reasons":{"minItems":1}}}}
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "ASK",
+              "DENY"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "reasons": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "ALLOW",
+              "ASK"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "capability": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "origin": {
+            "enum": [
+              "operator",
+              "planning",
+              "agent"
+            ]
+          }
+        }
+      }
+    }
   ]
 }

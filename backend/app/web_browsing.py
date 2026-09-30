@@ -596,19 +596,19 @@ def fetch_web_snapshot(
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
     policy = policy or WebFetchPolicy()
-    checked = validate_web_fetch_url(url, allow_private_hosts=policy.allow_private_hosts)
     try:
         require(
             PermissionRequest(
                 capability="network.public_http",
                 subject="web_browsing.fetch",
-                target=str(checked["fetch_url"]),
+                target=str(url),
                 origin="operator",
             ),
             cfg=cfg,
         )
     except PermissionEngineError as exc:
         raise WebBrowsingError(exc.status, exc.detail) from exc
+    checked = validate_web_fetch_url(url, allow_private_hosts=policy.allow_private_hosts)
     requested_at = utc_now()
     redirect_chain: list[dict[str, Any]] = []
     opener = _governed_opener(policy, _GovernedRedirectHandler(policy, redirect_chain))
