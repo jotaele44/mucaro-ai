@@ -14,7 +14,7 @@ const PATHS = {
 function Icon({ type }) {
   return <svg className="rail-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" focusable="false" aria-hidden="true"><path d={PATHS[type] || PATHS.chat} /></svg>;
 }
-export function NavigationShell({ view, contextOpen, setContextOpen, conversations, activeId, filter, setFilter, onSelect, onConversation, onTasks, onCloseMobile }) {
+export function NavigationShell({ view, contextOpen, setContextOpen, conversations, activeId, filter, setFilter, onSelect, onConversation, onTasks, onCloseMobile, inactive = false }) {
   const route = ROUTES.find((row) => row.id === view) || ROUTES[0];
   const visible = conversations.filter((row) => String(row.title || "").toLowerCase().includes(filter.trim().toLowerCase()));
 
@@ -27,7 +27,7 @@ export function NavigationShell({ view, contextOpen, setContextOpen, conversatio
     window.requestAnimationFrame(() => element.focus({ preventScroll: true }));
   }
   return (
-    <div id="navigation-shell" className="sidebar">
+    <div id="navigation-shell" className="sidebar" inert={inactive}>
       <nav className="primary-rail" aria-label="Primary">
         <button type="button" className="rail-brand" aria-label="Home — Chat" title="Mucaro home" onClick={() => onSelect("chat")}><span aria-hidden="true">M</span></button>
         <ul className="rail-pages">
