@@ -56,7 +56,12 @@ export function MemoryWorkspace({ announce }) {
         </label>
         <button type="submit" className="primary-button" disabled={!content.trim()}>Save</button>
       </form>
-      {!rows.length && <p className="empty-state muted">Nothing remembered.</p>}
+      {!rows.length && !error && (
+        <div className="empty-state workspace-empty-state">
+          <h2>No saved memory</h2>
+          <p className="muted">Memory stays empty until you explicitly save context. Next: use the Remember field above, choose its kind, then Save.</p>
+        </div>
+      )}
       <ul className="memory-list">
         {rows.map((row) => (
           <li key={row.memory_id} className={row.enabled ? "" : "disabled-row"}>
