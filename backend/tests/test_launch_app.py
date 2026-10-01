@@ -120,6 +120,27 @@ def test_verify_macos_app_bundle_rejects_missing_bundle(tmp_path):
     assert "launcher_executable" in failed_names
 
 
+def test_certify_release_large_file_allowlist_is_path_specific_and_bounded(monkeypatch, tmp_path):
+    monkeypatch.setattr(certify_release, "ROOT", tmp_path)
+    icon = tmp_path / "Mucaro AI.app" / "Contents" / "Resources" / "MucaroAI.icns"
+    icon.parent.mkdir(parents=True)
+    icon.write_bytes(b"x" * 2_500_000)
+
+    gate = certify_release.gate_no_large_files([icon])
+    assert gate.status == "PASS"
+
+    icon.write_bytes(b"x" * 3_000_001)
+    gate = certify_release.gate_no_large_files([icon])
+    assert gate.status == "FAIL"
+    assert "Mucaro AI.app/Contents/Resources/MucaroAI.icns:3000001" in gate.detail
+
+    unrelated = tmp_path / "unexpected.bin"
+    unrelated.write_bytes(b"x" * 1_000_001)
+    gate = certify_release.gate_no_large_files([unrelated])
+    assert gate.status == "FAIL"
+    assert "unexpected.bin:1000001" in gate.detail
+
+
 def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
     calls = []
 
