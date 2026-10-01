@@ -41,6 +41,18 @@ def test_current_git_head_prefers_bound_source_identity(monkeypatch, tmp_path: P
     assert runtime_identity.current_git_head(tmp_path) == "d" * 40
 
 
+def test_current_git_head_reads_packaged_build_identity(monkeypatch, tmp_path: Path) -> None:
+    from backend.app import runtime_identity
+
+    monkeypatch.delenv("MUCARO_SOURCE_HEAD", raising=False)
+    (tmp_path / "mucaro_build_identity.json").write_text(
+        '{"schema_version":"mucaro-build-identity/1.0","source_head":"' + "f" * 40 + '"}\n',
+        encoding="utf-8",
+    )
+
+    assert runtime_identity.current_git_head(tmp_path) == "f" * 40
+
+
 def test_current_git_head_reads_packed_refs(monkeypatch, tmp_path: Path) -> None:
     from backend.app import runtime_identity
 
