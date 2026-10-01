@@ -11,6 +11,7 @@ from backend.app import work_runs
 from backend.app.conversations import create_conversation, get_conversation
 from backend.app.ingestion import ingest_file
 from backend.app.main import create_app
+from backend.app.preferences import get_preferences
 from backend.app.response_flow import get_interaction, get_pending_interaction
 from backend.app.tools import (
     TOOL_REGISTRY,
@@ -109,6 +110,34 @@ def test_idempotent_resubmission_returns_the_original_run(cfg, conversation):
     assert again["status"] == "RUN_DUPLICATE_RETURNED"
     assert again["run"]["run_id"] == first["run"]["run_id"]
     assert len(get_conversation(conversation, cfg)["turns"]) == 2
+
+
+def test_preference_prompt_updates_locally_without_model_or_tool_execution(cfg, conversation):
+    run = _submit(conversation, "Set theme to dark", cfg)
+    run = get_run(run["run_id"], cfg)
+    assert run["state"] == "COMPLETED"
+    assert run["outcome"] == "PREFERENCES_UPDATED"
+    events = list_run_events(run["run_id"], cfg=cfg)
+    types = [event["type"] for event in events]
+    assert "preference_update" in types
+    assert "text_delta" in types
+    assert "route" not in types
+    assert "retrieval" not in types
+    assert "tool_call" not in types
+    assert get_preferences(cfg)["values"]["theme"] == "dark"
+    turns = get_conversation(conversation, cfg)["turns"]
+    assert [turn["role"] for turn in turns] == ["user", "assistant"]
+    assert turns[0]["content"] == "Set theme to dark"
+    assert "theme=dark" in turns[1]["content"]
+
+
+def test_secret_setting_prompt_is_rejected_before_run_or_turn_persistence(cfg, conversation):
+    with pytest.raises(RunError) as exc:
+        submit_message(conversation, "Set API key to sk-not-stored", cfg=cfg)
+    assert exc.value.status == "ERROR_SECRET_SETTING_PROMPT_BLOCKED"
+    assert list_runs(conversation_id=conversation, cfg=cfg)["runs"] == []
+    assert get_conversation(conversation, cfg)["turns"] == []
+    assert not (cfg.processed_dir / "user_preferences.json").exists()
 
 
 @pytest.mark.parametrize(
