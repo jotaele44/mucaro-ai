@@ -9,7 +9,7 @@ from jsonschema import Draft202012Validator
 from backend.app.offline_independence import (
     OFFLINE_INDEPENDENCE_RECEIPT_SCHEMA,
     STATUS_BLOCKED,
-    STATUS_PASS,
+    STATUS_CERTIFIED,
     OfflineIndependenceError,
     build_offline_independence_receipt,
 )
@@ -109,7 +109,7 @@ def test_complete_evidence_emits_offline_independent() -> None:
     )
 
     assert receipt["schema_version"] == OFFLINE_INDEPENDENCE_RECEIPT_SCHEMA
-    assert receipt["status"] == STATUS_PASS
+    assert receipt["status"] == STATUS_CERTIFIED
     assert receipt["blocking"] == {
         "failed_capabilities": [],
         "failed_external_evidence_gates": [],
@@ -173,7 +173,7 @@ def test_required_capability_residue_blocks_but_optional_residue_does_not() -> N
         head_sha=HEAD,
         artifact_sha256=ARTIFACT,
     )
-    assert passed["status"] == STATUS_PASS
+    assert passed["status"] == STATUS_CERTIFIED
     assert all(row["capability"] != "ocr.image" for row in passed["capability_results"])
 
 
@@ -205,7 +205,7 @@ def test_platform_capability_adoption_extends_frozen_core_scope() -> None:
         declared_capabilities=["ocr.image"],
     )
 
-    assert receipt["status"] == STATUS_PASS
+    assert receipt["status"] == STATUS_CERTIFIED
     assert receipt["scope"]["required_offline_capabilities"] == [*REQUIRED_CAPABILITIES, "ocr.image"]
     assert receipt["counts"]["required_capabilities"] == len(REQUIRED_CAPABILITIES) + 1
 
