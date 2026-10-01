@@ -3345,10 +3345,20 @@ def run_flagpole_inventory_verify(args: argparse.Namespace, cfg: Settings) -> in
         path = Path(args.inventory)
         if not path.is_absolute():
             path = cfg.project_root / path
-        inventory = json.loads(path.read_text(encoding="utf-8"))
         mode = "RECEIPT"
-        errors.extend(validate_flagpole_inventory_schema(inventory, schema_path))
-        errors.extend(verify_flagpole_receipt(cfg.project_root, inventory))
+        try:
+            inventory = json.loads(path.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            inventory = None
+            errors.append("INVENTORY_NOT_JSON")
+        if inventory is not None and not isinstance(inventory, dict):
+            errors.append("INVENTORY_NOT_OBJECT")
+        if isinstance(inventory, dict):
+            # Semantic verification assumes the schema's shape; a malformed receipt stops at its schema errors.
+            schema_errors = validate_flagpole_inventory_schema(inventory, schema_path)
+            errors.extend(schema_errors)
+            if not schema_errors:
+                errors.extend(verify_flagpole_receipt(cfg.project_root, inventory))
     else:
         inventory = generate_flagpole_inventory(cfg.project_root)
         mode = "HEAD_SELF_CONSISTENCY"
@@ -3358,8 +3368,8 @@ def run_flagpole_inventory_verify(args: argparse.Namespace, cfg: Settings) -> in
         {
             "status": "FLAGPOLE_INVENTORY_OK" if not errors else "FLAGPOLE_INVENTORY_FAILED",
             "mode": mode,
-            "source_sha": inventory.get("source_sha"),
-            "file_count": inventory.get("file_count"),
+            "source_sha": inventory.get("source_sha") if isinstance(inventory, dict) else None,
+            "file_count": inventory.get("file_count") if isinstance(inventory, dict) else None,
             "errors": errors,
         },
         args.format,

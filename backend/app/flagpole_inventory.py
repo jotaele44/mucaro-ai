@@ -55,10 +55,14 @@ def generate(repo: Path, ref: str = "HEAD") -> dict[str, Any]:
     # Resolve once, to a commit: a tree or blob SHA is not a source commit, and HEAD must not move between calls.
     source_sha = _git(repo, "rev-parse", "--verify", f"{ref}^{{commit}}")
     tree_sha = _git(repo, "rev-parse", f"{source_sha}^{{tree}}")
-    raw = _git(repo, "ls-tree", "-r", "-l", "--full-tree", source_sha)
+    # -z keeps paths raw: without it Git C-quotes non-ASCII and control characters, and a newline in a
+    # tracked name would split one record into two.
+    raw = _git(repo, "ls-tree", "-r", "-l", "-z", "--full-tree", source_sha)
     files: list[dict[str, Any]] = []
-    for line in raw.splitlines():
-        meta, path = line.split("\t", 1)
+    for record in raw.split("\0"):
+        if not record:
+            continue
+        meta, path = record.split("\t", 1)
         mode, obj_type, blob_sha, size_text = meta.split()
         if obj_type != "blob":
             continue

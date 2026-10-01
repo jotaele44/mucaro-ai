@@ -213,3 +213,32 @@ def test_cli_verify_receipt_passes_and_fails_on_tamper(
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "FLAGPOLE_INVENTORY_FAILED"
     assert "FILE_COUNT_MISMATCH" in payload["errors"]
+
+
+def test_inventory_records_raw_git_paths(tiny_repo: Path) -> None:
+    for name in ("café.txt", "tab\tname.txt", "new\nline.txt"):
+        (tiny_repo / name).write_text("x\n")
+    _git(tiny_repo, "add", "-A")
+    _git(tiny_repo, "commit", "-q", "-m", "names")
+    inventory = generate(tiny_repo)
+
+    assert {row["path"] for row in inventory["files"]} == {"a.py", "café.txt", "tab\tname.txt", "new\nline.txt"}
+    assert validate(tiny_repo, inventory) == []
+
+
+def test_cli_verify_reports_malformed_receipts_without_crashing(
+    checkout_cfg, tmp_path_factory: pytest.TempPathFactory, capsys: pytest.CaptureFixture[str]
+) -> None:
+    receipt = generate(checkout_cfg.project_root)
+    stored = tmp_path_factory.mktemp("receipts") / "inv.json"
+    bad_path = {**receipt, "files": [{**receipt["files"][0], "path": 7}, *receipt["files"][1:]]}
+    for text, expected in (
+        ("[]", "INVENTORY_NOT_OBJECT"),
+        ("{not json", "INVENTORY_NOT_JSON"),
+        (json.dumps(bad_path), "SCHEMA_VIOLATION:files/0/path"),
+    ):
+        stored.write_text(text)
+        assert cli_main(["flagpole", "inventory", "verify", "--inventory", str(stored)], cfg=checkout_cfg) == 2
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["status"] == "FLAGPOLE_INVENTORY_FAILED"
+        assert expected in payload["errors"]
