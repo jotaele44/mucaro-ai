@@ -9,6 +9,10 @@
 >
 > The source-bound bundle below needs a checkout and a Python environment, and opens the system
 > browser (contradiction RC-006, adjudicated).
+>
+> `Mucaro AI.app` (project root) is the exception to the browser rule: it runs
+> `scripts/launch_app.py --native`, which shows the UI in a native pywebview window and never opens
+> a browser. It is still a source-bound launcher, not a release artifact.
 
 Desktop Launcher Mode lets Mucaro AI run with one command.
 

@@ -33,7 +33,8 @@ if str(ROOT) not in sys.path:
 
 from scripts import launch_app  # noqa: E402
 
-PYTHON_EXTRAS = "dev,anthropic"
+# The native window (pywebview + pyobjc) is macOS-only, so only macOS installs the desktop extra.
+PYTHON_EXTRAS = "dev,anthropic,desktop" if sys.platform == "darwin" else "dev,anthropic"
 # Import names that prove the dependency install is usable (runtime, geospatial, live mode, preflight).
 KEY_MODULES = (
     "fastapi",
@@ -50,7 +51,7 @@ KEY_MODULES = (
     "anthropic",
     "httpx",
     "pytest",
-)
+) + (("webview",) if sys.platform == "darwin" else ())
 NPM_REGISTRY = "https://registry.npmjs.org/"
 LOG_KEEP = 10
 TOTAL_STEPS = 6
@@ -463,6 +464,11 @@ def main(argv: list[str] | None = None) -> int:
             "Nothing outside this folder was changed. Fix the problem named above (usually the internet "
             "connection), then double-click again; setup resumes where it stopped."
         )
+        if os.environ.get("MUCARO_HEADLESS") == "1":
+            launch_app.native_window.show_dialog(
+                f"Mucaro AI setup did not finish: {exc.code}\n\nDetails: {log_path}\n\n"
+                "Open Mucaro AI again to resume where it stopped."
+            )
         return 2
     except KeyboardInterrupt:
         log.line("")

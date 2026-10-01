@@ -31,9 +31,31 @@ log_line() {
   fi
 }
 
+# Mucaro AI.app sets MUCARO_HEADLESS=1: there is no Terminal to read, so say things in dialogs instead.
+ui_dialog() {
+  if [ "${MUCARO_HEADLESS:-}" = "1" ] && [ "$(uname -s)" = "Darwin" ]; then
+    /usr/bin/osascript \
+      -e 'on run argv' \
+      -e 'display dialog (item 1 of argv) with title "Mucaro AI" buttons {"OK"} default button "OK" with icon caution' \
+      -e 'end run' -- "$1" </dev/null >/dev/null 2>&1 || true
+  fi
+}
+
+ui_notify() {
+  if [ "${MUCARO_HEADLESS:-}" = "1" ] && [ "$(uname -s)" = "Darwin" ]; then
+    /usr/bin/osascript \
+      -e 'on run argv' \
+      -e 'display notification (item 1 of argv) with title "Mucaro AI"' \
+      -e 'end run' -- "$1" </dev/null >/dev/null 2>&1 || true
+  fi
+}
+
 fatal() {
   code="$1"
   shift
+  ui_dialog "Mucaro AI cannot start: ${code} $*${LOG:+
+
+Details: ${LOG}}"
   log_line ""
   log_line "${code} $*"
   log_line ""
@@ -153,6 +175,7 @@ acquire_lock() {
     if lock_holder_alive "${holder}"; then
       if [ "${waited}" -eq 0 ]; then
         log_line "SETUP_WAITING another Mucaro AI window (pid ${holder}) is still setting up; this window continues when it finishes"
+        ui_notify "Mucaro AI is already being set up; it will open when that finishes."
       fi
       sleep 2
       waited=$((waited + 2))
@@ -326,6 +349,9 @@ detect_platform
 log_line "PLATFORM ${PLATFORM_LABEL} uv_target=${UV_TARGET} node=${NODE_PLAT}"
 acquire_lock
 trap release_lock EXIT
+if [ ! -f "${RUNTIME}/state.json" ]; then
+  ui_notify "Setting up Mucaro AI. The first run takes a few minutes; the window opens by itself when it is ready."
+fi
 
 set +e
 (stage0) 2>&1 | tee -a "${LOG}"
@@ -336,6 +362,9 @@ if [ "${stage0_rc}" -ne 0 ]; then
   log_line "Mucaro AI setup did not finish (step failed with code ${stage0_rc})."
   log_line "Details: ${LOG}"
   log_line "Nothing outside this folder was changed. Fix the problem named above (usually the internet connection), then double-click again; setup resumes where it stopped."
+  ui_dialog "Mucaro AI setup did not finish (usually the internet connection). Open Mucaro AI again to resume where it stopped.
+
+Details: ${LOG}"
   exit "${stage0_rc}"
 fi
 

@@ -1,7 +1,14 @@
 # Double-Click Setup
 
-Double-click `Mucaro AI.command` (macOS) or `Mucaro AI.cmd` (Windows). The first run installs
+Double-click **`Mucaro AI.app`** (macOS) or `Mucaro AI.cmd` (Windows). The first run installs
 everything and opens the app; later runs open it in seconds. No input is needed at any point.
+
+`Mucaro AI.app` is a self-contained desktop app: it opens Mucaro AI in its own native window
+(not a browser) and runs the whole setup out of sight, with no Terminal. Keep it in the project
+folder. It shows a notification on the first run, and a dialog if setup cannot finish; the full
+output is in `.mucaro-runtime/logs/app.log` and the newest `setup-*.log`. Opening it again while
+it runs brings the existing window to the front. Closing the window stops the app.
+`Mucaro AI.command` still works as a visible, Terminal-based alternative.
 
 ## Why it exists
 
