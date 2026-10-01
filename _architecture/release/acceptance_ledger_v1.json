@@ -1877,9 +1877,9 @@
         "_architecture/mucaro_v1_denominator_events.json"
       ],
       "state": "PROVISIONAL",
-      "blocker_id": null,
+      "blocker_id": "BLK-ACTIONS-001",
       "dag_node": "N09",
-      "notes": "PR #127 merged a frozen 24-document IETF/W3C/NIST real-world corpus lane. Run 36382763249 passed with 24/24 source-bound queries hitting expected sources in top-5, 3 parser formats, 8,277,197 source bytes and 4,933 chunks; artifact 10952734875 digest sha256:1eb4198e783fbaa84ae60610c7048d6e889c077aaf59aa70c7db29cebd4badac. MATRIX-007 remains PROVISIONAL because its crosswalk also includes RT-10 production-scale stress/scalability, which is not closed by this corpus."
+      "notes": "PR #127 merged a frozen 24-document IETF/W3C/NIST real-world corpus lane. Run 36382763249 passed with 24/24 source-bound queries hitting expected sources in top-5, 3 parser formats, 8,277,197 source bytes and 4,933 chunks; artifact 10952734875 digest sha256:1eb4198e783fbaa84ae60610c7048d6e889c077aaf59aa70c7db29cebd4badac. MATRIX-007 remains PROVISIONAL because its crosswalk also includes RT-10 production-scale stress/scalability, which is not closed by this corpus. PR #138 v1.2 is frozen at 81b7a2d1128f4c20331b2ef46ce7ac9b4f7eced7. Exact-head RT-10, normal CI, and macOS jobs terminate with zero executed steps; unrelated repository workflows reproduce the same condition. MATRIX-007 remains PROVISIONAL and N09 is BLOCKED on BLK-ACTIONS-001 until runner admission executes the frozen lane."
     },
     {
       "requirement_id": "MATRIX-008",

@@ -133,9 +133,6 @@ export const api = {
   },
   health: () => request("/health"),
   config: () => request("/config"),
-  // Only when Start Mucaro AI.app / Start Mucaro AI.exe started the service (config.desktop.quit_supported).
-  // The custom header makes browsers send a CORS preflight first, so other websites cannot quit Mucaro.
-  quit: () => request("/shutdown", { method: "POST", headers: { "X-Mucaro-Action": "quit" } }),
   models: () => request("/models"),
   offlineManifest: () => request("/offline-manifest"),
   modes: () => request("/work-runs/modes"),
@@ -148,6 +145,11 @@ export const api = {
   conversationRuns: (id) => request(`/conversations/${id}/runs?limit=100`),
 
   sendMessage: (conversationId, payload) => request(`/conversations/${conversationId}/messages`, json("POST", payload)),
+  editConversationMessage: (conversationId, messageKey, content, expectedRevision) =>
+    request(
+      `/conversations/${conversationId}/messages/${encodeURIComponent(messageKey)}`,
+      json("PATCH", { content, expected_revision: expectedRevision }),
+    ),
   runEvents: (runId, after = 0) => request(`/work-runs/${runId}/events?after=${after}`),
   workRuns: (beforeSeq) => request(`/work-runs?limit=20${beforeSeq ? `&before_seq=${beforeSeq}` : ""}`),
   stopRun: (runId) => request(`/work-runs/${runId}/stop`, { method: "POST" }),

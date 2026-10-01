@@ -1,16 +1,10 @@
 # Double-Click Setup
 
-Double-click `Start Mucaro AI.app` (macOS) or `Start Mucaro AI.exe` (Windows). A progress page
-opens in the browser; the first run installs everything and the page turns into the app; later runs
-open it in seconds. No input is needed at any point and no terminal window opens. The app runs in
-the background until **Quit Mucaro AI** is clicked.
-
-`Mucaro AI.command` (macOS/Linux) and `Mucaro AI.cmd` (Windows) run the same setup with progress in
-a Terminal or console window; closing that window stops the app.
-
-All four run Mucaro AI from this source folder. The native macOS app (`Mucaro AI.app`, its own
-window, no browser) is a separate release build that CI makes and that is never committed: see
-`docs/release/MACOS_APP.md`.
+Double-click `Mucaro AI.app` (macOS) beside `pyproject.toml`, or `Mucaro AI.cmd` (Windows).
+On macOS, the app provisions private runtimes and builds the UI quietly, then opens its native
+window. No Terminal or browser launches. First setup requires internet access; completed steps
+are cached. Errors appear in a dialog with the startup log path. Keep the whole checkout together
+when moving it. The `.command` file remains a legacy console path.
 
 ## Why it exists
 
@@ -29,14 +23,15 @@ first-time user:
 
 ## How it works
 
+The macOS app runs `scripts/native_start.sh`, which redirects startup output to a log and runs
+`scripts/one_click.sh --native`. The stages below are shared with the legacy console launchers.
+On macOS, the Python install includes the desktop extra and checks `webview`, `AppKit`,
+`Foundation`, and `WebKit` before recording a successful setup fingerprint.
+
 ```
-Start Mucaro AI.app (macOS)                    Start Mucaro AI.exe (Windows)
-  Contents/MacOS/mucaro-launcher (bash)          C launcher, GUI subsystem
-  writes + opens the progress page,              starts the .ps1 with CREATE_NO_WINDOW,
-  starts setup detached, exits at once           exits at once
-        | --ui                                          | --ui
-        |      Mucaro AI.command / Mucaro AI.cmd (Terminal/console window, no --ui)
-        v                                               v
+Mucaro AI.command (macOS/Linux)          Mucaro AI.cmd (Windows)
+        | exec                                   | powershell -ExecutionPolicy Bypass
+        v                                        v
 scripts/one_click.sh        -- stage 0 --   scripts/one_click_windows.ps1
   pins: scripts/one_click_pins.env (versions + SHA-256)
   platform check, disk check, setup lock, log file
@@ -49,27 +44,7 @@ scripts/one_click.py        -- stage 1 (same on every OS) --
         |
         v
 scripts/launch_app.py --auto-port --exit-if-running --startup-timeout 120
-                      (--ui adds: --no-browser --status-file <page> --stop-file <file>)
 ```
-
-- **Progress page.** `.mucaro-runtime/ui/progress.html` is rewritten from
-  `scripts/one_click_progress.html` at every step by the same renderer in three languages
-  (`scripts/progress_page.py`, `scripts/progress_page.sh`, and the copy in
-  `scripts/one_click_windows.ps1`; tests keep them byte-identical). While setup runs it reloads
-  itself every second; when the app is ready it redirects to `http://127.0.0.1:<port>` (and shows an
-  "Open Mucaro AI" link); on failure it shows the error code, what to do, and the log path. It uses
-  no JavaScript, so it behaves the same for a `file://` page in every browser.
-- **Background app and Quit.** In `--ui` mode all output goes to `.mucaro-runtime/logs/run-*.log`.
-  The **Quit Mucaro AI** button calls `POST /shutdown`, which writes `.mucaro-runtime/stop-request`;
-  the launcher notices it within a second, stops the backend, and marks the page stopped. The
-  endpoint only works when the launcher started the backend, only from this computer (loopback),
-  only with the header `X-Mucaro-Action: quit` (so other websites cannot trigger it), and with the
-  operator token when one is set.
-- **Each double-click is a fresh launcher.** Both launchers exit within a second, so a second
-  double-click while the app runs goes through the fast path and the page switches straight to the
-  running app (`DESKTOP_LAUNCH_REUSED`).
-- **Crashes never leave the page spinning.** If setup ends while the page still says "running",
-  the launcher (macOS) or the `.ps1` (Windows) turns it into an error page.
 
 - **Private runtimes only.** Setup never runs `python`, `python3`, `git`, `node`, or `npm` from
   `PATH`, so preinstalled or broken tools cannot interfere and the macOS developer-tools dialog
@@ -90,23 +65,9 @@ scripts/launch_app.py --auto-port --exit-if-running --startup-timeout 120
   (`SETUP_WAITING`). A lock left by a killed process is detected and removed
   (`SETUP_LOCK_STALE`).
 - **Launch.** If port 8000 is taken by another program, the next free port is used
-  (`PORT_FALLBACK`). If Mucaro AI is already running, it is reused (`DESKTOP_LAUNCH_REUSED`).
-  With `Mucaro AI.command` / `Mucaro AI.cmd`, closing the window stops the backend.
-
-## The launchers
-
-They are named `Start Mucaro AI` so they cannot be confused with the native release app
-`Mucaro AI.app`; the bundle identifier (`ai.mucaro.source-launcher`) is distinct as well.
-
-| File | What it is | How it is checked |
-|---|---|---|
-| `Start Mucaro AI.app/Contents/MacOS/mucaro-launcher` | bash 3.2 script; same "no `PATH` tools" rules as `one_click.sh` | shellcheck, unit tests, CI launches the `.app` through LaunchServices (`open`) |
-| `Start Mucaro AI.app/Contents/Info.plist` | `LSUIElement` (no Dock icon for a launcher that lives a second), macOS 13+, version kept equal to `pyproject.toml` | unit test |
-| `Start Mucaro AI.exe` | about 89 KB, x86-64, GUI subsystem, built from `packaging/launchers/windows/` with pinned zig | `scripts/build_launchers.py --check` rebuilds it byte for byte in CI; `BUILD_SHA256` records its hash |
-| `AppIcon.icns`, `packaging/icons/mucaro.ico` | owl mark (a mucaro is an owl), drawn by `scripts/build_launchers.py` with pinned Pillow | rebuilt byte for byte in CI |
-
-To change the launchers or icons, edit their source, run `python scripts/build_launchers.py` on
-Linux x86_64 (Python 3.11 or 3.12), and commit the rebuilt files together with `BUILD_SHA256`.
+  (`PORT_FALLBACK`). The macOS app uses `--native` and activates an existing native window
+  (`DESKTOP_LAUNCH_REUSED`) when available. Closing the window stops the backend it owns.
+  The legacy console launchers retain browser mode.
 
 ## Pinned versions
 
@@ -141,8 +102,8 @@ Everything stays inside the project folder:
 |---|---|
 | `.mucaro-runtime/uv`, `node`, `python` | private uv, Node.js, CPython |
 | `.mucaro-runtime/cache` | uv and npm download caches (lets a moved folder rebuild offline) |
-| `.mucaro-runtime/logs/setup-*.log`, `run-*.log` | the last 10 setup logs and the last 10 background-run logs |
-| `.mucaro-runtime/ui/progress.html` | the progress page |
+| `.mucaro-runtime/logs/setup-*.log` | the last 10 setup logs |
+| `.mucaro-runtime/logs/launch-*.log` | the last 10 silent app startup/backend logs |
 | `.mucaro-runtime/state.json` | step fingerprints |
 | `.venv`, `frontend/node_modules`, `frontend/dist`, `.env` | project environment, UI build, settings |
 
@@ -167,19 +128,13 @@ downloads (`ERROR_DISK_FULL`).
 | `ERROR_MACOS_TOO_OLD`, `ERROR_PLATFORM_UNSUPPORTED` | see Supported platforms | |
 | `ERROR_SETUP_LOCK_TIMEOUT` | another window has been setting up for over an hour | close it, double-click again |
 | `ERROR_STAGE0_MISSING`, `ERROR_NOT_IN_VENV` | `scripts/one_click.py` was started directly | use the double-click file |
-| `ERROR_UNEXPECTED` | setup hit an error it does not know | see the log named on the page; double-click again |
-| `SHUTDOWN_NOT_SUPERVISED` (409) | Quit was called on a backend not started by a double-click launcher | stop it where it was started |
-| `SHUTDOWN_LOOPBACK_ONLY` (403), `SHUTDOWN_HEADER_REQUIRED` (400) | Quit was called from another computer, or without `X-Mucaro-Action: quit` | use the button on the computer running Mucaro AI |
 
 ## Limits that code cannot remove
 
 | Limit | Effect | Tier | Confidence |
 |---|---|---|---|
-| A ZIP downloaded from GitHub carries the macOS quarantine flag (Windows: Mark-of-the-Web) | The unsigned `.app` is blocked until it is allowed in System Settings > Privacy & Security; the `.exe` gets a SmartScreen prompt. Cloning with `git` or GitHub Desktop avoids both. Removing them for ZIP downloads needs an Apple Developer ID with notarization and a Windows code-signing certificate. | T4 | 90% |
-| macOS App Translocation (quarantined app run from a random read-only copy) | The launcher detects it and shows one alert: move the folder with Finder or clone with git. | T4 | 85% |
-| Windows antivirus heuristics on an unsigned `.exe` that starts PowerShell with `-ExecutionPolicy Bypass` | Could be flagged. Reduced by hiding the window with a process flag (not `-WindowStyle Hidden`) and by the reproducible source build; `Mucaro AI.cmd` remains as a fallback. | T4 | 70% not flagged |
-| Safari following a `file://` page's refresh to `http://127.0.0.1` | Verified in Chromium (Chrome, Edge); not reproduced in Safari. The ready page also shows an "Open Mucaro AI" link. | T4 | 85% |
-| Project inside `~/Desktop`, `~/Documents`, or `~/Downloads` on macOS | macOS may ask once whether the app may access that folder. `~/Developer` is not affected. | T4 | 85% |
+| A ZIP downloaded from GitHub carries the macOS quarantine flag (Windows: Mark-of-the-Web) | Gatekeeper or SmartScreen asks once before the first run. Cloning with `git` or GitHub Desktop avoids it. Removing it for ZIP downloads needs a signed and notarized installer. | T4 | 90% |
+| Project inside `~/Desktop`, `~/Documents`, or `~/Downloads` on macOS | macOS asks once whether Terminal may access that folder. `~/Developer` is not affected. | T4 | 85% |
 | First run needs internet | later runs work offline (verified with the network disabled) | T1 | 99% |
 | Group Policy that enforces a PowerShell execution policy | `-ExecutionPolicy Bypass` cannot override it | T4 | 90% |
 | Corporate TLS inspection | uv and Node use their own certificate stores. Set `SSL_CERT_FILE` / `NODE_EXTRA_CA_CERTS` (or `UV_SYSTEM_CERTS=1`) in the environment. | T4 | 75% |
@@ -206,25 +161,15 @@ tripwire stubs for `python`, `python3`, `pip`, `node`, `npm`, `npx`, and `git` f
 | Pinned checksum altered | `ERROR_CHECKSUM_MISMATCH`, lock released; with the pin restored, the next run resumed |
 | Real `git clone`, run twice | `ONE_CLICK_SETUP_OK` then `ONE_CLICK_FAST_PATH`; `git status` clean afterwards |
 | Project folder moved, then moved again with the network disabled | `VENV_RECREATE`, packages reinstalled from the private cache, `DESKTOP_SMOKE_OK` both times |
-| `Start Mucaro AI.app` launcher on a fresh copy (browser journey in Chromium) | the progress page showed each step and switched to the app by itself; **Quit Mucaro AI** asked for confirmation and showed the stopped screen; port closed, no processes left, page "stopped" |
-| Second launcher while the app runs | `DESKTOP_LAUNCH_REUSED`, one backend only, page "ready" |
-| Pinned checksum altered, through the launcher | page in error with `ERROR_CHECKSUM_MISMATCH` and the log path, no refresh loop, lock released; next launch resumed |
-| Progress page renderers (Python, bash 5.2, PowerShell 7.5) | byte-identical output for every state |
-| `scripts/build_launchers.py --check` on Python 3.11 and 3.12 | `.exe`, `.icns`, `.ico` rebuilt byte for byte |
-| `pytest backend/tests` | 1012 passed on Python 3.11 and 1012 passed on 3.12, with `pwsh` on `PATH` (so including the 2 PowerShell parity tests) |
-| Rendered UI QA (`qa/rendered`, Chromium, 1440x900 and 390x844) with the Quit scenario | 100/100 checks: Quit hidden when no launcher supervises the service; offered in the sidebar and Settings when one does; Keep running quits nothing; Quit writes the stop file and shows the stopped screen, which stays; no serious axe findings; no horizontal overflow |
-| shellcheck 0.11 / PowerShell 7.5 parser and PSScriptAnalyzer | clean / 0 parse errors, 0 analyzer errors |
+| `pytest backend/tests` | 710 passed on Python 3.11 and 710 passed on the private 3.12 |
+| shellcheck 0.11 / PowerShell 7.5 parser | clean / 0 parse errors |
 
 On real macOS (Apple silicon and Intel), Windows x64, and Linux runners, the `One-click setup`
-workflow (`.github/workflows/one-click-setup.yml`):
-
-- launches `Start Mucaro AI.app` through LaunchServices (`open`) and `Start Mucaro AI.exe` through
-  `Start-Process`, from a fresh checkout: a first-run smoke launch, then a background start, a
-  second launch while it runs, and the Quit endpoint (backend gone, page "stopped");
-- runs `Mucaro AI.command` and `Mucaro AI.cmd` with `PATH` cut down to OS directories (plus tripwire stubs on macOS
-  and Linux), requiring `ONE_CLICK_SETUP_OK` then `ONE_CLICK_FAST_PATH`, both with
-  `DESKTOP_SMOKE_OK`, and checks the bash 3.2 page renderer on macOS;
-- rebuilds the `.exe` and icons and requires them to match the committed files byte for byte.
+workflow (`.github/workflows/one-click-setup.yml`) runs the double-click files themselves. `PATH`
+is cut down to OS directories (plus the tripwire stubs on macOS and Linux). The workflow requires
+`ONE_CLICK_SETUP_OK` on the first run and `ONE_CLICK_FAST_PATH` on the second, both with
+`DESKTOP_SMOKE_OK`. It also checks that `.venv` runs the private Python and that setup left no
+tracked changes.
 
 ## Blind spots
 
@@ -232,19 +177,16 @@ workflow (`.github/workflows/one-click-setup.yml`):
   runners, which have developer tools installed. The tripwire stubs show those tools are not used,
   but the Command Line Tools dialog itself was not reproduced.
 - Terminal.app's behaviour when a window is closed was simulated with SIGHUP.
-- The progress page's redirect was verified in Chromium only (see Limits for Safari).
-- Whether Windows Defender flags the unsigned `.exe` on a real user's PC cannot be measured in CI.
 - Gatekeeper, SmartScreen, and macOS folder-access prompts come from platform documentation (T4)
   and were not reproduced.
 
 ## Queued leads (not changed here)
 
-1. **Signing.** A Developer ID signature with notarization for `Start Mucaro AI.app` and an
-   Authenticode signature for `Start Mucaro AI.exe` would remove the Gatekeeper/SmartScreen prompts
-   for ZIP downloads and the antivirus risk. Needs an Apple Developer account and a code-signing
-   certificate.
-2. **git at runtime.** `backend/app/skill_runtime.py` runs `git rev-parse HEAD` when a skill runs.
-   On a Mac without the developer tools that can open the install dialog after setup.
+1. **Signed installer.** A notarized macOS `.pkg`/`.dmg` and a signed Windows installer would
+   remove the one-time Gatekeeper/SmartScreen prompt for ZIP downloads.
+2. **Git-backed coding tools.** Runtime identity no longer launches `git`; it reads bound build
+   identity or local `.git` metadata directly. Coding repository/diff/patch operations still use
+   Git and are now classified as a bundle/replace dependency by the offline manifest.
 3. **Python lock file.** `--exclude-newer` freezes resolution by date. A committed lock file
    (for example `uv.lock`) would also pin exact versions for the developer bootstrap and CI.
 4. **Windows on ARM.** The setup could run x64 Python under emulation; not attempted because it

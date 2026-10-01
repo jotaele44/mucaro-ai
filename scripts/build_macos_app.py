@@ -160,7 +160,7 @@ def build_icns(workdir: Path) -> Path | None:
 # --- verification steps (macOS)
 
 
-def verify_app(app: Path, *, version: str, build_number: str) -> dict[str, Any]:
+def verify_app(app: Path, *, version: str, build_number: str, head: str) -> dict[str, Any]:
     checks: dict[str, Any] = {}
     info = plistlib.loads((app / "Contents" / "Info.plist").read_bytes())
     expected = {
@@ -194,6 +194,15 @@ def verify_app(app: Path, *, version: str, build_number: str) -> dict[str, Any]:
     resources = app / "Contents" / "Resources"
     checks["bundled_gui"] = {"ok": (resources / "frontend" / "dist" / "index.html").exists()}
     checks["bundled_schemas"] = {"ok": (resources / "schemas").is_dir()}
+    identity_path = resources / "mucaro_build_identity.json"
+    try:
+        identity = json.loads(identity_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        identity = {}
+    checks["bundled_source_identity"] = {
+        "ok": identity.get("schema_version") == "mucaro-build-identity/1.0" and identity.get("source_head") == head,
+        "source_head": identity.get("source_head"),
+    }
     return checks
 
 
@@ -248,6 +257,20 @@ def main() -> int:
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     output = (args.output_dir or ROOT / "data" / "exports" / "macos_app" / f"{stamp}-{head[:12]}").resolve()
     output.mkdir(parents=True, exist_ok=True)
+    build_identity = output / "mucaro_build_identity.json"
+    build_identity.write_text(
+        json.dumps(
+            {
+                "schema_version": "mucaro-build-identity/1.0",
+                "source_head": head,
+                "release_version": version,
+                "build_number": build_number,
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     work = output / "pyinstaller"
     icon = build_icns(output)
     env = dict(os.environ)
@@ -258,6 +281,7 @@ def main() -> int:
             "MUCARO_APP_BUNDLE_ID": BUNDLE_ID,
             "MUCARO_APP_MINIMUM_OS": MINIMUM_OS,
             "MUCARO_APP_ICON": str(icon) if icon else "",
+            "MUCARO_BUILD_IDENTITY_FILE": str(build_identity),
         }
     )
     started = datetime.now(UTC)
@@ -286,6 +310,7 @@ def main() -> int:
             "spec_sha256": _sha256(SPEC),
             "lock_sha256": _sha256(LOCK),
             "frontend_index_sha256": _sha256(index),
+            "build_identity_sha256": _sha256(build_identity),
         },
         "signing": {"identity": "ad-hoc", "developer_id": False, "notarized": False, "stapled": False, "blocker": "BLK-SIGN-001"},
     }
@@ -297,7 +322,7 @@ def main() -> int:
         _run(["ditto", str(built), str(app)])
         # Seal the finished bundle as a whole (PyInstaller signs its parts ad-hoc).
         _run(["codesign", "--force", "--deep", "--sign", "-", "--timestamp=none", str(app)])
-        checks = verify_app(app, version=version, build_number=build_number)
+        checks = verify_app(app, version=version, build_number=build_number, head=head)
         checks["smoke"] = smoke(app / "Contents" / "MacOS" / APP_NAME)
         rows = tree_manifest(app)
         archive = output / f"Mucaro-AI-{version}-{build_number}-macos-arm64.zip"
@@ -310,6 +335,7 @@ def main() -> int:
         checks = {"smoke": smoke(tree / APP_NAME)}
         checks["bundled_gui"] = {"ok": any(tree.rglob("frontend/dist/index.html"))}
         checks["bundled_schemas"] = {"ok": any(path.is_dir() for path in tree.rglob("schemas"))}
+        checks["bundled_source_identity"] = {"ok": any(tree.rglob("mucaro_build_identity.json"))}
         rows = tree_manifest(tree)
         blocking = [name for name, check in checks.items() if not _check_ok(check)]
         receipt["status"] = "STRUCTURAL_BUILD_OK" if not blocking else "STRUCTURAL_BUILD_FAILED"

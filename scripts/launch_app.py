@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import signal
@@ -19,9 +20,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.app.env_file import merge_env_file  # noqa: E402
-from scripts import progress_page  # noqa: E402
+from scripts import native_window  # noqa: E402
 
 BACKEND_APP = "backend.app.main:app"
+WINDOW_PID_FILE = ROOT / ".mucaro-runtime" / "window.pid"
+WINDOW_STORAGE_DIR = ROOT / ".mucaro-runtime" / "webview"
 
 
 def build_env() -> dict[str, str]:
@@ -52,9 +55,15 @@ def port_open(port: int) -> bool:
 def health_ok(port: int) -> bool:
     try:
         with urllib.request.urlopen(health_url(port), timeout=1.5) as response:
-            body = response.read().decode("utf-8", errors="replace")
-            return response.status == 200 and '"status":"OK"' in body.replace(" ", "")
-    except (urllib.error.URLError, TimeoutError, OSError):
+            body = json.loads(response.read().decode("utf-8"))
+            # A generic healthy service is not this checkout's backend.
+            return (
+                response.status == 200
+                and isinstance(body, dict)
+                and body.get("status") == "OK"
+                and body.get("project_root") == str(ROOT)
+            )
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
         return False
 
 
@@ -124,7 +133,7 @@ def wait_for_health(port: int, timeout_seconds: float) -> bool:
     return False
 
 
-def start_backend(port: int, extra_env: dict[str, str] | None = None) -> subprocess.Popen:
+def start_backend(port: int) -> subprocess.Popen:
     cmd = [
         sys.executable,
         "-s",
@@ -139,9 +148,7 @@ def start_backend(port: int, extra_env: dict[str, str] | None = None) -> subproc
         str(port),
     ]
     print("STARTING_DESKTOP_BACKEND", " ".join(cmd))
-    env = build_env()
-    env.update(extra_env or {})
-    return subprocess.Popen(cmd, cwd=ROOT, env=env)
+    return subprocess.Popen(cmd, cwd=ROOT, env=build_env())
 
 
 def stop_backend(proc: subprocess.Popen, port: int) -> bool:
@@ -220,6 +227,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Launch Mucaro AI as a desktop-style local app.")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument(
+        "--native",
+        action="store_true",
+        help="Show the app in its own native window instead of the system browser, and report failures in a dialog "
+        "(what Mucaro AI.app runs; there is no Terminal to read them in).",
+    )
     parser.add_argument("--skip-build", action="store_true", help="Do not build frontend/dist if missing.")
     parser.add_argument(
         "--frontend-verified",
@@ -238,17 +251,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--exit-if-running",
         action="store_true",
-        help="If Mucaro AI is already running, open it in the browser and exit instead of waiting.",
-    )
-    parser.add_argument(
-        "--status-file",
-        type=Path,
-        help="Progress page to update (ready/error/stopped); used by the Start Mucaro AI.app and Start Mucaro AI.exe launchers.",
-    )
-    parser.add_argument(
-        "--stop-file",
-        type=Path,
-        help="Stop cleanly when this file appears; the backend's POST /shutdown (Quit button) creates it.",
+        help="If Mucaro AI is already running, activate its native window or open the browser in browser mode.",
     )
     args = parser.parse_args(argv)
 
@@ -257,47 +260,42 @@ def main(argv: list[str] | None = None) -> int:
 
     previous_signals = install_stop_signals()
     try:
-        return _launch(args)
+        code = _launch(args)
+    except KeyboardInterrupt:
+        if not args.native:
+            raise
+        code = 0
+    except (Exception, SystemExit) as exc:
+        if not args.native:
+            raise
+        print(f"ERROR_NATIVE_LAUNCH {exc}", file=sys.stderr)
+        code = 10
     finally:
         restore_signals(previous_signals)
-
-
-def _page(args: argparse.Namespace, state: str, title: str, detail: str = "", url: str = "") -> None:
-    log = os.environ.get("MUCARO_RUN_LOG") or os.environ.get("MUCARO_SETUP_LOG") or ""
-    progress_page.try_write(args.status_file, state, step=6, title=title, detail=detail, log=log, url=url)
-
-
-def _fail(args: argparse.Namespace, code: int, message: str, detail: str) -> int:
-    print(message, file=sys.stderr)
-    _page(args, "error", "Mucaro AI could not start", detail)
+    if code != 0 and args.native and os.environ.get("MUCARO_SILENT_LAUNCH") != "1":
+        native_window.show_dialog(_failure_message(code))
     return code
 
 
-def _stop_requested(stop_file: Path | None) -> bool:
-    if stop_file is None or not stop_file.exists():
-        return False
-    try:
-        stop_file.unlink()
-    except OSError:
-        pass
-    return True
+def _failure_message(code: int) -> str:
+    log = os.environ.get("MUCARO_SETUP_LOG") or str(ROOT / ".mucaro-runtime" / "logs")
+    return (
+        f"Mucaro AI could not start (code {code}).\n\n"
+        f"Details are in: {log}\n\n"
+        "Open Mucaro AI again to retry; setup resumes where it stopped."
+    )
 
 
 def _launch(args: argparse.Namespace) -> int:
     print(f"DESKTOP_LAUNCH_START root={ROOT}")
     ensure_frontend_dist(skip_build=args.skip_build, verified=args.frontend_verified)
-    backend_env = {"MUCARO_AI_STOP_FILE": str(args.stop_file)} if args.stop_file else {}
 
     port = args.port
     if args.auto_port and port_open(port) and not health_ok(port):
         fallback = find_fallback_port(port)
         if fallback is None:
-            return _fail(
-                args,
-                5,
-                f"ERROR_PORT_IN_USE_NON_MUCARO_AI port={port} no free port up to {port + 20}",
-                f"Ports {port}-{port + 20} are all used by other programs. Close one of them and double-click Start Mucaro AI again.",
-            )
+            print(f"ERROR_PORT_IN_USE_NON_MUCARO_AI port={port} no free port up to {port + 20}", file=sys.stderr)
+            return 5
         print(f"PORT_FALLBACK from={port} to={fallback}")
         port = fallback
 
@@ -308,35 +306,33 @@ def _launch(args: argparse.Namespace) -> int:
             if health_ok(port):
                 print(f"REUSING_EXISTING_BACKEND {health_url(port)}")
             else:
-                return _fail(
-                    args,
-                    5,
-                    f"ERROR_PORT_IN_USE_NON_MUCARO_AI port={port}",
-                    f"Port {port} is used by another program. Close it and double-click Start Mucaro AI again.",
-                )
+                print(f"ERROR_PORT_IN_USE_NON_MUCARO_AI port={port}", file=sys.stderr)
+                return 5
         else:
-            # A stop request left over from an earlier session must not stop this one. Only cleared when
-            # starting a new backend: a reusing launcher must not swallow a Quit meant for the running one.
-            _stop_requested(args.stop_file)
-            proc = start_backend(port, backend_env)
+            proc = start_backend(port)
             if not wait_for_health(port, args.startup_timeout):
                 if proc.poll() is not None:
-                    return _fail(
-                        args,
-                        proc.returncode or 6,
-                        f"ERROR_BACKEND_EXITED_EARLY returncode={proc.returncode}",
-                        f"The Mucaro AI service stopped while starting (code {proc.returncode}).",
-                    )
-                return _fail(
-                    args,
-                    7,
-                    f"ERROR_BACKEND_HEALTH_TIMEOUT url={health_url(port)}",
-                    f"The Mucaro AI service did not answer within {args.startup_timeout:.0f} seconds.",
-                )
+                    print(f"ERROR_BACKEND_EXITED_EARLY returncode={proc.returncode}", file=sys.stderr)
+                    return proc.returncode or 6
+                print(f"ERROR_BACKEND_HEALTH_TIMEOUT url={health_url(port)}", file=sys.stderr)
+                return 7
             print(f"BACKEND_READY {health_url(port)}")
-        _page(args, "ready", "Mucaro AI is ready", "Opening Mucaro AI...", url)
 
-        if not args.no_browser:
+        if args.native and not args.smoke_test:
+            if proc is None and args.exit_if_running and native_window.activate_existing_window(WINDOW_PID_FILE):
+                print(f"DESKTOP_LAUNCH_REUSED {url}")
+                return 0
+            print(f"OPENING_NATIVE_WINDOW {url}", flush=True)
+            try:
+                native_window.run_window(url, storage_dir=WINDOW_STORAGE_DIR, pid_file=WINDOW_PID_FILE)
+            except ImportError as exc:
+                # Never fall back to a browser: the app is meant to be self-contained.
+                print(f"ERROR_NATIVE_WINDOW_UNAVAILABLE {exc}", file=sys.stderr)
+                return 10
+            print("DESKTOP_WINDOW_CLOSED")
+            return 0
+
+        if not args.no_browser and not args.native:
             print(f"OPENING_BROWSER {url}")
             webbrowser.open(url)
 
@@ -353,9 +349,8 @@ def _launch(args: argparse.Namespace) -> int:
                 ok = stop_backend(proc, port)
                 proc = None
                 if not ok:
-                    return _fail(args, 9, f"ERROR_BACKEND_PORT_STILL_OPEN port={port}", "The Mucaro AI service did not stop.")
+                    return 9
             print("DESKTOP_SMOKE_OK")
-            _page(args, "stopped", "Mucaro AI has stopped", "Smoke test finished.")
             return 0
 
         print("")
@@ -364,16 +359,9 @@ def _launch(args: argparse.Namespace) -> int:
         print("", flush=True)
         try:
             while True:
-                if _stop_requested(args.stop_file):
-                    print("DESKTOP_STOP_REQUESTED reason=quit_button")
-                    return 0
                 if proc is not None and proc.poll() is not None:
-                    return _fail(
-                        args,
-                        proc.returncode or 8,
-                        f"ERROR_BACKEND_EXITED returncode={proc.returncode}",
-                        f"The Mucaro AI service stopped unexpectedly (code {proc.returncode}).",
-                    )
+                    print(f"ERROR_BACKEND_EXITED returncode={proc.returncode}", file=sys.stderr)
+                    return proc.returncode or 8
                 time.sleep(1)
         except KeyboardInterrupt:
             print("DESKTOP_STOP_REQUESTED")
@@ -382,7 +370,6 @@ def _launch(args: argparse.Namespace) -> int:
             if proc is not None and proc.poll() is None:
                 stop_backend(proc, port)
                 proc = None
-                _page(args, "stopped", "Mucaro AI has stopped")
             print("DESKTOP_STOP_OK")
     finally:
         # Covers Ctrl+C, a closed window, or an error while the backend was still starting.

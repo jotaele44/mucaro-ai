@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { api } from "../api.js";
 import { STATE_LABEL, toolSummaryLabel } from "../feed.js";
-import { MessageActions } from "./MessageActions.jsx";
-import { RichText } from "./RichText.jsx";
+import { EditableMessage } from "./MessageActions.jsx";
 import { Sheet } from "./Sheet.jsx";
 
 const OUTCOME_TEXT = {
@@ -185,17 +184,27 @@ function Citations({ citations, onOpenCitation }) {
   );
 }
 
-export function RunBlock({ view, onChanged, onOpenCitation, announce }) {
+export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdits = {}, onEditMessage }) {
   const [toolsOpen, setToolsOpen] = useState(false);
-  const active = ["RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT", "QUEUED"].includes(view.state);
   const toolLabel = toolSummaryLabel(view.calls);
   const planSteps = view.plan?.steps || [];
+  const userMessageKey = `run:${view.runId}:user`;
+  const assistantMessageKey = `run:${view.runId}:assistant`;
+  const userEdit = messageEdits[userMessageKey];
+  const assistantEdit = messageEdits[assistantMessageKey];
 
   return (
     <article className="run" aria-busy={view.state === "RUNNING"} data-state={view.state}>
       <div className="bubble user-bubble">
-        <RichText text={view.prompt} />
-        {view.mode !== "ask" && <span className="mode-tag">{view.mode}</span>}
+        <EditableMessage
+          text={String(userEdit?.content ?? view.prompt ?? "")}
+          revision={Number(userEdit?.revision || 0)}
+          edited={Boolean(userEdit)}
+          onSave={(content, revision) => onEditMessage(userMessageKey, content, revision)}
+          announce={announce}
+        >
+          {view.mode !== "ask" && <span className="mode-tag">{view.mode}</span>}
+        </EditableMessage>
       </div>
 
       <div className="assistant-block">
@@ -248,7 +257,14 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce }) {
 
         {view.answer && (
           <div className="bubble assistant-bubble">
-            <RichText text={view.answer} />
+            <EditableMessage
+              text={String(assistantEdit?.content ?? view.answer ?? "")}
+              revision={Number(assistantEdit?.revision || 0)}
+              edited={Boolean(assistantEdit)}
+              onSave={(content, revision) => onEditMessage(assistantMessageKey, content, revision)}
+              announce={announce}
+              allowReadAloud
+            />
           </div>
         )}
         <Citations citations={view.citations} onOpenCitation={onOpenCitation} />
@@ -275,7 +291,6 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce }) {
         {view.final && !view.answer && view.final.outcome !== "ANSWERED" && (
           <p className="outcome">{OUTCOME_TEXT[view.final.outcome] || `Outcome: ${view.final.outcome}`}</p>
         )}
-        {view.answer && !active && <MessageActions text={view.answer} announce={announce} />}
       </div>
       {toolsOpen && <ToolDrawer calls={view.calls} onClose={() => setToolsOpen(false)} />}
     </article>

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import ipaddress
-import os
 import re
 from pathlib import Path, PurePath
 
@@ -13,10 +11,12 @@ from fastapi.staticfiles import StaticFiles
 from .auth import auth_status, is_public_api_path, require_operator_auth
 from .config import Settings, settings
 from .conversations import (
+    ConversationMessageEditError,
     append_answer_turn,
     build_conversation_context,
     create_conversation,
     delete_conversation,
+    edit_conversation_message,
     get_conversation,
     list_conversations,
     rename_conversation,
@@ -47,6 +47,7 @@ from .models import (
     InteractionResolveRequest,
     MemoryCreateRequest,
     MemoryUpdateRequest,
+    MessageEditRequest,
     MessageRequest,
     RunEditRequest,
     PlanRequest,
@@ -123,23 +124,6 @@ def api_error(status: str, detail: str, *, status_code: int = 400, **extra: obje
     payload = {"status": status, "detail": detail}
     payload.update(extra)
     return HTTPException(status_code=status_code, detail=payload)
-
-
-# Set by scripts/launch_app.py (--stop-file) when the desktop launcher supervises this backend.
-STOP_FILE_ENV = "MUCARO_AI_STOP_FILE"
-
-
-def _is_loopback_client(host: str | None) -> bool:
-    if not host:
-        return False
-    if host.strip().lower() == "localhost":
-        return True
-    try:
-        address = ipaddress.ip_address(host.strip())
-    except ValueError:
-        return False
-    mapped = getattr(address, "ipv4_mapped", None)
-    return address.is_loopback or bool(mapped and mapped.is_loopback)
 
 
 def sanitize_upload_filename(filename: str | None) -> str:
@@ -275,32 +259,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             "cors_origins": list(cfg.cors_origins),
             "auth": auth_status(cfg),
             "security": build_security_report(cfg),
-            "desktop": {"quit_supported": bool(os.environ.get(STOP_FILE_ENV))},
         }
-
-    @app.post("/shutdown")
-    def shutdown(
-        request: Request,
-        x_mucaro_action: str | None = Header(default=None),
-        _auth: dict = Depends(require_auth),
-    ) -> dict:
-        # The custom header forces a CORS preflight, so other websites cannot trigger this from a browser.
-        if x_mucaro_action != "quit":
-            raise api_error("SHUTDOWN_HEADER_REQUIRED", "Send the header X-Mucaro-Action: quit.")
-        if not _is_loopback_client(request.client.host if request.client else None):
-            raise api_error("SHUTDOWN_LOOPBACK_ONLY", "Mucaro AI can only be quit from this computer.", status_code=403)
-        stop_file = os.environ.get(STOP_FILE_ENV)
-        if not stop_file:
-            raise api_error(
-                "SHUTDOWN_NOT_SUPERVISED",
-                "This backend was not started by the Mucaro AI launcher; stop it where it was started.",
-                status_code=409,
-            )
-        try:
-            Path(stop_file).write_text("quit\n", encoding="utf-8")
-        except OSError as exc:
-            raise api_error("SHUTDOWN_FAILED", f"Could not signal the launcher: {exc}", status_code=500) from exc
-        return {"status": "SHUTDOWN_REQUESTED"}
 
     @app.get("/security")
     def security_status() -> dict:
@@ -600,6 +559,47 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             )
         except RunError as exc:
             raise run_error(exc) from exc
+
+    @app.patch("/conversations/{conversation_id}/messages/{message_key}")
+    def edit_message(
+        conversation_id: str,
+        message_key: str,
+        req: MessageEditRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        conversation_payload = get_conversation(conversation_id, cfg)
+        if conversation_payload is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+
+        if message_key.startswith("turn:"):
+            turn_id = message_key.removeprefix("turn:")
+            if not turn_id or not any(turn.get("turn_id") == turn_id for turn in conversation_payload.get("turns", [])):
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404)
+        else:
+            match = re.fullmatch(r"run:([^:]+):(user|assistant)", message_key)
+            if match is None:
+                raise api_error("ERROR_MESSAGE_KEY_INVALID", "Message key is not valid.")
+            run_id = match.group(1)
+            try:
+                run = get_run(run_id, cfg)
+            except RunError as exc:
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404) from exc
+            if run.get("conversation_id") != conversation_id:
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404)
+
+        try:
+            edit = edit_conversation_message(
+                conversation_id,
+                message_key,
+                req.content,
+                req.expected_revision,
+                cfg,
+            )
+        except ConversationMessageEditError as exc:
+            conflict = exc.status in {"ERROR_MESSAGE_EDIT_REVISION_CONFLICT", "ERROR_MESSAGE_EDITS_INVALID"}
+            missing = exc.status == "ERROR_CONVERSATION_NOT_FOUND"
+            raise api_error(exc.status, exc.detail, status_code=404 if missing else 409 if conflict else 400) from exc
+        return {"status": "MESSAGE_EDITED", "message_edit": edit}
 
     @app.get("/conversations/{conversation_id}/runs")
     def conversation_runs(conversation_id: str, limit: int = 50) -> dict:

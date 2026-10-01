@@ -167,11 +167,75 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "02-answer");
   axeRuns.push(await axe(page, viewport, "answer"));
 
-  // Reload reproduces the transcript (F02).
+  // Message interaction contract: native selection plus one Copy/Edit surface on both sides.
+  const completedRun = lastRun(page);
+  const userMessage = completedRun.locator(".user-bubble");
+  const assistantMessage = completedRun.locator(".assistant-bubble");
+  const selectionContract = await assistantMessage.locator(".rich-text").evaluate((node) => {
+    const style = window.getComputedStyle(node);
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const selectedText = selection.toString();
+    selection.removeAllRanges();
+    return {
+      userSelect: style.getPropertyValue("user-select"),
+      webkitUserSelect: style.getPropertyValue("-webkit-user-select"),
+      selectedText,
+    };
+  });
+  check(
+    "message text is selectable",
+    viewport,
+    (selectionContract.userSelect === "text" || selectionContract.webkitUserSelect === "text") &&
+      selectionContract.selectedText.trim().length > 0,
+    JSON.stringify(selectionContract),
+  );
+  check(
+    "sent message exposes one Copy and one Edit action",
+    viewport,
+    (await userMessage.getByRole("button", { name: "Copy message text" }).count()) === 1 &&
+      (await userMessage.getByRole("button", { name: "Edit message" }).count()) === 1,
+  );
+  check(
+    "received message exposes one Copy and one Edit action",
+    viewport,
+    (await assistantMessage.getByRole("button", { name: "Copy message text" }).count()) === 1 &&
+      (await assistantMessage.getByRole("button", { name: "Edit message" }).count()) === 1,
+  );
+
+  await assistantMessage.getByRole("button", { name: "Copy message text" }).click();
+  await page.waitForFunction(() => document.querySelector('[role="status"]')?.textContent?.includes("Copied to clipboard."));
+  check("copy action reports success", viewport, true);
+
+  await userMessage.getByRole("button", { name: "Edit message" }).click();
+  const userEditor = userMessage.getByLabel("Edit message text");
+  await userEditor.fill("How does source lineage work? [display edit]");
+  await userMessage.getByRole("button", { name: "Save edit" }).click();
+  await userMessage.getByText("Edited · original preserved").waitFor();
+  check("sent message edit renders explicit provenance marker", viewport, true);
+
+  await assistantMessage.getByRole("button", { name: "Edit message" }).click();
+  const assistantEditor = assistantMessage.getByLabel("Edit message text");
+  await assistantEditor.fill("Edited assistant display for rendered QA.");
+  await assistantMessage.getByRole("button", { name: "Save edit" }).click();
+  await assistantMessage.getByText("Edited · original preserved").waitFor();
+  check("received message edit renders explicit provenance marker", viewport, true);
+  await shot(page, viewport, "02b-message-actions");
+
+  // Reload reproduces the transcript and its display-only revisions (F02).
   const answerText = await lastRun(page).locator(".assistant-bubble").innerText();
   await page.reload();
   await lastRun(page).locator(".assistant-bubble").waitFor();
   check("reload reproduces the transcript (F02)", viewport, (await lastRun(page).locator(".assistant-bubble").innerText()) === answerText);
+  check(
+    "message display revisions survive reload",
+    viewport,
+    (await lastRun(page).locator(".user-bubble").getByText("How does source lineage work? [display edit]").count()) === 1 &&
+      (await lastRun(page).locator(".assistant-bubble").getByText("Edited assistant display for rendered QA.").count()) === 1,
+  );
 
   // Evidence sheet (TGT-030), Escape closes and restores focus.
   await citations.first().click();
@@ -354,7 +418,6 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByText("What works offline").waitFor();
   check("settings shows model choice and offline capabilities", viewport, (await page.getByRole("radio", { name: /openai_compatible_local/ }).count()) === 1);
-  check("Quit is hidden when no launcher supervises the service", viewport, (await page.getByRole("button", { name: "Quit Mucaro AI" }).count()) === 0);
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "16-settings");
   axeRuns.push(await axe(page, viewport, "settings"));
@@ -443,77 +506,6 @@ async function launchTokenScenario(browser, viewport) {
   }
 }
 
-// Start Mucaro AI.app / Start Mucaro AI.exe run the service in the background with no window of its own;
-// Quit is how it stops. The launcher sets MUCARO_AI_STOP_FILE and stops the service when the file appears
-// (scripts/launch_app.py --stop-file); here the file is only checked, the service keeps running.
-async function quitScenario(browser, viewport, contextOptions) {
-  const quitDir = mkdtempSync(path.join(tmpdir(), "mucaro-qa-quit-"));
-  const stopFile = path.join(quitDir, "stop-request");
-  const quitPort = await freePort();
-  const quitBase = `http://127.0.0.1:${quitPort}`;
-  const quitBackend = await startBackend(quitDir, quitPort, { MUCARO_AI_STOP_FILE: stopFile });
-  const axeRuns = [];
-  try {
-    if (!(await waitForHealth(quitBase))) throw new Error(`quit backend did not start:\n${quitBackend.log()}`);
-    const context = await browser.newContext({ ...contextOptions, baseURL: quitBase });
-    const page = await context.newPage();
-    const consoleErrors = [];
-    page.on("console", (msg) => msg.type() === "error" && consoleErrors.push(msg.text()));
-    page.on("pageerror", (err) => consoleErrors.push(String(err)));
-    await page.goto("/");
-    await page.getByRole("heading", { name: "What should Mucaro work on?" }).waitFor();
-    const openNav = async () => {
-      if (viewport === "iphone") await page.getByRole("button", { name: "Open navigation" }).click();
-    };
-
-    await openNav();
-    const navQuit = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Quit Mucaro AI" });
-    await navQuit.waitFor({ timeout: 10000 }).then(
-      () => check("Quit is offered when a Start Mucaro AI launcher runs the service", viewport, true),
-      () => check("Quit is offered when a Start Mucaro AI launcher runs the service", viewport, false),
-    );
-    await navQuit.click();
-    const dialog = page.getByRole("dialog", { name: "Quit Mucaro AI?" });
-    await dialog.waitFor();
-    if (viewport === "iphone") await page.waitForTimeout(300); // let the navigation drawer finish sliding away
-    await shot(page, viewport, "18-quit-confirm");
-    axeRuns.push(await axe(page, viewport, "quit-confirm"));
-    await dialog.getByRole("button", { name: "Keep running" }).click();
-    await dialog.waitFor({ state: "detached" });
-    check("Keep running closes the dialog without quitting", viewport, !existsSync(stopFile));
-
-    await openNav();
-    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
-    const settingsQuit = page.locator("#main").getByRole("button", { name: "Quit Mucaro AI" });
-    await settingsQuit.waitFor();
-    if (viewport === "iphone") {
-      const height = (await settingsQuit.boundingBox())?.height ?? 0;
-      check("Quit button is at least 44px tall", viewport, height >= 44, `${height}px`);
-    }
-    await settingsQuit.click();
-    const shutdown = page.waitForResponse((res) => new URL(res.url()).pathname === "/shutdown");
-    await dialog.getByRole("button", { name: "Quit", exact: true }).click();
-    const response = await shutdown;
-    check("Quit asks the launcher to stop (POST /shutdown)", viewport, response.status() === 200, `status ${response.status()}`);
-    const stoppedHeading = page.getByRole("heading", { name: "Mucaro AI has stopped" });
-    await stoppedHeading.waitFor();
-    const requested = existsSync(stopFile) && readFileSync(stopFile, "utf8") === "quit\n";
-    check("the launcher's stop file is written", viewport, requested);
-    await shot(page, viewport, "19-stopped");
-    axeRuns.push(await axe(page, viewport, "stopped"));
-    // The service is gone in real use; the page must stay on the stopped screen, not probe for it.
-    await page.waitForTimeout(4500);
-    check("stopped screen stays after the watchdog interval", viewport, await stoppedHeading.isVisible());
-    const layoutOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
-    check("no horizontal page overflow on the quit flow", viewport, !layoutOverflow);
-    check("no console errors on the quit flow", viewport, consoleErrors.length === 0, consoleErrors.join(" | "));
-    await context.close();
-  } finally {
-    quitBackend.kill("SIGTERM");
-  }
-  return axeRuns;
-}
-
 const dataDir = mkdtempSync(path.join(tmpdir(), "mucaro-qa-"));
 const port = await freePort();
 const base = `http://127.0.0.1:${port}`;
@@ -534,8 +526,6 @@ try {
   const iphone = devices["iPhone 13"];
   axeResults.push(...(await scenario(browser, base, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
   await launchTokenScenario(browser, "desktop");
-  axeResults.push(...(await quitScenario(browser, "desktop", { viewport: { width: 1440, height: 900 } })));
-  axeResults.push(...(await quitScenario(browser, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
   const headers = (await fetch(`${base}/`)).headers;
   check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
   await offlineScenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } }, async () => {

@@ -4,30 +4,23 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-**Double-click `Start Mucaro AI.app` (macOS) or `Start Mucaro AI.exe` (Windows).** That is the whole
-setup.
+**On macOS, double-click `Mucaro AI.app` in this checkout.** It runs setup quietly and opens
+Mucaro in its own native window. Keep the app next to `pyproject.toml`; move the whole folder
+together. No Terminal or browser opens. The `.command` file is a legacy console launcher.
+Windows continues to use `Mucaro AI.cmd`.
 
-A progress page opens in your browser. The first time, Mucaro AI downloads private,
-checksum-verified copies of Python 3.12 and Node.js into this folder (about 200 MB to download,
-about 700 MB on disk, 2-5 minutes on a typical connection), installs everything, builds the
-interface, and loads two sample documents; then the page turns into the app. Nothing needs to be
-installed beforehand, no terminal window opens, and nothing is written outside the project folder.
-Later double-clicks open the app in seconds and work offline.
-
-Mucaro AI keeps running in the background while you use it. To stop it, click **Quit Mucaro AI**
-(bottom of the sidebar, or under Settings). Double-clicking again while it runs just opens it.
-
-To watch setup in a window instead, double-click `Mucaro AI.command` (macOS) or `Mucaro AI.cmd`
-(Windows): they run the same setup in a Terminal or console window. Keep that window open while you
-use the app; close it (or press `Ctrl+C`) to stop.
+The first double-click downloads private, checksum-verified copies of Python 3.12 and Node.js
+into this folder (about 200 MB to download, about 700 MB on disk, 2-5 minutes on a typical
+connection), installs everything, builds
+the interface, loads two sample documents, and starts the app. On macOS, setup output is saved
+in `.mucaro-runtime/logs/` and failures appear in a dialog. Nothing
+needs to be installed beforehand and nothing is written outside the project folder. Later
+double-clicks reuse completed setup steps and can work offline. Close the native window to stop
+the backend it started. API calls and remote fetches still require internet access.
 
 Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, and Linux x86_64
-(run `./"Mucaro AI.command"` from a terminal). Get the folder with `git clone` (or GitHub Desktop):
-a ZIP download makes macOS and Windows ask for approval before the first run. See
-`docs/ONE_CLICK_SETUP.md` for what the setup does, its error codes, and how to remove it.
-
-These files run Mucaro AI from this source folder. The native macOS app (`Mucaro AI.app`, with its
-own window and no browser) is a separate release build: see `docs/release/MACOS_APP.md`.
+(run `./"Mucaro AI.command"` from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
+does, its error codes, and how to remove it.
 
 Settings go in `.env` (created from `.env.example` on first run). The launcher reads it at
 startup; variables already exported in your shell take precedence. If the UI shows **Backend not
@@ -35,6 +28,18 @@ reachable**, double-click the launcher again and press **Retry**.
 
 See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
 `docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
+
+### Runtime independence target
+
+The release target is stricter than "offline after setup": a prepared platform package should
+install and launch with the public network disabled, without requiring host Python, Node, Git,
+package managers, compilers, containers, Floot, GitHub, or another hosted service for the declared
+offline core. Explicit remote model APIs and governed web fetch/search/render remain network
+capabilities by design. See `docs/RUNTIME_INDEPENDENCE.md` and
+`_architecture/runtime_independence_v1.json`.
+
+The current source one-click path still needs internet on first setup. Do not treat it as an
+offline-installable release artifact.
 
 ### Developer setup (manual)
 
@@ -275,8 +280,8 @@ receipts for the archive and every member.
 
 Use `mucaro package macos-app --format text` to build a local source-bound
 `Mucaro AI.app` under `data/exports/desktop_apps`. Double-clicking that app
-launches this checkout with the Python executable recorded at build time and
-opens the browser UI through `scripts/launch_app.py`. This is not yet a portable
+launches this checkout through silent setup and opens the native window. It provisions private
+runtimes on first use. This is not yet a portable
 signed installer with embedded runtime, reinstall, upgrade, and rollback
 guarantees.
 

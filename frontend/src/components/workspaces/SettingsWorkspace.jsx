@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../../api.js";
 
-// One settings home (TGT-033): model, retrieval, access token, offline capability view, and Quit when a
-// Start Mucaro AI launcher runs the service in the background (onQuit is null otherwise).
-export function SettingsWorkspace({ options, onOptionsChange, announce, onQuit = null }) {
+// One settings home (TGT-033): model, retrieval, access token and offline capability view.
+export function SettingsWorkspace({ options, onOptionsChange, announce }) {
   const [models, setModels] = useState([]);
   const [manifest, setManifest] = useState(null);
   const [config, setConfig] = useState(null);
@@ -86,16 +85,6 @@ export function SettingsWorkspace({ options, onOptionsChange, announce, onQuit =
           </>
         )}
       </fieldset>
-
-      {onQuit && (
-        <fieldset className="panel">
-          <legend>Mucaro AI on this computer</legend>
-          <p className="muted small">Mucaro keeps running in the background, with no window of its own, until you quit it.</p>
-          <div>
-            <button type="button" className="secondary-button" onClick={onQuit}>Quit Mucaro AI</button>
-          </div>
-        </fieldset>
-      )}
 
       {manifest && (
         <details className="panel" open>

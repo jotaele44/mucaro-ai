@@ -7,8 +7,9 @@
  * a fresh launcher (if Mucaro AI is already running, the progress page goes straight to it).
  * With --smoke-test (automated checks only) it waits and returns the setup's exit code.
  *
- * Built reproducibly by scripts/build_launchers.py (pinned zig); the committed Start Mucaro AI.exe must
- * match packaging/launchers/windows/BUILD_SHA256.
+ * Built reproducibly by scripts/build_launchers.py (pinned zig) into build/launchers/. Not wired up yet:
+ * no .exe is committed, and main's one_click_windows.ps1 has no --ui mode. These sources are the base
+ * for the queued Windows double-click launcher.
  */
 #define WIN32_LEAN_AND_MEAN
 #define UNICODE

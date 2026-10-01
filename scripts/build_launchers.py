@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""Build the committed desktop launcher assets from source, reproducibly.
+"""Build the Windows launcher from source, reproducibly.
 
-Outputs (all committed):
-- ``Start Mucaro AI.exe``                                 Windows launcher (C, packaging/launchers/windows/)
-- ``Start Mucaro AI.app/Contents/Resources/AppIcon.icns`` macOS app icon
-- ``packaging/icons/mucaro.ico``                    Windows icon (embedded in the .exe)
-- ``packaging/launchers/windows/BUILD_SHA256``      expected hash of the .exe
+The launcher sources in packaging/launchers/windows/ are not wired up yet: they are the base for the
+queued Windows double-click launcher, which will commit a working .exe. Until then nothing is
+committed from the build except the icon.
+
+Outputs:
+- ``packaging/icons/mucaro.ico``             Windows icon (committed; embedded in the .exe)
+- ``build/launchers/mucaro_launcher.exe``    Windows launcher (C, GUI subsystem; build/ is not committed)
 
 Tools are pinned and hash-checked (packaging/launchers/build-requirements.txt: zig for cross-compiling,
-Pillow for the icons) and installed into a temporary folder. The build host is Linux x86_64.
+Pillow for the icon) and installed into a temporary folder. The build host is Linux x86_64.
 
-    python scripts/build_launchers.py           # rebuild and write the outputs
-    python scripts/build_launchers.py --check   # rebuild in a temp folder; fail unless identical to the committed files
+    python scripts/build_launchers.py           # rebuild the icon and the .exe
+    python scripts/build_launchers.py --check   # build twice: the .exe must be identical, the icon must match the committed one
 """
 
 from __future__ import annotations
@@ -28,10 +30,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REQUIREMENTS = ROOT / "packaging" / "launchers" / "build-requirements.txt"
 WINDOWS_SRC = ROOT / "packaging" / "launchers" / "windows"
-EXE = ROOT / "Start Mucaro AI.exe"
-ICNS = ROOT / "Start Mucaro AI.app" / "Contents" / "Resources" / "AppIcon.icns"
+EXE = ROOT / "build" / "launchers" / "mucaro_launcher.exe"
 ICO = ROOT / "packaging" / "icons" / "mucaro.ico"
-EXE_HASH_FILE = WINDOWS_SRC / "BUILD_SHA256"
 ZIG_FLAGS = [
     "cc",
     "-target",
@@ -43,7 +43,7 @@ ZIG_FLAGS = [
     "-Wl,--subsystem,windows",
 ]
 
-# The mark drawn in scripts/one_click_progress.html (64-unit grid): an owl face, since a mucaro is an owl.
+# An owl face on a 64-unit grid, since a mucaro is an owl.
 BACKGROUND = (27, 36, 51, 255)
 TUFT = (201, 163, 107, 255)
 EYE = (242, 230, 207, 255)
@@ -96,12 +96,9 @@ def draw_icon(size: int):
     return canvas.resize((size, size), Image.Resampling.LANCZOS)
 
 
-def build_icons(icns: Path, ico: Path) -> None:
-    master = draw_icon(1024)
-    icns.parent.mkdir(parents=True, exist_ok=True)
+def build_icon(ico: Path) -> None:
     ico.parent.mkdir(parents=True, exist_ok=True)
-    master.save(icns, format="ICNS")
-    master.save(ico, format="ICO", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+    draw_icon(1024).save(ico, format="ICO", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
 
 
 def build_exe(tools: Path, ico: Path, output: Path, scratch: Path) -> None:
@@ -123,6 +120,7 @@ def build_exe(tools: Path, ico: Path, output: Path, scratch: Path) -> None:
         env=env,
         check=True,
     )
+    output.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src / "launcher.exe", output)
 
 
@@ -130,42 +128,38 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build_all(out_exe: Path, out_icns: Path, out_ico: Path, scratch: Path) -> None:
+def install(scratch: Path) -> Path:
     tools = scratch / "tools"
     install_tools(tools)
     sys.path.insert(0, str(tools))
-    build_icons(out_icns, out_ico)
-    build_exe(tools, out_ico, out_exe, scratch / "exe")
+    return tools
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--check", action="store_true", help="Rebuild in a temp folder and compare with the committed files.")
+    parser.add_argument("--check", action="store_true", help="Build twice in a temp folder and compare.")
     args = parser.parse_args(argv)
 
     with tempfile.TemporaryDirectory(prefix="mucaro-launchers-") as tmp:
         scratch = Path(tmp)
+        tools = install(scratch)
         if not args.check:
-            build_all(EXE, ICNS, ICO, scratch)
-            EXE_HASH_FILE.write_text(f"{sha256(EXE)}  Start Mucaro AI.exe\n", encoding="utf-8")
-            for path in (EXE, ICNS, ICO):
+            build_icon(ICO)
+            build_exe(tools, ICO, EXE, scratch / "exe")
+            for path in (ICO, EXE):
                 print(f"BUILT {path.relative_to(ROOT)} sha256={sha256(path)} bytes={path.stat().st_size}")
             print("LAUNCHERS_BUILD_OK")
             return 0
 
         out = scratch / "out"
-        out.mkdir()
-        rebuilt = {EXE: out / "launcher.exe", ICNS: out / "AppIcon.icns", ICO: out / "mucaro.ico"}
-        build_all(rebuilt[EXE], rebuilt[ICNS], rebuilt[ICO], scratch)
-        ok = True
-        for committed, fresh in rebuilt.items():
-            same = committed.is_file() and committed.read_bytes() == fresh.read_bytes()
-            ok = ok and same
-            print(f"{'MATCH' if same else 'MISMATCH'} {committed.relative_to(ROOT)} rebuilt_sha256={sha256(fresh)}")
-        recorded = EXE_HASH_FILE.read_text(encoding="utf-8").split()[0] if EXE_HASH_FILE.is_file() else ""
-        if recorded != sha256(rebuilt[EXE]):
-            ok = False
-            print(f"MISMATCH {EXE_HASH_FILE.relative_to(ROOT)} recorded={recorded or 'missing'}")
+        build_icon(out / "mucaro.ico")
+        build_exe(tools, out / "mucaro.ico", out / "first.exe", scratch / "exe-1")
+        build_exe(tools, out / "mucaro.ico", out / "second.exe", scratch / "exe-2")
+        icon_same = ICO.is_file() and ICO.read_bytes() == (out / "mucaro.ico").read_bytes()
+        exe_same = (out / "first.exe").read_bytes() == (out / "second.exe").read_bytes()
+        print(f"{'MATCH' if icon_same else 'MISMATCH'} {ICO.relative_to(ROOT)} rebuilt_sha256={sha256(out / 'mucaro.ico')}")
+        print(f"{'MATCH' if exe_same else 'MISMATCH'} launcher .exe built twice sha256={sha256(out / 'first.exe')} / {sha256(out / 'second.exe')}")
+        ok = icon_same and exe_same
         print("LAUNCHERS_REPRODUCIBLE_OK" if ok else "LAUNCHERS_REPRODUCIBLE_FAILED")
         return 0 if ok else 1
 

@@ -1,32 +1,24 @@
 name: One-click setup
 
-# Runs the real double-click files on clean runners:
-# - Start Mucaro AI.app through LaunchServices (`open`) and Start Mucaro AI.exe through Start-Process (no
-#   terminal window): first-run setup (smoke launch), then a background start, a second double-click while
-#   running, and the Quit endpoint.
-# - "Mucaro AI.command" / "Mucaro AI.cmd" (the same setup in a Terminal/console window). PATH is cut down to OS
-#   directories (plus tripwire stubs on macOS/Linux), so the job fails if setup ever depends on a
-#   preinstalled Python, Node, npm, or git.
-# - scripts/build_launchers.py --check: the committed .exe and icons are exactly what their source builds.
+# Runs the real double-click files ("Mucaro AI.command" / "Mucaro AI.cmd") on clean runners.
+# PATH is cut down to OS directories (plus tripwire stubs on macOS/Linux), so the job fails if
+# setup ever depends on a preinstalled Python, Node, npm, or git.
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "Start Mucaro AI.app/**"
-      - "Start Mucaro AI.exe"
       - "Mucaro AI.command"
+      - "Mucaro AI.app/**"
+      - "scripts/native_start.sh"
+      - "scripts/native_window.py"
+      - "backend/tests/test_native_launch.py"
       - "Mucaro AI.cmd"
       - ".gitattributes"
-      - "packaging/launchers/**"
-      - "packaging/icons/**"
       - "scripts/one_click*"
-      - "scripts/progress_page*"
-      - "scripts/build_launchers.py"
       - "scripts/launch_app.py"
       - "scripts/preflight.py"
       - "scripts/ingest_folder.py"
-      - "backend/app/main.py"
       - "pyproject.toml"
       - "frontend/package.json"
       - "frontend/package-lock.json"
@@ -35,13 +27,12 @@ on:
     branches:
       - main
     paths:
-      - "Start Mucaro AI.app/**"
-      - "Start Mucaro AI.exe"
       - "Mucaro AI.command"
+      - "Mucaro AI.app/**"
+      - "scripts/native_start.sh"
+      - "scripts/native_window.py"
       - "Mucaro AI.cmd"
-      - "packaging/launchers/**"
       - "scripts/one_click*"
-      - "scripts/progress_page*"
       - "scripts/launch_app.py"
       - "pyproject.toml"
       - "frontend/package-lock.json"
@@ -51,125 +42,6 @@ permissions:
   contents: read
 
 jobs:
-  start-app:
-    name: ${{ matrix.label }} (Start Mucaro AI.app)
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            label: macOS arm64
-          - os: macos-15-intel
-            label: macOS Intel
-    steps:
-      - uses: actions/checkout@v7
-      - name: First double-click through LaunchServices (full setup, smoke launch)
-        timeout-minutes: 20
-        run: |
-          open -W "Start Mucaro AI.app" --args --smoke-test --no-browser
-          cat .mucaro-runtime/logs/run-*.log
-          grep -q "ONE_CLICK_SETUP_OK" .mucaro-runtime/logs/run-*.log
-          grep -q "DESKTOP_SMOKE_OK" .mucaro-runtime/logs/run-*.log
-          grep -q 'class="state-stopped"' .mucaro-runtime/ui/progress.html
-          grep -q "^home = $(pwd -P)/.mucaro-runtime/python/" .venv/pyvenv.cfg
-      - name: Background start, second double-click while running, Quit endpoint
-        timeout-minutes: 5
-        run: |
-          set -u
-          open "Start Mucaro AI.app" --args --no-browser
-          for i in $(seq 1 120); do curl -sf http://127.0.0.1:8000/health >/dev/null && break; sleep 1; done
-          curl -sf http://127.0.0.1:8000/health
-          sleep 2
-          grep -q 'class="state-ready"' .mucaro-runtime/ui/progress.html
-          grep -q 'url=http://127.0.0.1:8000' .mucaro-runtime/ui/progress.html
-          test "$(curl -sf http://127.0.0.1:8000/config | .venv/bin/python -c 'import json,sys; print(json.load(sys.stdin)["desktop"]["quit_supported"])')" = "True"
-          # A second double-click while running goes straight to the running app.
-          open "Start Mucaro AI.app" --args --no-browser
-          for i in $(seq 1 60); do grep -qs "DESKTOP_LAUNCH_REUSED" .mucaro-runtime/logs/run-*.log && break; sleep 1; done
-          grep -q "DESKTOP_LAUNCH_REUSED" .mucaro-runtime/logs/run-*.log
-          # Quit button.
-          curl -sf -X POST -H "X-Mucaro-Action: quit" http://127.0.0.1:8000/shutdown
-          for i in $(seq 1 30); do curl -s -m 1 http://127.0.0.1:8000/health >/dev/null || break; sleep 1; done
-          if curl -s -m 1 http://127.0.0.1:8000/health >/dev/null; then echo "backend still running after quit"; exit 1; fi
-          grep -q 'class="state-stopped"' .mucaro-runtime/ui/progress.html
-          grep -q "DESKTOP_STOP_REQUESTED reason=quit_button" .mucaro-runtime/logs/run-*.log
-          if pgrep -f "uvicorn backend.app.main" >/dev/null; then echo "uvicorn left running"; exit 1; fi
-          test -z "$(git status --porcelain)"
-      - name: Upload logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: start-app-logs-${{ matrix.os }}
-          path: |
-            .mucaro-runtime/logs/
-            .mucaro-runtime/ui/
-          if-no-files-found: ignore
-
-  start-exe:
-    name: Windows x64 (Start Mucaro AI.exe)
-    runs-on: windows-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-      - name: First double-click (full setup, smoke launch)
-        timeout-minutes: 20
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem"
-          $p = Start-Process -FilePath ".\Start Mucaro AI.exe" -ArgumentList "--smoke-test", "--no-browser" -Wait -PassThru
-          Get-Content .mucaro-runtime\logs\setup-*.log, .mucaro-runtime\logs\run-*.log
-          if ($p.ExitCode -ne 0) { throw "Start Mucaro AI.exe exited with $($p.ExitCode)" }
-          if (-not (Select-String -Quiet -Path .mucaro-runtime\logs\setup-*.log -Pattern "ONE_CLICK_SETUP_OK")) { throw "setup did not finish" }
-          if (-not (Select-String -Quiet -Path .mucaro-runtime\logs\run-*.log -Pattern "DESKTOP_SMOKE_OK")) { throw "smoke launch did not finish" }
-          if (-not (Select-String -Quiet -Path .mucaro-runtime\ui\progress.html -Pattern 'class="state-stopped"' -SimpleMatch)) { throw "progress page not stopped" }
-      - name: Background start, second double-click while running, Quit endpoint
-        timeout-minutes: 5
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem"
-          function Test-Health { try { Invoke-RestMethod -TimeoutSec 2 http://127.0.0.1:8000/health | Out-Null; $true } catch { $false } }
-          Start-Process -FilePath ".\Start Mucaro AI.exe" -ArgumentList "--no-browser"
-          for ($i = 0; $i -lt 120 -and -not (Test-Health); $i++) { Start-Sleep 1 }
-          if (-not (Test-Health)) { Get-Content .mucaro-runtime\logs\*.log; throw "backend did not start" }
-          Start-Sleep 2
-          $page = Get-Content -Raw .mucaro-runtime\ui\progress.html
-          if (-not $page.Contains('class="state-ready"')) { throw "progress page not ready" }
-          if (-not (Invoke-RestMethod http://127.0.0.1:8000/config).desktop.quit_supported) { throw "quit not supported" }
-          Start-Process -FilePath ".\Start Mucaro AI.exe" -ArgumentList "--no-browser"
-          for ($i = 0; $i -lt 60 -and -not (Select-String -Quiet -Path .mucaro-runtime\logs\run-*.log -Pattern "DESKTOP_LAUNCH_REUSED"); $i++) { Start-Sleep 1 }
-          if (-not (Select-String -Quiet -Path .mucaro-runtime\logs\run-*.log -Pattern "DESKTOP_LAUNCH_REUSED")) { throw "second launch did not reuse the running app" }
-          Invoke-RestMethod -Method Post -Headers @{ "X-Mucaro-Action" = "quit" } http://127.0.0.1:8000/shutdown | Out-Null
-          for ($i = 0; $i -lt 30 -and (Test-Health); $i++) { Start-Sleep 1 }
-          if (Test-Health) { throw "backend still running after quit" }
-          Start-Sleep 2
-          $page = Get-Content -Raw .mucaro-runtime\ui\progress.html
-          if (-not $page.Contains('class="state-stopped"')) { throw "progress page not stopped" }
-          if (-not (Select-String -Quiet -Path .mucaro-runtime\logs\run-*.log -Pattern "DESKTOP_STOP_REQUESTED reason=quit_button")) { throw "no quit marker" }
-          $dirty = git status --porcelain
-          if ($dirty) { throw "setup left tracked changes:`n$dirty" }
-      - name: Upload logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: start-exe-logs-windows
-          path: |
-            .mucaro-runtime/logs/
-            .mucaro-runtime/ui/
-          if-no-files-found: ignore
-
-  reproducible-launchers:
-    name: Launchers rebuild byte-for-byte
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-      - name: Rebuild Start Mucaro AI.exe and icons from source and compare
-        run: python scripts/build_launchers.py --check
-
   posix:
     name: ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
@@ -211,15 +83,21 @@ jobs:
           grep -q "ONE_CLICK_FAST_PATH" "$RUNNER_TEMP/run2.log"
           grep -q "DESKTOP_SMOKE_OK" "$RUNNER_TEMP/run2.log"
           test "$elapsed" -lt 90
+      - name: Silent source app smoke (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          env -i HOME="$RUNNER_TEMP/home" PATH="$RUNNER_TEMP/stubs:/usr/bin:/bin:/usr/sbin:/sbin" LANG=en_US.UTF-8 CI=true \
+            "./Mucaro AI.app/Contents/MacOS/mucaro-ai" --smoke-test --no-browser > "$RUNNER_TEMP/silent-app.log" 2>&1
+          test ! -s "$RUNNER_TEMP/silent-app.log"
+          grep -q "DESKTOP_SMOKE_OK" .mucaro-runtime/logs/launch-*.log
+          grep -q "DESKTOP_BACKEND_PORT_CLOSED" .mucaro-runtime/logs/launch-*.log
+          .venv/bin/python -c "import webview, AppKit, Foundation, WebKit"
       - name: Verify isolation
         run: |
           if [ -s "$RUNNER_TEMP/tripwire.txt" ]; then echo "setup ran a PATH tool:"; cat "$RUNNER_TEMP/tripwire.txt"; exit 1; fi
           grep -q "^home = $(pwd -P)/.mucaro-runtime/python/" .venv/pyvenv.cfg
           test -z "$(ls -A "$RUNNER_TEMP/home")"
           test -z "$(git status --porcelain)"
-      - name: Bash 3.2 progress-page renderer matches Python (macOS system bash)
-        if: runner.os == 'macOS'
-        run: .venv/bin/python -m pytest backend/tests/test_desktop_launchers.py -q -k "bash_renderer or app_launcher"
       - name: Upload setup logs
         if: failure()
         uses: actions/upload-artifact@v7

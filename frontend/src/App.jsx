@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
 import { ChatView } from "./components/ChatView.jsx";
-import { QuitDialog, StoppedScreen } from "./components/QuitDialog.jsx";
 import { TasksDrawer } from "./components/TasksDrawer.jsx";
 import { MemoryWorkspace } from "./components/workspaces/MemoryWorkspace.jsx";
 import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace.jsx";
@@ -45,15 +44,6 @@ export function App() {
   const [options, setOptions] = useState(() => ({ ...DEFAULT_OPTIONS, ...stored("mucaro.options", {}) }));
   const [message, setMessage] = useState("");
   const [health, setHealth] = useState({ state: "checking" });
-  // Quit is offered only when a Start Mucaro AI launcher supervises the service (config.desktop.quit_supported).
-  const [quitSupported, setQuitSupported] = useState(false);
-  const [quitOpen, setQuitOpen] = useState(false);
-  const [stopped, setStopped] = useState(false);
-  const closeQuit = useCallback(() => setQuitOpen(false), []);
-  const openQuit = useCallback(() => {
-    setNavOpen(false);
-    setQuitOpen(true);
-  }, []);
 
   const announce = useCallback((text) => {
     setMessage("");
@@ -73,9 +63,8 @@ export function App() {
     try {
       await api.health();
       setHealth({ state: "ok" });
-      const [modePayload, configPayload] = await Promise.all([api.modes(), api.config().catch(() => null), loadConversations()]);
+      const [modePayload] = await Promise.all([api.modes(), loadConversations()]);
       setModes(modePayload);
-      setQuitSupported(Boolean(configPayload?.desktop?.quit_supported));
     } catch (err) {
       setHealth({ state: "error", error: err });
     }
@@ -87,7 +76,6 @@ export function App() {
 
   // Watchdog: a local service that stops mid-session is reported instead of leaving requests hanging.
   useEffect(() => {
-    if (stopped) return undefined;
     const timer = window.setInterval(async () => {
       if (document.hidden) return;
       try {
@@ -98,7 +86,7 @@ export function App() {
       }
     }, 4000);
     return () => window.clearInterval(timer);
-  }, [stopped]);
+  }, []);
 
   useEffect(() => persist("mucaro.activeConversation", activeId), [activeId]);
   useEffect(() => persist("mucaro.options", options), [options]);
@@ -110,7 +98,6 @@ export function App() {
   }
 
   const visible = conversations.filter((row) => row.title.toLowerCase().includes(filter.trim().toLowerCase()));
-  if (stopped) return <StoppedScreen />;
   return (
     <div className={`app ${navOpen ? "nav-open" : ""}`}>
       <a className="skip-link" href="#main">Skip to content</a>
@@ -158,11 +145,6 @@ export function App() {
             {!visible.length && <li className="muted small pad">{conversations.length ? "No matches." : "No conversations yet."}</li>}
           </ul>
         </div>
-        {quitSupported && (
-          <button type="button" className="secondary-button wide" onClick={openQuit}>
-            Quit Mucaro AI
-          </button>
-        )}
       </nav>
       <div className="nav-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
       <main id="main" className="main" tabIndex={-1}>
@@ -193,10 +175,9 @@ export function App() {
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}
         {health.state === "ok" && view === "provenance" && <ProvenanceWorkspace />}
-        {health.state === "ok" && view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions} announce={announce} onQuit={quitSupported ? openQuit : null} />}
+        {health.state === "ok" && view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions} announce={announce} />}
       </main>
       {tasksOpen && <TasksDrawer onClose={() => setTasksOpen(false)} />}
-      {quitOpen && <QuitDialog onClose={closeQuit} onStopped={() => setStopped(true)} />}
       <div className="sr-only" role="status" aria-live="polite">{message}</div>
     </div>
   );

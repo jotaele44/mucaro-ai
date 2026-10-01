@@ -8,6 +8,7 @@ from typing import Any
 
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
+from .local_tools import resolve_local_tool
 
 CODING_LIFECYCLE_SCHEMA_VERSION = "mucaro-coding-lifecycle/1.0"
 PROTECTED_BRANCHES = {"main", "master"}
@@ -26,17 +27,20 @@ class CodingLifecycleError(RuntimeError):
 
 
 def _git(repo_root: Path, *args: str, timeout: int = 30) -> subprocess.CompletedProcess[str]:
+    git = resolve_local_tool("git")
+    if not git:
+        raise CodingLifecycleError("ERROR_CODING_GIT_UNAVAILABLE", "Git is not bundled in this Mucaro runtime.")
     try:
         return subprocess.run(
-            ["git", *args],
+            [git, *args],
             cwd=repo_root,
             text=True,
             capture_output=True,
             check=False,
             timeout=timeout,
         )
-    except FileNotFoundError as exc:
-        raise CodingLifecycleError("ERROR_CODING_GIT_UNAVAILABLE", "git executable is not available") from exc
+    except OSError as exc:
+        raise CodingLifecycleError("ERROR_CODING_GIT_UNAVAILABLE", "Bundled Git could not be started.") from exc
     except subprocess.TimeoutExpired as exc:
         raise CodingLifecycleError("ERROR_CODING_LIFECYCLE_TIMEOUT", "git command timed out") from exc
 

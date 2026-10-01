@@ -10,8 +10,6 @@
 # - Never runs python/python3/git/node/npm from PATH. On a Mac without the
 #   Command Line Tools those are stubs in /usr/bin that open an install dialog.
 # - Writes nothing outside the project folder.
-# With --ui (passed by Start Mucaro AI.app), every step and failure also updates the browser progress page
-# .mucaro-runtime/ui/progress.html; the flag is passed on to scripts/one_click.py.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -25,14 +23,6 @@ PINS_FILE="${ROOT}/scripts/one_click_pins.env"
 VENV_PY="${ROOT}/.venv/bin/python"
 MIN_FREE_KB=2000000
 LOG=""
-PAGE=""
-for arg in ${1+"$@"}; do
-  if [ "${arg}" = "--ui" ]; then
-    PAGE="${RUNTIME}/ui/progress.html"
-  fi
-done
-# shellcheck source=scripts/progress_page.sh
-. "${SCRIPT_DIR}/progress_page.sh"
 
 log_line() {
   printf '%s\n' "$*"
@@ -44,7 +34,6 @@ log_line() {
 fatal() {
   code="$1"
   shift
-  progress_page_write "${PAGE}" error 0 "Mucaro AI cannot start on this computer" "${code}: $*" "${LOG}"
   log_line ""
   log_line "${code} $*"
   log_line ""
@@ -123,7 +112,7 @@ detect_platform() {
       PLATFORM_LABEL="Linux ${arch}"
       ;;
     *)
-      fatal ERROR_PLATFORM_UNSUPPORTED "${os_name} is not supported by this launcher; on Windows double-click \"Start Mucaro AI.exe\""
+      fatal ERROR_PLATFORM_UNSUPPORTED "${os_name} is not supported by this launcher; on Windows double-click \"Mucaro AI.cmd\""
       ;;
   esac
   uv_hash_var="UV_SHA256_$(printf '%s' "${UV_TARGET}" | tr '-' '_')"
@@ -214,13 +203,8 @@ say() {
 fail() {
   code="$1"
   shift
-  progress_page_write "${PAGE}" error 0 "Mucaro AI setup did not finish" "${code}: $*" "${LOG}"
   say "${code} $*"
   exit 3
-}
-
-page_step() {
-  progress_page_write "${PAGE}" running 0 "Preparing Mucaro AI" "$1" "${LOG}"
 }
 
 download() {
@@ -266,7 +250,6 @@ ensure_uv() {
   fi
   require_disk_space
   say "==> Downloading the Python installer uv ${UV_VERSION} (one time, about 20 MB)"
-  page_step "Downloading the Python installer (one time, about 20 MB)"
   work="$(mktemp -d "${RUNTIME}/tmp.XXXXXX")"
   fetch_verified "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${UV_TARGET}.tar.gz" "${work}/uv.tar.gz" "${UV_SHA256}"
   tar -xzf "${work}/uv.tar.gz" -C "${work}" || fail ERROR_EXTRACT_FAILED "uv archive"
@@ -285,7 +268,6 @@ ensure_node() {
   fi
   require_disk_space
   say "==> Downloading private Node.js ${NODE_VERSION} (one time, about 50 MB)"
-  page_step "Downloading Node.js (one time, about 50 MB)"
   work="$(mktemp -d "${RUNTIME}/tmp.XXXXXX")"
   archive="node-v${NODE_VERSION}-${NODE_PLAT}"
   fetch_verified "https://nodejs.org/dist/v${NODE_VERSION}/${archive}.tar.gz" "${work}/node.tar.gz" "${NODE_SHA256}"
@@ -321,7 +303,6 @@ ensure_venv() {
   fi
   require_disk_space
   say "==> Installing private Python ${PYTHON_VERSION} (one time, about 30 MB)"
-  page_step "Installing a private Python ${PYTHON_VERSION} (one time, about 30 MB)"
   "${UV_BIN}" python install --no-bin --no-registry "${PYTHON_VERSION}" || fail ERROR_PYTHON_INSTALL_FAILED "uv python install ${PYTHON_VERSION}"
   rm -rf "${ROOT}/.venv"
   "${UV_BIN}" venv --seed --no-project --python "${PYTHON_VERSION}" "${ROOT}/.venv" || fail ERROR_VENV_FAILED "uv venv"
@@ -333,7 +314,6 @@ stage0() {
   set -euo pipefail
   rm -rf "${RUNTIME}"/tmp.* 2>/dev/null || true
   say "==> [0/6] Preparing private runtimes in .mucaro-runtime"
-  page_step "Checking the private Python and Node.js"
   ensure_uv
   ensure_node
   ensure_venv
@@ -353,10 +333,6 @@ stage0_rc="${PIPESTATUS[0]}"
 set -e
 if [ "${stage0_rc}" -ne 0 ]; then
   log_line ""
-  # fail() already put its reason on the page; this covers anything that stopped stage 0 without it.
-  if [ -n "${PAGE}" ] && ! grep -q 'class="state-error"' "${PAGE}" 2>/dev/null; then
-    progress_page_write "${PAGE}" error 0 "Mucaro AI setup did not finish" "ERROR_STAGE0_FAILED: step failed with code ${stage0_rc}" "${LOG}"
-  fi
   log_line "Mucaro AI setup did not finish (step failed with code ${stage0_rc})."
   log_line "Details: ${LOG}"
   log_line "Nothing outside this folder was changed. Fix the problem named above (usually the internet connection), then double-click again; setup resumes where it stopped."
