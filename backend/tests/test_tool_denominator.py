@@ -64,6 +64,9 @@ def test_runtime_evidence_is_derived_from_governed_requests() -> None:
     assert tools["web.fetch"]["evidence_state"] == "EXERCISED"
     assert "backend/tests/test_tools.py::test_tool_runtime_executes_governed_web_fetch" in tools["web.fetch"]["runtime_evidence"]
     assert tools["source_library.status"]["evidence_state"] == "EXERCISED"
+    for name in ("gis.inspect", "ocr.analyze_image"):
+        assert tools[name]["evidence_state"] == "EXERCISED", name
+        assert tools[name]["classification"] == "SUPPORTING"
     for name in ("coding.repo_status", "coding.read_file", "coding.diff", "coding.patch_check", "coding.patch_apply"):
         assert tools[name]["evidence_state"] == "EXERCISED", name
         assert tools[name]["classification"] == "REQUIRED"
