@@ -356,7 +356,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   check("settings shows model choice and offline capabilities", viewport, (await page.getByRole("radio", { name: /openai_compatible_local/ }).count()) === 1);
 
   const darkTheme = page.getByRole("radio", { name: "Dark" });
-  await darkTheme.check();
+  await darkTheme.click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
   check("persistent theme applies to the live document", viewport, await darkTheme.isChecked());
 
