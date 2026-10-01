@@ -145,6 +145,8 @@ export const api = {
   conversationRuns: (id) => request(`/conversations/${id}/runs?limit=100`),
 
   sendMessage: (conversationId, payload) => request(`/conversations/${conversationId}/messages`, json("POST", payload)),
+  branchRun: (conversationId, runId, payload) =>
+    request(`/conversations/${conversationId}/runs/${runId}/branch`, json("POST", payload)),
   editConversationMessage: (conversationId, messageKey, content, expectedRevision) =>
     request(
       `/conversations/${conversationId}/messages/${encodeURIComponent(messageKey)}`,
