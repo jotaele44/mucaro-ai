@@ -193,7 +193,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
     try {
       let id = conversationId;
       const creating = !id;
-      if (creating) id = (await api.createConversation(prompt.slice(0, 60))).conversation_id;
+      if (creating) id = (await api.createConversation()).conversation_id;
       const key = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const result = await api.sendMessage(id, { prompt, mode, idempotency_key: key, options: defaultOptions });
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
