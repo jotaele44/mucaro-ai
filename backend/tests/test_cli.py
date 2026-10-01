@@ -1690,6 +1690,9 @@ mucaro = "backend.app.cli:main"
         "scripts/package_desktop.py",
         "scripts/certify_source_artifact.py",
         "scripts/certify_python_distribution.py",
+        "scripts/native_start.sh",
+        "scripts/one_click.sh",
+        "scripts/one_click.py",
     ]:
         (root / path).write_text("# fixture\n", encoding="utf-8")
     (root / "frontend" / "package.json").write_text(
