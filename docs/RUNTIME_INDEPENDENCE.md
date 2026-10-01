@@ -58,6 +58,27 @@ Capabilities that cannot satisfy a platform's sandbox or executable-code rules
 must be marked unsupported or replaced by a platform-native adapter rather than
 quietly requiring an external helper.
 
+## Bundled tool resolution
+
+Packaged/frozen Mucaro releases use a bundled-tools-only resolver for native helper
+executables. The resolver searches the app's own `runtime/bin` resource directory
+and never falls back to the host `PATH`. This applies to Git-backed coding,
+Tesseract, Poppler's `pdftoppm`, and container-engine discovery.
+
+Source/developer checkouts retain host-`PATH` fallback so development and CI do
+not require vendored binaries. That fallback is deliberately absent from frozen
+releases.
+
+If an optional helper is not present in the release artifact, Mucaro reports the
+capability as unavailable and records packaging residue. The operator is not told
+to install the missing helper. Explicit executable-path overrides are also
+rejected in a frozen release when the path is outside the bundled tools directory.
+
+Docker/Podman remains a platform-adapter gap rather than a universal bundle
+candidate. Desktop distributions may adopt a supported isolated execution
+adapter; mobile distributions must use a platform-appropriate sandbox or mark
+that execution class unsupported.
+
 ## Certification gate
 
 A platform earns `OFFLINE_INDEPENDENT` only when all of the following pass on
