@@ -265,8 +265,8 @@ def test_offline_manifest_reports_missing_packages_even_for_network_capabilities
 def test_offline_manifest_exposes_git_backed_coding_as_a_bundle_candidate(monkeypatch):
     import backend.app.offline as offline
 
-    real_which = offline.shutil.which
-    monkeypatch.setattr(offline.shutil, "which", lambda name: None if name == "git" else real_which(name))
+    real_resolve = offline.resolve_local_tool
+    monkeypatch.setattr(offline, "resolve_local_tool", lambda name: None if name == "git" else real_resolve(name))
     rows = {row["capability"]: row for row in build_offline_manifest()["capabilities"]}
 
     for capability in (
