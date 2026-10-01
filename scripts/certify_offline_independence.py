@@ -75,7 +75,7 @@ def main() -> int:
         "--capability",
         action="append",
         dest="capabilities",
-        help="Override/adopt a required offline capability for this platform release; repeat as needed.",
+        help="Add an adopted platform capability to the frozen core denominator; repeat as needed.",
     )
     args = parser.parse_args()
 
