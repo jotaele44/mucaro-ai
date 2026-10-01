@@ -11,9 +11,9 @@ even when it would also need the network.
 from __future__ import annotations
 
 import importlib.util
-import shutil
 from typing import Any
 
+from .local_tools import resolve_local_tool
 from .model_router import list_model_providers
 from .tools import TOOL_REGISTRY
 
@@ -69,7 +69,7 @@ def _dependency_present(kind: str | None, dependency: str | None) -> bool:
     if kind == "python_module":
         return _module_present(dependency)
     if kind == "binary":
-        return shutil.which(dependency) is not None
+        return resolve_local_tool(dependency) is not None
     raise ValueError(f"unsupported local dependency kind: {kind}")
 
 
