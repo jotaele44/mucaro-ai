@@ -222,7 +222,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
                 </span>
               )}
             </summary>
-            {(planSteps.length > 0 || view.route) && (
+            {(planSteps.length > 0 || view.route || toolLabel) && (
               <div className="run-receipt-body">
                 {planSteps.length > 0 && (
                   <ol>
