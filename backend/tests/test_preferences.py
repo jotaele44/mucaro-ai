@@ -164,3 +164,41 @@ def test_run_options_projection_excludes_ui_only_preferences(tmp_path: Path):
     assert projected["allow_live"] is False
     assert "theme" not in projected
     assert "reduced_motion" not in projected
+
+def test_explicit_secret_assignment_is_blocked_before_value_parsing():
+    parsed = parse_preference_prompt("/settings operator_token=do-not-store")
+    assert parsed["status"] == "PREFERENCE_PROMPT_BLOCKED"
+    assert "do-not-store" not in parsed["detail"]
+
+
+def test_unknown_persisted_key_fails_closed(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    cfg.ensure_dirs()
+    write_json(
+        cfg.processed_dir / "user_preferences.json",
+        {
+            "schema_version": "mucaro-user-preferences/1.0",
+            "revision": 1,
+            "values": {"top_k": 5, "future_unreviewed_setting": True},
+        },
+    )
+    with pytest.raises(PreferenceError) as exc:
+        get_preferences(cfg)
+    assert exc.value.status == "ERROR_PREFERENCES_SCHEMA"
+
+
+@pytest.mark.parametrize("revision", [-1, "not-an-int", True])
+def test_invalid_persisted_revision_fails_closed(tmp_path: Path, revision):
+    cfg = make_settings(tmp_path)
+    cfg.ensure_dirs()
+    write_json(
+        cfg.processed_dir / "user_preferences.json",
+        {
+            "schema_version": "mucaro-user-preferences/1.0",
+            "revision": revision,
+            "values": {"top_k": 5},
+        },
+    )
+    with pytest.raises(PreferenceError) as exc:
+        get_preferences(cfg)
+    assert exc.value.status == "ERROR_PREFERENCES_SCHEMA"
