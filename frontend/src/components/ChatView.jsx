@@ -101,6 +101,9 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
             if (!entry || entry.events.some((row) => row.seq === event.seq)) return previous;
             return new Map(previous).set(runId, { run: entry.run, events: [...entry.events, event] });
           });
+          if (event.type === "preference_update" && onPreferencesChanged) {
+            Promise.resolve(onPreferencesChanged()).catch(() => {});
+          }
           if (["approval_request", "question", "final", "interrupted", "error"].includes(event.type)) {
             loadRun(runId).catch(() => {});
           }
@@ -113,7 +116,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
           if (!controller.signal.aborted) refreshRef.current?.().catch(() => {});
         });
     },
-    [loadRun],
+    [loadRun, onPreferencesChanged],
   );
 
   const refresh = useCallback(async () => {
@@ -257,7 +260,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
         )}
       </header>
 
-      <div className="feed" ref={feedRef} onScroll={onScroll} role="log" aria-label="Conversation history" aria-live="polite" aria-relevant="additions">
+      <div className="feed" ref={feedRef} onScroll={onScroll} role="log" aria-label="Conversation history" aria-relevant="additions">
         {loading && <p className="muted center">Loading conversation…</p>}
         {empty && (
           <div className="empty-state">
