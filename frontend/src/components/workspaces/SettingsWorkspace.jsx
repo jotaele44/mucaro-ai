@@ -74,7 +74,7 @@ export function SettingsWorkspace({ options, preferences, onPreferencesChanged, 
           Changes are validated, versioned, and written locally before Mucaro confirms them.
         </p>
         <p className="warning-inline small">
-          Credentials are intentionally excluded from prompt control because prompts are retained in conversation history.
+          Credential-setting prompts are rejected before a run is persisted. Use the dedicated local access field instead.
         </p>
       </fieldset>
 
@@ -219,7 +219,7 @@ export function SettingsWorkspace({ options, preferences, onPreferencesChanged, 
       <fieldset className="panel" id="settings-access">
         <legend>Local access token</legend>
         <p className="muted small">
-          This credential is deliberately outside prompt-configurable preferences so it cannot be copied into a saved chat transcript.
+          This credential is deliberately outside prompt-configurable preferences. Requests to set it in chat are rejected before a run is saved.
         </p>
         {api.tokenIsLaunchManaged() ? (
           <p className="muted small">The Mucaro app created a fresh token for this launch and uses it automatically. Nothing to set here.</p>
