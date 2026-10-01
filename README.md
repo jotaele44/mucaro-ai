@@ -29,6 +29,18 @@ reachable**, double-click the launcher again and press **Retry**.
 See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
 `docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
 
+### Runtime independence target
+
+The release target is stricter than "offline after setup": a prepared platform package should
+install and launch with the public network disabled, without requiring host Python, Node, Git,
+package managers, compilers, containers, Floot, GitHub, or another hosted service for the declared
+offline core. Explicit remote model APIs and governed web fetch/search/render remain network
+capabilities by design. See `docs/RUNTIME_INDEPENDENCE.md` and
+`_architecture/runtime_independence_v1.json`.
+
+The current source one-click path still needs internet on first setup. Do not treat it as an
+offline-installable release artifact.
+
 ### Developer setup (manual)
 
 Requirements: Python 3.11-3.13 and Node 20+ already installed.

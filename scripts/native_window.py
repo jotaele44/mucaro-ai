@@ -99,6 +99,17 @@ def _name_the_app() -> None:
         info["CFBundleName"] = APP_NAME
 
 
+def _set_dock_icon() -> None:
+    """Show the Mucaro AI owl in the Dock while the window is open."""
+    icon = Path(__file__).resolve().parents[1] / "Mucaro AI.app" / "Contents" / "Resources" / "MucaroAI.png"
+    with contextlib.suppress(Exception):
+        from AppKit import NSApplication, NSImage  # type: ignore[import-not-found]
+
+        image = NSImage.alloc().initWithContentsOfFile_(str(icon))
+        if image is not None:
+            NSApplication.sharedApplication().setApplicationIconImage_(image)
+
+
 @contextlib.contextmanager
 def _stop_on_signal(on_signal: Callable[[], None]) -> Iterator[None]:
     """Deliver SIGTERM/SIGINT to a worker thread even while AppKit owns the main thread."""
@@ -138,6 +149,7 @@ def run_window(url: str, *, storage_dir: Path, pid_file: Path) -> None:
     import webview  # type: ignore[import-not-found]
 
     _name_the_app()
+    _set_dock_icon()
     window = webview.create_window(APP_NAME, url=url, width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], min_size=WINDOW_MIN_SIZE)
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     pid_file.write_text(f"{os.getpid()}\n", encoding="utf-8")
