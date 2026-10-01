@@ -202,3 +202,17 @@ def test_invalid_persisted_revision_fails_closed(tmp_path: Path, revision):
     with pytest.raises(PreferenceError) as exc:
         get_preferences(cfg)
     assert exc.value.status == "ERROR_PREFERENCES_SCHEMA"
+
+
+def test_provider_change_updates_its_default_model(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    result = update_preferences({"model_provider": "openai_compatible_local"}, source="test", cfg=cfg)
+    assert result["values"]["model_provider"] == "openai_compatible_local"
+    assert result["values"]["model_name"] == "llama3.1:8b"
+
+
+def test_positive_live_and_offline_prompts_clear_the_opposing_mode():
+    live = parse_preference_prompt("Enable live models")
+    assert live["changes"] == {"allow_live": True, "require_offline": False}
+    offline = parse_preference_prompt("Enable offline mode")
+    assert offline["changes"] == {"require_offline": True, "allow_live": False}
