@@ -162,6 +162,38 @@
         "TGT-006",
         "INV-015"
       ]
+    },
+    {
+      "delta_id": "SD-012",
+      "classification": "ENHANCEMENT",
+      "title": "Phone access to a local Mucaro service (TLS LAN serving, an installable web app or a native client); the packaged app binds loopback only and the backend has no TLS, so iPhone-width evidence does not imply a mobile shipping channel",
+      "discovered_by": "release-certification audit 2026-09-29",
+      "evidence": [
+        "backend/app/desktop_shell.py _bind_loopback binds 127.0.0.1",
+        "docs/RELEASE_SCOPE_2026-09-29.md: phone access to the local Mac is not part of the responsive UI evidence"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "MOB-F01",
+        "TGT-021"
+      ]
+    },
+    {
+      "delta_id": "SD-013",
+      "classification": "ENHANCEMENT",
+      "title": "Packaged, signed Windows and Linux desktop release lanes; these platforms have only the source one-click setup",
+      "discovered_by": "release-certification audit 2026-09-29",
+      "evidence": [
+        "_architecture/release/release_scope_manifest_v1.json release_class.platform is macOS",
+        "docs/RELEASE_SCOPE_2026-09-29.md: Windows and Linux are source setup documentation only",
+        ".github/workflows/one-click-setup.yml runs the source setup, not a packaged release"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "TGT-026"
+      ]
     }
   ]
 }
