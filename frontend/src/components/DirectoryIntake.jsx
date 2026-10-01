@@ -27,7 +27,7 @@ export function DirectoryIntake({ onIngested }) {
   async function ingestCheckedPath(targetPath) {
     const payload = await api.ingestPath({ path: targetPath });
     setResult(payload);
-    setPermission(payload.directory_permission || permission);
+    if (payload.directory_permission) setPermission(payload.directory_permission);
     if (onIngested) await onIngested();
   }
 
