@@ -56,6 +56,25 @@ def test_frozen_runtime_is_implicitly_bundled_only(monkeypatch, tmp_path: Path) 
     assert local_tools.resolve_local_tool("tesseract") is None
 
 
+def test_frozen_runtime_rejects_explicit_host_executable(monkeypatch, tmp_path: Path) -> None:
+    bundled_root = tmp_path / "bundle"
+    host_root = tmp_path / "host"
+    host_tool = _make_tool(host_root, "tesseract")
+    monkeypatch.setenv(local_tools.BUNDLED_TOOLS_ENV, str(bundled_root))
+    monkeypatch.setattr(local_tools, "frozen_runtime", lambda: True)
+
+    assert local_tools.resolve_tool_request("tesseract", str(host_tool)) is None
+
+
+def test_frozen_runtime_accepts_explicit_bundled_executable(monkeypatch, tmp_path: Path) -> None:
+    bundled_root = tmp_path / "bundle"
+    bundled_tool = _make_tool(bundled_root, "tesseract")
+    monkeypatch.setenv(local_tools.BUNDLED_TOOLS_ENV, str(bundled_root))
+    monkeypatch.setattr(local_tools, "frozen_runtime", lambda: True)
+
+    assert local_tools.resolve_tool_request("tesseract", str(bundled_tool)) == str(bundled_tool.resolve())
+
+
 def test_unknown_tool_fails_closed() -> None:
     with pytest.raises(ValueError):
         local_tools.resolve_local_tool("curl")
