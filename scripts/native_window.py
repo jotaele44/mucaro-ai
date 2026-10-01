@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import contextlib
 import os
+import select
 import signal
 import subprocess
 import sys
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 APP_NAME = "Mucaro AI"
@@ -84,10 +85,9 @@ def activate_existing_window(pid_file: Path) -> bool:
         app = NSRunningApplication.runningApplicationWithProcessIdentifier_(pid)
         if app is None:
             return False
-        app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
+        return bool(app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps))
     except ImportError:
-        return True  # a window is open; without AppKit it just cannot be raised
-    return True
+        return False
 
 
 def _name_the_app() -> None:
@@ -99,20 +99,49 @@ def _name_the_app() -> None:
         info["CFBundleName"] = APP_NAME
 
 
-def _stop_on_signal(on_signal: Callable[[], None]) -> None:
+def _set_dock_icon() -> None:
+    """Show the Mucaro AI owl in the Dock while the window is open."""
+    icon = Path(__file__).resolve().parents[1] / "Mucaro AI.app" / "Contents" / "Resources" / "MucaroAI.png"
+    with contextlib.suppress(Exception):
+        from AppKit import NSApplication, NSImage  # type: ignore[import-not-found]
+
+        image = NSImage.alloc().initWithContentsOfFile_(str(icon))
+        if image is not None:
+            NSApplication.sharedApplication().setApplicationIconImage_(image)
+
+
+@contextlib.contextmanager
+def _stop_on_signal(on_signal: Callable[[], None]) -> Iterator[None]:
     """Deliver SIGTERM/SIGINT to a worker thread even while AppKit owns the main thread."""
     read_fd, write_fd = os.pipe()
     os.set_blocking(write_fd, False)
-    signal.set_wakeup_fd(write_fd)
-    for signum in (signal.SIGTERM, signal.SIGINT, getattr(signal, "SIGHUP", signal.SIGTERM)):
-        signal.signal(signum, lambda *_: None)
+    previous_fd = signal.set_wakeup_fd(write_fd)
+    previous_handlers = {}
+    stopped = threading.Event()
 
     def watch() -> None:
-        with contextlib.suppress(OSError):
-            os.read(read_fd, 1)
-        on_signal()
+        while not stopped.is_set():
+            ready, _, _ = select.select([read_fd], [], [], 0.1)
+            if ready:
+                os.read(read_fd, 1)
+                on_signal()
+                return
 
-    threading.Thread(target=watch, name="mucaro-signal", daemon=True).start()
+    worker = threading.Thread(target=watch, name="mucaro-signal", daemon=True)
+    try:
+        for signum in {signal.SIGTERM, signal.SIGINT, getattr(signal, "SIGHUP", signal.SIGTERM)}:
+            previous_handlers[signum] = signal.signal(signum, lambda *_: None)
+        worker.start()
+        yield
+    finally:
+        signal.set_wakeup_fd(previous_fd)
+        for signum, handler in previous_handlers.items():
+            signal.signal(signum, handler)
+        stopped.set()
+        if worker.ident is not None:
+            worker.join(timeout=1)
+        os.close(read_fd)
+        os.close(write_fd)
 
 
 def run_window(url: str, *, storage_dir: Path, pid_file: Path) -> None:
@@ -120,13 +149,14 @@ def run_window(url: str, *, storage_dir: Path, pid_file: Path) -> None:
     import webview  # type: ignore[import-not-found]
 
     _name_the_app()
+    _set_dock_icon()
     window = webview.create_window(APP_NAME, url=url, width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], min_size=WINDOW_MIN_SIZE)
-    _stop_on_signal(window.destroy)
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     pid_file.write_text(f"{os.getpid()}\n", encoding="utf-8")
     try:
         storage_dir.mkdir(parents=True, exist_ok=True)
-        webview.start(private_mode=False, storage_path=str(storage_dir))
+        with _stop_on_signal(window.destroy):
+            webview.start(gui="cocoa" if sys.platform == "darwin" else None, private_mode=False, storage_path=str(storage_dir))
     finally:
         with contextlib.suppress(FileNotFoundError):
             pid_file.unlink()

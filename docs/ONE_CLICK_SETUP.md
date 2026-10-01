@@ -1,14 +1,10 @@
 # Double-Click Setup
 
-Double-click **`Mucaro AI.app`** (macOS) or `Mucaro AI.cmd` (Windows). The first run installs
-everything and opens the app; later runs open it in seconds. No input is needed at any point.
-
-`Mucaro AI.app` is a self-contained desktop app: it opens Mucaro AI in its own native window
-(not a browser) and runs the whole setup out of sight, with no Terminal. Keep it in the project
-folder. It shows a notification on the first run, and a dialog if setup cannot finish; the full
-output is in `.mucaro-runtime/logs/app.log` and the newest `setup-*.log`. Opening it again while
-it runs brings the existing window to the front. Closing the window stops the app.
-`Mucaro AI.command` still works as a visible, Terminal-based alternative.
+Double-click `Mucaro AI.app` (macOS) beside `pyproject.toml`, or `Mucaro AI.cmd` (Windows).
+On macOS, the app provisions private runtimes and builds the UI quietly, then opens its native
+window. No Terminal or browser launches. First setup requires internet access; completed steps
+are cached. Errors appear in a dialog with the startup log path. Keep the whole checkout together
+when moving it. The `.command` file remains a legacy console path.
 
 ## Why it exists
 
@@ -26,6 +22,11 @@ first-time user:
 | `frontend/dist` was rebuilt only when missing, so a `git pull` could serve an old UI | `scripts/launch_app.py` |
 
 ## How it works
+
+The macOS app runs `scripts/native_start.sh`, which redirects startup output to a log and runs
+`scripts/one_click.sh --native`. The stages below are shared with the legacy console launchers.
+On macOS, the Python install includes the desktop extra and checks `webview`, `AppKit`,
+`Foundation`, and `WebKit` before recording a successful setup fingerprint.
 
 ```
 Mucaro AI.command (macOS/Linux)          Mucaro AI.cmd (Windows)
@@ -64,8 +65,9 @@ scripts/launch_app.py --auto-port --exit-if-running --startup-timeout 120
   (`SETUP_WAITING`). A lock left by a killed process is detected and removed
   (`SETUP_LOCK_STALE`).
 - **Launch.** If port 8000 is taken by another program, the next free port is used
-  (`PORT_FALLBACK`). If Mucaro AI is already running, the browser opens and the new window exits
-  (`DESKTOP_LAUNCH_REUSED`). Closing the window stops the backend.
+  (`PORT_FALLBACK`). The macOS app uses `--native` and activates an existing native window
+  (`DESKTOP_LAUNCH_REUSED`) when available. Closing the window stops the backend it owns.
+  The legacy console launchers retain browser mode.
 
 ## Pinned versions
 
@@ -101,6 +103,7 @@ Everything stays inside the project folder:
 | `.mucaro-runtime/uv`, `node`, `python` | private uv, Node.js, CPython |
 | `.mucaro-runtime/cache` | uv and npm download caches (lets a moved folder rebuild offline) |
 | `.mucaro-runtime/logs/setup-*.log` | the last 10 setup logs |
+| `.mucaro-runtime/logs/launch-*.log` | the last 10 silent app startup/backend logs |
 | `.mucaro-runtime/state.json` | step fingerprints |
 | `.venv`, `frontend/node_modules`, `frontend/dist`, `.env` | project environment, UI build, settings |
 

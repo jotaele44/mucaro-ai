@@ -1,14 +1,4 @@
 #!/bin/bash
-# Mucaro AI.app: double-click to set up (first run only) and open Mucaro AI in its own window.
-# No Terminal and no browser: all output goes to .mucaro-runtime/logs/app.log, and problems are
-# shown in dialogs. The app lives in the project folder and runs the project beside it.
-APP_DIR="$(cd "$(dirname "$0")/../.." && pwd -P)"
-ROOT="$(dirname "${APP_DIR}")"
-# LaunchServices starts apps with a bare environment.
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
-export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-export MUCARO_HEADLESS=1
-cd "${ROOT}" || exit 2
-mkdir -p .mucaro-runtime/logs 2>/dev/null
-exec /bin/bash scripts/one_click.sh --native </dev/null >>.mucaro-runtime/logs/app.log 2>&1
+# Keep this source launcher next to pyproject.toml; move the whole checkout together.
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd -P)" || exit 2
+exec /bin/bash "${ROOT}/scripts/native_start.sh" "${ROOT}" "$@"

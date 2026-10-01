@@ -33,7 +33,6 @@ if str(ROOT) not in sys.path:
 
 from scripts import launch_app  # noqa: E402
 
-# The native window (pywebview + pyobjc) is macOS-only, so only macOS installs the desktop extra.
 PYTHON_EXTRAS = "dev,anthropic,desktop" if sys.platform == "darwin" else "dev,anthropic"
 # Import names that prove the dependency install is usable (runtime, geospatial, live mode, preflight).
 KEY_MODULES = (
@@ -51,7 +50,7 @@ KEY_MODULES = (
     "anthropic",
     "httpx",
     "pytest",
-) + (("webview",) if sys.platform == "darwin" else ())
+) + (("webview", "AppKit", "Foundation", "WebKit") if sys.platform == "darwin" else ())
 NPM_REGISTRY = "https://registry.npmjs.org/"
 LOG_KEEP = 10
 TOTAL_STEPS = 6
@@ -172,11 +171,12 @@ def release_lock() -> None:
 
 
 def prune_logs(log_dir: Path, keep: int = LOG_KEEP) -> None:
-    for old in sorted(log_dir.glob("setup-*.log"))[:-keep]:
-        try:
-            old.unlink()
-        except OSError:
-            pass
+    for pattern in ("setup-*.log", "launch-*.log"):
+        for old in sorted(log_dir.glob(pattern))[:-keep]:
+            try:
+                old.unlink()
+            except OSError:
+                pass
 
 
 class SetupLog:
@@ -274,12 +274,12 @@ class OneClickSetup:
 
     def check_stage0(self) -> None:
         if sys.prefix == sys.base_prefix:
-            raise SetupError("ERROR_NOT_IN_VENV", "start Mucaro AI by double-clicking Mucaro AI.command (macOS) or Mucaro AI.cmd (Windows)")
+            raise SetupError("ERROR_NOT_IN_VENV", "start Mucaro AI by double-clicking Mucaro AI.app (macOS) or Mucaro AI.cmd (Windows)")
         for label, path in (("uv", self.uv), ("node", self.node), ("npm", self.npm_cli)):
             if not path.is_file():
                 raise SetupError(
                     "ERROR_STAGE0_MISSING",
-                    f"{label} not found at {path}; start Mucaro AI by double-clicking Mucaro AI.command (macOS) or Mucaro AI.cmd (Windows)",
+                    f"{label} not found at {path}; start Mucaro AI by double-clicking Mucaro AI.app (macOS) or Mucaro AI.cmd (Windows)",
                 )
 
     def python_deps(self) -> None:
@@ -464,11 +464,6 @@ def main(argv: list[str] | None = None) -> int:
             "Nothing outside this folder was changed. Fix the problem named above (usually the internet "
             "connection), then double-click again; setup resumes where it stopped."
         )
-        if os.environ.get("MUCARO_HEADLESS") == "1":
-            launch_app.native_window.show_dialog(
-                f"Mucaro AI setup did not finish: {exc.code}\n\nDetails: {log_path}\n\n"
-                "Open Mucaro AI again to resume where it stopped."
-            )
         return 2
     except KeyboardInterrupt:
         log.line("")

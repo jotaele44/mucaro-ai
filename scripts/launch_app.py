@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import signal
@@ -54,9 +55,15 @@ def port_open(port: int) -> bool:
 def health_ok(port: int) -> bool:
     try:
         with urllib.request.urlopen(health_url(port), timeout=1.5) as response:
-            body = response.read().decode("utf-8", errors="replace")
-            return response.status == 200 and '"status":"OK"' in body.replace(" ", "")
-    except (urllib.error.URLError, TimeoutError, OSError):
+            body = json.loads(response.read().decode("utf-8"))
+            # A generic healthy service is not this checkout's backend.
+            return (
+                response.status == 200
+                and isinstance(body, dict)
+                and body.get("status") == "OK"
+                and body.get("project_root") == str(ROOT)
+            )
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
         return False
 
 
@@ -244,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--exit-if-running",
         action="store_true",
-        help="If Mucaro AI is already running, open it in the browser and exit instead of waiting.",
+        help="If Mucaro AI is already running, activate its native window or open the browser in browser mode.",
     )
     args = parser.parse_args(argv)
 
@@ -254,9 +261,18 @@ def main(argv: list[str] | None = None) -> int:
     previous_signals = install_stop_signals()
     try:
         code = _launch(args)
+    except KeyboardInterrupt:
+        if not args.native:
+            raise
+        code = 0
+    except (Exception, SystemExit) as exc:
+        if not args.native:
+            raise
+        print(f"ERROR_NATIVE_LAUNCH {exc}", file=sys.stderr)
+        code = 10
     finally:
         restore_signals(previous_signals)
-    if code != 0 and args.native:
+    if code != 0 and args.native and os.environ.get("MUCARO_SILENT_LAUNCH") != "1":
         native_window.show_dialog(_failure_message(code))
     return code
 

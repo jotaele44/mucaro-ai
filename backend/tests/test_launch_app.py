@@ -89,7 +89,8 @@ def test_package_desktop_self_test():
 def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     (tmp_path / "scripts").mkdir()
     (tmp_path / "frontend" / "dist").mkdir(parents=True)
-    (tmp_path / "scripts" / "launch_app.py").write_text("# launcher\n", encoding="utf-8")
+    for name in ("native_start.sh", "one_click.sh", "one_click.py"):
+        (tmp_path / "scripts" / name).write_text("# launcher\n", encoding="utf-8")
     (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n', encoding="utf-8")
 
@@ -102,7 +103,7 @@ def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     assert app_path.is_dir()
     assert executable.exists()
     assert executable.stat().st_mode & 0o111
-    assert "scripts/launch_app.py" in executable.read_text(encoding="utf-8")
+    assert "scripts/native_start.sh" in executable.read_text(encoding="utf-8")
     assert '"$@"' in executable.read_text(encoding="utf-8")
     assert json.loads(receipt.read_text(encoding="utf-8"))["scope"] == "source_bound_local_macos_app_wrapper"
 
