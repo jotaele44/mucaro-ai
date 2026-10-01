@@ -320,7 +320,7 @@ export function App() {
               <div
                 key={tab.mountId}
                 id={"panel-" + tab.mountId}
-                role="tabpanel"
+                role="region"
                 aria-labelledby={"tab-" + tab.mountId}
                 className="workspace-pane"
                 data-tab-key={tab.key}
