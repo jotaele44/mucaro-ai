@@ -3,14 +3,16 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
+import os
 import platform
-import subprocess
+import re
 import sys
 from pathlib import Path
 from typing import Any, Iterable
 
 RUNTIME_IDENTITY_SCHEMA_VERSION = "mucaro-runtime-identity/1.0"
 DEFAULT_PACKAGES = ("mucaro-ai", "fastapi", "pydantic", "shapely", "pypdf")
+_SHA40 = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def _package_versions(packages: Iterable[str]) -> dict[str, str | None]:
@@ -23,22 +25,86 @@ def _package_versions(packages: Iterable[str]) -> dict[str, str | None]:
     return versions
 
 
-def current_git_head(project_root: Path) -> str | None:
+def _normalized_sha(value: str | None) -> str | None:
+    candidate = (value or "").strip()
+    return candidate.lower() if _SHA40.fullmatch(candidate) else None
+
+
+def _git_directory(project_root: Path) -> Path | None:
+    marker = project_root / ".git"
+    if marker.is_dir():
+        return marker
+    if not marker.is_file():
+        return None
     try:
-        proc = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=project_root,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except (OSError, subprocess.SubprocessError):
+        text = marker.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
         return None
-    if proc.returncode != 0:
+    prefix = "gitdir:"
+    if not text.lower().startswith(prefix):
         return None
-    head = proc.stdout.strip()
-    return head if len(head) == 40 else None
+    target = text[len(prefix):].strip()
+    if not target:
+        return None
+    candidate = Path(target)
+    if not candidate.is_absolute():
+        candidate = marker.parent / candidate
+    try:
+        resolved = candidate.resolve()
+    except OSError:
+        return None
+    return resolved if resolved.is_dir() else None
+
+
+def _packed_ref(git_dir: Path, ref_name: str) -> str | None:
+    packed = git_dir / "packed-refs"
+    try:
+        lines = packed.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError):
+        return None
+    for line in lines:
+        if not line or line.startswith(("#", "^")):
+            continue
+        parts = line.split(" ", 1)
+        if len(parts) == 2 and parts[1].strip() == ref_name:
+            return _normalized_sha(parts[0])
+    return None
+
+
+def current_git_head(project_root: Path) -> str | None:
+    """Resolve source identity without invoking a host Git executable.
+
+    Packaged builds may bind MUCARO_SOURCE_HEAD. Source checkouts are read
+    directly from .git metadata, including worktree gitdir pointers and packed
+    refs. Missing identity remains explicit as None.
+    """
+
+    bound = _normalized_sha(os.getenv("MUCARO_SOURCE_HEAD"))
+    if bound is not None:
+        return bound
+
+    git_dir = _git_directory(project_root)
+    if git_dir is None:
+        return None
+    try:
+        head_text = (git_dir / "HEAD").read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return None
+
+    direct = _normalized_sha(head_text)
+    if direct is not None:
+        return direct
+    if not head_text.startswith("ref:"):
+        return None
+
+    ref_name = head_text[4:].strip()
+    if not ref_name or ref_name.startswith("/") or ".." in Path(ref_name).parts:
+        return None
+    try:
+        loose_text = (git_dir / ref_name).read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        loose_text = ""
+    return _normalized_sha(loose_text) or _packed_ref(git_dir, ref_name)
 
 
 def build_runtime_identity(
