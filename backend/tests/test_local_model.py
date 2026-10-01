@@ -283,6 +283,22 @@ def test_offline_manifest_exposes_git_backed_coding_as_a_bundle_candidate(monkey
         assert rows[capability]["operator_external_setup_required"] is True
 
 
+def test_frozen_manifest_reports_packaging_residue_not_operator_setup(monkeypatch):
+    import backend.app.offline as offline
+
+    monkeypatch.setattr(offline, "bundled_only", lambda: True)
+    monkeypatch.setattr(offline, "resolve_local_tool", lambda name: None)
+    manifest = build_offline_manifest()
+    rows = {row["capability"]: row for row in manifest["capabilities"]}
+
+    assert rows["tool:coding.repo_status"]["resolution_policy"] == "BUNDLED_ONLY"
+    assert rows["tool:coding.repo_status"]["operator_external_setup_required"] is False
+    assert rows["tool:coding.repo_status"]["release_packaging_residue"] is True
+    assert rows["execution.container"]["state_now"] == "LOCAL_DEPENDENCY_MISSING"
+    assert rows["execution.container"]["operator_external_setup_required"] is False
+    assert "PLATFORM_ADAPTER_REQUIRED" in rows["execution.container"]["independence_actions"]
+
+
 def test_offline_manifest_reports_a_missing_remote_sdk(monkeypatch):
     import backend.app.offline as offline
 
