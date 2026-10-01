@@ -219,3 +219,93 @@ def test_contradictions_survive_replacement_and_block_completion_until_adjudicat
     assert transition_checkpoint(created["checkpoint_id"], state="COMPLETED", cfg=cfg)["state"] == "COMPLETED"
     with pytest.raises(CheckpointError):
         adjudicate_contradiction(created["checkpoint_id"], contradiction_id="c-1", resolution="x", rationale="y", adjudicated_by="z", cfg=cfg)
+
+
+def test_checkpoints_start_only_in_an_initial_state_and_are_validated_before_writing(tmp_path: Path) -> None:
+    from backend.app.agent_checkpoints import list_checkpoints
+
+    cfg = make_settings(tmp_path)
+    for state in ("COMPLETED", "FAILED", "PAUSED_PROVIDER", "BLOCKED_EXTERNAL"):
+        with pytest.raises(CheckpointError) as exc:
+            create_checkpoint(session_id="session-1", run_id="run-1", objective="Audit", source_sha=SHA, state=state, cfg=cfg)
+        assert exc.value.status == "ERROR_CHECKPOINT_INITIAL_STATE", state
+    with pytest.raises(CheckpointError) as invalid:
+        create_checkpoint(session_id="session-1", run_id="run-1", objective="Audit", source_sha=SHA, completed_steps=[1], cfg=cfg)
+    assert invalid.value.status == "ERROR_CHECKPOINT_SCHEMA"
+    with pytest.raises(CheckpointError) as forged:
+        create_checkpoint(session_id="session-1", run_id="run-1", objective="Audit", source_sha=SHA, contradictions=[{"id": "c-1", "state": "ADJUDICATED"}], cfg=cfg)
+    assert forged.value.status == "ERROR_CHECKPOINT_CONTRADICTION_STATE"
+    assert list_checkpoints(cfg) == []
+    for state in ("PLANNING", "READY_FOR_APPROVAL", "EXECUTING"):
+        assert create_checkpoint(session_id="session-1", run_id="run-1", objective="Audit", source_sha=SHA, state=state, cfg=cfg)["state"] == state
+
+
+def test_contradictions_change_only_through_adjudication(tmp_path: Path) -> None:
+    from backend.app.agent_checkpoints import record_contradiction
+
+    cfg = make_settings(tmp_path)
+    created = _executing(cfg)
+    recorded = record_contradiction(created["checkpoint_id"], contradiction_id="c-1", claims=["A is 3", "A is 4"], cfg=cfg)
+    original = recorded["contradictions"][0]
+
+    attempts = {
+        "ERROR_CHECKPOINT_CONTRADICTION_REWRITTEN": [{"id": "c-1", "state": "ADJUDICATED"}],
+        "ERROR_CHECKPOINT_CONTRADICTION_DUPLICATE": [original, {"id": "c-1", "state": "ADJUDICATED"}],
+        "ERROR_CHECKPOINT_CONTRADICTION_STATE": [original, {"id": "c-2", "state": "ADJUDICATED", "resolution": "x"}],
+        "ERROR_CHECKPOINT_CONTRADICTION_ID": [original, {"state": "UNRESOLVED"}],
+    }
+    for status, supplied in attempts.items():
+        with pytest.raises(CheckpointError) as exc:
+            transition_checkpoint(created["checkpoint_id"], state="EXECUTING", contradictions=supplied, cfg=cfg)
+        assert exc.value.status == status
+    assert get_checkpoint(created["checkpoint_id"], cfg)["contradictions"] == [original]
+    with pytest.raises(CheckpointError) as blocked:
+        transition_checkpoint(created["checkpoint_id"], state="COMPLETED", cfg=cfg)
+    assert blocked.value.status == "ERROR_CHECKPOINT_OPEN_CONTRADICTIONS"
+
+    added = transition_checkpoint(created["checkpoint_id"], state="EXECUTING", contradictions=[original, {"id": "c-2", "state": "UNRESOLVED", "claims": ["B"]}], cfg=cfg)
+    assert [item["id"] for item in added["contradictions"]] == ["c-1", "c-2"]
+
+
+def test_completion_counts_any_unadjudicated_record_as_open(tmp_path: Path) -> None:
+    import json
+    import sqlite3
+
+    cfg = make_settings(tmp_path)
+    created = _executing(cfg)
+    for legacy in ({"id": "c-1", "state": "RESOLVED"}, {"id": "c-1", "state": "ADJUDICATED"}):
+        stored = {**get_checkpoint(created["checkpoint_id"], cfg), "contradictions": [legacy]}
+        with sqlite3.connect(cfg.sqlite_path) as conn:
+            conn.execute("UPDATE agent_checkpoints SET payload_json = ? WHERE checkpoint_id = ?", (json.dumps(stored), created["checkpoint_id"]))
+        with pytest.raises(CheckpointError) as exc:
+            transition_checkpoint(created["checkpoint_id"], state="COMPLETED", cfg=cfg)
+        assert exc.value.status == "ERROR_CHECKPOINT_OPEN_CONTRADICTIONS", legacy
+
+
+def test_terminal_checkpoints_take_no_new_contradictions(tmp_path: Path) -> None:
+    from backend.app.agent_checkpoints import record_contradiction
+
+    cfg = make_settings(tmp_path)
+    created = _executing(cfg)
+    done = transition_checkpoint(created["checkpoint_id"], state="COMPLETED", cfg=cfg)
+    with pytest.raises(CheckpointError) as exc:
+        record_contradiction(created["checkpoint_id"], contradiction_id="late", claims=["X"], cfg=cfg)
+    assert exc.value.status == "ERROR_CHECKPOINT_TERMINAL"
+    assert get_checkpoint(created["checkpoint_id"], cfg) == done
+
+
+def test_list_checkpoints_fails_closed_on_corrupt_or_invalid_rows(tmp_path: Path) -> None:
+    import json
+    import sqlite3
+
+    from backend.app.agent_checkpoints import list_checkpoints
+
+    cfg = make_settings(tmp_path)
+    created = _executing(cfg)
+    assert list_checkpoints(cfg) == [created]
+    for payload, status in (("{not json", "ERROR_CHECKPOINT_CORRUPT"), (json.dumps({**created, "state": "NOT_A_STATE"}), "ERROR_CHECKPOINT_SCHEMA")):
+        with sqlite3.connect(cfg.sqlite_path) as conn:
+            conn.execute("UPDATE agent_checkpoints SET payload_json = ? WHERE checkpoint_id = ?", (payload, created["checkpoint_id"]))
+        with pytest.raises(CheckpointError) as exc:
+            list_checkpoints(cfg)
+        assert exc.value.status == status
