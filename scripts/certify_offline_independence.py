@@ -39,11 +39,19 @@ def _sha256(path: Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Evaluate externally collected clean-machine evidence against Mucaro's offline-independence contract."
+        description=(
+            "Evaluate externally collected clean-machine evidence against "
+            "Mucaro's offline-independence contract."
+        )
     )
     parser.add_argument("--platform", required=True, help="Bound platform label, e.g. macos-arm64.")
     parser.add_argument("--head", required=True, help="Exact 40-character source HEAD SHA.")
-    parser.add_argument("--artifact", type=Path, required=True, help="Prepared release artifact whose bytes are being certified.")
+    parser.add_argument(
+        "--artifact",
+        type=Path,
+        required=True,
+        help="Prepared release artifact whose bytes are being certified.",
+    )
     parser.add_argument(
         "--offline-manifest",
         type=Path,
