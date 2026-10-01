@@ -44,7 +44,9 @@ def test_update_is_atomic_versioned_and_persistent(tmp_path: Path):
     cfg = make_settings(tmp_path)
     result = update_preferences({"top_k": 8, "theme": "dark"}, expected_revision=0, source="test", cfg=cfg)
     assert result["status"] == "PREFERENCES_UPDATED"
+    assert result["schema_version"] == "mucaro-user-preferences/1.0"
     assert result["revision"] == 1
+    assert result["updated_at"]
     assert result["changed"] == {"top_k": 8, "theme": "dark"}
     loaded = get_preferences(cfg)
     assert loaded["revision"] == 1
