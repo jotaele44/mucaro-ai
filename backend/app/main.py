@@ -11,10 +11,12 @@ from fastapi.staticfiles import StaticFiles
 from .auth import auth_status, is_public_api_path, require_operator_auth
 from .config import Settings, settings
 from .conversations import (
+    ConversationMessageEditError,
     append_answer_turn,
     build_conversation_context,
     create_conversation,
     delete_conversation,
+    edit_conversation_message,
     get_conversation,
     list_conversations,
     rename_conversation,
@@ -45,6 +47,7 @@ from .models import (
     InteractionResolveRequest,
     MemoryCreateRequest,
     MemoryUpdateRequest,
+    MessageEditRequest,
     MessageRequest,
     RunEditRequest,
     PlanRequest,
@@ -556,6 +559,47 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             )
         except RunError as exc:
             raise run_error(exc) from exc
+
+    @app.patch("/conversations/{conversation_id}/messages/{message_key}")
+    def edit_message(
+        conversation_id: str,
+        message_key: str,
+        req: MessageEditRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        conversation_payload = get_conversation(conversation_id, cfg)
+        if conversation_payload is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+
+        if message_key.startswith("turn:"):
+            turn_id = message_key.removeprefix("turn:")
+            if not turn_id or not any(turn.get("turn_id") == turn_id for turn in conversation_payload.get("turns", [])):
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404)
+        else:
+            match = re.fullmatch(r"run:([^:]+):(user|assistant)", message_key)
+            if match is None:
+                raise api_error("ERROR_MESSAGE_KEY_INVALID", "Message key is not valid.")
+            run_id = match.group(1)
+            try:
+                run = get_run(run_id, cfg)
+            except RunError as exc:
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404) from exc
+            if run.get("conversation_id") != conversation_id:
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404)
+
+        try:
+            edit = edit_conversation_message(
+                conversation_id,
+                message_key,
+                req.content,
+                req.expected_revision,
+                cfg,
+            )
+        except ConversationMessageEditError as exc:
+            conflict = exc.status in {"ERROR_MESSAGE_EDIT_REVISION_CONFLICT", "ERROR_MESSAGE_EDITS_INVALID"}
+            missing = exc.status == "ERROR_CONVERSATION_NOT_FOUND"
+            raise api_error(exc.status, exc.detail, status_code=404 if missing else 409 if conflict else 400) from exc
+        return {"status": "MESSAGE_EDITED", "message_edit": edit}
 
     @app.get("/conversations/{conversation_id}/runs")
     def conversation_runs(conversation_id: str, limit: int = 50) -> dict:

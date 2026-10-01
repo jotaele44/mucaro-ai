@@ -167,11 +167,75 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "02-answer");
   axeRuns.push(await axe(page, viewport, "answer"));
 
-  // Reload reproduces the transcript (F02).
+  // Message interaction contract: native selection plus one Copy/Edit surface on both sides.
+  const completedRun = lastRun(page);
+  const userMessage = completedRun.locator(".user-bubble");
+  const assistantMessage = completedRun.locator(".assistant-bubble");
+  const selectionContract = await assistantMessage.locator(".rich-text").evaluate((node) => {
+    const style = window.getComputedStyle(node);
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const selectedText = selection.toString();
+    selection.removeAllRanges();
+    return {
+      userSelect: style.getPropertyValue("user-select"),
+      webkitUserSelect: style.getPropertyValue("-webkit-user-select"),
+      selectedText,
+    };
+  });
+  check(
+    "message text is selectable",
+    viewport,
+    (selectionContract.userSelect === "text" || selectionContract.webkitUserSelect === "text") &&
+      selectionContract.selectedText.trim().length > 0,
+    JSON.stringify(selectionContract),
+  );
+  check(
+    "sent message exposes one Copy and one Edit action",
+    viewport,
+    (await userMessage.getByRole("button", { name: "Copy message text" }).count()) === 1 &&
+      (await userMessage.getByRole("button", { name: "Edit message" }).count()) === 1,
+  );
+  check(
+    "received message exposes one Copy and one Edit action",
+    viewport,
+    (await assistantMessage.getByRole("button", { name: "Copy message text" }).count()) === 1 &&
+      (await assistantMessage.getByRole("button", { name: "Edit message" }).count()) === 1,
+  );
+
+  await assistantMessage.getByRole("button", { name: "Copy message text" }).click();
+  await page.waitForFunction(() => document.querySelector('[role="status"]')?.textContent?.includes("Copied to clipboard."));
+  check("copy action reports success", viewport, true);
+
+  await userMessage.getByRole("button", { name: "Edit message" }).click();
+  const userEditor = userMessage.getByLabel("Edit message text");
+  await userEditor.fill("How does source lineage work? [display edit]");
+  await userMessage.getByRole("button", { name: "Save edit" }).click();
+  await userMessage.getByText("Edited · original preserved").waitFor();
+  check("sent message edit renders explicit provenance marker", viewport, true);
+
+  await assistantMessage.getByRole("button", { name: "Edit message" }).click();
+  const assistantEditor = assistantMessage.getByLabel("Edit message text");
+  await assistantEditor.fill("Edited assistant display for rendered QA.");
+  await assistantMessage.getByRole("button", { name: "Save edit" }).click();
+  await assistantMessage.getByText("Edited · original preserved").waitFor();
+  check("received message edit renders explicit provenance marker", viewport, true);
+  await shot(page, viewport, "02b-message-actions");
+
+  // Reload reproduces the transcript and its display-only revisions (F02).
   const answerText = await lastRun(page).locator(".assistant-bubble").innerText();
   await page.reload();
   await lastRun(page).locator(".assistant-bubble").waitFor();
   check("reload reproduces the transcript (F02)", viewport, (await lastRun(page).locator(".assistant-bubble").innerText()) === answerText);
+  check(
+    "message display revisions survive reload",
+    viewport,
+    (await lastRun(page).locator(".user-bubble").getByText("How does source lineage work? [display edit]").count()) === 1 &&
+      (await lastRun(page).locator(".assistant-bubble").getByText("Edited assistant display for rendered QA.").count()) === 1,
+  );
 
   // Evidence sheet (TGT-030), Escape closes and restores focus.
   await citations.first().click();

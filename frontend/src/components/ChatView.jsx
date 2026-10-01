@@ -3,7 +3,7 @@ import { api, streamRunEvents } from "../api.js";
 import { ACTIVE_STATES, deriveRun, transcriptText } from "../feed.js";
 import { Composer } from "./Composer.jsx";
 import { EvidencePanel } from "./EvidencePanel.jsx";
-import { RichText } from "./RichText.jsx";
+import { EditableMessage } from "./MessageActions.jsx";
 import { RunBlock } from "./RunBlock.jsx";
 import { Sheet } from "./Sheet.jsx";
 
@@ -164,6 +164,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
     [runs],
   );
   const legacyTurns = (conversation?.turns || []).filter((turn) => !turn.work_run_id);
+  const messageEdits = conversation?.message_edits || {};
   const activeRun = views.find((view) => ["RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT"].includes(view.state));
   const queued = summaries.filter((row) => row.state === "QUEUED");
   const lastStatus = activeRun ? activeRun.state : views.length ? views[views.length - 1].state : null;
@@ -231,6 +232,14 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
     }
   }
 
+  async function saveMessageEdit(messageKey, content, expectedRevision) {
+    if (!conversationId) throw new Error("Conversation is not available.");
+    const result = await api.editConversationMessage(conversationId, messageKey, content, expectedRevision);
+    await refresh();
+    announce("Message updated. Original preserved in provenance.");
+    return result.message_edit;
+  }
+
   const empty = !loading && !views.length && !legacyTurns.length;
   return (
     <section className="chat" aria-label="Conversation">
@@ -265,13 +274,32 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
             <p className="muted">Ask about your sources, or use a command such as <code>/status</code> or <code>/fetch https://…</code>. Actions always ask before they run unless you choose Auto for local read-only tools.</p>
           </div>
         )}
-        {legacyTurns.map((turn) => (
-          <div key={turn.turn_id} className={`bubble ${turn.role === "user" ? "user-bubble" : "assistant-bubble"}`}>
-            <RichText text={String(turn.content || "")} />
-          </div>
-        ))}
+        {legacyTurns.map((turn) => {
+          const messageKey = `turn:${turn.turn_id}`;
+          const edit = messageEdits[messageKey];
+          return (
+            <div key={turn.turn_id} className={`bubble ${turn.role === "user" ? "user-bubble" : "assistant-bubble"}`}>
+              <EditableMessage
+                text={String(edit?.content ?? turn.content ?? "")}
+                revision={Number(edit?.revision || 0)}
+                edited={Boolean(edit)}
+                onSave={(content, revision) => saveMessageEdit(messageKey, content, revision)}
+                announce={announce}
+                allowReadAloud={turn.role === "assistant"}
+              />
+            </div>
+          );
+        })}
         {views.map((view) => (
-          <RunBlock key={view.runId} view={view} onChanged={() => loadRun(view.runId).then(refresh)} onOpenCitation={setCitation} announce={announce} />
+          <RunBlock
+            key={view.runId}
+            view={view}
+            onChanged={() => loadRun(view.runId).then(refresh)}
+            onOpenCitation={setCitation}
+            announce={announce}
+            messageEdits={messageEdits}
+            onEditMessage={saveMessageEdit}
+          />
         ))}
         {error && (
           <p className="error-card" role="alert">
