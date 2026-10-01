@@ -75,6 +75,34 @@ def resolve_local_tool(name: str, *, allow_host: bool | None = None) -> str | No
     return shutil.which(name)
 
 
+def resolve_tool_request(name: str, requested: str | None = None) -> str | None:
+    """Resolve an optional caller-supplied executable under the same release policy."""
+
+    if requested is None:
+        return resolve_local_tool(name)
+    if name not in KNOWN_LOCAL_TOOLS:
+        raise ValueError(f"unknown local tool: {name}")
+
+    candidate = Path(requested).expanduser()
+    if not candidate.is_absolute():
+        # Logical names still flow through the controlled resolver.
+        return resolve_local_tool(name)
+
+    try:
+        resolved = candidate.resolve()
+    except OSError:
+        return None
+    if not _usable_file(resolved):
+        return None
+
+    if bundled_only():
+        try:
+            resolved.relative_to(bundled_tools_dir())
+        except ValueError:
+            return None
+    return str(resolved)
+
+
 def local_tool_status(name: str, *, allow_host: bool | None = None) -> dict[str, Any]:
     resolved = resolve_local_tool(name, allow_host=allow_host)
     root = bundled_tools_dir()
