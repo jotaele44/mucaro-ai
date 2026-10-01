@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .coding_mutation import CodingMutationError, apply_patch_transaction
@@ -10,8 +11,11 @@ from .coding_patch import validate_patch_proposal
 from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
 from .contracts import validate_contract
+from .gis_processing import GISProcessingError, inspect_geojson
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
+from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
 from .product_audit import build_product_audit
 from .utils import canonical_sha256, read_json, stable_id, update_json, utc_now
 from .web_browsing import (
@@ -31,6 +35,7 @@ TOOL_CALL_STATUSES = ("PENDING_APPROVAL", "APPROVED", "DENIED", "CANCELLED", "RU
 # Wall-clock bound for one in-process handler (MATRIX-011 TIMEOUT). Remote tools also carry their own
 # network timeouts; this bound covers everything else (slow disks, huge repositories, stuck parsers).
 DEFAULT_TOOL_TIMEOUT_SECONDS = 120.0
+OCR_TOOL_MAX_TIMEOUT_SECONDS = 90
 
 
 class ToolRuntimeError(RuntimeError):
@@ -88,6 +93,73 @@ def _workspace_profiles(arguments: dict[str, Any], cfg: Settings) -> dict[str, A
 def _memory_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     include_disabled = bool(arguments.get("include_disabled", True))
     return list_memory_items(cfg, include_disabled=include_disabled)
+
+
+def _resolve_tool_input_path(value: str, cfg: Settings) -> Path:
+    path = Path(value).expanduser()
+    return path.resolve() if path.is_absolute() else (cfg.project_root / path).resolve()
+
+
+def _require_tool_filesystem_read(path: Path, cfg: Settings, *, subject: str) -> None:
+    try:
+        require_permission(
+            PermissionRequest(
+                capability="filesystem.read",
+                subject=subject,
+                target=str(path),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _gis_inspect(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    value = arguments.get("path")
+    if not isinstance(value, str) or not value.strip():
+        raise ToolRuntimeError("ERROR_GIS_TOOL_PATH_REQUIRED", "gis.inspect requires a non-empty path argument.")
+    path = _resolve_tool_input_path(value, cfg)
+    _require_tool_filesystem_read(path, cfg, subject="tools.gis.inspect")
+    try:
+        return inspect_geojson(path, cfg=cfg)
+    except GISProcessingError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _ocr_analyze_image(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    value = arguments.get("path")
+    if not isinstance(value, str) or not value.strip():
+        raise ToolRuntimeError("ERROR_OCR_TOOL_PATH_REQUIRED", "ocr.analyze_image requires a non-empty path argument.")
+    path = _resolve_tool_input_path(value, cfg)
+    _require_tool_filesystem_read(path, cfg, subject="tools.ocr.analyze_image")
+    language = arguments.get("language", "eng")
+    layout_mode = arguments.get("layout_mode", "auto")
+    timeout_seconds = arguments.get("timeout_seconds", 30)
+    if not isinstance(language, str):
+        raise ToolRuntimeError("ERROR_OCR_LANGUAGE_INVALID", "OCR language must be a string.")
+    if not isinstance(layout_mode, str):
+        raise ToolRuntimeError("ERROR_OCR_LAYOUT_INVALID", "OCR layout_mode must be a string.")
+    if (
+        not isinstance(timeout_seconds, int)
+        or isinstance(timeout_seconds, bool)
+        or timeout_seconds <= 0
+        or timeout_seconds > OCR_TOOL_MAX_TIMEOUT_SECONDS
+    ):
+        raise ToolRuntimeError(
+            "ERROR_OCR_TIMEOUT_INVALID",
+            f"OCR timeout_seconds must be an integer from 1 through {OCR_TOOL_MAX_TIMEOUT_SECONDS}.",
+        )
+    try:
+        return analyze_image_ocr(
+            path,
+            cfg=cfg,
+            language=language,
+            layout_mode=layout_mode,
+            timeout_seconds=timeout_seconds,
+        )
+    except OCRAnalysisError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
 def _coding_repo_status(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
@@ -259,6 +331,20 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_memory_list,
+    ),
+    "gis.inspect": ToolDefinition(
+        name="gis.inspect",
+        description="Inspect one explicitly approved local GeoJSON FeatureCollection and emit a provenance-bound geometry/topology report without transforming the source.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_gis_inspect,
+    ),
+    "ocr.analyze_image": ToolDefinition(
+        name="ocr.analyze_image",
+        description="Run explicitly approved local image OCR through the governed filesystem and subprocess permission boundaries and emit a provenance-bound OCR report.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_ocr_analyze_image,
     ),
     "coding.repo_status": ToolDefinition(
         name="coding.repo_status",

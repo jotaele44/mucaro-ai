@@ -291,7 +291,7 @@ def test_offline_manifest_exposes_git_backed_coding_as_a_bundle_candidate(monkey
     import backend.app.offline as offline
 
     real_resolve = offline.resolve_local_tool
-    monkeypatch.setattr(offline, "resolve_local_tool", lambda name: None if name == "git" else real_resolve(name))
+    monkeypatch.setattr(offline, "resolve_local_tool", lambda name: None if name in {"git", "tesseract"} else real_resolve(name))
     rows = {row["capability"]: row for row in build_offline_manifest()["capabilities"]}
 
     for capability in (
@@ -306,6 +306,12 @@ def test_offline_manifest_exposes_git_backed_coding_as_a_bundle_candidate(monkey
         assert rows[capability]["local_dependency_kind"] == "binary"
         assert "BUNDLE_LOCAL_COMPONENT" in rows[capability]["independence_actions"]
         assert rows[capability]["operator_external_setup_required"] is True
+
+    ocr_tool = rows["tool:ocr.analyze_image"]
+    assert ocr_tool["state_now"] == "LOCAL_DEPENDENCY_MISSING"
+    assert ocr_tool["local_dependency"] == "tesseract"
+    assert ocr_tool["local_dependency_kind"] == "binary"
+    assert "BUNDLE_LOCAL_COMPONENT" in ocr_tool["independence_actions"]
 
 
 def test_frozen_manifest_reports_packaging_residue_not_operator_setup(monkeypatch):

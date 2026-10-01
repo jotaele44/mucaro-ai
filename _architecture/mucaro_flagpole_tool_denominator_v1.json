@@ -8,7 +8,10 @@
       "id": "TOOL-01",
       "capability": "repository.inspect",
       "clause": "Audit all seven federation repositories",
-      "satisfied_by": ["coding.repo_status", "coding.read_file"],
+      "satisfied_by": [
+        "coding.repo_status",
+        "coding.read_file"
+      ],
       "state": "PRESENT",
       "owner_domain": "V13",
       "note": "Read-only repository status and bounded file reads."
@@ -17,7 +20,9 @@
       "id": "TOOL-02",
       "capability": "repository.diff",
       "clause": "fix only independently evidenced defects",
-      "satisfied_by": ["coding.diff"],
+      "satisfied_by": [
+        "coding.diff"
+      ],
       "state": "PRESENT",
       "owner_domain": "V13",
       "note": "Bounded read-only diff with staged, unstaged, and untracked residue."
@@ -26,7 +31,9 @@
       "id": "TOOL-03",
       "capability": "patch.validate",
       "clause": "fix only independently evidenced defects",
-      "satisfied_by": ["coding.patch_check"],
+      "satisfied_by": [
+        "coding.patch_check"
+      ],
       "state": "PRESENT",
       "owner_domain": "V13",
       "note": "Proposal validation without mutation."
@@ -35,7 +42,9 @@
       "id": "TOOL-04",
       "capability": "patch.apply",
       "clause": "fix only independently evidenced defects",
-      "satisfied_by": ["coding.patch_apply"],
+      "satisfied_by": [
+        "coding.patch_apply"
+      ],
       "state": "PRESENT",
       "owner_domain": "V13",
       "note": "Mutation bound to exact HEAD, patch hash, and preimages."
@@ -78,7 +87,9 @@
     }
   ],
   "supporting_tools": [
+    "gis.inspect",
     "memory.list",
+    "ocr.analyze_image",
     "product.audit",
     "source_library.status",
     "web.fetch",
