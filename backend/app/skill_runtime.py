@@ -9,6 +9,7 @@ from typing import Any, Callable
 from .capability_policy import RUNTIME_CAPABILITY, CapabilityPolicy, evaluate_capabilities
 from .config import Settings, settings
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
+from .execution_records import build_execution_contract
 from .execution_router import ExecutionRouterError, execute_routed, select_execution_route
 from .runtime_identity import build_runtime_identity
 from .utils import read_json, stable_id, utc_now, write_json
@@ -365,7 +366,20 @@ def execute_skill(
         status = "FAIL"
         error = {"type": type(exc).__name__, "detail": str(exc)}
     finished_at = utc_now()
+    execution_contract = build_execution_contract(
+        execution_id=execution_id,
+        skill_id=skill_id,
+        skill_version=skill.version,
+        skill_digest=skill.digest,
+        runtime=skill.runtime,
+        status=status,
+        started_at=started_at,
+        finished_at=finished_at,
+        executed_by=executed_by,
+        error=error,
+    )
     event = {
+        "execution_contract": execution_contract,
         "execution_id": execution_id,
         "skill_id": skill_id,
         "skill_version": skill.version,

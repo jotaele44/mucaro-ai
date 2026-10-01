@@ -21,6 +21,7 @@ from backend.app.contracts import (
 )
 from backend.app.exports import export_answer_trace
 from backend.app.ingestion import ingest_file
+from backend.app.execution_records import build_artifact_identity, build_execution_contract, build_run_manifest
 from backend.app.main import create_app
 from backend.app.memory import list_memory_items, remember_memory_item
 from backend.app.memory_policy import select_memory_context
@@ -105,6 +106,71 @@ def test_real_producer_payloads_satisfy_contracts(cfg):
         cfg.project_root, receipt_type="unit_test", status="UNIT_OK", head_sha="a" * 40, command=["x"], payload={}
     )
     validate_contract("release_receipt", json.loads(receipt.read_text(encoding="utf-8")))
+
+
+def test_common_contract_builders_validate_without_filesystem_record_ids(cfg):
+    execution = build_execution_contract(
+        execution_id="exec_alpha",
+        skill_id="skill.alpha",
+        skill_version="1.0.0",
+        skill_digest="sha256:" + "a" * 64,
+        runtime="IN_PROCESS",
+        status="OPEN",
+        started_at="2026-09-30T00:00:00Z",
+    )
+    validate_contract("execution_contract", execution)
+
+    run = build_run_manifest(
+        run_id="../not-a-path-because-it-is-data-only",
+        task_id="task.alpha",
+        state="PLANNING",
+        started_at="2026-09-30T00:00:00Z",
+    )
+    validate_contract("run_manifest", run)
+    assert not (cfg.project_root.parent / "not-a-path-because-it-is-data-only.json").exists()
+
+    artifact = cfg.project_root / "artifact.bin"
+    artifact.write_bytes(b"contract-bound artifact")
+    identity = build_artifact_identity(
+        artifact,
+        artifact_type="DERIVED",
+        logical_identity="unit-test-artifact",
+        producer="test_contracts",
+        producer_version="1",
+    )
+    validate_contract("artifact_identity", identity)
+    assert identity["byte_size"] == len(b"contract-bound artifact")
+    assert identity["sha256"] == __import__("hashlib").sha256(b"contract-bound artifact").hexdigest()
+
+
+def test_invalid_common_contract_builder_inputs_fail_closed(cfg):
+    with pytest.raises(ContractViolation):
+        build_execution_contract(
+            execution_id="exec_bad",
+            skill_id="skill.bad",
+            skill_version="1",
+            skill_digest="not-a-digest",
+            runtime="IN_PROCESS",
+            status="OPEN",
+            started_at="2026-09-30T00:00:00Z",
+        )
+    with pytest.raises(ContractViolation):
+        build_run_manifest(
+            run_id="run_bad",
+            task_id="task.bad",
+            state="TELEPORTED",
+            started_at="2026-09-30T00:00:00Z",
+        )
+    artifact = cfg.project_root / "bad-artifact.bin"
+    artifact.write_bytes(b"x")
+    with pytest.raises(ContractViolation):
+        build_artifact_identity(
+            artifact,
+            artifact_type="UNKNOWN",
+            logical_identity="bad-artifact",
+            producer="test_contracts",
+            producer_version="1",
+        )
 
 
 # --- negative: violations are rejected -------------------------------------------
@@ -378,3 +444,36 @@ def test_concurrent_ledger_writers_do_not_lose_updates(cfg):
         thread.join()
     assert len(load_directory_grants(cfg)) == 6
     assert not list(Path(cfg.processed_dir).glob(".*.tmp"))
+
+def test_skill_execution_persists_validated_execution_contract(cfg):
+    from backend.app.skill_runtime import activate_skill, execute_skill, mount_skill
+
+    mount_skill("mucaro/intelligence-plane-health", cfg=cfg)
+    activate_skill("mucaro/intelligence-plane-health", cfg=cfg)
+    execution = execute_skill("mucaro/intelligence-plane-health", cfg=cfg)["execution"]
+    assert execution["execution_contract"]["execution_id"] == execution["execution_id"]
+    validate_contract("execution_contract", execution["execution_contract"])
+
+
+def test_package_builder_embeds_artifact_identity_contract(tmp_path, monkeypatch):
+    from backend.app import packaging
+
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n[project.scripts]\nmucaro = "backend.app.cli:main"\n',
+        encoding="utf-8",
+    )
+    (root / "README.md").write_text("hello", encoding="utf-8")
+    monkeypatch.setattr(packaging, "build_package_status", lambda root: {"status": "PACKAGE_READY", "checks": []})
+    calls = {
+        ("rev-parse", "HEAD"): (True, "a" * 40),
+        ("status", "--short"): (True, ""),
+        ("ls-files",): (True, "pyproject.toml\nREADME.md\n"),
+    }
+    monkeypatch.setattr(packaging, "_git_output", lambda root, args: calls[tuple(args)])
+    result = packaging.build_release_artifacts(root)
+    manifest = json.loads(Path(result["manifest"]["path"]).read_text(encoding="utf-8"))
+    validate_contract("artifact_identity", manifest["artifact_identity"])
+    assert manifest["artifact_identity"]["sha256"] == result["artifact"]["sha256"]
+    assert manifest["artifact_identity"]["byte_size"] == result["artifact"]["size_bytes"]
