@@ -175,6 +175,55 @@ def test_required_capability_residue_blocks_but_optional_residue_does_not() -> N
     assert all(row["capability"] != "ocr.image" for row in passed["capability_results"])
 
 
+def test_platform_capability_adoption_extends_frozen_core_scope() -> None:
+    extended_manifest = manifest()
+    extended_manifest["capabilities"].append(
+        {
+            "capability": "ocr.image",
+            "state_now": "AVAILABLE_LOCALLY",
+            "runtime_network_required": False,
+            "operator_external_setup_required": False,
+            "release_packaging_residue": False,
+            "resolution_policy": "BUNDLED_ONLY",
+        }
+    )
+    # Remove the optional missing row with the same identity first.
+    extended_manifest["capabilities"] = [
+        row
+        for row in extended_manifest["capabilities"]
+        if row["capability"] != "ocr.image" or row["state_now"] == "AVAILABLE_LOCALLY"
+    ]
+    receipt = build_offline_independence_receipt(
+        contract=contract(),
+        offline_manifest=extended_manifest,
+        evidence=evidence(),
+        platform="macos-arm64",
+        head_sha=HEAD,
+        artifact_sha256=ARTIFACT,
+        declared_capabilities=["ocr.image"],
+    )
+
+    assert receipt["status"] == STATUS_PASS
+    assert receipt["scope"]["required_offline_capabilities"] == [*REQUIRED_CAPABILITIES, "ocr.image"]
+    assert receipt["counts"]["required_capabilities"] == len(REQUIRED_CAPABILITIES) + 1
+
+
+def test_platform_scope_cannot_replace_core_denominator() -> None:
+    receipt = build_offline_independence_receipt(
+        contract=contract(),
+        offline_manifest=manifest(),
+        evidence=evidence(),
+        platform="macos-arm64",
+        head_sha=HEAD,
+        artifact_sha256=ARTIFACT,
+        declared_capabilities=["ocr.image"],
+    )
+
+    assert receipt["status"] == STATUS_BLOCKED
+    assert receipt["counts"]["required_capabilities"] == len(REQUIRED_CAPABILITIES) + 1
+    assert receipt["blocking"]["failed_capabilities"] == ["ocr.image"]
+
+
 def test_duplicate_or_missing_required_capability_fails_closed() -> None:
     duplicate = manifest()
     duplicate["capabilities"].append(dict(duplicate["capabilities"][0]))
