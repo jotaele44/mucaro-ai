@@ -14,7 +14,32 @@ const WORKSPACES = [
   { id: "provenance", label: "Provenance" },
   { id: "settings", label: "Settings" },
 ];
-const DEFAULT_OPTIONS = { model_provider: "mock", retrieval_strategy: "hybrid", allow_live: false, top_k: 5 };
+const DEFAULT_OPTIONS = {
+  model_provider: "mock",
+  model_name: "mock-cited-synthesizer-v1",
+  retrieval_strategy: "hybrid",
+  allow_mock_fallback: false,
+  allow_live: false,
+  require_offline: false,
+  top_k: 5,
+};
+const RUN_OPTION_KEYS = [
+  "model_provider",
+  "model_name",
+  "retrieval_strategy",
+  "allow_mock_fallback",
+  "allow_live",
+  "require_offline",
+  "top_k",
+];
+
+function optionsFromPreferences(payload, fallback = DEFAULT_OPTIONS) {
+  const values = payload?.values || {};
+  return RUN_OPTION_KEYS.reduce((next, key) => {
+    if (values[key] !== undefined) next[key] = values[key];
+    return next;
+  }, { ...fallback });
+}
 
 function stored(key, fallback) {
   try {
@@ -42,6 +67,7 @@ export function App() {
   const [tasksOpen, setTasksOpen] = useState(false);
   const [modes, setModes] = useState(null);
   const [options, setOptions] = useState(() => ({ ...DEFAULT_OPTIONS, ...stored("mucaro.options", {}) }));
+  const [preferences, setPreferences] = useState(() => stored("mucaro.preferencesCache", null));
   const [message, setMessage] = useState("");
   const [health, setHealth] = useState({ state: "checking" });
 
@@ -59,16 +85,29 @@ export function App() {
     }
   }, []);
 
+  const acceptPreferences = useCallback((payload) => {
+    if (!payload?.values) return;
+    setPreferences(payload);
+    setOptions((current) => optionsFromPreferences(payload, current));
+    persist("mucaro.preferencesCache", payload);
+  }, []);
+
+  const loadPreferences = useCallback(async () => {
+    const payload = await api.preferences();
+    acceptPreferences(payload);
+    return payload;
+  }, [acceptPreferences]);
+
   const checkHealth = useCallback(async () => {
     try {
       await api.health();
       setHealth({ state: "ok" });
-      const [modePayload] = await Promise.all([api.modes(), loadConversations()]);
+      const [modePayload] = await Promise.all([api.modes(), loadConversations(), loadPreferences()]);
       setModes(modePayload);
     } catch (err) {
       setHealth({ state: "error", error: err });
     }
-  }, [loadConversations]);
+  }, [loadConversations, loadPreferences]);
 
   useEffect(() => {
     checkHealth();
@@ -90,6 +129,12 @@ export function App() {
 
   useEffect(() => persist("mucaro.activeConversation", activeId), [activeId]);
   useEffect(() => persist("mucaro.options", options), [options]);
+
+  useEffect(() => {
+    const values = preferences?.values || {};
+    document.documentElement.dataset.theme = values.theme || "auto";
+    document.documentElement.dataset.reducedMotion = values.reduced_motion ? "true" : "false";
+  }, [preferences]);
 
   function openConversation(id) {
     setActiveId(id);
@@ -170,12 +215,20 @@ export function App() {
             announce={announce}
             modes={modes}
             defaultOptions={options}
+            onPreferencesChanged={loadPreferences}
           />
         )}
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}
         {health.state === "ok" && view === "provenance" && <ProvenanceWorkspace />}
-        {health.state === "ok" && view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions} announce={announce} />}
+        {health.state === "ok" && view === "settings" && (
+          <SettingsWorkspace
+            options={options}
+            preferences={preferences}
+            onPreferencesChanged={acceptPreferences}
+            announce={announce}
+          />
+        )}
       </main>
       {tasksOpen && <TasksDrawer onClose={() => setTasksOpen(false)} />}
       <div className="sr-only" role="status" aria-live="polite">{message}</div>
