@@ -22,6 +22,13 @@ class ConversationMessageEditError(RuntimeError):
         self.detail = detail
 
 
+class ConversationBranchError(RuntimeError):
+    def __init__(self, status: str, detail: str):
+        super().__init__(detail)
+        self.status = status
+        self.detail = detail
+
+
 def _title_from_query(query: str) -> str:
     compact = " ".join(query.strip().split())
     return compact[:64] or DEFAULT_TITLE
@@ -94,6 +101,65 @@ def delete_conversation(conversation_id: str, cfg: Settings = settings) -> dict[
     }
 
 
+def create_branch_conversation(
+    source_conversation_id: str,
+    source_run_id: str,
+    branch_key: str,
+    request_sha256: str,
+    context_turns: list[dict[str, Any]],
+    source_turn_id: str,
+    source_display_revision: int,
+    cfg: Settings = settings,
+) -> tuple[dict[str, Any], bool]:
+    """Create or recover one deterministic semantic branch without mutating the source conversation."""
+    if not branch_key:
+        raise ConversationBranchError("ERROR_BRANCH_KEY_REQUIRED", "Branch idempotency key is required.")
+    if not all(isinstance(turn, dict) for turn in context_turns):
+        raise ConversationBranchError("ERROR_BRANCH_CONTEXT_INVALID", "Branch context must contain only turn records.")
+
+    with _CONVERSATION_LOCK:
+        source = get_conversation(source_conversation_id, cfg)
+        if source is None:
+            raise ConversationBranchError("ERROR_CONVERSATION_NOT_FOUND", "Source conversation not found.")
+
+        branch_id = stable_id("conv_branch", source_conversation_id, source_run_id, branch_key, length=12)
+        existing = get_conversation(branch_id, cfg)
+        if existing is not None:
+            origin = existing.get("branch_origin")
+            if not isinstance(origin, dict) or origin.get("request_sha256") != request_sha256:
+                raise ConversationBranchError(
+                    "ERROR_BRANCH_IDEMPOTENCY_CONFLICT",
+                    "This branch key is already bound to a different request.",
+                )
+            return existing, False
+
+        now = utc_now()
+        source_title = str(source.get("title") or DEFAULT_TITLE)
+        origin = {
+            "kind": "SEMANTIC_BRANCH",
+            "source_conversation_id": source_conversation_id,
+            "source_run_id": source_run_id,
+            "source_turn_id": source_turn_id,
+            "source_display_revision": int(source_display_revision),
+            "request_sha256": request_sha256,
+            "context_turn_ids": [turn.get("turn_id") for turn in context_turns if turn.get("turn_id")],
+            "created_at": now,
+            "original_preserved": True,
+        }
+        conversation = {
+            "conversation_id": branch_id,
+            "title": f"Branch · {source_title}"[:120],
+            "created_at": now,
+            "updated_at": now,
+            "turns": [],
+            "message_edits": {},
+            "branch_context_turns": [dict(turn) for turn in context_turns],
+            "branch_origin": origin,
+        }
+        upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
+        return conversation, True
+
+
 def edit_conversation_message(
     conversation_id: str,
     message_key: str,
@@ -150,9 +216,19 @@ def edit_conversation_message(
 
 
 def build_conversation_context(conversation: dict[str, Any]) -> list[dict[str, Any]]:
-    """Build bounded model context without mutating or deleting canonical turns."""
+    """Build bounded model context; semantic branches prepend their immutable canonical context snapshot."""
+    raw_branch_context = conversation.get("branch_context_turns", [])
+    if raw_branch_context is None:
+        raw_branch_context = []
+    if not isinstance(raw_branch_context, list) or not all(isinstance(turn, dict) for turn in raw_branch_context):
+        raise ValueError("ERROR_BRANCH_CONTEXT_INVALID")
+    current_turns = conversation.get("turns", [])
+    if not isinstance(current_turns, list) or not all(isinstance(turn, dict) for turn in current_turns):
+        raise ValueError("ERROR_CONVERSATION_TURNS_INVALID")
+    context_conversation = dict(conversation)
+    context_conversation["turns"] = [dict(turn) for turn in raw_branch_context] + [dict(turn) for turn in current_turns]
     state = build_context_state(
-        conversation,
+        context_conversation,
         recent_turn_limit=MAX_CONTEXT_TURNS,
         recent_char_limit=MAX_CONTEXT_CHARS,
     )
