@@ -10,16 +10,15 @@ export function WorkspaceTabs({ tabs, activeKey, conversations, onSelect, onClos
   }
 
   return (
-    <div className="workspace-tabs" role="tablist" aria-label="Open workspace tabs">
+    <div className="workspace-tabs" role="toolbar" aria-label="Open workspace tabs">
       {tabs.map((tab) => (
         <div className="workspace-tab-entry" key={tab.mountId} role="presentation">
           <button
             type="button"
             className="workspace-tab"
             id={"tab-" + tab.mountId}
-            role="tab"
             aria-controls={"panel-" + tab.mountId}
-            aria-selected={tab.key === activeKey}
+            aria-pressed={tab.key === activeKey}
             tabIndex={tab.key === activeKey ? 0 : -1}
             title={title(tab)}
             onClick={() => onSelect(tab.key)}
@@ -34,7 +33,7 @@ export function WorkspaceTabs({ tabs, activeKey, conversations, onSelect, onClos
               document.getElementById("tab-" + tabs[next].mountId)?.focus();
             }}
           >{title(tab)}</button>
-          <button type="button" className="close-tab" aria-label={"Close " + title(tab) + " tab"} title={"Close " + title(tab) + " tab"} onClick={() => { onClose(tab.key); window.requestAnimationFrame(() => document.querySelector(".workspace-tab[aria-selected=\"true\"]")?.focus()); }}>×</button>
+          <button type="button" className="close-tab" aria-label={"Close " + title(tab) + " tab"} title={"Close " + title(tab) + " tab"} onClick={() => { onClose(tab.key); window.requestAnimationFrame(() => document.querySelector(".workspace-tab[aria-pressed=\"true\"]")?.focus()); }}>×</button>
         </div>
       ))}
     </div>
