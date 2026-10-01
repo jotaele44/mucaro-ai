@@ -184,8 +184,9 @@ tracked changes.
 
 1. **Signed installer.** A notarized macOS `.pkg`/`.dmg` and a signed Windows installer would
    remove the one-time Gatekeeper/SmartScreen prompt for ZIP downloads.
-2. **git at runtime.** `backend/app/skill_runtime.py` runs `git rev-parse HEAD` when a skill runs.
-   On a Mac without the developer tools that can open the install dialog after setup.
+2. **Git-backed coding tools.** Runtime identity no longer launches `git`; it reads bound build
+   identity or local `.git` metadata directly. Coding repository/diff/patch operations still use
+   Git and are now classified as a bundle/replace dependency by the offline manifest.
 3. **Python lock file.** `--exclude-newer` freezes resolution by date. A committed lock file
    (for example `uv.lock`) would also pin exact versions for the developer bootstrap and CI.
 4. **Windows on ARM.** The setup could run x64 Python under emulation; not attempted because it
