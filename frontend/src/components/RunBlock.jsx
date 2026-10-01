@@ -186,7 +186,6 @@ function Citations({ citations, onOpenCitation }) {
 
 export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdits = {}, onEditMessage }) {
   const [toolsOpen, setToolsOpen] = useState(false);
-  const active = ["RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT", "QUEUED"].includes(view.state);
   const toolLabel = toolSummaryLabel(view.calls);
   const planSteps = view.plan?.steps || [];
   const userMessageKey = `run:${view.runId}:user`;
