@@ -8,7 +8,7 @@ from typing import Any, Callable
 import jsonschema
 
 from .config import Settings, settings
-from .db import get_connection, init_db, list_payloads, upsert_payload
+from .db import get_connection, init_db, upsert_payload
 from .utils import stable_id, utc_now
 
 CHECKPOINT_SCHEMA_VERSION = "mucaro-agent-checkpoint/1.0"
@@ -25,6 +25,8 @@ CHECKPOINT_STATES = {
 }
 TERMINAL_STATES = {"FAILED", "COMPLETED"}
 RESUMABLE_STATES = {"PAUSED_PROVIDER", "PAUSED_RESOURCE", "BLOCKED_EXTERNAL"}
+# A checkpoint is born before any work runs: never terminal, and never paused or blocked without a reason.
+INITIAL_STATES = frozenset({"PLANNING", "READY_FOR_APPROVAL", "EXECUTING"})
 # Legal state changes. A checkpoint cannot jump anywhere: COMPLETED must be reached through EXECUTING,
 # and terminal states have no outgoing edges. Same-state EXECUTING -> EXECUTING records step progress.
 TRANSITIONS: dict[str, frozenset[str]] = {
@@ -67,6 +69,8 @@ def create_checkpoint(
 ) -> dict[str, Any]:
     if state not in CHECKPOINT_STATES:
         raise CheckpointError("ERROR_CHECKPOINT_STATE", f"unsupported checkpoint state: {state}")
+    if state not in INITIAL_STATES:
+        raise CheckpointError("ERROR_CHECKPOINT_INITIAL_STATE", f"a checkpoint cannot start in {state}")
     if not session_id or not run_id or not objective.strip():
         raise CheckpointError("ERROR_CHECKPOINT_IDENTITY", "session_id, run_id, and objective are required")
     if len(source_sha) != 40 or any(char not in "0123456789abcdef" for char in source_sha):
@@ -87,12 +91,13 @@ def create_checkpoint(
         "sequence": 0,
         "completed_steps": list(completed_steps or []),
         "pending_steps": list(pending_steps or []),
-        "contradictions": list(contradictions or []),
+        "contradictions": _merged_contradictions([], contradictions or []),
         "pause_reason": None,
         "provider": provider,
         "model": model,
         "metadata": dict(metadata or {}),
     }
+    _validate_payload(checkpoint, cfg)
     upsert_payload("agent_checkpoints", "checkpoint_id", checkpoint, cfg.sqlite_path)
     return checkpoint
 
@@ -134,7 +139,10 @@ def get_checkpoint(checkpoint_id: str, cfg: Settings = settings) -> dict[str, An
 
 def list_checkpoints(cfg: Settings = settings) -> list[dict[str, Any]]:
     init_db(cfg.sqlite_path)
-    return list_payloads("agent_checkpoints", cfg.sqlite_path)
+    with get_connection(cfg.sqlite_path) as conn:
+        rows = conn.execute("SELECT payload_json FROM agent_checkpoints ORDER BY rowid ASC").fetchall()
+    # Same fail-closed decode as get_checkpoint: a corrupt or schema-invalid row is a CheckpointError.
+    return [_decode(row["payload_json"], cfg) for row in rows]
 
 
 def _mutate(checkpoint_id: str, change: Callable[[dict[str, Any]], dict[str, Any] | None], cfg: Settings, *, expected_sequence: int | None = None) -> dict[str, Any]:
@@ -177,6 +185,37 @@ def _contradiction_ids(items: list[dict[str, Any]]) -> set[str]:
     return {str(item.get("id")) for item in items if isinstance(item, dict) and item.get("id") is not None}
 
 
+def _merged_contradictions(current: list[dict[str, Any]], supplied: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Stored contradictions survive exactly as stored; new ones enter UNRESOLVED.
+
+    Only adjudicate_contradiction closes one, so a caller cannot rewrite a record to ADJUDICATED and
+    drop its claims.
+    """
+    stored = {str(item["id"]): item for item in current if isinstance(item, dict) and item.get("id") is not None}
+    seen: set[str] = set()
+    for item in supplied:
+        item_id = item.get("id") if isinstance(item, dict) else None
+        if not isinstance(item_id, str) or not item_id:
+            raise CheckpointError("ERROR_CHECKPOINT_CONTRADICTION_ID", "every contradiction needs a non-empty string id")
+        if item_id in seen:
+            raise CheckpointError("ERROR_CHECKPOINT_CONTRADICTION_DUPLICATE", item_id)
+        seen.add(item_id)
+        if item_id in stored:
+            if item != stored[item_id]:
+                raise CheckpointError("ERROR_CHECKPOINT_CONTRADICTION_REWRITTEN", f"{item_id} changes only through adjudicate_contradiction")
+        elif item.get("state") != CONTRADICTION_OPEN:
+            raise CheckpointError("ERROR_CHECKPOINT_CONTRADICTION_STATE", f"new contradiction {item_id} must be {CONTRADICTION_OPEN}")
+    dropped = sorted(set(stored) - seen)
+    if dropped:
+        raise CheckpointError("ERROR_CHECKPOINT_CONTRADICTION_DROPPED", f"contradictions must survive; missing: {dropped}")
+    return [dict(item) for item in supplied]
+
+
+def _adjudicated(item: dict[str, Any]) -> bool:
+    # Closed only the way adjudicate_contradiction closes it; any other state or a missing resolution is open.
+    return item.get("state") == CONTRADICTION_CLOSED and all(str(item.get(key) or "").strip() for key in ("resolution", "rationale", "adjudicated_by"))
+
+
 def transition_checkpoint(
     checkpoint_id: str,
     *,
@@ -201,14 +240,11 @@ def transition_checkpoint(
         if state not in TRANSITIONS[current["state"]]:
             raise CheckpointError("ERROR_CHECKPOINT_TRANSITION", f"illegal transition {current['state']} -> {state}")
         if contradictions is not None:
-            dropped = _contradiction_ids(current["contradictions"]) - _contradiction_ids(contradictions)
-            if dropped:
-                raise CheckpointError("ERROR_CHECKPOINT_CONTRADICTION_DROPPED", f"contradictions must survive; missing: {sorted(dropped)}")
-            current["contradictions"] = list(contradictions)
+            current["contradictions"] = _merged_contradictions(current["contradictions"], contradictions)
         if state == "COMPLETED":
             if current.get("in_flight_step"):
                 raise CheckpointError("ERROR_CHECKPOINT_STEP_IN_FLIGHT", "cannot complete while a step is in flight")
-            open_ids = sorted(str(c.get("id")) for c in current["contradictions"] if c.get("state") == CONTRADICTION_OPEN)
+            open_ids = sorted(str(c.get("id")) for c in current["contradictions"] if not _adjudicated(c))
             if open_ids:
                 raise CheckpointError("ERROR_CHECKPOINT_OPEN_CONTRADICTIONS", f"unadjudicated contradictions: {open_ids}")
         current["state"] = state
@@ -272,6 +308,8 @@ def complete_step(checkpoint_id: str, *, idempotency_key: str, result: dict[str,
 
 def record_contradiction(checkpoint_id: str, *, contradiction_id: str, claims: list[str], cfg: Settings = settings) -> dict[str, Any]:
     def change(current: dict[str, Any]) -> dict[str, Any]:
+        if current["state"] in TERMINAL_STATES:
+            raise CheckpointError("ERROR_CHECKPOINT_TERMINAL", "terminal checkpoint cannot record contradictions")
         if contradiction_id in _contradiction_ids(current["contradictions"]):
             raise CheckpointError("ERROR_CHECKPOINT_CONTRADICTION_EXISTS", contradiction_id)
         current["contradictions"] = [*current["contradictions"], {"id": contradiction_id, "state": CONTRADICTION_OPEN, "claims": list(claims), "recorded_at": utc_now()}]
