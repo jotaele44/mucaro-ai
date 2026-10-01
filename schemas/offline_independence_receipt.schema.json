@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/offline_independence_receipt.schema.json",
+  "title": "Mucaro Offline Independence Receipt 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "status", "platform", "head_sha", "artifact_sha256", "goal",
+    "scope", "capability_results", "evidence", "counts", "blocking", "invariants",
+    "basis", "limitations", "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {"const": "mucaro-offline-independence-receipt/1.0"},
+    "status": {"enum": ["OFFLINE_INDEPENDENT", "OFFLINE_INDEPENDENCE_BLOCKED"]},
+    "platform": {"type": "string", "minLength": 1},
+    "head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "goal": {"type": ["string", "null"]},
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_offline_capabilities", "required_external_evidence_gates", "explicit_network_exceptions"],
+      "properties": {
+        "required_offline_capabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "required_external_evidence_gates": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "explicit_network_exceptions": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+      }
+    },
+    "capability_results": {"type": "array", "items": {"type": "object"}},
+    "evidence": {"type": "object", "additionalProperties": {"type": "object"}},
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_capabilities", "capabilities_passed", "required_external_evidence_gates", "external_evidence_gates_passed"],
+      "properties": {
+        "required_capabilities": {"type": "integer", "minimum": 1},
+        "capabilities_passed": {"type": "integer", "minimum": 0},
+        "required_external_evidence_gates": {"type": "integer", "minimum": 1},
+        "external_evidence_gates_passed": {"type": "integer", "minimum": 0}
+      }
+    },
+    "blocking": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["failed_capabilities", "failed_external_evidence_gates", "missing_external_evidence_gates"],
+      "properties": {
+        "failed_capabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "failed_external_evidence_gates": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "missing_external_evidence_gates": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+      }
+    },
+    "invariants": {"type": "object", "additionalProperties": {"type": "boolean"}},
+    "basis": {"type": "string", "minLength": 1},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "receipt_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
