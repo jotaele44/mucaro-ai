@@ -211,7 +211,8 @@ def build_offline_independence_receipt(
         "limitations": [
             "This evaluator does not itself disable public networking or prove host cleanliness.",
             "Optional capabilities outside the declared release scope do not block the core independence claim.",
-            "Explicit API/fetch/search/render network capabilities are exceptions only when the operator authorizes them.",
+            "Explicit API/fetch/search/render network capabilities are exceptions only when the operator "
+            "authorizes them.",
         ],
     }
     unsigned = dict(receipt)
