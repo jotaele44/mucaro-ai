@@ -91,12 +91,76 @@ def _call_name(node: ast.expr) -> str | None:
     return None
 
 
+def _strings(node: ast.expr) -> set[str]:
+    return {node.value} if isinstance(node, ast.Constant) and isinstance(node.value, str) else set()
+
+
+def _loop_values(func: ast.AST, name: str) -> set[str]:
+    """Literal values a for-loop (or comprehension) inside the test binds to ``name``."""
+    values: set[str] = set()
+    for node in ast.walk(func):
+        if not isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
+            continue
+        if not isinstance(node.iter, (ast.Tuple, ast.List, ast.Set)):
+            continue
+        if isinstance(node.target, ast.Name) and node.target.id == name:
+            for item in node.iter.elts:
+                values |= _strings(item)
+        elif isinstance(node.target, (ast.Tuple, ast.List)):
+            for index, part in enumerate(node.target.elts):
+                if isinstance(part, ast.Name) and part.id == name:
+                    for row in node.iter.elts:
+                        if isinstance(row, (ast.Tuple, ast.List)) and index < len(row.elts):
+                            values |= _strings(row.elts[index])
+    return values
+
+
+def _parametrize_values(func: ast.FunctionDef | ast.AsyncFunctionDef, name: str) -> set[str]:
+    """Literal values ``@pytest.mark.parametrize`` passes to the test argument ``name``."""
+    values: set[str] = set()
+    for decorator in func.decorator_list:
+        if not (isinstance(decorator, ast.Call) and _call_name(decorator.func) == "parametrize" and len(decorator.args) >= 2):
+            continue
+        spec, rows = decorator.args[0], decorator.args[1]
+        if isinstance(spec, ast.Constant) and isinstance(spec.value, str):
+            names = [part.strip() for part in spec.value.split(",")]
+        elif isinstance(spec, (ast.Tuple, ast.List)):
+            names = [part.value for part in spec.elts if isinstance(part, ast.Constant) and isinstance(part.value, str)]
+        else:
+            continue
+        if name not in names or not isinstance(rows, (ast.Tuple, ast.List)):
+            continue
+        index = names.index(name)
+        for row in rows.elts:
+            if len(names) == 1:
+                values |= _strings(row)
+            elif isinstance(row, (ast.Tuple, ast.List)) and index < len(row.elts):
+                values |= _strings(row.elts[index])
+    return values
+
+
+def _requested_tools(func: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    """Tools this test passes to ``request_tool_call``, read from each call's tool-name argument."""
+    requested: set[str] = set()
+    for node in ast.walk(func):
+        if not (isinstance(node, ast.Call) and _call_name(node.func) == "request_tool_call"):
+            continue
+        argument = node.args[0] if node.args else next((kw.value for kw in node.keywords if kw.arg == "tool_name"), None)
+        if argument is None:
+            continue
+        requested |= _strings(argument)
+        if isinstance(argument, ast.Name):
+            requested |= _loop_values(func, argument.id) | _parametrize_values(func, argument.id)
+    return requested
+
+
 def runtime_evidence(repo: Path, tool_names: list[str]) -> dict[str, list[str]]:
     """Map each tool to test functions that request it through the governed runtime.
 
-    Evidence means a top-level test calls ``request_tool_call`` and names the tool as a
-    string constant. It shows the tool is exercised through the approval boundary, not
-    that its output is correct.
+    A test counts for a tool only when one of its ``request_tool_call`` calls names that tool:
+    a string literal, or a variable bound by a literal for-loop or ``pytest.mark.parametrize``.
+    Other string constants in the test do not count. This shows the tool crosses the approval
+    boundary, not that its output is correct.
     """
     evidence: dict[str, list[str]] = {name: [] for name in tool_names}
     tests_dir = repo / "backend" / "tests"
@@ -105,12 +169,9 @@ def runtime_evidence(repo: Path, tool_names: list[str]) -> dict[str, list[str]]:
         for node in tree.body:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or not node.name.startswith("test"):
                 continue
-            nodes = list(ast.walk(node))
-            if not any(isinstance(item, ast.Call) and _call_name(item.func) == "request_tool_call" for item in nodes):
-                continue
-            constants = {item.value for item in nodes if isinstance(item, ast.Constant) and isinstance(item.value, str)}
+            requested = _requested_tools(node)
             for name in tool_names:
-                if name in constants:
+                if name in requested:
                     evidence[name].append(f"{path.relative_to(repo).as_posix()}::{node.name}")
     return evidence
 

@@ -241,3 +241,39 @@ print(json.dumps({{"before": before, "while_running": while_running, "reconciled
         "after": "INTERRUPTED",
         "rerun": "ERROR_TOOL_CALL_NOT_APPROVED",
     }
+
+
+def test_rewriting_arguments_and_digest_together_is_caught_by_the_audit_log(cfg: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = register_probe(monkeypatch, lambda arguments, cfg: {"status": "PROBE_OK"})
+    forged = {"url": "https://attacker.invalid"}
+
+    before = request_tool_call("test.probe", {"url": "https://example.com"}, cfg=cfg)["tool_call"]["tool_call_id"]
+    edit_ledger(cfg, before, arguments=forged, arguments_sha256=arguments_digest(forged))
+    with pytest.raises(ToolRuntimeError) as not_approved:
+        approve_tool_call(before, cfg=cfg, approved_by="test")
+    assert not_approved.value.status == "ERROR_TOOL_BINDING_MISMATCH"
+    assert ledger_call(cfg, before)["status"] == "PENDING_APPROVAL"
+
+    after = request_tool_call("test.probe", {"url": "https://example.com"}, cfg=cfg)["tool_call"]["tool_call_id"]
+    approve_tool_call(after, cfg=cfg, approved_by="test")
+    edit_ledger(cfg, after, arguments=forged, arguments_sha256=arguments_digest(forged))
+    with pytest.raises(ToolRuntimeError) as not_run:
+        run_tool_call(after, cfg=cfg, executed_by="test")
+    assert not_run.value.status == "ERROR_TOOL_BINDING_MISMATCH"
+    assert ledger_call(cfg, after)["status"] == "FAILED"
+    assert calls == []
+
+
+def test_a_broken_audit_chain_blocks_approval(cfg: Settings) -> None:
+    from backend.app.tools import TOOL_AUDIT_NAME
+
+    tool_call_id = request_tool_call("source_library.status", {}, cfg=cfg)["tool_call"]["tool_call_id"]
+    path = cfg.processed_dir / TOOL_AUDIT_NAME
+    events = read_json(path, [])
+    events[-1]["actor"] = "someone-else"
+    write_json(path, events)
+
+    with pytest.raises(ToolRuntimeError) as exc:
+        approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
+    assert exc.value.status == "ERROR_TOOL_AUDIT_CHAIN_BROKEN"
+    assert ledger_call(cfg, tool_call_id)["status"] == "PENDING_APPROVAL"

@@ -120,3 +120,43 @@ def test_registry_digest_tracks_tool_definition_changes(monkeypatch: pytest.Monk
     monkeypatch.setitem(TOOL_REGISTRY, "web.render", fake_tool("web.render", mutates_state=True))
 
     assert registry_sha256() != before
+
+
+def test_runtime_evidence_counts_only_the_tools_each_request_names(tmp_path: Path) -> None:
+    from backend.app.tool_denominator import runtime_evidence
+
+    tests_dir = tmp_path / "backend" / "tests"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "test_probe.py").write_text(
+        """
+import pytest
+
+
+def test_mentions_without_requesting():
+    request_tool_call("memory.list", {})
+    assert "web.render" not in ["coding.diff"]
+
+
+def test_loop():
+    for name, arguments in (("coding.diff", {}), ("coding.read_file", {})):
+        request_tool_call(name, arguments)
+
+
+@pytest.mark.parametrize("tool", ["web.search", "web.fetch"])
+def test_parametrized(tool):
+    request_tool_call(tool, {})
+
+
+def test_keyword():
+    request_tool_call(tool_name="product.audit")
+""",
+        encoding="utf-8",
+    )
+    names = ["memory.list", "web.render", "coding.diff", "coding.read_file", "web.search", "web.fetch", "product.audit"]
+    evidence = runtime_evidence(tmp_path, names)
+
+    assert evidence["memory.list"] == ["backend/tests/test_probe.py::test_mentions_without_requesting"]
+    assert evidence["web.render"] == []
+    assert evidence["coding.diff"] == evidence["coding.read_file"] == ["backend/tests/test_probe.py::test_loop"]
+    assert evidence["web.search"] == evidence["web.fetch"] == ["backend/tests/test_probe.py::test_parametrized"]
+    assert evidence["product.audit"] == ["backend/tests/test_probe.py::test_keyword"]
