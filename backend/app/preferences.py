@@ -432,14 +432,14 @@ def parse_preference_prompt(prompt: str) -> dict[str, Any]:
     lowered = text.lower().rstrip(".!?")
 
     boolean_patterns = [
-        (r"^(?:turn|switch) (on|off) (?:the )?(live models|remote models|live)$", "allow_live"),
-        (r"^(?:enable|disable) (?:the )?(live models|remote models|live)$", "allow_live"),
-        (r"^(?:turn|switch) (on|off) (?:the )?(offline mode|offline only|offline)$", "require_offline"),
-        (r"^(?:enable|disable) (?:the )?(offline mode|offline only|offline)$", "require_offline"),
-        (r"^(?:turn|switch) (on|off) (?:the )?(mock fallback)$", "allow_mock_fallback"),
-        (r"^(?:enable|disable) (?:the )?(mock fallback)$", "allow_mock_fallback"),
-        (r"^(?:turn|switch) (on|off) (?:the )?(reduced motion)$", "reduced_motion"),
-        (r"^(?:enable|disable) (?:the )?(reduced motion)$", "reduced_motion"),
+        (r"^(?:turn|switch) (on|off) (?:the )?(?:live models|remote models|live)$", "allow_live"),
+        (r"^(enable|disable) (?:the )?(?:live models|remote models|live)$", "allow_live"),
+        (r"^(?:turn|switch) (on|off) (?:the )?(?:offline mode|offline only|offline)$", "require_offline"),
+        (r"^(enable|disable) (?:the )?(?:offline mode|offline only|offline)$", "require_offline"),
+        (r"^(?:turn|switch) (on|off) (?:the )?(?:mock fallback)$", "allow_mock_fallback"),
+        (r"^(enable|disable) (?:the )?(?:mock fallback)$", "allow_mock_fallback"),
+        (r"^(?:turn|switch) (on|off) (?:the )?(?:reduced motion)$", "reduced_motion"),
+        (r"^(enable|disable) (?:the )?(?:reduced motion)$", "reduced_motion"),
     ]
     for pattern, key in boolean_patterns:
         match = re.fullmatch(pattern, lowered)
