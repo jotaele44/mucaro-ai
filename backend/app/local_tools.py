@@ -88,18 +88,21 @@ def resolve_tool_request(name: str, requested: str | None = None) -> str | None:
         # Logical names still flow through the controlled resolver.
         return resolve_local_tool(name)
 
+    if not bundled_only():
+        # Preserve explicit developer/test overrides. The eventual subprocess
+        # invocation remains responsible for reporting an unusable path.
+        return str(candidate)
+
     try:
         resolved = candidate.resolve()
     except OSError:
         return None
     if not _usable_file(resolved):
         return None
-
-    if bundled_only():
-        try:
-            resolved.relative_to(bundled_tools_dir())
-        except ValueError:
-            return None
+    try:
+        resolved.relative_to(bundled_tools_dir())
+    except ValueError:
+        return None
     return str(resolved)
 
 
