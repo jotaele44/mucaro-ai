@@ -116,7 +116,18 @@ def edit_conversation_message(
             )
         edits = dict(raw_edits)
         previous = edits.get(message_key)
-        current_revision = int(previous.get("revision", 0)) if isinstance(previous, dict) else 0
+        if previous is not None and not isinstance(previous, dict):
+            raise ConversationMessageEditError(
+                "ERROR_MESSAGE_EDITS_INVALID",
+                "Stored message edit entry is not a valid mapping.",
+            )
+        try:
+            current_revision = int(previous.get("revision", 0)) if previous is not None else 0
+        except (TypeError, ValueError) as exc:
+            raise ConversationMessageEditError(
+                "ERROR_MESSAGE_EDITS_INVALID",
+                "Stored message edit revision is not valid.",
+            ) from exc
         if expected_revision != current_revision:
             raise ConversationMessageEditError(
                 "ERROR_MESSAGE_EDIT_REVISION_CONFLICT",
