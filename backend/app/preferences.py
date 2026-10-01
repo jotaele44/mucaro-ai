@@ -14,6 +14,8 @@ RETRIEVAL_STRATEGIES = ("hybrid", "bm25", "persistent", "semantic", "lexical", "
 THEMES = ("auto", "light", "dark")
 RESTRICTED_PROMPT_SETTINGS = (
     "operator_token",
+    "access_token",
+    "token",
     "api_key",
     "anthropic_api_key",
     "password",
@@ -195,11 +197,15 @@ def _validate_value(key: str, value: Any) -> Any:
 
 
 def _validate_values(values: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    unknown = sorted(set(values) - set(PREFERENCE_DEFINITIONS))
+    if unknown:
+        raise PreferenceError(
+            "ERROR_PREFERENCES_SCHEMA",
+            f"Stored preferences contain unknown key(s): {', '.join(unknown)}",
+        )
     defaults = _defaults(cfg)
     result = dict(defaults)
     for key, value in values.items():
-        if key not in PREFERENCE_DEFINITIONS:
-            continue
         result[key] = _validate_value(key, value)
     if result["allow_live"] and result["require_offline"]:
         raise PreferenceError(
@@ -207,6 +213,21 @@ def _validate_values(values: dict[str, Any], cfg: Settings) -> dict[str, Any]:
             "allow_live and require_offline cannot both be enabled",
         )
     return result
+
+
+def _revision(value: Any) -> int:
+    if isinstance(value, bool):
+        raise PreferenceError("ERROR_PREFERENCES_SCHEMA", "Stored preference revision must be a non-negative integer")
+    try:
+        revision = int(value or 0)
+    except (TypeError, ValueError) as exc:
+        raise PreferenceError(
+            "ERROR_PREFERENCES_SCHEMA",
+            "Stored preference revision must be a non-negative integer",
+        ) from exc
+    if revision < 0:
+        raise PreferenceError("ERROR_PREFERENCES_SCHEMA", "Stored preference revision must be a non-negative integer")
+    return revision
 
 
 def _initial(cfg: Settings) -> dict[str, Any]:
@@ -234,7 +255,7 @@ def get_preferences(cfg: Settings = settings) -> dict[str, Any]:
         values = _validate_values(dict(raw.get("values") or {}), cfg)
         state = {
             "schema_version": PREFERENCES_SCHEMA_VERSION,
-            "revision": max(0, int(raw.get("revision") or 0)),
+            "revision": _revision(raw.get("revision")),
             "created_at": raw.get("created_at") or utc_now(),
             "updated_at": raw.get("updated_at") or raw.get("created_at") or utc_now(),
             "values": values,
@@ -268,7 +289,7 @@ def update_preferences(
         current = _initial(cfg) if not isinstance(state, dict) or not state else state
         if current.get("schema_version") != PREFERENCES_SCHEMA_VERSION:
             raise PreferenceError("ERROR_PREFERENCES_SCHEMA", "Stored preferences use an unsupported schema")
-        revision = max(0, int(current.get("revision") or 0))
+        revision = _revision(current.get("revision"))
         if expected_revision is not None and revision != expected_revision:
             raise PreferenceError(
                 "ERROR_PREFERENCE_VERSION_CONFLICT",
@@ -355,11 +376,21 @@ def _assignment_value(key: str, raw: str) -> Any:
     return _validate_value(key, value)
 
 
+def _restricted_prompt_key(raw: str) -> bool:
+    normalized = "_".join(raw.strip().lower().replace("-", " ").split())
+    return normalized in RESTRICTED_PROMPT_SETTINGS or normalized.endswith("_token") or normalized.endswith("_api_key")
+
+
 def _blocked_secret_prompt(text: str) -> bool:
     lowered = text.lower()
     if not re.search(r"\b(set|change|save|store|configure|use)\b", lowered):
         return False
-    return bool(re.search(r"\b(api[ _-]?key|access[ _-]?token|operator[ _-]?token|password|secret)\b", lowered))
+    return bool(
+        re.search(
+            r"\b(api[ _-]?key|access[ _-]?token|operator[ _-]?token|token|password|secret)\b",
+            lowered,
+        )
+    )
 
 
 def parse_preference_prompt(prompt: str) -> dict[str, Any]:
@@ -384,6 +415,11 @@ def parse_preference_prompt(prompt: str) -> dict[str, Any]:
             if "=" not in token:
                 return {"status": "PREFERENCE_PROMPT_INVALID", "detail": f"Expected key=value, got: {token}"}
             raw_key, raw_value = token.split("=", 1)
+            if _restricted_prompt_key(raw_key):
+                return {
+                    "status": "PREFERENCE_PROMPT_BLOCKED",
+                    "detail": "Credentials cannot be changed through chat; use the dedicated credential control.",
+                }
             key = _canonical_key(raw_key)
             if key is None:
                 return {"status": "PREFERENCE_PROMPT_INVALID", "detail": f"Unknown setting: {raw_key}"}
