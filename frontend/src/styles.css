@@ -1247,7 +1247,7 @@ html {
   border-radius: 10px;
   background: var(--surface-2);
 }
-.workspace-tab-entry:has(.workspace-tab[aria-selected="true"]) {
+.workspace-tab-entry:has(.workspace-tab[aria-pressed="true"]) {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
@@ -1381,10 +1381,10 @@ html {
    fonts offline instead of fetching Google Fonts. No inherited global resets. */
 :root[data-mucaro-theme="light"] {
   --bg: #edf1f1; --surface: #f7f9f8; --surface-2: #e5eae9;
-  --text: #182224; --muted: #647477; --border: #cfd9d7; /* adjusted from draft for AA contrast */
-  --accent: #087f83; --accent-text: #f7ffff; --accent-soft: #cceeed;
+  --text: #182224; --muted: #556568; --border: #cfd9d7; /* AA across bg/surface/surface-2 */
+  --accent: #067276; --accent-text: #f7ffff; --accent-soft: #cceeed;
   --danger: #b33a43; --danger-soft: #fbe9ea;
-  --warn: #9a6612; --warn-soft: #fdf3dc;
+  --warn: #89580c; --warn-soft: #fdf3dc;
   --user-bubble: #e1eeee; --focus: #087f83;
   --shadow: 0 12px 32px rgba(18, 34, 36, 0.12);
   color-scheme: light;
