@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .config import Settings, settings
-from .local_tools import resolve_local_tool
+from .local_tools import resolve_tool_request
 from .multimodal import IMAGE_SUFFIXES, parse_multimodal_metadata
 from .utils import stable_id, utc_now, write_json
 
@@ -159,7 +159,7 @@ def analyze_image_ocr(
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
     source = _load_image_source(path)
-    engine_path = tesseract_path or resolve_local_tool("tesseract")
+    engine_path = resolve_tool_request("tesseract", tesseract_path)
     if not engine_path:
         raise OCRAnalysisError("ERROR_OCR_ENGINE_UNAVAILABLE", "Tesseract is not bundled in this Mucaro runtime.")
     if language.strip() != language or not language.strip():
