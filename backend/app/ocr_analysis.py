@@ -10,6 +10,7 @@ from typing import Any, Callable
 from .config import Settings, settings
 from .local_tools import resolve_tool_request
 from .multimodal import IMAGE_SUFFIXES, parse_multimodal_metadata
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .utils import stable_id, utc_now, write_json
 
 OCR_REPORT_SCHEMA_VERSION = "mucaro_ocr_report_v1"
@@ -167,6 +168,18 @@ def analyze_image_ocr(
     if layout_mode not in SUPPORTED_LAYOUT_MODES:
         raise OCRAnalysisError("ERROR_OCR_LAYOUT_INVALID", f"Unsupported OCR layout mode: {layout_mode}")
     page_segmentation_mode = SUPPORTED_LAYOUT_MODES[layout_mode]
+    try:
+        require(
+            PermissionRequest(
+                capability="subprocess.execute",
+                subject="ocr_analysis.tesseract",
+                target=engine_path,
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise OCRAnalysisError(exc.status, exc.detail) from exc
     command = [engine_path, str(path), "stdout", "--psm", page_segmentation_mode, "-l", language, "tsv"]
     try:
         completed = runner(command, timeout_seconds)

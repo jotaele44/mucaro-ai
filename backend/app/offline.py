@@ -14,6 +14,7 @@ import importlib.util
 from typing import Any
 
 from .local_tools import bundled_only, resolve_local_tool
+from .config import Settings, settings
 from .model_router import list_model_providers
 from .tools import TOOL_REGISTRY
 
@@ -116,7 +117,7 @@ def _row(
     }
 
 
-def build_offline_manifest(*, system_offline: bool = False) -> dict[str, Any]:
+def build_offline_manifest(*, system_offline: bool = False, cfg: Settings = settings) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     for capability_id, description, dependency, dependency_kind, actions in _CORE_CAPABILITIES:
         present = _dependency_present(dependency_kind, dependency)
@@ -152,7 +153,7 @@ def build_offline_manifest(*, system_offline: bool = False) -> dict[str, Any]:
                 independence_actions=actions,
             )
         )
-    for provider in list_model_providers():
+    for provider in list_model_providers(cfg):
         remote = provider.get("locality") == "remote"
         local_server = provider["name"] == "openai_compatible_local"
         if local_server:

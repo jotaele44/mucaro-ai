@@ -305,6 +305,27 @@ def execute_skill(
     if not isinstance(policy_decision, dict) or policy_decision.get("status") != "AUTHORIZED":
         raise SkillRuntimeError("ERROR_SKILL_POLICY_NOT_AUTHORIZED", skill_id)
 
+    declared = set(skill.capabilities) | {RUNTIME_CAPABILITY[skill.runtime]}
+    recheck = evaluate_capabilities(
+        policy=CapabilityPolicy.build(
+            policy_id=str(policy_decision.get("policy_id", "stored-activation-grant")),
+            allowed=set(policy_decision.get("granted", [])),
+        ),
+        declared_capabilities=declared,
+        requested_capabilities=declared,
+    )
+    if not recheck.authorized:
+        raise SkillRuntimeError("ERROR_SKILL_POLICY_STALE", "; ".join(recheck.reasons) or skill_id)
+    try:
+        require_distribution_runtime_authorized(
+            distribution_channel=cfg.distribution_channel,
+            runtime=skill.runtime,
+            granted_capabilities=recheck.granted,
+            skill_id=skill.skill_id,
+        )
+    except DistributionPolicyError as exc:
+        raise SkillRuntimeError(exc.status, exc.detail) from exc
+
     try:
         route = select_execution_route(skill.runtime, policy_decision)
     except ExecutionRouterError as exc:
