@@ -139,7 +139,9 @@ def test_failed_network_negative_control_blocks_claim() -> None:
     receipt = build_offline_independence_receipt(
         contract=contract(),
         offline_manifest=manifest(),
-        evidence=evidence(web_network_negative_control_failed_closed={"passed": False, "observed": "request succeeded"}),
+        evidence=evidence(
+            web_network_negative_control_failed_closed={"passed": False, "observed": "request succeeded"}
+        ),
         platform="macos-arm64",
         head_sha=HEAD,
         artifact_sha256=ARTIFACT,
