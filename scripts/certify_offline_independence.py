@@ -86,7 +86,9 @@ def main() -> int:
 
     contract = load_runtime_independence_contract(args.contract)
     manifest = _object(args.offline_manifest, "OFFLINE_MANIFEST")
-    evidence = _object(args.evidence, "OFFLINE_EVIDENCE")
+    external_evidence = _object(args.evidence, "OFFLINE_EVIDENCE")
+    nested = external_evidence.get("evidence")
+    evidence = nested if isinstance(nested, dict) else external_evidence
     receipt = build_offline_independence_receipt(
         contract=contract,
         offline_manifest=manifest,
