@@ -9,6 +9,7 @@ export function SettingsWorkspace({ options, preferences, onPreferencesChanged, 
   const [config, setConfig] = useState(null);
   const [token, setToken] = useState(api.getOperatorToken());
   const [modelName, setModelName] = useState(options.model_name || "");
+  const [topKDraft, setTopKDraft] = useState(String(options.top_k ?? 5));
   const [busyKey, setBusyKey] = useState(null);
   const [error, setError] = useState(null);
 
@@ -17,6 +18,10 @@ export function SettingsWorkspace({ options, preferences, onPreferencesChanged, 
   useEffect(() => {
     setModelName(values.model_name || "");
   }, [values.model_name]);
+
+  useEffect(() => {
+    setTopKDraft(String(values.top_k ?? 5));
+  }, [values.top_k]);
 
   useEffect(() => {
     Promise.all([api.models(), api.offlineManifest(), api.config()])
@@ -46,7 +51,7 @@ export function SettingsWorkspace({ options, preferences, onPreferencesChanged, 
         }
       }
       setError(err);
-      throw err;
+      return null;
     } finally {
       setBusyKey(null);
     }
@@ -198,22 +203,33 @@ export function SettingsWorkspace({ options, preferences, onPreferencesChanged, 
             ))}
           </select>
         </label>
-        <label className="field">
-          <span>Retrieved chunks (1–20)</span>
-          <input
-            type="number"
-            min="1"
-            max="20"
-            value={values.top_k ?? 5}
-            disabled={Boolean(busyKey)}
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (Number.isInteger(value) && value >= 1 && value <= 20) {
-                savePreference({ top_k: value }, "Retrieved chunks set to " + value + ".");
-              }
-            }}
-          />
-        </label>
+        <form
+          className="inline-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const value = Number(topKDraft);
+            if (Number.isInteger(value) && value >= 1 && value <= 20) {
+              savePreference({ top_k: value }, "Retrieved chunks set to " + value + ".");
+            } else {
+              setError({ status: "ERROR_PREFERENCE_VALUE", message: "Retrieved chunks must be an integer from 1 to 20." });
+            }
+          }}
+        >
+          <label className="field grow">
+            <span>Retrieved chunks (1–20)</span>
+            <input
+              type="number"
+              min="1"
+              max="20"
+              value={topKDraft}
+              disabled={Boolean(busyKey)}
+              onChange={(event) => setTopKDraft(event.target.value)}
+            />
+          </label>
+          <button type="submit" className="secondary-button" disabled={Boolean(busyKey)}>
+            Save
+          </button>
+        </form>
       </fieldset>
 
       <fieldset className="panel" id="settings-access">
