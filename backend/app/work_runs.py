@@ -328,6 +328,9 @@ def submit_message(
         raise RunError("ERROR_RUN_PROMPT_EMPTY", "Message text is required.")
     if len(text) > MAX_PROMPT_CHARS:
         raise RunError("ERROR_RUN_PROMPT_TOO_LONG", f"Message exceeds {MAX_PROMPT_CHARS} characters.")
+    preference_prompt = parse_preference_prompt(text)
+    if preference_prompt["status"] == "PREFERENCE_PROMPT_BLOCKED":
+        raise RunError("ERROR_SECRET_SETTING_PROMPT_BLOCKED", str(preference_prompt["detail"]))
     if mode not in MODES:
         raise RunError("ERROR_RUN_MODE_INVALID", f"Mode must be one of {sorted(MODES)}.")
     if get_conversation(conversation_id, cfg) is None:
@@ -423,6 +426,9 @@ def edit_queued_run(run_id: str, prompt: str, *, expected_version: int, cfg: Set
     text = (prompt or "").strip()
     if not text:
         raise RunError("ERROR_RUN_PROMPT_EMPTY", "Message text is required.")
+    preference_prompt = parse_preference_prompt(text)
+    if preference_prompt["status"] == "PREFERENCE_PROMPT_BLOCKED":
+        raise RunError("ERROR_SECRET_SETTING_PROMPT_BLOCKED", str(preference_prompt["detail"]))
     with _Tx(cfg) as conn:
         run = _load(conn, run_id)
         if run["state"] != "QUEUED":
