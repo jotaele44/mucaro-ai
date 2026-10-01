@@ -180,12 +180,17 @@ async function scenario(browser, base, viewport, contextOptions) {
     selection.addRange(range);
     const selectedText = selection.toString();
     selection.removeAllRanges();
-    return { userSelect: style.userSelect, selectedText };
+    return {
+      userSelect: style.getPropertyValue("user-select"),
+      webkitUserSelect: style.getPropertyValue("-webkit-user-select"),
+      selectedText,
+    };
   });
   check(
     "message text is selectable",
     viewport,
-    selectionContract.userSelect === "text" && selectionContract.selectedText.trim().length > 0,
+    (selectionContract.userSelect === "text" || selectionContract.webkitUserSelect === "text") &&
+      selectionContract.selectedText.trim().length > 0,
     JSON.stringify(selectionContract),
   );
   check(
