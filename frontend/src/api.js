@@ -136,6 +136,9 @@ export const api = {
   models: () => request("/models"),
   offlineManifest: () => request("/offline-manifest"),
   modes: () => request("/work-runs/modes"),
+  preferences: () => request("/preferences"),
+  updatePreferences: (changes, expectedRevision = null) =>
+    request("/preferences", json("PATCH", { changes, expected_revision: expectedRevision })),
 
   conversations: () => request("/conversations"),
   createConversation: (title) => request("/conversations", json("POST", { title })),
