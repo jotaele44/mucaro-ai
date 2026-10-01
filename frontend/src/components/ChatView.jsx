@@ -240,13 +240,32 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
     return result.message_edit;
   }
 
+  async function branchFromRun(runId, prompt, branchMode, options) {
+    if (!conversationId) throw new Error("Conversation is not available.");
+    const idempotencyKey = `branch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const result = await api.branchRun(conversationId, runId, {
+      prompt,
+      mode: branchMode || "ask",
+      options: options || defaultOptions,
+      idempotency_key: idempotencyKey,
+    });
+    await onConversationsChanged();
+    onConversationCreated(result.conversation.conversation_id);
+    announce("Branch created. Original conversation preserved.");
+    return result;
+  }
+
   const empty = !loading && !views.length && !legacyTurns.length;
   return (
     <section className="chat" aria-label="Conversation">
       <header className="chat-header">
         <div className="chat-title">
           <h1>{conversation?.title || "New conversation"}</h1>
-          <p className="muted small">Local workspace · answers cite your sources</p>
+          <p className="muted small">
+            {conversation?.branch_origin
+              ? `Semantic branch · source run ${conversation.branch_origin.source_run_id} · original preserved`
+              : "Local workspace · answers cite your sources"}
+          </p>
         </div>
         {conversation && (
           <ConversationMenu
@@ -299,6 +318,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
             announce={announce}
             messageEdits={messageEdits}
             onEditMessage={saveMessageEdit}
+            onBranchRun={branchFromRun}
           />
         ))}
         {error && (
