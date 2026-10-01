@@ -120,6 +120,35 @@ def test_verify_macos_app_bundle_rejects_missing_bundle(tmp_path):
     assert "launcher_executable" in failed_names
 
 
+
+def test_large_file_gate_allows_only_bounded_native_icon(tmp_path, monkeypatch):
+    monkeypatch.setattr(certify_release, "ROOT", tmp_path)
+    icon = tmp_path / "Mucaro AI.app" / "Contents" / "Resources" / "MucaroAI.icns"
+    icon.parent.mkdir(parents=True)
+    icon.write_bytes(b"x" * 2_500_000)
+    ordinary = tmp_path / "ordinary.bin"
+    ordinary.write_bytes(b"x" * 1_000_001)
+
+    allowed = certify_release.gate_no_large_files([icon])
+    rejected = certify_release.gate_no_large_files([ordinary])
+
+    assert allowed.status == "PASS"
+    assert rejected.status == "FAIL"
+    assert "ordinary.bin:1000001>1000000" in rejected.detail
+
+
+def test_large_file_gate_rejects_oversized_native_icon(tmp_path, monkeypatch):
+    monkeypatch.setattr(certify_release, "ROOT", tmp_path)
+    icon = tmp_path / "Mucaro AI.app" / "Contents" / "Resources" / "MucaroAI.icns"
+    icon.parent.mkdir(parents=True)
+    icon.write_bytes(b"x" * 3_000_001)
+
+    result = certify_release.gate_no_large_files([icon])
+
+    assert result.status == "FAIL"
+    assert "MucaroAI.icns:3000001>3000000" in result.detail
+
+
 def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
     calls = []
 
