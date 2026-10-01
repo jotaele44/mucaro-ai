@@ -171,7 +171,7 @@ def test_branch_context_corruption_fails_closed(tmp_path):
     upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
 
     with pytest.raises(ValueError, match="ERROR_BRANCH_CONTEXT_INVALID"):
-        build_conversation_context(get_conversation(conversation["conversation_id"], cfg), cfg)  # type: ignore[arg-type]
+        build_conversation_context(get_conversation(conversation["conversation_id"], cfg))  # type: ignore[arg-type]
 
 
 def test_branch_endpoint_requires_auth_and_returns_lineage(tmp_path):
