@@ -180,6 +180,11 @@ async function scenario(browser, base, viewport, contextOptions) {
     viewport,
     (await lastRun(page).locator(".user-bubble").getByRole("button", { name: "Branch and retry from this message" }).count()) === 1,
   );
+  check(
+    "assistant message does not duplicate semantic branch action",
+    viewport,
+    (await lastRun(page).locator(".assistant-bubble").getByRole("button", { name: "Branch and retry from this message" }).count()) === 0,
+  );
 
   // Message interaction contract: native selection plus one Copy/Edit surface on both sides.
   const completedRun = lastRun(page);
