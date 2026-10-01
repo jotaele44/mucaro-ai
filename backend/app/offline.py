@@ -13,7 +13,7 @@ from __future__ import annotations
 import importlib.util
 from typing import Any
 
-from .local_tools import resolve_local_tool
+from .local_tools import bundled_only, resolve_local_tool
 from .model_router import list_model_providers
 from .tools import TOOL_REGISTRY
 
@@ -26,6 +26,7 @@ REQUIRES_REMOTE_SERVICE = "REQUIRES_REMOTE_SERVICE"
 BUNDLE_LOCAL_COMPONENT = "BUNDLE_LOCAL_COMPONENT"
 OPTIONAL_LOCAL_ENGINE = "OPTIONAL_LOCAL_ENGINE"
 KEEP_EXPLICIT_NETWORK_GATE = "KEEP_EXPLICIT_NETWORK_GATE"
+PLATFORM_ADAPTER_REQUIRED = "PLATFORM_ADAPTER_REQUIRED"
 
 # Capabilities that are not tools:
 # (id, description, local dependency, dependency kind, independence actions).
@@ -38,6 +39,13 @@ _CORE_CAPABILITIES: tuple[tuple[str, str, str | None, str | None, tuple[str, ...
     ("ocr.pdf_render", "Scanned-PDF page rendering for OCR", "pdftoppm", "binary", (BUNDLE_LOCAL_COMPONENT,)),
     ("memory", "Explicit local memory", None, None, ()),
     ("exports", "Answer-trace, citation and receipt exports", None, None, ()),
+    (
+        "execution.container",
+        "Container-isolated execution for supported desktop development/research workflows",
+        "docker,podman",
+        "binary_any",
+        (PLATFORM_ADAPTER_REQUIRED,),
+    ),
 )
 
 # Local dependencies used by tools that are otherwise classified by network policy.
@@ -70,6 +78,8 @@ def _dependency_present(kind: str | None, dependency: str | None) -> bool:
         return _module_present(dependency)
     if kind == "binary":
         return resolve_local_tool(dependency) is not None
+    if kind == "binary_any":
+        return any(resolve_local_tool(name) is not None for name in dependency.split(","))
     raise ValueError(f"unsupported local dependency kind: {kind}")
 
 
@@ -100,7 +110,9 @@ def _row(
         "local_dependency_present": dependency_ok,
         "runtime_network_required": remote,
         "independence_actions": list(independence_actions),
-        "operator_external_setup_required": bool(dependency and not dependency_ok),
+        "operator_external_setup_required": bool(dependency and not dependency_ok and not bundled_only()),
+        "release_packaging_residue": bool(dependency and not dependency_ok and independence_actions),
+        "resolution_policy": "BUNDLED_ONLY" if bundled_only() else "BUNDLE_THEN_HOST_DEVELOPMENT_FALLBACK",
     }
 
 
