@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
 
 function errorDetail(err) {
@@ -24,6 +24,14 @@ export function DirectoryIntake({ onIngested }) {
 
   useEffect(() => { refreshGrants().catch((err) => setError(err.message)); }, []);
 
+  function changePath(value) {
+    setPath(value);
+    setPermission(null);
+    setPendingGrant(null);
+    setResult(null);
+    setError(null);
+  }
+
   async function checkAccess() {
     if (!path.trim()) return;
     setBusy(true);
@@ -32,33 +40,36 @@ export function DirectoryIntake({ onIngested }) {
     try {
       const payload = await api.checkDirectoryPermission({ path, reason });
       setPermission(payload);
-      if (payload.status === "ERROR_DIRECTORY_PERMISSION_REQUIRED") {
-        setPendingGrant({ path, canonicalRoot: payload.canonical_root, reason });
-      } else {
-        setPendingGrant(null);
-      }
+      setPendingGrant(
+        payload.status === "ERROR_DIRECTORY_PERMISSION_REQUIRED"
+          ? { path, canonicalRoot: payload.canonical_root, reason }
+          : null,
+      );
     } catch (err) {
       const detail = errorDetail(err);
       setPermission(detail);
+      setPendingGrant(null);
       setError(detail.detail || err.message);
     } finally {
       setBusy(false);
     }
   }
 
-  async function grantAccess({ ingestAfterGrant = false } = {}) {
-    const target = pendingGrant?.path || path;
-    if (!target.trim()) return;
+  async function grantAccess() {
+    const target = pendingGrant?.path;
+    if (!target?.trim()) return;
     setBusy(true);
     setError(null);
     try {
       const grant = await api.grantDirectoryPermission({ path: target, reason });
-      setPermission({ status: "PERMISSION_OK", scope: "granted_directory", canonical_root: grant.canonical_root, grant });
+      setPermission({
+        status: "PERMISSION_OK",
+        scope: "granted_directory",
+        canonical_root: grant.canonical_root,
+        grant,
+      });
       setPendingGrant(null);
       await refreshGrants();
-      if (ingestAfterGrant) {
-        await ingestDirectory(target);
-      }
     } catch (err) {
       const detail = errorDetail(err);
       setError(detail.detail || err.message);
@@ -67,21 +78,21 @@ export function DirectoryIntake({ onIngested }) {
     }
   }
 
-  async function ingestDirectory(targetPath = path) {
-    if (!targetPath.trim()) return;
+  async function ingestDirectory() {
+    if (!path.trim() || permission?.status !== "PERMISSION_OK") return;
     setBusy(true);
     setError(null);
     setResult(null);
     try {
-      const payload = await api.ingestPath({ path: targetPath });
+      const payload = await api.ingestPath({ path });
       setResult(payload);
-      setPermission(payload.directory_permission || null);
+      setPermission(payload.directory_permission || permission);
       if (onIngested) await onIngested();
     } catch (err) {
       const detail = errorDetail(err);
       if (detail.status === "ERROR_DIRECTORY_PERMISSION_REQUIRED") {
         setPermission(detail);
-        setPendingGrant({ path: targetPath, canonicalRoot: detail.canonical_root, reason });
+        setPendingGrant({ path, canonicalRoot: detail.canonical_root, reason });
       }
       setError(detail.detail || err.message);
     } finally {
@@ -89,13 +100,33 @@ export function DirectoryIntake({ onIngested }) {
     }
   }
 
-  async function revokeGrant(grant) {
+  function selectGrant(grant) {
+    setPath(grant.canonical_root);
+    setPermission({
+      status: "PERMISSION_OK",
+      scope: "granted_directory",
+      canonical_root: grant.canonical_root,
+      grant,
+    });
+    setPendingGrant(null);
+    setResult(null);
+    setError(null);
+  }
+
+  const currentGrant = useMemo(
+    () => grants.find((grant) => grant.canonical_root === permission?.canonical_root) || null,
+    [grants, permission],
+  );
+
+  async function revokeCurrentGrant() {
+    if (!currentGrant) return;
     setBusy(true);
     setError(null);
     try {
-      await api.revokeDirectoryPermission({ path: grant.canonical_root, reason: "operator revoke" });
+      await api.revokeDirectoryPermission({ path: currentGrant.canonical_root, reason: "operator revoke" });
       await refreshGrants();
-      if (permission?.canonical_root === grant.canonical_root) setPermission(null);
+      setPermission(null);
+      setPendingGrant(null);
     } catch (err) {
       const detail = errorDetail(err);
       setError(detail.detail || err.message);
@@ -105,23 +136,24 @@ export function DirectoryIntake({ onIngested }) {
   }
 
   const permissionStatus = permission?.status || "NOT_CHECKED";
-  const canIngest = path.trim().length > 0 && !busy;
+  const hasPath = path.trim().length > 0;
 
   return (
-    <section className="panel directory-intake">
+    <section className="panel directory-intake" aria-labelledby="directory-access-title">
       <div className="panel-header">
-        <h2>Directory Access</h2>
+        <h2 id="directory-access-title">Directory Access</h2>
         <span className="badge">{permissionStatus}</span>
       </div>
       <p className="hint">
-        Enter a folder path on the computer running the Mucaro backend. Access is granted per folder and can be revoked below.
+        Choose one host folder, verify its permission state, then ingest it. Permission changes live only in this control surface.
       </p>
+
       <div className="path-form">
         <label>
           Folder path on the host computer
           <input
             value={path}
-            onChange={(e) => setPath(e.target.value)}
+            onChange={(event) => changePath(event.target.value)}
             placeholder="~/Documents/mucaro-sources"
             autoCapitalize="off"
             autoCorrect="off"
@@ -130,54 +162,70 @@ export function DirectoryIntake({ onIngested }) {
         </label>
         <label>
           Reason
-          <input value={reason} onChange={(e) => setReason(e.target.value)} />
+          <input value={reason} onChange={(event) => setReason(event.target.value)} />
         </label>
       </div>
-      <div className="button-row">
-        <button onClick={checkAccess} disabled={!canIngest}>Check Access</button>
-        <button onClick={() => ingestDirectory()} disabled={!canIngest}>Ingest Path</button>
+      <div className="button-row directory-actions">
+        <button type="button" className="secondary-button" onClick={checkAccess} disabled={!hasPath || busy}>Check access</button>
+        <button type="button" className="primary-button" onClick={ingestDirectory} disabled={!hasPath || busy || permissionStatus !== "PERMISSION_OK"}>
+          Ingest folder
+        </button>
       </div>
-      {error && <div className="notice error">{error}</div>}
-      {permission && (
-        <div className="permission-status">
-          <dl>
-            <div><dt>Status</dt><dd>{permission.status}</dd></div>
-            <div><dt>Scope</dt><dd>{permission.scope || "none"}</dd></div>
-            <div><dt>Root</dt><dd>{permission.canonical_root || "unresolved"}</dd></div>
-          </dl>
-        </div>
-      )}
-      {pendingGrant && (
-        <div className="permission-confirm">
-          <h3>Confirm Directory Access</h3>
-          <p>Mucaro AI will be allowed to read supported files under this directory for local ingestion.</p>
-          <dl>
-            <div><dt>Requested</dt><dd>{pendingGrant.path}</dd></div>
-            <div><dt>Granted Root</dt><dd>{pendingGrant.canonicalRoot}</dd></div>
-          </dl>
-          <div className="button-row">
-            <button onClick={() => grantAccess({ ingestAfterGrant: false })} disabled={busy}>Grant Access</button>
-            <button onClick={() => grantAccess({ ingestAfterGrant: true })} disabled={busy}>Grant and Ingest</button>
-            <button className="secondary" onClick={() => setPendingGrant(null)} disabled={busy}>Cancel</button>
+
+      {error && <div className="notice error" role="alert">{error}</div>}
+      <div className="permission-control" aria-label="Current directory permission">
+        <dl className="facts">
+          <dt>Path</dt><dd className="mono">{path.trim() || "No folder selected"}</dd>
+          <dt>Status</dt><dd>{permissionStatus}</dd>
+          <dt>Scope</dt><dd>{permission?.scope || "none"}</dd>
+          <dt>Granted root</dt><dd className="mono">{permission?.canonical_root || "unresolved"}</dd>
+        </dl>
+
+        {pendingGrant && (
+          <div className="permission-confirm">
+            <h3>Confirm Directory Access</h3>
+            <p>Mucaro AI will be allowed to read supported files under this directory for local ingestion.</p>
+            <dl className="facts">
+              <dt>Requested</dt><dd className="mono">{pendingGrant.path}</dd>
+              <dt>Granted root</dt><dd className="mono">{pendingGrant.canonicalRoot}</dd>
+            </dl>
+            <div className="button-row">
+              <button type="button" className="secondary-button" onClick={() => { setPendingGrant(null); setPermission(null); }} disabled={busy}>Cancel</button>
+              <button type="button" className="primary-button" onClick={grantAccess} disabled={busy}>Grant access</button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {currentGrant && !pendingGrant && (
+          <div className="button-row">
+            <button type="button" className="danger-button" onClick={revokeCurrentGrant} disabled={busy}>Revoke access</button>
+          </div>
+        )}
+      </div>
+
       {result && (
-        <div className="notice">
-          {result.status} files_ingested={result.files_ingested ?? 1}
+        <div className="notice" role="status">
+          {result.status} · files ingested {result.files_ingested ?? 1}
         </div>
       )}
+
       <div className="grant-list">
         <h3>Granted Directories</h3>
         {grants.length === 0 && <p className="hint">No user-directory grants are active.</p>}
         {grants.map((grant) => (
-          <article key={grant.canonical_root} className="grant-row">
-            <div>
+          <button
+            type="button"
+            key={grant.canonical_root}
+            className="grant-select"
+            aria-pressed={currentGrant?.canonical_root === grant.canonical_root}
+            onClick={() => selectGrant(grant)}
+          >
+            <span>
               <strong>{grant.canonical_root}</strong>
-              <small>{grant.reason || "No reason recorded"} - {grant.granted_by}</small>
-            </div>
-            <button className="secondary" onClick={() => revokeGrant(grant)} disabled={busy}>Revoke</button>
-          </article>
+              <small>{grant.reason || "No reason recorded"} · {grant.granted_by}</small>
+            </span>
+            <span className="muted small">Manage</span>
+          </button>
         ))}
       </div>
     </section>
