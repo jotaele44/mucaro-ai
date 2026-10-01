@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/offline_independence_external_evidence.schema.json",
+  "title": "Mucaro Offline Independence External Evidence 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "evidence"],
+  "properties": {
+    "schema_version": {"const": "mucaro-offline-independence-external-evidence/1.0"},
+    "note": {"type": "string"},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["passed"],
+        "properties": {
+          "passed": {"type": "boolean"},
+          "state": {"type": "string"},
+          "source": {"type": "string"},
+          "required_observation": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}
