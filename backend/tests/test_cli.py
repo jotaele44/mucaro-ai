@@ -1690,6 +1690,9 @@ mucaro = "backend.app.cli:main"
         "scripts/package_desktop.py",
         "scripts/certify_source_artifact.py",
         "scripts/certify_python_distribution.py",
+        "scripts/native_start.sh",
+        "scripts/one_click.sh",
+        "scripts/one_click.py",
     ]:
         (root / path).write_text("# fixture\n", encoding="utf-8")
     (root / "frontend" / "package.json").write_text(
@@ -1763,9 +1766,6 @@ def test_cli_package_macos_app_builds_and_verifies_bundle(tmp_path: Path, capsys
     write_package_fixture(tmp_path)
     (tmp_path / "frontend" / "dist").mkdir(parents=True)
     (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
-    (tmp_path / "scripts").mkdir(exist_ok=True)
-    for name in ("native_start.sh", "one_click.sh", "one_click.py"):
-        (tmp_path / "scripts" / name).write_text("# launcher\n", encoding="utf-8")
     output_dir = tmp_path / "desktop-apps"
 
     assert (
