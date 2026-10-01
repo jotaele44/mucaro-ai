@@ -1094,7 +1094,7 @@ details summary {
   margin: 4px 0 0;
 }
 
-.badge {
+.directory-access-heading .badge {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -1273,6 +1273,10 @@ details summary {
 /* ---------- phone widths (F01) ---------- */
 
 @media (max-width: 760px) {
+  .run-receipt > summary {
+    min-height: 44px;
+  }
+
   .path-form {
     grid-template-columns: 1fr;
   }
