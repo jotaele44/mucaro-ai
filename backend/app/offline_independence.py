@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 OFFLINE_INDEPENDENCE_RECEIPT_SCHEMA = "mucaro-offline-independence-receipt/1.0"
-STATUS_PASS = "OFFLINE_INDEPENDENT"
+STATUS_CERTIFIED = "OFFLINE_INDEPENDENT"
 STATUS_BLOCKED = "OFFLINE_INDEPENDENCE_BLOCKED"
 _SHA40 = re.compile(r"^[0-9a-f]{40}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -191,7 +191,7 @@ def build_offline_independence_receipt(
     all_pass = not failed_evidence and not failed_capabilities
     receipt: dict[str, Any] = {
         "schema_version": OFFLINE_INDEPENDENCE_RECEIPT_SCHEMA,
-        "status": STATUS_PASS if all_pass else STATUS_BLOCKED,
+        "status": STATUS_CERTIFIED if all_pass else STATUS_BLOCKED,
         "platform": platform.strip(),
         "head_sha": head_sha,
         "artifact_sha256": artifact_sha256,
