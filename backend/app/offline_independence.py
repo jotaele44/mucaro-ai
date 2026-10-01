@@ -89,18 +89,21 @@ def build_offline_independence_receipt(
             "ERROR_OFFLINE_INDEPENDENCE_CONTRACT",
             "certification_profile is required",
         )
-    required_capabilities = declared_capabilities
-    if required_capabilities is None:
-        required_capabilities = profile.get("required_offline_capabilities")
+    core_capabilities = profile.get("required_offline_capabilities")
     required_gates = profile.get("required_external_evidence_gates")
     if (
-        not isinstance(required_capabilities, list)
-        or not required_capabilities
-        or not all(isinstance(value, str) and value for value in required_capabilities)
+        not isinstance(core_capabilities, list)
+        or not core_capabilities
+        or not all(isinstance(value, str) and value for value in core_capabilities)
     ):
         raise OfflineIndependenceError(
             "ERROR_OFFLINE_INDEPENDENCE_CONTRACT",
             "required_offline_capabilities must be a non-empty string list",
+        )
+    if len(core_capabilities) != len(set(core_capabilities)):
+        raise OfflineIndependenceError(
+            "ERROR_OFFLINE_INDEPENDENCE_CONTRACT",
+            "required_offline_capabilities must be unique",
         )
     if (
         not isinstance(required_gates, list)
@@ -111,6 +114,20 @@ def build_offline_independence_receipt(
             "ERROR_OFFLINE_INDEPENDENCE_CONTRACT",
             "required_external_evidence_gates must be a non-empty string list",
         )
+    if len(required_gates) != len(set(required_gates)):
+        raise OfflineIndependenceError(
+            "ERROR_OFFLINE_INDEPENDENCE_CONTRACT",
+            "required_external_evidence_gates must be unique",
+        )
+
+    required_capabilities = list(core_capabilities)
+    if declared_capabilities is not None:
+        if not all(isinstance(value, str) and value for value in declared_capabilities):
+            raise OfflineIndependenceError(
+                "ERROR_OFFLINE_INDEPENDENCE_SCOPE",
+                "declared capabilities must be non-empty strings",
+            )
+        required_capabilities.extend(value for value in declared_capabilities if value not in required_capabilities)
 
     capability_rows = offline_manifest.get("capabilities")
     if not isinstance(capability_rows, list) or offline_manifest.get("arithmetic_closes") is not True:
