@@ -280,6 +280,47 @@ def record_contradiction(checkpoint_id: str, *, contradiction_id: str, claims: l
     return _mutate(checkpoint_id, change, cfg)
 
 
+
+PROVIDER_ATTEMPT_STARTED = "STARTED"
+PROVIDER_ATTEMPT_ACCEPTED = "ACCEPTED"
+
+
+def record_provider_attempt(
+    checkpoint_id: str,
+    *,
+    attempt_id: str,
+    record: dict[str, Any],
+    claim: bool = False,
+    reclaim_started: bool = False,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Atomically write one provider operation attempt under ``metadata.provider_attempts``.
+
+    An ACCEPTED attempt is final and is never overwritten, so an accepted operation is never run again.
+    ``claim=True`` marks the attempt as started; it refuses a terminal checkpoint and, unless
+    ``reclaim_started``, an attempt another executor already started, so two executors cannot both run it."""
+
+    def change(current: dict[str, Any]) -> dict[str, Any]:
+        metadata = dict(current.get("metadata") or {})
+        attempts = dict(metadata.get("provider_attempts") or {})
+        existing = attempts.get(attempt_id) or {}
+        if existing.get("state") == PROVIDER_ATTEMPT_ACCEPTED:
+            raise CheckpointError("ERROR_CHECKPOINT_ATTEMPT_ACCEPTED", attempt_id)
+        entry = dict(record)
+        if claim:
+            if current["state"] in TERMINAL_STATES:
+                raise CheckpointError("ERROR_CHECKPOINT_TERMINAL", "terminal checkpoint cannot start a provider attempt")
+            if existing.get("state") == PROVIDER_ATTEMPT_STARTED and not reclaim_started:
+                raise CheckpointError("ERROR_CHECKPOINT_ATTEMPT_IN_FLIGHT", f"{attempt_id} started at {existing.get('started_at')} with no recorded outcome")
+            entry["state"] = PROVIDER_ATTEMPT_STARTED
+            entry["attempts"] = int(existing.get("attempts", 0)) + 1
+        attempts[attempt_id] = entry
+        metadata["provider_attempts"] = attempts
+        current["metadata"] = metadata
+        return current
+
+    return _mutate(checkpoint_id, change, cfg)
+
 def adjudicate_contradiction(checkpoint_id: str, *, contradiction_id: str, resolution: str, rationale: str, adjudicated_by: str, cfg: Settings = settings) -> dict[str, Any]:
     """Close a contradiction without erasing it (invariant 7): claims stay, resolution is appended."""
     if not resolution.strip() or not rationale.strip() or not adjudicated_by.strip():
