@@ -495,12 +495,6 @@ button:disabled {
   border-radius: 18px 18px 18px 4px;
 }
 
-.assistant-block {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
 .mode-tag {
   display: inline-block;
   margin-top: 4px;
