@@ -12,7 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.app.offline_independence import (  # noqa: E402
-    STATUS_PASS,
+    STATUS_CERTIFIED,
     build_offline_independence_receipt,
     load_runtime_independence_contract,
     write_offline_independence_receipt,
@@ -113,7 +113,7 @@ def main() -> int:
             sort_keys=True,
         )
     )
-    return 0 if receipt["status"] == STATUS_PASS else 2
+    return 0 if receipt["status"] == STATUS_CERTIFIED else 2
 
 
 if __name__ == "__main__":
