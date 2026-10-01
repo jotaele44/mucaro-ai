@@ -67,7 +67,7 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
   );
 }
 
-export function ChatView({ conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions }) {
+export function ChatView({ conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, onPreferencesChanged, announce, modes, defaultOptions }) {
   const [conversation, setConversation] = useState(null);
   const [runs, setRuns] = useState(new Map());
   const [summaries, setSummaries] = useState([]);
@@ -257,7 +257,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
         )}
       </header>
 
-      <div className="feed" ref={feedRef} onScroll={onScroll}>
+      <div className="feed" ref={feedRef} onScroll={onScroll} role="log" aria-label="Conversation history" aria-live="polite" aria-relevant="additions">
         {loading && <p className="muted center">Loading conversation…</p>}
         {empty && (
           <div className="empty-state">
