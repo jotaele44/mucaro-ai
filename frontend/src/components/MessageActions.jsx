@@ -23,8 +23,15 @@ export function MessageActions({ text, announce, onEdit, allowReadAloud = false 
 
   async function copy() {
     try {
-      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-      else fallbackCopy(text);
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          fallbackCopy(text);
+        }
+      } else {
+        fallbackCopy(text);
+      }
       announce?.("Copied to clipboard.");
     } catch {
       announce?.("Copy failed: clipboard access was not allowed.");
