@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 
 import pytest
@@ -8,6 +9,7 @@ from fastapi.testclient import TestClient
 from backend.app import work_runs
 from backend.app.conversations import (
     build_conversation_context,
+    create_branch_conversation,
     create_conversation,
     edit_conversation_message,
     get_conversation,
@@ -110,6 +112,30 @@ def test_semantic_branch_preserves_source_and_uses_only_pre_prompt_context(tmp_p
     assert get_conversation(conversation_id, cfg) == source_before
     assert source_before["turns"][2]["content"] == "Second canonical question"
     assert source_before["message_edits"][f"run:{second['run_id']}:user"]["content"] == "Second visible display revision"
+
+
+def test_concurrent_branch_creation_converges_on_one_identity(tmp_path):
+    cfg = prepared_cfg(tmp_path)
+    source_id = create_conversation("Concurrent source", cfg)["conversation_id"]
+
+    def create():
+        return create_branch_conversation(
+            source_id,
+            "wrun_concurrent_source",
+            "semantic-branch-concurrent",
+            "a" * 64,
+            [],
+            "turn_concurrent_source",
+            0,
+            cfg,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: create(), range(2)))
+
+    ids = {conversation["conversation_id"] for conversation, _created in results}
+    assert len(ids) == 1
+    assert sorted(created for _conversation, created in results) == [False, True]
 
 
 def test_semantic_branch_is_idempotent_and_conflicting_key_fails_closed(tmp_path):
