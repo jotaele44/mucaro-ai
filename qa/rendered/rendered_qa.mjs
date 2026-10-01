@@ -360,11 +360,16 @@ async function scenario(browser, base, viewport, contextOptions) {
 
   // Three-region regression: rail navigation must not destroy sibling tab state.
   const tablist = page.getByRole("toolbar", { name: "Open workspace tabs" });
+  const navShell = page.locator("#navigation-shell");
+  const mobileShellInactive = viewport !== "iphone" || await navShell.evaluate((node) => node.inert === true);
   check("primary rail and contextual sidebar are distinct regions", viewport,
-    (await page.getByRole("navigation", { name: "Primary" }).count()) === (viewport === "iphone" ? 0 : 1) &&
     (await page.locator(".primary-rail").count()) === 1 &&
     (await page.locator(".context-sidebar").count()) === 1 &&
-    (await page.getByRole("complementary", { name: "Settings navigation" }).count()) === (viewport === "iphone" ? 0 : 1));
+    mobileShellInactive &&
+    (viewport === "iphone" || (
+      (await page.getByRole("navigation", { name: "Primary" }).count()) === 1 &&
+      (await page.getByRole("complementary", { name: "Settings navigation" }).count()) === 1
+    )));
   check("visited workspaces have persistent accessible tabs", viewport,
     (await tablist.locator(".workspace-tab").count()) >= 5 &&
     (await tablist.getByRole("button", { name: "Settings", exact: true }).getAttribute("aria-pressed")) === "true");
