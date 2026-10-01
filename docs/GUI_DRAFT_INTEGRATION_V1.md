@@ -31,7 +31,7 @@ These route *names* support only a set comparison; they do not establish functio
 
 ## Integrated scope
 
-- Adapted teal/ink day and night design tokens without importing hosted fonts or the prototype's 46 new direct dependencies. Adjusted its normal-text muted token to reach WCAG AA contrast: `#647477` versus light surface `#f7f9f8`, computed ratio about 4.61:1 (the draft token would be about 4.41:1).
+- Adapted teal/ink day and night design tokens without importing hosted fonts or the prototype's 46 new direct dependencies. Adjusted light-theme contrast tokens after rendered Axe evidence: muted `#556568` is at least ~5.01:1 across the light surface set (`#e5eae9`, `#edf1f1`, `#f7f9f8`); accent `#067276` is ~4.63:1 on `#cceeed`; warning `#89580c` is ~5.49:1 on `#fdf3dc`. These are computed token-pair checks; rendered Axe remains the binding UI gate.
 - Bundled the locally derived owl WebP for offline brand/logo, primary rail, favicon and pet static fallback; no assumption that missing 40-frame sprite atlas exists.
 - Preserved PR #148's canonical three-region nav and standalone local-first dependency posture. One explicit external three-line context-sidebar handle; rail icons persist when context is collapsed; mobile overlay remains separate.
 - Added validated/persisted local UI preferences for explicit Auto/Light/Dark theme and bounded EN/ES navigation + Settings localization with bottom-rail active-language flag. Workspace/backend content not yet translated is explicitly not claimed bilingual.
