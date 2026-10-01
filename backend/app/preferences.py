@@ -313,6 +313,7 @@ def update_preferences(
             return {
                 "status": "PREFERENCES_UNCHANGED",
                 "revision": revision,
+                "updated_at": current.get("updated_at"),
                 "changed": {},
                 "values": before,
                 "values_sha256": canonical_sha256(before),
@@ -337,6 +338,7 @@ def update_preferences(
         return {
             "status": "PREFERENCES_UPDATED",
             "revision": revision + 1,
+            "updated_at": now,
             "changed": changed,
             "values": after,
             "values_sha256": receipt["new_values_sha256"],
@@ -345,6 +347,7 @@ def update_preferences(
 
     result = update_json(_path(cfg), _initial(cfg), mutate)
     return {
+        "schema_version": PREFERENCES_SCHEMA_VERSION,
         **result,
         "definitions": preference_definitions(),
         "restricted_prompt_settings": list(RESTRICTED_PROMPT_SETTINGS),
