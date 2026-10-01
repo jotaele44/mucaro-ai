@@ -89,7 +89,8 @@ def test_package_desktop_self_test():
 def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     (tmp_path / "scripts").mkdir()
     (tmp_path / "frontend" / "dist").mkdir(parents=True)
-    (tmp_path / "scripts" / "launch_app.py").write_text("# launcher\n", encoding="utf-8")
+    for name in ("native_start.sh", "one_click.sh", "one_click.py"):
+        (tmp_path / "scripts" / name).write_text("# launcher\n", encoding="utf-8")
     (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n', encoding="utf-8")
 
@@ -102,7 +103,7 @@ def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     assert app_path.is_dir()
     assert executable.exists()
     assert executable.stat().st_mode & 0o111
-    assert "scripts/launch_app.py" in executable.read_text(encoding="utf-8")
+    assert "scripts/native_start.sh" in executable.read_text(encoding="utf-8")
     assert '"$@"' in executable.read_text(encoding="utf-8")
     assert json.loads(receipt.read_text(encoding="utf-8"))["scope"] == "source_bound_local_macos_app_wrapper"
 
@@ -734,3 +735,24 @@ def test_release_check_pythonpath_uses_platform_separator(tmp_path, monkeypatch)
         release_check.main()
 
     assert calls[0]["PYTHONPATH"] == f"{tmp_path};{tmp_path / 'backend'}"
+
+
+def test_native_mode_never_falls_back_to_a_browser(monkeypatch, capsys):
+    opened = []
+    dialogs = []
+    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda **_: None)
+    monkeypatch.setattr(launch_app, "port_open", lambda port: True)
+    monkeypatch.setattr(launch_app, "health_ok", lambda port: True)
+    monkeypatch.setattr(launch_app.webbrowser, "open", lambda url: opened.append(url))
+    monkeypatch.setattr(launch_app.native_window, "show_dialog", lambda message: dialogs.append(message))
+
+    def no_window(*args, **kwargs):
+        raise ImportError("No module named 'webview'")
+
+    monkeypatch.setattr(launch_app.native_window, "run_window", no_window)
+
+    assert launch_app.main(["--native"]) == 10
+
+    assert opened == []
+    assert len(dialogs) == 1 and "could not start" in dialogs[0]
+    assert "ERROR_NATIVE_WINDOW_UNAVAILABLE" in capsys.readouterr().err
