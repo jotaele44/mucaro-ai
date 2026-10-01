@@ -449,7 +449,12 @@ def parse_preference_prompt(prompt: str) -> dict[str, Any]:
         if match:
             verb = match.group(1)
             value = verb in {"on", "enable"}
-            return {"status": "PREFERENCE_PROMPT_MATCH", "changes": {key: value}, "parser": "boolean_phrase_v1"}
+            changes = {key: value}
+            if key == "allow_live" and value:
+                changes["require_offline"] = False
+            elif key == "require_offline" and value:
+                changes["allow_live"] = False
+            return {"status": "PREFERENCE_PROMPT_MATCH", "changes": changes, "parser": "boolean_phrase_v1"}
 
     special = [
         (r"^(?:work|stay|run) offline only$", {"require_offline": True, "allow_live": False}),
