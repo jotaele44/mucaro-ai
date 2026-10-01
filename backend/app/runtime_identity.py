@@ -71,15 +71,37 @@ def _packed_ref(git_dir: Path, ref_name: str) -> str | None:
     return None
 
 
+def _bound_file_head(project_root: Path) -> str | None:
+    candidates = (
+        ("mucaro_build_identity.json", "source_head"),
+        ("portable-manifest.json", "head_sha"),
+    )
+    for filename, key in candidates:
+        path = project_root / filename
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, dict):
+            bound = _normalized_sha(payload.get(key))
+            if bound is not None:
+                return bound
+    return None
+
+
 def current_git_head(project_root: Path) -> str | None:
     """Resolve source identity without invoking a host Git executable.
 
-    Packaged builds may bind MUCARO_SOURCE_HEAD. Source checkouts are read
-    directly from .git metadata, including worktree gitdir pointers and packed
-    refs. Missing identity remains explicit as None.
+    Packaged builds may bind MUCARO_SOURCE_HEAD or ship a build/portable
+    manifest containing the source SHA. Source checkouts are read directly
+    from .git metadata, including worktree gitdir pointers and packed refs.
+    Missing identity remains explicit as None.
     """
 
     bound = _normalized_sha(os.getenv("MUCARO_SOURCE_HEAD"))
+    if bound is not None:
+        return bound
+    bound = _bound_file_head(project_root)
     if bound is not None:
         return bound
 
