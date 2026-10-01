@@ -15,7 +15,7 @@ function fallbackCopy(text) {
 }
 
 // One canonical per-message action surface. Copy/edit never mutate the canonical transcript.
-export function MessageActions({ text, announce, onEdit, allowReadAloud = false }) {
+export function MessageActions({ text, announce, onEdit, onBranch, allowReadAloud = false }) {
   const [speaking, setSpeaking] = useState(false);
   const canSpeak = allowReadAloud && typeof window !== "undefined" && "speechSynthesis" in window;
 
@@ -60,6 +60,11 @@ export function MessageActions({ text, announce, onEdit, allowReadAloud = false 
       <button type="button" className="ghost-button" onClick={onEdit} aria-label="Edit message">
         Edit
       </button>
+      {onBranch && (
+        <button type="button" className="ghost-button" onClick={onBranch} aria-label="Branch and retry from this message">
+          Branch & retry
+        </button>
+      )}
       {canSpeak && (
         <button type="button" className="ghost-button" onClick={toggleSpeech} aria-pressed={speaking} aria-label={speaking ? "Stop reading aloud" : "Read message aloud"}>
           {speaking ? "Stop reading" : "Read aloud"}
@@ -74,6 +79,7 @@ export function EditableMessage({
   revision = 0,
   edited = false,
   onSave,
+  onBranch,
   announce,
   allowReadAloud = false,
   children,
@@ -173,6 +179,7 @@ export function EditableMessage({
                 setError("");
                 setEditing(true);
               }}
+              onBranch={onBranch}
               allowReadAloud={allowReadAloud}
             />
           </div>
