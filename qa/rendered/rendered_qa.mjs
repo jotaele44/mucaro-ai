@@ -393,7 +393,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   drawerStates.push(await drawerClosed());
 
   if (viewport === "iphone") {
-    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
+    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 6 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
     // iOS zooms into fields under 16px on focus; touch targets need 44px (Apple HIG).
     const touch = await page.evaluate(() => {
       const visible = (el) => {
