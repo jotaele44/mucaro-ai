@@ -5,7 +5,7 @@ import shlex
 from typing import Any
 
 from .config import Settings, settings
-from .model_router import model_provider_names
+from .model_router import get_model_provider_spec, model_provider_names
 from .utils import canonical_sha256, read_json, update_json, utc_now
 
 PREFERENCES_SCHEMA_VERSION = "mucaro-user-preferences/1.0"
@@ -283,6 +283,9 @@ def update_preferences(
         unknown = sorted(key for key in changes if key not in PREFERENCE_DEFINITIONS)
         raise PreferenceError("ERROR_PREFERENCE_UNKNOWN", f"Unknown preference(s): {', '.join(unknown)}")
     normalized_changes = {key: _validate_value(key, value) for key, value in changes.items()}
+    if "model_provider" in normalized_changes and "model_name" not in normalized_changes:
+        provider = str(normalized_changes["model_provider"])
+        normalized_changes["model_name"] = get_model_provider_spec(provider).default_model
     cfg.ensure_dirs()
 
     def mutate(state: Any) -> dict[str, Any]:
