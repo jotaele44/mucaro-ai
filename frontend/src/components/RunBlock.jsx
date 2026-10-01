@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { api } from "../api.js";
-import { STATE_LABEL, toolSummaryLabel } from "../feed.js";
+import { STATE_LABEL, TERMINAL_STATES, toolSummaryLabel } from "../feed.js";
 import { EditableMessage } from "./MessageActions.jsx";
 import { Sheet } from "./Sheet.jsx";
 
@@ -184,23 +184,118 @@ function Citations({ citations, onOpenCitation }) {
   );
 }
 
-export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdits = {}, onEditMessage }) {
+function BranchRetrySheet({ view, initialPrompt, onCreate, onClose }) {
+  const [prompt, setPrompt] = useState(initialPrompt);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!prompt.trim() || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await onCreate(prompt);
+      onClose();
+    } catch (err) {
+      setError(err?.message || "Branch could not be created.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet title="Branch & retry" onClose={onClose} side="center">
+      <p>
+        This creates a new conversation from the canonical context before this prompt. The source message,
+        answer, citations, and any display edits remain unchanged.
+      </p>
+      <form className="branch-retry-form" onSubmit={submit}>
+        <label className="field">
+          <span>Revised prompt</span>
+          <textarea
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            rows={Math.min(12, Math.max(4, prompt.split("\n").length + 1))}
+            autoFocus
+            disabled={busy}
+          />
+        </label>
+        <dl className="facts">
+          <dt>Source run</dt><dd className="mono">{view.runId}</dd>
+          <dt>Mode</dt><dd>{view.mode}</dd>
+          <dt>Context</dt><dd>Canonical turns before this prompt only</dd>
+        </dl>
+        <details>
+          <summary>Canonical source prompt</summary>
+          <p className="evidence-text">{view.prompt}</p>
+        </details>
+        {error && <p className="error-card" role="alert">{error}</p>}
+        <div className="button-row">
+          <button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Cancel</button>
+          <button type="submit" className="primary-button" disabled={busy || !prompt.trim()}>
+            {busy ? "Creating…" : "Create branch"}
+          </button>
+        </div>
+      </form>
+    </Sheet>
+  );
+}
+
+function PlanBody({ view, planSteps }) {
+  if (!planSteps.length && !view.route) return null;
+  return (
+    <div className="run-receipt-section">
+      <strong>Plan</strong>
+      {planSteps.length > 0 && (
+        <ol>
+          {planSteps.map((step, index) => (
+            <li key={index}>
+              {step.step}
+              {step.tool && step.requires_approval && <span className="muted small"> — needs approval</span>}
+            </li>
+          ))}
+        </ol>
+      )}
+      {view.route && (
+        <p className="muted small">
+          Model: {view.route.selected_provider || "none"} ({view.route.selection_reason || view.route.status})
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdits = {}, onEditMessage, onBranchRun }) {
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [branchOpen, setBranchOpen] = useState(false);
   const toolLabel = toolSummaryLabel(view.calls);
   const planSteps = view.plan?.steps || [];
+  const terminal = TERMINAL_STATES.has(view.state);
   const userMessageKey = `run:${view.runId}:user`;
   const assistantMessageKey = `run:${view.runId}:assistant`;
   const userEdit = messageEdits[userMessageKey];
   const assistantEdit = messageEdits[assistantMessageKey];
+  const userText = String(userEdit?.content ?? view.prompt ?? "");
+  const outcomeText = view.final && view.final.outcome !== "ANSWERED"
+    ? OUTCOME_TEXT[view.final.outcome] || `Outcome: ${view.final.outcome}`
+    : "";
+  const receiptBits = [
+    STATE_LABEL[view.state] || view.state,
+    planSteps.length ? `${planSteps.length} plan step${planSteps.length === 1 ? "" : "s"}` : "",
+    toolLabel,
+    !view.answer ? outcomeText : "",
+  ].filter(Boolean);
 
   return (
     <article className="run" aria-busy={view.state === "RUNNING"} data-state={view.state}>
       <div className="bubble user-bubble">
         <EditableMessage
-          text={String(userEdit?.content ?? view.prompt ?? "")}
+          text={userText}
           revision={Number(userEdit?.revision || 0)}
           edited={Boolean(userEdit)}
           onSave={(content, revision) => onEditMessage(userMessageKey, content, revision)}
+          onBranch={view.state === "COMPLETED" && onBranchRun ? () => setBranchOpen(true) : undefined}
           announce={announce}
         >
           {view.mode !== "ask" && <span className="mode-tag">{view.mode}</span>}
@@ -208,30 +303,20 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
       </div>
 
       <div className="assistant-block">
-        <div className="run-status">
-          <span className={`status-chip status-${view.state.toLowerCase()}`}>{STATE_LABEL[view.state] || view.state}</span>
-          {view.state === "RUNNING" && <span className="spinner" aria-hidden="true" />}
-          {(planSteps.length > 0 || view.route) && (
-            <details className="plan-details">
-              <summary>Plan · {planSteps.length} step{planSteps.length === 1 ? "" : "s"}</summary>
-              <ol>
-                {planSteps.map((step, index) => (
-                  <li key={index}>
-                    {step.step}
-                    {step.tool && step.requires_approval && <span className="muted small"> — needs approval</span>}
-                  </li>
-                ))}
-              </ol>
-              {view.route && (
-                <p className="muted small">
-                  Model: {view.route.selected_provider || "none"} ({view.route.selection_reason || view.route.status})
-                </p>
-              )}
-            </details>
-          )}
-        </div>
+        {!terminal && (
+          <div className="run-status">
+            <span className={`status-chip status-${view.state.toLowerCase()}`}>{STATE_LABEL[view.state] || view.state}</span>
+            {view.state === "RUNNING" && <span className="spinner" aria-hidden="true" />}
+            {(planSteps.length > 0 || view.route) && (
+              <details className="plan-details">
+                <summary>Plan · {planSteps.length} step{planSteps.length === 1 ? "" : "s"}</summary>
+                <PlanBody view={view} planSteps={planSteps} />
+              </details>
+            )}
+          </div>
+        )}
 
-        {toolLabel && (
+        {!terminal && toolLabel && (
           <button type="button" className="tool-summary" onClick={() => setToolsOpen(true)} aria-haspopup="dialog">
             {toolLabel}
           </button>
@@ -242,7 +327,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
         ))}
 
         {view.pendingQuestion && <QuestionCard question={view.pendingQuestion} onAnswered={onChanged} announce={announce} />}
-        {view.question && view.questionResolution && (
+        {!terminal && view.question && view.questionResolution && (
           <p className="receipt">
             <span className="muted">{view.question.question}</span>
             <br />
@@ -285,14 +370,56 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
         {view.interrupted && (
           <p className="notice">
             Stopped ({view.interrupted.reason}).
-            {view.interrupted.in_flight_at_stop?.length > 0 && " An action was already running when you stopped; its result is recorded in Tool activity."}
+            {view.interrupted.in_flight_at_stop?.length > 0 && " An action was already running when you stopped; its result is recorded in the run receipt."}
           </p>
         )}
-        {view.final && !view.answer && view.final.outcome !== "ANSWERED" && (
-          <p className="outcome">{OUTCOME_TEXT[view.final.outcome] || `Outcome: ${view.final.outcome}`}</p>
+
+        {terminal && (
+          <details className="run-receipt">
+            <summary>{receiptBits.join(" · ")}</summary>
+            <div className="run-receipt-body">
+              <div className="run-status">
+                <span className={`status-chip status-${view.state.toLowerCase()}`}>{STATE_LABEL[view.state] || view.state}</span>
+                {view.lineage?.source_run_id && <span className="muted small">branched from {view.lineage.source_run_id}</span>}
+              </div>
+              <PlanBody view={view} planSteps={planSteps} />
+              {toolLabel && (
+                <button type="button" className="tool-summary" onClick={() => setToolsOpen(true)} aria-haspopup="dialog">
+                  {toolLabel}
+                </button>
+              )}
+              {view.question && view.questionResolution && (
+                <p className="receipt">
+                  <span className="muted">{view.question.question}</span>
+                  <br />
+                  You chose:{" "}
+                  <strong>
+                    {view.questionResolution.freeform_text ||
+                      view.question.options.find((option) => option.option_id === view.questionResolution.option_id)?.label ||
+                      view.questionResolution.status}
+                  </strong>
+                </p>
+              )}
+              {view.lineage?.source_run_id && (
+                <dl className="facts branch-lineage">
+                  <dt>Branch source</dt><dd className="mono">{view.lineage.source_run_id}</dd>
+                  <dt>Original preserved</dt><dd>{view.lineage.original_preserved ? "Yes" : "Unknown"}</dd>
+                </dl>
+              )}
+              {!view.answer && outcomeText && <p className="outcome">{outcomeText}</p>}
+            </div>
+          </details>
         )}
       </div>
       {toolsOpen && <ToolDrawer calls={view.calls} onClose={() => setToolsOpen(false)} />}
+      {branchOpen && (
+        <BranchRetrySheet
+          view={view}
+          initialPrompt={userText}
+          onCreate={(prompt) => onBranchRun(view.runId, prompt, view.mode, view.options)}
+          onClose={() => setBranchOpen(false)}
+        />
+      )}
     </article>
   );
 }
