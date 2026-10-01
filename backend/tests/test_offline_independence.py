@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from backend.app.offline_independence import (
     OFFLINE_INDEPENDENCE_RECEIPT_SCHEMA,
@@ -14,6 +15,7 @@ from backend.app.offline_independence import (
 )
 
 
+ROOT = Path(__file__).resolve().parents[2]
 HEAD = "a" * 40
 ARTIFACT = "b" * 64
 REQUIRED_CAPABILITIES = [
@@ -263,6 +265,29 @@ def test_invalid_manifest_or_identity_is_rejected() -> None:
             artifact_sha256=ARTIFACT,
         )
     assert exc.value.status == "ERROR_OFFLINE_INDEPENDENCE_HEAD"
+
+
+def test_external_evidence_template_and_receipt_match_schemas() -> None:
+    evidence_schema = json.loads(
+        (ROOT / "schemas" / "offline_independence_external_evidence.schema.json").read_text(encoding="utf-8")
+    )
+    receipt_schema = json.loads(
+        (ROOT / "schemas" / "offline_independence_receipt.schema.json").read_text(encoding="utf-8")
+    )
+    template = json.loads(
+        (ROOT / "_architecture" / "offline_independence_evidence_template_v1.json").read_text(encoding="utf-8")
+    )
+    Draft202012Validator(evidence_schema).validate(template)
+
+    receipt = build_offline_independence_receipt(
+        contract=contract(),
+        offline_manifest=manifest(),
+        evidence=evidence(),
+        platform="macos-arm64",
+        head_sha=HEAD,
+        artifact_sha256=ARTIFACT,
+    )
+    Draft202012Validator(receipt_schema).validate(receipt)
 
 
 def test_receipt_hash_is_deterministic() -> None:
