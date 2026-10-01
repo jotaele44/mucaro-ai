@@ -38,6 +38,7 @@ from .parser import ParseError
 from .models import (
     ApprovalRequest,
     AskRequest,
+    BranchRetryRequest,
     ConversationCreateRequest,
     ConversationUpdateRequest,
     DirectoryPermissionRequest,
@@ -102,6 +103,7 @@ from .validation import validate_project_json
 from .work_runs import (
     RunError,
     available_modes,
+    branch_run,
     edit_queued_run,
     get_run,
     list_run_events,
@@ -232,8 +234,16 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             resume_waiting_run(run_id, cfg)
 
     def run_error(exc: RunError) -> HTTPException:
-        not_found = exc.status in {"ERROR_RUN_NOT_FOUND", "ERROR_CONVERSATION_NOT_FOUND"}
-        conflict = exc.status in {"ERROR_RUN_VERSION_CONFLICT", "ERROR_RUN_NOT_QUEUED", "ERROR_RUN_ALREADY_FINISHED"}
+        not_found = exc.status in {"ERROR_RUN_NOT_FOUND", "ERROR_CONVERSATION_NOT_FOUND", "ERROR_BRANCH_SOURCE_NOT_FOUND"}
+        conflict = exc.status in {
+            "ERROR_RUN_VERSION_CONFLICT",
+            "ERROR_RUN_NOT_QUEUED",
+            "ERROR_RUN_ALREADY_FINISHED",
+            "ERROR_BRANCH_SOURCE_NOT_COMPLETED",
+            "ERROR_BRANCH_SOURCE_TURN_UNRESOLVED",
+            "ERROR_BRANCH_IDEMPOTENCY_CONFLICT",
+            "ERROR_MESSAGE_EDITS_INVALID",
+        }
         return api_error(exc.status, exc.detail, status_code=404 if not_found else 409 if conflict else 400)
 
     def require_auth(
@@ -600,6 +610,26 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             missing = exc.status == "ERROR_CONVERSATION_NOT_FOUND"
             raise api_error(exc.status, exc.detail, status_code=404 if missing else 409 if conflict else 400) from exc
         return {"status": "MESSAGE_EDITED", "message_edit": edit}
+
+    @app.post("/conversations/{conversation_id}/runs/{run_id}/branch")
+    def branch_conversation_run(
+        conversation_id: str,
+        run_id: str,
+        req: BranchRetryRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return branch_run(
+                conversation_id,
+                run_id,
+                req.prompt,
+                mode=req.mode,
+                options=req.options.model_dump(),
+                idempotency_key=req.idempotency_key,
+                cfg=cfg,
+            )
+        except RunError as exc:
+            raise run_error(exc) from exc
 
     @app.get("/conversations/{conversation_id}/runs")
     def conversation_runs(conversation_id: str, limit: int = 50) -> dict:
