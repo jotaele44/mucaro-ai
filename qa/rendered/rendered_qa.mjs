@@ -338,7 +338,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Memory", exact: true }).click();
   await page.getByLabel("Remember").fill("Prefer tables for comparisons");
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await page.getByText("Prefer tables for comparisons").waitFor();
+  await page.locator("#memory-list").getByText("Prefer tables for comparisons", { exact: true }).first().waitFor();
   check("memory add is visible with provenance", viewport, (await page.getByText(/preference · from api/).count()) >= 1);
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "14-memory");
@@ -373,7 +373,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   check("source selection survives switching workspace tabs", viewport,
     (await page.locator(".source-row.selected").count()) === 1);
   await tablist.getByRole("button", { name: "Memory", exact: true }).click();
-  await page.getByText("Prefer tables for comparisons").waitFor();
+  await page.locator("#memory-list").getByText("Prefer tables for comparisons", { exact: true }).first().waitFor();
   check("memory workspace survives switching tabs", viewport, true);
   await tablist.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByText("What works offline").waitFor();
