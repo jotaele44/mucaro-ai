@@ -485,7 +485,8 @@ async function scenario(browser, base, viewport, contextOptions) {
     (await conversationTitles.filter({ hasText: `QA ${viewport} conversation` }).count()) >= 2,
   );
   if (viewport === "iphone") {
-    await page.getByRole("button", { name: "Open navigation" }).click().catch(() => {});
+    await page.locator(".nav-scrim").click();
+    await page.waitForFunction(() => document.querySelector(".sidebar").getBoundingClientRect().right <= 0, null, { timeout: 5000 });
   }
   await shot(page, viewport, "16b-semantic-branch");
 
