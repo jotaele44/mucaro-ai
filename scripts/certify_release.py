@@ -43,6 +43,7 @@ GENERATED_PATH_PARTS = {
     ".serena",
 }
 GENERATED_SUFFIXES = {".sqlite", ".sqlite3", ".db", ".pyc"}
+LARGE_FILE_ALLOWLIST = {"Mucaro AI.app/Contents/Resources/MucaroAI.icns": 3_000_000}
 
 
 @dataclass
@@ -89,8 +90,15 @@ def gate_no_secret_patterns(files: list[Path]) -> Gate:
 
 
 def gate_no_large_files(files: list[Path], *, max_bytes: int = 1_000_000) -> Gate:
-    hits = [f"{path.relative_to(ROOT)}:{path.stat().st_size}" for path in files if path.stat().st_size > max_bytes]
-    return Gate("large_file_scan", "PASS" if not hits else "FAIL", ",".join(hits) or f"<= {max_bytes} bytes")
+    hits = []
+    for path in files:
+        rel = path.relative_to(ROOT).as_posix()
+        size = path.stat().st_size
+        limit = LARGE_FILE_ALLOWLIST.get(rel, max_bytes)
+        if size > limit:
+            hits.append(f"{rel}:{size}>{limit}")
+    detail = ",".join(hits) or f"default<={max_bytes} bytes; bounded_allowlist={LARGE_FILE_ALLOWLIST}"
+    return Gate("large_file_scan", "PASS" if not hits else "FAIL", detail)
 
 
 def gate_no_generated_tracked(files: list[Path]) -> Gate:
