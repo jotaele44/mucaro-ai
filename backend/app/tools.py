@@ -6,11 +6,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from .coding_container import CodingContainerError, build_coding_container_plan, run_coding_container_plan
+from .coding_checks import CodingCheck, CodingCheckError, execute_coding_check_suite
 from .coding_mutation import CodingMutationError, apply_patch_transaction
 from .coding_patch import validate_patch_proposal
 from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
 from .contracts import validate_contract
+from .github_ci import GitHubCIError, read_github_ci_status
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
 from .product_audit import build_product_audit
@@ -247,6 +249,57 @@ def _coding_exec(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
         "container_receipt": receipt,
     }
 
+
+def _coding_regression_run(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    image = arguments.get("image")
+    raw_checks = arguments.get("checks")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.regression_run requires a non-empty repo_root argument.")
+    if not isinstance(image, str) or not image.strip():
+        raise ToolRuntimeError("ERROR_CODING_REGRESSION_IMAGE_REQUIRED", "coding.regression_run requires an immutable pinned image identity.")
+    if not isinstance(raw_checks, list) or not raw_checks or len(raw_checks) > 6:
+        raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECKS", "coding.regression_run requires 1..6 check definitions.")
+
+    checks: list[CodingCheck] = []
+    for index, raw in enumerate(raw_checks):
+        if not isinstance(raw, dict):
+            raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECK", f"check {index} must be an object.")
+        check_id = raw.get("check_id")
+        kind = raw.get("kind")
+        command = raw.get("command")
+        required = raw.get("required", True)
+        if not isinstance(check_id, str) or not check_id.strip():
+            raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECK", f"check {index} requires check_id.")
+        if not isinstance(kind, str):
+            raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECK", f"check {index} requires kind.")
+        if not isinstance(command, list) or not command or not all(isinstance(part, str) and part for part in command):
+            raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECK", f"check {index} requires a non-empty argv array.")
+        if not isinstance(required, bool):
+            raise ToolRuntimeError("ERROR_CODING_REGRESSION_CHECK", f"check {index} required must be boolean.")
+        checks.append(CodingCheck(check_id=check_id.strip(), kind=kind, command=tuple(command), required=required))
+    try:
+        return execute_coding_check_suite(repo_root, image=image, checks=checks, cfg=cfg)
+    except CodingCheckError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _github_ci_status(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    del cfg
+    repo = arguments.get("repo")
+    if not isinstance(repo, str):
+        raise ToolRuntimeError("ERROR_GITHUB_CI_REPO_REQUIRED", "github.ci_status requires repo in owner/name form.")
+    try:
+        return read_github_ci_status(
+            repo=repo,
+            branch=arguments.get("branch"),
+            workflow=arguments.get("workflow", "CI"),
+            expected_head_sha=arguments.get("expected_head_sha"),
+            limit=arguments.get("limit", 10),
+        )
+    except GitHubCIError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
 def _web_fetch(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     url = arguments.get("url")
     if not isinstance(url, str):
@@ -381,6 +434,23 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         handler=_coding_exec,
         timeout_seconds=150.0,
+    ),
+    "coding.regression_run": ToolDefinition(
+        name="coding.regression_run",
+        description="Execute 1..6 declared test/lint/type/build/security/benchmark checks through the isolated coding-container boundary and preserve PASS/FAIL/BLOCKED rows.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_regression_run,
+        timeout_seconds=900.0,
+    ),
+    "github.ci_status": ToolDefinition(
+        name="github.ci_status",
+        description="Read bounded GitHub Actions workflow status and optional current-head binding without triggering or mutating remote workflows.",
+        mutates_state=False,
+        requires_approval=True,
+        network="remote",
+        handler=_github_ci_status,
+        timeout_seconds=75.0,
     ),
     "web.render": ToolDefinition(
         name="web.render",
