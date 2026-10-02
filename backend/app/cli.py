@@ -132,6 +132,12 @@ from .permissions import (
     load_directory_grants,
     revoke_directory,
 )
+from .permission_leases import (
+    PermissionLeaseError,
+    grant_permission_lease,
+    list_permission_leases,
+    revoke_permission_lease,
+)
 from .product_audit import build_product_audit, build_product_roadmap
 from .release_receipts import find_release_receipt, list_release_receipts, load_release_receipt, summarize_release_receipts
 from .release_scope import (
@@ -1500,6 +1506,44 @@ def build_parser() -> argparse.ArgumentParser:
     permissions_revoke.add_argument("path", help="File or directory path whose containing grant should be revoked.")
     permissions_revoke.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     permissions_revoke.set_defaults(handler=run_permissions_revoke)
+
+    permissions_lease_list = permissions_subcommands.add_parser(
+        "lease-list", help="List bounded run-scoped tool permission leases."
+    )
+    permissions_lease_list.add_argument("--run-id", help="Optional run ID filter.")
+    permissions_lease_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    permissions_lease_list.set_defaults(handler=run_permissions_lease_list)
+
+    permissions_lease_grant = permissions_subcommands.add_parser(
+        "lease-grant", help="Grant a bounded run-scoped tool permission lease."
+    )
+    permissions_lease_grant.add_argument("run_id", help="Exact run ID the lease may authorize.")
+    permissions_lease_grant.add_argument(
+        "--scope",
+        choices=["RUN_READ_ONLY", "EXACT_TOOLS", "TOOL_PREFIXES"],
+        required=True,
+        help="Lease scope class.",
+    )
+    permissions_lease_grant.add_argument("--tool", action="append", default=[], help="Exact tool name; repeatable for EXACT_TOOLS.")
+    permissions_lease_grant.add_argument(
+        "--tool-prefix", action="append", default=[], help="Tool-name prefix; repeatable for TOOL_PREFIXES."
+    )
+    permissions_lease_grant.add_argument("--workspace-root", help="Optional exact canonical repo_root binding.")
+    permissions_lease_grant.add_argument("--allow-mutating", action="store_true", help="Permit mutation-capable tools inside the declared scope.")
+    permissions_lease_grant.add_argument("--allow-network", action="store_true", help="Permit remote/network tools inside the declared scope.")
+    permissions_lease_grant.add_argument("--ttl-seconds", type=int, default=3600, help="Lease lifetime in seconds (1..86400).")
+    permissions_lease_grant.add_argument("--max-uses", type=int, default=64, help="Maximum approved tool calls (1..1000).")
+    permissions_lease_grant.add_argument("--yes", action="store_true", help="Confirm the lease without an interactive prompt.")
+    permissions_lease_grant.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    permissions_lease_grant.set_defaults(handler=run_permissions_lease_grant)
+
+    permissions_lease_revoke = permissions_subcommands.add_parser(
+        "lease-revoke", help="Revoke one exact run-scoped permission lease."
+    )
+    permissions_lease_revoke.add_argument("lease_id", help="Exact lease ID to revoke.")
+    permissions_lease_revoke.add_argument("--yes", action="store_true", help="Confirm revocation without an interactive prompt.")
+    permissions_lease_revoke.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    permissions_lease_revoke.set_defaults(handler=run_permissions_lease_revoke)
 
     plan = subcommands.add_parser("plan", help="Analyze a request with the Planning Gate.")
     plan.add_argument("request", nargs="+", help="Request to analyze.")
@@ -8354,6 +8398,73 @@ def run_permissions_revoke(args: argparse.Namespace, cfg: Settings) -> int:
     return 0
 
 
+def _confirm_permission_lease(message: str, *, yes: bool, command_hint: str) -> None:
+    if yes:
+        return
+    if not sys.stdin.isatty():
+        raise MucaroCLIError(
+            "ERROR_PERMISSION_CONFIRMATION_REQUIRED",
+            f"{message} Re-run with --yes after reviewing the scope: {command_hint}",
+        )
+    print(f"{message} [y/N] ", end="", file=sys.stderr)
+    if sys.stdin.readline().strip().lower() not in {"y", "yes"}:
+        raise MucaroCLIError("ERROR_PERMISSION_LEASE_DENIED", "Run-scoped permission lease was not granted.")
+
+
+def run_permissions_lease_list(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = list_permission_leases(run_id=args.run_id, cfg=cfg)
+    except PermissionLeaseError as exc:
+        raise MucaroCLIError(exc.status, exc.detail) from exc
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_permissions_lease_grant(args: argparse.Namespace, cfg: Settings) -> int:
+    description = (
+        f"Grant {args.scope} permission lease for run {args.run_id}; "
+        f"mutating={bool(args.allow_mutating)} network={bool(args.allow_network)} "
+        f"ttl={args.ttl_seconds}s max_uses={args.max_uses}?"
+    )
+    _confirm_permission_lease(
+        description,
+        yes=args.yes,
+        command_hint=f"mucaro permissions lease-grant {args.run_id} --scope {args.scope} --yes",
+    )
+    try:
+        result = grant_permission_lease(
+            run_id=args.run_id,
+            scope_type=args.scope,
+            granted_by="cli",
+            tool_names=args.tool,
+            tool_prefixes=args.tool_prefix,
+            workspace_root=args.workspace_root,
+            allow_mutating=bool(args.allow_mutating),
+            allow_network=bool(args.allow_network),
+            ttl_seconds=args.ttl_seconds,
+            max_uses=args.max_uses,
+            cfg=cfg,
+        )
+    except PermissionLeaseError as exc:
+        raise MucaroCLIError(exc.status, exc.detail) from exc
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_permissions_lease_revoke(args: argparse.Namespace, cfg: Settings) -> int:
+    _confirm_permission_lease(
+        f"Revoke permission lease {args.lease_id}?",
+        yes=args.yes,
+        command_hint=f"mucaro permissions lease-revoke {args.lease_id} --yes",
+    )
+    try:
+        result = revoke_permission_lease(args.lease_id, revoked_by="cli", cfg=cfg)
+    except PermissionLeaseError as exc:
+        raise MucaroCLIError(exc.status, exc.detail) from exc
+    emit_payload(result, args.format)
+    return 0
+
+
 def run_serve(args: argparse.Namespace, cfg: Settings) -> int:
     import uvicorn
 
@@ -8378,6 +8489,9 @@ def main(argv: Sequence[str] | None = None, cfg: Settings = settings) -> int:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
         return 2
     except DirectoryPermissionError as exc:
+        emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
+        return 2
+    except PermissionLeaseError as exc:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
         return 2
     except (ParseError, IngestLimitError) as exc:
