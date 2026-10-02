@@ -256,7 +256,9 @@ def update_autopilot_budgets(
     if checkpoint["state"] not in {"PLANNING", "PAUSED_RESOURCE", "BLOCKED_EXTERNAL"}:
         raise AutopilotError("ERROR_AUTOPILOT_BUDGET_STATE", "budgets change only while planned or paused")
     state = _state_from_checkpoint(checkpoint)
-    state["budgets"] = _normalize_budgets(budgets)
+    merged_budgets = dict(state["budgets"])
+    merged_budgets.update(budgets)
+    state["budgets"] = _normalize_budgets(merged_budgets)
     state["stop_reason"] = None
     checkpoint = _set_state(checkpoint, state, cfg=cfg)
     return {"status": "AUTOPILOT_BUDGETS_UPDATED", "checkpoint": checkpoint}
@@ -451,27 +453,46 @@ def _task_call(
     action: dict[str, Any],
     cfg: Settings,
 ) -> dict[str, Any] | None:
-    artifact_ids = [
-        artifact.get("tool_call_id")
+    digest = arguments_digest(action["arguments"])
+    action_sha = canonical_sha256(action)
+    reason = f"autopilot:{checkpoint['checkpoint_id']}:{task['id']}:{action_sha}"
+    artifact_rows = [
+        artifact
         for artifact in task.get("artifacts", [])
         if isinstance(artifact, dict) and artifact.get("kind") == "tool_call" and artifact.get("tool_call_id")
     ]
-    artifact_ids = list(dict.fromkeys(artifact_ids))
+    artifact_ids = list(dict.fromkeys(artifact["tool_call_id"] for artifact in artifact_rows))
     calls = list_tool_calls(cfg)["tool_calls"]
     by_id = {call["tool_call_id"]: call for call in calls}
+
+    def validate_identity(call: dict[str, Any]) -> dict[str, Any]:
+        if (
+            call.get("run_id") != checkpoint["run_id"]
+            or call.get("requested_by") != "autopilot"
+            or call.get("tool_name") != action["tool_name"]
+            or call.get("arguments_sha256") != digest
+            or call.get("reason") != reason
+        ):
+            raise AutopilotError("ERROR_AUTOPILOT_TOOL_CALL_IDENTITY", task["id"])
+        return call
+
     if len(artifact_ids) > 1:
         raise AutopilotError("ERROR_AUTOPILOT_AMBIGUOUS_TOOL_CALL", task["id"])
     if artifact_ids:
         call = by_id.get(artifact_ids[0])
         if call is None:
             raise AutopilotError("ERROR_AUTOPILOT_TOOL_CALL_MISSING", artifact_ids[0])
+        call = validate_identity(call)
+        artifact = artifact_rows[0]
+        if (
+            artifact.get("tool_name") != call.get("tool_name")
+            or artifact.get("arguments_sha256") != call.get("arguments_sha256")
+        ):
+            raise AutopilotError("ERROR_AUTOPILOT_TOOL_ARTIFACT_IDENTITY", task["id"])
         return call
 
-    digest = arguments_digest(action["arguments"])
-    action_sha = canonical_sha256(action)
-    reason = f"autopilot:{checkpoint['checkpoint_id']}:{task['id']}:{action_sha}"
     candidates = [
-        call
+        validate_identity(call)
         for call in calls
         if call.get("run_id") == checkpoint["run_id"]
         and call.get("requested_by") == "autopilot"
@@ -694,13 +715,16 @@ def advance_autopilot(checkpoint_id: str, *, cfg: Settings = settings) -> dict[s
                 "tool_call_id": call["tool_call_id"],
                 "checkpoint": checkpoint,
             }
-        approved = approve_tool_call(
-            call["tool_call_id"],
-            cfg=cfg,
-            approved_by="autopilot:local-readonly-policy",
-            reason="authorized autopilot may auto-approve local non-mutating tools",
-            expected_arguments_sha256=call["arguments_sha256"],
-        )
+        try:
+            approved = approve_tool_call(
+                call["tool_call_id"],
+                cfg=cfg,
+                approved_by="autopilot:local-readonly-policy",
+                reason="authorized autopilot may auto-approve local non-mutating tools",
+                expected_arguments_sha256=call["arguments_sha256"],
+            )
+        except ToolRuntimeError as exc:
+            raise AutopilotError(exc.status, exc.detail) from exc
         call = approved["tool_call"]
 
     if call["status"] in {"DENIED", "CANCELLED", "INTERRUPTED"}:
