@@ -267,9 +267,9 @@ def grant_permission_lease(
         raise PermissionLeaseError("ERROR_PERMISSION_LEASE_TTL", f"ttl_seconds must be null or 1..{MAX_TTL_SECONDS}")
 
     cfg.ensure_dirs()
-    created_at = utc_now()
+    created_at = datetime.now(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
     expires_at = (
-        (datetime.now(UTC) + timedelta(seconds=ttl_seconds)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        (datetime.now(UTC) + timedelta(seconds=ttl_seconds)).isoformat(timespec="microseconds").replace("+00:00", "Z")
         if ttl_seconds is not None
         else None
     )
@@ -358,7 +358,7 @@ def revoke_permission_lease(
         index, lease = matches[0]
         _validate_integrity(lease, cfg)
         if lease["state"] == "REVOKED":
-            return lease
+            return {"lease": lease, "changed": False}
         updated = {
             **lease,
             "state": "REVOKED",
@@ -367,20 +367,22 @@ def revoke_permission_lease(
         }
         _validate_schema(updated)
         leases[index] = updated
-        return updated
+        return {"lease": updated, "changed": True}
 
-    updated = update_json(_leases_path(cfg), [], mutate)
-    _append_audit(
-        {
-            "event": "LEASE_REVOKED",
-            "lease_id": lease_id,
-            "run_id": updated["run_id"],
-            "grant_sha256": updated["grant_sha256"],
-            "revoked_by": revoked_by.strip(),
-        },
-        cfg,
-    )
-    return {"status": "PERMISSION_LEASE_REVOKED", "lease": updated}
+    outcome = update_json(_leases_path(cfg), [], mutate)
+    updated = outcome["lease"]
+    if outcome["changed"]:
+        _append_audit(
+            {
+                "event": "LEASE_REVOKED",
+                "lease_id": lease_id,
+                "run_id": updated["run_id"],
+                "grant_sha256": updated["grant_sha256"],
+                "revoked_by": revoked_by.strip(),
+            },
+            cfg,
+        )
+    return {"status": "PERMISSION_LEASE_REVOKED", "lease": updated, "changed": outcome["changed"]}
 
 
 def _call_by_id(tool_call_id: str, cfg: Settings) -> dict[str, Any]:
