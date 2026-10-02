@@ -33,6 +33,18 @@ _NOTIFY_SCRIPT = (
 )
 
 
+# The link carries the access token, so it reaches this script through the environment, never through argv (which
+# any local user can list) and never through a log file.
+_PHONE_LINK_VARIABLE = "MUCARO_PHONE_LINK"
+_PHONE_SCRIPT = (
+    "on run argv",
+    'set answer to button returned of (display dialog (item 1 of argv) with title "Mucaro AI" '
+    'buttons {"Copy link", "OK"} default button "OK" with icon note)',
+    f'if answer is "Copy link" then set the clipboard to (system attribute "{_PHONE_LINK_VARIABLE}")',
+    "end run",
+)
+
+
 def _osascript(script: tuple[str, ...], message: str) -> None:
     if sys.platform != "darwin":
         return
@@ -52,6 +64,22 @@ def show_dialog(message: str) -> None:
 
 def notify(message: str) -> None:
     _osascript(_NOTIFY_SCRIPT, message)
+
+
+def show_phone_link(message: str, link: str) -> None:
+    """Say how a phone can reach Mucaro, with a Copy link button. Does not wait: the app window opens meanwhile.
+
+    An empty link shows the message alone (phone access is on but there is nothing to open yet).
+    """
+    if sys.platform != "darwin":
+        return
+    cmd = ["/usr/bin/osascript"]
+    for line in _PHONE_SCRIPT if link else _DIALOG_SCRIPT:
+        cmd += ["-e", line]
+    cmd += ["--", message]
+    env = {**os.environ, _PHONE_LINK_VARIABLE: link} if link else None
+    with contextlib.suppress(OSError, subprocess.SubprocessError):
+        subprocess.Popen(cmd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def pid_alive(pid: int) -> bool:
