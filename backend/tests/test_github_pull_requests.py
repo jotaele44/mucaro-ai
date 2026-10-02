@@ -52,6 +52,7 @@ def test_pr_create_requires_exact_request_and_remote_head_and_keeps_body_out_of_
         "build_pull_request_request",
         lambda *args, **kwargs: approved_request(head, request_hash),
     )
+    monkeypatch.setattr(github_pr, "_local_origin_repo", lambda repo_root: "jotaele44/mucaro-ai")
     monkeypatch.setattr(github_pr, "_remote_branch_sha", lambda repo, branch: head)
 
     def fake_list(repo, *, head_branch, base_branch):
@@ -94,6 +95,7 @@ def test_pr_create_requires_exact_request_and_remote_head_and_keeps_body_out_of_
     assert result["network_action_performed"] is True
     assert result["invariants"] == {
         "local_request_exact": True,
+        "origin_repo_exact": True,
         "remote_head_exact": True,
         "pr_head_exact": True,
         "pr_head_branch_exact": True,
@@ -136,6 +138,7 @@ def test_pr_update_revalidates_existing_identity_and_postcondition(
         "build_pull_request_request",
         lambda *args, **kwargs: approved_request(head, request_hash, title="New", body="New body"),
     )
+    monkeypatch.setattr(github_pr, "_local_origin_repo", lambda repo_root: "jotaele44/mucaro-ai")
     monkeypatch.setattr(github_pr, "_remote_branch_sha", lambda repo, branch: head)
     monkeypatch.setattr(github_pr, "_open_prs", lambda *args, **kwargs: [existing])
     monkeypatch.setattr(github_pr, "_view_pr", lambda repo, number: updated)
@@ -176,6 +179,7 @@ def test_pr_remote_head_drift_blocks_before_remote_mutation(
         "build_pull_request_request",
         lambda *args, **kwargs: approved_request(head, request_hash),
     )
+    monkeypatch.setattr(github_pr, "_local_origin_repo", lambda repo_root: "jotaele44/mucaro-ai")
     monkeypatch.setattr(github_pr, "_remote_branch_sha", lambda repo, branch: "1" * 40)
     monkeypatch.setattr(
         github_pr,
@@ -256,3 +260,40 @@ def test_pr_input_negative_controls(tmp_path: Path, overrides: dict, status: str
     with pytest.raises(GitHubPullRequestError) as blocked:
         open_or_update_pull_request(**args)
     assert blocked.value.status == status
+
+def test_pr_origin_mismatch_blocks_before_remote_head_lookup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = make_settings(tmp_path)
+    head = "7" * 40
+    request_hash = "8" * 64
+    monkeypatch.setattr(
+        github_pr,
+        "build_pull_request_request",
+        lambda *args, **kwargs: {
+            **approved_request(head, request_hash),
+            "repo_root": str(tmp_path / "repo"),
+        },
+    )
+    monkeypatch.setattr(github_pr, "_local_origin_repo", lambda repo_root: "someone/fork")
+    monkeypatch.setattr(
+        github_pr,
+        "_remote_branch_sha",
+        lambda *args, **kwargs: pytest.fail("remote lookup must not occur after origin mismatch"),
+    )
+
+    with pytest.raises(GitHubPullRequestError) as blocked:
+        open_or_update_pull_request(
+            str(tmp_path / "repo"),
+            remote_repo="jotaele44/mucaro-ai",
+            expected_head_sha=head,
+            head_branch="feature/video-cli",
+            base_branch="main",
+            title="Title",
+            body="Body",
+            expected_request_sha256=request_hash,
+            cfg=cfg,
+        )
+    assert blocked.value.status == "ERROR_GITHUB_PR_ORIGIN_MISMATCH"
+
