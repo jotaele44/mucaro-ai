@@ -262,6 +262,44 @@ def transition_checkpoint(
     return _mutate(checkpoint_id, change, cfg, expected_sequence=expected_sequence)
 
 
+
+def install_pending_task_dag_state(
+    checkpoint_id: str,
+    *,
+    tasks: list[dict[str, Any]],
+    dag_metadata: dict[str, Any],
+    expected_sequence: int,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Atomically install the initial task DAG without creating a second persistence authority.
+
+    Task definitions live in pending_steps; metadata contains only DAG identity/topology summary.
+    Existing progress is never overwritten. Replanning/supersession is a separate operation.
+    """
+    if not isinstance(tasks, list) or not tasks:
+        raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_EMPTY", "task DAG requires at least one task")
+    if not isinstance(dag_metadata, dict) or not dag_metadata:
+        raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_METADATA", "task DAG metadata is required")
+
+    def change(current: dict[str, Any]) -> dict[str, Any]:
+        if current["state"] in TERMINAL_STATES:
+            raise CheckpointError("ERROR_CHECKPOINT_TERMINAL", "terminal checkpoint cannot install a task DAG")
+        if current["state"] != "PLANNING":
+            raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_STATE", f"task DAG installs only in PLANNING, not {current['state']}")
+        if current.get("in_flight_step"):
+            raise CheckpointError("ERROR_CHECKPOINT_STEP_IN_FLIGHT", "cannot install a task DAG while a step is in flight")
+        if current.get("pending_steps") or current.get("completed_steps"):
+            raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_PROGRESS_EXISTS", "existing pending/completed progress cannot be overwritten")
+        metadata = dict(current.get("metadata") or {})
+        if metadata.get("task_dag"):
+            raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_EXISTS", "task DAG is already installed")
+        current["pending_steps"] = [dict(task) for task in tasks]
+        metadata["task_dag"] = dict(dag_metadata)
+        current["metadata"] = metadata
+        return current
+
+    return _mutate(checkpoint_id, change, cfg, expected_sequence=expected_sequence)
+
 def resume_checkpoint(checkpoint_id: str, cfg: Settings = settings, *, provider: str | None = _UNSET, model: str | None = _UNSET) -> dict[str, Any]:
     checkpoint = get_checkpoint(checkpoint_id, cfg)
     if checkpoint is None:
