@@ -19,8 +19,9 @@ needs to be installed beforehand and nothing is written outside the project fold
 double-clicks reuse completed setup steps and can work offline. Close the native window to stop
 the backend it started. API calls and remote fetches still require internet access.
 
-Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, and Linux x86_64
-(run `./"Mucaro AI.command"` from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
+Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, Windows 11 on ARM
+(through x64 emulation; not yet run on ARM hardware), and Linux x86_64 (run `./"Mucaro AI.command"`
+from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
 does, its error codes, and how to remove it.
 
 Settings go in `.env` (created from `.env.example` on first run). The launcher reads it at

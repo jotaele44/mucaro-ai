@@ -113,7 +113,8 @@ makes the next double-click reinstall the Python packages once.
 |---|---|---|
 | macOS, Apple silicon | macOS 14 | rasterio 1.4.3 and pyproj 3.7.2 publish `macosx_14_0_arm64` wheels only |
 | macOS, Intel | macOS 13 | pyproj 3.7.2 publishes `macosx_13_0_x86_64` wheels |
-| Windows x64 | Windows 10 | rasterio publishes `win_amd64` wheels only (no Windows on ARM) |
+| Windows x64 | Windows 10 | rasterio publishes `win_amd64` wheels only |
+| Windows on ARM | Windows 11 (build 22000) | the same x64 uv, Node, and Python (requested as `cpython-3.12-windows-x86_64-none`) run under Windows 11's x64 emulation; Windows 10 on ARM emulates only 32-bit x86. Not yet run on ARM hardware. |
 | Linux x86_64 | glibc 2.28 | pyproj `manylinux_2_28` wheels; run `./"Mucaro AI.command"` from a terminal |
 
 Anything else stops at once with `ERROR_PLATFORM_UNSUPPORTED` or `ERROR_MACOS_TOO_OLD`.
@@ -164,6 +165,7 @@ downloads (`ERROR_DISK_FULL`).
 | Group Policy that enforces a PowerShell execution policy | `-ExecutionPolicy Bypass` cannot override it | T4 | 90% |
 | Unsigned `Mucaro AI.exe` | SmartScreen asks once for a ZIP download; antivirus heuristics could flag an unsigned launcher that starts PowerShell. Reduced by hiding the console with a process flag (not `-WindowStyle Hidden`) and by the reproducible source build; `Mucaro AI.cmd` remains. | T4 | 70% not flagged |
 | WebView2 Runtime missing (older Windows 10) | the app stops with a dialog linking the download instead of opening a broken window | T1 (code) / T4 (real PC) | 90% |
+| Windows 11 on ARM runs everything under x64 emulation | slower first setup and higher CPU use than a native build; rasterio publishes no Windows ARM wheels, so a native build is not possible with the pinned versions. uv 0.12.19 treats x64 Python as runnable on ARM64 Windows (its source, T1); the window (pythonnet, WebView2) under emulation is unverified. | T1 (code) / T4 (real device) | 75% works first time |
 | Corporate TLS inspection | uv and Node use their own certificate stores. Set `SSL_CERT_FILE` / `NODE_EXTRA_CA_CERTS` (or `UV_SYSTEM_CERTS=1`) in the environment. | T4 | 75% |
 
 ## Verification
@@ -190,13 +192,17 @@ tripwire stubs for `python`, `python3`, `pip`, `node`, `npm`, `npx`, and `git` f
 | Project folder moved, then moved again with the network disabled | `VENV_RECREATE`, packages reinstalled from the private cache, `DESKTOP_SMOKE_OK` both times |
 | `pytest backend/tests` | 710 passed on Python 3.11 and 710 passed on the private 3.12 |
 | shellcheck 0.11 / PowerShell 7.5 parser | clean / 0 parse errors |
+| Windows platform check, run under PowerShell 7 | x64, and ARM64 on build 22000 or later, accepted; ARM64 on build 19045 (Windows 10) and x86 stop with `ERROR_PLATFORM_UNSUPPORTED` |
 
 On real macOS (Apple silicon and Intel), Windows x64, and Linux runners, the `One-click setup`
 workflow (`.github/workflows/one-click-setup.yml`) runs the double-click files themselves. `PATH`
 is cut down to OS directories (plus the tripwire stubs on macOS and Linux). The workflow requires
 `ONE_CLICK_SETUP_OK` on the first run and `ONE_CLICK_FAST_PATH` on the second, both with
 `DESKTOP_SMOKE_OK`. It also checks that `.venv` runs the private Python and that setup left no
-tracked changes.
+tracked changes. A `Windows 11 on ARM (x64 emulation)` job runs the setup and `Mucaro AI.exe` on a
+`windows-11-arm` runner, only when the workflow is started by hand (Actions > One-click setup >
+Run workflow), because hosted ARM Windows runners may not be offered to this repository; it has
+not run yet.
 
 ## Blind spots
 
@@ -206,6 +212,8 @@ tracked changes.
 - Terminal.app's behaviour when a window is closed was simulated with SIGHUP.
 - Gatekeeper, SmartScreen, and macOS folder-access prompts come from platform documentation (T4)
   and were not reproduced.
+- Windows 11 on ARM has not run on ARM hardware. The platform check and the x64 Python request
+  are tested; the emulated setup, pythonnet, and WebView2 are T4 until the manual ARM job passes.
 
 ## Queued leads (not changed here)
 
@@ -221,5 +229,8 @@ tracked changes.
    "Locked dependency set"). The developer bootstrap (`make setup`, `bootstrap_*`) and the CI
    jobs still run `pip install -e ".[dev]"` on Python 3.11 and resolve at install time; moving
    them onto the locks would need 3.11 locks or a CI move to 3.12.
-4. **Windows on ARM.** The setup could run x64 Python under emulation; not attempted because it
-   could not be verified.
+4. **Windows on ARM.** Done in code for Windows 11 on ARM: the setup installs the same x64 uv,
+   Node, and Python and runs them under Windows 11's x64 emulation (`Get-WindowsTargetProblem` in
+   `scripts/one_click_windows.ps1`). Windows 10 on ARM cannot run x64 programs and still stops
+   with `ERROR_PLATFORM_UNSUPPORTED`. Not yet run on ARM hardware: start the manual
+   `Windows 11 on ARM (x64 emulation)` workflow job to verify it.

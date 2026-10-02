@@ -147,6 +147,45 @@ def test_windows_stage0_never_merges_native_stderr():
         assert "2>&1" not in line, line
 
 
+def test_windows_stage0_always_installs_x64_python():
+    # Windows 11 on ARM runs it under emulation; the Windows lock and rasterio are x64 only.
+    text = STAGE0_PS1.read_text(encoding="utf-8")
+    assert '$PythonRequest = "cpython-" + $Pins["PYTHON_VERSION"] + "-windows-x86_64-none"' in text
+    assert "python install --no-bin --no-registry $PythonRequest" in text
+    assert "venv --seed --no-project --python $PythonRequest" in text
+    assert "uv-x86_64-pc-windows-msvc.zip" in text
+    assert '"-win-x64"' in text
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell 7 not installed")
+@pytest.mark.parametrize(
+    "arch,build,problem",
+    [
+        ("AMD64", 19045, ""),
+        ("AMD64", 26100, ""),
+        ("ARM64", 22000, ""),  # first Windows 11 build: runs x64 programs under emulation
+        ("ARM64", 26100, ""),
+        ("ARM64", 19045, "Windows 10 on ARM cannot run x64 programs; Windows 11 on ARM is supported"),
+        ("x86", 19045, "Windows on x86 is not supported"),
+    ],
+)
+def test_windows_stage0_accepts_x64_and_windows_11_on_arm(arch, build, problem):
+    script = str(STAGE0_PS1).replace("'", "''")
+    command = (
+        f"$ast = [System.Management.Automation.Language.Parser]::ParseFile('{script}', [ref]$null, [ref]$null); "
+        "$fn = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] "
+        "-and $node.Name -eq 'Get-WindowsTargetProblem' }, $true); "
+        ". ([scriptblock]::Create($fn.Extent.Text)); "
+        f"Write-Output ('RESULT=' + (Get-WindowsTargetProblem '{arch}' {build}))"
+    )
+    pwsh = [shutil.which("pwsh"), "-NoProfile", "-NonInteractive", "-Command", command]
+    proc = subprocess.run(pwsh, capture_output=True, text=True, check=False)
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    result = proc.stdout.strip().removeprefix("RESULT=")
+    assert result.startswith(problem) if problem else result == ""
+
+
 def test_runtime_folder_is_git_ignored():
     assert ".mucaro-runtime/" in (REPO / ".gitignore").read_text(encoding="utf-8").splitlines()
 

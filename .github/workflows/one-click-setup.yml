@@ -174,6 +174,55 @@ jobs:
           path: .mucaro-runtime/logs/
           if-no-files-found: ignore
 
+  windows-arm:
+    # Windows 11 on ARM runs the same x64 runtimes under emulation. Hosted ARM Windows runners may
+    # not be offered to this repository, so this job never gates a pull request: start it by hand
+    # (Actions > One-click setup > Run workflow).
+    name: Windows 11 on ARM (x64 emulation)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-11-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Double-click setup (full setup, smoke launch)
+        shell: cmd
+        run: |
+          set "PATH=%SystemRoot%\System32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SystemRoot%\System32\WindowsPowerShell\v1.0"
+          call "Mucaro AI.cmd" --smoke-test --no-browser > "%RUNNER_TEMP%\run1.log" 2>&1
+          set "RC=%ERRORLEVEL%"
+          type "%RUNNER_TEMP%\run1.log"
+          if not "%RC%"=="0" exit /b %RC%
+          findstr /c:"PLATFORM_X64_EMULATION" "%RUNNER_TEMP%\run1.log" || exit /b 1
+          findstr /c:"ONE_CLICK_SETUP_OK" "%RUNNER_TEMP%\run1.log" || exit /b 1
+          findstr /c:"DESKTOP_SMOKE_OK" "%RUNNER_TEMP%\run1.log" || exit /b 1
+      - name: Silent Mucaro AI.exe smoke (no console, no browser)
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          $p = Start-Process -FilePath ".\Mucaro AI.exe" -ArgumentList "--smoke-test", "--no-browser" -Wait -PassThru
+          $log = Get-ChildItem .mucaro-runtime\logs\launch-*.log | Where-Object { $_.Name -notlike "*.err.log" } | Sort-Object LastWriteTime | Select-Object -Last 1
+          Get-Content $log.FullName
+          if ($p.ExitCode -ne 0) { throw "Mucaro AI.exe exited with $($p.ExitCode)" }
+          if (-not (Select-String -Quiet -Path $log.FullName -Pattern "DESKTOP_SMOKE_OK")) { throw "smoke launch did not finish" }
+          if (-not (Select-String -Quiet -Path $log.FullName -Pattern "DESKTOP_BACKEND_PORT_CLOSED")) { throw "backend left running" }
+      - name: Private Python is the x64 build
+        shell: pwsh
+        run: |
+          $plat = & .venv\Scripts\python.exe -c "import sysconfig; print(sysconfig.get_platform())"
+          if ($plat -ne "win-amd64") { throw "expected the x64 Python under emulation, got $plat" }
+          & .venv\Scripts\python.exe -c "import webview, clr, rasterio"
+          if ($LASTEXITCODE -ne 0) { throw "x64 packages did not import under emulation" }
+          & .venv\Scripts\python.exe -c "from scripts import native_window; print('WEBVIEW_RENDERER=' + str(native_window.windows_renderer()))"
+          $dirty = git status --porcelain
+          if ($dirty) { throw "setup left tracked changes:`n$dirty" }
+      - name: Upload setup logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: one-click-logs-windows-arm
+          path: .mucaro-runtime/logs/
+          if-no-files-found: ignore
+
   reproducible-launcher:
     name: Mucaro AI.exe rebuilds byte for byte
     runs-on: ubuntu-latest
