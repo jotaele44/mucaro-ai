@@ -1,10 +1,10 @@
 # Double-Click Setup
 
-Double-click `Mucaro AI.app` (macOS) beside `pyproject.toml`, or `Mucaro AI.cmd` (Windows).
-On macOS, the app provisions private runtimes and builds the UI quietly, then opens its native
-window. No Terminal or browser launches. First setup requires internet access; completed steps
+Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows) beside `pyproject.toml`.
+The app provisions private runtimes and builds the UI quietly, then opens its native window. No
+Terminal, console or browser launches. First setup requires internet access; completed steps
 are cached. Errors appear in a dialog with the startup log path. Keep the whole checkout together
-when moving it. The `.command` file remains a legacy console path.
+when moving it. `Mucaro AI.command` and `Mucaro AI.cmd` remain legacy console paths.
 
 ## Why it exists
 
@@ -24,9 +24,19 @@ first-time user:
 ## How it works
 
 The macOS app runs `scripts/native_start.sh`, which redirects startup output to a log and runs
-`scripts/one_click.sh --native`. The stages below are shared with the legacy console launchers.
-On macOS, the Python install includes the desktop extra and checks `webview`, `AppKit`,
-`Foundation`, and `WebKit` before recording a successful setup fingerprint.
+`scripts/one_click.sh --native`. `Mucaro AI.exe` is the Windows counterpart: a small GUI-subsystem
+launcher (C source in `packaging/launchers/windows/`) that starts `scripts/native_start.ps1` with
+no console window; that script logs to `.mucaro-runtime/logs/launch-*.log`, runs
+`scripts/one_click_windows.ps1 --native`, and shows one dialog if setup or the app fails. The
+stages below are shared with the legacy console launchers. On macOS and Windows the Python
+install includes the desktop extra and checks `webview` plus `AppKit`, `Foundation` and `WebKit`
+(macOS) or `clr` (pythonnet, Windows) before recording a successful setup fingerprint.
+
+The Windows window is drawn by the Microsoft Edge WebView2 Runtime. Without it, pywebview would
+fall back to Internet Explorer, which cannot run the interface, so the app stops instead with
+exit code 11 and a dialog linking the WebView2 download. `scripts/build_launchers.py` rebuilds
+`Mucaro AI.exe` and its icon (from the macOS app's owl) byte for byte with pinned tools;
+`packaging/launchers/windows/BUILD_SHA256` records the expected hash and CI checks it.
 
 ```
 Mucaro AI.command (macOS/Linux)          Mucaro AI.cmd (Windows)
@@ -54,9 +64,14 @@ scripts/launch_app.py --auto-port --exit-if-running --startup-timeout 120
   `scripts/one_click_pins.env`, which were copied from the official release checksum files.
   CPython is installed by the pinned uv, which verifies its own downloads. A mismatch deletes the
   file and stops with `ERROR_CHECKSUM_MISMATCH`.
-- **Frozen dependency set.** Python packages are installed with
-  `--exclude-newer $PY_EXCLUDE_NEWER`, so a later release of a transitive dependency cannot change
-  what a fresh setup installs. npm uses `package-lock.json` through `npm ci`.
+- **Locked dependency set.** Python packages come from a hash-pinned lock for the platform,
+  `packaging/one_click/requirements-<target>.lock` (macOS arm64 and Intel, Linux x86_64, Windows
+  x64), installed with `uv pip install --require-hashes --no-deps`. Every package and every file
+  hash is fixed, including setuptools, which then builds the editable project install
+  (`--no-build-isolation`), so setup installs nothing that is not hash-pinned. The lock is chosen
+  by the interpreter's own platform (x64 Python on Windows on ARM uses the x64 lock); a platform
+  without a lock stops with `ERROR_PLATFORM_UNSUPPORTED`. npm uses `package-lock.json` through
+  `npm ci`.
 - **Isolation.** The user's `~/.npmrc`, npm cache, `NODE_OPTIONS`, `PYTHONPATH`, active virtualenv
   or conda environment, and uv config files are ignored.
 - **Resumable.** Each step records a fingerprint of its inputs only after it succeeds. An
@@ -65,8 +80,8 @@ scripts/launch_app.py --auto-port --exit-if-running --startup-timeout 120
   (`SETUP_WAITING`). A lock left by a killed process is detected and removed
   (`SETUP_LOCK_STALE`).
 - **Launch.** If port 8000 is taken by another program, the next free port is used
-  (`PORT_FALLBACK`). The macOS app uses `--native` and activates an existing native window
-  (`DESKTOP_LAUNCH_REUSED`) when available. Closing the window stops the backend it owns.
+  (`PORT_FALLBACK`). The macOS and Windows apps use `--native` and activate an existing native
+  window (`DESKTOP_LAUNCH_REUSED`) when available. Closing the window stops the backend it owns.
   The legacy console launchers retain browser mode.
 
 ## Pinned versions
@@ -83,13 +98,23 @@ To update a pin, change `scripts/one_click_pins.env` using the official checksum
 `One-click setup` workflow proves the new pins on every platform. Bump `SETUP_SCHEMA` when a
 change must make every existing setup redo all steps once.
 
+After changing a Python pin in `pyproject.toml` (or `PY_EXCLUDE_NEWER`, `PYTHON_VERSION`, or
+`UV_VERSION`), regenerate the locks with `python scripts/lock_python_deps.py`. It compiles them
+with the pinned uv for the pinned Python, ignoring anything published after `PY_EXCLUDE_NEWER`,
+so the same inputs always give the same files; `--check` regenerates into a temporary folder
+and fails unless the committed locks are identical (the Linux CI job runs it).
+`backend/tests/test_python_locks.py` checks that each lock is fully hash-pinned and pins exactly
+the `pyproject.toml` versions of the extras the setup installs on that platform. A changed lock
+makes the next double-click reinstall the Python packages once.
+
 ## Supported platforms
 
 | Platform | Minimum | Why the minimum |
 |---|---|---|
 | macOS, Apple silicon | macOS 14 | rasterio 1.4.3 and pyproj 3.7.2 publish `macosx_14_0_arm64` wheels only |
 | macOS, Intel | macOS 13 | pyproj 3.7.2 publishes `macosx_13_0_x86_64` wheels |
-| Windows x64 | Windows 10 | rasterio publishes `win_amd64` wheels only (no Windows on ARM) |
+| Windows x64 | Windows 10 | rasterio publishes `win_amd64` wheels only |
+| Windows on ARM | Windows 11 (build 22000) | the same x64 uv, Node, and Python (requested as `cpython-3.12-windows-x86_64-none`) run under Windows 11's x64 emulation; Windows 10 on ARM emulates only 32-bit x86. Not yet run on ARM hardware. |
 | Linux x86_64 | glibc 2.28 | pyproj `manylinux_2_28` wheels; run `./"Mucaro AI.command"` from a terminal |
 
 Anything else stops at once with `ERROR_PLATFORM_UNSUPPORTED` or `ERROR_MACOS_TOO_OLD`.
@@ -128,6 +153,7 @@ downloads (`ERROR_DISK_FULL`).
 | `ERROR_MACOS_TOO_OLD`, `ERROR_PLATFORM_UNSUPPORTED` | see Supported platforms | |
 | `ERROR_SETUP_LOCK_TIMEOUT` | another window has been setting up for over an hour | close it, double-click again |
 | `ERROR_STAGE0_MISSING`, `ERROR_NOT_IN_VENV` | `scripts/one_click.py` was started directly | use the double-click file |
+| exit code 11, `ERROR_WEBVIEW2_MISSING` (Windows) | the Microsoft Edge WebView2 Runtime is not installed | install it from the link in the dialog, open `Mucaro AI.exe` again |
 
 ## Limits that code cannot remove
 
@@ -137,6 +163,9 @@ downloads (`ERROR_DISK_FULL`).
 | Project inside `~/Desktop`, `~/Documents`, or `~/Downloads` on macOS | macOS asks once whether Terminal may access that folder. `~/Developer` is not affected. | T4 | 85% |
 | First run needs internet | later runs work offline (verified with the network disabled) | T1 | 99% |
 | Group Policy that enforces a PowerShell execution policy | `-ExecutionPolicy Bypass` cannot override it | T4 | 90% |
+| Unsigned `Mucaro AI.exe` | SmartScreen asks once for a ZIP download; antivirus heuristics could flag an unsigned launcher that starts PowerShell. Reduced by hiding the console with a process flag (not `-WindowStyle Hidden`) and by the reproducible source build; `Mucaro AI.cmd` remains. | T4 | 70% not flagged |
+| WebView2 Runtime missing (older Windows 10) | the app stops with a dialog linking the download instead of opening a broken window | T1 (code) / T4 (real PC) | 90% |
+| Windows 11 on ARM runs everything under x64 emulation | slower first setup and higher CPU use than a native build; rasterio publishes no Windows ARM wheels, so a native build is not possible with the pinned versions. uv 0.12.19 treats x64 Python as runnable on ARM64 Windows (its source, T1); the window (pythonnet, WebView2) under emulation is unverified. | T1 (code) / T4 (real device) | 75% works first time |
 | Corporate TLS inspection | uv and Node use their own certificate stores. Set `SSL_CERT_FILE` / `NODE_EXTRA_CA_CERTS` (or `UV_SYSTEM_CERTS=1`) in the environment. | T4 | 75% |
 
 ## Verification
@@ -163,13 +192,17 @@ tripwire stubs for `python`, `python3`, `pip`, `node`, `npm`, `npx`, and `git` f
 | Project folder moved, then moved again with the network disabled | `VENV_RECREATE`, packages reinstalled from the private cache, `DESKTOP_SMOKE_OK` both times |
 | `pytest backend/tests` | 710 passed on Python 3.11 and 710 passed on the private 3.12 |
 | shellcheck 0.11 / PowerShell 7.5 parser | clean / 0 parse errors |
+| Windows platform check, run under PowerShell 7 | x64, and ARM64 on build 22000 or later, accepted; ARM64 on build 19045 (Windows 10) and x86 stop with `ERROR_PLATFORM_UNSUPPORTED` |
 
 On real macOS (Apple silicon and Intel), Windows x64, and Linux runners, the `One-click setup`
 workflow (`.github/workflows/one-click-setup.yml`) runs the double-click files themselves. `PATH`
 is cut down to OS directories (plus the tripwire stubs on macOS and Linux). The workflow requires
 `ONE_CLICK_SETUP_OK` on the first run and `ONE_CLICK_FAST_PATH` on the second, both with
 `DESKTOP_SMOKE_OK`. It also checks that `.venv` runs the private Python and that setup left no
-tracked changes.
+tracked changes. A `Windows 11 on ARM (x64 emulation)` job runs the setup and `Mucaro AI.exe` on a
+`windows-11-arm` runner, only when the workflow is started by hand (Actions > One-click setup >
+Run workflow), because hosted ARM Windows runners may not be offered to this repository; it has
+not run yet.
 
 ## Blind spots
 
@@ -179,6 +212,8 @@ tracked changes.
 - Terminal.app's behaviour when a window is closed was simulated with SIGHUP.
 - Gatekeeper, SmartScreen, and macOS folder-access prompts come from platform documentation (T4)
   and were not reproduced.
+- Windows 11 on ARM has not run on ARM hardware. The platform check and the x64 Python request
+  are tested; the emulated setup, pythonnet, and WebView2 are T4 until the manual ARM job passes.
 
 ## Queued leads (not changed here)
 
@@ -186,8 +221,16 @@ tracked changes.
    remove the one-time Gatekeeper/SmartScreen prompt for ZIP downloads.
 2. **Git-backed coding tools.** Runtime identity no longer launches `git`; it reads bound build
    identity or local `.git` metadata directly. Coding repository/diff/patch operations still use
-   Git and are now classified as a bundle/replace dependency by the offline manifest.
-3. **Python lock file.** `--exclude-newer` freezes resolution by date. A committed lock file
-   (for example `uv.lock`) would also pin exact versions for the developer bootstrap and CI.
-4. **Windows on ARM.** The setup could run x64 Python under emulation; not attempted because it
-   could not be verified.
+   Git and are now classified as a bundle/replace dependency by the offline manifest. In a source
+   checkout on macOS, `/usr/bin/git` is used only when the Command Line Tools or Xcode are
+   installed (`backend/app/local_tools.py`, `macos_developer_tools_present`); otherwise `/repo` and
+   `/diff` report Git as unavailable instead of opening Apple's "install developer tools" dialog.
+3. **Python lock file.** Done for the double-click setup (hash-pinned per-platform locks, see
+   "Locked dependency set"). The developer bootstrap (`make setup`, `bootstrap_*`) and the CI
+   jobs still run `pip install -e ".[dev]"` on Python 3.11 and resolve at install time; moving
+   them onto the locks would need 3.11 locks or a CI move to 3.12.
+4. **Windows on ARM.** Done in code for Windows 11 on ARM: the setup installs the same x64 uv,
+   Node, and Python and runs them under Windows 11's x64 emulation (`Get-WindowsTargetProblem` in
+   `scripts/one_click_windows.ps1`). Windows 10 on ARM cannot run x64 programs and still stops
+   with `ERROR_PLATFORM_UNSUPPORTED`. Not yet run on ARM hardware: start the manual
+   `Windows 11 on ARM (x64 emulation)` workflow job to verify it.
