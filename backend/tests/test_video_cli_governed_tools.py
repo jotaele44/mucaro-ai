@@ -277,3 +277,95 @@ def test_git_lifecycle_tool_argument_negative_controls(
         run_tool_call(call_id, cfg=cfg, executed_by="test")
     assert blocked.value.status == status
 
+def test_pr_request_and_remote_pr_tools_share_frozen_request_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = make_settings(tmp_path)
+    head = "5" * 40
+    request_hash = "6" * 64
+    local_calls: list[dict[str, object]] = []
+    remote_calls: list[dict[str, object]] = []
+
+    def fake_request(repo_root, *, expected_head_sha, head_branch, base_branch, title, body, cfg):
+        local_calls.append(
+            {
+                "repo_root": repo_root,
+                "expected_head_sha": expected_head_sha,
+                "head_branch": head_branch,
+                "base_branch": base_branch,
+                "title": title,
+                "body": body,
+            }
+        )
+        return {
+            "status": "CODING_PR_REQUEST_READY",
+            "head_sha": expected_head_sha,
+            "head_branch": head_branch,
+            "base_branch": base_branch,
+            "title": title,
+            "body": body,
+            "request_sha256": request_hash,
+        }
+
+    def fake_remote(repo_root, **kwargs):
+        kwargs = dict(kwargs)
+        kwargs.pop("cfg")
+        remote_calls.append({"repo_root": repo_root, **kwargs})
+        return {
+            "status": "GITHUB_PR_OPEN_UPDATE_OK",
+            "action": "CREATED",
+            "request_sha256": kwargs["expected_request_sha256"],
+            "local_head_sha": kwargs["expected_head_sha"],
+            "remote_head_sha": kwargs["expected_head_sha"],
+            "network_action_performed": True,
+            "pull_request": {"number": 1, "url": "https://example.invalid/pr/1"},
+        }
+
+    monkeypatch.setattr(tools_module, "build_pull_request_request", fake_request)
+    monkeypatch.setattr(tools_module, "open_or_update_pull_request", fake_remote)
+
+    local_args = {
+        "repo_root": str(tmp_path / "repo"),
+        "expected_head_sha": head,
+        "head_branch": "feature/video-cli",
+        "base_branch": "main",
+        "title": "Parity increment",
+        "body": "Bounded body",
+    }
+    requested = request_tool_call("coding.pr_request", local_args, cfg=cfg, requested_by="test")
+    local_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(local_id, cfg=cfg, approved_by="test")
+    local_result = run_tool_call(local_id, cfg=cfg, executed_by="test")["result"]
+    assert local_result["request_sha256"] == request_hash
+
+    remote_args = {
+        **local_args,
+        "remote_repo": "jotaele44/mucaro-ai",
+        "expected_request_sha256": local_result["request_sha256"],
+    }
+    requested = request_tool_call("github.pr_open_update", remote_args, cfg=cfg, requested_by="test")
+    remote_id = requested["tool_call"]["tool_call_id"]
+
+    with pytest.raises(ToolRuntimeError) as blocked:
+        run_tool_call(remote_id, cfg=cfg, executed_by="test")
+    assert blocked.value.status == "ERROR_TOOL_APPROVAL_REQUIRED"
+
+    approve_tool_call(remote_id, cfg=cfg, approved_by="test")
+    remote_result = run_tool_call(remote_id, cfg=cfg, executed_by="test")["result"]
+    assert remote_result["status"] == "GITHUB_PR_OPEN_UPDATE_OK"
+    assert remote_result["request_sha256"] == request_hash
+    assert local_calls == [local_args]
+    assert remote_calls == [
+        {
+            "repo_root": str(tmp_path / "repo"),
+            "remote_repo": "jotaele44/mucaro-ai",
+            "expected_head_sha": head,
+            "head_branch": "feature/video-cli",
+            "base_branch": "main",
+            "title": "Parity increment",
+            "body": "Bounded body",
+            "expected_request_sha256": request_hash,
+        }
+    ]
+
