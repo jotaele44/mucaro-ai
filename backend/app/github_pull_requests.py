@@ -35,7 +35,7 @@ def _bounded_token(value: str, *, label: str) -> str:
     return cleaned
 
 
-def _gh(args: list[str], *, timeout_seconds: int = 45) -> str:
+def _gh(args: list[str], *, timeout_seconds: int = 45, input_text: str | None = None) -> str:
     try:
         gh = resolve_local_tool("gh")
     except ValueError as exc:
@@ -46,6 +46,7 @@ def _gh(args: list[str], *, timeout_seconds: int = 45) -> str:
         proc = subprocess.run(
             [gh, *args],
             text=True,
+            input=input_text,
             capture_output=True,
             check=False,
             timeout=timeout_seconds,
@@ -189,10 +190,11 @@ def open_or_update_pull_request(
                 base_branch,
                 "--title",
                 request["title"],
-                "--body",
-                request["body"],
+                "--body-file",
+                "-",
             ],
             timeout_seconds=60,
+            input_text=request["body"],
         ).strip()
         created = _open_prs(remote_repo, head_branch=head_branch, base_branch=base_branch)
         if len(created) != 1:
@@ -227,12 +229,13 @@ def open_or_update_pull_request(
                     remote_repo,
                     "--title",
                     request["title"],
-                    "--body",
-                    request["body"],
+                    "--body-file",
+                    "-",
                     "--base",
                     base_branch,
                 ],
                 timeout_seconds=60,
+                input_text=request["body"],
             )
             action = "UPDATED"
             network_action_performed = True
