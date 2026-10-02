@@ -308,6 +308,21 @@ def install_pending_task_dag_state(
         raise CheckpointError(exc.status, exc.detail) from exc
     if completed:
         raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_INITIAL_TERMINAL", "initial task DAG cannot contain terminal tasks")
+    non_initial = sorted(
+        task["id"]
+        for task in pending
+        if task.get("state") not in {"PENDING", "READY"}
+        or task.get("attempt_count") != 0
+        or task.get("started_at") is not None
+        or task.get("completed_at") is not None
+        or task.get("evidence")
+        or task.get("artifacts")
+    )
+    if non_initial:
+        raise CheckpointError(
+            "ERROR_CHECKPOINT_TASK_DAG_NOT_INITIAL",
+            f"initial task DAG contains progressed state: {','.join(non_initial)}",
+        )
 
     def change(current: dict[str, Any]) -> dict[str, Any]:
         if current["state"] in TERMINAL_STATES:
@@ -386,8 +401,11 @@ def transition_task_dag_state(
     def change(current: dict[str, Any]) -> dict[str, Any]:
         if current["state"] in TERMINAL_STATES:
             raise CheckpointError("ERROR_CHECKPOINT_TERMINAL", "terminal checkpoint cannot transition task state")
-        if current["state"] == "PLANNING":
-            raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_NOT_EXECUTING", "leave PLANNING before task execution")
+        if current["state"] != "EXECUTING":
+            raise CheckpointError(
+                "ERROR_CHECKPOINT_TASK_DAG_NOT_EXECUTING",
+                f"task transitions require EXECUTING checkpoint state, not {current['state']}",
+            )
         metadata = (current.get("metadata") or {}).get("task_dag")
         if not metadata:
             raise CheckpointError("ERROR_CHECKPOINT_TASK_DAG_MISSING", checkpoint_id)
