@@ -279,6 +279,11 @@ def main(argv: list[str] | None = None) -> int:
 
 def _failure_message(code: int) -> str:
     log = os.environ.get("MUCARO_SETUP_LOG") or str(ROOT / ".mucaro-runtime" / "logs")
+    if code == 11:
+        return (
+            "Mucaro AI needs the Microsoft Edge WebView2 Runtime to show its window.\n\n"
+            f"Install it from {native_window.WEBVIEW2_DOWNLOAD}, then open Mucaro AI again."
+        )
     return (
         f"Mucaro AI could not start (code {code}).\n\n"
         f"Details are in: {log}\n\n"
@@ -329,6 +334,10 @@ def _launch(args: argparse.Namespace) -> int:
                 # Never fall back to a browser: the app is meant to be self-contained.
                 print(f"ERROR_NATIVE_WINDOW_UNAVAILABLE {exc}", file=sys.stderr)
                 return 10
+            except native_window.WebView2Missing as exc:
+                # Distinct code: scripts/native_start.ps1 turns it into a dialog with the download link.
+                print(f"ERROR_WEBVIEW2_MISSING {exc}", file=sys.stderr)
+                return 11
             print("DESKTOP_WINDOW_CLOSED")
             return 0
 

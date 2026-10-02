@@ -33,7 +33,13 @@ if str(ROOT) not in sys.path:
 
 from scripts import launch_app  # noqa: E402
 
-PYTHON_EXTRAS = "dev,anthropic,desktop" if sys.platform == "darwin" else "dev,anthropic"
+# desktop (pywebview) draws the native window that Mucaro AI.app (macOS) and Mucaro AI.exe (Windows) open.
+NATIVE_WINDOW_PLATFORMS = ("darwin", "win32")
+NATIVE_WINDOW_MODULES = {
+    "darwin": ("webview", "AppKit", "Foundation", "WebKit"),
+    "win32": ("webview", "clr"),  # clr: pythonnet, which pywebview's WebView2 backend loads
+}
+PYTHON_EXTRAS = "dev,anthropic,desktop" if sys.platform in NATIVE_WINDOW_PLATFORMS else "dev,anthropic"
 # Import names that prove the dependency install is usable (runtime, geospatial, live mode, preflight).
 KEY_MODULES = (
     "fastapi",
@@ -50,7 +56,7 @@ KEY_MODULES = (
     "anthropic",
     "httpx",
     "pytest",
-) + (("webview", "AppKit", "Foundation", "WebKit") if sys.platform == "darwin" else ())
+) + NATIVE_WINDOW_MODULES.get(sys.platform, ())
 NPM_REGISTRY = "https://registry.npmjs.org/"
 LOG_KEEP = 10
 TOTAL_STEPS = 6

@@ -4,16 +4,17 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-**On macOS, double-click `Mucaro AI.app` in this checkout.** It runs setup quietly and opens
-Mucaro in its own native window. Keep the app next to `pyproject.toml`; move the whole folder
-together. No Terminal or browser opens. The `.command` file is a legacy console launcher.
-Windows continues to use `Mucaro AI.cmd`.
+**Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows) in this checkout.** It runs
+setup quietly and opens Mucaro in its own native window. Keep it next to `pyproject.toml`; move
+the whole folder together. No Terminal, console or browser opens. `Mucaro AI.command` and
+`Mucaro AI.cmd` are legacy console launchers. On Windows the window needs the Microsoft Edge
+WebView2 Runtime, which Windows 11 and current Windows 10 include.
 
 The first double-click downloads private, checksum-verified copies of Python 3.12 and Node.js
 into this folder (about 200 MB to download, about 700 MB on disk, 2-5 minutes on a typical
 connection), installs everything, builds
-the interface, loads two sample documents, and starts the app. On macOS, setup output is saved
-in `.mucaro-runtime/logs/` and failures appear in a dialog. Nothing
+the interface, loads two sample documents, and starts the app. Setup output is saved in
+`.mucaro-runtime/logs/` and failures appear in a dialog. Nothing
 needs to be installed beforehand and nothing is written outside the project folder. Later
 double-clicks reuse completed setup steps and can work offline. Close the native window to stop
 the backend it started. API calls and remote fetches still require internet access.

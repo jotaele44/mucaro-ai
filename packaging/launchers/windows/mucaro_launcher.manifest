@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <assemblyIdentity type="win32" name="ai.mucaro.source-launcher" version="0.1.23.0" processorArchitecture="amd64"/>
-  <description>Start Mucaro AI (source setup launcher)</description>
+  <description>Mucaro AI (source checkout launcher)</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>

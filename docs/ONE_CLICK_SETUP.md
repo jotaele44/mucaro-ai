@@ -1,10 +1,10 @@
 # Double-Click Setup
 
-Double-click `Mucaro AI.app` (macOS) beside `pyproject.toml`, or `Mucaro AI.cmd` (Windows).
-On macOS, the app provisions private runtimes and builds the UI quietly, then opens its native
-window. No Terminal or browser launches. First setup requires internet access; completed steps
+Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows) beside `pyproject.toml`.
+The app provisions private runtimes and builds the UI quietly, then opens its native window. No
+Terminal, console or browser launches. First setup requires internet access; completed steps
 are cached. Errors appear in a dialog with the startup log path. Keep the whole checkout together
-when moving it. The `.command` file remains a legacy console path.
+when moving it. `Mucaro AI.command` and `Mucaro AI.cmd` remain legacy console paths.
 
 ## Why it exists
 
@@ -24,9 +24,19 @@ first-time user:
 ## How it works
 
 The macOS app runs `scripts/native_start.sh`, which redirects startup output to a log and runs
-`scripts/one_click.sh --native`. The stages below are shared with the legacy console launchers.
-On macOS, the Python install includes the desktop extra and checks `webview`, `AppKit`,
-`Foundation`, and `WebKit` before recording a successful setup fingerprint.
+`scripts/one_click.sh --native`. `Mucaro AI.exe` is the Windows counterpart: a small GUI-subsystem
+launcher (C source in `packaging/launchers/windows/`) that starts `scripts/native_start.ps1` with
+no console window; that script logs to `.mucaro-runtime/logs/launch-*.log`, runs
+`scripts/one_click_windows.ps1 --native`, and shows one dialog if setup or the app fails. The
+stages below are shared with the legacy console launchers. On macOS and Windows the Python
+install includes the desktop extra and checks `webview` plus `AppKit`, `Foundation` and `WebKit`
+(macOS) or `clr` (pythonnet, Windows) before recording a successful setup fingerprint.
+
+The Windows window is drawn by the Microsoft Edge WebView2 Runtime. Without it, pywebview would
+fall back to Internet Explorer, which cannot run the interface, so the app stops instead with
+exit code 11 and a dialog linking the WebView2 download. `scripts/build_launchers.py` rebuilds
+`Mucaro AI.exe` and its icon (from the macOS app's owl) byte for byte with pinned tools;
+`packaging/launchers/windows/BUILD_SHA256` records the expected hash and CI checks it.
 
 ```
 Mucaro AI.command (macOS/Linux)          Mucaro AI.cmd (Windows)
@@ -65,8 +75,8 @@ scripts/launch_app.py --auto-port --exit-if-running --startup-timeout 120
   (`SETUP_WAITING`). A lock left by a killed process is detected and removed
   (`SETUP_LOCK_STALE`).
 - **Launch.** If port 8000 is taken by another program, the next free port is used
-  (`PORT_FALLBACK`). The macOS app uses `--native` and activates an existing native window
-  (`DESKTOP_LAUNCH_REUSED`) when available. Closing the window stops the backend it owns.
+  (`PORT_FALLBACK`). The macOS and Windows apps use `--native` and activate an existing native
+  window (`DESKTOP_LAUNCH_REUSED`) when available. Closing the window stops the backend it owns.
   The legacy console launchers retain browser mode.
 
 ## Pinned versions
@@ -128,6 +138,7 @@ downloads (`ERROR_DISK_FULL`).
 | `ERROR_MACOS_TOO_OLD`, `ERROR_PLATFORM_UNSUPPORTED` | see Supported platforms | |
 | `ERROR_SETUP_LOCK_TIMEOUT` | another window has been setting up for over an hour | close it, double-click again |
 | `ERROR_STAGE0_MISSING`, `ERROR_NOT_IN_VENV` | `scripts/one_click.py` was started directly | use the double-click file |
+| exit code 11, `ERROR_WEBVIEW2_MISSING` (Windows) | the Microsoft Edge WebView2 Runtime is not installed | install it from the link in the dialog, open `Mucaro AI.exe` again |
 
 ## Limits that code cannot remove
 
@@ -137,6 +148,8 @@ downloads (`ERROR_DISK_FULL`).
 | Project inside `~/Desktop`, `~/Documents`, or `~/Downloads` on macOS | macOS asks once whether Terminal may access that folder. `~/Developer` is not affected. | T4 | 85% |
 | First run needs internet | later runs work offline (verified with the network disabled) | T1 | 99% |
 | Group Policy that enforces a PowerShell execution policy | `-ExecutionPolicy Bypass` cannot override it | T4 | 90% |
+| Unsigned `Mucaro AI.exe` | SmartScreen asks once for a ZIP download; antivirus heuristics could flag an unsigned launcher that starts PowerShell. Reduced by hiding the console with a process flag (not `-WindowStyle Hidden`) and by the reproducible source build; `Mucaro AI.cmd` remains. | T4 | 70% not flagged |
+| WebView2 Runtime missing (older Windows 10) | the app stops with a dialog linking the download instead of opening a broken window | T1 (code) / T4 (real PC) | 90% |
 | Corporate TLS inspection | uv and Node use their own certificate stores. Set `SSL_CERT_FILE` / `NODE_EXTRA_CA_CERTS` (or `UV_SYSTEM_CERTS=1`) in the environment. | T4 | 75% |
 
 ## Verification

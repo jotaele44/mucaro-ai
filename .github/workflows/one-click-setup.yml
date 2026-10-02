@@ -1,8 +1,9 @@
 name: One-click setup
 
-# Runs the real double-click files ("Mucaro AI.command" / "Mucaro AI.cmd") on clean runners.
-# PATH is cut down to OS directories (plus tripwire stubs on macOS/Linux), so the job fails if
-# setup ever depends on a preinstalled Python, Node, npm, or git.
+# Runs the real double-click files ("Mucaro AI.command" / "Mucaro AI.cmd", then the silent
+# "Mucaro AI.app" / "Mucaro AI.exe") on clean runners. PATH is cut down to OS directories (plus
+# tripwire stubs on macOS/Linux), so the job fails if setup ever depends on a preinstalled Python,
+# Node, npm, or git. The committed Mucaro AI.exe must also rebuild byte for byte from its source.
 
 on:
   workflow_dispatch:
@@ -10,9 +11,13 @@ on:
     paths:
       - "Mucaro AI.command"
       - "Mucaro AI.app/**"
-      - "scripts/native_start.sh"
-      - "scripts/native_window.py"
+      - "Mucaro AI.exe"
+      - "packaging/launchers/**"
+      - "packaging/icons/**"
+      - "scripts/native_*"
+      - "scripts/build_launchers.py"
       - "backend/tests/test_native_launch.py"
+      - "backend/tests/test_windows_*"
       - "Mucaro AI.cmd"
       - ".gitattributes"
       - "scripts/one_click*"
@@ -29,8 +34,9 @@ on:
     paths:
       - "Mucaro AI.command"
       - "Mucaro AI.app/**"
-      - "scripts/native_start.sh"
-      - "scripts/native_window.py"
+      - "Mucaro AI.exe"
+      - "packaging/launchers/**"
+      - "scripts/native_*"
       - "Mucaro AI.cmd"
       - "scripts/one_click*"
       - "scripts/launch_app.py"
@@ -132,6 +138,20 @@ jobs:
           if not "%RC%"=="0" exit /b %RC%
           findstr /c:"ONE_CLICK_FAST_PATH" "%RUNNER_TEMP%\run2.log" || exit /b 1
           findstr /c:"DESKTOP_SMOKE_OK" "%RUNNER_TEMP%\run2.log" || exit /b 1
+      - name: Silent Mucaro AI.exe smoke (no console, no browser)
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          $p = Start-Process -FilePath ".\Mucaro AI.exe" -ArgumentList "--smoke-test", "--no-browser" -Wait -PassThru
+          $log = Get-ChildItem .mucaro-runtime\logs\launch-*.log | Where-Object { $_.Name -notlike "*.err.log" } | Sort-Object LastWriteTime | Select-Object -Last 1
+          Get-Content $log.FullName
+          if ($p.ExitCode -ne 0) { throw "Mucaro AI.exe exited with $($p.ExitCode)" }
+          if (-not (Select-String -Quiet -Path $log.FullName -Pattern "DESKTOP_SMOKE_OK")) { throw "smoke launch did not finish" }
+          if (-not (Select-String -Quiet -Path $log.FullName -Pattern "DESKTOP_BACKEND_PORT_CLOSED")) { throw "backend left running" }
+          & .venv\Scripts\python.exe -c "import webview, clr"
+          if ($LASTEXITCODE -ne 0) { throw "window dependencies missing" }
+          # Informational: the engine pywebview would draw with on this runner (edgechromium or mshtml).
+          & .venv\Scripts\python.exe -c "from scripts import native_window; print('WEBVIEW_RENDERER=' + str(native_window.windows_renderer()))"
       - name: Verify isolation
         shell: pwsh
         run: |
@@ -147,3 +167,15 @@ jobs:
           name: one-click-logs-windows
           path: .mucaro-runtime/logs/
           if-no-files-found: ignore
+
+  reproducible-launcher:
+    name: Mucaro AI.exe rebuilds byte for byte
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Rebuild Mucaro AI.exe and its icon from source and compare
+        run: python scripts/build_launchers.py --check

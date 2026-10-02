@@ -1,15 +1,13 @@
 /*
- * Start Mucaro AI.exe - Windows launcher for the double-click source setup.
+ * Mucaro AI.exe - Windows double-click launcher for this source checkout.
  *
- * Starts scripts\one_click_windows.ps1 --ui from the folder that contains this .exe, with
- * CREATE_NO_WINDOW: PowerShell and everything it starts share one console that has no window,
- * so nothing but the browser progress page appears. Returns at once, so every double-click starts
- * a fresh launcher (if Mucaro AI is already running, the progress page goes straight to it).
- * With --smoke-test (automated checks only) it waits and returns the setup's exit code.
+ * Starts scripts\native_start.ps1 from the folder that contains this .exe, with CREATE_NO_WINDOW:
+ * PowerShell, the setup and the app share one console that has no window, so the only thing that
+ * appears is the Mucaro AI window itself (or one dialog if something fails). Returns at once; with
+ * --smoke-test (automated checks only) it waits and returns the setup's exit code.
  *
- * Built reproducibly by scripts/build_launchers.py (pinned zig) into build/launchers/. Not wired up yet:
- * no .exe is committed, and main's one_click_windows.ps1 has no --ui mode. These sources are the base
- * for the queued Windows double-click launcher.
+ * Built reproducibly by scripts/build_launchers.py (pinned zig); the committed Mucaro AI.exe must
+ * match packaging/launchers/windows/BUILD_SHA256.
  */
 #define WIN32_LEAN_AND_MEAN
 #define UNICODE
@@ -56,9 +54,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR ansi_args, int 
     }
     *slash = L'\0';
 
-    if (swprintf(script, BIG, L"%ls\\scripts\\one_click_windows.ps1", root) < 0 ||
+    if (swprintf(script, BIG, L"%ls\\scripts\\native_start.ps1", root) < 0 ||
         GetFileAttributesW(script) == INVALID_FILE_ATTRIBUTES) {
-        fail(L"Keep Start Mucaro AI.exe inside the mucaro-ai folder. It could not find the project files next to it.");
+        fail(L"Keep Mucaro AI.exe inside the mucaro-ai folder. It could not find the project files next to it.");
         return 2;
     }
 
@@ -71,7 +69,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR ansi_args, int 
 
     const wchar_t *args = arguments_after_program(GetCommandLineW());
     if (swprintf(command, BIG * 2,
-                 L"\"%ls\" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"%ls\" --ui %ls",
+                 L"\"%ls\" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"%ls\" %ls",
                  powershell, script, args) < 0) {
         fail(L"The Mucaro AI command line is too long.");
         return 2;
