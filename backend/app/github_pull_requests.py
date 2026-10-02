@@ -5,6 +5,7 @@ import re
 import subprocess
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
 
 from .coding_lifecycle import CodingLifecycleError, build_pull_request_request
 from .config import Settings, settings
@@ -68,6 +69,47 @@ def _gh_json(args: list[str], *, timeout_seconds: int = 45) -> Any:
     except json.JSONDecodeError as exc:
         raise GitHubPullRequestError("ERROR_GITHUB_PR_JSON", f"GitHub CLI returned invalid JSON: {exc}") from exc
 
+
+
+def _local_origin_repo(repo_root: str) -> str:
+    try:
+        git = resolve_local_tool("git")
+    except ValueError as exc:
+        raise GitHubPullRequestError("ERROR_GITHUB_PR_GIT_UNAVAILABLE", "Git is not allowlisted") from exc
+    if not git:
+        raise GitHubPullRequestError("ERROR_GITHUB_PR_GIT_UNAVAILABLE", "Git is not available in this runtime")
+    try:
+        proc = subprocess.run(
+            [git, "-C", repo_root, "remote", "get-url", "origin"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise GitHubPullRequestError("ERROR_GITHUB_PR_ORIGIN_UNAVAILABLE", "local origin could not be resolved") from exc
+    if proc.returncode != 0:
+        raise GitHubPullRequestError(
+            "ERROR_GITHUB_PR_ORIGIN_UNAVAILABLE",
+            (proc.stderr or proc.stdout or "origin is not configured").strip(),
+        )
+    value = proc.stdout.strip()
+    if value.startswith("git@github.com:"):
+        path = value.split(":", 1)[1]
+    else:
+        parsed = urlparse(value)
+        if parsed.hostname != "github.com":
+            raise GitHubPullRequestError("ERROR_GITHUB_PR_ORIGIN_NOT_GITHUB", "origin is not a github.com repository")
+        path = parsed.path.lstrip("/")
+    if path.endswith(".git"):
+        path = path[:-4]
+    parts = [part for part in path.split("/") if part]
+    if len(parts) != 2:
+        raise GitHubPullRequestError("ERROR_GITHUB_PR_ORIGIN_INVALID", "origin does not resolve to owner/name")
+    origin_repo = f"{parts[0]}/{parts[1]}"
+    if not REPO_PATTERN.fullmatch(origin_repo):
+        raise GitHubPullRequestError("ERROR_GITHUB_PR_ORIGIN_INVALID", "origin owner/name is invalid")
+    return origin_repo
 
 def _remote_branch_sha(repo: str, branch: str) -> str:
     payload = _gh_json(["api", f"repos/{repo}/git/ref/heads/{branch}"])
@@ -167,6 +209,13 @@ def open_or_update_pull_request(
             f"expected request {expected_request_sha256}, observed {observed_request_sha256}",
         )
 
+    origin_repo = _local_origin_repo(str(request["repo_root"]))
+    if origin_repo != remote_repo:
+        raise GitHubPullRequestError(
+            "ERROR_GITHUB_PR_ORIGIN_MISMATCH",
+            f"local origin resolves to {origin_repo}, requested remote is {remote_repo}",
+        )
+
     remote_head_sha = _remote_branch_sha(remote_repo, head_branch)
     if remote_head_sha != expected_head_sha:
         raise GitHubPullRequestError(
@@ -254,6 +303,7 @@ def open_or_update_pull_request(
         "action": action,
         "retrieved_utc": _utc_now(),
         "remote_repo": remote_repo,
+        "local_origin_repo": origin_repo,
         "request_sha256": expected_request_sha256,
         "local_head_sha": expected_head_sha,
         "remote_head_sha": remote_head_sha,
@@ -271,6 +321,7 @@ def open_or_update_pull_request(
         "network_action_performed": network_action_performed,
         "invariants": {
             "local_request_exact": observed_request_sha256 == expected_request_sha256,
+            "origin_repo_exact": origin_repo == remote_repo,
             "remote_head_exact": remote_head_sha == expected_head_sha,
             "pr_head_exact": pr.get("headRefOid") == expected_head_sha,
             "pr_head_branch_exact": pr.get("headRefName") == head_branch,
@@ -283,6 +334,7 @@ def open_or_update_pull_request(
         ],
         "falsification_criteria": [
             "reject local request hash drift",
+            "reject local origin repository mismatch",
             "reject local or remote head SHA drift",
             "reject multiple open PR candidates for the same head/base pair",
             "verify branch identity and head SHA again after every create/update action",
