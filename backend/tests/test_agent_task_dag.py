@@ -289,3 +289,69 @@ def test_checkpoint_task_transition_rejects_stale_sequence(tmp_path: Path) -> No
     assert stale.value.status == "ERROR_CHECKPOINT_CONFLICT"
     assert get_task_dag_state(checkpoint["checkpoint_id"], cfg)["ready_task_ids"] == ["inspect"]
     assert executing["sequence"] == 2
+
+
+def test_checkpoint_rejects_progressed_dag_as_initial_state(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    checkpoint = create_checkpoint(
+        session_id="session",
+        run_id="run",
+        objective="Audit",
+        source_sha=SHA,
+        state="PLANNING",
+        cfg=cfg,
+    )
+    dag = build_task_dag([{"id": "inspect", "title": "Inspect"}], created_at=NOW)
+    progressed = transition_task_dag(dag, task_id="inspect", state="RUNNING", now=NOW)
+
+    with pytest.raises(CheckpointError) as exc:
+        install_task_dag_state(
+            checkpoint["checkpoint_id"],
+            dag=progressed,
+            expected_sequence=checkpoint["sequence"],
+            cfg=cfg,
+        )
+    assert exc.value.status == "ERROR_CHECKPOINT_TASK_DAG_NOT_INITIAL"
+
+
+def test_paused_checkpoint_cannot_advance_task_dag(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    checkpoint = create_checkpoint(
+        session_id="session",
+        run_id="run",
+        objective="Audit",
+        source_sha=SHA,
+        state="PLANNING",
+        cfg=cfg,
+    )
+    dag = build_task_dag([{"id": "inspect", "title": "Inspect"}], created_at=NOW)
+    installed = install_task_dag_state(
+        checkpoint["checkpoint_id"],
+        dag=dag,
+        expected_sequence=0,
+        cfg=cfg,
+    )
+    executing = transition_checkpoint(
+        checkpoint["checkpoint_id"],
+        state="EXECUTING",
+        expected_sequence=installed["sequence"],
+        cfg=cfg,
+    )
+    paused = transition_checkpoint(
+        checkpoint["checkpoint_id"],
+        state="PAUSED_PROVIDER",
+        pause_reason="provider unavailable",
+        expected_sequence=executing["sequence"],
+        cfg=cfg,
+    )
+
+    with pytest.raises(CheckpointError) as exc:
+        transition_task_dag_state(
+            checkpoint["checkpoint_id"],
+            task_id="inspect",
+            state="RUNNING",
+            expected_sequence=paused["sequence"],
+            cfg=cfg,
+        )
+    assert exc.value.status == "ERROR_CHECKPOINT_TASK_DAG_NOT_EXECUTING"
+    assert get_task_dag_state(checkpoint["checkpoint_id"], cfg)["ready_task_ids"] == ["inspect"]
