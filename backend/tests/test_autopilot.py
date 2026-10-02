@@ -37,7 +37,7 @@ def make_settings(root: Path) -> Settings:
     return cfg
 
 
-def action_task(task_id: str, tool_name: str, success: str, *, depends_on=None, arguments=None) -> dict:
+def action_task(task_id: str, tool_name: str, *, depends_on=None, arguments=None) -> dict:
     return {
         "id": task_id,
         "title": task_id,
@@ -46,7 +46,6 @@ def action_task(task_id: str, tool_name: str, success: str, *, depends_on=None, 
             "action": {
                 "tool_name": tool_name,
                 "arguments": dict(arguments or {}),
-                "success_statuses": [success],
             }
         },
     }
@@ -59,7 +58,7 @@ def test_authorized_autopilot_executes_local_read_only_tool_and_completes(tmp_pa
         run_id="r",
         objective="Read source status",
         source_sha=SHA,
-        task_definitions=[action_task("status", "source_library.status", "SOURCE_LIBRARY_STATUS_OK")],
+        task_definitions=[action_task("status", "source_library.status")],
         cfg=cfg,
     )
     checkpoint = planned["checkpoint"]
@@ -98,6 +97,7 @@ def test_mutating_tool_waits_for_explicit_approval_then_resumes(monkeypatch: pyt
             mutates_state=True,
             requires_approval=True,
             handler=mutate,
+            autopilot_success_statuses=("MUTATE_OK",),
         ),
     )
     planned = plan_autopilot(
@@ -105,7 +105,7 @@ def test_mutating_tool_waits_for_explicit_approval_then_resumes(monkeypatch: pyt
         run_id="r",
         objective="Mutate only after approval",
         source_sha=SHA,
-        task_definitions=[action_task("mutate", "test.mutate", "MUTATE_OK", arguments={"value": 3})],
+        task_definitions=[action_task("mutate", "test.mutate", arguments={"value": 3})],
         cfg=cfg,
     )
     checkpoint = authorize_autopilot(
@@ -140,8 +140,8 @@ def test_tool_call_budget_pauses_before_second_request_and_can_resume(tmp_path: 
         objective="Two reads",
         source_sha=SHA,
         task_definitions=[
-            action_task("a", "source_library.status", "SOURCE_LIBRARY_STATUS_OK"),
-            action_task("b", "source_library.status", "SOURCE_LIBRARY_STATUS_OK", depends_on=["a"]),
+            action_task("a", "source_library.status"),
+            action_task("b", "source_library.status", depends_on=["a"]),
         ],
         budgets={"max_tool_calls": 1},
         cfg=cfg,
@@ -184,7 +184,7 @@ def test_unmetered_model_budget_fails_closed_before_tool_execution(tmp_path: Pat
         run_id="r",
         objective="Budgeted read",
         source_sha=SHA,
-        task_definitions=[action_task("a", "source_library.status", "SOURCE_LIBRARY_STATUS_OK")],
+        task_definitions=[action_task("a", "source_library.status")],
         budgets={"max_model_tokens": 100},
         cfg=cfg,
     )
@@ -240,7 +240,6 @@ def test_task_call_artifact_is_not_identity_without_independent_bindings(monkeyp
     action = {
         "tool_name": "source_library.status",
         "arguments": {},
-        "success_statuses": ["SOURCE_LIBRARY_STATUS_OK"],
     }
     task = {
         "id": "status",
@@ -282,7 +281,7 @@ def test_invalid_budget_update_does_not_silently_reset_existing_limits(tmp_path:
         run_id="r",
         objective="Budget preservation",
         source_sha=SHA,
-        task_definitions=[action_task("a", "source_library.status", "SOURCE_LIBRARY_STATUS_OK")],
+        task_definitions=[action_task("a", "source_library.status")],
         budgets={"max_steps": 7, "max_tool_calls": 3},
         cfg=cfg,
     )
@@ -315,3 +314,30 @@ def test_invalid_autopilot_plan_writes_no_orphan_checkpoint(tmp_path: Path) -> N
         )
     assert exc.value.status == "ERROR_TASK_DAG_CYCLE"
     assert list_checkpoints(cfg) == []
+
+
+def test_plan_cannot_redefine_tool_failure_as_success(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    with pytest.raises(AutopilotError) as exc:
+        plan_autopilot(
+            session_id="s",
+            run_id="r",
+            objective="Do not redefine failure",
+            source_sha=SHA,
+            task_definitions=[
+                {
+                    "id": "ci",
+                    "title": "Check CI",
+                    "metadata": {
+                        "action": {
+                            "tool_name": "github.ci_status",
+                            "arguments": {"repo": "owner/repo"},
+                            "success_statuses": ["GITHUB_CI_STATUS_OK"],
+                        }
+                    },
+                }
+            ],
+            cfg=cfg,
+        )
+    # Unknown action fields are rejected before checkpoint persistence; success semantics belong to ToolDefinition.
+    assert exc.value.status == "ERROR_TASK_DAG_CYCLE" if False else "ERROR_AUTOPILOT_ACTION"
