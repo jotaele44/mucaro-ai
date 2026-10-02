@@ -139,6 +139,10 @@ def plan_autopilot(
     cfg: Settings = settings,
 ) -> dict[str, Any]:
     state = build_autopilot_state(budgets=budgets)
+    try:
+        dag = build_task_dag(task_definitions)
+    except TaskDagError as exc:
+        raise AutopilotError(exc.status, exc.detail) from exc
     checkpoint = create_checkpoint(
         session_id=session_id,
         run_id=run_id,
@@ -151,14 +155,13 @@ def plan_autopilot(
         cfg=cfg,
     )
     try:
-        dag = build_task_dag(task_definitions)
         checkpoint = install_task_dag_state(
             checkpoint["checkpoint_id"],
             dag=dag,
             expected_sequence=checkpoint["sequence"],
             cfg=cfg,
         )
-    except (TaskDagError, CheckpointError) as exc:
+    except CheckpointError as exc:
         raise AutopilotError(exc.status, exc.detail) from exc
     return {
         "status": "AUTOPILOT_PLANNED",
