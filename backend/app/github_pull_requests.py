@@ -131,8 +131,6 @@ def _open_prs(repo: str, *, head_branch: str, base_branch: str) -> list[dict[str
             repo,
             "--head",
             head_branch,
-            "--base",
-            base_branch,
             "--state",
             "open",
             "--json",
@@ -144,7 +142,7 @@ def _open_prs(repo: str, *, head_branch: str, base_branch: str) -> list[dict[str
     if len(payload) > 1:
         raise GitHubPullRequestError(
             "ERROR_GITHUB_PR_AMBIGUOUS",
-            f"multiple open pull requests exist for {head_branch} -> {base_branch}",
+            f"multiple open pull requests exist for head branch {head_branch}; base identity is ambiguous",
         )
     return payload
 
@@ -261,12 +259,16 @@ def open_or_update_pull_request(
                 "ERROR_GITHUB_PR_EXISTING_HEAD_DRIFT",
                 f"open PR head is {pr.get('headRefOid')}, expected {expected_head_sha}",
             )
-        if pr.get("headRefName") != head_branch or pr.get("baseRefName") != base_branch:
-            raise GitHubPullRequestError("ERROR_GITHUB_PR_EXISTING_IDENTITY", "open PR branch identity does not match the approved request")
+        if pr.get("headRefName") != head_branch:
+            raise GitHubPullRequestError("ERROR_GITHUB_PR_EXISTING_IDENTITY", "open PR head branch identity does not match the approved request")
         number = pr.get("number")
         if not isinstance(number, int):
             raise GitHubPullRequestError("ERROR_GITHUB_PR_EXISTING_IDENTITY", "open PR has no numeric identity")
-        if pr.get("title") == request["title"] and (pr.get("body") or "") == request["body"]:
+        if (
+            pr.get("title") == request["title"]
+            and (pr.get("body") or "") == request["body"]
+            and pr.get("baseRefName") == base_branch
+        ):
             action = "UNCHANGED"
         else:
             _gh(
