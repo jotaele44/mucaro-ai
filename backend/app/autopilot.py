@@ -452,22 +452,18 @@ def _action(task: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if not isinstance(raw, dict):
         raise AutopilotError("ERROR_AUTOPILOT_ACTION", f"{task['id']}: action must be an object")
-    allowed = {"tool_name", "arguments", "success_statuses"}
+    allowed = {"tool_name", "arguments"}
     if set(raw) - allowed:
         raise AutopilotError("ERROR_AUTOPILOT_ACTION", f"{task['id']}: action has unknown fields")
     tool_name = raw.get("tool_name")
     arguments = raw.get("arguments")
-    success_statuses = raw.get("success_statuses")
     if not isinstance(tool_name, str) or not tool_name:
         raise AutopilotError("ERROR_AUTOPILOT_ACTION", f"{task['id']}: tool_name is required")
     if not isinstance(arguments, dict):
         raise AutopilotError("ERROR_AUTOPILOT_ACTION", f"{task['id']}: arguments must be an object")
-    if not isinstance(success_statuses, list) or not success_statuses or not all(isinstance(item, str) and item for item in success_statuses):
-        raise AutopilotError("ERROR_AUTOPILOT_ACTION", f"{task['id']}: non-empty success_statuses is required")
     return {
         "tool_name": tool_name,
         "arguments": deepcopy(arguments),
-        "success_statuses": list(dict.fromkeys(success_statuses)),
     }
 
 
@@ -591,7 +587,9 @@ def _terminalize_tool_result(
         "result_status": result.get("status"),
         "result_sha256": canonical_sha256(result),
     }]
-    if call.get("status") == "EXECUTED" and result.get("status") in action["success_statuses"]:
+    tool = TOOL_REGISTRY[action["tool_name"]]
+    success = tool.autopilot_result_is_success(result) if call.get("status") == "EXECUTED" else False
+    if success is True:
         checkpoint = _transition_task(checkpoint, task_id=task["id"], state="PASSED", evidence=evidence, cfg=cfg)
         return checkpoint, "PASSED"
     checkpoint = _transition_task(checkpoint, task_id=task["id"], state="FAILED", evidence=evidence, cfg=cfg)
@@ -697,6 +695,16 @@ def advance_autopilot(checkpoint_id: str, *, cfg: Settings = settings) -> dict[s
                 blocked_reason=f"tool_unavailable:{action['tool_name']}",
                 cfg=cfg,
             )
+        checkpoint = _set_runtime_status(checkpoint, status="STOPPED", stop_reason="REQUIRED_CAPABILITY_UNAVAILABLE", cfg=cfg)
+        return {"status": "AUTOPILOT_STOPPED", "reason": "REQUIRED_CAPABILITY_UNAVAILABLE", "task_id": task["id"], "checkpoint": checkpoint}
+    if not TOOL_REGISTRY[action["tool_name"]].autopilot_success_statuses:
+        checkpoint = _transition_task(
+            checkpoint,
+            task_id=task["id"],
+            state="BLOCKED",
+            blocked_reason=f"autopilot_success_contract_missing:{action['tool_name']}",
+            cfg=cfg,
+        )
         checkpoint = _set_runtime_status(checkpoint, status="STOPPED", stop_reason="REQUIRED_CAPABILITY_UNAVAILABLE", cfg=cfg)
         return {"status": "AUTOPILOT_STOPPED", "reason": "REQUIRED_CAPABILITY_UNAVAILABLE", "task_id": task["id"], "checkpoint": checkpoint}
 
