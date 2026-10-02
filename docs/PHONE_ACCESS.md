@@ -12,7 +12,7 @@ Phone access is off unless you ask for it. A normal launch listens on this compu
 
 | How you start Mucaro | What to do |
 |---|---|
-| `Mucaro AI.app` (macOS) | Add `MUCARO_AI_PHONE_ACCESS=1` to `.env`, then open the app. A dialog offers **Copy link**. |
+| `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows) | Add `MUCARO_AI_PHONE_ACCESS=1` to `.env`, then open the app. A dialog offers to copy the link (a **Copy link** button on macOS, a Yes or No question on Windows). |
 | `Mucaro AI.command`, `Mucaro AI.cmd` | Add `MUCARO_AI_PHONE_ACCESS=1` to `.env`, or pass `--phone` from a terminal. The window prints the link. |
 | A terminal | `python scripts/launch_app.py --phone` |
 
@@ -55,7 +55,7 @@ Generate a token with `python -c "import secrets; print(secrets.token_urlsafe(32
 | Another device is not told the computer's file paths or allowed origins by `/health` or `/config` | `backend/app/main.py` |
 | The token is compared in constant time, and it travels in a header, never in a URL path or query | `backend/app/auth.py`, `frontend/src/api.js` |
 | The app's own window on the computer gets the token too, so nothing on the machine is left open | `scripts/launch_app.py` |
-| The macOS app keeps the token out of its log file and passes the link to the dialog through the environment, not the process arguments | `scripts/launch_app.py`, `scripts/native_window.py` |
+| The native apps (macOS and Windows) keep the token out of their log files. The macOS dialog gets the link through the environment, not the process arguments | `scripts/launch_app.py`, `scripts/native_window.py` |
 
 The web page itself (HTML and scripts) is served to anyone who can reach the port. It contains no data.
 
@@ -102,14 +102,15 @@ network address Mucaro still works, with these differences:
 
 - The server checks run against a simulated remote peer in `backend/tests/test_phone_access.py`:
   the strong-token rule, the remote refusal, the redaction, the launcher plan, the TLS arguments
-  and the native-app dialog.
+  and the native-app dialogs (with fakes for the macOS and Windows calls).
 - The browser checks in `qa/rendered/rendered_qa.mjs` drive an emulated iPhone against a real
   backend, including a real non-loopback address of the test machine: the token gate, a changed
   token, remember-on-device, the cleartext notice, and Copy without the clipboard API.
 
 Still open, and needing a person with a phone: signing in on a physical iPhone over a real Wi-Fi
 network, the on-screen keyboard and the password field, resuming after the phone locks, the macOS
-firewall prompt, and a network that isolates clients.
+firewall prompt, and a network that isolates clients. The two native-app dialogs have not been run
+on a real Mac or a real Windows PC either.
 
 ## Not supported
 

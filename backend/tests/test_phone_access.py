@@ -451,7 +451,7 @@ def test_native_phone_launch_keeps_the_token_out_of_the_log_and_offers_the_link_
     assert "PHONE_URL http://192.168.1.20:54321/ (token withheld from this log)" in captured.out
     ((message, link),) = offered
     assert link == f"http://192.168.1.20:54321/#token={token}"
-    assert "Copy link" in message and token not in message
+    assert "Copy the link" in message and token not in message
     assert windows == [f"http://127.0.0.1:54321/#token={token}"]  # this computer's own window needs the token too
 
 
@@ -491,7 +491,50 @@ def test_the_phone_dialog_keeps_the_link_out_of_the_process_arguments(monkeypatc
     assert "Copy link" not in " ".join(plain_cmd) and plain_kwargs["env"] is None
 
 
-def test_the_phone_dialog_does_nothing_off_macos(monkeypatch):
+def test_the_windows_phone_dialog_asks_before_copying_and_keeps_the_link_out_of_the_dialog(monkeypatch):
+    native = launch_app.native_window
+    boxes, copies = [], []
+    answers = iter([6, 7])  # IDYES, then IDNO
+
+    class User32:
+        def MessageBoxW(self, hwnd, text, caption, flags):
+            boxes.append((text, caption, flags))
+            return next(answers)
+
+    monkeypatch.setattr(native, "_windll", lambda name: User32())
+    monkeypatch.setattr(native.subprocess, "run", lambda cmd, **kwargs: copies.append((cmd, kwargs)))
+    link = "http://192.168.1.20:8000/#token=SECRET"
+
+    native._windows_phone_dialog("Phone access is on.", link)  # the person says Yes
+    native._windows_phone_dialog("Phone access is on.", link)  # the person says No
+    native._windows_phone_dialog("No private network address.", "")  # nothing to copy: a plain message
+
+    assert len(boxes) == 3 and all("SECRET" not in text for text, _, _ in boxes)
+    assert boxes[0][0].endswith("Copy the link to the clipboard?") and boxes[0][2] & 0x4  # a Yes/No box
+    assert not boxes[2][2] & 0x4 and "clipboard" not in boxes[2][0]  # no question without a link
+    assert [cmd for cmd, _ in copies] == [["clip"]] and copies[0][1]["input"] == link  # only the Yes copied
+
+
+def test_the_windows_phone_dialog_runs_on_its_own_thread_so_the_window_still_opens(monkeypatch):
+    native = launch_app.native_window
+    threads = []
+
+    class FakeThread:
+        def __init__(self, target, args, name, daemon):
+            threads.append((target, args, daemon))
+
+        def start(self):
+            threads.append("started")
+
+    monkeypatch.setattr(native.sys, "platform", "win32")
+    monkeypatch.setattr(native.threading, "Thread", FakeThread)
+
+    native.show_phone_link("Phone access is on.", "http://192.168.1.20:8000/#token=SECRET")
+
+    assert threads == [(native._windows_phone_dialog, ("Phone access is on.", "http://192.168.1.20:8000/#token=SECRET"), True), "started"]
+
+
+def test_the_phone_dialog_does_nothing_off_macos_and_windows(monkeypatch):
     native = launch_app.native_window
     spawned = []
     monkeypatch.setattr(native.sys, "platform", "linux")
