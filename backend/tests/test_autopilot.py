@@ -356,3 +356,33 @@ def test_tool_owned_success_contract_rejects_ci_and_regression_failure_receipts(
     assert regression.autopilot_result_is_success(
         {"status": "CODING_CHECK_SUITE_EXECUTED_FAIL", "execution_status": "FAIL"}
     ) is False
+
+
+def test_tool_without_autopilot_success_contract_is_rejected_before_persistence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cfg = make_settings(tmp_path)
+    monkeypatch.setitem(
+        TOOL_REGISTRY,
+        "test.no_contract",
+        ToolDefinition(
+            name="test.no_contract",
+            description="no autonomous success semantics",
+            mutates_state=False,
+            requires_approval=True,
+            handler=lambda arguments, settings: {"status": "OK"},
+        ),
+    )
+
+    with pytest.raises(AutopilotError) as exc:
+        plan_autopilot(
+            session_id="s",
+            run_id="r",
+            objective="Must fail closed",
+            source_sha=SHA,
+            task_definitions=[action_task("probe", "test.no_contract")],
+            cfg=cfg,
+        )
+    assert exc.value.status == "ERROR_AUTOPILOT_SUCCESS_CONTRACT_MISSING"
+    assert list_checkpoints(cfg) == []
