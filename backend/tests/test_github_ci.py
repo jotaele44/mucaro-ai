@@ -4,6 +4,7 @@ import pytest
 
 import backend.app.github_ci as github_ci
 from backend.app.github_ci import GitHubCIError, read_github_ci_status
+from backend.app.local_tools import KNOWN_LOCAL_TOOLS
 
 
 def test_ci_status_binds_latest_run_to_expected_head(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -97,3 +98,7 @@ def test_ci_status_input_negative_controls(kwargs, status: str) -> None:
     with pytest.raises(GitHubCIError) as blocked:
         read_github_ci_status(**kwargs)
     assert blocked.value.status == status
+
+def test_github_cli_is_a_controlled_local_tool_name() -> None:
+    assert "gh" in KNOWN_LOCAL_TOOLS
+
