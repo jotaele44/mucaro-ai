@@ -170,10 +170,11 @@
       "discovered_by": "release-certification audit 2026-09-29",
       "evidence": [
         "backend/app/desktop_shell.py _bind_loopback binds 127.0.0.1",
-        "docs/RELEASE_SCOPE_2026-09-29.md: phone access to the local Mac is not part of the responsive UI evidence"
+        "docs/RELEASE_SCOPE_2026-09-29.md: phone access to the local Mac is not part of the responsive UI evidence",
+        "2026-10-01 adoption: the packaged app is unchanged and stays loopback-only; the adopted scope is access through the source launcher (scripts/launch_app.py --phone) with an access token and optional TLS flags, see docs/PHONE_ACCESS.md"
       ],
-      "adopted": false,
-      "adoption_authority": null,
+      "adopted": true,
+      "adoption_authority": "Project owner affirmation in the active session, 2026-10-01: phone access over a private network or VPN is a supported mode. Adopted scope: the source launcher with an access token and optional TLS. Not adopted: an installable web app, a native client (SD-010) and serving from the packaged app.",
       "parent_requirement_ids": [
         "MOB-F01",
         "TGT-021"

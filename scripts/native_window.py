@@ -42,6 +42,18 @@ _NOTIFY_SCRIPT = (
 )
 
 
+# The link carries the access token, so it reaches this script through the environment, never through argv (which
+# any local user can list) and never through a log file.
+_PHONE_LINK_VARIABLE = "MUCARO_PHONE_LINK"
+_PHONE_SCRIPT = (
+    "on run argv",
+    'set answer to button returned of (display dialog (item 1 of argv) with title "Mucaro AI" '
+    'buttons {"Copy link", "OK"} default button "OK" with icon note)',
+    f'if answer is "Copy link" then set the clipboard to (system attribute "{_PHONE_LINK_VARIABLE}")',
+    "end run",
+)
+
+
 def _osascript(script: tuple[str, ...], message: str) -> None:
     if sys.platform != "darwin":
         return
@@ -70,6 +82,43 @@ def show_dialog(message: str) -> None:
 
 def notify(message: str) -> None:
     _osascript(_NOTIFY_SCRIPT, message)
+
+
+def _windows_phone_dialog(message: str, link: str) -> None:
+    """Windows has no scriptable dialog with a Copy button: ask Yes or No, then copy with clip.exe.
+
+    The link goes to the clipboard on request and is never part of the dialog text or a log.
+    """
+    mb_yesno, mb_iconinformation, mb_setforeground, id_yes = 0x4, 0x40, 0x10000, 6
+    with contextlib.suppress(Exception):
+        if not link:
+            _windll("user32").MessageBoxW(None, message, APP_NAME, mb_iconinformation | mb_setforeground)
+            return
+        answer = _windll("user32").MessageBoxW(
+            None, f"{message}\n\nCopy the link to the clipboard?", APP_NAME, mb_yesno | mb_iconinformation | mb_setforeground
+        )
+        if answer == id_yes:
+            subprocess.run(["clip"], input=link, text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10, check=False)
+
+
+def show_phone_link(message: str, link: str) -> None:
+    """Say how a phone can reach Mucaro and offer to copy the link. Does not wait: the app window opens meanwhile.
+
+    An empty link shows the message alone (phone access is on but there is nothing to open yet).
+    """
+    if sys.platform == "win32":
+        # A message box waits for an answer, so it gets its own thread while the window opens.
+        threading.Thread(target=_windows_phone_dialog, args=(message, link), name="mucaro-phone-link", daemon=True).start()
+        return
+    if sys.platform != "darwin":
+        return
+    cmd = ["/usr/bin/osascript"]
+    for line in _PHONE_SCRIPT if link else _DIALOG_SCRIPT:
+        cmd += ["-e", line]
+    cmd += ["--", message]
+    env = {**os.environ, _PHONE_LINK_VARIABLE: link} if link else None
+    with contextlib.suppress(OSError, subprocess.SubprocessError):
+        subprocess.Popen(cmd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def _windows_pid_alive(pid: int) -> bool:
