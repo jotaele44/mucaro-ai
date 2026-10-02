@@ -186,7 +186,10 @@ tracked changes.
    remove the one-time Gatekeeper/SmartScreen prompt for ZIP downloads.
 2. **Git-backed coding tools.** Runtime identity no longer launches `git`; it reads bound build
    identity or local `.git` metadata directly. Coding repository/diff/patch operations still use
-   Git and are now classified as a bundle/replace dependency by the offline manifest.
+   Git and are now classified as a bundle/replace dependency by the offline manifest. In a source
+   checkout on macOS, `/usr/bin/git` is used only when the Command Line Tools or Xcode are
+   installed (`backend/app/local_tools.py`, `macos_developer_tools_present`); otherwise `/repo` and
+   `/diff` report Git as unavailable instead of opening Apple's "install developer tools" dialog.
 3. **Python lock file.** `--exclude-newer` freezes resolution by date. A committed lock file
    (for example `uv.lock`) would also pin exact versions for the developer bootstrap and CI.
 4. **Windows on ARM.** The setup could run x64 Python under emulation; not attempted because it
