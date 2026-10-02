@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .coding_container import CodingContainerError, build_coding_container_plan, run_coding_container_plan
+from .coding_lifecycle import CodingLifecycleError, commit_approved_changes, create_work_branch_transaction
 from .coding_checks import CodingCheck, CodingCheckError, execute_coding_check_suite
 from .coding_mutation import CodingMutationError, apply_patch_transaction
 from .coding_patch import validate_patch_proposal
@@ -250,6 +251,56 @@ def _coding_exec(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     }
 
 
+
+def _coding_branch_create(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    branch_name = arguments.get("branch_name")
+    expected_head_sha = arguments.get("expected_head_sha")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.branch_create requires a non-empty repo_root argument.")
+    if not isinstance(branch_name, str) or not branch_name.strip():
+        raise ToolRuntimeError("ERROR_CODING_BRANCH_REQUIRED", "coding.branch_create requires branch_name.")
+    if not isinstance(expected_head_sha, str) or not expected_head_sha:
+        raise ToolRuntimeError("ERROR_CODING_BRANCH_HEAD_REQUIRED", "coding.branch_create requires expected_head_sha.")
+    try:
+        return create_work_branch_transaction(
+            repo_root,
+            branch_name=branch_name,
+            expected_head_sha=expected_head_sha,
+            cfg=cfg,
+        )
+    except CodingLifecycleError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _coding_commit(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    expected_head_sha = arguments.get("expected_head_sha")
+    expected_branch = arguments.get("expected_branch")
+    approved_paths = arguments.get("approved_paths")
+    message = arguments.get("message")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.commit requires a non-empty repo_root argument.")
+    if not isinstance(expected_head_sha, str) or not expected_head_sha:
+        raise ToolRuntimeError("ERROR_CODING_COMMIT_HEAD_REQUIRED", "coding.commit requires expected_head_sha.")
+    if not isinstance(expected_branch, str) or not expected_branch.strip():
+        raise ToolRuntimeError("ERROR_CODING_COMMIT_BRANCH_REQUIRED", "coding.commit requires expected_branch.")
+    if not isinstance(approved_paths, list) or not approved_paths:
+        raise ToolRuntimeError("ERROR_CODING_COMMIT_PATHS_REQUIRED", "coding.commit requires approved_paths.")
+    if not isinstance(message, str) or not message.strip():
+        raise ToolRuntimeError("ERROR_CODING_COMMIT_MESSAGE_REQUIRED", "coding.commit requires a non-empty message.")
+    try:
+        return commit_approved_changes(
+            repo_root,
+            expected_head_sha=expected_head_sha,
+            expected_branch=expected_branch,
+            approved_paths=approved_paths,
+            message=message,
+            cfg=cfg,
+        )
+    except CodingLifecycleError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
 def _coding_regression_run(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     repo_root = arguments.get("repo_root")
     image = arguments.get("image")
@@ -434,6 +485,22 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         handler=_coding_exec,
         timeout_seconds=150.0,
+    ),
+    "coding.branch_create": ToolDefinition(
+        name="coding.branch_create",
+        description="Create one approved non-protected Git work branch only when the repository is clean and exact HEAD matches the approved source SHA.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_coding_branch_create,
+        timeout_seconds=60.0,
+    ),
+    "coding.commit": ToolDefinition(
+        name="coding.commit",
+        description="Commit exactly the approved dirty-path set on the exact approved non-protected branch and parent SHA, with rollback on commit or postcondition failure.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_coding_commit,
+        timeout_seconds=120.0,
     ),
     "coding.regression_run": ToolDefinition(
         name="coding.regression_run",

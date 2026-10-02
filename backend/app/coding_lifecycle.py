@@ -125,7 +125,7 @@ def create_work_branch_transaction(
     try:
         after = inspect_repository(context.repo_root, cfg=cfg)
     except Exception as exc:
-        rollback_args = ("switch", original_branch) if original_branch != "DETACHED" else ("switch", "--detach", expected_head_sha)
+        rollback_args = ("switch", original_branch) if original_branch else ("switch", "--detach", expected_head_sha)
         rollback = _git(context.repo_root, *rollback_args)
         raise CodingLifecycleError(
             "ERROR_CODING_BRANCH_VERIFY_FAILED",
@@ -133,7 +133,7 @@ def create_work_branch_transaction(
         ) from exc
 
     if after["head_sha"] != expected_head_sha or after["branch"] != branch_name or after["dirty_status"] != "CLEAN":
-        rollback_args = ("switch", original_branch) if original_branch != "DETACHED" else ("switch", "--detach", expected_head_sha)
+        rollback_args = ("switch", original_branch) if original_branch else ("switch", "--detach", expected_head_sha)
         rollback = _git(context.repo_root, *rollback_args)
         rollback_status = "CODING_BRANCH_ROLLED_BACK" if rollback.returncode == 0 else "CODING_BRANCH_ROLLBACK_FAILED"
         receipt = {
