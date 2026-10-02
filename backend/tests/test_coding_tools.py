@@ -255,3 +255,31 @@ def test_coding_exec_rejects_network_enablement(tmp_path: Path) -> None:
         run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
     assert blocked.value.status == "ERROR_CODING_EXEC_NETWORK_POLICY"
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("timeout_seconds", 121),
+        ("max_output_bytes", 2 * 1024 * 1024 + 1),
+        ("memory_mb", 4097),
+        ("cpus", 4.25),
+        ("pids_limit", 513),
+        ("workspace_mb", 4097),
+    ],
+)
+def test_coding_exec_rejects_resource_ceiling_overrides(tmp_path: Path, field: str, value) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    arguments = {
+        "repo_root": str(repo),
+        "image": "sha256:" + ("a" * 64),
+        "command": ["python", "-V"],
+        field: value,
+    }
+    requested = request_tool_call("coding.exec", arguments, cfg=cfg, requested_by="test")
+    tool_call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
+
+    with pytest.raises(ToolRuntimeError) as blocked:
+        run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
+    assert blocked.value.status == "ERROR_CODING_EXEC_RESOURCE_LIMIT"
+
