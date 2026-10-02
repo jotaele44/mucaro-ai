@@ -14,6 +14,7 @@ from backend.app.autopilot import (
     run_autopilot,
     update_autopilot_budgets,
 )
+from backend.app.agent_checkpoints import list_checkpoints
 from backend.app.config import Settings
 from backend.app.tools import TOOL_REGISTRY, ToolDefinition, approve_tool_call, list_tool_calls
 
@@ -296,3 +297,21 @@ def test_invalid_budget_update_does_not_silently_reset_existing_limits(tmp_path:
     state = updated["metadata"]["autopilot"]
     assert state["budgets"]["max_steps"] == 7
     assert state["budgets"]["max_tool_calls"] == 4
+
+
+def test_invalid_autopilot_plan_writes_no_orphan_checkpoint(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    with pytest.raises(AutopilotError) as exc:
+        plan_autopilot(
+            session_id="s",
+            run_id="r",
+            objective="Invalid cycle",
+            source_sha=SHA,
+            task_definitions=[
+                {"id": "a", "title": "A", "depends_on": ["b"]},
+                {"id": "b", "title": "B", "depends_on": ["a"]},
+            ],
+            cfg=cfg,
+        )
+    assert exc.value.status == "ERROR_TASK_DAG_CYCLE"
+    assert list_checkpoints(cfg) == []
