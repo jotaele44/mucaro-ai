@@ -44,14 +44,15 @@ def test_committed_denominator_closes_against_live_registry() -> None:
     assert len(report["registry_sha256"]) == 64
 
 
-def test_absent_flagpole_capabilities_keep_certification_open() -> None:
+def test_all_flagpole_tool_capabilities_are_present_but_execution_certification_remains_provisional() -> None:
     report = build_tool_denominator(REPO)
 
-    assert report["certification_state"] == "OPEN"
-    assert set(report["open_capabilities"]) == {
-        "pull_request.open_update",
-    }
+    assert report["certification_state"] == "PROVISIONAL"
+    assert report["open_capabilities"] == []
+    assert report["counts"]["absent"] == 0
+    assert report["counts"]["unexercised_tools"] == 0
     for row in report["required_capabilities"]:
+        assert row["state"] == "PRESENT", row["id"]
         assert row["clause"], row["id"]
 
 
@@ -73,6 +74,11 @@ def test_runtime_evidence_is_derived_from_governed_requests() -> None:
         assert tools[name]["evidence_state"] == "EXERCISED", name
         assert tools[name]["classification"] == "REQUIRED"
         assert tools[name]["mutates_state"] is True
+    assert tools["coding.pr_request"]["evidence_state"] == "EXERCISED"
+    assert tools["coding.pr_request"]["classification"] == "SUPPORTING"
+    assert tools["github.pr_open_update"]["evidence_state"] == "EXERCISED"
+    assert tools["github.pr_open_update"]["classification"] == "REQUIRED"
+    assert tools["github.pr_open_update"]["mutates_state"] is True
     assert all(row["requires_approval"] for row in tools.values())
 
 
