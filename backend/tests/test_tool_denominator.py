@@ -49,8 +49,6 @@ def test_absent_flagpole_capabilities_keep_certification_open() -> None:
 
     assert report["certification_state"] == "OPEN"
     assert set(report["open_capabilities"]) == {
-        "ci.status.read",
-        "regression.run",
         "vcs.branch_commit",
         "pull_request.open_update",
     }
@@ -69,6 +67,9 @@ def test_runtime_evidence_is_derived_from_governed_requests() -> None:
         assert tools[name]["classification"] == "REQUIRED"
     assert tools["coding.exec"]["evidence_state"] == "EXERCISED"
     assert tools["coding.exec"]["classification"] == "SUPPORTING"
+    for name in ("coding.regression_run", "github.ci_status"):
+        assert tools[name]["evidence_state"] == "EXERCISED", name
+        assert tools[name]["classification"] == "REQUIRED"
     assert all(row["requires_approval"] for row in tools.values())
 
 

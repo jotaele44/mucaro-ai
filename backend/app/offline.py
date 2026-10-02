@@ -58,6 +58,8 @@ _TOOL_LOCAL_DEPENDENCIES: dict[str, tuple[str, str]] = {
     "coding.patch_check": ("binary", "git"),
     "coding.patch_apply": ("binary", "git"),
     "coding.exec": ("binary_any", "docker,podman"),
+    "coding.regression_run": ("binary_any", "docker,podman"),
+    "github.ci_status": ("binary", "gh"),
     "web.render": ("python_module", "playwright"),
 }
 
