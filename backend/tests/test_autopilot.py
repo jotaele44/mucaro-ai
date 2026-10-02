@@ -340,4 +340,19 @@ def test_plan_cannot_redefine_tool_failure_as_success(tmp_path: Path) -> None:
             cfg=cfg,
         )
     # Unknown action fields are rejected before checkpoint persistence; success semantics belong to ToolDefinition.
-    assert exc.value.status == "ERROR_TASK_DAG_CYCLE" if False else "ERROR_AUTOPILOT_ACTION"
+    assert exc.value.status == "ERROR_AUTOPILOT_ACTION"
+    assert list_checkpoints(cfg) == []
+
+
+def test_tool_owned_success_contract_rejects_ci_and_regression_failure_receipts() -> None:
+    ci = TOOL_REGISTRY["github.ci_status"]
+    regression = TOOL_REGISTRY["coding.regression_run"]
+
+    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "state": "PASS"}) is True
+    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "state": "FAIL"}) is False
+    assert regression.autopilot_result_is_success(
+        {"status": "CODING_CHECK_SUITE_EXECUTED_PASS", "execution_status": "PASS"}
+    ) is True
+    assert regression.autopilot_result_is_success(
+        {"status": "CODING_CHECK_SUITE_EXECUTED_FAIL", "execution_status": "FAIL"}
+    ) is False
