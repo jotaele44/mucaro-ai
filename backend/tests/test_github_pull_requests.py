@@ -124,13 +124,14 @@ def test_pr_update_revalidates_existing_identity_and_postcondition(
         "body": "Old body",
         "headRefName": "feature/video-cli",
         "headRefOid": head,
-        "baseRefName": "main",
+        "baseRefName": "develop",
         "isDraft": False,
     }
     updated = {
         **existing,
         "title": "New",
         "body": "New body",
+        "baseRefName": "main",
         "state": "OPEN",
     }
 
@@ -297,4 +298,18 @@ def test_pr_origin_mismatch_blocks_before_remote_head_lookup(
             cfg=cfg,
         )
     assert blocked.value.status == "ERROR_GITHUB_PR_ORIGIN_MISMATCH"
+
+def test_open_pr_discovery_is_head_scoped_so_base_retarget_is_possible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[str] = []
+
+    def fake_json(args, *, timeout_seconds=45):
+        captured.extend(args)
+        return []
+
+    monkeypatch.setattr(github_pr, "_gh_json", fake_json)
+    assert github_pr._open_prs("jotaele44/mucaro-ai", head_branch="feature/video-cli", base_branch="main") == []
+    assert "--head" in captured
+    assert "--base" not in captured
 
