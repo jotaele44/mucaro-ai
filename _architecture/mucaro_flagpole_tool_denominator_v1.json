@@ -87,13 +87,16 @@
       "id": "TOOL-08",
       "capability": "pull_request.open_update",
       "clause": "open or update PRs where authorized",
-      "satisfied_by": [],
-      "state": "ABSENT",
+      "satisfied_by": [
+        "github.pr_open_update"
+      ],
+      "state": "PRESENT",
       "owner_domain": "V13",
-      "note": "No governed pull request tool."
+      "note": "Governed authenticated PR create/update is bound to an exact local request hash and exact remote head SHA."
     }
   ],
   "supporting_tools": [
+    "coding.pr_request",
     "coding.exec",
     "memory.list",
     "product.audit",

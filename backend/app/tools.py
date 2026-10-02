@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .coding_container import CodingContainerError, build_coding_container_plan, run_coding_container_plan
-from .coding_lifecycle import CodingLifecycleError, commit_approved_changes, create_work_branch_transaction
+from .coding_lifecycle import CodingLifecycleError, build_pull_request_request, commit_approved_changes, create_work_branch_transaction
 from .coding_checks import CodingCheck, CodingCheckError, execute_coding_check_suite
 from .coding_mutation import CodingMutationError, apply_patch_transaction
 from .coding_patch import validate_patch_proposal
@@ -14,6 +14,7 @@ from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_
 from .config import Settings, settings
 from .contracts import validate_contract
 from .github_ci import GitHubCIError, read_github_ci_status
+from .github_pull_requests import GitHubPullRequestError, open_or_update_pull_request
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
 from .product_audit import build_product_audit
@@ -301,6 +302,71 @@ def _coding_commit(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     except CodingLifecycleError as exc:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
+
+def _coding_pr_request(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    expected_head_sha = arguments.get("expected_head_sha")
+    head_branch = arguments.get("head_branch")
+    base_branch = arguments.get("base_branch")
+    title = arguments.get("title")
+    body = arguments.get("body", "")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.pr_request requires a non-empty repo_root argument.")
+    if not isinstance(expected_head_sha, str) or not expected_head_sha:
+        raise ToolRuntimeError("ERROR_CODING_PR_HEAD_REQUIRED", "coding.pr_request requires expected_head_sha.")
+    if not isinstance(head_branch, str) or not head_branch.strip():
+        raise ToolRuntimeError("ERROR_CODING_PR_HEAD_BRANCH_REQUIRED", "coding.pr_request requires head_branch.")
+    if not isinstance(base_branch, str) or not base_branch.strip():
+        raise ToolRuntimeError("ERROR_CODING_PR_BASE_BRANCH_REQUIRED", "coding.pr_request requires base_branch.")
+    if not isinstance(title, str) or not title.strip():
+        raise ToolRuntimeError("ERROR_CODING_PR_TITLE_REQUIRED", "coding.pr_request requires title.")
+    if not isinstance(body, str):
+        raise ToolRuntimeError("ERROR_CODING_PR_BODY_INVALID", "coding.pr_request body must be a string.")
+    try:
+        return build_pull_request_request(
+            repo_root,
+            expected_head_sha=expected_head_sha,
+            head_branch=head_branch,
+            base_branch=base_branch,
+            title=title,
+            body=body,
+            cfg=cfg,
+        )
+    except CodingLifecycleError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _github_pr_open_update(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    required = (
+        "repo_root",
+        "remote_repo",
+        "expected_head_sha",
+        "head_branch",
+        "base_branch",
+        "title",
+        "expected_request_sha256",
+    )
+    missing = [key for key in required if not isinstance(arguments.get(key), str) or not arguments.get(key).strip()]
+    if missing:
+        raise ToolRuntimeError("ERROR_GITHUB_PR_ARGUMENT_REQUIRED", f"missing required string arguments: {','.join(missing)}")
+    body = arguments.get("body", "")
+    if not isinstance(body, str):
+        raise ToolRuntimeError("ERROR_GITHUB_PR_BODY_INVALID", "github.pr_open_update body must be a string.")
+    try:
+        return open_or_update_pull_request(
+            arguments["repo_root"],
+            remote_repo=arguments["remote_repo"],
+            expected_head_sha=arguments["expected_head_sha"],
+            head_branch=arguments["head_branch"],
+            base_branch=arguments["base_branch"],
+            title=arguments["title"],
+            body=body,
+            expected_request_sha256=arguments["expected_request_sha256"],
+            cfg=cfg,
+        )
+    except GitHubPullRequestError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
 def _coding_regression_run(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     repo_root = arguments.get("repo_root")
     image = arguments.get("image")
@@ -501,6 +567,23 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         handler=_coding_commit,
         timeout_seconds=120.0,
+    ),
+    "coding.pr_request": ToolDefinition(
+        name="coding.pr_request",
+        description="Build an exact local pull-request request artifact from a clean work branch and current expected HEAD without performing a network action.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_pr_request,
+        timeout_seconds=60.0,
+    ),
+    "github.pr_open_update": ToolDefinition(
+        name="github.pr_open_update",
+        description="Create or update the unique open GitHub pull request for an exact frozen local request only after the remote head branch SHA matches the approved local HEAD.",
+        mutates_state=True,
+        requires_approval=True,
+        network="remote",
+        handler=_github_pr_open_update,
+        timeout_seconds=180.0,
     ),
     "coding.regression_run": ToolDefinition(
         name="coding.regression_run",
