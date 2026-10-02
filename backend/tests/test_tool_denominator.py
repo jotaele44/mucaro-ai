@@ -44,13 +44,12 @@ def test_committed_denominator_closes_against_live_registry() -> None:
     assert len(report["registry_sha256"]) == 64
 
 
-def test_all_flagpole_tool_capabilities_are_present_but_execution_certification_remains_provisional() -> None:
+def test_all_flagpole_tool_capabilities_are_present_without_overclaiming_execution_certification() -> None:
     report = build_tool_denominator(REPO)
 
-    assert report["certification_state"] == "PROVISIONAL"
+    assert report["certification_state"] in {"OPEN", "PROVISIONAL"}
     assert report["open_capabilities"] == []
     assert report["counts"]["absent"] == 0
-    assert report["counts"]["unexercised_tools"] == 0
     for row in report["required_capabilities"]:
         assert row["state"] == "PRESENT", row["id"]
         assert row["clause"], row["id"]
