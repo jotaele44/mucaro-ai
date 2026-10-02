@@ -183,10 +183,36 @@ def _coding_exec(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     if arguments.get("network_allowed") not in (None, False):
         raise ToolRuntimeError("ERROR_CODING_EXEC_NETWORK_POLICY", "coding.exec does not permit network access.")
 
+    bounded_limits = {
+        "timeout_seconds": (1, 120),
+        "max_output_bytes": (1, 2 * 1024 * 1024),
+        "memory_mb": (128, 4096),
+        "cpus": (0.25, 4.0),
+        "pids_limit": (16, 512),
+        "workspace_mb": (64, 4096),
+    }
     options: dict[str, Any] = {}
-    for key in ("timeout_seconds", "max_output_bytes", "memory_mb", "cpus", "pids_limit", "workspace_mb", "engine"):
-        if key in arguments:
-            options[key] = arguments[key]
+    for key, (minimum, maximum) in bounded_limits.items():
+        if key not in arguments:
+            continue
+        value = arguments[key]
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or value < minimum
+            or value > maximum
+            or (key != "cpus" and not isinstance(value, int))
+        ):
+            raise ToolRuntimeError(
+                "ERROR_CODING_EXEC_RESOURCE_LIMIT",
+                f"coding.exec {key} must be within {minimum}..{maximum}.",
+            )
+        options[key] = value
+    if "engine" in arguments:
+        engine = arguments["engine"]
+        if not isinstance(engine, str) or engine not in {"docker", "podman"}:
+            raise ToolRuntimeError("ERROR_CODING_EXEC_ENGINE", "coding.exec engine must be docker or podman.")
+        options["engine"] = engine
     try:
         plan = build_coding_container_plan(
             repo_root,
@@ -354,6 +380,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_exec,
+        timeout_seconds=150.0,
     ),
     "web.render": ToolDefinition(
         name="web.render",
