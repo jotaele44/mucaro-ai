@@ -156,6 +156,36 @@ def _validate_integrity(lease: dict[str, Any], cfg: Settings) -> None:
     if grant.get("grant_sha256") != lease["grant_sha256"] or grant.get("run_id") != lease["run_id"]:
         raise PermissionLeaseError("ERROR_PERMISSION_LEASE_GRANT_EVENT_MISMATCH", lease["lease_id"])
 
+    events = [
+        event
+        for event in read_json(_audit_path(cfg), [])
+        if isinstance(event, dict) and event.get("lease_id") == lease["lease_id"]
+    ]
+    reserved = [
+        str(event.get("tool_call_id"))
+        for event in events
+        if event.get("event") == "LEASE_USE_RESERVED" and event.get("tool_call_id")
+    ]
+    if len(reserved) != len(set(reserved)):
+        raise PermissionLeaseError("ERROR_PERMISSION_LEASE_USAGE_AUDIT_DUPLICATE", lease["lease_id"])
+    if lease["used_call_ids"] != reserved:
+        raise PermissionLeaseError(
+            "ERROR_PERMISSION_LEASE_USAGE_AUDIT_MISMATCH",
+            f"{lease['lease_id']}:stored={lease['used_call_ids']}:audited={reserved}",
+        )
+
+    revocations = [event for event in events if event.get("event") == "LEASE_REVOKED"]
+    if len(revocations) > 1:
+        raise PermissionLeaseError("ERROR_PERMISSION_LEASE_REVOCATION_AMBIGUOUS", lease["lease_id"])
+    if lease["state"] == "REVOKED":
+        if len(revocations) != 1:
+            raise PermissionLeaseError("ERROR_PERMISSION_LEASE_REVOCATION_EVENT_MISSING", lease["lease_id"])
+        revoked = revocations[0]
+        if revoked.get("revoked_by") != lease.get("revoked_by"):
+            raise PermissionLeaseError("ERROR_PERMISSION_LEASE_REVOCATION_MISMATCH", lease["lease_id"])
+    elif revocations:
+        raise PermissionLeaseError("ERROR_PERMISSION_LEASE_REVOCATION_STATE_MISMATCH", lease["lease_id"])
+
 
 def _canonical_workspace(value: str | None) -> str | None:
     if value is None:
