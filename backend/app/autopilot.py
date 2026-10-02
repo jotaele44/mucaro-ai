@@ -380,6 +380,29 @@ def _progress_fingerprint(checkpoint: dict[str, Any], dag: dict[str, Any], cfg: 
     )
 
 
+def classify_progress(
+    *,
+    history: list[str],
+    no_progress_streak: int,
+    before: str,
+    after: str,
+    max_no_progress: int,
+    max_fingerprint_occurrences: int,
+) -> tuple[list[str], int, str | None]:
+    """Classify repeated state without treating deterministic repetition as progress evidence."""
+    if not all(isinstance(value, str) and len(value) == 64 for value in [*history, before, after]):
+        raise AutopilotError("ERROR_AUTOPILOT_FINGERPRINT", "progress fingerprints must be 64-character hashes")
+    if max_no_progress < 1 or max_fingerprint_occurrences < 2:
+        raise AutopilotError("ERROR_AUTOPILOT_PROGRESS_POLICY", "progress thresholds are invalid")
+    streak = no_progress_streak + 1 if before == after else 0
+    updated = [*history, after][-MAX_HISTORY:]
+    if streak >= max_no_progress:
+        return updated, streak, "NO_PROGRESS"
+    if updated.count(after) >= max_fingerprint_occurrences:
+        return updated, streak, "LOOP_DETECTED"
+    return updated, streak, None
+
+
 def _record_progress(
     checkpoint: dict[str, Any],
     *,
@@ -389,21 +412,19 @@ def _record_progress(
     cfg: Settings,
 ) -> tuple[dict[str, Any], str | None]:
     state = _state_from_checkpoint(checkpoint)
-    history = list(state["fingerprint_history"])
-    streak = int(state["no_progress_streak"])
-    streak = streak + 1 if before == after else 0
-    history.append(after)
-    history = history[-MAX_HISTORY:]
+    history, streak, reason = classify_progress(
+        history=list(state["fingerprint_history"]),
+        no_progress_streak=int(state["no_progress_streak"]),
+        before=before,
+        after=after,
+        max_no_progress=int(state["budgets"]["max_no_progress"]),
+        max_fingerprint_occurrences=int(state["budgets"]["max_fingerprint_occurrences"]),
+    )
     state["fingerprint_history"] = history
     state["no_progress_streak"] = streak
     state["last_task_id"] = last_task_id
     state["counters"] = _usage(checkpoint, get_task_dag_state(checkpoint["checkpoint_id"], cfg), cfg)
 
-    reason: str | None = None
-    if streak >= state["budgets"]["max_no_progress"]:
-        reason = "NO_PROGRESS"
-    elif history.count(after) >= state["budgets"]["max_fingerprint_occurrences"]:
-        reason = "LOOP_DETECTED"
     checkpoint = _set_state(checkpoint, state, cfg=cfg)
     return checkpoint, reason
 
