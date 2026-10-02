@@ -29,6 +29,9 @@ reachable**, double-click the launcher again and press **Retry**.
 See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
 `docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
 
+To use Mucaro from a phone on the same Wi-Fi or VPN, see `docs/PHONE_ACCESS.md`. It is off by
+default and needs an access token.
+
 ### Runtime independence target
 
 The release target is stricter than "offline after setup": a prepared platform package should
@@ -119,7 +122,8 @@ shell instead.
 - `MUCARO_AI_WORKSPACE_PROFILE`: runtime workspace profile name. Default is `default`.
 - `MUCARO_AI_DEPLOYMENT_PROFILE`: `local` or `production`. Production mode requires a strong operator token and explicit CORS origins.
 - `MUCARO_AI_DISTRIBUTION_CHANNEL`: `local` or `mac_app_store`. The Store channel requires production mode, loopback binding, and disables subprocess, local-worker, and container execution.
-- `MUCARO_AI_ALLOW_PUBLIC_BIND=1`: explicitly permits non-loopback binding in local mode.
+- `MUCARO_AI_ALLOW_PUBLIC_BIND=1`: explicitly permits non-loopback binding in local mode. It requires `MUCARO_AI_OPERATOR_TOKEN` of at least 32 characters in every profile; Mucaro refuses to start without one.
+- `MUCARO_AI_PHONE_ACCESS=1`: lets a phone on the same private network or VPN use Mucaro (`--phone` on `scripts/launch_app.py` does the same). The launcher listens on all interfaces, requires an access token (generated for each launch unless `MUCARO_AI_OPERATOR_TOKEN` has 32 or more characters) and prints the link. See `docs/PHONE_ACCESS.md`.
 
 ## Ingest files
 
@@ -418,7 +422,7 @@ python scripts/extract_reference_patterns.py
 - Execution Gate approval is required before mutation-oriented execution.
 - Tool calls require explicit approval and are recorded in a local audit log.
 - Uploaded files are stored locally under `data/input/`.
-- Set `MUCARO_AI_OPERATOR_TOKEN` before exposing the local API beyond a trusted loopback-only development session.
+- Set `MUCARO_AI_OPERATOR_TOKEN` before exposing the local API beyond a trusted loopback-only development session. A request from another device is refused unless a token is set, and a public bind needs one of 32 or more characters (`docs/PHONE_ACCESS.md`).
 - Every answer trace must include source IDs and cited chunk IDs or validation flags.
 
 ## Phase 2 roadmap
