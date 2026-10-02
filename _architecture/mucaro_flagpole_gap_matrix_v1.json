@@ -85,9 +85,15 @@
     },
     {
       "id": "V08",
-      "state": "UNVERIFIED",
-      "evidence": [],
-      "gap": "No bounded source evidence yet establishes long-horizon autopilot continuation, loop detection, budgets, and exhaust-vector stopping as one runtime."
+      "state": "PARTIAL",
+      "evidence": [
+        "backend/app/autopilot.py",
+        "backend/app/agent_task_dag.py",
+        "backend/app/agent_checkpoints.py",
+        "schemas/autopilot_state.schema.json",
+        "backend/tests/test_autopilot.py"
+      ],
+      "gap": "Bounded checkpoint/DAG continuation, governed tool execution, explicit activation, budgets, progress fingerprints, loop/no-progress classification, deterministic stopping and pause/resume are source-backed. Model-driven replanning, permission leases, terminal integration, and executed long-horizon certification remain OPEN."
     },
     {
       "id": "V09",
