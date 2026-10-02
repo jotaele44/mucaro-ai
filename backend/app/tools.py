@@ -55,6 +55,20 @@ class ToolDefinition:
     # "none": local only; "remote": contacts an external service (TGT-019 offline classification).
     network: str = "none"
     timeout_seconds: float = DEFAULT_TOOL_TIMEOUT_SECONDS
+    # Autopilot may mark a task PASSED only from this tool-owned result contract.
+    # Empty statuses means the tool is not yet eligible for autonomous terminalization.
+    autopilot_success_statuses: tuple[str, ...] = ()
+    autopilot_success_fields: tuple[tuple[str, tuple[str, ...]], ...] = ()
+
+    def autopilot_result_is_success(self, result: dict[str, Any]) -> bool | None:
+        if not self.autopilot_success_statuses:
+            return None
+        if result.get("status") not in self.autopilot_success_statuses:
+            return False
+        for field, allowed in self.autopilot_success_fields:
+            if str(result.get(field)) not in allowed:
+                return False
+        return True
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -65,6 +79,14 @@ class ToolDefinition:
             "network": self.network,
             "timeout_seconds": self.timeout_seconds,
             "offline_availability": "AVAILABLE_LOCALLY" if self.network == "none" else "REQUIRES_REMOTE_SERVICE",
+            "autopilot_success_contract": (
+                {
+                    "statuses": list(self.autopilot_success_statuses),
+                    "required_fields": {field: list(allowed) for field, allowed in self.autopilot_success_fields},
+                }
+                if self.autopilot_success_statuses
+                else None
+            ),
         }
 
 
@@ -487,6 +509,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_source_library_status,
+        autopilot_success_statuses=("SOURCE_LIBRARY_STATUS_OK",),
     ),
     "product.audit": ToolDefinition(
         name="product.audit",
@@ -494,6 +517,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_product_audit,
+        autopilot_success_statuses=("PRODUCT_AUDIT_OK",),
     ),
     "workspace_profiles.list": ToolDefinition(
         name="workspace_profiles.list",
@@ -501,6 +525,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_workspace_profiles,
+        autopilot_success_statuses=("WORKSPACE_PROFILES_OK",),
     ),
     "memory.list": ToolDefinition(
         name="memory.list",
@@ -508,6 +533,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_memory_list,
+        autopilot_success_statuses=("MEMORY_OK",),
     ),
     "coding.repo_status": ToolDefinition(
         name="coding.repo_status",
@@ -515,6 +541,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_repo_status,
+        autopilot_success_statuses=("CODING_REPOSITORY_STATUS_OK",),
     ),
     "coding.read_file": ToolDefinition(
         name="coding.read_file",
@@ -522,6 +549,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_read_file,
+        autopilot_success_statuses=("CODING_FILE_READ_OK",),
     ),
     "coding.diff": ToolDefinition(
         name="coding.diff",
@@ -529,6 +557,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_diff,
+        autopilot_success_statuses=("CODING_DIFF_OK",),
     ),
     "coding.patch_check": ToolDefinition(
         name="coding.patch_check",
@@ -536,6 +565,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_patch_check,
+        autopilot_success_statuses=("CODING_PATCH_CHECK_OK",),
     ),
     "coding.patch_apply": ToolDefinition(
         name="coding.patch_apply",
@@ -543,6 +573,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_coding_patch_apply,
+        autopilot_success_statuses=("CODING_MUTATION_APPLIED",),
     ),
     "coding.exec": ToolDefinition(
         name="coding.exec",
@@ -550,6 +581,8 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_exec,
+        autopilot_success_statuses=("CODING_EXEC_OK",),
+        autopilot_success_fields=(("execution_status", ("PASS",)),),
         timeout_seconds=150.0,
     ),
     "coding.branch_create": ToolDefinition(
@@ -558,6 +591,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_coding_branch_create,
+        autopilot_success_statuses=("CODING_BRANCH_CREATED",),
         timeout_seconds=60.0,
     ),
     "coding.commit": ToolDefinition(
@@ -566,6 +600,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_coding_commit,
+        autopilot_success_statuses=("CODING_COMMIT_CREATED",),
         timeout_seconds=120.0,
     ),
     "coding.pr_request": ToolDefinition(
@@ -574,6 +609,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_pr_request,
+        autopilot_success_statuses=("CODING_PR_REQUEST_READY",),
         timeout_seconds=60.0,
     ),
     "github.pr_open_update": ToolDefinition(
@@ -583,6 +619,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         network="remote",
         handler=_github_pr_open_update,
+        autopilot_success_statuses=("GITHUB_PR_OPEN_UPDATE_OK",),
         timeout_seconds=180.0,
     ),
     "coding.regression_run": ToolDefinition(
@@ -591,6 +628,8 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_regression_run,
+        autopilot_success_statuses=("CODING_CHECK_SUITE_EXECUTED_PASS",),
+        autopilot_success_fields=(("execution_status", ("PASS",)),),
         timeout_seconds=900.0,
     ),
     "github.ci_status": ToolDefinition(
@@ -600,6 +639,8 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         network="remote",
         handler=_github_ci_status,
+        autopilot_success_statuses=("GITHUB_CI_STATUS_OK",),
+        autopilot_success_fields=(("state", ("PASS",)),),
         timeout_seconds=75.0,
     ),
     "web.render": ToolDefinition(
@@ -609,6 +650,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         network="remote",
         handler=_web_render,
+        autopilot_success_statuses=("WEB_RENDER_OK",),
     ),
     "web.search": ToolDefinition(
         name="web.search",
@@ -617,6 +659,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         network="remote",
         handler=_web_search,
+        autopilot_success_statuses=("WEB_SEARCH_OK",),
     ),
     "web.fetch": ToolDefinition(
         name="web.fetch",
@@ -625,6 +668,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         network="remote",
         handler=_web_fetch,
+        autopilot_success_statuses=("WEB_FETCH_SNAPSHOT_OK",),
     ),
     "web.fetch_session": ToolDefinition(
         name="web.fetch_session",
@@ -633,6 +677,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         network="remote",
         handler=_web_fetch_session,
+        autopilot_success_statuses=("WEB_BROWSE_SESSION_OK",),
     ),
 }
 
