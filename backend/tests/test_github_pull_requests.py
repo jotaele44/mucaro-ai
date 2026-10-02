@@ -28,6 +28,7 @@ def make_settings(root: Path) -> Settings:
 def approved_request(head: str, request_hash: str, *, title: str = "Title", body: str = "Body") -> dict:
     return {
         "status": "CODING_PR_REQUEST_READY",
+        "repo_root": "/repo",
         "head_sha": head,
         "head_branch": "feature/video-cli",
         "base_branch": "main",
