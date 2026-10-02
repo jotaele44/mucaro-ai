@@ -64,9 +64,14 @@ scripts/launch_app.py --auto-port --exit-if-running --startup-timeout 120
   `scripts/one_click_pins.env`, which were copied from the official release checksum files.
   CPython is installed by the pinned uv, which verifies its own downloads. A mismatch deletes the
   file and stops with `ERROR_CHECKSUM_MISMATCH`.
-- **Frozen dependency set.** Python packages are installed with
-  `--exclude-newer $PY_EXCLUDE_NEWER`, so a later release of a transitive dependency cannot change
-  what a fresh setup installs. npm uses `package-lock.json` through `npm ci`.
+- **Locked dependency set.** Python packages come from a hash-pinned lock for the platform,
+  `packaging/one_click/requirements-<target>.lock` (macOS arm64 and Intel, Linux x86_64, Windows
+  x64), installed with `uv pip install --require-hashes --no-deps`. Every package and every file
+  hash is fixed, including setuptools, which then builds the editable project install
+  (`--no-build-isolation`), so setup installs nothing that is not hash-pinned. The lock is chosen
+  by the interpreter's own platform (x64 Python on Windows on ARM uses the x64 lock); a platform
+  without a lock stops with `ERROR_PLATFORM_UNSUPPORTED`. npm uses `package-lock.json` through
+  `npm ci`.
 - **Isolation.** The user's `~/.npmrc`, npm cache, `NODE_OPTIONS`, `PYTHONPATH`, active virtualenv
   or conda environment, and uv config files are ignored.
 - **Resumable.** Each step records a fingerprint of its inputs only after it succeeds. An
@@ -92,6 +97,15 @@ To update a pin, change `scripts/one_click_pins.env` using the official checksum
 `test_pins_cover_every_supported_platform_with_sha256` checks the format, and the
 `One-click setup` workflow proves the new pins on every platform. Bump `SETUP_SCHEMA` when a
 change must make every existing setup redo all steps once.
+
+After changing a Python pin in `pyproject.toml` (or `PY_EXCLUDE_NEWER`, `PYTHON_VERSION`, or
+`UV_VERSION`), regenerate the locks with `python scripts/lock_python_deps.py`. It compiles them
+with the pinned uv for the pinned Python, ignoring anything published after `PY_EXCLUDE_NEWER`,
+so the same inputs always give the same files; `--check` regenerates into a temporary folder
+and fails unless the committed locks are identical (the Linux CI job runs it).
+`backend/tests/test_python_locks.py` checks that each lock is fully hash-pinned and pins exactly
+the `pyproject.toml` versions of the extras the setup installs on that platform. A changed lock
+makes the next double-click reinstall the Python packages once.
 
 ## Supported platforms
 
@@ -203,7 +217,9 @@ tracked changes.
    checkout on macOS, `/usr/bin/git` is used only when the Command Line Tools or Xcode are
    installed (`backend/app/local_tools.py`, `macos_developer_tools_present`); otherwise `/repo` and
    `/diff` report Git as unavailable instead of opening Apple's "install developer tools" dialog.
-3. **Python lock file.** `--exclude-newer` freezes resolution by date. A committed lock file
-   (for example `uv.lock`) would also pin exact versions for the developer bootstrap and CI.
+3. **Python lock file.** Done for the double-click setup (hash-pinned per-platform locks, see
+   "Locked dependency set"). The developer bootstrap (`make setup`, `bootstrap_*`) and the CI
+   jobs still run `pip install -e ".[dev]"` on Python 3.11 and resolve at install time; moving
+   them onto the locks would need 3.11 locks or a CI move to 3.12.
 4. **Windows on ARM.** The setup could run x64 Python under emulation; not attempted because it
    could not be verified.

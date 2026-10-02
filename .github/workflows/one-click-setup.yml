@@ -16,6 +16,8 @@ on:
       - "packaging/icons/**"
       - "scripts/native_*"
       - "scripts/build_launchers.py"
+      - "scripts/lock_python_deps.py"
+      - "packaging/one_click/**"
       - "backend/tests/test_native_launch.py"
       - "backend/tests/test_windows_*"
       - "Mucaro AI.cmd"
@@ -36,6 +38,7 @@ on:
       - "Mucaro AI.app/**"
       - "Mucaro AI.exe"
       - "packaging/launchers/**"
+      - "packaging/one_click/**"
       - "scripts/native_*"
       - "Mucaro AI.cmd"
       - "scripts/one_click*"
@@ -98,6 +101,9 @@ jobs:
           grep -q "DESKTOP_SMOKE_OK" .mucaro-runtime/logs/launch-*.log
           grep -q "DESKTOP_BACKEND_PORT_CLOSED" .mucaro-runtime/logs/launch-*.log
           .venv/bin/python -c "import webview, AppKit, Foundation, WebKit"
+      - name: Python locks regenerate byte for byte (pinned uv)
+        if: runner.os == 'Linux'
+        run: .venv/bin/python scripts/lock_python_deps.py --check
       - name: Verify isolation
         run: |
           if [ -s "$RUNNER_TEMP/tripwire.txt" ]; then echo "setup ran a PATH tool:"; cat "$RUNNER_TEMP/tripwire.txt"; exit 1; fi
