@@ -143,6 +143,18 @@ def plan_autopilot(
         dag = build_task_dag(task_definitions)
     except TaskDagError as exc:
         raise AutopilotError(exc.status, exc.detail) from exc
+    for task in dag["tasks"]:
+        action = _action(task)
+        if action is None:
+            continue
+        tool = TOOL_REGISTRY.get(action["tool_name"])
+        if tool is None:
+            raise AutopilotError("ERROR_AUTOPILOT_TOOL_UNAVAILABLE", f"{task['id']}:{action['tool_name']}")
+        if not tool.autopilot_success_statuses:
+            raise AutopilotError(
+                "ERROR_AUTOPILOT_SUCCESS_CONTRACT_MISSING",
+                f"{task['id']}:{action['tool_name']}",
+            )
     checkpoint = create_checkpoint(
         session_id=session_id,
         run_id=run_id,
