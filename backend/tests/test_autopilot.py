@@ -386,3 +386,17 @@ def test_tool_without_autopilot_success_contract_is_rejected_before_persistence(
         )
     assert exc.value.status == "ERROR_AUTOPILOT_SUCCESS_CONTRACT_MISSING"
     assert list_checkpoints(cfg) == []
+
+
+def test_github_ci_autopilot_success_contract_binds_ci_state() -> None:
+    tool = TOOL_REGISTRY["github.ci_status"]
+
+    assert tool.autopilot_result_is_success(
+        {"status": "GITHUB_CI_STATUS_OK", "ci_state": "PASS"}
+    ) is True
+    assert tool.autopilot_result_is_success(
+        {"status": "GITHUB_CI_STATUS_OK", "ci_state": "FAIL"}
+    ) is False
+    assert tool.autopilot_result_is_success(
+        {"status": "GITHUB_CI_STATUS_OK", "state": "PASS"}
+    ) is False
