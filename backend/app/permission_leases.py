@@ -21,6 +21,7 @@ LEASE_SCHEMA_VERSION = "mucaro-permission-lease/1.0"
 LEASES_NAME = "permission_leases.json"
 LEASE_AUDIT_NAME = "permission_lease_audit.json"
 SCOPE_TYPES = {"RUN_READ_ONLY", "EXACT_TOOLS", "TOOL_PREFIXES"}
+SHA256_PATTERN = __import__("re").compile(r"^[0-9a-f]{64}$")
 MAX_TTL_SECONDS = 86_400
 MAX_USES = 1000
 
@@ -67,6 +68,7 @@ def _grant_payload(lease: dict[str, Any]) -> dict[str, Any]:
         "tool_names": list(lease["tool_names"]),
         "tool_prefixes": list(lease["tool_prefixes"]),
         "workspace_root": lease["workspace_root"],
+        "arguments_sha256": lease["arguments_sha256"],
         "allow_mutating": lease["allow_mutating"],
         "allow_network": lease["allow_network"],
         "granted_by": lease["granted_by"],
@@ -238,6 +240,7 @@ def grant_permission_lease(
     tool_names: list[str] | None = None,
     tool_prefixes: list[str] | None = None,
     workspace_root: str | None = None,
+    arguments_sha256: str | None = None,
     allow_mutating: bool = False,
     allow_network: bool = False,
     ttl_seconds: int | None = 3600,
@@ -256,6 +259,13 @@ def grant_permission_lease(
         tool_prefixes=prefixes,
         allow_mutating=bool(allow_mutating),
     )
+    if arguments_sha256 is not None and (
+        not isinstance(arguments_sha256, str) or not SHA256_PATTERN.fullmatch(arguments_sha256)
+    ):
+        raise PermissionLeaseError(
+            "ERROR_PERMISSION_LEASE_ARGUMENT_HASH",
+            "arguments_sha256 must be a lowercase 64-character SHA-256 or null",
+        )
     if not isinstance(max_uses, int) or isinstance(max_uses, bool) or not 1 <= max_uses <= MAX_USES:
         raise PermissionLeaseError("ERROR_PERMISSION_LEASE_MAX_USES", f"max_uses must be 1..{MAX_USES}")
     if ttl_seconds is not None and (
@@ -282,6 +292,7 @@ def grant_permission_lease(
         "tool_names": names,
         "tool_prefixes": prefixes,
         "workspace_root": _canonical_workspace(workspace_root),
+        "arguments_sha256": arguments_sha256,
         "allow_mutating": bool(allow_mutating),
         "allow_network": bool(allow_network),
         "granted_by": granted_by.strip(),
@@ -432,6 +443,9 @@ def _scope_matches(lease: dict[str, Any], call: dict[str, Any]) -> bool:
     if tool.network != "none" and not lease["allow_network"]:
         return False
     if not _workspace_matches(lease, call):
+        return False
+    bound_arguments = lease.get("arguments_sha256")
+    if bound_arguments is not None and call.get("arguments_sha256") != bound_arguments:
         return False
 
     scope = lease["scope_type"]
