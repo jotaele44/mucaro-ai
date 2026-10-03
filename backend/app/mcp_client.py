@@ -46,6 +46,17 @@ def config_path(cfg: Settings) -> Path:
     return cfg.data_dir / "mcp_servers.json"
 
 
+def validate_server_spec(name: str, spec: Any) -> dict[str, Any]:
+    """A server declaration: a valid name, a non-empty argv of strings, and an optional string-to-string env."""
+    command = spec.get("command") if isinstance(spec, dict) else None
+    if not SERVER_NAME.fullmatch(name) or not isinstance(command, list) or not command or not all(isinstance(c, str) and c for c in command):
+        raise McpError("ERROR_MCP_CONFIG_INVALID", f"server {name!r} needs a valid name and non-empty string command list")
+    env = spec.get("env", {})
+    if not isinstance(env, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in env.items()):
+        raise McpError("ERROR_MCP_CONFIG_INVALID", f"server {name!r} env must map strings to strings")
+    return spec
+
+
 def load_servers(cfg: Settings) -> dict[str, dict[str, Any]]:
     path = config_path(cfg)
     if not path.is_file():
@@ -57,16 +68,19 @@ def load_servers(cfg: Settings) -> dict[str, dict[str, Any]]:
     except (ValueError, KeyError, TypeError) as exc:
         raise McpError("ERROR_MCP_CONFIG_INVALID", f"{path.name}: {exc}") from exc
     for name, spec in servers.items():
-        command = spec.get("command") if isinstance(spec, dict) else None
-        if not SERVER_NAME.fullmatch(name) or not isinstance(command, list) or not command or not all(isinstance(c, str) and c for c in command):
-            raise McpError("ERROR_MCP_CONFIG_INVALID", f"server {name!r} needs a valid name and non-empty string command list")
-        env = spec.get("env", {})
-        if not isinstance(env, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in env.items()):
-            raise McpError("ERROR_MCP_CONFIG_INVALID", f"server {name!r} env must map strings to strings")
+        validate_server_spec(name, spec)
     return servers
 
 
 def _server(cfg: Settings, name: str) -> dict[str, Any]:
+    if ":" in name:  # PLUGIN:SERVER, declared by an installed plugin; plugins validates its specs with this module
+        from .plugins import PluginError, plugin_server
+
+        plugin, _, server = name.partition(":")
+        try:
+            return plugin_server(cfg, plugin, server)
+        except PluginError as exc:
+            raise McpError(exc.status, exc.detail) from exc
     servers = load_servers(cfg)
     if name not in servers:
         raise McpError("ERROR_MCP_SERVER_UNKNOWN", f"{name} is not declared in {config_path(cfg).name}")
@@ -170,8 +184,11 @@ class _Session:
 
 
 def list_server_names(cfg: Settings) -> dict[str, Any]:
+    from .plugins import plugin_server_rows
+
     servers = load_servers(cfg)
-    return {"status": "MCP_SERVERS_OK", "servers": [{"name": n, "command": s["command"]} for n, s in sorted(servers.items())]}
+    rows = [{"name": n, "command": s["command"], "source": "operator"} for n, s in sorted(servers.items())]
+    return {"status": "MCP_SERVERS_OK", "servers": [*rows, *plugin_server_rows(cfg)]}
 
 
 def list_tools(cfg: Settings, server: str, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> dict[str, Any]:

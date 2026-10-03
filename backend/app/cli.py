@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 
 from .cli_code import register_code_commands
 from .cli_mcp import register_mcp_commands
+from .cli_plugin import register_plugin_commands
 from .cli_web import register_web_commands
 from .config import Settings, settings
 from .capability_contracts import build_capability_contract_report, validate_gis_report_file, validate_ocr_report_file
@@ -1507,6 +1508,7 @@ def build_parser() -> argparse.ArgumentParser:
     register_code_commands(subcommands)
     register_web_commands(subcommands)
     register_mcp_commands(subcommands)
+    register_plugin_commands(subcommands)
 
     plan = subcommands.add_parser("plan", help="Analyze a request with the Planning Gate.")
     plan.add_argument("request", nargs="+", help="Request to analyze.")

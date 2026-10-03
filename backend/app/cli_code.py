@@ -36,6 +36,7 @@ from .config import Settings
 from .event_stream import EventSink, EventSinkError
 from .model_router import ModelProviderError
 from .operator_audit import CLI_ACTOR, ApprovalDecision, OperatorAuditError, approval_mode, audit_decision, run_audited
+from .plugins import PluginError, activate, plugin_profile
 
 HANDLED_ERRORS = (
     CodingWorkspaceError,
@@ -47,6 +48,7 @@ HANDLED_ERRORS = (
     AgentError,
     ModelProviderError,
     OperatorAuditError,
+    PluginError,
 )
 
 
@@ -266,14 +268,30 @@ def _parse_checks(specs: list[str]) -> list[CodingCheck]:
     return checks
 
 
+def _checks_target(args: argparse.Namespace, cfg: Settings) -> tuple[str, list[str], list[CodingCheck], dict[str, str] | None]:
+    """(image, check specs, parsed checks, plugin provenance) from --profile, or from --image with --check."""
+    if args.profile:
+        if args.image or args.check:
+            raise CodingCheckError("ERROR_CODING_CHECK_SPEC", "--profile replaces --image and --check; give one or the other")
+        plugin, separator, profile = args.profile.partition(":")
+        if not separator or not profile:
+            raise CodingCheckError("ERROR_CODING_CHECK_SPEC", "--profile looks like PLUGIN:PROFILE")
+        image, checks, provenance = plugin_profile(cfg, plugin, profile)
+        return image, [f"{check.kind}:{check.check_id}={' '.join(check.command)}" for check in checks], checks, provenance
+    if not args.image or not args.check:
+        raise CodingCheckError("ERROR_CODING_CHECK_SPEC", "give --image and at least one --check, or --profile PLUGIN:PROFILE")
+    return args.image, args.check, _parse_checks(args.check), None
+
+
 def run_code_checks(args: argparse.Namespace, cfg: Settings) -> int:
     def action() -> dict[str, Any]:
-        checks = _parse_checks(args.check)
+        image, specs, checks, provenance = _checks_target(args, cfg)
         if not args.run:
-            return build_coding_check_suite_plan(args.repo, image=args.image, checks=checks, cfg=cfg, engine=args.engine)
+            return build_coding_check_suite_plan(args.repo, image=image, checks=checks, cfg=cfg, engine=args.engine)
         via = f" with engine {args.engine}" if args.engine else ""
-        summary = f"Run {len(checks)} check(s) in container image {args.image}{via} (network disabled)"
-        tool_args = {"image": args.image, "checks": args.check, "engine": args.engine}
+        source = f", from plugin {provenance['plugin']} {provenance['version']}" if provenance else ""
+        summary = f"Run {len(checks)} check(s) in container image {image}{via}{source} (network disabled)"
+        tool_args = {"image": image, "checks": specs, "engine": args.engine, "plugin": provenance}
         call_id = _require_approval(args, cfg, "coding.checks_run", tool_args, summary)
         sink = _event_sink(args)
         payload = run_audited(
@@ -281,7 +299,7 @@ def run_code_checks(args: argparse.Namespace, cfg: Settings) -> int:
             "coding.checks_run",
             call_id,
             CLI_ACTOR,
-            lambda: execute_coding_check_suite(args.repo, image=args.image, checks=checks, cfg=cfg, on_event=sink, engine=args.engine),
+            lambda: execute_coding_check_suite(args.repo, image=image, checks=checks, cfg=cfg, on_event=sink, engine=args.engine),
         )
         if _streaming_json(args):
             print(json.dumps({"event": "result", **payload}, ensure_ascii=False), flush=True)
@@ -371,11 +389,20 @@ def _agent_chat(args: argparse.Namespace) -> Any:
 
 
 def _agent_turn(
-    args: argparse.Namespace, cfg: Settings, goal: str, chat: Any, approve: Any, repo: str, history: Any, on_event: EventSink | None = None
+    args: argparse.Namespace,
+    cfg: Settings,
+    goal: str,
+    chat: Any,
+    approve: Any,
+    repo: str,
+    history: Any,
+    on_event: EventSink | None = None,
+    guidance: str = "",
+    plugins: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     result = run_agent(
         goal, repo, chat=chat, approve=approve, cfg=cfg, max_steps=args.max_steps, history=history,
-        allow_live_search=args.allow_live_search, on_event=on_event,
+        allow_live_search=args.allow_live_search, on_event=on_event, guidance=guidance, active_plugins=plugins,
     )
     if args.session:
         result["session_path"] = str(save_session(cfg, args.session, repo, result))
@@ -397,7 +424,11 @@ def _agent_resume(args: argparse.Namespace, cfg: Settings) -> tuple[str, Any]:
 def run_code_agent(args: argparse.Namespace, cfg: Settings) -> int:
     def action() -> dict[str, Any]:
         repo, history = _agent_resume(args, cfg)
-        result = _agent_turn(args, cfg, args.goal, _agent_chat(args), _agent_approver(args), repo, history, on_event=_event_sink(args))
+        guidance, plugins = activate(cfg, args.plugin)  # verified before anything runs; a tampered plugin stops the run
+        result = _agent_turn(
+            args, cfg, args.goal, _agent_chat(args), _agent_approver(args), repo, history,
+            on_event=_event_sink(args), guidance=guidance, plugins=plugins,
+        )
         result["resumed"] = history is not None
         if args.format == "json":
             result.pop("messages", None)
@@ -413,6 +444,7 @@ def run_code_chat(args: argparse.Namespace, cfg: Settings) -> int:
     try:
         repo, history = _agent_resume(args, cfg)
         chat, approve = _agent_chat(args), _agent_approver(args)
+        guidance, plugins = activate(cfg, args.plugin)
     except HANDLED_ERRORS as exc:
         return _fail(exc, args.format)
     print("mucaro code chat - enter a goal per line; /exit to quit.", file=sys.stderr)
@@ -424,7 +456,8 @@ def run_code_chat(args: argparse.Namespace, cfg: Settings) -> int:
         if not goal:
             continue
         try:
-            result = _agent_turn(args, cfg, goal, chat, approve, repo, history, on_event=sink)
+            result = _agent_turn(args, cfg, goal, chat, approve, repo, history, on_event=sink, guidance=guidance, plugins=plugins)
+            guidance = ""  # given once per run of the REPL; the history carries it from then on
             history = result["messages"]
             print(result["final"] or f"[{result['status']}]")
         except EventSinkError as exc:
@@ -500,6 +533,10 @@ def register_code_commands(subcommands: Any) -> None:
         action="store_true",
         help="Emit step events as they happen: NDJSON on stdout for --format json (ending with a result event), readable lines on stderr for --format text.",
     )
+    agent.add_argument(
+        "--plugin", action="append", default=[], metavar="NAME",
+        help="Activate an installed plugin for this run: its guidance reaches the model and its MCP servers become callable (repeatable). Never grants tools or approvals.",
+    )
     confirmed(agent)
 
     chat = add("chat", "Interactive multi-turn coding loop reading goals from stdin.", run_code_chat)
@@ -511,11 +548,13 @@ def register_code_commands(subcommands: Any) -> None:
         "--allow-live-search", action="store_true", help="Let the agent ask to use live Brave web search (each call still needs approval)."
     )
     chat.add_argument("--stream", action="store_true", help="Show each step as it happens (progress lines on stderr).")
+    chat.add_argument("--plugin", action="append", default=[], metavar="NAME", help="Activate an installed plugin for this session (repeatable).")
     confirmed(chat)
 
     checks = add("checks", "Plan (default) or run (--run) containerized checks with network disabled.", run_code_checks)
-    checks.add_argument("--check", action="append", required=True, help="kind:id=command, e.g. test:unit='pytest -q'; repeatable.")
-    checks.add_argument("--image", required=True, help="Pinned container image.")
+    checks.add_argument("--check", action="append", help="kind:id=command, e.g. test:unit='pytest -q'; repeatable. Needs --image.")
+    checks.add_argument("--image", help="Pinned container image. Needs --check.")
+    checks.add_argument("--profile", metavar="PLUGIN:PROFILE", help="Use an installed plugin's check profile (its pinned image and checks) instead of --image and --check.")
     checks.add_argument(
         "--engine",
         help="Container engine binary (docker or podman), for example /Applications/Docker.app/Contents/Resources/bin/docker when it is not on PATH.",
