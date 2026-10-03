@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../../api.js";
 import { DirectoryIntake } from "../DirectoryIntake.jsx";
+import { Sheet } from "../Sheet.jsx";
+
+const UPLOAD_ACCEPT = ".txt,.md,.csv,.json,.pdf,.zip,.html,.htm,.docx,.eml,.msg,.png,.jpg,.jpeg,.gif,.webp,.wav,.mp3,.m4a,.mp4,.mov,.webm";
 
 // Source inspection (TGT-030): every ingested manifestation with identity, parser, warnings and provenance.
 export function SourcesWorkspace({ announce }) {
@@ -8,16 +11,19 @@ export function SourcesWorkspace({ announce }) {
   const [index, setIndex] = useState(null);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState(null);
 
   const load = useCallback(async () => {
     try {
       const payload = await api.sources();
       setSources(payload.sources || []);
       setIndex(payload.index || null);
+      return true;
     } catch (err) {
       setError(err);
+      return false;
     }
   }, []);
 
@@ -33,7 +39,7 @@ export function SourcesWorkspace({ announce }) {
   async function upload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-    setBusy(true);
+    setBusyAction("upload");
     setError(null);
     try {
       const result = await api.ingest(file);
@@ -42,19 +48,37 @@ export function SourcesWorkspace({ announce }) {
     } catch (err) {
       setError(err);
     } finally {
-      setBusy(false);
+      setBusyAction(null);
       event.target.value = "";
     }
   }
 
   async function remove(sourceId) {
+    setBusyAction("remove");
+    setError(null);
     try {
       await api.deleteSource(sourceId);
       setSelected(null);
+      setPendingDelete(null);
       await load();
       announce("Source removed.");
     } catch (err) {
       setError(err);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function rebuildIndex() {
+    setBusyAction("reindex");
+    setError(null);
+    try {
+      await api.reindexSources();
+      if (await load()) announce("Index rebuilt.");
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusyAction(null);
     }
   }
 
@@ -68,13 +92,14 @@ export function SourcesWorkspace({ announce }) {
       </header>
       <div className="workspace-actions">
         <label className="primary-button file-button">
-          {busy ? "Adding…" : "Add a file"}
-          <input type="file" onChange={upload} disabled={busy} className="sr-only" />
+          {busyAction === "upload" ? "Adding…" : "Add a file"}
+          <input type="file" name="source-file" accept={UPLOAD_ACCEPT} onChange={upload} disabled={Boolean(busyAction)} className="sr-only" />
         </label>
-        <button type="button" className="secondary-button" onClick={() => api.reindexSources().then(load).then(() => announce("Index rebuilt."))}>
-          Rebuild index
+        <button type="button" className="secondary-button" onClick={rebuildIndex} disabled={Boolean(busyAction)}>
+          {busyAction === "reindex" ? "Rebuilding…" : "Rebuild index"}
         </button>
       </div>
+      <p className="muted small">Supported: TXT, Markdown, CSV, JSON, PDF, ZIP, HTML, DOCX, EML/MSG, images, audio, and video. Media files are indexed as metadata only.</p>
       {error && <p className="error-card" role="alert">{error.category || "ERROR"} — {error.status}: {error.message}</p>}
       <details className="panel">
         <summary>Add a folder from this Mac</summary>
@@ -112,12 +137,27 @@ export function SourcesWorkspace({ announce }) {
                     {detail.chunks.map((chunk) => <li key={chunk.chunk_id}><span className="mono small">{chunk.chunk_id}</span><p>{chunk.text}</p></li>)}
                   </ol>
                 </details>
-                <button type="button" className="danger-button" onClick={() => remove(source.source_id)}>Remove source</button>
+                <button type="button" className="danger-button" onClick={() => setPendingDelete(source)} disabled={Boolean(busyAction)}>Remove source</button>
               </div>
             )}
           </li>
         ))}
       </ul>
+      {pendingDelete && (
+        <Sheet title="Remove source?" onClose={() => setPendingDelete(null)} side="center">
+          <p>
+            This removes <strong>{pendingDelete.file_name}</strong> from Mucaro’s source library, including its chunks and retrieval indexes.
+            If the original file is managed under <code>data/input</code>, it will also be permanently deleted. Existing conversations and
+            answer receipts are kept.
+          </p>
+          <div className="button-row">
+            <button type="button" className="secondary-button" onClick={() => setPendingDelete(null)} disabled={Boolean(busyAction)}>Keep source</button>
+            <button type="button" className="danger-button" onClick={() => remove(pendingDelete.source_id)} disabled={Boolean(busyAction)}>
+              {busyAction === "remove" ? "Removing…" : "Remove permanently"}
+            </button>
+          </div>
+        </Sheet>
+      )}
     </section>
   );
 }

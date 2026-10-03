@@ -45,7 +45,7 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
           >
             <label className="field">
               <span>Title</span>
-              <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} />
+              <input name="conversation-title" autoComplete="off" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} />
             </label>
             <div className="button-row">
               <button type="button" className="secondary-button" onClick={() => setDialog(null)}>Cancel</button>
@@ -188,11 +188,13 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
   async function send(prompt) {
     setError(null);
     try {
+      const requestOptions = { ...defaultOptions };
+      delete requestOptions.model_provider_explicit;
       let id = conversationId;
       const creating = !id;
       if (creating) id = (await api.createConversation(prompt.slice(0, 60))).conversation_id;
       const key = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const result = await api.sendMessage(id, { prompt, mode, idempotency_key: key, options: defaultOptions });
+      const result = await api.sendMessage(id, { prompt, mode, idempotency_key: key, options: requestOptions });
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
       if (creating) onConversationCreated(id);
       else {

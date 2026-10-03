@@ -130,6 +130,12 @@ async function axe(page, viewport, name) {
 
 async function scenario(browser, base, viewport, contextOptions) {
   const context = await browser.newContext({ ...contextOptions, baseURL: base });
+  await context.addInitScript(() => {
+    localStorage.setItem(
+      "mucaro.options",
+      JSON.stringify({ model_provider: "mock", retrieval_strategy: "hybrid", allow_live: false, top_k: 5 }),
+    );
+  });
   const page = await context.newPage();
   const consoleErrors = [];
   page.on("console", (msg) => msg.type() === "error" && consoleErrors.push(msg.text()));
@@ -159,7 +165,19 @@ async function scenario(browser, base, viewport, contextOptions) {
   axeRuns.push(await axe(page, viewport, "empty"));
 
   // Ask with citations (F02, TGT-002, TGT-031).
+  let firstMessagePayload;
+  const messageRoute = "**/conversations/*/messages";
+  await page.route(messageRoute, async (route) => {
+    if (route.request().method() === "POST") firstMessagePayload = route.request().postDataJSON();
+    await route.continue();
+  });
   await send(page, "How does source lineage work?");
+  await page.unroute(messageRoute);
+  check(
+    "default model provider follows server configuration",
+    viewport,
+    !Object.hasOwn(firstMessagePayload?.options || {}, "model_provider"),
+  );
   await waitRunState(page, "COMPLETED");
   const citations = lastRun(page).getByRole("button", { name: /Open citation/ });
   check("answer completes with citations", viewport, (await citations.count()) > 0, `${await citations.count()} citations`);
@@ -174,7 +192,8 @@ async function scenario(browser, base, viewport, contextOptions) {
   check("reload reproduces the transcript (F02)", viewport, (await lastRun(page).locator(".assistant-bubble").innerText()) === answerText);
 
   // Evidence sheet (TGT-030), Escape closes and restores focus.
-  await citations.first().click();
+  await citations.first().focus();
+  await citations.first().press("Enter");
   const evidence = page.getByRole("dialog", { name: /Evidence \[1\]/ });
   await evidence.waitFor();
   await evidence.getByText("Cited text").waitFor();
@@ -333,6 +352,15 @@ async function scenario(browser, base, viewport, contextOptions) {
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "13-sources");
   axeRuns.push(await axe(page, viewport, "sources"));
+  const sourceRows = page.locator(".source-row");
+  const sourceCountBeforeDelete = await sourceRows.count();
+  await page.getByRole("button", { name: "Remove source" }).click();
+  const sourceConfirm = page.getByRole("dialog", { name: "Remove source?" });
+  await sourceConfirm.getByText(/permanently deleted/).waitFor();
+  await sourceConfirm.getByRole("button", { name: "Keep source" }).click();
+  await sourceConfirm.waitFor({ state: "detached" });
+  const sourceCancelPreserved = (await sourceRows.count()) === sourceCountBeforeDelete;
+  check("source removal requires confirmation and cancel preserves it", viewport, sourceCancelPreserved);
 
   await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Memory", exact: true }).click();
@@ -342,6 +370,18 @@ async function scenario(browser, base, viewport, contextOptions) {
   check("memory add is visible with provenance", viewport, (await page.getByText(/preference · from api/).count()) >= 1);
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "14-memory");
+  const memoryDelete = page.getByRole("button", { name: "Delete memory: Prefer tables for comparisons" });
+  await memoryDelete.click();
+  const memoryConfirm = page.getByRole("dialog", { name: "Delete saved memory?" });
+  await memoryConfirm.getByText(/permanently deletes/).waitFor();
+  await memoryConfirm.getByRole("button", { name: "Keep memory" }).click();
+  await memoryConfirm.waitFor({ state: "detached" });
+  const memoryCancelPreserved = await page.getByText("Prefer tables for comparisons").count() > 0;
+  await page.getByRole("button", { name: "Delete memory: Prefer tables for comparisons" }).click();
+  await page.getByRole("dialog", { name: "Delete saved memory?" }).getByRole("button", { name: "Delete permanently" }).click();
+  await memoryConfirm.waitFor({ state: "detached" });
+  await page.getByText("Prefer tables for comparisons").waitFor({ state: "detached" });
+  check("memory deletion requires confirmation and cancel preserves it", viewport, memoryCancelPreserved);
 
   await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Provenance", exact: true }).click();
@@ -377,11 +417,25 @@ async function scenario(browser, base, viewport, contextOptions) {
         fields: fields.length,
         smallFonts: fields.filter((el) => parseFloat(getComputedStyle(el).fontSize) < 16).map(label),
         targets: targets.length,
-        smallTargets: targets.filter((el) => el.getBoundingClientRect().height < 44).map(label),
+        smallTargets: targets
+          .filter((el) => el.getBoundingClientRect().height < 44)
+          .map((el) => `${label(el)}=${el.getBoundingClientRect().height.toFixed(1)}px`),
       };
     });
     check("form fields are at least 16px (no iOS focus zoom)", viewport, touch.fields > 0 && touch.smallFonts.length === 0, touch.smallFonts.join(", ") || `${touch.fields} fields`);
     check("touch targets are at least 44px tall", viewport, touch.targets > 0 && touch.smallTargets.length === 0, touch.smallTargets.join(", ") || `${touch.targets} targets`);
+  }
+
+  if (viewport === "iphone") {
+    await openNav();
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources", exact: true }).click();
+    await page.locator(".source-row").first().click();
+    const sourceCountBeforeDelete = await page.locator(".source-row").count();
+    await page.getByRole("button", { name: "Remove source" }).click();
+    await page.getByRole("dialog", { name: "Remove source?" }).getByRole("button", { name: "Remove permanently" }).click();
+    await page.getByRole("dialog", { name: "Remove source?" }).waitFor({ state: "detached" });
+    await page.waitForFunction((count) => document.querySelectorAll(".source-row").length === count - 1, sourceCountBeforeDelete);
+    check("confirmed source removal updates the local library", viewport, true);
   }
 
   const layoutOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);

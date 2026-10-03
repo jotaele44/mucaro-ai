@@ -120,6 +120,8 @@ export function DirectoryIntake({ onIngested }) {
         <label>
           Folder path on the host computer
           <input
+            name="directory-path"
+            autoComplete="off"
             value={path}
             onChange={(e) => setPath(e.target.value)}
             placeholder="~/Documents/mucaro-sources"
@@ -130,7 +132,7 @@ export function DirectoryIntake({ onIngested }) {
         </label>
         <label>
           Reason
-          <input value={reason} onChange={(e) => setReason(e.target.value)} />
+          <input name="directory-reason" autoComplete="off" value={reason} onChange={(e) => setReason(e.target.value)} />
         </label>
       </div>
       <div className="button-row">

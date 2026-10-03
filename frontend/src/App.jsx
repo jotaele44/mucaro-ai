@@ -14,7 +14,7 @@ const WORKSPACES = [
   { id: "provenance", label: "Provenance" },
   { id: "settings", label: "Settings" },
 ];
-const DEFAULT_OPTIONS = { model_provider: "mock", retrieval_strategy: "hybrid", allow_live: false, top_k: 5 };
+const DEFAULT_OPTIONS = { retrieval_strategy: "hybrid", allow_live: false, top_k: 5 };
 
 function stored(key, fallback) {
   try {
@@ -33,6 +33,15 @@ function persist(key, value) {
   }
 }
 
+function initialOptions() {
+  const saved = stored("mucaro.options", {}) || {};
+  const options = { ...DEFAULT_OPTIONS, ...saved };
+  if (saved.model_provider === "mock" && saved.model_provider_explicit !== true) {
+    delete options.model_provider;
+  }
+  return options;
+}
+
 export function App() {
   const [view, setView] = useState("chat");
   const [conversations, setConversations] = useState([]);
@@ -41,7 +50,7 @@ export function App() {
   const [navOpen, setNavOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [modes, setModes] = useState(null);
-  const [options, setOptions] = useState(() => ({ ...DEFAULT_OPTIONS, ...stored("mucaro.options", {}) }));
+  const [options, setOptions] = useState(initialOptions);
   const [message, setMessage] = useState("");
   const [health, setHealth] = useState({ state: "checking" });
 
@@ -131,7 +140,14 @@ export function App() {
         <div className="conversation-section">
           <label className="field compact">
             <span className="sr-only">Filter conversations</span>
-            <input type="search" placeholder="Filter conversations" value={filter} onChange={(event) => setFilter(event.target.value)} />
+            <input
+              type="search"
+              name="conversation-search"
+              autoComplete="off"
+              placeholder="Filter conversations…"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+            />
           </label>
           <ul className="conversation-list" aria-label="Conversations">
             {visible.map((row) => (

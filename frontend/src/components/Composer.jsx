@@ -25,7 +25,7 @@ function QueuedItem({ run, onCancel, onEdit }) {
         >
           <label className="field grow">
             <span className="sr-only">Edit queued message</span>
-            <input value={value} onChange={(event) => setValue(event.target.value)} />
+            <input name="queued-message" autoComplete="off" value={value} onChange={(event) => setValue(event.target.value)} />
           </label>
           <button type="submit" className="secondary-button" disabled={!value.trim()}>Save</button>
           <button type="button" className="ghost-button" onClick={() => setEditing(false)}>Cancel edit</button>
@@ -123,9 +123,11 @@ export function Composer({ conversationId, modes, mode, onModeChange, onSend, on
         <textarea
           id="composer-input"
           ref={area}
+          name="message"
+          autoComplete="off"
           rows={1}
           value={text}
-          placeholder={activeRun ? "Message will be queued until the current turn finishes" : "Ask a question, or type /status, /fetch <url>…"}
+          placeholder={activeRun ? "Message will be queued until the current turn finishes…" : "Ask a question, or type /status, /fetch <url>…"}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={onKeyDown}
           disabled={disabled}

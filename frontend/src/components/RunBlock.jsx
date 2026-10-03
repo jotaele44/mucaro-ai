@@ -107,7 +107,15 @@ function QuestionCard({ question, onAnswered, announce }) {
             <span className="grow">
               <strong>Other</strong>
               {usingOther && (
-                <textarea className="other-input" aria-label="Your answer" value={other} onChange={(event) => setOther(event.target.value)} rows={2} />
+                <textarea
+                  className="other-input"
+                  name="interaction-answer"
+                  autoComplete="off"
+                  aria-label="Your answer"
+                  value={other}
+                  onChange={(event) => setOther(event.target.value)}
+                  rows={2}
+                />
               )}
             </span>
           </label>

@@ -35,8 +35,8 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
               type="radio"
               name="model"
               value={model.name}
-              checked={(options.model_provider || "mock") === model.name}
-              onChange={() => onOptionsChange({ ...options, model_provider: model.name, allow_live: model.locality === "remote" ? options.allow_live : false })}
+              checked={(options.model_provider || config?.model_provider || "mock") === model.name}
+              onChange={() => onOptionsChange({ ...options, model_provider: model.name, model_provider_explicit: true, allow_live: model.locality === "remote" ? options.allow_live : false })}
             />
             <span className="grow">
               <strong>{model.name}</strong> <span className="muted small">({model.locality}{model.status !== "MODEL_PROVIDER_READY" ? ` · ${model.status.replace("MODEL_PROVIDER_", "").toLowerCase()}` : ""})</span>
@@ -78,7 +78,7 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
             >
               <label className="field grow">
                 <span>Token</span>
-                <input type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} />
+                <input type="password" name="operator-token" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} />
               </label>
               <button type="submit" className="secondary-button">Save</button>
             </form>

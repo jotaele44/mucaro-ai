@@ -238,8 +238,9 @@ textarea {
   overflow: hidden;
 }
 
-.main:focus {
-  outline: none;
+.main:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
 }
 
 .mobile-bar,
@@ -837,6 +838,7 @@ details summary {
 .sheet-body {
   padding: 16px 18px calc(16px + env(safe-area-inset-bottom));
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .tool-row,
@@ -917,6 +919,11 @@ details summary {
 .file-button {
   display: inline-flex;
   align-items: center;
+}
+
+.file-button:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .panel {
@@ -1093,6 +1100,10 @@ html {
 @media (max-width: 900px), (pointer: coarse) {
   :root :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
     font-size: 16px;
+  }
+
+  :root select {
+    height: 44px;
   }
 
   :root :is(button, select, input:not([type="file"]):not([type="checkbox"]):not([type="radio"])) {
