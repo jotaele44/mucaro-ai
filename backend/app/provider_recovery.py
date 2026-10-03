@@ -16,6 +16,7 @@ PROVIDER_INTERRUPTION_STATUSES = {
     "ERROR_MODEL_PROVIDER_UNAVAILABLE",
     "ERROR_MODEL_PROVIDER_RATE_LIMIT",
     "ERROR_MODEL_PROVIDER_TIMEOUT",
+    "ERROR_LOCAL_MODEL_UNAVAILABLE",
 }
 # The provider may or may not have acted on the request: retrying is allowed, calling it ACCEPTED is not.
 ATTEMPT_INTERRUPTED_UNKNOWN = "INTERRUPTED_UNKNOWN"
@@ -64,6 +65,7 @@ def execute_with_provider_checkpoint(
     operation: Callable[[], dict[str, Any]],
     operation_key: str | None = None,
     reclaim_started: bool = False,
+    pause_on_interruption: bool = True,
     cfg: Settings = settings,
 ) -> dict[str, Any]:
     """Run one provider call against a checkpoint.
@@ -99,6 +101,17 @@ def execute_with_provider_checkpoint(
             _record(checkpoint_id, attempt_id, {**record, "state": outcome, "provider_error": exc.status, "finished_at": utc_now()}, cfg)
         if not interrupted:
             raise
+        if not pause_on_interruption:
+            current = get_checkpoint(checkpoint_id, cfg)
+            interrupted_result: dict[str, Any] = {
+                "status": "PROVIDER_EXECUTION_INTERRUPTED",
+                "provider_error": exc.status,
+                "detail": exc.detail,
+                "checkpoint": current,
+            }
+            if attempt_id:
+                interrupted_result["attempt_id"] = attempt_id
+            return interrupted_result
         paused = transition_checkpoint(
             checkpoint_id,
             state="PAUSED_PROVIDER",
