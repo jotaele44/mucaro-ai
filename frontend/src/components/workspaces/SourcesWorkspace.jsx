@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../../api.js";
+import { ConfirmSheet } from "../ConfirmSheet.jsx";
 import { DirectoryIntake } from "../DirectoryIntake.jsx";
 
 // Source inspection (TGT-030): every ingested manifestation with identity, parser, warnings and provenance.
@@ -10,6 +11,7 @@ export function SourcesWorkspace({ announce }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [pendingRemoval, setPendingRemoval] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -47,15 +49,12 @@ export function SourcesWorkspace({ announce }) {
     }
   }
 
+  // Throws on failure so the confirmation sheet can show the error and stay open.
   async function remove(sourceId) {
-    try {
-      await api.deleteSource(sourceId);
-      setSelected(null);
-      await load();
-      announce("Source removed.");
-    } catch (err) {
-      setError(err);
-    }
+    await api.deleteSource(sourceId);
+    setSelected(null);
+    await load();
+    announce("Source removed.");
   }
 
   return (
@@ -112,12 +111,19 @@ export function SourcesWorkspace({ announce }) {
                     {detail.chunks.map((chunk) => <li key={chunk.chunk_id}><span className="mono small">{chunk.chunk_id}</span><p>{chunk.text}</p></li>)}
                   </ol>
                 </details>
-                <button type="button" className="danger-button" onClick={() => remove(source.source_id)}>Remove source</button>
+                <button type="button" className="danger-button" onClick={() => setPendingRemoval({ id: source.source_id, name: source.file_name })}>Remove source</button>
               </div>
             )}
           </li>
         ))}
       </ul>
+      {pendingRemoval && (
+        <ConfirmSheet title="Remove this source?" confirmLabel="Remove permanently" onConfirm={() => remove(pendingRemoval.id)} onClose={() => setPendingRemoval(null)}>
+          <p>
+            Remove <strong>{pendingRemoval.name}</strong> from the source library? Mucaro deletes its chunks and its stored copy of the file, then rebuilds the index. Answers that already cited it keep their receipts, but the source can no longer be opened. This cannot be undone.
+          </p>
+        </ConfirmSheet>
+      )}
     </section>
   );
 }

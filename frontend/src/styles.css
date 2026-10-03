@@ -389,6 +389,10 @@ button:disabled {
   position: relative;
 }
 
+.chat-notice {
+  margin: 0 14px 8px;
+}
+
 .menu {
   position: absolute;
   right: 0;
@@ -450,6 +454,19 @@ button:disabled {
   border-radius: var(--radius);
   max-width: 100%;
   overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+.bubble .rich-text,
+.bubble .rich-text * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.bubble .rich-text {
+  cursor: text;
 }
 
 .user-bubble {
@@ -695,9 +712,81 @@ details summary {
   color: var(--muted);
 }
 
+.editable-message {
+  min-width: 0;
+}
+
+.message-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  min-height: 28px;
+}
+
+.user-bubble .message-footer {
+  justify-content: flex-end;
+}
+
+.message-edited-label {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 .message-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
+  margin-left: auto;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.message-actions .ghost-button {
+  min-height: 28px;
+  padding: 2px 7px;
+  font-size: 12px;
+}
+
+.message-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.message-editor label,
+.message-editor textarea {
+  width: 100%;
+}
+
+.message-editor textarea {
+  min-height: 88px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 9px 10px;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.message-editor textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.message-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.message-edit-disclosure {
+  margin: 0;
 }
 
 /* ---------- composer ---------- */
@@ -996,6 +1085,19 @@ details summary {
 .offline-list li {
   padding: 6px 0;
   font-size: 14px;
+}
+
+/* ---------- access token gate (phone access) ---------- */
+
+.gate .gate-input {
+  display: flex;
+  gap: 8px;
+}
+
+.gate .gate-input input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
 }
 
 /* ---------- phone widths (F01) ---------- */
