@@ -16,6 +16,7 @@ from backend.app.autopilot import (
 )
 from backend.app.agent_checkpoints import list_checkpoints
 from backend.app.config import Settings
+from backend.app.permission_leases import grant_permission_lease
 from backend.app.tools import TOOL_REGISTRY, ToolDefinition, approve_tool_call, list_tool_calls
 
 SHA = "a" * 40
@@ -348,8 +349,9 @@ def test_tool_owned_success_contract_rejects_ci_and_regression_failure_receipts(
     ci = TOOL_REGISTRY["github.ci_status"]
     regression = TOOL_REGISTRY["coding.regression_run"]
 
-    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "state": "PASS"}) is True
-    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "state": "FAIL"}) is False
+    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "ci_state": "PASS"}) is True
+    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "ci_state": "FAIL"}) is False
+    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "state": "PASS"}) is False
     assert regression.autopilot_result_is_success(
         {"status": "CODING_CHECK_SUITE_EXECUTED_PASS", "execution_status": "PASS"}
     ) is True
@@ -388,15 +390,58 @@ def test_tool_without_autopilot_success_contract_is_rejected_before_persistence(
     assert list_checkpoints(cfg) == []
 
 
-def test_github_ci_autopilot_success_contract_binds_ci_state() -> None:
-    tool = TOOL_REGISTRY["github.ci_status"]
+def test_mutating_autopilot_action_can_use_exact_run_permission_lease(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cfg = make_settings(tmp_path)
+    executed = {"count": 0}
 
-    assert tool.autopilot_result_is_success(
-        {"status": "GITHUB_CI_STATUS_OK", "ci_state": "PASS"}
-    ) is True
-    assert tool.autopilot_result_is_success(
-        {"status": "GITHUB_CI_STATUS_OK", "ci_state": "FAIL"}
-    ) is False
-    assert tool.autopilot_result_is_success(
-        {"status": "GITHUB_CI_STATUS_OK", "state": "PASS"}
-    ) is False
+    def mutate(arguments, settings):
+        executed["count"] += 1
+        return {"status": "LEASE_MUTATE_OK"}
+
+    monkeypatch.setitem(
+        TOOL_REGISTRY,
+        "test.lease_mutate",
+        ToolDefinition(
+            name="test.lease_mutate",
+            description="lease integration probe",
+            mutates_state=True,
+            requires_approval=True,
+            handler=mutate,
+            autopilot_success_statuses=("LEASE_MUTATE_OK",),
+        ),
+    )
+    planned = plan_autopilot(
+        session_id="s",
+        run_id="run-lease",
+        objective="Execute bounded leased mutation",
+        source_sha=SHA,
+        task_definitions=[action_task("mutate", "test.lease_mutate")],
+        cfg=cfg,
+    )
+    checkpoint = planned["checkpoint"]
+    grant = grant_permission_lease(
+        run_id="run-lease",
+        scope_type="EXACT_TOOLS",
+        tool_names=["test.lease_mutate"],
+        allow_mutating=True,
+        granted_by="operator",
+        max_uses=1,
+        cfg=cfg,
+    )["lease"]
+    authorized = authorize_autopilot(
+        checkpoint["checkpoint_id"],
+        approved_by="operator",
+        expected_sequence=checkpoint["sequence"],
+        cfg=cfg,
+    )["checkpoint"]
+
+    result = run_autopilot(authorized["checkpoint_id"], cfg=cfg)
+
+    assert result["status"] == "AUTOPILOT_COMPLETED"
+    assert executed["count"] == 1
+    calls = list_tool_calls(cfg)["tool_calls"]
+    assert len(calls) == 1
+    assert calls[0]["approved_by"] == f"lease:{grant['lease_id']}"
