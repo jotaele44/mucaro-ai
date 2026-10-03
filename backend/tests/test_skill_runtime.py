@@ -223,3 +223,58 @@ def test_active_mount_can_be_reauthorized_under_a_new_policy(tmp_path: Path):
 
     executed = execute_skill(skill_id, cfg=cfg)
     assert executed["execution"]["policy_decision"]["policy_id"] == "replacement-policy"
+
+
+def _synthetic_skill(skill_id: str, capabilities: tuple[str, ...]) -> SkillDefinition:
+    return SkillDefinition(
+        skill_id=skill_id,
+        version="1.0.0",
+        description="Synthetic re-evaluation test.",
+        runtime="IN_PROCESS",
+        capabilities=capabilities,
+        input_schema="test.input/1",
+        output_schema="test.output/1",
+        handler=lambda arguments, settings: {"status": "RAN"},
+    )
+
+
+def test_execute_re_evaluates_distribution_channel_changed_after_activation(monkeypatch, tmp_path: Path):
+    from backend.app import skill_runtime
+
+    local_cfg = make_settings(tmp_path)
+    definition = _synthetic_skill("test/channel-flip", ())
+    monkeypatch.setitem(skill_runtime.SKILL_REGISTRY, definition.skill_id, definition)
+    mount_skill(definition.skill_id, cfg=local_cfg)
+    activate_skill(definition.skill_id, cfg=local_cfg)
+    assert execute_skill(definition.skill_id, cfg=local_cfg)["status"] == "SKILL_EXECUTED"
+
+    try:
+        execute_skill(definition.skill_id, cfg=make_app_store_settings(tmp_path))
+    except SkillRuntimeError as exc:
+        assert exc.status == "ERROR_DISTRIBUTION_RUNTIME_POLICY"
+    else:
+        raise AssertionError("expected execution-time distribution denial")
+
+
+def test_execute_rejects_tampered_mount_grant(monkeypatch, tmp_path: Path):
+    from backend.app import skill_runtime
+
+    cfg = make_settings(tmp_path)
+    definition = _synthetic_skill("test/tampered-grant", ("network.public_http",))
+    monkeypatch.setitem(skill_runtime.SKILL_REGISTRY, definition.skill_id, definition)
+    mount_skill(definition.skill_id, cfg=cfg)
+    activate_skill(definition.skill_id, cfg=cfg, allowed_capabilities={"network.public_http"})
+
+    mounts = skill_runtime._load_mounts(cfg)
+    for mount in mounts:
+        if mount["skill_id"] == definition.skill_id:
+            mount["policy_decision"]["granted"] = ["runtime.in_process"]  # silently drops network.public_http
+    skill_runtime._write_mounts(mounts, cfg)
+
+    try:
+        execute_skill(definition.skill_id, cfg=cfg)
+    except SkillRuntimeError as exc:
+        assert exc.status == "ERROR_SKILL_POLICY_STALE"
+        assert "network.public_http" in exc.detail
+    else:
+        raise AssertionError("expected tampered grant to be refused at execution")

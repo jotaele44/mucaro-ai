@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 
 LOCAL_WORKER_PROTOCOL = "mucaro-local-worker/1.0"
 DEFAULT_TIMEOUT_SECONDS = 30
@@ -98,6 +99,14 @@ def run_local_worker(
         raise LocalWorkerError("ERROR_LOCAL_WORKER_REQUEST_TOO_LARGE", str(len(request_bytes)))
 
     preexec_fn, resource_limit_names = _resource_limiter(max_memory_mb, max_cpu_seconds)
+    for capability in ("subprocess.execute", *(("network.public_http",) if network_allowed else ())):
+        try:
+            require(
+                PermissionRequest(capability=capability, subject=skill_id, target="local_worker", origin="operator"),
+                distribution_channel=distribution_channel,
+            )
+        except PermissionEngineError as exc:
+            raise LocalWorkerError(exc.status, exc.detail) from exc
     try:
         proc = subprocess.run(
             [sys.executable, "-m", "backend.app.local_worker_entry"],
