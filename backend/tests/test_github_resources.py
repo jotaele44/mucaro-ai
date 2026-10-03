@@ -181,15 +181,14 @@ def test_all_github_resource_tools_flow_through_governed_approval(
     monkeypatch.setattr(tools_module, "list_github_gists", lambda **kwargs: {"status": "GITHUB_GISTS_OK"})
     monkeypatch.setattr(tools_module, "get_github_gist", lambda **kwargs: {"status": "GITHUB_GIST_OK"})
 
-    cases = (
+    for name, arguments in (
         ("github.issues_list", {"repo": "owner/repo"}),
         ("github.issue_view", {"repo": "owner/repo", "number": 1}),
         ("github.prs_list", {"repo": "owner/repo"}),
         ("github.pr_view", {"repo": "owner/repo", "number": 2}),
         ("github.gists_list", {"owner": "owner"}),
         ("github.gist_view", {"gist_id": "abcdef1234567890"}),
-    )
-    for name, arguments in cases:
+    ):
         call = request_tool_call(name, arguments, cfg=cfg, requested_by="test")["tool_call"]
         approve_tool_call(
             call["tool_call_id"],
@@ -201,5 +200,12 @@ def test_all_github_resource_tools_flow_through_governed_approval(
         assert executed["tool_call"]["status"] == "EXECUTED"
 
     by_name = {call["tool_name"]: call for call in list_tool_calls(cfg)["tool_calls"]}
-    assert set(by_name) == {name for name, _ in cases}
+    assert set(by_name) == {
+        "github.issues_list",
+        "github.issue_view",
+        "github.prs_list",
+        "github.pr_view",
+        "github.gists_list",
+        "github.gist_view",
+    }
     assert all(call["status"] == "EXECUTED" for call in by_name.values())
