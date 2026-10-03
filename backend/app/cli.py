@@ -116,7 +116,10 @@ from .portable_runtime import (
     verify_portable_macos_app,
 )
 from .portable_runtime_source import (
+    DEFAULT_INSPECT_MAX_MEMBERS,
+    DEFAULT_INSPECT_MAX_REGULAR_BYTES,
     PortableRuntimeSourceError,
+    inspect_runtime_archive,
     materialize_portable_runtime,
     verify_materialized_runtime,
 )
@@ -1144,12 +1147,39 @@ def build_parser() -> argparse.ArgumentParser:
     package_portable_runtime.add_argument(
         "--manifest",
         type=Path,
-        help="Runtime source manifest; defaults to the governed x86_64 macOS manifest.",
+        help=(
+            "Runtime source manifest; defaults to the governed x86_64 macOS manifest. "
+            "When supplied explicitly, the default output directory is derived from the manifest filename."
+        ),
     )
     package_portable_runtime.add_argument(
         "--archive",
         type=Path,
         help="Optional predownloaded archive; its exact size and SHA-256 must match the source manifest.",
+    )
+    package_portable_runtime.add_argument(
+        "--inspect-archive",
+        type=Path,
+        help=(
+            "Inspect one runtime tar.gz without extraction or materialization; emits exact byte/hash, "
+            "archive geometry, logical-member hash, and payload-multiset hash."
+        ),
+    )
+    package_portable_runtime.add_argument(
+        "--max-members",
+        type=int,
+        help=(
+            "Inspection-only member ceiling; defaults to "
+            f"{DEFAULT_INSPECT_MAX_MEMBERS} from the governed x86_64 runtime policy."
+        ),
+    )
+    package_portable_runtime.add_argument(
+        "--max-regular-bytes",
+        type=int,
+        help=(
+            "Inspection-only regular-file byte ceiling; defaults to "
+            f"{DEFAULT_INSPECT_MAX_REGULAR_BYTES} from the governed x86_64 runtime policy."
+        ),
     )
     package_portable_runtime.add_argument(
         "--output-dir",
@@ -3583,10 +3613,45 @@ def run_package_app_store_audit(args: argparse.Namespace, cfg: Settings) -> int:
 def run_package_portable_runtime(args: argparse.Namespace, cfg: Settings) -> int:
     manifest = args.manifest or (cfg.project_root / "packaging" / "runtime" / "macos-x86_64.json")
     try:
-        if args.verify is not None:
+        if args.inspect_archive is not None:
+            conflicting = [
+                name
+                for name, value in (
+                    ("--manifest", args.manifest),
+                    ("--archive", args.archive),
+                    ("--output-dir", args.output_dir),
+                    ("--verify", args.verify),
+                )
+                if value is not None
+            ]
+            if conflicting:
+                emit_error(
+                    "ERROR_PORTABLE_RUNTIME_MODE_CONFLICT",
+                    "--inspect-archive cannot be combined with " + ",".join(conflicting),
+                    args.format,
+                )
+                return 2
+            inspect_kwargs: dict[str, int] = {}
+            if args.max_members is not None:
+                inspect_kwargs["max_members"] = args.max_members
+            if args.max_regular_bytes is not None:
+                inspect_kwargs["max_regular_bytes"] = args.max_regular_bytes
+            report = {
+                "status": "PORTABLE_RUNTIME_ARCHIVE_INSPECTED",
+                **inspect_runtime_archive(args.inspect_archive, **inspect_kwargs),
+            }
+        elif args.max_members is not None or args.max_regular_bytes is not None:
+            emit_error(
+                "ERROR_PORTABLE_RUNTIME_MODE_CONFLICT",
+                "--max-members and --max-regular-bytes require --inspect-archive",
+                args.format,
+            )
+            return 2
+        elif args.verify is not None:
             report = verify_materialized_runtime(cfg.project_root, args.verify, manifest)
         else:
-            output_dir = args.output_dir or (cfg.export_dir / "portable_runtimes" / "macos-x86_64")
+            default_runtime_name = "macos-x86_64" if args.manifest is None else manifest.stem
+            output_dir = args.output_dir or (cfg.export_dir / "portable_runtimes" / default_runtime_name)
             report = materialize_portable_runtime(
                 cfg.project_root,
                 manifest,
@@ -3597,7 +3662,7 @@ def run_package_portable_runtime(args: argparse.Namespace, cfg: Settings) -> int
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(report, args.format)
-    return 0 if report["status"] == "PORTABLE_RUNTIME_VERIFIED" else 2
+    return 0 if report["status"] in {"PORTABLE_RUNTIME_VERIFIED", "PORTABLE_RUNTIME_ARCHIVE_INSPECTED"} else 2
 
 
 def run_package_portable_macos_app(args: argparse.Namespace, cfg: Settings) -> int:
