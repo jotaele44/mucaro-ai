@@ -38,6 +38,7 @@ RECORD_SCHEMAS: dict[str, str] = {
     "memory_item": "memory_item.schema.json",
     "memory_selection": "memory_selection.schema.json",
     "model_route_decision": "model_route_decision.schema.json",
+    "model_failover": "model_failover.schema.json",
     "model_runtime": "model_runtime.schema.json",
     "release_receipt": "release_receipt.schema.json",
     "release_scope_manifest": "release_scope_manifest.schema.json",
@@ -53,7 +54,7 @@ CONTRACT_FAMILIES: dict[str, tuple[str, ...]] = {
     "ARTIFACT": ("artifact_identity",),
     "CITATION": ("citation_record", "answer_trace"),
     "MEMORY": ("memory_item", "memory_selection"),
-    "MODEL_ROUTING": ("model_route_decision", "model_runtime"),
+    "MODEL_ROUTING": ("model_route_decision", "model_failover", "model_runtime"),
     "CERTIFICATION": ("release_receipt", "release_scope_manifest", "release_acceptance_ledger"),
 }
 
