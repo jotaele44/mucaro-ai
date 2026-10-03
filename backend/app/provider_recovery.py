@@ -30,6 +30,27 @@ class ProviderRecoveryError(RuntimeError):
         self.detail = detail
 
 
+def pause_provider_checkpoint(
+    checkpoint_id: str,
+    *,
+    provider: str,
+    model: str | None,
+    provider_error: str,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    try:
+        return transition_checkpoint(
+            checkpoint_id,
+            state="PAUSED_PROVIDER",
+            pause_reason=f"{provider}:{provider_error}",
+            provider=provider,
+            model=model,
+            cfg=cfg,
+        )
+    except CheckpointError as exc:
+        raise ProviderRecoveryError(exc.status, exc.detail) from exc
+
+
 def provider_attempt_id(checkpoint: dict[str, Any], operation_key: str) -> str:
     """Identity of one logical operation in one run. Provider and model are deliberately not part of it:
     retrying on another provider after an outage is the same operation, not a new one."""
@@ -112,12 +133,11 @@ def execute_with_provider_checkpoint(
             if attempt_id:
                 interrupted_result["attempt_id"] = attempt_id
             return interrupted_result
-        paused = transition_checkpoint(
+        paused = pause_provider_checkpoint(
             checkpoint_id,
-            state="PAUSED_PROVIDER",
-            pause_reason=f"{provider}:{exc.status}",
             provider=provider,
             model=model,
+            provider_error=exc.status,
             cfg=cfg,
         )
         paused_result: dict[str, Any] = {"status": "PAUSED_PROVIDER", "provider_error": exc.status, "checkpoint": paused}
