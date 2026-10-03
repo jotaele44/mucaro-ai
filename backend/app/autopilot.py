@@ -20,6 +20,7 @@ from .agent_checkpoints import (
 )
 from .agent_task_dag import TaskDagError, build_task_dag
 from .config import Settings, settings
+from .permission_leases import PermissionLeaseError, authorize_tool_call_with_lease
 from .tools import (
     TOOL_REGISTRY,
     ToolRuntimeError,
@@ -752,24 +753,40 @@ def advance_autopilot(checkpoint_id: str, *, cfg: Settings = settings) -> dict[s
     auto_approvable = not tool.mutates_state and tool.network == "none"
     if call["status"] == "PENDING_APPROVAL":
         if not auto_approvable:
-            checkpoint = _set_runtime_status(checkpoint, status="WAITING_APPROVAL", stop_reason=None, cfg=cfg)
-            return {
-                "status": "AUTOPILOT_WAITING_APPROVAL",
-                "task_id": task["id"],
-                "tool_call_id": call["tool_call_id"],
-                "checkpoint": checkpoint,
-            }
-        try:
-            approved = approve_tool_call(
-                call["tool_call_id"],
-                cfg=cfg,
-                approved_by="autopilot:local-readonly-policy",
-                reason="authorized autopilot may auto-approve local non-mutating tools",
-                expected_arguments_sha256=call["arguments_sha256"],
-            )
-        except ToolRuntimeError as exc:
-            raise AutopilotError(exc.status, exc.detail) from exc
-        call = approved["tool_call"]
+            try:
+                leased = authorize_tool_call_with_lease(call["tool_call_id"], cfg=cfg)
+            except PermissionLeaseError as exc:
+                if exc.status == "ERROR_PERMISSION_LEASE_NO_MATCH":
+                    checkpoint = _set_runtime_status(checkpoint, status="WAITING_APPROVAL", stop_reason=None, cfg=cfg)
+                    return {
+                        "status": "AUTOPILOT_WAITING_APPROVAL",
+                        "task_id": task["id"],
+                        "tool_call_id": call["tool_call_id"],
+                        "checkpoint": checkpoint,
+                    }
+                if exc.status == "ERROR_PERMISSION_LEASE_AMBIGUOUS":
+                    checkpoint = _set_runtime_status(checkpoint, status="WAITING_APPROVAL", stop_reason=None, cfg=cfg)
+                    return {
+                        "status": "AUTOPILOT_WAITING_APPROVAL",
+                        "task_id": task["id"],
+                        "tool_call_id": call["tool_call_id"],
+                        "lease_error": exc.status,
+                        "checkpoint": checkpoint,
+                    }
+                raise AutopilotError(exc.status, exc.detail) from exc
+            call = leased["tool_call"]
+        else:
+            try:
+                approved = approve_tool_call(
+                    call["tool_call_id"],
+                    cfg=cfg,
+                    approved_by="autopilot:local-readonly-policy",
+                    reason="authorized autopilot may auto-approve local non-mutating tools",
+                    expected_arguments_sha256=call["arguments_sha256"],
+                )
+            except ToolRuntimeError as exc:
+                raise AutopilotError(exc.status, exc.detail) from exc
+            call = approved["tool_call"]
 
     if call["status"] in {"DENIED", "CANCELLED", "INTERRUPTED"}:
         checkpoint = _transition_task(
