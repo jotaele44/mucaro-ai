@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { api } from "./api.js";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { api, authIssueOf, onAuthIssue } from "./api.js";
 import { ChatView } from "./components/ChatView.jsx";
 import { TasksDrawer } from "./components/TasksDrawer.jsx";
+import { TokenGate } from "./components/TokenGate.jsx";
 import { MemoryWorkspace } from "./components/workspaces/MemoryWorkspace.jsx";
 import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace.jsx";
 import { SettingsWorkspace } from "./components/workspaces/SettingsWorkspace.jsx";
@@ -40,6 +41,9 @@ function optionsFromPreferences(payload, fallback = DEFAULT_OPTIONS) {
     return next;
   }, { ...fallback });
 }
+// Foreground liveness check. A phone that was away this long has lost its live streams without any error.
+const HEALTH_POLL_MS = 15000;
+const RESUME_AFTER_AWAY_MS = 3000;
 
 function stored(key, fallback) {
   try {
@@ -58,6 +62,9 @@ function persist(key, value) {
   }
 }
 
+// Same object when nothing changed, so repeated refusals cause no re-render.
+const locked = (current, reason) => (current.state === "locked" && current.reason === reason ? current : { state: "locked", reason });
+
 export function App() {
   const [view, setView] = useState("chat");
   const [conversations, setConversations] = useState([]);
@@ -69,7 +76,19 @@ export function App() {
   const [options, setOptions] = useState(() => ({ ...DEFAULT_OPTIONS, ...stored("mucaro.options", {}) }));
   const [preferences, setPreferences] = useState(() => stored("mucaro.preferencesCache", null));
   const [message, setMessage] = useState("");
+  // state: checking | ok | error | locked. `offline` marks a service that answered before and has gone quiet: the UI
+  // stays mounted (open sheets, streams and drafts survive a network blip) and reconciles once the service is back.
+  // `locked` is a service that is reachable but wants a token this browser lacks (reason: required | rejected | disabled).
   const [health, setHealth] = useState({ state: "checking" });
+  const [gateBusy, setGateBusy] = useState(false);
+  const [reconnect, setReconnect] = useState(0);
+  const healthRef = useRef(health);
+  const polling = useRef(false);
+  const offline = useRef(false);
+
+  useEffect(() => {
+    healthRef.current = health;
+  });
 
   const announce = useCallback((text) => {
     setMessage("");
@@ -98,14 +117,51 @@ export function App() {
     return payload;
   }, [acceptPreferences]);
 
+  // Startup and Retry: decides between ready and unreachable.
   const checkHealth = useCallback(async () => {
     try {
       await api.health();
-      setHealth({ state: "ok" });
       const [modePayload] = await Promise.all([api.modes(), loadConversations(), loadPreferences()]);
       setModes(modePayload);
+      offline.current = false;
+      setHealth((current) => (current.state === "ok" && !current.offline ? current : { state: "ok" }));
     } catch (err) {
-      setHealth({ state: "error", error: err });
+      const issue = authIssueOf(err);
+      setHealth((current) => (issue ? locked(current, issue) : { state: "error", error: err }));
+    }
+  }, [loadConversations, loadPreferences]);
+
+  // Any call that finds the token refused (the computer restarted Mucaro and made a new one) sends the person to the gate.
+  useEffect(() => onAuthIssue((reason) => setHealth((current) => locked(current, reason))), []);
+
+  async function submitToken(token, remember) {
+    api.setOperatorToken(token, { remember });
+    setGateBusy(true);
+    try {
+      await checkHealth();
+    } finally {
+      setGateBusy(false);
+    }
+  }
+
+  // Foreground poll once the app is up. It never replaces a state object that did not change, so a healthy
+  // service causes no re-render, and a blip is shown as a banner instead of tearing the workspace down.
+  const pollHealth = useCallback(async () => {
+    if (polling.current) return;
+    polling.current = true;
+    try {
+      await api.health();
+      if (offline.current) {
+        offline.current = false;
+        setHealth((current) => (current.state === "ok" ? { state: "ok" } : current));
+        loadConversations();
+        setReconnect((count) => count + 1);
+      }
+    } catch {
+      offline.current = true;
+      setHealth((current) => (current.state === "ok" && !current.offline ? { state: "ok", offline: true } : current));
+    } finally {
+      polling.current = false;
     }
   }, [loadConversations, loadPreferences]);
 
@@ -113,19 +169,52 @@ export function App() {
     checkHealth();
   }, [checkHealth]);
 
-  // Watchdog: a local service that stops mid-session is reported instead of leaving requests hanging.
+  // Watchdog and phone lifecycle. A service that never came up is retried so the app starts by itself; a page that
+  // was suspended, restored from the back-forward cache, or regained its network asks the chat to reconnect,
+  // because iOS drops sockets without telling the page.
   useEffect(() => {
-    const timer = window.setInterval(async () => {
+    const tick = () => {
       if (document.hidden) return;
-      try {
-        await api.health();
-        setHealth((current) => (current.state === "error" ? current : { state: "ok" }));
-      } catch (err) {
-        setHealth({ state: "error", error: err });
+      if (healthRef.current.state === "error") checkHealth();
+      else if (healthRef.current.state === "ok") pollHealth();
+    };
+    const timer = window.setInterval(tick, HEALTH_POLL_MS);
+    let awaySince = null;
+    const onVisibility = () => {
+      if (document.hidden) {
+        awaySince = Date.now();
+        return;
       }
-    }, 4000);
-    return () => window.clearInterval(timer);
-  }, []);
+      const wasAway = awaySince !== null && Date.now() - awaySince > RESUME_AFTER_AWAY_MS;
+      awaySince = null;
+      if (wasAway) setReconnect((count) => count + 1);
+      tick();
+    };
+    const onOnline = () => {
+      setReconnect((count) => count + 1);
+      tick();
+    };
+    const onPageShow = (event) => {
+      if (event.persisted) {
+        setReconnect((count) => count + 1);
+        tick();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, [checkHealth, pollHealth]);
+
+  async function retry() {
+    await checkHealth();
+    setReconnect((count) => count + 1);
+  }
 
   useEffect(() => persist("mucaro.activeConversation", activeId), [activeId]);
   useEffect(() => persist("mucaro.options", options), [options]);
@@ -146,7 +235,7 @@ export function App() {
   return (
     <div className={`app ${navOpen ? "nav-open" : ""}`}>
       <a className="skip-link" href="#main">Skip to content</a>
-      <nav className="sidebar" aria-label="Primary">
+      <nav className="sidebar" aria-label="Primary" inert={health.state === "locked"}>
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">M</span>
           <span>Mucaro</span>
@@ -199,15 +288,17 @@ export function App() {
           </button>
           <span className="brand-inline">Mucaro</span>
         </div>
-        {health.state === "error" && (
+        {(health.state === "error" || health.offline) && (
           <div className="error-card banner" role="alert">
-            <strong>Mucaro's local service is not reachable.</strong> Your data is safe on this Mac.
-            <button type="button" className="secondary-button" onClick={checkHealth}>Retry</button>
+            <strong>Mucaro's local service is not reachable.</strong> {health.offline ? "Reconnecting…" : "Your data stays on the computer that runs Mucaro."}
+            <button type="button" className="secondary-button" onClick={retry}>Retry</button>
           </div>
         )}
         {health.state === "checking" && <p className="muted center pad">Starting…</p>}
+        {health.state === "locked" && <TokenGate reason={health.reason} busy={gateBusy} onSubmit={submitToken} onRetry={retry} />}
         {health.state === "ok" && view === "chat" && (
           <ChatView
+            reconnect={reconnect}
             conversationId={activeId}
             onConversationCreated={(id) => setActiveId(id)}
             onConversationsChanged={loadConversations}

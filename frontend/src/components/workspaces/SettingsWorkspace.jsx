@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../../api.js";
+import { CleartextNotice } from "../CleartextNotice.jsx";
 
 // One governed settings home (TGT-033). Persistent preferences are backend-owned;
 // the local access token remains a separate credential boundary and is never written through chat.
@@ -237,6 +238,7 @@ export function SettingsWorkspace({ options, preferences, onPreferencesChanged, 
         <p className="muted small">
           This credential is deliberately outside prompt-configurable preferences. Requests to set it in chat are rejected before a run is saved.
         </p>
+        <CleartextNotice />
         {api.tokenIsLaunchManaged() ? (
           <p className="muted small">The Mucaro app created a fresh token for this launch and uses it automatically. Nothing to set here.</p>
         ) : (
@@ -246,7 +248,7 @@ export function SettingsWorkspace({ options, preferences, onPreferencesChanged, 
               className="inline-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                api.setOperatorToken(token);
+                api.setOperatorToken(token, { remember: true });
                 announce("Token saved for this device.");
               }}
             >

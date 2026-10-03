@@ -1,25 +1,45 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, streamRunEvents } from "../api.js";
+import { copyFailureMessage, copyText } from "../clipboard.js";
 import { ACTIVE_STATES, deriveRun, transcriptText } from "../feed.js";
 import { Composer } from "./Composer.jsx";
+import { ConfirmSheet } from "./ConfirmSheet.jsx";
 import { EvidencePanel } from "./EvidencePanel.jsx";
-import { RichText } from "./RichText.jsx";
+import { EditableMessage } from "./MessageActions.jsx";
 import { RunBlock } from "./RunBlock.jsx";
 import { Sheet } from "./Sheet.jsx";
+
+// A stream route that keeps failing is retried with backoff, then paused until the user (or a reconnect) resumes it.
+const MAX_STREAM_RETRIES = 10;
+const bump = (map, key) => map.set(key, (map.get(key) || 0) + 1);
 
 function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, announce }) {
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState(null);
   const [title, setTitle] = useState(conversation?.title || "");
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState(null);
+
+  async function submitRename(event) {
+    event.preventDefault();
+    const next = title.trim();
+    if (!next || renaming) return;
+    setRenaming(true);
+    setRenameError(null);
+    try {
+      await onRename(next);
+      setDialog(null);
+    } catch (err) {
+      setRenameError(`${err?.status || "ERROR"}: ${err?.message || "The conversation could not be renamed."}`);
+    } finally {
+      setRenaming(false);
+    }
+  }
 
   async function copyTranscript() {
     setOpen(false);
-    try {
-      await navigator.clipboard.writeText(transcriptText(conversation?.turns || []));
-      announce("Transcript copied.");
-    } catch {
-      announce("Copy failed: clipboard access was not allowed.");
-    }
+    const result = await copyText(transcriptText(conversation?.turns || []));
+    announce(result.ok ? "Transcript copied." : copyFailureMessage(result));
   }
 
   return (
@@ -29,7 +49,7 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
       </button>
       {open && (
         <ul className="menu" role="menu">
-          <li role="none"><button role="menuitem" type="button" onClick={() => { setOpen(false); setTitle(conversation?.title || ""); setDialog("rename"); }}>Rename</button></li>
+          <li role="none"><button role="menuitem" type="button" onClick={() => { setOpen(false); setTitle(conversation?.title || ""); setRenameError(null); setDialog("rename"); }}>Rename</button></li>
           <li role="none"><button role="menuitem" type="button" onClick={copyTranscript}>Copy transcript</button></li>
           <li role="none"><button role="menuitem" type="button" onClick={() => { setOpen(false); onOpenTasks(); }}>Background tasks</button></li>
           <li role="none"><button role="menuitem" type="button" className="danger-text" onClick={() => { setOpen(false); setDialog("delete"); }}>Delete…</button></li>
@@ -37,37 +57,33 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
       )}
       {dialog === "rename" && (
         <Sheet title="Rename conversation" onClose={() => setDialog(null)} side="center">
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (title.trim()) onRename(title.trim()).then(() => setDialog(null));
-            }}
-          >
+          <form onSubmit={submitRename}>
             <label className="field">
               <span>Title</span>
-              <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} />
+              <input data-autofocus value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} />
             </label>
+            {renameError && (
+              <p className="error-text" role="alert">
+                {renameError}
+              </p>
+            )}
             <div className="button-row">
               <button type="button" className="secondary-button" onClick={() => setDialog(null)}>Cancel</button>
-              <button type="submit" className="primary-button" disabled={!title.trim()}>Save</button>
+              <button type="submit" className="primary-button" disabled={!title.trim() || renaming}>{renaming ? "Saving…" : "Save"}</button>
             </div>
           </form>
         </Sheet>
       )}
       {dialog === "delete" && (
-        <Sheet title="Delete conversation?" onClose={() => setDialog(null)} side="center">
-          <p>This permanently deletes the conversation and its transcript from this Mac. Sources, memory and receipts are kept. There is no archive or undo.</p>
-          <div className="button-row">
-            <button type="button" className="secondary-button" onClick={() => setDialog(null)}>Keep it</button>
-            <button type="button" className="danger-button" onClick={() => onDelete().then(() => setDialog(null))}>Delete permanently</button>
-          </div>
-        </Sheet>
+        <ConfirmSheet title="Delete conversation?" confirmLabel="Delete permanently" onConfirm={onDelete} onClose={() => setDialog(null)}>
+          <p>This permanently deletes the conversation and its transcript from the computer that runs Mucaro. Sources, memory and receipts are kept. There is no archive or undo.</p>
+        </ConfirmSheet>
       )}
     </div>
   );
 }
 
-export function ChatView({ conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, onPreferencesChanged, announce, modes, defaultOptions }) {
+export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, onPreferencesChanged, announce, modes, defaultOptions }) {
   const [conversation, setConversation] = useState(null);
   const [runs, setRuns] = useState(new Map());
   const [summaries, setSummaries] = useState([]);
@@ -75,11 +91,26 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [citation, setCitation] = useState(null);
+  const [paused, setPaused] = useState(false);
   const streams = useRef(new Map());
+  const failures = useRef(new Map()); // runId -> consecutive stream failures
+  const retryTimers = useRef(new Map());
+  const handledReconnect = useRef(reconnect);
   const caughtUp = useRef(new Set());
   const refreshRef = useRef(null);
   const feedRef = useRef(null);
   const stick = useRef(true);
+
+  // Drops every open stream and pending retry. A page that was suspended keeps stream objects that are dead
+  // but still registered, which would block a re-follow.
+  const resetStreams = useCallback(() => {
+    for (const controller of streams.current.values()) controller.abort();
+    streams.current.clear();
+    for (const timer of retryTimers.current.values()) clearTimeout(timer);
+    retryTimers.current.clear();
+    failures.current.clear();
+    setPaused(false);
+  }, []);
 
   const loadRun = useCallback(async (runId) => {
     const payload = await api.runEvents(runId);
@@ -96,6 +127,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
         runId,
         after,
         (event) => {
+          failures.current.delete(runId); // data is flowing, so the stream route works
           setRuns((previous) => {
             const entry = previous.get(runId);
             if (!entry || entry.events.some((row) => row.seq === event.seq)) return previous;
@@ -110,10 +142,32 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
         },
         controller.signal,
       )
-        .catch(() => {})
+        .then((closing) => {
+          if (!closing) bump(failures.current, runId); // the server closed the stream without an end event
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) bump(failures.current, runId);
+        })
         .finally(() => {
-          streams.current.delete(runId);
-          if (!controller.signal.aborted) refreshRef.current?.().catch(() => {});
+          if (streams.current.get(runId) === controller) streams.current.delete(runId);
+          if (controller.signal.aborted) return;
+          const failed = failures.current.get(runId) || 0;
+          if (!failed) {
+            refreshRef.current?.().catch(() => {}); // a normal end: load the final state at once
+          } else if (failed >= MAX_STREAM_RETRIES) {
+            setPaused(true);
+          } else {
+            // Exponential backoff with jitter, so a stream route that keeps failing is not hammered.
+            const delay = Math.min(30000, 500 * 2 ** (failed - 1)) * (0.75 + Math.random() * 0.5);
+            clearTimeout(retryTimers.current.get(runId));
+            retryTimers.current.set(
+              runId,
+              setTimeout(() => {
+                retryTimers.current.delete(runId);
+                refreshRef.current?.().catch(() => {});
+              }, delay),
+            );
+          }
         });
     },
     [loadRun, onPreferencesChanged],
@@ -142,8 +196,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
   refreshRef.current = refresh;
 
   useEffect(() => {
-    for (const controller of streams.current.values()) controller.abort();
-    streams.current.clear();
+    resetStreams();
     setRuns(new Map());
     setSummaries([]);
     setConversation(null);
@@ -153,11 +206,21 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
     refresh()
       .catch((err) => setError(err))
       .finally(() => setLoading(false));
-    return () => {
-      for (const controller of streams.current.values()) controller.abort();
-      streams.current.clear();
-    };
-  }, [conversationId, refresh]);
+    return () => resetStreams();
+  }, [conversationId, refresh, resetStreams]);
+
+  // The app asks for this after the page was away, regained its network, or the service came back.
+  useEffect(() => {
+    if (reconnect === handledReconnect.current) return;
+    handledReconnect.current = reconnect;
+    resetStreams();
+    if (conversationId) refreshRef.current?.().catch(() => {});
+  }, [reconnect, conversationId, resetStreams]);
+
+  function resume() {
+    resetStreams();
+    refreshRef.current?.().catch((err) => setError(err));
+  }
 
   const views = useMemo(
     () =>
@@ -167,6 +230,7 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
     [runs],
   );
   const legacyTurns = (conversation?.turns || []).filter((turn) => !turn.work_run_id);
+  const messageEdits = conversation?.message_edits || {};
   const activeRun = views.find((view) => ["RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT"].includes(view.state));
   const queued = summaries.filter((row) => row.state === "QUEUED");
   const lastStatus = activeRun ? activeRun.state : views.length ? views[views.length - 1].state : null;
@@ -234,6 +298,14 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
     }
   }
 
+  async function saveMessageEdit(messageKey, content, expectedRevision) {
+    if (!conversationId) throw new Error("Conversation is not available.");
+    const result = await api.editConversationMessage(conversationId, messageKey, content, expectedRevision);
+    await refresh();
+    announce("Message updated. Original preserved in provenance.");
+    return result.message_edit;
+  }
+
   const empty = !loading && !views.length && !legacyTurns.length;
   return (
     <section className="chat" aria-label="Conversation">
@@ -268,13 +340,32 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
             <p className="muted">Ask about your sources, or use a command such as <code>/status</code> or <code>/fetch https://…</code>. Actions always ask before they run unless you choose Auto for local read-only tools.</p>
           </div>
         )}
-        {legacyTurns.map((turn) => (
-          <div key={turn.turn_id} className={`bubble ${turn.role === "user" ? "user-bubble" : "assistant-bubble"}`}>
-            <RichText text={String(turn.content || "")} />
-          </div>
-        ))}
+        {legacyTurns.map((turn) => {
+          const messageKey = `turn:${turn.turn_id}`;
+          const edit = messageEdits[messageKey];
+          return (
+            <div key={turn.turn_id} className={`bubble ${turn.role === "user" ? "user-bubble" : "assistant-bubble"}`}>
+              <EditableMessage
+                text={String(edit?.content ?? turn.content ?? "")}
+                revision={Number(edit?.revision || 0)}
+                edited={Boolean(edit)}
+                onSave={(content, revision) => saveMessageEdit(messageKey, content, revision)}
+                announce={announce}
+                allowReadAloud={turn.role === "assistant"}
+              />
+            </div>
+          );
+        })}
         {views.map((view) => (
-          <RunBlock key={view.runId} view={view} onChanged={() => loadRun(view.runId).then(refresh)} onOpenCitation={setCitation} announce={announce} />
+          <RunBlock
+            key={view.runId}
+            view={view}
+            onChanged={() => loadRun(view.runId).then(refresh)}
+            onOpenCitation={setCitation}
+            announce={announce}
+            messageEdits={messageEdits}
+            onEditMessage={saveMessageEdit}
+          />
         ))}
         {error && (
           <p className="error-card" role="alert">
@@ -282,6 +373,15 @@ export function ChatView({ conversationId, onConversationCreated, onConversation
           </p>
         )}
       </div>
+
+      {paused && (
+        <p className="notice chat-notice" role="status">
+          Live updates paused after repeated failures.{" "}
+          <button type="button" className="ghost-button" onClick={resume}>
+            Resume
+          </button>
+        </p>
+      )}
 
       <Composer
         conversationId={conversationId}

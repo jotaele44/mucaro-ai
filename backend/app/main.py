@@ -8,13 +8,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .auth import auth_status, is_public_api_path, require_operator_auth
+from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
 from .conversations import (
+    ConversationMessageEditError,
     append_answer_turn,
     build_conversation_context,
     create_conversation,
     delete_conversation,
+    edit_conversation_message,
     get_conversation,
     list_conversations,
     rename_conversation,
@@ -45,6 +47,7 @@ from .models import (
     InteractionResolveRequest,
     MemoryCreateRequest,
     MemoryUpdateRequest,
+    MessageEditRequest,
     MessageRequest,
     RunEditRequest,
     PlanRequest,
@@ -203,6 +206,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     ) -> dict:
         if is_public_api_path(request.url.path):
             return {"status": "AUTH_PUBLIC_ROUTE"}
+        require_remote_token(cfg, request.scope)
         return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
 
     app = FastAPI(title="Mucaro AI", version="0.1.23", dependencies=[Depends(require_auth_unless_public)])
@@ -241,13 +245,18 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     ) -> dict:
         return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
 
+    # These two routes are public so a client can discover that a token is needed. A remote peer learns that and
+    # nothing about the host: no filesystem paths and no origin list.
     @app.get("/health")
-    def health() -> dict:
-        return {"status": "OK", "model_provider": cfg.default_model_provider, "project_root": str(cfg.project_root)}
+    def health(request: Request) -> dict:
+        payload = {"status": "OK", "model_provider": cfg.default_model_provider}
+        if not client_is_remote(request.scope):
+            payload["project_root"] = str(cfg.project_root)
+        return payload
 
     @app.get("/config")
-    def config_status() -> dict:
-        return {
+    def config_status(request: Request) -> dict:
+        payload = {
             "status": "CONFIG_OK",
             "project_root": str(cfg.project_root),
             "data_dir": str(cfg.data_dir),
@@ -259,6 +268,10 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             "auth": auth_status(cfg),
             "security": build_security_report(cfg),
         }
+        if client_is_remote(request.scope):
+            for key in ("project_root", "data_dir", "cors_origins"):
+                payload.pop(key)
+        return payload
 
     @app.get("/security")
     def security_status() -> dict:
@@ -578,6 +591,47 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             )
         except RunError as exc:
             raise run_error(exc) from exc
+
+    @app.patch("/conversations/{conversation_id}/messages/{message_key}")
+    def edit_message(
+        conversation_id: str,
+        message_key: str,
+        req: MessageEditRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        conversation_payload = get_conversation(conversation_id, cfg)
+        if conversation_payload is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+
+        if message_key.startswith("turn:"):
+            turn_id = message_key.removeprefix("turn:")
+            if not turn_id or not any(turn.get("turn_id") == turn_id for turn in conversation_payload.get("turns", [])):
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404)
+        else:
+            match = re.fullmatch(r"run:([^:]+):(user|assistant)", message_key)
+            if match is None:
+                raise api_error("ERROR_MESSAGE_KEY_INVALID", "Message key is not valid.")
+            run_id = match.group(1)
+            try:
+                run = get_run(run_id, cfg)
+            except RunError as exc:
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404) from exc
+            if run.get("conversation_id") != conversation_id:
+                raise api_error("ERROR_MESSAGE_NOT_FOUND", "Message not found.", status_code=404)
+
+        try:
+            edit = edit_conversation_message(
+                conversation_id,
+                message_key,
+                req.content,
+                req.expected_revision,
+                cfg,
+            )
+        except ConversationMessageEditError as exc:
+            conflict = exc.status in {"ERROR_MESSAGE_EDIT_REVISION_CONFLICT", "ERROR_MESSAGE_EDITS_INVALID"}
+            missing = exc.status == "ERROR_CONVERSATION_NOT_FOUND"
+            raise api_error(exc.status, exc.detail, status_code=404 if missing else 409 if conflict else 400) from exc
+        return {"status": "MESSAGE_EDITED", "message_edit": edit}
 
     @app.get("/conversations/{conversation_id}/runs")
     def conversation_runs(conversation_id: str, limit: int = 50) -> dict:

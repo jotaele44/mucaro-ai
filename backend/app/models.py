@@ -118,6 +118,11 @@ class MessageRequest(BaseModel):
     options: RunOptions = Field(default_factory=RunOptions)
 
 
+class MessageEditRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=20000)
+    expected_revision: int = Field(default=0, ge=0)
+
+
 class RunEditRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=20000)
     expected_version: int = Field(ge=1)
