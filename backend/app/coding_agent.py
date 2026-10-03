@@ -61,6 +61,10 @@ APPROVAL_VALUE_LIMIT = 2_000
 MAX_ACTION_SCAN_ATTEMPTS = 500
 # Longest tool-argument summary carried by a streamed tool_call event.
 EVENT_SUMMARY_LIMIT = 200
+# Largest reply the Anthropic path asks for without streaming. Models that always think spend part of it before the
+# JSON action, so a small ceiling would cut replies off mid-action.
+ANTHROPIC_MAX_TOKENS = 16_000
+PROVIDER_DETAIL_CHARS = 300
 # Names under which agent actions appear in the hash-chained tool audit log.
 AUDIT_TOOL_NAMES = {
     "read": "coding.read_file",
@@ -504,18 +508,66 @@ def provider_chat(provider: str | None, model_name: str | None = None) -> Chat:
 
         return chat
     if name == "anthropic":
-        try:
-            from anthropic import Anthropic  # type: ignore
-        except Exception as exc:
-            raise ModelProviderError("ERROR_MODEL_SDK_MISSING", 'python -m pip install -e ".[anthropic]"') from exc
-        client = Anthropic()
-        model = model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model)
-
-        def chat(messages: list[dict[str, str]]) -> str:
-            response = client.messages.create(
-                model=model, max_tokens=2000, system=messages[0]["content"], messages=messages[1:]
-            )
-            return "\n".join(b.text for b in response.content if getattr(b, "type", None) == "text")
-
-        return chat
+        return _anthropic_chat(model_name)
     raise ModelProviderError("ERROR_AGENT_PROVIDER_UNSUPPORTED", "use --provider local or anthropic, or --script for deterministic replays")
+
+
+def _bounded(text: str, limit: int = PROVIDER_DETAIL_CHARS) -> str:
+    return " ".join(str(text).split())[:limit]
+
+
+def _anthropic_error(sdk: Any, exc: Exception, model: str) -> ModelProviderError:
+    """The provider error for an Anthropic SDK failure, most specific class first. The message never carries a credential."""
+    detail = _bounded(getattr(exc, "message", None) or str(exc))
+    key = os.getenv(MODEL_PROVIDER_SPECS["anthropic"].api_key_env or "")
+    if key:
+        detail = detail.replace(key, "[redacted]")  # an upstream message that echoes the credential must not reach a terminal or log
+    for class_names, status, explanation in (
+        (("AuthenticationError", "PermissionDeniedError"), "ERROR_MODEL_AUTH_REJECTED", "the API key was rejected or lacks permission"),
+        (("NotFoundError",), "ERROR_MODEL_NOT_FOUND", f"model {model} was not found, or this key cannot use it"),
+        (("RateLimitError",), "ERROR_MODEL_RATE_LIMITED", "the API rate limit was reached"),
+        (("BadRequestError",), "ERROR_MODEL_REQUEST_REJECTED", f"the API rejected the request for {model}"),
+        (("APIConnectionError",), "ERROR_MODEL_UNAVAILABLE", "the API could not be reached"),  # includes request timeouts
+    ):
+        classes = tuple(getattr(sdk, class_name) for class_name in class_names if hasattr(sdk, class_name))
+        if classes and isinstance(exc, classes):
+            return ModelProviderError(status, f"{explanation}: {detail}")
+    code = getattr(exc, "status_code", None)
+    if isinstance(code, int) and code >= 500:
+        return ModelProviderError("ERROR_MODEL_UNAVAILABLE", f"the API failed with HTTP {code}: {detail}")
+    return ModelProviderError("ERROR_MODEL_HTTP_ERROR", f"the API returned an error: {detail}")
+
+
+def _anthropic_chat(model_name: str | None) -> Chat:
+    spec = MODEL_PROVIDER_SPECS["anthropic"]
+    # The opt-in `mucaro ask` requires: a live provider is sent repository content, so it stays off unless enabled.
+    if os.getenv("MUCARO_AI_LIVE_MODE") != "1":
+        raise ModelProviderError("ERROR_LIVE_MODE_DISABLED", "Set MUCARO_AI_LIVE_MODE=1 to permit live Anthropic calls.")
+    if spec.api_key_env and not os.getenv(spec.api_key_env):
+        raise ModelProviderError("ERROR_MODEL_API_KEY_MISSING", f"Set {spec.api_key_env} in your shell before using --provider anthropic.")
+    try:
+        import anthropic  # type: ignore
+    except Exception as exc:
+        raise ModelProviderError("ERROR_MODEL_SDK_MISSING", 'python -m pip install -e ".[anthropic]"') from exc
+    client = anthropic.Anthropic()
+    model = model_name or os.getenv("MUCARO_AI_MODEL", spec.default_model)
+
+    def chat(messages: list[dict[str, str]]) -> str:
+        # No thinking, sampling or tool parameters: they differ across model generations, and the reply is one JSON action.
+        try:
+            response = client.messages.create(
+                model=model, max_tokens=ANTHROPIC_MAX_TOKENS, system=messages[0]["content"], messages=messages[1:]
+            )
+        except anthropic.APIError as exc:
+            raise _anthropic_error(anthropic, exc, model) from exc
+        if getattr(response, "stop_reason", None) == "refusal":
+            category = getattr(getattr(response, "stop_details", None), "category", None)
+            raise ModelProviderError("ERROR_MODEL_REFUSED", f"{model} declined the request" + (f" (category: {category})" if category else ""))
+        text = "\n".join(block.text for block in response.content if getattr(block, "type", None) == "text")
+        if getattr(response, "stop_reason", None) == "max_tokens":
+            raise ModelProviderError("ERROR_MODEL_TRUNCATED", f"the reply from {model} reached the {ANTHROPIC_MAX_TOKENS}-token limit before it finished")
+        if not text.strip():
+            raise ModelProviderError("ERROR_MODEL_EMPTY_RESPONSE", f"{model} returned no text")
+        return text
+
+    return chat
