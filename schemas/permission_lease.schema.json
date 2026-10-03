@@ -4,7 +4,7 @@
   "title":"Mucaro Run Permission Lease 1.0",
   "type":"object",
   "additionalProperties":false,
-  "required":["schema_version","lease_id","run_id","scope_type","tool_names","tool_prefixes","workspace_root","allow_mutating","allow_network","granted_by","created_at","expires_at","max_uses","used_call_ids","state","revoked_at","revoked_by","grant_sha256"],
+  "required":["schema_version","lease_id","run_id","scope_type","tool_names","tool_prefixes","workspace_root","arguments_sha256","allow_mutating","allow_network","granted_by","created_at","expires_at","max_uses","used_call_ids","state","revoked_at","revoked_by","grant_sha256"],
   "properties":{
     "schema_version":{"const":"mucaro-permission-lease/1.0"},
     "lease_id":{"type":"string","minLength":1},
@@ -13,6 +13,7 @@
     "tool_names":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
     "tool_prefixes":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
     "workspace_root":{"type":["string","null"]},
+    "arguments_sha256":{"type":["string","null"],"pattern":"^[0-9a-f]{64}$"},
     "allow_mutating":{"type":"boolean"},
     "allow_network":{"type":"boolean"},
     "granted_by":{"type":"string","minLength":1},
