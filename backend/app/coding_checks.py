@@ -62,6 +62,7 @@ def build_coding_check_suite_plan(
     image: str,
     checks: list[CodingCheck],
     cfg: Settings = settings,
+    engine: str | None = None,
 ) -> dict[str, Any]:
     checks = _validated_checks(checks)
     rows: list[dict[str, Any]] = []
@@ -74,6 +75,7 @@ def build_coding_check_suite_plan(
                 command=list(check.command),
                 cfg=cfg,
                 network_allowed=False,
+                engine=engine,
             )
             validation = validate_coding_container_plan(plan, cfg=cfg)
             planned = validation.get("status") == "CODING_CONTAINER_PLAN_VALID"
@@ -150,6 +152,7 @@ def execute_coding_check_suite(
     checks: list[CodingCheck],
     cfg: Settings = settings,
     on_event: EventSink | None = None,
+    engine: str | None = None,
 ) -> dict[str, Any]:
     checks = _validated_checks(checks)
     rows: list[dict[str, Any]] = []
@@ -165,6 +168,7 @@ def execute_coding_check_suite(
                 command=list(check.command),
                 cfg=cfg,
                 network_allowed=False,
+                engine=engine,
             )
             receipt = run_coding_container_plan(plan, cfg=cfg)
             passed = receipt.get("execution_status") == "PASS"

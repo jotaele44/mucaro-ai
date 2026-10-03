@@ -27,6 +27,18 @@ DEFAULT_WORKSPACE_MB = 1024
 MAX_COMMAND_PARTS = 64
 MAX_COMMAND_PART_BYTES = 4096
 CONTAINER_UID_GID = "65532:65532"
+PREFLIGHT_TIMEOUT_SECONDS = 15
+# `docker run` reserves exit code 125 for "the engine itself failed", but a contained command can exit 125 as
+# well, so the code only counts together with a message that looks like the engine's own.
+ENGINE_ERROR_EXIT_CODE = 125
+ENGINE_ERROR_SIGNATURES = (
+    "error response from daemon",
+    "cannot connect to the docker daemon",
+    "cannot connect to podman",
+    "oci runtime",
+    "unable to find image",
+    "no such image",
+)
 
 
 class CodingContainerError(RuntimeError):
@@ -283,10 +295,53 @@ def _output_receipt(raw: bytes, *, max_bytes: int) -> dict[str, Any]:
     }
 
 
+def _stderr_summary(raw: bytes | None, limit: int = 400) -> str:
+    return (raw or b"").decode("utf-8", errors="replace").strip()[-limit:]
+
+
+def _engine_probe(argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    try:
+        return subprocess.run(argv, stdin=subprocess.DEVNULL, capture_output=True, timeout=PREFLIGHT_TIMEOUT_SECONDS, check=False)
+    except subprocess.TimeoutExpired as exc:
+        raise CodingContainerError(
+            "ERROR_CODING_CONTAINER_ENGINE_UNAVAILABLE", f"`{argv[1]}` did not answer within {PREFLIGHT_TIMEOUT_SECONDS}s"
+        ) from exc
+    except OSError as exc:
+        raise CodingContainerError("ERROR_CODING_CONTAINER_ENGINE_UNAVAILABLE", str(exc)) from exc
+
+
+def _preflight_engine(plan: CodingContainerPlan) -> str:
+    """Prove the engine answers and the pinned image is present locally, and return the image's local ID.
+
+    docs/CODING_CAPABILITY_STATUS.md: a non-zero command is FAIL, but engine, image and isolation failures are
+    BLOCKED. Without this, a stopped daemon would surface as a failing check, because `docker run` exits non-zero
+    for it too. The probes rely only on exit codes and `image inspect --format {{.Id}}`, which Docker and Podman
+    both support; format templates for `info` differ between them, so none is used.
+    """
+    info = _engine_probe([plan.engine, "info"])
+    if info.returncode != 0:
+        raise CodingContainerError(
+            "ERROR_CODING_CONTAINER_ENGINE_UNAVAILABLE", _stderr_summary(info.stderr) or f"{plan.engine} info exited {info.returncode}"
+        )
+    inspect = _engine_probe([plan.engine, "image", "inspect", "--format", "{{.Id}}", plan.image])
+    if inspect.returncode != 0:
+        raise CodingContainerError("ERROR_CODING_CONTAINER_IMAGE_MISSING", f"{plan.image} is not present locally: {_stderr_summary(inspect.stderr)}")
+    reported = inspect.stdout.decode("utf-8", errors="replace").strip().splitlines()
+    observed = reported[0].strip().lower() if reported else ""
+    observed = observed if observed.startswith("sha256:") else f"sha256:{observed}"  # Podman omits the prefix
+    if not LOCAL_IMAGE_ID_PATTERN.fullmatch(observed):
+        raise CodingContainerError("ERROR_CODING_CONTAINER_IMAGE_MISSING", f"{plan.engine} returned no usable image ID for {plan.image}")
+    # A registry digest is the manifest hash, not the local image ID, so only exact local IDs can be compared.
+    if LOCAL_IMAGE_ID_PATTERN.fullmatch(plan.image) and observed != plan.image:
+        raise CodingContainerError("ERROR_CODING_CONTAINER_IMAGE_IDENTITY_MISMATCH", f"expected {plan.image}, the engine reports {observed}")
+    return observed
+
+
 def run_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = settings) -> dict[str, Any]:
     before = validate_coding_container_plan(plan, cfg=cfg)
     if before["status"] != "CODING_CONTAINER_PLAN_VALID":
         raise CodingContainerError("ERROR_CODING_CONTAINER_PLAN_STALE", "repository state drifted before execution")
+    observed_image_id = _preflight_engine(plan)
 
     argv = build_coding_container_command(plan)
     started = time.monotonic()
@@ -304,6 +359,8 @@ def run_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = sett
     except OSError as exc:
         raise CodingContainerError("ERROR_CODING_CONTAINER_START", str(exc)) from exc
     duration_ms = max(0, int((time.monotonic() - started) * 1000))
+    if proc.returncode == ENGINE_ERROR_EXIT_CODE and any(signature in _stderr_summary(proc.stderr, 4096).lower() for signature in ENGINE_ERROR_SIGNATURES):
+        raise CodingContainerError("ERROR_CODING_CONTAINER_ENGINE_ERROR", _stderr_summary(proc.stderr))
 
     stdout = _output_receipt(proc.stdout, max_bytes=plan.max_output_bytes)
     stderr = _output_receipt(proc.stderr, max_bytes=plan.max_output_bytes)
@@ -319,6 +376,7 @@ def run_coding_container_plan(plan: CodingContainerPlan, *, cfg: Settings = sett
         "image": plan.image,
         "image_digest": plan.image.rsplit("@", 1)[-1],
         "image_identity_kind": "local_image_id" if LOCAL_IMAGE_ID_PATTERN.fullmatch(plan.image) else "registry_digest",
+        "observed_image_id": observed_image_id,
         "engine": plan.engine,
         "command_argv": list(plan.command),
         "container_argv_sha256": hashlib.sha256(json.dumps(argv, separators=(",", ":")).encode("utf-8")).hexdigest(),

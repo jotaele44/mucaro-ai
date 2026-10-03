@@ -268,16 +268,18 @@ def run_code_checks(args: argparse.Namespace, cfg: Settings) -> int:
     def action() -> dict[str, Any]:
         checks = _parse_checks(args.check)
         if not args.run:
-            return build_coding_check_suite_plan(args.repo, image=args.image, checks=checks, cfg=cfg)
-        summary = f"Run {len(checks)} check(s) in container image {args.image} (network disabled)"
-        call_id = _require_approval(args, cfg, "coding.checks_run", {"image": args.image, "checks": args.check}, summary)
+            return build_coding_check_suite_plan(args.repo, image=args.image, checks=checks, cfg=cfg, engine=args.engine)
+        via = f" with engine {args.engine}" if args.engine else ""
+        summary = f"Run {len(checks)} check(s) in container image {args.image}{via} (network disabled)"
+        tool_args = {"image": args.image, "checks": args.check, "engine": args.engine}
+        call_id = _require_approval(args, cfg, "coding.checks_run", tool_args, summary)
         sink = _event_sink(args)
         payload = run_audited(
             cfg,
             "coding.checks_run",
             call_id,
             CLI_ACTOR,
-            lambda: execute_coding_check_suite(args.repo, image=args.image, checks=checks, cfg=cfg, on_event=sink),
+            lambda: execute_coding_check_suite(args.repo, image=args.image, checks=checks, cfg=cfg, on_event=sink, engine=args.engine),
         )
         if _streaming_json(args):
             print(json.dumps({"event": "result", **payload}, ensure_ascii=False), flush=True)
@@ -473,6 +475,10 @@ def register_code_commands(subcommands: Any) -> None:
     checks = add("checks", "Plan (default) or run (--run) containerized checks with network disabled.", run_code_checks)
     checks.add_argument("--check", action="append", required=True, help="kind:id=command, e.g. test:unit='pytest -q'; repeatable.")
     checks.add_argument("--image", required=True, help="Pinned container image.")
+    checks.add_argument(
+        "--engine",
+        help="Container engine binary (docker or podman), for example /Applications/Docker.app/Contents/Resources/bin/docker when it is not on PATH.",
+    )
     checks.add_argument("--run", action="store_true", help="Execute the checks instead of only planning them.")
     checks.add_argument("--stream", action="store_true", help="With --run, emit check_start and check_result events as each check finishes (same formats as the agent).")
     confirmed(checks)

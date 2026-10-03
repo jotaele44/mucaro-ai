@@ -54,6 +54,9 @@ def make_repo(root: Path) -> Path:
 
 def fake_engine(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(coding_container, "resolve_container_engine", lambda preferred=None: preferred or "/usr/bin/docker")
+    # A healthy engine that has the pinned image. The preflight itself is tested in test_coding_container_preflight.py;
+    # routed fakes below answer every engine argv alike, so they must not also be asked to play `info` and `image inspect`.
+    monkeypatch.setattr(coding_container, "_preflight_engine", lambda plan: None)
 
 
 def test_plan_uses_read_only_source_and_ephemeral_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
