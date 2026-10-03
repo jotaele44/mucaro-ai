@@ -445,3 +445,17 @@ def test_mutating_autopilot_action_can_use_exact_run_permission_lease(
     calls = list_tool_calls(cfg)["tool_calls"]
     assert len(calls) == 1
     assert calls[0]["approved_by"] == f"lease:{grant['lease_id']}"
+
+
+def test_github_ci_autopilot_success_contract_binds_ci_state() -> None:
+    tool = TOOL_REGISTRY["github.ci_status"]
+
+    assert tool.autopilot_result_is_success(
+        {"status": "GITHUB_CI_STATUS_OK", "ci_state": "PASS"}
+    ) is True
+    assert tool.autopilot_result_is_success(
+        {"status": "GITHUB_CI_STATUS_OK", "ci_state": "FAIL"}
+    ) is False
+    assert tool.autopilot_result_is_success(
+        {"status": "GITHUB_CI_STATUS_OK", "state": "PASS"}
+    ) is False
