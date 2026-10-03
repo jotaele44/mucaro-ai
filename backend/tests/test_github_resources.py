@@ -209,3 +209,19 @@ def test_all_github_resource_tools_flow_through_governed_approval(
         "github.gist_view",
     }
     assert all(call["status"] == "EXECUTED" for call in by_name.values())
+
+
+def test_issue_search_refuses_pages_outside_github_retrievable_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = {"value": False}
+
+    def fake_api(*args, **kwargs):
+        called["value"] = True
+        return {}
+
+    monkeypatch.setattr(resources, "_api_json", fake_api)
+    with pytest.raises(GitHubResourceError) as exc:
+        resources.list_github_issues(repo="owner/repo", page=11, per_page=100)
+    assert exc.value.status == "ERROR_GITHUB_ISSUE_SEARCH_WINDOW"
+    assert called["value"] is False
