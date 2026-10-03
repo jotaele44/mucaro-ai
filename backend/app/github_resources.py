@@ -142,6 +142,11 @@ def list_github_issues(
     if state not in ISSUE_STATES:
         raise GitHubResourceError("ERROR_GITHUB_ISSUE_STATE", state)
     page, per_page = _page_args(page=page, per_page=per_page)
+    if (page - 1) * per_page >= SEARCH_RESULT_CEILING:
+        raise GitHubResourceError(
+            "ERROR_GITHUB_ISSUE_SEARCH_WINDOW",
+            f"GitHub Search exposes only the first {SEARCH_RESULT_CEILING} results",
+        )
     qualifiers = [f"repo:{repo}", "is:issue"]
     if state != "all":
         qualifiers.append(f"state:{state}")
