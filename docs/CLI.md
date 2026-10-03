@@ -122,6 +122,8 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro permissions revoke PATH` | Revoke directory access | 0 | 2 |
 | `mucaro permissions lease-list` | List bounded run-scoped tool permission leases | 0 | 2 |
 | `mucaro permissions lease-grant RUN_ID` | Grant an explicit run-scoped tool permission lease | 0 | 2 |
+
+For consequential actions, add `--arguments-sha256 <64-hex>` to bind the lease to one exact canonical tool-argument payload. A changed argument set will not match that lease.
 | `mucaro permissions lease-revoke LEASE_ID` | Revoke one exact run-scoped permission lease | 0 | 2 |
 | `mucaro validate` | Validate JSON artifacts and schemas | 0 | 2 |
 | `mucaro serve` | Start the local FastAPI server | 0 | 2 |
