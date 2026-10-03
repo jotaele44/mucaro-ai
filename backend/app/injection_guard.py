@@ -61,6 +61,6 @@ def scan_chunks(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return flagged
 
 
-def neutralize_fence(text: str) -> str:
-    """Untrusted text cannot close or open a source fence (prevents fence-breaking injection)."""
-    return re.sub(r"<\s*(/?)\s*source", lambda match: f"<{match.group(1)}source-text", text, flags=re.IGNORECASE)
+def neutralize_fence(text: str, tag: str = "source") -> str:
+    """Untrusted text cannot close or open a `<tag>` fence (prevents fence-breaking injection)."""
+    return re.sub(rf"<\s*(/?)\s*{re.escape(tag)}", lambda match: f"<{match.group(1)}{tag}-text", text, flags=re.IGNORECASE)

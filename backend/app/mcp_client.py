@@ -13,6 +13,7 @@ import os
 import re
 import select
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Self
@@ -22,15 +23,23 @@ from .config import Settings
 PROTOCOL_VERSION = "2024-11-05"
 MAX_LINE_BYTES = 1_000_000
 DEFAULT_TIMEOUT_SECONDS = 20.0
+STDERR_TAIL_BYTES = 2_048
 SERVER_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")
 SAFE_ENV_KEYS = ("PATH", "HOME", "LANG", "TMPDIR")
 
 
 class McpError(RuntimeError):
-    def __init__(self, status: str, detail: str) -> None:
+    def __init__(self, status: str, detail: str, stderr_tail: str = "") -> None:
         super().__init__(detail)
         self.status = status
         self.detail = detail
+        # Server diagnostics for the operator's terminal only. It is untrusted output and never goes back to a model.
+        self.stderr_tail = stderr_tail
+
+
+def _supports_pipe_polling() -> bool:
+    """select() cannot poll pipes on Windows, so stdio servers are POSIX-only for now."""
+    return os.name != "nt"
 
 
 def config_path(cfg: Settings) -> Path:
@@ -66,32 +75,45 @@ def _server(cfg: Settings, name: str) -> dict[str, Any]:
 
 class _Session:
     def __init__(self, spec: dict[str, Any], timeout: float) -> None:
+        if not _supports_pipe_polling():
+            raise McpError("ERROR_MCP_PLATFORM_UNSUPPORTED", "MCP stdio servers need POSIX pipe polling; Windows is not supported yet")
         env = {k: os.environ[k] for k in SAFE_ENV_KEYS if k in os.environ}
         env.update(spec.get("env", {}))
+        # stderr goes to a temp file, not a pipe: a chatty server cannot block on a full pipe, and the tail explains failures.
+        self._stderr = tempfile.TemporaryFile()  # noqa: SIM115 - lives as long as the session; close() releases it
         try:
             self.proc = subprocess.Popen(
-                spec["command"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env
+                spec["command"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self._stderr, env=env
             )
         except OSError as exc:
+            self._stderr.close()
             raise McpError("ERROR_MCP_SERVER_START_FAILED", str(exc)) from exc
         self.timeout = timeout
         self.next_id = 0
         self.buffer = b""
+
+    def _stderr_tail(self) -> str:
+        try:
+            fd = self._stderr.fileno()
+            size = os.fstat(fd).st_size
+            return os.pread(fd, STDERR_TAIL_BYTES, max(0, size - STDERR_TAIL_BYTES)).decode("utf-8", errors="replace").strip()
+        except (OSError, ValueError):
+            return ""
 
     def _readline(self, deadline: float) -> bytes:
         fd = self.proc.stdout.fileno()
         while b"\n" not in self.buffer:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise McpError("ERROR_MCP_TIMEOUT", "server did not respond in time")
+                raise McpError("ERROR_MCP_TIMEOUT", "server did not respond in time", self._stderr_tail())
             if not select.select([fd], [], [], remaining)[0]:
                 continue
             chunk = os.read(fd, 65536)
             if not chunk:
-                raise McpError("ERROR_MCP_SERVER_EXITED", "server closed its output")
+                raise McpError("ERROR_MCP_SERVER_EXITED", "server closed its output", self._stderr_tail())
             self.buffer += chunk
             if len(self.buffer) > MAX_LINE_BYTES and b"\n" not in self.buffer:
-                raise McpError("ERROR_MCP_RESPONSE_TOO_LARGE", f"message exceeds {MAX_LINE_BYTES} bytes")
+                raise McpError("ERROR_MCP_RESPONSE_TOO_LARGE", f"message exceeds {MAX_LINE_BYTES} bytes", self._stderr_tail())
         line, _, self.buffer = self.buffer.partition(b"\n")
         return line
 
@@ -100,7 +122,7 @@ class _Session:
             self.proc.stdin.write((json.dumps(message) + "\n").encode())
             self.proc.stdin.flush()
         except OSError as exc:
-            raise McpError("ERROR_MCP_SERVER_EXITED", str(exc)) from exc
+            raise McpError("ERROR_MCP_SERVER_EXITED", str(exc), self._stderr_tail()) from exc
 
     def request(self, method: str, params: dict[str, Any] | None = None) -> Any:
         self.next_id += 1
@@ -111,12 +133,12 @@ class _Session:
             try:
                 message = json.loads(self._readline(deadline))
             except ValueError as exc:
-                raise McpError("ERROR_MCP_RESPONSE_INVALID", f"non-JSON message: {exc}") from exc
+                raise McpError("ERROR_MCP_RESPONSE_INVALID", f"non-JSON message: {exc}", self._stderr_tail()) from exc
             if not isinstance(message, dict) or message.get("id") != request_id:
                 continue  # notifications and unrelated traffic
             if "error" in message:
                 error = message["error"] if isinstance(message["error"], dict) else {}
-                raise McpError("ERROR_MCP_SERVER_ERROR", str(error.get("message", "unknown server error")))
+                raise McpError("ERROR_MCP_SERVER_ERROR", str(error.get("message", "unknown server error")), self._stderr_tail())
             return message.get("result")
 
     def handshake(self) -> dict[str, Any]:
@@ -134,6 +156,11 @@ class _Session:
         except subprocess.TimeoutExpired:
             self.proc.kill()
             self.proc.wait()
+        for stream in (self.proc.stdout, self._stderr):
+            try:
+                stream.close()
+            except OSError:
+                pass
 
     def __enter__(self) -> Self:
         return self

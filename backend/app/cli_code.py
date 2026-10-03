@@ -32,6 +32,7 @@ from .coding_workspace import (
 )
 from .config import Settings
 from .model_router import ModelProviderError
+from .operator_audit import CLI_ACTOR, ApprovalDecision, OperatorAuditError, approval_mode, audit_decision, run_audited
 
 HANDLED_ERRORS = (
     CodingWorkspaceError,
@@ -41,6 +42,7 @@ HANDLED_ERRORS = (
     CodingCheckError,
     AgentError,
     ModelProviderError,
+    OperatorAuditError,
 )
 
 
@@ -111,9 +113,18 @@ def _confirm(args: argparse.Namespace, summary: str) -> bool:
     return sys.stdin.readline().strip().lower() in {"y", "yes"}
 
 
-def _require_approval(args: argparse.Namespace, summary: str) -> None:
-    if not _confirm(args, summary):
+def _require_approval(args: argparse.Namespace, cfg: Settings, tool_name: str, tool_args: dict[str, Any], summary: str) -> str:
+    """Ask the operator, audit the decision (including a refusal) in the hash-chained tool log, and return the call id."""
+    mode = approval_mode(args.yes)
+    try:
+        approved = _confirm(args, summary)
+    except CodingWorkspaceError:
+        audit_decision(cfg, tool_name, tool_args, approved=False, requested_by=CLI_ACTOR, mode="denied_non_tty")
+        raise
+    call_id = audit_decision(cfg, tool_name, tool_args, approved=approved, requested_by=CLI_ACTOR, mode=mode)
+    if not approved:
         raise CodingWorkspaceError("ERROR_CODING_APPROVAL_DENIED", "Operator declined the change.")
+    return call_id
 
 
 def run_code_apply(args: argparse.Namespace, cfg: Settings) -> int:
@@ -122,14 +133,21 @@ def run_code_apply(args: argparse.Namespace, cfg: Settings) -> int:
         proposal = validate_patch_proposal(args.repo, patch, cfg=cfg)
         if not proposal["applicable"]:
             raise CodingWorkspaceError("ERROR_CODING_PATCH_NOT_APPLICABLE", proposal.get("git_apply_detail") or "patch rejected")
-        _require_approval(args, f"Apply patch touching {', '.join(proposal['patch_paths'])}")
-        return apply_patch_transaction(
-            args.repo,
-            patch,
-            expected_head_sha=proposal["head_sha"],
-            expected_patch_sha256=proposal["patch_sha256"],
-            expected_preimages=proposal["preimages"],
-            cfg=cfg,
+        summary = f"Apply patch touching {', '.join(proposal['patch_paths'])}"
+        call_id = _require_approval(args, cfg, "coding.patch_apply", {"patch": patch}, summary)
+        return run_audited(
+            cfg,
+            "coding.patch_apply",
+            call_id,
+            CLI_ACTOR,
+            lambda: apply_patch_transaction(
+                args.repo,
+                patch,
+                expected_head_sha=proposal["head_sha"],
+                expected_patch_sha256=proposal["patch_sha256"],
+                expected_preimages=proposal["preimages"],
+                cfg=cfg,
+            ),
         )
 
     return _run(action, args)
@@ -138,8 +156,14 @@ def run_code_apply(args: argparse.Namespace, cfg: Settings) -> int:
 def run_code_branch(args: argparse.Namespace, cfg: Settings) -> int:
     def action() -> dict[str, Any]:
         head = inspect_repository(args.repo, cfg=cfg)["head_sha"]
-        _require_approval(args, f"Create branch {args.name} at {head[:12]}")
-        return create_work_branch_transaction(args.repo, branch_name=args.name, expected_head_sha=head, cfg=cfg)
+        call_id = _require_approval(args, cfg, "coding.create_branch", {"name": args.name}, f"Create branch {args.name} at {head[:12]}")
+        return run_audited(
+            cfg,
+            "coding.create_branch",
+            call_id,
+            CLI_ACTOR,
+            lambda: create_work_branch_transaction(args.repo, branch_name=args.name, expected_head_sha=head, cfg=cfg),
+        )
 
     return _run(action, args)
 
@@ -147,14 +171,21 @@ def run_code_branch(args: argparse.Namespace, cfg: Settings) -> int:
 def run_code_commit(args: argparse.Namespace, cfg: Settings) -> int:
     def action() -> dict[str, Any]:
         state = inspect_repository(args.repo, cfg=cfg)
-        _require_approval(args, f"Commit {', '.join(args.path)} on {state['branch']}")
-        return commit_approved_changes(
-            args.repo,
-            expected_head_sha=state["head_sha"],
-            expected_branch=state["branch"],
-            approved_paths=args.path,
-            message=args.message,
-            cfg=cfg,
+        summary = f"Commit {', '.join(args.path)} on {state['branch']}"
+        call_id = _require_approval(args, cfg, "coding.commit", {"paths": args.path, "message": args.message}, summary)
+        return run_audited(
+            cfg,
+            "coding.commit",
+            call_id,
+            CLI_ACTOR,
+            lambda: commit_approved_changes(
+                args.repo,
+                expected_head_sha=state["head_sha"],
+                expected_branch=state["branch"],
+                approved_paths=args.path,
+                message=args.message,
+                cfg=cfg,
+            ),
         )
 
     return _run(action, args)
@@ -176,8 +207,15 @@ def run_code_checks(args: argparse.Namespace, cfg: Settings) -> int:
         checks = _parse_checks(args.check)
         if not args.run:
             return build_coding_check_suite_plan(args.repo, image=args.image, checks=checks, cfg=cfg)
-        _require_approval(args, f"Run {len(checks)} check(s) in container image {args.image} (network disabled)")
-        return execute_coding_check_suite(args.repo, image=args.image, checks=checks, cfg=cfg)
+        summary = f"Run {len(checks)} check(s) in container image {args.image} (network disabled)"
+        call_id = _require_approval(args, cfg, "coding.checks_run", {"image": args.image, "checks": args.check}, summary)
+        return run_audited(
+            cfg,
+            "coding.checks_run",
+            call_id,
+            CLI_ACTOR,
+            lambda: execute_coding_check_suite(args.repo, image=args.image, checks=checks, cfg=cfg),
+        )
 
     return _run(action, args)
 
@@ -199,13 +237,18 @@ def run_code_pr_request(args: argparse.Namespace, cfg: Settings) -> int:
 
 
 def _agent_approver(args: argparse.Namespace) -> Any:
-    def approve(tool: str, tool_args: dict[str, Any]) -> bool:
+    def approve(tool: str, tool_args: dict[str, Any], description: str) -> ApprovalDecision:
         if args.yes:
-            return True
+            return ApprovalDecision(True, "blanket_yes")
         if not sys.stdin.isatty():
-            return False
-        print(f"Approve {tool} {json.dumps(tool_args)[:600]}? [y/N] ", end="", file=sys.stderr)
-        return sys.stdin.readline().strip().lower() in {"y", "yes"}
+            return ApprovalDecision(False, "denied_non_tty")
+        while True:
+            print(f"Approve {description}? [y/N, v = view the full arguments] ", end="", file=sys.stderr)
+            answer = sys.stdin.readline().strip().lower()
+            if answer == "v":
+                print(json.dumps(tool_args, indent=2, ensure_ascii=False), file=sys.stderr)
+                continue
+            return ApprovalDecision(answer in {"y", "yes"}, "interactive")
 
     return approve
 
@@ -218,7 +261,10 @@ def _agent_chat(args: argparse.Namespace) -> Any:
 
 
 def _agent_turn(args: argparse.Namespace, cfg: Settings, goal: str, chat: Any, approve: Any, repo: str, history: Any) -> dict[str, Any]:
-    result = run_agent(goal, repo, chat=chat, approve=approve, cfg=cfg, max_steps=args.max_steps, history=history)
+    result = run_agent(
+        goal, repo, chat=chat, approve=approve, cfg=cfg, max_steps=args.max_steps, history=history,
+        allow_live_search=args.allow_live_search,
+    )
     if args.session:
         result["session_path"] = str(save_session(cfg, args.session, repo, result))
     return result
@@ -325,6 +371,9 @@ def register_code_commands(subcommands: Any) -> None:
     agent.add_argument("--script", help="JSON list of model replies for deterministic replay (no network).")
     agent.add_argument("--max-steps", type=int, default=12, help="Maximum tool turns (1-30).")
     agent.add_argument("--session", help="Session id: resume it if present, and save progress to it.")
+    agent.add_argument(
+        "--allow-live-search", action="store_true", help="Let the agent ask to use live Brave web search (each call still needs approval)."
+    )
     confirmed(agent)
 
     chat = add("chat", "Interactive multi-turn coding loop reading goals from stdin.", run_code_chat)
@@ -332,6 +381,9 @@ def register_code_commands(subcommands: Any) -> None:
         chat.add_argument(flag, default=default, help=help_text)
     chat.add_argument("--max-steps", type=int, default=12, help="Maximum tool turns per goal (1-30).")
     chat.add_argument("--session", help="Session id to resume and persist.")
+    chat.add_argument(
+        "--allow-live-search", action="store_true", help="Let the agent ask to use live Brave web search (each call still needs approval)."
+    )
     confirmed(chat)
 
     checks = add("checks", "Plan (default) or run (--run) containerized checks with network disabled.", run_code_checks)

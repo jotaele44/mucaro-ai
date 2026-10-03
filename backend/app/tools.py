@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -391,6 +392,63 @@ def verify_tool_audit_chain(cfg: Settings = settings) -> dict[str, Any]:
         previous = digest
         chained += 1
     return {"status": "TOOL_AUDIT_CHAIN_OK", "event_count": len(events), "chained_event_count": chained}
+
+
+# How an operator decision was reached: answered at a prompt, covered by a blanket --yes, refused because no
+# terminal could ask, handed to a caller-supplied callback, or refused because a sub-agent is read-only.
+APPROVAL_MODES = ("interactive", "blanket_yes", "denied_non_tty", "callback", "subagent_read_only")
+
+
+def record_operator_decision(
+    cfg: Settings,
+    tool_name: str,
+    arguments: dict[str, Any],
+    *,
+    approved: bool,
+    requested_by: str,
+    approval_mode: str,
+    reason: str | None = None,
+) -> str:
+    """Audit an operator decision taken outside the API approval queue (CLI commands and the agent loop).
+
+    Appends hash-chained REQUESTED then APPROVED|DENIED events and returns the tool_call_id that
+    record_operator_outcome() attaches the result to. Only the arguments digest is stored, never the
+    arguments, so patches, queries and URLs cannot leak into the audit log. The CLI executes
+    synchronously in the caller's process, so there is no STARTED event.
+    """
+    if approval_mode not in APPROVAL_MODES:
+        raise ToolRuntimeError("ERROR_TOOL_APPROVAL_MODE_INVALID", f"Unknown approval mode: {approval_mode}")
+    digest = arguments_digest(arguments)
+    tool_call_id = stable_id("toolcall", tool_name, digest, utc_now(), secrets.token_hex(4))
+    note = f"approval_mode={approval_mode}" + (f"; {reason}" if reason else "")
+    shared = {"tool_call_id": tool_call_id, "tool_name": tool_name, "reason": note, "arguments_sha256": digest}
+    _append_audit_event({**shared, "event": "TOOL_CALL_REQUESTED", "status": "PENDING_APPROVAL", "actor": requested_by}, cfg)
+    verdict = "APPROVED" if approved else "DENIED"
+    _append_audit_event({**shared, "event": f"TOOL_CALL_{verdict}", "status": verdict, "actor": "operator"}, cfg)
+    return tool_call_id
+
+
+def record_operator_outcome(
+    cfg: Settings,
+    tool_call_id: str,
+    tool_name: str,
+    *,
+    requested_by: str,
+    ok: bool,
+    result_status: str | None,
+) -> None:
+    """Append EXECUTED or FAILED for a call that record_operator_decision() approved."""
+    _append_audit_event(
+        {
+            "event": "TOOL_CALL_EXECUTED" if ok else "TOOL_CALL_FAILED",
+            "tool_call_id": tool_call_id,
+            "tool_name": tool_name,
+            "status": "EXECUTED" if ok else (result_status or "FAILED"),
+            "actor": requested_by,
+            "result_status": result_status,
+        },
+        cfg,
+    )
 
 
 def _find_tool_call(tool_call_id: str, calls: list[dict[str, Any]]) -> tuple[int, dict[str, Any]]:

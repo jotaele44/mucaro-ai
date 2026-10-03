@@ -13,6 +13,7 @@ import sys
 from typing import Any
 
 from .config import Settings
+from .operator_audit import CLI_ACTOR, OperatorAuditError, approval_mode, audit_decision, run_audited
 from .web_browsing import (
     WebBrowsingError,
     build_web_browse_session_policy,
@@ -22,7 +23,7 @@ from .web_browsing import (
 )
 from .web_search import WebSearchError, search_web_brave
 
-WEB_ERRORS = (WebBrowsingError, WebSearchError)
+WEB_ERRORS = (WebBrowsingError, WebSearchError, OperatorAuditError)
 
 
 def _confirm(args: argparse.Namespace, summary: str) -> None:
@@ -33,6 +34,18 @@ def _confirm(args: argparse.Namespace, summary: str) -> None:
     print(f"{summary}. Proceed? [y/N] ", end="", file=sys.stderr)
     if sys.stdin.readline().strip().lower() not in {"y", "yes"}:
         raise WebBrowsingError("ERROR_WEB_APPROVAL_DENIED", "Operator declined network access.")
+
+
+def _approve(args: argparse.Namespace, cfg: Settings, tool_name: str, tool_args: dict[str, Any], summary: str) -> str:
+    """Ask the operator, audit the decision (including a refusal) in the hash-chained tool log, and return the call id."""
+    mode = approval_mode(args.yes)
+    try:
+        _confirm(args, summary)
+    except WebBrowsingError as exc:
+        refused_mode = "denied_non_tty" if exc.status == "ERROR_WEB_CONFIRMATION_REQUIRED" else mode
+        audit_decision(cfg, tool_name, tool_args, approved=False, requested_by=CLI_ACTOR, mode=refused_mode)
+        raise
+    return audit_decision(cfg, tool_name, tool_args, approved=True, requested_by=CLI_ACTOR, mode=mode)
 
 
 def _run(action: Any, args: argparse.Namespace) -> int:
@@ -55,21 +68,34 @@ def _fetch_arguments(args: argparse.Namespace) -> dict[str, Any]:
 
 def run_web_fetch(args: argparse.Namespace, cfg: Settings) -> int:
     def action() -> dict[str, Any]:
-        _confirm(args, f"Fetch {args.url}")
-        return fetch_web_snapshot(args.url, cfg=cfg, policy=build_web_fetch_policy(_fetch_arguments(args)))
+        call_id = _approve(args, cfg, "web.fetch", {"url": args.url, **_fetch_arguments(args)}, f"Fetch {args.url}")
+        return run_audited(
+            cfg,
+            "web.fetch",
+            call_id,
+            CLI_ACTOR,
+            lambda: fetch_web_snapshot(args.url, cfg=cfg, policy=build_web_fetch_policy(_fetch_arguments(args))),
+        )
 
     return _run(action, args)
 
 
 def run_web_session(args: argparse.Namespace, cfg: Settings) -> int:
     def action() -> dict[str, Any]:
-        _confirm(args, f"Fetch {len(args.urls)} operator-supplied URL(s)")
-        return fetch_web_browse_session(
-            args.urls,
-            purpose=args.purpose,
-            cfg=cfg,
-            fetch_policy=build_web_fetch_policy(_fetch_arguments(args)),
-            session_policy=build_web_browse_session_policy({"max_pages": args.max_pages, "require_same_host": args.same_host}),
+        tool_args = {"urls": args.urls, "purpose": args.purpose, "max_pages": args.max_pages, "same_host": args.same_host, **_fetch_arguments(args)}
+        call_id = _approve(args, cfg, "web.fetch_session", tool_args, f"Fetch {len(args.urls)} operator-supplied URL(s)")
+        return run_audited(
+            cfg,
+            "web.fetch_session",
+            call_id,
+            CLI_ACTOR,
+            lambda: fetch_web_browse_session(
+                args.urls,
+                purpose=args.purpose,
+                cfg=cfg,
+                fetch_policy=build_web_fetch_policy(_fetch_arguments(args)),
+                session_policy=build_web_browse_session_policy({"max_pages": args.max_pages, "require_same_host": args.same_host}),
+            ),
         )
 
     return _run(action, args)
@@ -77,8 +103,15 @@ def run_web_session(args: argparse.Namespace, cfg: Settings) -> int:
 
 def run_web_search(args: argparse.Namespace, cfg: Settings) -> int:
     def action() -> dict[str, Any]:
-        _confirm(args, f"Send the query to the live Brave Search API: {args.query!r}")
-        return search_web_brave(args.query, cfg=cfg, count=args.count, allow_live_search=args.allow_live_search)
+        tool_args = {"query": args.query, "count": args.count, "allow_live_search": args.allow_live_search}
+        call_id = _approve(args, cfg, "web.search", tool_args, f"Send the query to the live Brave Search API: {args.query!r}")
+        return run_audited(
+            cfg,
+            "web.search",
+            call_id,
+            CLI_ACTOR,
+            lambda: search_web_brave(args.query, cfg=cfg, count=args.count, allow_live_search=args.allow_live_search),
+        )
 
     return _run(action, args)
 

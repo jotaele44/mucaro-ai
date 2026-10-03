@@ -9,18 +9,23 @@ from typing import Any
 
 from .config import Settings
 from .mcp_client import McpError, call_tool, list_server_names, list_tools
+from .operator_audit import CLI_ACTOR, OperatorAuditError, approval_mode, audit_decision, run_audited
 
 
 def _run(action: Any) -> int:
     try:
         print(json.dumps(action(), indent=2, ensure_ascii=False))
         return 0
-    except McpError as exc:
-        print(json.dumps({"status": exc.status, "detail": exc.detail}, indent=2), file=sys.stderr)
+    except (McpError, OperatorAuditError) as exc:
+        payload = {"status": exc.status, "detail": exc.detail}
+        tail = getattr(exc, "stderr_tail", "")
+        if tail:
+            payload["server_stderr_tail"] = tail  # untrusted server output, shown to the operator only
+        print(json.dumps(payload, indent=2), file=sys.stderr)
         return 2
 
 
-def _approve(args: argparse.Namespace, summary: str) -> None:
+def _confirm(args: argparse.Namespace, summary: str) -> None:
     if args.yes:
         return
     if not sys.stdin.isatty():
@@ -28,6 +33,18 @@ def _approve(args: argparse.Namespace, summary: str) -> None:
     print(f"{summary}. Proceed? [y/N] ", end="", file=sys.stderr)
     if sys.stdin.readline().strip().lower() not in {"y", "yes"}:
         raise McpError("ERROR_MCP_APPROVAL_DENIED", "Operator declined.")
+
+
+def _approve(args: argparse.Namespace, cfg: Settings, tool_name: str, tool_args: dict[str, Any], summary: str) -> str:
+    """Ask the operator, audit the decision (including a refusal) in the hash-chained tool log, and return the call id."""
+    mode = approval_mode(args.yes)
+    try:
+        _confirm(args, summary)
+    except McpError as exc:
+        refused_mode = "denied_non_tty" if exc.status == "ERROR_MCP_CONFIRMATION_REQUIRED" else mode
+        audit_decision(cfg, tool_name, tool_args, approved=False, requested_by=CLI_ACTOR, mode=refused_mode)
+        raise
+    return audit_decision(cfg, tool_name, tool_args, approved=True, requested_by=CLI_ACTOR, mode=mode)
 
 
 def register_mcp_commands(subcommands: Any) -> None:
@@ -43,8 +60,8 @@ def register_mcp_commands(subcommands: Any) -> None:
 
     def run_tools(args: argparse.Namespace, cfg: Settings) -> int:
         def action() -> dict[str, Any]:
-            _approve(args, f"Launch MCP server {args.server}")
-            return list_tools(cfg, args.server)
+            call_id = _approve(args, cfg, "mcp.tools", {"server": args.server}, f"Launch MCP server {args.server}")
+            return run_audited(cfg, "mcp.tools", call_id, CLI_ACTOR, lambda: list_tools(cfg, args.server))
 
         return _run(action)
 
@@ -62,8 +79,9 @@ def register_mcp_commands(subcommands: Any) -> None:
                 arguments = json.loads(args.args)
             except ValueError as exc:
                 raise McpError("ERROR_MCP_CALL_INVALID", f"--args is not valid JSON: {exc}") from exc
-            _approve(args, f"Launch MCP server {args.server} and call {args.tool}")
-            return call_tool(cfg, args.server, args.tool, arguments)
+            tool_args = {"server": args.server, "tool": args.tool, "args": arguments}
+            call_id = _approve(args, cfg, "mcp.call", tool_args, f"Launch MCP server {args.server} and call {args.tool}")
+            return run_audited(cfg, "mcp.call", call_id, CLI_ACTOR, lambda: call_tool(cfg, args.server, args.tool, arguments))
 
         return _run(action)
 
