@@ -22,6 +22,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import sysconfig
 import time
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
@@ -31,9 +32,15 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts import launch_app  # noqa: E402
+from scripts import launch_app, lock_python_deps  # noqa: E402
 
-PYTHON_EXTRAS = "dev,anthropic,desktop" if sys.platform == "darwin" else "dev,anthropic"
+# desktop (pywebview) draws the native window that Mucaro AI.app (macOS) and Mucaro AI.exe (Windows) open.
+NATIVE_WINDOW_PLATFORMS = ("darwin", "win32")
+NATIVE_WINDOW_MODULES = {
+    "darwin": ("webview", "AppKit", "Foundation", "WebKit"),
+    "win32": ("webview", "clr"),  # clr: pythonnet, which pywebview's WebView2 backend loads
+}
+PYTHON_EXTRAS = "dev,anthropic,desktop" if sys.platform in NATIVE_WINDOW_PLATFORMS else "dev,anthropic"
 # Import names that prove the dependency install is usable (runtime, geospatial, live mode, preflight).
 KEY_MODULES = (
     "fastapi",
@@ -50,7 +57,7 @@ KEY_MODULES = (
     "anthropic",
     "httpx",
     "pytest",
-) + (("webview", "AppKit", "Foundation", "WebKit") if sys.platform == "darwin" else ())
+) + NATIVE_WINDOW_MODULES.get(sys.platform, ())
 NPM_REGISTRY = "https://registry.npmjs.org/"
 LOG_KEEP = 10
 TOTAL_STEPS = 6
@@ -66,6 +73,22 @@ class SetupError(Exception):
         super().__init__(f"{code} {detail}")
         self.code = code
         self.detail = detail
+
+
+def lock_target(system: str | None = None, machine: str | None = None, interpreter_platform: str | None = None) -> str | None:
+    """The packaging/one_click lock for this interpreter (see scripts/lock_python_deps.py), or None.
+
+    Follows the interpreter's own architecture: x64 Python running under emulation on ARM64
+    Windows uses the x64 lock, because the wheels it installs must match the interpreter.
+    """
+    system = system or sys.platform
+    if system == "darwin":
+        return {"arm64": "aarch64-apple-darwin", "x86_64": "x86_64-apple-darwin"}.get(machine or platform.machine())
+    if system == "win32":
+        return {"win-amd64": "x86_64-pc-windows-msvc"}.get(interpreter_platform or sysconfig.get_platform())
+    if system.startswith("linux"):
+        return {"x86_64": "x86_64-unknown-linux-gnu"}.get(machine or platform.machine())
+    return None
 
 
 def runtime_dir() -> Path:
@@ -274,25 +297,33 @@ class OneClickSetup:
 
     def check_stage0(self) -> None:
         if sys.prefix == sys.base_prefix:
-            raise SetupError("ERROR_NOT_IN_VENV", "start Mucaro AI by double-clicking Mucaro AI Setup.app (macOS) or Mucaro AI.cmd (Windows)")
+            raise SetupError("ERROR_NOT_IN_VENV", "start Mucaro AI by double-clicking Mucaro AI Setup.app (macOS) or Mucaro AI.exe (Windows)")
         for label, path in (("uv", self.uv), ("node", self.node), ("npm", self.npm_cli)):
             if not path.is_file():
                 raise SetupError(
                     "ERROR_STAGE0_MISSING",
-                    f"{label} not found at {path}; start Mucaro AI by double-clicking Mucaro AI Setup.app (macOS) or Mucaro AI.cmd (Windows)",
+                    f"{label} not found at {path}; start Mucaro AI by double-clicking Mucaro AI Setup.app (macOS) or Mucaro AI.exe (Windows)",
                 )
 
     def python_deps(self) -> None:
         self._step(1, "Python packages (first run: about 1-2 minutes)")
+        target = lock_target()
+        lock_dir = ROOT / "packaging" / "one_click"
+        lock = lock_python_deps.lock_path(target, lock_dir) if target else None
+        if lock is None or not lock.is_file():
+            raise SetupError(
+                "ERROR_PLATFORM_UNSUPPORTED",
+                f"no Python lock for {sys.platform} {platform.machine()} ({sysconfig.get_platform()}) in {lock_dir}",
+            )
         fp = fingerprint(
             [
                 f"schema={self.pins['SETUP_SCHEMA']}",
                 f"python={platform.python_version()}",
                 f"extras={PYTHON_EXTRAS}",
-                f"exclude_newer={self.pins['PY_EXCLUDE_NEWER']}",
+                f"lock={target}",
                 f"uv={self.pins['UV_VERSION']}",
             ],
-            [ROOT / "pyproject.toml"],
+            [ROOT / "pyproject.toml", lock],
         )
         missing = missing_modules()
         if self.state.get("python_deps") == fp and not missing:
@@ -300,19 +331,19 @@ class OneClickSetup:
             return
         if missing:
             self.log.line("PY_DEPS_MISSING " + ",".join(missing))
+        # Every package comes from the hash-pinned lock (scripts/lock_python_deps.py), including
+        # setuptools, which then builds the editable project install without fetching anything else.
+        self.log.line(f"PY_DEPS_LOCK {lock.relative_to(ROOT)}")
         run_with_retries(
             "py_deps",
-            [
-                str(self.uv),
-                "pip",
-                "install",
-                "--python",
-                sys.executable,
-                "--exclude-newer",
-                self.pins["PY_EXCLUDE_NEWER"],
-                "-e",
-                f".[{PYTHON_EXTRAS}]",
-            ],
+            [str(self.uv), "pip", "install", "--python", sys.executable, "--require-hashes", "--no-deps", "-r", str(lock)],
+            log=self.log,
+            attempts=3,
+            cwd=ROOT,
+        )
+        run_with_retries(
+            "py_deps",
+            [str(self.uv), "pip", "install", "--python", sys.executable, "--no-deps", "--no-build-isolation", "-e", "."],
             log=self.log,
             attempts=3,
             cwd=ROOT,

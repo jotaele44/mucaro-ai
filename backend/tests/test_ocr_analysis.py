@@ -114,7 +114,7 @@ def test_analyze_image_ocr_records_no_text_without_synthesis(tmp_path: Path):
 def test_analyze_image_ocr_fails_closed_when_engine_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     cfg = make_settings(tmp_path)
     image = write_image(tmp_path / "scan.png")
-    monkeypatch.setattr("backend.app.ocr_analysis.shutil.which", lambda _: None)
+    monkeypatch.setattr("backend.app.ocr_analysis.resolve_tool_request", lambda *args, **kwargs: None)
 
     with pytest.raises(OCRAnalysisError) as exc:
         analyze_image_ocr(image, cfg=cfg)

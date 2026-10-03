@@ -107,6 +107,16 @@
     },
     "metadata": {
       "type": "object"
+    },
+    "in_flight_step": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["step_id", "idempotency_key", "started_at"],
+      "properties": {
+        "step_id": {"type": "string", "minLength": 1},
+        "idempotency_key": {"type": "string", "minLength": 1},
+        "started_at": {"type": "string", "minLength": 1}
+      }
     }
   }
 }

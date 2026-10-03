@@ -2,18 +2,24 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
+import secrets
 import shutil
 import signal
 import socket
+import ssl
 import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
 import webbrowser
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -25,6 +31,11 @@ from scripts import native_window  # noqa: E402
 BACKEND_APP = "backend.app.main:app"
 WINDOW_PID_FILE = ROOT / ".mucaro-runtime" / "window.pid"
 WINDOW_STORAGE_DIR = ROOT / ".mucaro-runtime" / "webview"
+
+PHONE_ACCESS_ENV = "MUCARO_AI_PHONE_ACCESS"
+PHONE_BIND_HOST = "0.0.0.0"
+MIN_PHONE_TOKEN_CHARS = 32  # the backend's strong-token rule for any non-loopback bind
+OVERLAY_NETWORK = ipaddress.ip_network("100.64.0.0/10")  # carrier-grade NAT range, which Tailscale also uses
 
 
 def build_env() -> dict[str, str]:
@@ -38,12 +49,117 @@ def build_env() -> dict[str, str]:
     return env
 
 
-def url_for(port: int) -> str:
-    return f"http://127.0.0.1:{port}"
+def truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def health_url(port: int) -> str:
-    return f"{url_for(port)}/health"
+@dataclass(frozen=True)
+class PhonePlan:
+    token: str
+    generated: bool
+    scheme: str
+    env: dict[str, str]  # the backend's environment: the caller's, plus the token and the public-bind opt-in
+
+
+def plan_phone_access(env: Mapping[str, str], *, tls: bool = False) -> PhonePlan:
+    """Phone access needs a token: keep a configured one that is long enough, otherwise mint one for this launch."""
+    configured = env.get("MUCARO_AI_OPERATOR_TOKEN", "")
+    generated = len(configured) < MIN_PHONE_TOKEN_CHARS
+    token = secrets.token_urlsafe(32) if generated else configured
+    backend_env = {**env, "MUCARO_AI_OPERATOR_TOKEN": token, "MUCARO_AI_ALLOW_PUBLIC_BIND": "1"}
+    return PhonePlan(token=token, generated=generated, scheme="https" if tls else "http", env=backend_env)
+
+
+def phone_link(scheme: str, host: str, port: int, token: str) -> str:
+    # The token rides in the URL fragment: browsers never send it to the server, and the app removes it from the
+    # address bar.
+    return f"{scheme}://{host}:{port}/#token={quote(token, safe='')}"
+
+
+def lan_addresses(candidates: Iterable[str]) -> list[str]:
+    """Private or overlay-network IPv4 addresses a phone could reach: RFC 1918 and 100.64/10, never loopback."""
+    found: list[str] = []
+    for text in candidates:
+        try:
+            address = ipaddress.ip_address(text)
+        except ValueError:
+            continue
+        if address.version != 4 or address.is_loopback or address.is_link_local:
+            continue
+        if (address.is_private or address in OVERLAY_NETWORK) and text not in found:
+            found.append(text)
+    return found
+
+
+def discover_lan_addresses() -> list[str]:
+    candidates: list[str] = []
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("192.0.2.1", 9))  # a UDP "connect" sends nothing; it only picks the outbound interface
+            candidates.append(sock.getsockname()[0])
+    except OSError:
+        pass
+    try:
+        candidates.extend(socket.gethostbyname_ex(socket.gethostname())[2])
+    except OSError:
+        pass
+    return lan_addresses(candidates)
+
+
+def print_phone_links(plan: PhonePlan, port: int, *, show_token: bool = True) -> list[str]:
+    """Print where a phone can reach Mucaro and return the full links (they carry the token).
+
+    With show_token=False, for a launch with no Terminal whose output goes to a log file on disk, the printed lines
+    carry no token: the caller hands the full link to the person another way.
+    """
+    source = "generated for this launch" if plan.generated else "from MUCARO_AI_OPERATOR_TOKEN"
+    print(f"PHONE_ACCESS_ENABLED bind={PHONE_BIND_HOST} token={source}")
+    addresses = discover_lan_addresses()
+    links = [phone_link(plan.scheme, address, port, plan.token) for address in addresses]
+    for address, link in zip(addresses, links):
+        shown = link if show_token else f"{plan.scheme}://{address}:{port}/ (token withheld from this log)"
+        print(f"PHONE_URL {shown}")
+    if not addresses:
+        print("PHONE_ACCESS_NO_LAN_ADDRESS no private network address was found; join Wi-Fi or a VPN and launch again")
+    if plan.scheme == "http":
+        print(
+            "PHONE_ACCESS_CLEARTEXT_HTTP this link is not encrypted: use it only on a network you trust, "
+            "or over a VPN (see docs/PHONE_ACCESS.md)"
+        )
+    print("PHONE_ACCESS_NOTE the link carries the access token; do not post or share it", flush=True)
+    return links
+
+
+def offer_phone_link(plan: PhonePlan, links: list[str]) -> None:
+    """The native app has no Terminal, so say where the phone link is in a dialog; the link is copied on request."""
+    if not links:
+        native_window.show_phone_link(
+            "Phone access is on, but this computer has no private network address (Wi-Fi or VPN). "
+            "Join one, then open Mucaro AI again.",
+            "",
+        )
+        return
+    lines = [
+        "Phone access is on.",
+        "",
+        "Copy the link, send it to your phone (for example by AirDrop, Messages or email) and open it there. "
+        "It works only on this network, and only with the token inside the link.",
+    ]
+    if plan.scheme == "http":
+        lines += [
+            "",
+            "This connection is not encrypted: use it only on a network you trust, or over a VPN. "
+            "See docs/PHONE_ACCESS.md.",
+        ]
+    native_window.show_phone_link("\n".join(lines), links[0])
+
+
+def url_for(port: int, scheme: str = "http") -> str:
+    return f"{scheme}://127.0.0.1:{port}"
+
+
+def health_url(port: int, scheme: str = "http") -> str:
+    return f"{url_for(port, scheme)}/health"
 
 
 def port_open(port: int) -> bool:
@@ -52,11 +168,19 @@ def port_open(port: int) -> bool:
         return sock.connect_ex(("127.0.0.1", port)) == 0
 
 
-def health_ok(port: int) -> bool:
+def health_ok(port: int, tls: bool = False) -> bool:
+    context = None
+    if tls:
+        # A phone-access certificate is usually self-signed or issued for another name. This only asks the loopback
+        # service whether it is up, so the certificate is not verified.
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+    url = health_url(port, "https" if tls else "http")
     try:
-        with urllib.request.urlopen(health_url(port), timeout=1.5) as response:
+        with urllib.request.urlopen(url, timeout=1.5, context=context) as response:
             body = json.loads(response.read().decode("utf-8"))
-            # A generic healthy service is not this checkout's backend.
+            # A generic healthy service is not this checkout's backend. Loopback callers still get project_root.
             return (
                 response.status == 200
                 and isinstance(body, dict)
@@ -124,16 +248,27 @@ def ensure_frontend_dist(skip_build: bool = False, verified: bool = False) -> No
     print(f"OK_FRONTEND_DIST {dist_index}")
 
 
-def wait_for_health(port: int, timeout_seconds: float) -> bool:
+def _healthy(port: int, tls: bool) -> bool:
+    # A plain-http check keeps the one-argument call that callers and tests rely on.
+    return health_ok(port, tls=True) if tls else health_ok(port)
+
+
+def wait_for_health(port: int, timeout_seconds: float, tls: bool = False) -> bool:
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
-        if health_ok(port):
+        if _healthy(port, tls):
             return True
         time.sleep(0.25)
     return False
 
 
-def start_backend(port: int) -> subprocess.Popen:
+def start_backend(
+    port: int,
+    *,
+    host: str = "127.0.0.1",
+    env: dict[str, str] | None = None,
+    tls: tuple[str, str] | None = None,
+) -> subprocess.Popen:
     cmd = [
         sys.executable,
         "-s",
@@ -143,12 +278,14 @@ def start_backend(port: int) -> subprocess.Popen:
         "uvicorn",
         BACKEND_APP,
         "--host",
-        "127.0.0.1",
+        host,
         "--port",
         str(port),
     ]
+    if tls:
+        cmd += ["--ssl-certfile", tls[0], "--ssl-keyfile", tls[1]]
     print("STARTING_DESKTOP_BACKEND", " ".join(cmd))
-    return subprocess.Popen(cmd, cwd=ROOT, env=build_env())
+    return subprocess.Popen(cmd, cwd=ROOT, env=env if env is not None else build_env())
 
 
 def stop_backend(proc: subprocess.Popen, port: int) -> bool:
@@ -170,10 +307,10 @@ def stop_backend(proc: subprocess.Popen, port: int) -> bool:
     return False
 
 
-def find_fallback_port(port: int, span: int = 20) -> int | None:
+def find_fallback_port(port: int, span: int = 20, tls: bool = False) -> int | None:
     """Return the first later port that is free or already serves a healthy Mucaro AI backend."""
     for candidate in range(port + 1, port + span + 1):
-        if not port_open(candidate) or health_ok(candidate):
+        if not port_open(candidate) or _healthy(candidate, tls):
             return candidate
     return None
 
@@ -253,6 +390,20 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="If Mucaro AI is already running, activate its native window or open the browser in browser mode.",
     )
+    parser.add_argument(
+        "--phone",
+        action="store_true",
+        help=(
+            "Let a phone on the same private network (or VPN) use Mucaro: bind all interfaces, require an access token "
+            f"(generated for this launch unless {MIN_PHONE_TOKEN_CHARS}+ characters are set in "
+            "MUCARO_AI_OPERATOR_TOKEN) "
+            f"and print the links. Also switched on by {PHONE_ACCESS_ENV}=1 in .env."
+        ),
+    )
+    parser.add_argument(
+        "--tls-cert", help="Certificate file (PEM) to serve phone access over https. Needs --tls-key and --phone."
+    )
+    parser.add_argument("--tls-key", help="Private key file (PEM) for --tls-cert.")
     args = parser.parse_args(argv)
 
     if args.self_test:
@@ -279,6 +430,11 @@ def main(argv: list[str] | None = None) -> int:
 
 def _failure_message(code: int) -> str:
     log = os.environ.get("MUCARO_SETUP_LOG") or str(ROOT / ".mucaro-runtime" / "logs")
+    if code == 11:
+        return (
+            "Mucaro AI needs the Microsoft Edge WebView2 Runtime to show its window.\n\n"
+            f"Install it from {native_window.WEBVIEW2_DOWNLOAD}, then open Mucaro AI again."
+        )
     return (
         f"Mucaro AI could not start (code {code}).\n\n"
         f"Details are in: {log}\n\n"
@@ -288,53 +444,99 @@ def _failure_message(code: int) -> str:
 
 def _launch(args: argparse.Namespace) -> int:
     print(f"DESKTOP_LAUNCH_START root={ROOT}")
+    env = build_env()
+    phone = args.phone or truthy(env.get(PHONE_ACCESS_ENV))
+    tls: tuple[str, str] | None = None
+    if args.tls_cert or args.tls_key:
+        if not (args.tls_cert and args.tls_key):
+            print("ERROR_TLS_CERT_AND_KEY_REQUIRED pass both --tls-cert and --tls-key", file=sys.stderr)
+            return 2
+        if not phone:
+            print(
+                "ERROR_TLS_REQUIRES_PHONE_ACCESS --tls-cert and --tls-key are for phone access: add --phone",
+                file=sys.stderr,
+            )
+            return 2
+        for path in (args.tls_cert, args.tls_key):
+            if not Path(path).is_file():
+                print(f"ERROR_TLS_FILE_MISSING {path}", file=sys.stderr)
+                return 2
+        tls = (args.tls_cert, args.tls_key)
     ensure_frontend_dist(skip_build=args.skip_build, verified=args.frontend_verified)
 
+    scheme = "https" if tls else "http"
     port = args.port
-    if args.auto_port and port_open(port) and not health_ok(port):
-        fallback = find_fallback_port(port)
+    if args.auto_port and port_open(port) and not _healthy(port, bool(tls)):
+        fallback = find_fallback_port(port, tls=True) if tls else find_fallback_port(port)
         if fallback is None:
             print(f"ERROR_PORT_IN_USE_NON_MUCARO_AI port={port} no free port up to {port + 20}", file=sys.stderr)
             return 5
         print(f"PORT_FALLBACK from={port} to={fallback}")
         port = fallback
 
-    url = url_for(port)
+    url = url_for(port, scheme)
+    # Phone mode starts the backend itself with a token and on all interfaces. The default launch keeps the
+    # original call shapes: loopback only, no token.
+    plan = plan_phone_access(env, tls=bool(tls)) if phone else None
+    backend_kwargs = {"host": PHONE_BIND_HOST, "env": plan.env, "tls": tls} if plan is not None else {}
+    phone_links: list[str] = []
     proc: subprocess.Popen | None = None
     try:
         if port_open(port):
-            if health_ok(port):
-                print(f"REUSING_EXISTING_BACKEND {health_url(port)}")
+            if _healthy(port, bool(tls)):
+                print(f"REUSING_EXISTING_BACKEND {health_url(port, scheme)}")
+                if plan is not None:
+                    print(
+                        "PHONE_ACCESS_UNAVAILABLE a Mucaro backend is already running on this port; "
+                        "stop it and launch again to enable phone access"
+                    )
+                    plan = None  # no links for a backend this launch did not start: its token is unknown
             else:
                 print(f"ERROR_PORT_IN_USE_NON_MUCARO_AI port={port}", file=sys.stderr)
                 return 5
         else:
-            proc = start_backend(port)
-            if not wait_for_health(port, args.startup_timeout):
+            proc = start_backend(port, **backend_kwargs)
+            if tls:
+                ready = wait_for_health(port, args.startup_timeout, tls=True)
+            else:
+                ready = wait_for_health(port, args.startup_timeout)
+            if not ready:
                 if proc.poll() is not None:
                     print(f"ERROR_BACKEND_EXITED_EARLY returncode={proc.returncode}", file=sys.stderr)
                     return proc.returncode or 6
-                print(f"ERROR_BACKEND_HEALTH_TIMEOUT url={health_url(port)}", file=sys.stderr)
+                print(f"ERROR_BACKEND_HEALTH_TIMEOUT url={health_url(port, scheme)}", file=sys.stderr)
                 return 7
-            print(f"BACKEND_READY {health_url(port)}")
+            print(f"BACKEND_READY {health_url(port, scheme)}")
+            if plan is not None:
+                phone_links = print_phone_links(plan, port, show_token=not args.native)
 
         if args.native and not args.smoke_test:
             if proc is None and args.exit_if_running and native_window.activate_existing_window(WINDOW_PID_FILE):
                 print(f"DESKTOP_LAUNCH_REUSED {url}")
                 return 0
             print(f"OPENING_NATIVE_WINDOW {url}", flush=True)
+            window_url = url
+            if plan is not None:
+                offer_phone_link(plan, phone_links)
+                # In phone mode every client needs the token, this computer's own window included.
+                window_url = f"{url}/#token={quote(plan.token, safe='')}"
             try:
-                native_window.run_window(url, storage_dir=WINDOW_STORAGE_DIR, pid_file=WINDOW_PID_FILE)
+                native_window.run_window(window_url, storage_dir=WINDOW_STORAGE_DIR, pid_file=WINDOW_PID_FILE)
             except ImportError as exc:
                 # Never fall back to a browser: the app is meant to be self-contained.
                 print(f"ERROR_NATIVE_WINDOW_UNAVAILABLE {exc}", file=sys.stderr)
                 return 10
+            except native_window.WebView2Missing as exc:
+                # Distinct code: scripts/native_start.ps1 turns it into a dialog with the download link.
+                print(f"ERROR_WEBVIEW2_MISSING {exc}", file=sys.stderr)
+                return 11
             print("DESKTOP_WINDOW_CLOSED")
             return 0
 
         if not args.no_browser and not args.native:
             print(f"OPENING_BROWSER {url}")
-            webbrowser.open(url)
+            # In phone mode every client needs the token, this computer's own window included.
+            webbrowser.open(url if plan is None else f"{url}/#token={quote(plan.token, safe='')}")
 
         if proc is None and args.exit_if_running and not args.smoke_test:
             print(f"DESKTOP_LAUNCH_REUSED {url}")

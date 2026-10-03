@@ -28,14 +28,25 @@ def test_finder_setup_is_silent_and_forces_native_window(tmp_path, code):
         '#!/bin/bash\nprintf "ARGS=%s SILENT=%s\\n" "$*" "$MUCARO_SILENT_LAUNCH"\n'
         f'echo "setup error" >&2\nexit {code}\n', encoding="utf-8",
     )
+    dialog_calls = tmp_path / "dialog_calls.txt"
+    stub = tmp_path / "osascript"
+    stub.write_text(f'#!/bin/bash\nprintf "%s\\n" "$*" >> "{dialog_calls}"\n', encoding="utf-8")
+    stub.chmod(0o755)
     proc = subprocess.run(
         ["/bin/bash", str(ROOT / "scripts/native_start.sh"), str(root), "--setup-only"],
         text=True, capture_output=True, check=False,
+        env={**os.environ, "MUCARO_OSASCRIPT": str(stub)},  # never show a real dialog from a test
     )
     assert proc.returncode == code
     assert proc.stdout == proc.stderr == ""
     logs = list((root / ".mucaro-runtime/logs").glob("launch-*.log"))
     assert len(logs) == 1
+    if code == 0:
+        assert not dialog_calls.exists()
+    else:
+        shown = dialog_calls.read_text()
+        assert shown.count("could not start") == 1
+        assert f"code {code}" in shown and str(logs[0]) in shown
     assert "ARGS=--native --setup-only SILENT=1" in logs[0].read_text()
     assert "setup error" in logs[0].read_text()
 

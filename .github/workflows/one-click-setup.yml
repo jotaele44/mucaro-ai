@@ -1,8 +1,9 @@
 name: One-click setup
 
-# Runs the real double-click files ("Mucaro AI.command" / "Mucaro AI.cmd") on clean runners.
-# PATH is cut down to OS directories (plus tripwire stubs on macOS/Linux), so the job fails if
-# setup ever depends on a preinstalled Python, Node, npm, or git.
+# Runs the real double-click files ("Mucaro AI.command" / "Mucaro AI.cmd", then the silent
+# "Mucaro AI Setup.app" / "Mucaro AI.exe") on clean runners. PATH is cut down to OS directories (plus
+# tripwire stubs on macOS/Linux), so the job fails if setup ever depends on a preinstalled Python,
+# Node, npm, or git. The committed Mucaro AI.exe must also rebuild byte for byte from its source.
 
 on:
   workflow_dispatch:
@@ -10,9 +11,15 @@ on:
     paths:
       - "Mucaro AI.command"
       - "Mucaro AI Setup.app/**"
-      - "scripts/native_start.sh"
-      - "scripts/native_window.py"
+      - "Mucaro AI.exe"
+      - "packaging/launchers/**"
+      - "packaging/icons/**"
+      - "scripts/native_*"
+      - "scripts/build_launchers.py"
+      - "scripts/lock_python_deps.py"
+      - "packaging/one_click/**"
       - "backend/tests/test_native_launch.py"
+      - "backend/tests/test_windows_*"
       - "Mucaro AI.cmd"
       - ".gitattributes"
       - "scripts/one_click*"
@@ -29,8 +36,10 @@ on:
     paths:
       - "Mucaro AI.command"
       - "Mucaro AI Setup.app/**"
-      - "scripts/native_start.sh"
-      - "scripts/native_window.py"
+      - "Mucaro AI.exe"
+      - "packaging/launchers/**"
+      - "packaging/one_click/**"
+      - "scripts/native_*"
       - "Mucaro AI.cmd"
       - "scripts/one_click*"
       - "scripts/launch_app.py"
@@ -92,6 +101,9 @@ jobs:
           grep -q "DESKTOP_SMOKE_OK" .mucaro-runtime/logs/launch-*.log
           grep -q "DESKTOP_BACKEND_PORT_CLOSED" .mucaro-runtime/logs/launch-*.log
           .venv/bin/python -c "import webview, AppKit, Foundation, WebKit"
+      - name: Python locks regenerate byte for byte (pinned uv)
+        if: runner.os == 'Linux'
+        run: .venv/bin/python scripts/lock_python_deps.py --check
       - name: Verify isolation
         run: |
           if [ -s "$RUNNER_TEMP/tripwire.txt" ]; then echo "setup ran a PATH tool:"; cat "$RUNNER_TEMP/tripwire.txt"; exit 1; fi
@@ -132,6 +144,20 @@ jobs:
           if not "%RC%"=="0" exit /b %RC%
           findstr /c:"ONE_CLICK_FAST_PATH" "%RUNNER_TEMP%\run2.log" || exit /b 1
           findstr /c:"DESKTOP_SMOKE_OK" "%RUNNER_TEMP%\run2.log" || exit /b 1
+      - name: Silent Mucaro AI.exe smoke (no console, no browser)
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          $p = Start-Process -FilePath ".\Mucaro AI.exe" -ArgumentList "--smoke-test", "--no-browser" -Wait -PassThru
+          $log = Get-ChildItem .mucaro-runtime\logs\launch-*.log | Where-Object { $_.Name -notlike "*.err.log" } | Sort-Object LastWriteTime | Select-Object -Last 1
+          Get-Content $log.FullName
+          if ($p.ExitCode -ne 0) { throw "Mucaro AI.exe exited with $($p.ExitCode)" }
+          if (-not (Select-String -Quiet -Path $log.FullName -Pattern "DESKTOP_SMOKE_OK")) { throw "smoke launch did not finish" }
+          if (-not (Select-String -Quiet -Path $log.FullName -Pattern "DESKTOP_BACKEND_PORT_CLOSED")) { throw "backend left running" }
+          & .venv\Scripts\python.exe -c "import webview, clr"
+          if ($LASTEXITCODE -ne 0) { throw "window dependencies missing" }
+          # Informational: the engine pywebview would draw with on this runner (edgechromium or mshtml).
+          & .venv\Scripts\python.exe -c "from scripts import native_window; print('WEBVIEW_RENDERER=' + str(native_window.windows_renderer()))"
       - name: Verify isolation
         shell: pwsh
         run: |
@@ -147,3 +173,64 @@ jobs:
           name: one-click-logs-windows
           path: .mucaro-runtime/logs/
           if-no-files-found: ignore
+
+  windows-arm:
+    # Windows 11 on ARM runs the same x64 runtimes under emulation. Hosted ARM Windows runners may
+    # not be offered to this repository, so this job never gates a pull request: start it by hand
+    # (Actions > One-click setup > Run workflow).
+    name: Windows 11 on ARM (x64 emulation)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-11-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Double-click setup (full setup, smoke launch)
+        shell: cmd
+        run: |
+          set "PATH=%SystemRoot%\System32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SystemRoot%\System32\WindowsPowerShell\v1.0"
+          call "Mucaro AI.cmd" --smoke-test --no-browser > "%RUNNER_TEMP%\run1.log" 2>&1
+          set "RC=%ERRORLEVEL%"
+          type "%RUNNER_TEMP%\run1.log"
+          if not "%RC%"=="0" exit /b %RC%
+          findstr /c:"PLATFORM_X64_EMULATION" "%RUNNER_TEMP%\run1.log" || exit /b 1
+          findstr /c:"ONE_CLICK_SETUP_OK" "%RUNNER_TEMP%\run1.log" || exit /b 1
+          findstr /c:"DESKTOP_SMOKE_OK" "%RUNNER_TEMP%\run1.log" || exit /b 1
+      - name: Silent Mucaro AI.exe smoke (no console, no browser)
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          $p = Start-Process -FilePath ".\Mucaro AI.exe" -ArgumentList "--smoke-test", "--no-browser" -Wait -PassThru
+          $log = Get-ChildItem .mucaro-runtime\logs\launch-*.log | Where-Object { $_.Name -notlike "*.err.log" } | Sort-Object LastWriteTime | Select-Object -Last 1
+          Get-Content $log.FullName
+          if ($p.ExitCode -ne 0) { throw "Mucaro AI.exe exited with $($p.ExitCode)" }
+          if (-not (Select-String -Quiet -Path $log.FullName -Pattern "DESKTOP_SMOKE_OK")) { throw "smoke launch did not finish" }
+          if (-not (Select-String -Quiet -Path $log.FullName -Pattern "DESKTOP_BACKEND_PORT_CLOSED")) { throw "backend left running" }
+      - name: Private Python is the x64 build
+        shell: pwsh
+        run: |
+          $plat = & .venv\Scripts\python.exe -c "import sysconfig; print(sysconfig.get_platform())"
+          if ($plat -ne "win-amd64") { throw "expected the x64 Python under emulation, got $plat" }
+          & .venv\Scripts\python.exe -c "import webview, clr, rasterio"
+          if ($LASTEXITCODE -ne 0) { throw "x64 packages did not import under emulation" }
+          & .venv\Scripts\python.exe -c "from scripts import native_window; print('WEBVIEW_RENDERER=' + str(native_window.windows_renderer()))"
+          $dirty = git status --porcelain
+          if ($dirty) { throw "setup left tracked changes:`n$dirty" }
+      - name: Upload setup logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: one-click-logs-windows-arm
+          path: .mucaro-runtime/logs/
+          if-no-files-found: ignore
+
+  reproducible-launcher:
+    name: Mucaro AI.exe rebuilds byte for byte
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Rebuild Mucaro AI.exe and its icon from source and compare
+        run: python scripts/build_launchers.py --check

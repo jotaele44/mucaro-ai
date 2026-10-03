@@ -1,0 +1,90 @@
+{
+  "schema": "mucaro-flagpole-tool-denominator/1.0",
+  "domain": "V05",
+  "derivation": "docs/MUCARO_FLAGPOLE_V1.md flagpole torture test clauses; every governed tool in backend/app/tools.py TOOL_REGISTRY must be classified exactly once",
+  "caveat": "PRESENT means a governed tool exists for the capability; it is not certification of live execution.",
+  "required_capabilities": [
+    {
+      "id": "TOOL-01",
+      "capability": "repository.inspect",
+      "clause": "Audit all seven federation repositories",
+      "satisfied_by": ["coding.repo_status", "coding.read_file"],
+      "state": "PRESENT",
+      "owner_domain": "V13",
+      "note": "Read-only repository status and bounded file reads."
+    },
+    {
+      "id": "TOOL-02",
+      "capability": "repository.diff",
+      "clause": "fix only independently evidenced defects",
+      "satisfied_by": ["coding.diff"],
+      "state": "PRESENT",
+      "owner_domain": "V13",
+      "note": "Bounded read-only diff with staged, unstaged, and untracked residue."
+    },
+    {
+      "id": "TOOL-03",
+      "capability": "patch.validate",
+      "clause": "fix only independently evidenced defects",
+      "satisfied_by": ["coding.patch_check"],
+      "state": "PRESENT",
+      "owner_domain": "V13",
+      "note": "Proposal validation without mutation."
+    },
+    {
+      "id": "TOOL-04",
+      "capability": "patch.apply",
+      "clause": "fix only independently evidenced defects",
+      "satisfied_by": ["coding.patch_apply"],
+      "state": "PRESENT",
+      "owner_domain": "V13",
+      "note": "Mutation bound to exact HEAD, patch hash, and preimages."
+    },
+    {
+      "id": "TOOL-05",
+      "capability": "ci.status.read",
+      "clause": "identify every failing applicable CI gate",
+      "satisfied_by": [],
+      "state": "ABSENT",
+      "owner_domain": "V13",
+      "note": "The certify github-actions CLI diagnostic is not a governed tool call."
+    },
+    {
+      "id": "TOOL-06",
+      "capability": "regression.run",
+      "clause": "run applicable regression gates",
+      "satisfied_by": [],
+      "state": "ABSENT",
+      "owner_domain": "V19",
+      "note": "coding_checks.execute_coding_check_suite exists outside the governed tool runtime."
+    },
+    {
+      "id": "TOOL-07",
+      "capability": "vcs.branch_commit",
+      "clause": "open or update PRs where authorized",
+      "satisfied_by": [],
+      "state": "ABSENT",
+      "owner_domain": "V13",
+      "note": "No governed branch or commit mutation tool."
+    },
+    {
+      "id": "TOOL-08",
+      "capability": "pull_request.open_update",
+      "clause": "open or update PRs where authorized",
+      "satisfied_by": [],
+      "state": "ABSENT",
+      "owner_domain": "V13",
+      "note": "No governed pull request tool."
+    }
+  ],
+  "supporting_tools": [
+    "memory.list",
+    "product.audit",
+    "source_library.status",
+    "web.fetch",
+    "web.fetch_session",
+    "web.render",
+    "web.search",
+    "workspace_profiles.list"
+  ]
+}

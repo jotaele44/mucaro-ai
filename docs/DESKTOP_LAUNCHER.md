@@ -17,7 +17,8 @@ Desktop Launcher Mode lets Mucaro AI run with one command.
 ## Legacy console setup and launch
 
 `Mucaro AI.command` (macOS) and `Mucaro AI.cmd` (Windows) set up everything on first use and then
-run `scripts/launch_app.py --auto-port --exit-if-running`. See `docs/ONE_CLICK_SETUP.md`.
+run `scripts/launch_app.py --auto-port --exit-if-running`. `Mucaro AI Setup.app` and `Mucaro AI.exe` run
+the same setup silently and add `--native` (own window, no browser). See `docs/ONE_CLICK_SETUP.md`.
 
 Launcher options used by the double-click files:
 
