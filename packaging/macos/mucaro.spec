@@ -19,12 +19,16 @@ BUILD_NUMBER = os.environ.get("MUCARO_APP_BUILD", VERSION)
 BUNDLE_ID = os.environ.get("MUCARO_APP_BUNDLE_ID", "ai.mucaro.app")
 MINIMUM_OS = os.environ.get("MUCARO_APP_MINIMUM_OS", "14.0")
 ICON = os.environ.get("MUCARO_APP_ICON") or None
+BUILD_IDENTITY_FILE = os.environ.get("MUCARO_BUILD_IDENTITY_FILE")
+if not BUILD_IDENTITY_FILE or not Path(BUILD_IDENTITY_FILE).is_file():
+    raise RuntimeError("MUCARO_BUILD_IDENTITY_FILE must identify the generated source-identity manifest")
 
 datas = [
     (str(ROOT / "schemas"), "schemas"),
     (str(ROOT / "frontend" / "dist"), "frontend/dist"),
     (str(ROOT / "pyproject.toml"), "."),
     (str(ROOT / "backend" / "app" / "gis_grids"), "backend/app/gis_grids"),
+    (BUILD_IDENTITY_FILE, "."),
 ]
 binaries = []
 hiddenimports = collect_submodules("backend.app") + collect_submodules("uvicorn")

@@ -4,7 +4,8 @@
 *.sh text eol=lf
 *.command text eol=lf
 scripts/one_click_pins.env text eol=lf
-# The launcher inside Mucaro AI Setup.app is a bash script without an extension: keep LF there too.
+# The app launchers are bash scripts without an extension inside their bundles: keep LF there too.
+Mucaro[[:space:]]AI.app/Contents/MacOS/* text eol=lf
 *.app/Contents/MacOS/* text eol=lf
 *.plist text eol=lf
 *.icns binary

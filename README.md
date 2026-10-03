@@ -4,22 +4,29 @@ Local-first prototype for a custom LLM workflow with file ingestion, source line
 
 ## Quick start
 
-**macOS: open `Mucaro AI Setup.app`** (the owl icon in this folder). **Windows: double-click
-`Mucaro AI.cmd`.** That is the whole setup.
+**Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows) in this checkout.** It runs
+setup quietly and opens Mucaro in its own native window. Keep it next to `pyproject.toml`; move
+the whole folder together. No Terminal, console or browser opens. `Mucaro AI.command` and
+`Mucaro AI.cmd` are legacy console launchers. On Windows the window needs the Microsoft Edge
+WebView2 Runtime, which Windows 11 and current Windows 10 include.
 
-On a Mac the app sets itself up and opens in its own window with its own Dock icon: no Terminal,
-no browser, and nothing to install first. The first open downloads private, checksum-verified
-copies of Python 3.12 and Node.js into this folder (about 200 MB to download, about 700 MB on
-disk, 2-5 minutes on a typical connection), installs everything, builds the interface, and loads
-two sample documents while the window shows each step. Then the same window becomes Mucaro AI,
-ready to use. Later opens take a few seconds and work offline. Quit it like any app (Cmd+Q, or
-close the window). Keep `Mucaro AI Setup.app` inside this folder; to start it from the Dock, drag it
-onto the Dock.
+The first double-click downloads private, checksum-verified copies of Python 3.12 and Node.js
+into this folder (about 200 MB to download, about 700 MB on disk, 2-5 minutes on a typical
+connection), installs everything, builds
+the interface, loads two sample documents, and starts the app. Setup output is saved in
+`.mucaro-runtime/logs/` and failures appear in a dialog. Nothing
+needs to be installed beforehand and nothing is written outside the project folder. Later
+double-clicks reuse completed setup steps and can work offline. Close the native window to stop
+the backend it started. API calls and remote fetches still require internet access.
 
-On Windows, `Mucaro AI.cmd` runs the same setup in a console window and opens the app in your
-browser; keep that window open while you use the app. `Mucaro AI.command` does the same on a Mac
-(setup output in Terminal, app in the browser) and is the way to run Mucaro AI on Linux
-(`./"Mucaro AI.command"` from a terminal). Everything the setup installs stays in this folder.
+Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, Windows 11 on ARM
+(through x64 emulation; not yet run on ARM hardware), and Linux x86_64 (run `./"Mucaro AI.command"`
+from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
+does, its error codes, and how to remove it.
+
+`Mucaro AI Setup.app` (macOS, the owl icon) runs the same setup but shows each step in its own
+window during the first open, then turns that window into Mucaro AI with its own Dock icon.
+Keep it inside this folder; to start it from the Dock, drag it onto the Dock.
 
 A folder downloaded as a ZIP file is quarantined by macOS, which blocks the app the first time
 ("cannot be opened because Apple cannot check it for malicious software"). Double-click
@@ -35,6 +42,21 @@ it at startup; variables already exported in your shell take precedence. If the 
 
 See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
 `docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
+
+To use Mucaro from a phone on the same Wi-Fi or VPN, see `docs/PHONE_ACCESS.md`. It is off by
+default and needs an access token.
+
+### Runtime independence target
+
+The release target is stricter than "offline after setup": a prepared platform package should
+install and launch with the public network disabled, without requiring host Python, Node, Git,
+package managers, compilers, containers, Floot, GitHub, or another hosted service for the declared
+offline core. Explicit remote model APIs and governed web fetch/search/render remain network
+capabilities by design. See `docs/RUNTIME_INDEPENDENCE.md` and
+`_architecture/runtime_independence_v1.json`.
+
+The current source one-click path still needs internet on first setup. Do not treat it as an
+offline-installable release artifact.
 
 ### Developer setup (manual)
 
@@ -114,7 +136,8 @@ shell instead.
 - `MUCARO_AI_WORKSPACE_PROFILE`: runtime workspace profile name. Default is `default`.
 - `MUCARO_AI_DEPLOYMENT_PROFILE`: `local` or `production`. Production mode requires a strong operator token and explicit CORS origins.
 - `MUCARO_AI_DISTRIBUTION_CHANNEL`: `local` or `mac_app_store`. The Store channel requires production mode, loopback binding, and disables subprocess, local-worker, and container execution.
-- `MUCARO_AI_ALLOW_PUBLIC_BIND=1`: explicitly permits non-loopback binding in local mode.
+- `MUCARO_AI_ALLOW_PUBLIC_BIND=1`: explicitly permits non-loopback binding in local mode. It requires `MUCARO_AI_OPERATOR_TOKEN` of at least 32 characters in every profile; Mucaro refuses to start without one.
+- `MUCARO_AI_PHONE_ACCESS=1`: lets a phone on the same private network or VPN use Mucaro (`--phone` on `scripts/launch_app.py` does the same). The launcher listens on all interfaces, requires an access token (generated for each launch unless `MUCARO_AI_OPERATOR_TOKEN` has 32 or more characters) and prints the link. See `docs/PHONE_ACCESS.md`.
 
 ## Ingest files
 
@@ -275,8 +298,8 @@ receipts for the archive and every member.
 
 Use `mucaro package macos-app --format text` to build a local source-bound
 `Mucaro AI.app` under `data/exports/desktop_apps`. Double-clicking that app
-launches this checkout with the Python executable recorded at build time and
-opens the browser UI through `scripts/launch_app.py`. This is not yet a portable
+launches this checkout through silent setup and opens the native window. It provisions private
+runtimes on first use. This is not yet a portable
 signed installer with embedded runtime, reinstall, upgrade, and rollback
 guarantees. For source-checkout use, open the `Mucaro AI Setup.app` at the top of this folder
 instead: it needs no build step and opens in its own window.
@@ -414,7 +437,7 @@ python scripts/extract_reference_patterns.py
 - Execution Gate approval is required before mutation-oriented execution.
 - Tool calls require explicit approval and are recorded in a local audit log.
 - Uploaded files are stored locally under `data/input/`.
-- Set `MUCARO_AI_OPERATOR_TOKEN` before exposing the local API beyond a trusted loopback-only development session.
+- Set `MUCARO_AI_OPERATOR_TOKEN` before exposing the local API beyond a trusted loopback-only development session. A request from another device is refused unless a token is set, and a public bind needs one of 32 or more characters (`docs/PHONE_ACCESS.md`).
 - Every answer trace must include source IDs and cited chunk IDs or validation flags.
 
 ## Phase 2 roadmap

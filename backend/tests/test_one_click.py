@@ -156,6 +156,45 @@ def test_windows_stage0_never_merges_native_stderr():
         assert "2>&1" not in line, line
 
 
+def test_windows_stage0_always_installs_x64_python():
+    # Windows 11 on ARM runs it under emulation; the Windows lock and rasterio are x64 only.
+    text = STAGE0_PS1.read_text(encoding="utf-8")
+    assert '$PythonRequest = "cpython-" + $Pins["PYTHON_VERSION"] + "-windows-x86_64-none"' in text
+    assert "python install --no-bin --no-registry $PythonRequest" in text
+    assert "venv --seed --no-project --python $PythonRequest" in text
+    assert "uv-x86_64-pc-windows-msvc.zip" in text
+    assert '"-win-x64"' in text
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell 7 not installed")
+@pytest.mark.parametrize(
+    "arch,build,problem",
+    [
+        ("AMD64", 19045, ""),
+        ("AMD64", 26100, ""),
+        ("ARM64", 22000, ""),  # first Windows 11 build: runs x64 programs under emulation
+        ("ARM64", 26100, ""),
+        ("ARM64", 19045, "Windows 10 on ARM cannot run x64 programs; Windows 11 on ARM is supported"),
+        ("x86", 19045, "Windows on x86 is not supported"),
+    ],
+)
+def test_windows_stage0_accepts_x64_and_windows_11_on_arm(arch, build, problem):
+    script = str(STAGE0_PS1).replace("'", "''")
+    command = (
+        f"$ast = [System.Management.Automation.Language.Parser]::ParseFile('{script}', [ref]$null, [ref]$null); "
+        "$fn = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] "
+        "-and $node.Name -eq 'Get-WindowsTargetProblem' }, $true); "
+        ". ([scriptblock]::Create($fn.Extent.Text)); "
+        f"Write-Output ('RESULT=' + (Get-WindowsTargetProblem '{arch}' {build}))"
+    )
+    pwsh = [shutil.which("pwsh"), "-NoProfile", "-NonInteractive", "-Command", command]
+    proc = subprocess.run(pwsh, capture_output=True, text=True, check=False)
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    result = proc.stdout.strip().removeprefix("RESULT=")
+    assert result.startswith(problem) if problem else result == ""
+
+
 def test_runtime_folder_is_git_ignored():
     assert ".mucaro-runtime/" in (REPO / ".gitignore").read_text(encoding="utf-8").splitlines()
 
@@ -307,8 +346,10 @@ class FakeTools:
         del log, cwd, env
         joined = " ".join(str(part) for part in cmd)
         frontend = self.root / "frontend"
-        if " pip install " in joined:
-            self.calls.append("uv_pip")
+        if " pip install " in joined and "--require-hashes --no-deps -r " in joined:
+            self.calls.append("uv_pip_lock")
+        elif " pip install " in joined and joined.endswith("--no-deps --no-build-isolation -e ."):
+            self.calls.append("uv_pip_project")
         elif " ci " in joined:
             self.calls.append("npm_ci")
             (frontend / "node_modules" / "vite" / "bin").mkdir(parents=True, exist_ok=True)
@@ -342,6 +383,9 @@ def project(tmp_path, monkeypatch):
     }.items():
         (frontend / name).write_text(text, encoding="utf-8")
     (root / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
+    lock = one_click.lock_python_deps.lock_path(one_click.lock_target(), root / "packaging" / "one_click")
+    lock.parent.mkdir(parents=True)
+    lock.write_text("x==1 --hash=sha256:00\n", encoding="utf-8")
     runtime = root / ".mucaro-runtime"
     tools = FakeTools(root)
     monkeypatch.setattr(one_click, "ROOT", root)
@@ -359,7 +403,7 @@ def test_setup_runs_every_step_once_then_takes_the_fast_path(project):
     root, runtime, tools = project
 
     assert _run_setup(runtime) == ["python_deps", "frontend_deps", "frontend_build", "preflight", "samples"]
-    assert tools.calls == ["uv_pip", "npm_ci", "vite_build", "preflight", "ingest"]
+    assert tools.calls == ["uv_pip_lock", "uv_pip_project", "npm_ci", "vite_build", "preflight", "ingest"]
 
     tools.calls.clear()
     assert _run_setup(runtime) == []
@@ -393,6 +437,10 @@ def test_setup_reinstalls_python_deps_when_pyproject_or_imports_change(project, 
     tools.calls.clear()
 
     (root / "pyproject.toml").write_text("[project]\nname='y'\n", encoding="utf-8")
+    assert _run_setup(runtime) == ["python_deps", "preflight"]
+
+    lock = one_click.lock_python_deps.lock_path(one_click.lock_target(), root / "packaging" / "one_click")
+    lock.write_text("x==2 --hash=sha256:11\n", encoding="utf-8")
     assert _run_setup(runtime) == ["python_deps", "preflight"]
 
     tools.calls.clear()
@@ -498,12 +546,14 @@ def test_main_setup_only_does_not_launch(tmp_path, monkeypatch, capsys):
 # --- Mucaro AI Setup.app (desktop mode) hooks -----------------------------------------------------------
 
 
-def test_window_library_is_part_of_the_install_on_macos_only():
-    assert one_click.python_extras("darwin") == "dev,anthropic,desktop"
-    assert "webview" in one_click.key_modules("darwin")
-    for platform_name in ("linux", "win32"):
-        assert one_click.python_extras(platform_name) == one_click.PYTHON_EXTRAS == "dev,anthropic"
-        assert one_click.key_modules(platform_name) == one_click.KEY_MODULES
+def test_window_library_is_part_of_the_install_on_macos_and_windows():
+    # main's Mucaro AI.app (macOS) and Mucaro AI.exe (Windows) both open a pywebview window.
+    for platform_name in ("darwin", "win32"):
+        assert one_click.python_extras(platform_name) == "dev,anthropic,desktop"
+        assert "webview" in one_click.key_modules(platform_name)
+    assert one_click.python_extras("linux") == "dev,anthropic"
+    assert "webview" not in one_click.key_modules("linux")
+    assert one_click.key_modules(sys.platform) == one_click.KEY_MODULES
     extras = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))["project"]["optional-dependencies"]
     assert set(one_click.python_extras("darwin").split(",")) <= set(extras)
 
@@ -690,3 +740,30 @@ def test_launch_installs_and_restores_stop_signal_handlers():
     finally:
         launch_app.restore_signals(previous)
     assert signal.getsignal(signal.SIGTERM) == before
+
+
+def test_setup_fails_closed_without_a_lock_for_this_platform(project, monkeypatch):
+    _, runtime, tools = project
+    monkeypatch.setattr(one_click, "lock_target", lambda: None)
+
+    with pytest.raises(one_click.SetupError) as exc:
+        _run_setup(runtime)
+
+    assert exc.value.code == "ERROR_PLATFORM_UNSUPPORTED"
+    assert tools.calls == []
+
+
+@pytest.mark.parametrize(
+    "system,machine,interpreter,expected",
+    [
+        ("darwin", "arm64", None, "aarch64-apple-darwin"),
+        ("darwin", "x86_64", None, "x86_64-apple-darwin"),
+        ("linux", "x86_64", None, "x86_64-unknown-linux-gnu"),
+        ("win32", "ARM64", "win-amd64", "x86_64-pc-windows-msvc"),  # x64 Python under ARM emulation
+        ("win32", "AMD64", "win-amd64", "x86_64-pc-windows-msvc"),
+        ("win32", "ARM64", "win-arm64", None),  # ARM Python: rasterio has no Windows ARM wheels
+        ("linux", "aarch64", None, None),
+    ],
+)
+def test_lock_follows_the_interpreter_platform(system, machine, interpreter, expected):
+    assert one_click.lock_target(system, machine, interpreter) == expected

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../../api.js";
+import { CleartextNotice } from "../CleartextNotice.jsx";
 
 // One settings home (TGT-033): model, retrieval, access token and offline capability view.
 export function SettingsWorkspace({ options, onOptionsChange, announce }) {
@@ -63,6 +64,7 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
 
       <fieldset className="panel">
         <legend>Local access token</legend>
+        <CleartextNotice />
         {api.tokenIsLaunchManaged() ? (
           <p className="muted small">The Mucaro app created a fresh token for this launch and uses it automatically. Nothing to set here.</p>
         ) : (
@@ -72,7 +74,7 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
               className="inline-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                api.setOperatorToken(token);
+                api.setOperatorToken(token, { remember: true });
                 announce("Token saved for this device.");
               }}
             >
