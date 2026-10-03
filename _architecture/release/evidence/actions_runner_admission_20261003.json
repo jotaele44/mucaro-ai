@@ -1,0 +1,57 @@
+{
+  "schema_version": "mucaro-actions-runner-admission-evidence/1.0",
+  "observed_utc": "2026-10-03T22:15:00Z",
+  "repository": "jotaele44/mucaro-ai",
+  "repository_visibility": "private",
+  "canonical_main_sha": "7f104bf9114c85df92c24eeaecaf2260465b4568",
+  "classification": {
+    "fact": "A current-main-derived V04 reconstruction head created GitHub-hosted Linux, macOS, Chromium and WebKit jobs that all terminated before any workflow step executed.",
+    "binding": "BLOCKED infrastructure evidence; not code/test PASS and not code/test FAIL.",
+    "hypothesis": [
+      "Private-repository Actions quota or billing admission",
+      "Repository/account Actions policy or hosted-runner eligibility"
+    ],
+    "unknown": "The account-specific admission cause remains unreadable from the connected GitHub surface."
+  },
+  "reproduction": {
+    "pull_request": 196,
+    "head_sha": "1706982875e718b8e9cc7bd9d5160dd01dd7e9d6",
+    "base_sha": "7f104bf9114c85df92c24eeaecaf2260465b4568",
+    "purpose": "Current-main V04 model-failover reconstruction",
+    "jobs": [
+      {
+        "workflow": "CI",
+        "run_id": 37158317044,
+        "job_id": 111306267235,
+        "conclusion": "failure",
+        "executed_steps": 0
+      },
+      {
+        "workflow": "Rendered UI QA / WebKit",
+        "run_id": 37158317038,
+        "job_id": 111306267213,
+        "conclusion": "failure",
+        "executed_steps": 0
+      },
+      {
+        "workflow": "Rendered UI QA / Chromium",
+        "run_id": 37158317038,
+        "job_id": 111306267376,
+        "conclusion": "failure",
+        "executed_steps": 0
+      },
+      {
+        "workflow": "macOS app",
+        "run_id": 37158317034,
+        "job_id": 111306267266,
+        "conclusion": "failure",
+        "executed_steps": 0
+      }
+    ]
+  },
+  "falsification": [
+    "Any later GitHub-hosted job in this repository that executes at least one step falsifies the continuing universal-admission-block claim for that later time.",
+    "Once a job executes, its actual output must be adjudicated independently from this blocker evidence.",
+    "This evidence does not authorize changing any release requirement state or merging the V04 candidate."
+  ]
+}
