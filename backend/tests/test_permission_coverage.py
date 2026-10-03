@@ -20,14 +20,21 @@ FACADE_IMPORT = re.compile(r"from \.permission_engine import|import permission_e
 EXEMPT = {
     "answer_trace_eval.py": "certification harness spawning the project's own CLI",
     "clean_machine_macos.py": "release tooling",
+    "desktop_shell.py": "internal loopback desktop-service lifecycle; no public network target",
     "flagpole_inventory.py": "read-only git tree listing of the project itself",
     "gis_eval.py": "certification harness spawning the project's own CLI",
+    "local_tools.py": "read-only local toolchain discovery",
     "macos_app_store.py": "release tooling",
     "macos_distribution.py": "release tooling",
     "packaging.py": "release tooling",
     "portable_runtime.py": "release tooling",
+    "portable_runtime_source.py": "operator-only release runtime acquisition/materialization",
+    "release_manifest.py": "release tooling",
+    "release_scope.py": "release tooling and state snapshot diagnostics",
     "retrieval_quality_certification.py": "certification harness spawning the project's own CLI",
     "runtime_identity.py": "read-only git rev-parse of the project itself",
+    "security_gates.py": "certification/security harness",
+    "tool_denominator.py": "read-only governance inventory",
 }
 
 
@@ -56,7 +63,7 @@ def test_classification_lists_have_no_stale_entries() -> None:
 
 def test_migrated_call_sites_are_gated() -> None:
     files = _files_with_primitives()
-    for name in ("web_search.py", "ocr_analysis.py", "ocr_pdf.py", "web_browsing.py", "local_worker.py", "container_runtime.py"):
+    for name in ("web_search.py", "ocr_analysis.py", "ocr_pdf.py", "web_browsing.py", "local_worker.py", "container_runtime.py", "model_router.py"):
         assert files[name] is True, name
 
 
@@ -178,9 +185,37 @@ def test_cli_gh_runner_requires_network_capability_and_is_denied_on_unsupported_
     assert (ok, detail.startswith("ERROR_PERMISSION_DENIED")) == (False, True)
 
 
-@pytest.mark.xfail(strict=True, reason="V04/Workstream C: the live model call has no cfg and is not gated yet")
-def test_live_model_call_is_gated_by_model_invoke_permission() -> None:
-    # The Anthropic SDK does its own HTTP, so the primitive scan cannot see it. Tracked explicitly;
-    # strict xfail turns this into a failure the moment it is gated, forcing removal of the marker.
-    text = (APP_DIR / "model_router.py").read_text(encoding="utf-8")
-    assert FACADE_IMPORT.search(text)
+def test_model_router_is_permission_gated() -> None:
+    assert _files_with_primitives()["model_router.py"] is True
+
+
+def test_model_invocation_denied_on_unsupported_channel_before_provider(tmp_path: Path) -> None:
+    from backend.app.model_router import ModelProviderError, generate_answer
+
+    with pytest.raises(ModelProviderError) as exc:
+        generate_answer(
+            "q",
+            [{"chunk_id": "chunk_a", "source_id": "src_a", "text": "alpha"}],
+            model_provider="mock",
+            cfg=_cfg(tmp_path, "sideload"),
+        )
+    assert exc.value.status == "ERROR_PERMISSION_DENIED"
+
+
+def test_remote_model_agent_origin_requires_network_approval_before_sdk_call(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from backend.app.model_router import ModelProviderError, generate_answer
+
+    monkeypatch.setenv("MUCARO_AI_LIVE_MODE", "1")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    with pytest.raises(ModelProviderError) as exc:
+        generate_answer(
+            "q",
+            [{"chunk_id": "chunk_a", "source_id": "src_a", "text": "alpha"}],
+            model_provider="anthropic",
+            cfg=_cfg(tmp_path),
+            permission_origin="agent",
+        )
+    assert exc.value.status == "ERROR_PERMISSION_APPROVAL_REQUIRED"
