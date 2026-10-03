@@ -86,6 +86,20 @@ $UvHome = Join-Path $Runtime ("uv\" + $Pins["UV_VERSION"])
 $UvBin = Join-Path $UvHome "uv.exe"
 $NodeHome = Join-Path $Runtime ("node\" + $Pins["NODE_VERSION"])
 $NodeExe = Join-Path $NodeHome "node.exe"
+# Always the x64 build, also on Windows 11 on ARM: the Python lock and rasterio are x64 only.
+$PythonRequest = "cpython-" + $Pins["PYTHON_VERSION"] + "-windows-x86_64-none"
+
+# Every pinned runtime (uv, Node, CPython, the rasterio wheel) is an x64 build. Windows 11 on ARM
+# runs x64 programs under emulation (build 22000 is the first Windows 11 release); Windows 10 on
+# ARM emulates only 32-bit x86. Returns "" when this machine can run them, else the reason it cannot.
+function Get-WindowsTargetProblem([string]$Arch, [int]$Build) {
+    if ($Arch -eq "AMD64") { return "" }
+    if ($Arch -eq "ARM64") {
+        if ($Build -ge 22000) { return "" }
+        return "Windows 10 on ARM cannot run x64 programs; Windows 11 on ARM is supported (update Windows, then double-click again)"
+    }
+    return "Windows on $Arch is not supported (the pinned rasterio publishes Windows builds for x64 only)"
+}
 
 function Test-LockHolderAlive([string]$Holder) {
     if (-not $Holder) { return $false }
@@ -249,10 +263,10 @@ function Install-Venv {
     }
     Assert-DiskSpace
     Write-SetupLog ("==> Installing private Python " + $Pins["PYTHON_VERSION"] + " (one time, about 30 MB)")
-    & $UvBin python install --no-bin --no-registry $Pins["PYTHON_VERSION"]
+    & $UvBin python install --no-bin --no-registry $PythonRequest
     if ($LASTEXITCODE -ne 0) { Stop-Setup "ERROR_PYTHON_INSTALL_FAILED" ("uv python install returncode=$LASTEXITCODE") }
     Remove-Item -LiteralPath (Join-Path $Root ".venv") -Recurse -Force -ErrorAction SilentlyContinue
-    & $UvBin venv --seed --no-project --python $Pins["PYTHON_VERSION"] (Join-Path $Root ".venv")
+    & $UvBin venv --seed --no-project --python $PythonRequest (Join-Path $Root ".venv")
     if ($LASTEXITCODE -ne 0) { Stop-Setup "ERROR_VENV_FAILED" ("uv venv returncode=$LASTEXITCODE") }
     if (-not (Test-VenvManaged)) { Stop-Setup "ERROR_VENV_FAILED" (".venv was created but does not run the private Python " + $Pins["PYTHON_VERSION"]) }
     Write-SetupLog ("VENV_OK created .venv python " + (Get-NativeOutput $VenvPy @("-c", "import platform; print(platform.python_version())")))
@@ -264,10 +278,10 @@ Write-SetupLog "ONE_CLICK_STAGE0_START root=$Root log=$($script:Log)"
 
 $arch = $env:PROCESSOR_ARCHITECTURE
 if ($env:PROCESSOR_ARCHITEW6432) { $arch = $env:PROCESSOR_ARCHITEW6432 }
-if ($arch -ne "AMD64") {
-    Stop-Setup "ERROR_PLATFORM_UNSUPPORTED" "Windows on $arch is not supported (the pinned rasterio publishes Windows builds for x64 only)"
-}
+$problem = Get-WindowsTargetProblem $arch ([Environment]::OSVersion.Version.Build)
+if ($problem) { Stop-Setup "ERROR_PLATFORM_UNSUPPORTED" $problem }
 Write-SetupLog "PLATFORM Windows $([Environment]::OSVersion.Version) $arch"
+if ($arch -ne "AMD64") { Write-SetupLog "PLATFORM_X64_EMULATION Windows 11 runs the x64 runtimes on $arch" }
 
 Enter-Lock
 try {

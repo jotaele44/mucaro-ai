@@ -2,8 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 
 const MODE_LABEL = { plan: "Plan", ask: "Ask first", auto: "Auto (local read-only)" };
 
-// Message composer (F05/F06): empty send disabled, Enter sends (Shift+Enter for a new line),
-// IME composition never submits, and the draft survives sheets and reloads per conversation.
+// Touch keyboards have no Shift+Enter, so on a coarse pointer Return adds a line and the Send button submits;
+// otherwise a stray Return would send a half-typed prompt and multi-line prompts would be impossible.
+const touchKeyboard = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
+
+// Message composer (F05/F06): empty send disabled, Enter sends on a hardware keyboard (Shift+Enter for a new line,
+// Cmd/Ctrl+Enter always sends), IME composition never submits, and the draft survives sheets and reloads per conversation.
 function QueuedItem({ run, onCancel, onEdit }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(run.prompt_preview);
@@ -100,12 +104,18 @@ export function Composer({ conversationId, modes, mode, onModeChange, onSend, on
   }
 
   function onKeyDown(event) {
-    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing || event.keyCode === 229) return;
+    if (event.metaKey || event.ctrlKey) {
       event.preventDefault();
       send();
+      return;
     }
+    if (event.shiftKey || touchKeyboard()) return; // the browser inserts the newline
+    event.preventDefault();
+    send();
   }
 
+  const touch = touchKeyboard();
   const empty = !text.trim();
   return (
     <div className="composer">
@@ -125,7 +135,8 @@ export function Composer({ conversationId, modes, mode, onModeChange, onSend, on
           ref={area}
           rows={1}
           value={text}
-          placeholder={activeRun ? "Message will be queued until the current turn finishes" : "Ask a question, or type /status, /fetch <url>…"}
+          placeholder={activeRun ? "Message will be queued until the current turn finishes" : touch ? "Ask a question or type a /command…" : "Ask a question, or type /status, /fetch <url>…"}
+          enterKeyHint={touch ? "enter" : "send"}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={onKeyDown}
           disabled={disabled}
