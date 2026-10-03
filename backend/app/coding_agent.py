@@ -33,6 +33,7 @@ from .coding_workspace import (
     resolve_repository,
 )
 from .config import Settings
+from .event_stream import EventSink, emit
 from .injection_guard import neutralize_fence, scan_text
 from .mcp_client import call_tool as mcp_call_tool
 from .model_router import (
@@ -58,6 +59,8 @@ AGENT_ACTOR = "coding-agent"
 # Longest argument value shown to the operator before an explicit "bytes hidden" marker.
 APPROVAL_VALUE_LIMIT = 2_000
 MAX_ACTION_SCAN_ATTEMPTS = 500
+# Longest tool-argument summary carried by a streamed tool_call event.
+EVENT_SUMMARY_LIMIT = 200
 # Names under which agent actions appear in the hash-chained tool audit log.
 AUDIT_TOOL_NAMES = {
     "read": "coding.read_file",
@@ -334,6 +337,7 @@ def run_agent(
     history: list[dict[str, str]] | None = None,
     allowed_tools: frozenset[str] | None = None,
     allow_live_search: bool = False,
+    on_event: EventSink | None = None,
     _depth: int = 0,
 ) -> dict[str, Any]:
     if not goal.strip():
@@ -348,32 +352,42 @@ def run_agent(
     status = "AGENT_STEP_LIMIT_REACHED"
 
     for index in range(max_steps):
+        step = index + 1
+        emit(on_event, "step_start", step=step)
         reply = chat(messages)
         messages.append({"role": "assistant", "content": reply})
+        emit(on_event, "model_reply", step=step, chars=len(reply))
         try:
             action = parse_action(reply)
         except AgentError as exc:
             observation = {"status": exc.status, "detail": exc.detail}
-            steps.append({"step": index + 1, "reply": reply, "outcome": observation})
+            steps.append({"step": step, "reply": reply, "outcome": observation})
             messages.append({"role": "user", "content": _observe(observation)})
+            emit(on_event, "action_invalid", step=step, status=exc.status, detail=exc.detail)
             continue
         if "final" in action and "tool" not in action:
             final, status = action["final"], "AGENT_COMPLETED"
-            steps.append({"step": index + 1, "final": final})
+            steps.append({"step": step, "final": final})
+            emit(on_event, "final", step=step, final=final)
             break
         name, args = action["tool"], action.get("args") or {}
-        record: dict[str, Any] = {"step": index + 1, "tool": name, "args": args}
+        args_digest = arguments_digest(args)
+        record: dict[str, Any] = {"step": step, "tool": name, "args": args}
         context = {"chat": chat, "depth": _depth, "allow_live_search": allow_live_search}
+        # Events are emitted outside the try below, and a failing sink raises EventSinkError (a BaseException),
+        # so a closed pipe stops the run before an approved action instead of being fed back as a tool failure.
+        emit(on_event, "tool_call", step=step, tool=name, summary=_clip(json.dumps(args, ensure_ascii=False), EVENT_SUMMARY_LIMIT), args_sha256=args_digest)
         try:
             if allowed_tools is not None and name not in allowed_tools:
                 raise AgentError("ERROR_AGENT_TOOL_NOT_ALLOWED", f"{name} is not available to this agent")
             if requires_approval(name, args, repo_path, cfg):
                 description = describe_for_approval(name, args, repo=repo_path, cfg=cfg, allow_live_search=allow_live_search)
                 decision = _approval_decision(approve(name, args, description))
+                emit(on_event, "approval", step=step, tool=name, approved=decision.approved, mode=decision.mode, args_sha256=args_digest)
                 audit_name = AUDIT_TOOL_NAMES.get(name, f"agent.{name}")
                 # The decision is audited before anything runs; if it cannot be recorded, nothing runs.
                 call_id = audit_decision(cfg, audit_name, args, approved=decision.approved, requested_by=AGENT_ACTOR, mode=decision.mode)
-                record.update(approved=decision.approved, approval_mode=decision.mode, approved_args_sha256=arguments_digest(args))
+                record.update(approved=decision.approved, approval_mode=decision.mode, approved_args_sha256=args_digest)
                 if decision.approved:
                     dispatch = functools.partial(_dispatch, name, args, repo_path, cfg, context)
                     outcome = run_audited(cfg, audit_name, call_id, AGENT_ACTOR, dispatch)
@@ -389,6 +403,7 @@ def run_agent(
             record["injection_signals"] = signals
         steps.append(record)
         messages.append({"role": "user", "content": observation})
+        emit(on_event, "tool_result", step=step, tool=name, status=record["outcome_status"], **({"injection_signals": signals} if signals else {}))
 
     body = {"goal": goal, "repo": str(repo_path), "steps": steps, "final": final}
     return {

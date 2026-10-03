@@ -13,6 +13,7 @@ from .coding_container import (
     validate_coding_container_plan,
 )
 from .config import Settings, settings
+from .event_stream import EventSink, emit
 
 CODING_CHECK_SUITE_SCHEMA_VERSION = "mucaro-coding-check-suite/1.1"
 ALLOWED_CHECK_KINDS = {"test", "lint", "type", "build", "security", "benchmark"}
@@ -148,6 +149,7 @@ def execute_coding_check_suite(
     image: str,
     checks: list[CodingCheck],
     cfg: Settings = settings,
+    on_event: EventSink | None = None,
 ) -> dict[str, Any]:
     checks = _validated_checks(checks)
     rows: list[dict[str, Any]] = []
@@ -155,6 +157,7 @@ def execute_coding_check_suite(
     required_blocked: list[str] = []
 
     for check in checks:
+        emit(on_event, "check_start", check_id=check.check_id, kind=check.kind, command=list(check.command))
         try:
             plan = build_coding_container_plan(
                 repo_root,
@@ -190,6 +193,7 @@ def execute_coding_check_suite(
             if check.required:
                 required_blocked.append(check.check_id)
         rows.append(row)
+        emit(on_event, "check_result", check_id=check.check_id, state=row["state"], **({"error_status": row["error_status"]} if "error_status" in row else {}))
 
     state_counts = {state: sum(row["state"] == state for row in rows) for state in ("PASS", "FAIL", "BLOCKED")}
     required_failure_count = len(required_failures)

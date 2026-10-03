@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
 import sys
 from pathlib import Path
@@ -31,6 +32,7 @@ from .coding_workspace import (
     read_repository_file,
 )
 from .config import Settings
+from .event_stream import EventSink, EventSinkError
 from .model_router import ModelProviderError
 from .operator_audit import CLI_ACTOR, ApprovalDecision, OperatorAuditError, approval_mode, audit_decision, run_audited
 
@@ -68,11 +70,71 @@ def _fail(exc: Exception, output_format: str) -> int:
     return 2
 
 
+def _streaming_json(args: argparse.Namespace) -> bool:
+    return bool(getattr(args, "stream", False)) and args.format == "json"
+
+
+def _render_event(event: dict[str, Any]) -> str | None:
+    """One progress line for a person, or None for events the readable view does not show."""
+    kind, step = event["event"], event.get("step")
+    if kind == "tool_call":
+        return f"[step {step}] {event['tool']} {event['summary']}"
+    if kind == "approval":
+        return f"[step {step}]   {'approved' if event['approved'] else 'declined'} ({event['mode']})"
+    if kind == "tool_result":
+        signals = f"  (injection signals: {', '.join(event['injection_signals'])})" if event.get("injection_signals") else ""
+        return f"[step {step}]   -> {event['status']}{signals}"
+    if kind == "action_invalid":
+        return f"[step {step}] model reply rejected: {event['status']}"
+    if kind == "check_start":
+        return f"[check {event['check_id']}] {' '.join(event['command'])}"
+    if kind == "check_result":
+        return f"[check {event['check_id']}]   -> {event['state']}"
+    return None
+
+
+def _event_sink(args: argparse.Namespace, *, human: bool = False) -> EventSink | None:
+    """The consumer for --stream: NDJSON on stdout for --format json, readable lines on stderr otherwise."""
+    if not getattr(args, "stream", False):
+        return None
+    if args.format == "json" and not human:
+        return lambda event: print(json.dumps(event, ensure_ascii=False), flush=True)
+
+    def show(event: dict[str, Any]) -> None:
+        line = _render_event(event)
+        if line:
+            print(line, file=sys.stderr, flush=True)
+
+    return show
+
+
+def _closed_pipe_exit() -> int:
+    """A reader that went away (for example `| head`) is not worth a traceback; stop quietly, but not with success."""
+    try:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())  # so the interpreter's exit flush stays quiet
+    except (OSError, ValueError, AttributeError):
+        pass  # stdout is not a real file descriptor (captured or embedded); there is nothing more to detach
+    return 1
+
+
 def _run(action: Any, args: argparse.Namespace) -> int:
     try:
-        _emit(action(), args.format)
+        payload = action()
+        if payload is not None:
+            _emit(payload, args.format)
         return 0
+    except EventSinkError as exc:
+        if isinstance(exc.cause, BrokenPipeError):
+            return _closed_pipe_exit()
+        raise exc.cause from None
+    except BrokenPipeError:
+        return _closed_pipe_exit()
     except HANDLED_ERRORS as exc:
+        if _streaming_json(args):
+            try:  # a stdout reader of the event stream should see how the run ended
+                print(json.dumps({"event": "error", "status": getattr(exc, "status", "ERROR_CODING"), "detail": getattr(exc, "detail", str(exc))}, ensure_ascii=False), flush=True)
+            except BrokenPipeError:
+                pass
         return _fail(exc, args.format)
 
 
@@ -209,13 +271,18 @@ def run_code_checks(args: argparse.Namespace, cfg: Settings) -> int:
             return build_coding_check_suite_plan(args.repo, image=args.image, checks=checks, cfg=cfg)
         summary = f"Run {len(checks)} check(s) in container image {args.image} (network disabled)"
         call_id = _require_approval(args, cfg, "coding.checks_run", {"image": args.image, "checks": args.check}, summary)
-        return run_audited(
+        sink = _event_sink(args)
+        payload = run_audited(
             cfg,
             "coding.checks_run",
             call_id,
             CLI_ACTOR,
-            lambda: execute_coding_check_suite(args.repo, image=args.image, checks=checks, cfg=cfg),
+            lambda: execute_coding_check_suite(args.repo, image=args.image, checks=checks, cfg=cfg, on_event=sink),
         )
+        if _streaming_json(args):
+            print(json.dumps({"event": "result", **payload}, ensure_ascii=False), flush=True)
+            return None
+        return payload
 
     return _run(action, args)
 
@@ -260,10 +327,12 @@ def _agent_chat(args: argparse.Namespace) -> Any:
     return provider_chat(args.provider, args.model)
 
 
-def _agent_turn(args: argparse.Namespace, cfg: Settings, goal: str, chat: Any, approve: Any, repo: str, history: Any) -> dict[str, Any]:
+def _agent_turn(
+    args: argparse.Namespace, cfg: Settings, goal: str, chat: Any, approve: Any, repo: str, history: Any, on_event: EventSink | None = None
+) -> dict[str, Any]:
     result = run_agent(
         goal, repo, chat=chat, approve=approve, cfg=cfg, max_steps=args.max_steps, history=history,
-        allow_live_search=args.allow_live_search,
+        allow_live_search=args.allow_live_search, on_event=on_event,
     )
     if args.session:
         result["session_path"] = str(save_session(cfg, args.session, repo, result))
@@ -285,10 +354,13 @@ def _agent_resume(args: argparse.Namespace, cfg: Settings) -> tuple[str, Any]:
 def run_code_agent(args: argparse.Namespace, cfg: Settings) -> int:
     def action() -> dict[str, Any]:
         repo, history = _agent_resume(args, cfg)
-        result = _agent_turn(args, cfg, args.goal, _agent_chat(args), _agent_approver(args), repo, history)
+        result = _agent_turn(args, cfg, args.goal, _agent_chat(args), _agent_approver(args), repo, history, on_event=_event_sink(args))
         result["resumed"] = history is not None
         if args.format == "json":
             result.pop("messages", None)
+        if _streaming_json(args):
+            print(json.dumps({"event": "result", **result}, ensure_ascii=False), flush=True)
+            return None
         return result
 
     return _run(action, args)
@@ -301,6 +373,7 @@ def run_code_chat(args: argparse.Namespace, cfg: Settings) -> int:
     except HANDLED_ERRORS as exc:
         return _fail(exc, args.format)
     print("mucaro code chat - enter a goal per line; /exit to quit.", file=sys.stderr)
+    sink = _event_sink(args, human=True)  # the REPL is for people: --stream shows progress lines whatever --format says
     for line in sys.stdin:
         goal = line.strip()
         if goal in {"/exit", "/quit"}:
@@ -308,12 +381,17 @@ def run_code_chat(args: argparse.Namespace, cfg: Settings) -> int:
         if not goal:
             continue
         try:
-            result = _agent_turn(args, cfg, goal, chat, approve, repo, history)
+            result = _agent_turn(args, cfg, goal, chat, approve, repo, history, on_event=sink)
+            history = result["messages"]
+            print(result["final"] or f"[{result['status']}]")
+        except EventSinkError as exc:
+            if isinstance(exc.cause, BrokenPipeError):
+                return _closed_pipe_exit()
+            raise exc.cause from None
+        except BrokenPipeError:
+            return _closed_pipe_exit()
         except HANDLED_ERRORS as exc:
             _fail(exc, args.format)
-            continue
-        history = result["messages"]
-        print(result["final"] or f"[{result['status']}]")
     return 0
 
 
@@ -374,6 +452,11 @@ def register_code_commands(subcommands: Any) -> None:
     agent.add_argument(
         "--allow-live-search", action="store_true", help="Let the agent ask to use live Brave web search (each call still needs approval)."
     )
+    agent.add_argument(
+        "--stream",
+        action="store_true",
+        help="Emit step events as they happen: NDJSON on stdout for --format json (ending with a result event), readable lines on stderr for --format text.",
+    )
     confirmed(agent)
 
     chat = add("chat", "Interactive multi-turn coding loop reading goals from stdin.", run_code_chat)
@@ -384,12 +467,14 @@ def register_code_commands(subcommands: Any) -> None:
     chat.add_argument(
         "--allow-live-search", action="store_true", help="Let the agent ask to use live Brave web search (each call still needs approval)."
     )
+    chat.add_argument("--stream", action="store_true", help="Show each step as it happens (progress lines on stderr).")
     confirmed(chat)
 
     checks = add("checks", "Plan (default) or run (--run) containerized checks with network disabled.", run_code_checks)
     checks.add_argument("--check", action="append", required=True, help="kind:id=command, e.g. test:unit='pytest -q'; repeatable.")
     checks.add_argument("--image", required=True, help="Pinned container image.")
     checks.add_argument("--run", action="store_true", help="Execute the checks instead of only planning them.")
+    checks.add_argument("--stream", action="store_true", help="With --run, emit check_start and check_result events as each check finishes (same formats as the agent).")
     confirmed(checks)
 
     pr = add("pr-request", "Emit a governed pull-request request artifact for the current clean branch (no network).", run_code_pr_request)

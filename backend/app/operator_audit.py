@@ -83,10 +83,14 @@ def run_audited(
     requested_by: str,
     action: Callable[[], dict[str, Any]],
 ) -> dict[str, Any]:
-    """Run an approved action and record how it ended. The action's own result or error always wins."""
+    """Run an approved action and record how it ended. The action's own result or error always wins.
+
+    BaseException is caught (and re-raised) on purpose: a Ctrl-C during a long run, or a closed event
+    stream, must still leave a FAILED outcome behind instead of an approved call with no ending.
+    """
     try:
         result = action()
-    except Exception as exc:
+    except BaseException as exc:
         _record_outcome(cfg, call_id, tool_name, requested_by, ok=False, status=str(getattr(exc, "status", type(exc).__name__)))
         raise
     status = result.get("status") if isinstance(result, dict) else None
