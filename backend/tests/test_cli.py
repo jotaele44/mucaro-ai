@@ -5462,6 +5462,8 @@ def test_cli_permission_lease_grant_list_and_revoke(tmp_path: Path, capsys) -> N
             "--tool",
             "coding.patch_apply",
             "--allow-mutating",
+            "--arguments-sha256",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "--ttl-seconds",
             "600",
             "--max-uses",
@@ -5479,6 +5481,7 @@ def test_cli_permission_lease_grant_list_and_revoke(tmp_path: Path, capsys) -> N
     assert lease["tool_names"] == ["coding.patch_apply"]
     assert lease["allow_mutating"] is True
     assert lease["allow_network"] is False
+    assert lease["arguments_sha256"] == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     assert lease["max_uses"] == 3
 
     assert main(["permissions", "lease-list", "--run-id", "run-1", "--format", "json"], cfg=cfg) == 0
