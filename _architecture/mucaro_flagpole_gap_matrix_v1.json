@@ -71,9 +71,12 @@
       "evidence": [
         "backend/app/skill_runtime.py",
         "backend/app/distribution_policy.py",
+        "backend/app/permission_leases.py",
+        "schemas/permission_lease.schema.json",
+        "backend/tests/test_permission_leases.py",
         "docs/ARCHITECTURE.md"
       ],
-      "gap": "Fail-closed capability/distribution controls exist; full permission taxonomy and adversarial certification remain open."
+      "gap": "Fail-closed capability/distribution controls and bounded run-scoped permission leases exist with audit-chain, run/scope, mutation/network, workspace, TTL/use and revocation controls; terminal integration and broader adversarial certification remain open."
     },
     {
       "id": "V07",
@@ -93,7 +96,7 @@
         "schemas/autopilot_state.schema.json",
         "backend/tests/test_autopilot.py"
       ],
-      "gap": "Bounded checkpoint/DAG continuation, governed tool execution, explicit activation, budgets, progress fingerprints, loop/no-progress classification, deterministic stopping and pause/resume are source-backed. Model-driven replanning, permission leases, terminal integration, and executed long-horizon certification remain OPEN."
+      "gap": "Bounded checkpoint/DAG continuation, governed tool execution, explicit activation, budgets, progress fingerprints, loop/no-progress classification, deterministic stopping, pause/resume, and bounded run-scoped permission leases are source-backed. Model-driven replanning, terminal integration, and executed long-horizon certification remain OPEN."
     },
     {
       "id": "V09",
