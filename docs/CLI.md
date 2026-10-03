@@ -1203,3 +1203,47 @@ mucaro ask "How does source lineage work?" --provider anthropic
 ```
 
 If the provider is unavailable, `ask` returns a structured provider error. Use `--allow-mock-fallback` only when an explicit mock fallback is acceptable.
+
+## Coding Agent And Governed Web (`mucaro code`, `mucaro web`)
+
+All repositories outside the project root need a directory grant first (`mucaro permissions grant <path> --yes`). Every command that mutates a repository, runs containers, or touches the network requires explicit approval: pass `--yes` or answer the interactive prompt. Without either, non-interactive runs stop with a `*_CONFIRMATION_REQUIRED` error and change nothing.
+
+```bash
+# Read-only
+mucaro code status --repo ~/proj
+mucaro code read src/app.py --repo ~/proj
+mucaro code diff --repo ~/proj --base main
+mucaro code check-patch change.patch --repo ~/proj
+mucaro code review findings.json --repo ~/proj
+
+# Approval-gated changes (HEAD, patch hash, and file preimages are pinned)
+mucaro code branch work/fix --repo ~/proj --yes
+mucaro code apply change.patch --repo ~/proj --yes
+mucaro code commit --path src/app.py -m "Fix bug" --repo ~/proj --yes
+mucaro code pr-request --title "Fix bug" --repo ~/proj      # artifact only, no network
+
+# Containerized checks (network disabled); plan first, then --run
+mucaro code checks --image <pinned-image> --check "test:unit=pytest -q" --repo ~/proj
+mucaro code checks --image <pinned-image> --check "test:unit=pytest -q" --repo ~/proj --run --yes
+
+# Model-driven loop; mutating and web tools are approval-gated per call
+mucaro code agent "add input validation" --repo ~/proj --provider local --session fix1
+mucaro code chat --session fix1            # one goal per stdin line, /exit to quit
+mucaro code sessions
+mucaro code agent "..." --script replies.json   # deterministic offline replay
+
+# Governed web access (robots, private-host blocking, hashed snapshots)
+mucaro web fetch https://example.com --yes
+mucaro web session https://a.example https://b.example --purpose "compare" --yes
+mucaro web search "query" --allow-live-search --yes   # needs the Brave API key env var
+
+# MCP stdio servers, declared by you in data/mcp_servers.json:
+#   {"servers": {"name": {"command": ["executable", "arg"], "env": {"KEY": "value"}}}}
+mucaro mcp servers
+mucaro mcp tools name --yes
+mucaro mcp call name tool --args '{"k": "v"}' --yes
+```
+
+Agent tools: `status`, `read`, `diff`, `check_patch` (direct); `apply_patch`, `create_branch`, `commit`, `web_fetch`, `web_search`, `mcp_call` (approval per call); `delegate` starts a read-only sub-agent (status/read/diff/check_patch only, 6 steps, no further delegation). MCP servers run with a minimal environment plus the `env` you declare, and their output is treated as untrusted data. Provider `local` accepts loopback URLs only; `anthropic` needs the optional SDK and key. Agent output records every step's outcome status and a transcript SHA-256; the model's final summary is not verified evidence.
+
+Not yet provided: hosted PR creation, plugin packaging, streaming output, and live-provider validation.

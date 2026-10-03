@@ -15,6 +15,9 @@ from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlparse
 
+from .cli_code import register_code_commands
+from .cli_mcp import register_mcp_commands
+from .cli_web import register_web_commands
 from .config import Settings, settings
 from .capability_contracts import build_capability_contract_report, validate_gis_report_file, validate_ocr_report_file
 from .answer_trace_eval import (
@@ -1500,6 +1503,10 @@ def build_parser() -> argparse.ArgumentParser:
     permissions_revoke.add_argument("path", help="File or directory path whose containing grant should be revoked.")
     permissions_revoke.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     permissions_revoke.set_defaults(handler=run_permissions_revoke)
+
+    register_code_commands(subcommands)
+    register_web_commands(subcommands)
+    register_mcp_commands(subcommands)
 
     plan = subcommands.add_parser("plan", help="Analyze a request with the Planning Gate.")
     plan.add_argument("request", nargs="+", help="Request to analyze.")

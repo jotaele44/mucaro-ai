@@ -60,6 +60,14 @@
       "evidence": "backend/tests/test_local_model.py"
     },
     {
+      "rule": "S310",
+      "path": "backend/app/coding_agent.py",
+      "code": "request = urllib.request.Request(",
+      "classification": "NOT_APPLICABLE",
+      "rationale": "The coding agent's local provider applies the same _is_loopback_url check and proxy-bypassing opener as model_router before any request.",
+      "evidence": "backend/tests/test_cli_code.py"
+    },
+    {
       "rule": "S314",
       "path": "backend/app/parser.py",
       "code": "root = ElementTree.fromstring(read_member_limited(archive, \"docProps/core.xml\", DOCX_XML_BYTE_LIMIT))",
