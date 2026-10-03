@@ -1529,6 +1529,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--tool-prefix", action="append", default=[], help="Tool-name prefix; repeatable for TOOL_PREFIXES."
     )
     permissions_lease_grant.add_argument("--workspace-root", help="Optional exact canonical repo_root binding.")
+    permissions_lease_grant.add_argument(
+        "--arguments-sha256",
+        help="Optional exact tool-arguments SHA-256 binding; when present, only that argument set may consume the lease.",
+    )
     permissions_lease_grant.add_argument("--allow-mutating", action="store_true", help="Permit mutation-capable tools inside the declared scope.")
     permissions_lease_grant.add_argument("--allow-network", action="store_true", help="Permit remote/network tools inside the declared scope.")
     permissions_lease_grant.add_argument("--ttl-seconds", type=int, default=3600, help="Lease lifetime in seconds (1..86400).")
@@ -8424,6 +8428,7 @@ def run_permissions_lease_grant(args: argparse.Namespace, cfg: Settings) -> int:
     description = (
         f"Grant {args.scope} permission lease for run {args.run_id}; "
         f"mutating={bool(args.allow_mutating)} network={bool(args.allow_network)} "
+        f"arguments_sha256={args.arguments_sha256 or 'ANY'} "
         f"ttl={args.ttl_seconds}s max_uses={args.max_uses}?"
     )
     _confirm_permission_lease(
@@ -8439,6 +8444,7 @@ def run_permissions_lease_grant(args: argparse.Namespace, cfg: Settings) -> int:
             tool_names=args.tool,
             tool_prefixes=args.tool_prefix,
             workspace_root=args.workspace_root,
+            arguments_sha256=args.arguments_sha256,
             allow_mutating=bool(args.allow_mutating),
             allow_network=bool(args.allow_network),
             ttl_seconds=args.ttl_seconds,
