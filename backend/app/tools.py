@@ -350,6 +350,30 @@ def arguments_digest(arguments: dict[str, Any]) -> str:
     return canonical_sha256(arguments)
 
 
+def _binding_failure(call: dict[str, Any], cfg: Settings, *, anchors: tuple[str, ...]) -> tuple[str, str] | None:
+    """The stored arguments must hash to the digest the audit log recorded for this call (V05).
+
+    The ledger record alone is mutable: an editor could rewrite both its arguments and its digest.
+    So the digest is also checked against each ``anchors`` event in the hash-chained audit log,
+    which cannot be edited without breaking the chain.
+    """
+    recorded = call.get("arguments_sha256")
+    if not recorded:
+        return "ERROR_TOOL_BINDING_MISSING", "Tool call has no arguments digest to bind a decision to; request a new call."
+    if recorded != arguments_digest(call.get("arguments") or {}):
+        return "ERROR_TOOL_BINDING_MISMATCH", "Tool call arguments changed after the request; request a new call."
+    if verify_tool_audit_chain(cfg)["status"] != "TOOL_AUDIT_CHAIN_OK":
+        return "ERROR_TOOL_AUDIT_CHAIN_BROKEN", "The tool audit log failed verification; investigate it, then request a new call."
+    events = [event for event in _load_audit_events(cfg) if event.get("tool_call_id") == call.get("tool_call_id")]
+    for anchor in anchors:
+        audited = {event.get("arguments_sha256") for event in events if event.get("event") == anchor}
+        if not audited:
+            return "ERROR_TOOL_BINDING_MISSING", f"No audited {anchor} digest for this call; request a new call."
+        if audited != {recorded}:
+            return "ERROR_TOOL_BINDING_MISMATCH", "Tool call arguments differ from the audited digest; request a new call."
+    return None
+
+
 def _append_audit_event(event: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     """Append a hash-chained audit event under an exclusive lock."""
     cfg.ensure_dirs()
@@ -523,6 +547,9 @@ def approve_tool_call(
 ) -> dict[str, Any]:
     def change(call: dict[str, Any]) -> dict[str, Any]:
         _require_pending(call, expected_arguments_sha256)
+        failure = _binding_failure(call, cfg, anchors=("TOOL_CALL_REQUESTED",))
+        if failure:
+            raise ToolRuntimeError(failure[0], f"{failure[1]} {tool_call_id}")
         return {**call, "status": "APPROVED", "approved_by": approved_by, "approved_at": utc_now()}
 
     call = _transition(tool_call_id, cfg, change)
@@ -658,11 +685,30 @@ def run_tool_call(
             raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_APPROVED", f"Tool call is not approved: {tool_call_id}")
         if call.get("tool_name") not in TOOL_REGISTRY:
             raise ToolRuntimeError("ERROR_TOOL_NOT_ALLOWED", f"Tool is not in the local allowlist: {call.get('tool_name')}")
+        failure = _binding_failure(call, cfg, anchors=("TOOL_CALL_REQUESTED", "TOOL_CALL_APPROVED"))
+        if failure:
+            # Ends FAILED rather than staying APPROVED, so a work run sees the call finish and reports it.
+            result = {"status": failure[0], "detail": failure[1]}
+            return {**call, "status": "FAILED", "executed_at": utc_now(), "executed_by": executed_by, "result": result}
         return {**call, "status": "RUNNING", "started_at": utc_now(), "executed_by": executed_by}
 
     # The APPROVED -> RUNNING claim is atomic, so a duplicate invocation cannot execute twice.
     call = _transition(tool_call_id, cfg, claim)
     tool_name = str(call.get("tool_name", ""))
+    if call["status"] == "FAILED":
+        refused = call["result"]
+        _append_audit_event(
+            {
+                "event": "TOOL_CALL_FAILED",
+                "tool_call_id": tool_call_id,
+                "tool_name": tool_name,
+                "status": refused["status"],
+                "actor": executed_by,
+                "result_status": refused["status"],
+            },
+            cfg,
+        )
+        raise ToolRuntimeError(refused["status"], f"{refused['detail']} {tool_call_id}")
     tool = TOOL_REGISTRY[tool_name]
     _append_audit_event(
         {"event": "TOOL_CALL_STARTED", "tool_call_id": tool_call_id, "tool_name": tool_name, "status": "RUNNING", "actor": executed_by},

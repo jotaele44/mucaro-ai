@@ -4,3 +4,5 @@
 *.sh text eol=lf
 *.command text eol=lf
 scripts/one_click_pins.env text eol=lf
+# The app launcher is a bash script inside the bundle.
+Mucaro[[:space:]]AI.app/Contents/MacOS/* text eol=lf

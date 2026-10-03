@@ -1,0 +1,115 @@
+{
+  "schema_version": "mucaro-actions-runner-transition-evidence/1.0",
+  "repository": "jotaele44/mucaro-ai",
+  "classification": {
+    "fact": "The repository crossed from genuinely executed hosted jobs to zero-step hosted-job failures within an 8 minute 48 second window while the CI, macOS app, and Rendered UI workflow blobs remained byte-identical.",
+    "binding": "This excludes workflow-source drift as the cause of the admission transition for those three workflow definitions.",
+    "unknown": "The account/repository admission cause remains UNKNOWN because billing, usage-limit, and Actions policy settings are not exposed by the connected GitHub surface."
+  },
+  "last_executed_boundary": {
+    "created_at_utc": "2026-09-29T16:22:37Z",
+    "head_sha": "3308eab773d5fcb0b7b29cd42a5160312933c3e0",
+    "examples": [
+      {
+        "workflow": "CI",
+        "run_id": 36597257139,
+        "job_id": 109505247922,
+        "conclusion": "failure",
+        "executed_steps": 24
+      },
+      {
+        "workflow": "Rendered UI QA / WebKit",
+        "run_id": 36597257105,
+        "job_id": 109505246413,
+        "conclusion": "success",
+        "executed_steps": 13
+      },
+      {
+        "workflow": "Rendered UI QA / Chromium",
+        "run_id": 36597257105,
+        "job_id": 109505246135,
+        "conclusion": "failure",
+        "executed_steps": 13
+      },
+      {
+        "workflow": "macOS app",
+        "run_id": 36597257292,
+        "job_id": 109505247506,
+        "conclusion": "success",
+        "executed_steps": 15
+      }
+    ]
+  },
+  "first_confirmed_universal_zero_step_boundary": {
+    "created_at_utc": "2026-09-29T16:31:25Z",
+    "head_sha": "69bf1cb10c22ab5f11e1b5456a10edad63fd1bdf",
+    "examples": [
+      {
+        "workflow": "CI",
+        "run_id": 36598334515,
+        "job_id": 109509183391,
+        "conclusion": "failure",
+        "executed_steps": 0
+      },
+      {
+        "workflow": "Rendered UI QA / WebKit",
+        "run_id": 36598334690,
+        "job_id": 109508920169,
+        "conclusion": "failure",
+        "executed_steps": 0
+      },
+      {
+        "workflow": "Rendered UI QA / Chromium",
+        "run_id": 36598334690,
+        "job_id": 109508920427,
+        "conclusion": "failure",
+        "executed_steps": 0
+      },
+      {
+        "workflow": "macOS app",
+        "run_id": 36598334431,
+        "job_id": 109508919114,
+        "conclusion": "failure",
+        "executed_steps": 0
+      }
+    ]
+  },
+  "transition_window_seconds": 528,
+  "workflow_identity": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "blob_sha": "9d0333ac1cd585c54641e0e3a77bb4dd8495f5f1",
+      "same_across_boundary": true
+    },
+    {
+      "path": ".github/workflows/macos-app.yml",
+      "blob_sha": "81652ef376aadaf283cdea07b1122d902f632086",
+      "same_across_boundary": true
+    },
+    {
+      "path": ".github/workflows/rendered-qa.yml",
+      "blob_sha": "8000e0ba829dad577c63d9028ebc6799a5db0c30",
+      "same_across_boundary": true
+    }
+  ],
+  "current_main_reproduction": {
+    "head_sha": "6c5e2868fa35a984d715e80554bb93ea37373370",
+    "ci": {
+      "run_id": 36740205293,
+      "job_id": 109972306901,
+      "executed_steps": 0,
+      "conclusion": "failure"
+    },
+    "shadow_qa": {
+      "run_id": 36740205210,
+      "job_id": 109972306723,
+      "executed_steps": 0,
+      "conclusion": "failure"
+    }
+  },
+  "falsification": [
+    "Any later GitHub-hosted job that executes at least one step falsifies the continuing universal-admission-block claim for that later time.",
+    "A future settings or billing UI message may replace UNKNOWN with a direct account/repository cause.",
+    "This evidence does not authorize changing any release requirement state."
+  ]
+}
