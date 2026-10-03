@@ -640,7 +640,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         network="remote",
         handler=_github_ci_status,
         autopilot_success_statuses=("GITHUB_CI_STATUS_OK",),
-        autopilot_success_fields=(("state", ("PASS",)),),
+        autopilot_success_fields=(("ci_state", ("PASS",)),),
         timeout_seconds=75.0,
     ),
     "web.render": ToolDefinition(
