@@ -53,5 +53,15 @@
     "Any later GitHub-hosted job in this repository that executes at least one step falsifies the continuing universal-admission-block claim for that later time.",
     "Once a job executes, its actual output must be adjudicated independently from this blocker evidence.",
     "This evidence does not authorize changing any release requirement state or merging the V04 candidate."
-  ]
+  ],
+  "connector_boundary": {
+    "repository_metadata_readable": true,
+    "workflow_run_and_job_metadata_readable": true,
+    "repository_actions_permissions_endpoint_readable": false,
+    "repository_actions_runners_endpoint_readable": false,
+    "repository_workflow_permissions_endpoint_readable": false,
+    "account_billing_or_actions_usage_endpoint_readable": false,
+    "job_steps_present": false,
+    "note": "Connected GitHub fetch rejects the repository Actions permissions/runners/workflow-permissions endpoint families; account billing/usage is not exposed."
+  }
 }
