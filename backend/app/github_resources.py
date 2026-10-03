@@ -15,6 +15,10 @@ PR_STATES = {"open", "closed", "all"}
 MAX_PAGE = 10_000
 MAX_PER_PAGE = 100
 MAX_ERROR_CHARS = 4000
+MAX_BODY_CHARS = 20_000
+MAX_GIST_FILES = 50
+MAX_GIST_CONTENT_CHARS = 20_000
+SEARCH_RESULT_CEILING = 1000
 
 
 class GitHubResourceError(RuntimeError):
@@ -94,16 +98,27 @@ def _assignees(value: Any) -> list[str]:
     return [login for item in value if (login := _user_login(item)) is not None]
 
 
+def _bounded_text(value: Any, *, max_chars: int) -> tuple[str | None, bool]:
+    if value is None:
+        return None, False
+    if not isinstance(value, str):
+        raise GitHubResourceError("ERROR_GITHUB_RESOURCE_TEXT_SHAPE", "expected string or null")
+    return value[:max_chars], len(value) > max_chars
+
+
 def _normalize_issue(repo: str, row: dict[str, Any]) -> dict[str, Any]:
     number = row.get("number")
     if not isinstance(number, int) or isinstance(number, bool):
         raise GitHubResourceError("ERROR_GITHUB_ISSUE_SHAPE", "issue row has no numeric number")
     if "pull_request" in row:
         raise GitHubResourceError("ERROR_GITHUB_ISSUE_IS_PR", f"{repo}#{number}")
+    body, body_truncated = _bounded_text(row.get("body"), max_chars=MAX_BODY_CHARS)
     return {
         "repository": repo,
         "number": number,
         "title": row.get("title"),
+        "body": body,
+        "body_truncated": body_truncated,
         "state": row.get("state"),
         "url": row.get("html_url"),
         "author": _user_login(row.get("user")),
@@ -153,8 +168,13 @@ def list_github_issues(
         "returned_count": len(items),
         "total_count": total,
         "incomplete_results": payload.get("incomplete_results") is True,
-        "has_more": page * per_page < total,
+        "search_result_ceiling": SEARCH_RESULT_CEILING,
+        "has_more": page * per_page < min(total, SEARCH_RESULT_CEILING),
         "issues": items,
+        "limitations": [
+            "GitHub Search exposes at most the first 1000 matching results; total_count may exceed the retrievable search window",
+            "search pagination is discovery evidence unless pages are followed through the retrievable ceiling",
+        ],
     }
 
 
@@ -177,10 +197,13 @@ def _normalize_pr(repo: str, row: dict[str, Any]) -> dict[str, Any]:
         raise GitHubResourceError("ERROR_GITHUB_PR_RESOURCE_SHAPE", "pull request row has no numeric number")
     head = row.get("head") if isinstance(row.get("head"), dict) else {}
     base = row.get("base") if isinstance(row.get("base"), dict) else {}
+    body, body_truncated = _bounded_text(row.get("body"), max_chars=MAX_BODY_CHARS)
     return {
         "repository": repo,
         "number": number,
         "title": row.get("title"),
+        "body": body,
+        "body_truncated": body_truncated,
         "state": row.get("state"),
         "draft": row.get("draft") is True,
         "url": row.get("html_url"),
@@ -242,26 +265,29 @@ def get_github_pull_request(*, repo: str, number: int) -> dict[str, Any]:
     return {"status": "GITHUB_PR_OK", "pull_request": pr}
 
 
-def _normalize_gist(row: dict[str, Any]) -> dict[str, Any]:
+def _normalize_gist(row: dict[str, Any], *, include_content: bool = False) -> dict[str, Any]:
     gist_id = row.get("id")
     if not isinstance(gist_id, str) or not GIST_ID_PATTERN.fullmatch(gist_id):
         raise GitHubResourceError("ERROR_GITHUB_GIST_SHAPE", "gist has no canonical hexadecimal id")
     raw_files = row.get("files")
     files: list[dict[str, Any]] = []
-    if isinstance(raw_files, dict):
-        for name in sorted(raw_files):
-            item = raw_files[name]
-            if not isinstance(item, dict):
-                continue
-            files.append(
-                {
-                    "filename": item.get("filename") or name,
-                    "type": item.get("type"),
-                    "language": item.get("language"),
-                    "size": item.get("size"),
-                    "truncated": item.get("truncated"),
-                }
-            )
+    raw_names = sorted(raw_files) if isinstance(raw_files, dict) else []
+    for name in raw_names[:MAX_GIST_FILES]:
+        item = raw_files[name]
+        if not isinstance(item, dict):
+            continue
+        normalized = {
+            "filename": item.get("filename") or name,
+            "type": item.get("type"),
+            "language": item.get("language"),
+            "size": item.get("size"),
+            "truncated": item.get("truncated"),
+        }
+        if include_content:
+            content, content_truncated = _bounded_text(item.get("content"), max_chars=MAX_GIST_CONTENT_CHARS)
+            normalized["content"] = content
+            normalized["content_truncated_by_provider"] = content_truncated
+        files.append(normalized)
     return {
         "id": gist_id,
         "description": row.get("description"),
@@ -270,9 +296,10 @@ def _normalize_gist(row: dict[str, Any]) -> dict[str, Any]:
         "owner": _user_login(row.get("owner")),
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
+        "file_count": len(raw_names),
+        "files_truncated_by_provider": len(raw_names) > MAX_GIST_FILES,
         "files": files,
     }
-
 
 def list_github_gists(
     *,
@@ -309,7 +336,7 @@ def get_github_gist(*, gist_id: str) -> dict[str, Any]:
     payload = _api_json(f"gists/{gist_id}")
     if not isinstance(payload, dict):
         raise GitHubResourceError("ERROR_GITHUB_GIST_SHAPE", "gist view did not return an object")
-    gist = _normalize_gist(payload)
+    gist = _normalize_gist(payload, include_content=True)
     if gist["id"].lower() != gist_id.lower():
         raise GitHubResourceError("ERROR_GITHUB_GIST_IDENTITY", f"expected {gist_id}, observed {gist['id']}")
     return {"status": "GITHUB_GIST_OK", "gist": gist}
