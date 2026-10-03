@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -21,7 +22,7 @@ LEASE_SCHEMA_VERSION = "mucaro-permission-lease/1.0"
 LEASES_NAME = "permission_leases.json"
 LEASE_AUDIT_NAME = "permission_lease_audit.json"
 SCOPE_TYPES = {"RUN_READ_ONLY", "EXACT_TOOLS", "TOOL_PREFIXES"}
-SHA256_PATTERN = __import__("re").compile(r"^[0-9a-f]{64}$")
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 MAX_TTL_SECONDS = 86_400
 MAX_USES = 1000
 
