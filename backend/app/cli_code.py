@@ -24,6 +24,7 @@ from .coding_lifecycle import (
 )
 from .coding_mutation import CodingMutationError, apply_patch_transaction
 from .coding_patch import validate_patch_proposal
+from .coding_remote import CodingRemoteError, create_pull_request, load_request, push_branch
 from .coding_review import CodingReviewError, build_code_review_receipt
 from .coding_workspace import (
     CodingWorkspaceError,
@@ -42,6 +43,7 @@ HANDLED_ERRORS = (
     CodingMutationError,
     CodingLifecycleError,
     CodingCheckError,
+    CodingRemoteError,
     AgentError,
     ModelProviderError,
     OperatorAuditError,
@@ -292,7 +294,7 @@ def run_code_checks(args: argparse.Namespace, cfg: Settings) -> int:
 def run_code_pr_request(args: argparse.Namespace, cfg: Settings) -> int:
     def action() -> dict[str, Any]:
         state = inspect_repository(args.repo, cfg=cfg)
-        return build_pull_request_request(
+        request = build_pull_request_request(
             args.repo,
             expected_head_sha=state["head_sha"],
             head_branch=state["branch"],
@@ -301,6 +303,45 @@ def run_code_pr_request(args: argparse.Namespace, cfg: Settings) -> int:
             body=args.body,
             cfg=cfg,
         )
+        if args.output:  # preserved byte for byte as printed: its request_sha256 is what push and pr-create bind to
+            target = Path(args.output)
+            temporary = target.with_name(target.name + ".tmp")
+            temporary.write_text(json.dumps(request, indent=2, ensure_ascii=False), encoding="utf-8")
+            temporary.replace(target)
+        return request
+
+    return _run(action, args)
+
+
+def run_code_push(args: argparse.Namespace, cfg: Settings) -> int:
+    def action() -> dict[str, Any]:
+        request = load_request(args.request)
+        plan = push_branch(args.repo, request, cfg=cfg, dry_run=True)  # every local check runs before anyone is asked
+        if args.dry_run:
+            return plan
+        summary = f"Push {plan['branch']} ({plan['head_sha'][:12]}) to github.com/{plan['repo_slug']} with `{' '.join(plan['argv'])}` (never forced)"
+        tool_args = {"request_sha256": request["request_sha256"], "repo_slug": plan["repo_slug"], "branch": plan["branch"]}
+        call_id = _require_approval(args, cfg, "coding.push", tool_args, summary)
+        return run_audited(cfg, "coding.push", call_id, CLI_ACTOR, lambda: push_branch(args.repo, request, cfg=cfg))
+
+    return _run(action, args)
+
+
+def run_code_pr_create(args: argparse.Namespace, cfg: Settings) -> int:
+    def action() -> dict[str, Any]:
+        request = load_request(args.request)
+        draft = not args.ready
+        plan = create_pull_request(args.repo, request, cfg=cfg, draft=draft, dry_run=True)
+        if args.dry_run:
+            return plan
+        kind = "draft pull request" if draft else "pull request"
+        summary = (
+            f"Open a {kind} on github.com/{plan['repo_slug']}: {request['head_branch']} -> {request['base_branch']}, "
+            f"titled {request['title']!r} with a {len(request['body'].encode('utf-8'))}-byte body, using your gh login (head {plan['head_sha'][:12]})"
+        )
+        tool_args = {"request_sha256": request["request_sha256"], "repo_slug": plan["repo_slug"], "draft": draft}
+        call_id = _require_approval(args, cfg, "coding.pr_create", tool_args, summary)
+        return run_audited(cfg, "coding.pr_create", call_id, CLI_ACTOR, lambda: create_pull_request(args.repo, request, cfg=cfg, draft=draft))
 
     return _run(action, args)
 
@@ -487,5 +528,21 @@ def register_code_commands(subcommands: Any) -> None:
     pr.add_argument("--base", default="main", help="Base branch.")
     pr.add_argument("--title", required=True, help="PR title.")
     pr.add_argument("--body", default="", help="PR body.")
+    pr.add_argument("--output", help="Also write the request artifact to this file, for `code push` and `code pr-create` to bind to.")
+
+    push = add("push", "Push the reviewed work branch to origin (approval; bound to a pr-request artifact; never forced).", run_code_push)
+    push.add_argument("--request", required=True, help="Artifact written by `code pr-request --output`.")
+    push.add_argument("--dry-run", action="store_true", help="Run every local check and show the exact command without pushing.")
+    confirmed(push)
+
+    pr_create = add(
+        "pr-create",
+        "Open a draft pull request for a pushed branch with your gh login (approval; bound to a pr-request artifact).",
+        run_code_pr_create,
+    )
+    pr_create.add_argument("--request", required=True, help="Artifact written by `code pr-request --output`.")
+    pr_create.add_argument("--ready", action="store_true", help="Open it ready for review instead of as a draft.")
+    pr_create.add_argument("--dry-run", action="store_true", help="Run every local check and show the exact command without creating anything.")
+    confirmed(pr_create)
 
     add("sessions", "List saved agent sessions.", run_code_sessions)
