@@ -1,18 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
+import { copyFailureMessage, copyText } from "../clipboard.js";
 import { RichText } from "./RichText.jsx";
-
-function fallbackCopy(text) {
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const copied = document.execCommand("copy");
-  textarea.remove();
-  if (!copied) throw new Error("clipboard unavailable");
-}
 
 // One canonical per-message action surface. Copy/edit never mutate the canonical transcript.
 export function MessageActions({ text, announce, onEdit, onBranch, allowReadAloud = false }) {
@@ -22,20 +10,8 @@ export function MessageActions({ text, announce, onEdit, onBranch, allowReadAlou
   useEffect(() => () => canSpeak && window.speechSynthesis.cancel(), [canSpeak]);
 
   async function copy() {
-    try {
-      if (navigator.clipboard?.writeText) {
-        try {
-          await navigator.clipboard.writeText(text);
-        } catch {
-          fallbackCopy(text);
-        }
-      } else {
-        fallbackCopy(text);
-      }
-      announce?.("Copied to clipboard.");
-    } catch {
-      announce?.("Copy failed: clipboard access was not allowed.");
-    }
+    const result = await copyText(text);
+    announce?.(result.ok ? "Copied to clipboard." : copyFailureMessage(result));
   }
 
   function toggleSpeech() {

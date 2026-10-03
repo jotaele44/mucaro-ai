@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
+import { ConfirmSheet } from "./ConfirmSheet.jsx";
 
 function errorDetail(err) {
   const detail = err?.payload?.detail;
@@ -16,6 +17,7 @@ export function DirectoryIntake({ onIngested }) {
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [revoking, setRevoking] = useState(null);
 
   async function refreshGrants() {
     const payload = await api.directoryPermissions();
@@ -118,12 +120,13 @@ export function DirectoryIntake({ onIngested }) {
     [grants, permission],
   );
 
-  async function revokeCurrentGrant() {
-    if (!currentGrant) return;
+  // Revoking asks first (main's confirmation, M5): the button opens a ConfirmSheet that calls this.
+  async function revokeGrant(grant) {
+    if (!grant) return;
     setBusy(true);
     setError(null);
     try {
-      await api.revokeDirectoryPermission({ path: currentGrant.canonical_root, reason: "operator revoke" });
+      await api.revokeDirectoryPermission({ path: grant.canonical_root, reason: "operator revoke" });
       await refreshGrants();
       setPermission(null);
       setPendingGrant(null);
@@ -198,7 +201,7 @@ export function DirectoryIntake({ onIngested }) {
 
         {currentGrant && !pendingGrant && (
           <div className="button-row">
-            <button type="button" className="danger-button" onClick={revokeCurrentGrant} disabled={busy}>Revoke access</button>
+            <button type="button" className="danger-button" onClick={() => setRevoking(currentGrant)} disabled={busy}>Revoke access</button>
           </div>
         )}
       </div>
@@ -228,6 +231,13 @@ export function DirectoryIntake({ onIngested }) {
           </button>
         ))}
       </div>
+      {revoking && (
+        <ConfirmSheet title="Revoke folder access?" confirmLabel="Revoke access" onConfirm={() => revokeGrant(revoking)} onClose={() => setRevoking(null)}>
+          <p>
+            Mucaro will stop reading files under <strong>{revoking.canonical_root}</strong>. Sources already ingested from it stay in the library.
+          </p>
+        </ConfirmSheet>
+      )}
     </section>
   );
 }

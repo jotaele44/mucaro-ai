@@ -389,6 +389,10 @@ button:disabled {
   position: relative;
 }
 
+.chat-notice {
+  margin: 0 14px 8px;
+}
+
 .menu {
   position: absolute;
   right: 0;
@@ -1250,6 +1254,19 @@ details summary {
 .grant-select strong,
 .grant-select small {
   overflow-wrap: anywhere;
+}
+
+/* ---------- access token gate (phone access) ---------- */
+
+.gate .gate-input {
+  display: flex;
+  gap: 8px;
+}
+
+.gate .gate-input input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
 }
 
 /* ---------- phone widths (F01) ---------- */

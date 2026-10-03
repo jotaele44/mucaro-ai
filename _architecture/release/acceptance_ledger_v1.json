@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-27T03:40:07Z",
+  "updated_utc": "2026-10-02T15:01:08Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -2804,6 +2804,40 @@
       "blocker_id": null,
       "dag_node": "N02",
       "notes": "Direct connections re-resolve and vet every address at connect time; proxied connections delegate resolution to the configured proxy."
+    },
+    {
+      "requirement_id": "SD-012",
+      "requirement_text": "Phone access to a local Mucaro service over a private network or VPN, token-authenticated with optional TLS, through the source launcher (not an installable web app, a native client or the packaged app)",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/auth.py",
+        "backend/app/main.py",
+        "backend/app/security.py",
+        "scripts/launch_app.py",
+        "scripts/native_window.py",
+        "frontend/src/App.jsx",
+        "frontend/src/api.js",
+        "frontend/src/clipboard.js",
+        "frontend/src/components/TokenGate.jsx",
+        "frontend/src/components/CleartextNotice.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_phone_access.py::test_remote_client_with_the_right_token_is_served_and_other_tokens_get_401",
+      "negative_gate": "backend/tests/test_phone_access.py::test_remote_client_without_a_configured_token_is_refused",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_phone_access.py::test_public_bind_requires_a_strong_token_in_every_profile",
+        "backend/tests/test_phone_access.py::test_remote_clients_do_not_see_host_paths",
+        "backend/tests/test_phone_access.py::test_phone_launch_binds_all_interfaces_with_a_token_and_prints_the_links",
+        "backend/tests/test_phone_access.py::test_native_phone_launch_keeps_the_token_out_of_the_log_and_offers_the_link_in_a_dialog",
+        "qa/rendered/rendered_qa.mjs",
+        "docs/PHONE_ACCESS.md"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "PROVISIONAL, not PASS. The automated gates simulate a remote peer in-process (TestClient client=(ip, port)) and drive an emulated iPhone in Chromium against a real backend reached through a non-loopback address of the test machine. No physical iPhone or real network session has been observed. OPEN: signing in on a real iPhone, the on-screen keyboard and password field, resume after the phone locks, the macOS firewall prompt, a network that isolates clients, and WebKit (hosted runners are not executing jobs, BLK-ACTIONS-001). Not part of this requirement: an installable web app, a native client (SD-010) and serving from the packaged app, which stays loopback-only."
     }
   ]
 }

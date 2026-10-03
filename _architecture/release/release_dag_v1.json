@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-09-27T03:40:07Z",
+  "updated_utc": "2026-10-02T15:01:08Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -435,7 +435,8 @@
         "MOB-F05",
         "MOB-F06",
         "MOB-F17",
-        "MOB-F20"
+        "MOB-F20",
+        "SD-012"
       ],
       "dependencies": [
         "N15"
@@ -446,10 +447,11 @@
       "downstream_unlock_value": "MEDIUM",
       "expected_rework_cost": "HIGH",
       "evidence_required": [
-        "rendered QA at desktop and 390px widths"
+        "rendered QA at desktop and 390px widths",
+        "phone access (SD-012): sign-in from a real iPhone over a real network"
       ],
       "blocker": null,
-      "notes": "Conversation-first GUI with Sources/Memory/Provenance/Settings; GIS/OCR/Code workspaces open."
+      "notes": "Conversation-first GUI with Sources/Memory/Provenance/Settings; GIS/OCR/Code workspaces open. SD-012 (phone access) is implemented and PROVISIONAL until a physical iPhone session is observed."
     },
     {
       "node_id": "N18",

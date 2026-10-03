@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .auth import auth_status, is_public_api_path, require_operator_auth
+from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
 from .conversations import (
     ConversationMessageEditError,
@@ -206,6 +206,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     ) -> dict:
         if is_public_api_path(request.url.path):
             return {"status": "AUTH_PUBLIC_ROUTE"}
+        require_remote_token(cfg, request.scope)
         return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
 
     app = FastAPI(title="Mucaro AI", version="0.1.23", dependencies=[Depends(require_auth_unless_public)])
@@ -252,13 +253,18 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     ) -> dict:
         return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
 
+    # These two routes are public so a client can discover that a token is needed. A remote peer learns that and
+    # nothing about the host: no filesystem paths and no origin list.
     @app.get("/health")
-    def health() -> dict:
-        return {"status": "OK", "model_provider": cfg.default_model_provider, "project_root": str(cfg.project_root)}
+    def health(request: Request) -> dict:
+        payload = {"status": "OK", "model_provider": cfg.default_model_provider}
+        if not client_is_remote(request.scope):
+            payload["project_root"] = str(cfg.project_root)
+        return payload
 
     @app.get("/config")
-    def config_status() -> dict:
-        return {
+    def config_status(request: Request) -> dict:
+        payload = {
             "status": "CONFIG_OK",
             "project_root": str(cfg.project_root),
             "data_dir": str(cfg.data_dir),
@@ -270,6 +276,10 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             "auth": auth_status(cfg),
             "security": build_security_report(cfg),
         }
+        if client_is_remote(request.scope):
+            for key in ("project_root", "data_dir", "cors_origins"):
+                payload.pop(key)
+        return payload
 
     @app.get("/security")
     def security_status() -> dict:
