@@ -349,8 +349,9 @@ def test_tool_owned_success_contract_rejects_ci_and_regression_failure_receipts(
     ci = TOOL_REGISTRY["github.ci_status"]
     regression = TOOL_REGISTRY["coding.regression_run"]
 
-    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "state": "PASS"}) is True
-    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "state": "FAIL"}) is False
+    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "ci_state": "PASS"}) is True
+    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "ci_state": "FAIL"}) is False
+    assert ci.autopilot_result_is_success({"status": "GITHUB_CI_STATUS_OK", "state": "PASS"}) is False
     assert regression.autopilot_result_is_success(
         {"status": "CODING_CHECK_SUITE_EXECUTED_PASS", "execution_status": "PASS"}
     ) is True
