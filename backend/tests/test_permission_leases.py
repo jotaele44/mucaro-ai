@@ -15,7 +15,7 @@ from backend.app.permission_leases import (
     revoke_permission_lease,
     verify_permission_lease_audit_chain,
 )
-from backend.app.tools import TOOL_REGISTRY, ToolDefinition, list_tool_calls, request_tool_call
+from backend.app.tools import TOOL_REGISTRY, ToolDefinition, arguments_digest, list_tool_calls, request_tool_call
 
 
 def make_settings(root: Path) -> Settings:
@@ -257,3 +257,50 @@ def test_run_read_only_never_authorizes_mutation(monkeypatch: pytest.MonkeyPatch
 
     assert matching_permission_leases(read["tool_call_id"], cfg=cfg)["match_count"] == 1
     assert matching_permission_leases(write["tool_call_id"], cfg=cfg)["match_count"] == 0
+
+
+def test_argument_hash_binding_matches_only_the_exact_argument_set(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cfg = make_settings(tmp_path)
+    monkeypatch.setitem(TOOL_REGISTRY, "test.mutate", tool("test.mutate", mutates=True))
+    approved_arguments = {"value": 1, "target": "alpha"}
+    digest = arguments_digest(approved_arguments)
+    lease = grant_permission_lease(
+        run_id="run-1",
+        scope_type="EXACT_TOOLS",
+        tool_names=["test.mutate"],
+        arguments_sha256=digest,
+        allow_mutating=True,
+        granted_by="operator",
+        max_uses=2,
+        cfg=cfg,
+    )["lease"]
+    assert lease["arguments_sha256"] == digest
+
+    exact = pending("test.mutate", run_id="run-1", cfg=cfg, arguments=approved_arguments)
+    changed = pending("test.mutate", run_id="run-1", cfg=cfg, arguments={"value": 2, "target": "alpha"})
+
+    assert matching_permission_leases(exact["tool_call_id"], cfg=cfg)["matching_lease_ids"] == [lease["lease_id"]]
+    assert matching_permission_leases(changed["tool_call_id"], cfg=cfg)["match_count"] == 0
+
+
+def test_invalid_argument_hash_binding_fails_before_lease_persistence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cfg = make_settings(tmp_path)
+    monkeypatch.setitem(TOOL_REGISTRY, "test.read", tool("test.read"))
+
+    with pytest.raises(PermissionLeaseError) as exc:
+        grant_permission_lease(
+            run_id="run-1",
+            scope_type="EXACT_TOOLS",
+            tool_names=["test.read"],
+            arguments_sha256="not-a-sha",
+            granted_by="operator",
+            cfg=cfg,
+        )
+    assert exc.value.status == "ERROR_PERMISSION_LEASE_ARGUMENT_HASH"
+    assert not (cfg.processed_dir / "permission_leases.json").exists()
