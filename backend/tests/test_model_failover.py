@@ -133,6 +133,13 @@ def _ready_providers() -> list[dict]:
     ]
 
 
+def test_mock_route_is_terminal_even_when_other_offline_provider_is_ready(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("backend.app.model_routing_policy.list_model_providers", _ready_providers)
+    route = plan_model_route(task_type="cited_qa", preferred_provider="mock")
+    assert route["failover_order"] == [{"provider": "mock", "model": "mock"}]
+    assert route["invariants"]["mock_route_is_terminal"] is True
+
+
 def test_live_route_does_not_degrade_offline_without_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("backend.app.model_routing_policy.list_model_providers", _ready_providers)
     route = plan_model_route(task_type="cited_qa", preferred_provider="anthropic", allow_live=True)
