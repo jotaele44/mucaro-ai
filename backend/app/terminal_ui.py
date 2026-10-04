@@ -245,7 +245,7 @@ def render_terminal_snapshot(
     plan_height = min(8, max(4, height // 5))
     header_height = 2
     footer_height = 3
-    body_height = max(1, height - plan_height - 10)
+    body_height = max(1, height - plan_height - 9)
 
     header = _clip(f"MÚCARO AI  {_status_line(snapshot, mode)}", inner_width)
     title_rule = "─" * inner_width
