@@ -38,6 +38,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from .config import Settings, settings
+from .context_usage import ContextUsageError, build_context_usage_status
 from .conversations import append_turns, build_conversation_context, get_conversation
 from .db import ensure_db, get_connection
 from .error_categories import classify_error
@@ -245,6 +246,7 @@ def summarize_run(run: dict[str, Any], cfg: Settings = settings) -> dict[str, An
         "finished_at": run.get("finished_at"),
         "outcome": run.get("outcome"),
         "error": run.get("error"),
+        "context_usage": run.get("context_usage"),
         "tool_summary": summarize_tool_calls(calls),
         "event_count": int(count),
         "queue_seq": run["queue_seq"],
@@ -902,6 +904,17 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
         status = str(trace.get("status") or "ERROR_ANSWER_UNAVAILABLE")
         _fail(run_id, status, str(trace.get("detail") or trace.get("warnings") or status), cfg)
         return
+    try:
+        trace["context_usage"] = build_context_usage_status(
+            conversation,
+            model_provider=trace.get("model_provider"),
+            model_name=trace.get("model_name"),
+            run_mode=run.get("mode"),
+            answer_trace=trace,
+        )
+    except ContextUsageError as exc:
+        _fail(run_id, exc.status, exc.detail, cfg)
+        return
     events: list[tuple[str, dict[str, Any]]] = [
         ("retrieval", {"strategy": trace.get("retrieval_strategy"), "retrieved_chunk_ids": trace.get("retrieved_chunk_ids", []),
                        "source_ids": trace.get("source_ids", [])}),
@@ -958,8 +971,14 @@ def _complete(
         assistant_turn = {"turn_id": stable_id("turn", run["conversation_id"], "assistant", run_id, length=12), "role": "assistant",
                           "content": assistant_text or "", "created_at": now, "status": outcome, "work_run_id": run_id}
     append_turns(run["conversation_id"], [user_turn, assistant_turn], cfg, title_hint=run["prompt"])
-    final = {"outcome": outcome, "action_ledger": action_ledger or [], "citation_status": (answer_trace or {}).get("citation_status"),
-             "answer_run_id": (answer_trace or {}).get("run_id"), "assistant_turn_id": assistant_turn["turn_id"]}
+    final = {
+        "outcome": outcome,
+        "action_ledger": action_ledger or [],
+        "citation_status": (answer_trace or {}).get("citation_status"),
+        "answer_run_id": (answer_trace or {}).get("run_id"),
+        "assistant_turn_id": assistant_turn["turn_id"],
+        "context_usage": (answer_trace or {}).get("context_usage"),
+    }
 
     def change(current: dict[str, Any]) -> None:
         current["state"] = "COMPLETED"
@@ -967,6 +986,7 @@ def _complete(
         current["outcome"] = outcome
         current["finished_at"] = now
         current["answer_run_id"] = final["answer_run_id"]
+        current["context_usage"] = final["context_usage"]
 
     _update(run_id, cfg, change, [("final", final)])
 
