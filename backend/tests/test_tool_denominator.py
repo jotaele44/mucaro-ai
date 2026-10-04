@@ -78,6 +78,18 @@ def test_runtime_evidence_is_derived_from_governed_requests() -> None:
     assert tools["github.pr_open_update"]["evidence_state"] == "EXERCISED"
     assert tools["github.pr_open_update"]["classification"] == "REQUIRED"
     assert tools["github.pr_open_update"]["mutates_state"] is True
+    for name in (
+        "github.issues_list",
+        "github.issue_view",
+        "github.prs_list",
+        "github.pr_view",
+        "github.gists_list",
+        "github.gist_view",
+    ):
+        assert tools[name]["classification"] == "SUPPORTING", name
+        assert tools[name]["evidence_state"] == "EXERCISED", name
+        assert tools[name]["network"] == "remote", name
+        assert tools[name]["mutates_state"] is False, name
     assert all(row["requires_approval"] for row in tools.values())
 
 
