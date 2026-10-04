@@ -10,7 +10,8 @@ from backend.app.config import Settings
 from backend.app.conversations import create_conversation
 from backend.app.terminal_projection import build_terminal_snapshot
 from backend.app.terminal_ui import TerminalController, TerminalUIError, render_terminal_snapshot
-from backend.app.tools import TOOL_REGISTRY, ToolDefinition
+from backend.app.tools import TOOL_REGISTRY, ToolDefinition, ToolRuntimeError
+from backend.app.work_runs import get_run
 from backend.tests.test_api import make_settings
 
 
@@ -205,3 +206,55 @@ def test_agent_alias_renders_same_headless_surface(cfg: Settings, capsys: pytest
     assert code == 0
     assert "MÚCARO AI" in captured.out
     assert "Alias" in captured.out
+
+
+def test_terminal_resolves_pending_work_run_question_and_resumes(
+    monkeypatch: pytest.MonkeyPatch,
+    cfg: Settings,
+) -> None:
+    attempts = {"count": 0}
+
+    def failing(arguments, settings):
+        attempts["count"] += 1
+        raise ToolRuntimeError("ERROR_TOOL_FIXTURE", "fixture failure")
+
+    monkeypatch.setitem(
+        TOOL_REGISTRY,
+        "test.fail",
+        ToolDefinition(
+            name="test.fail",
+            description="failure fixture",
+            mutates_state=False,
+            requires_approval=True,
+            handler=failing,
+        ),
+    )
+    monkeypatch.setitem(
+        work_runs.COMMANDS,
+        "/fail",
+        {"tool": "test.fail", "usage": "/fail", "arg": None},
+    )
+    conversation = create_conversation("Interactive", cfg)
+    controller = TerminalController(
+        cfg=cfg,
+        conversation_id=conversation["conversation_id"],
+        mode="auto",
+    )
+
+    controller.submit("/fail")
+    waiting = controller.snapshot()
+    assert waiting["current_run"]["state"] == "AWAITING_INPUT"
+    interaction = waiting["pending_interaction"]
+    assert interaction["status"] == "PENDING"
+    assert {row["option_id"] for row in interaction["options"]} == {
+        "retry_failed",
+        "continue",
+        "stop",
+    }
+
+    controller.command("answer continue")
+    completed = get_run(waiting["current_run"]["run_id"], cfg)
+    assert completed["state"] == "COMPLETED"
+    assert completed["outcome"] == "ACTIONS_COMPLETED"
+    assert controller.snapshot()["pending_interaction"] is None
+    assert attempts["count"] == 1
