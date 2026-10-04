@@ -169,12 +169,26 @@ def _validate_integrity(lease: dict[str, Any], cfg: Settings) -> None:
         for event in events
         if event.get("event") == "LEASE_USE_RESERVED" and event.get("tool_call_id")
     ]
+    released = [
+        str(event.get("tool_call_id"))
+        for event in events
+        if event.get("event") == "LEASE_USE_RELEASED" and event.get("tool_call_id")
+    ]
     if len(reserved) != len(set(reserved)):
         raise PermissionLeaseError("ERROR_PERMISSION_LEASE_USAGE_AUDIT_DUPLICATE", lease["lease_id"])
-    if lease["used_call_ids"] != reserved:
+    if len(released) != len(set(released)):
+        raise PermissionLeaseError("ERROR_PERMISSION_LEASE_RELEASE_AUDIT_DUPLICATE", lease["lease_id"])
+    unknown_releases = sorted(set(released) - set(reserved))
+    if unknown_releases:
+        raise PermissionLeaseError(
+            "ERROR_PERMISSION_LEASE_RELEASE_WITHOUT_RESERVATION",
+            f"{lease['lease_id']}:{','.join(unknown_releases)}",
+        )
+    active_reserved = [tool_call_id for tool_call_id in reserved if tool_call_id not in set(released)]
+    if lease["used_call_ids"] != active_reserved:
         raise PermissionLeaseError(
             "ERROR_PERMISSION_LEASE_USAGE_AUDIT_MISMATCH",
-            f"{lease['lease_id']}:stored={lease['used_call_ids']}:audited={reserved}",
+            f"{lease['lease_id']}:stored={lease['used_call_ids']}:audited={active_reserved}",
         )
 
     revocations = [event for event in events if event.get("event") == "LEASE_REVOKED"]
@@ -308,16 +322,6 @@ def grant_permission_lease(
     }
     lease["grant_sha256"] = canonical_sha256(_grant_payload(lease))
     _validate_schema(lease)
-    _append_audit(
-        {
-            "event": "LEASE_GRANTED",
-            "lease_id": lease_id,
-            "run_id": lease["run_id"],
-            "grant_sha256": lease["grant_sha256"],
-            "granted_by": lease["granted_by"],
-        },
-        cfg,
-    )
 
     def append(leases: list[dict[str, Any]]) -> None:
         if any(row.get("lease_id") == lease_id for row in leases if isinstance(row, dict)):
@@ -325,6 +329,26 @@ def grant_permission_lease(
         leases.append(lease)
 
     update_json(_leases_path(cfg), [], append)
+    try:
+        _append_audit(
+            {
+                "event": "LEASE_GRANTED",
+                "lease_id": lease_id,
+                "run_id": lease["run_id"],
+                "grant_sha256": lease["grant_sha256"],
+                "granted_by": lease["granted_by"],
+            },
+            cfg,
+        )
+    except Exception:
+        def rollback(leases: list[dict[str, Any]]) -> None:
+            leases[:] = [
+                row
+                for row in leases
+                if not (isinstance(row, dict) and row.get("lease_id") == lease_id)
+            ]
+        update_json(_leases_path(cfg), [], rollback)
+        raise
     return {"status": "PERMISSION_LEASE_GRANTED", "lease": lease}
 
 
@@ -490,6 +514,73 @@ def matching_permission_leases(
     }
 
 
+def _release_reserved_use(
+    lease_id: str,
+    *,
+    tool_call_id: str,
+    reason: str,
+    cfg: Settings,
+) -> dict[str, Any]:
+    """Release one reservation after approval fails.
+
+    The audit release is written before state rollback. Any crash or write failure
+    between the two files becomes an integrity mismatch, never silent authority.
+    """
+    rows = read_json(_leases_path(cfg), [])
+    matches = [
+        row for row in rows
+        if isinstance(row, dict) and row.get("lease_id") == lease_id
+    ]
+    if len(matches) != 1:
+        raise PermissionLeaseError(
+            "ERROR_PERMISSION_LEASE_NOT_FOUND" if not matches else "ERROR_PERMISSION_LEASE_DUPLICATE",
+            lease_id,
+        )
+    lease = matches[0]
+    _validate_integrity(lease, cfg)
+    if tool_call_id not in lease["used_call_ids"]:
+        raise PermissionLeaseError("ERROR_PERMISSION_LEASE_RESERVATION_MISSING", tool_call_id)
+
+    _append_audit(
+        {
+            "event": "LEASE_USE_RELEASED",
+            "lease_id": lease_id,
+            "run_id": lease["run_id"],
+            "tool_call_id": tool_call_id,
+            "reason": reason,
+            "grant_sha256": lease["grant_sha256"],
+        },
+        cfg,
+    )
+
+    def release(leases: list[dict[str, Any]]) -> dict[str, Any]:
+        hits = [
+            (index, row)
+            for index, row in enumerate(leases)
+            if isinstance(row, dict) and row.get("lease_id") == lease_id
+        ]
+        if len(hits) != 1:
+            raise PermissionLeaseError(
+                "ERROR_PERMISSION_LEASE_NOT_FOUND" if not hits else "ERROR_PERMISSION_LEASE_DUPLICATE",
+                lease_id,
+            )
+        index, current = hits[0]
+        if tool_call_id not in current.get("used_call_ids", []):
+            raise PermissionLeaseError("ERROR_PERMISSION_LEASE_RESERVATION_MISSING", tool_call_id)
+        updated = {
+            **current,
+            "used_call_ids": [
+                value for value in current["used_call_ids"]
+                if value != tool_call_id
+            ],
+        }
+        _validate_schema(updated)
+        leases[index] = updated
+        return updated
+
+    return update_json(_leases_path(cfg), [], release)
+
+
 def authorize_tool_call_with_lease(
     tool_call_id: str,
     *,
@@ -546,6 +637,12 @@ def authorize_tool_call_with_lease(
             expected_arguments_sha256=call["arguments_sha256"],
         )
     except ToolRuntimeError as exc:
+        _release_reserved_use(
+            lease_id,
+            tool_call_id=tool_call_id,
+            reason=exc.status,
+            cfg=cfg,
+        )
         _append_audit(
             {
                 "event": "LEASE_APPROVAL_FAILED",
