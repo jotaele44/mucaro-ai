@@ -9,7 +9,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Any
 
-from .agent_checkpoints import get_checkpoint
+from .agent_checkpoints import CheckpointError, get_checkpoint
 from .autopilot import AutopilotError, authorize_autopilot, run_autopilot
 from .config import Settings, settings
 from .conversations import create_conversation, get_conversation
@@ -385,14 +385,17 @@ class TerminalController:
             self.github_owner = target or None
         else:
             raise TerminalUIError("ERROR_TUI_GITHUB_VIEW", view)
-        requested = request_tool_call(
-            tool_name,
-            arguments,
-            cfg=self.cfg,
-            requested_by="terminal",
-            reason=f"terminal:{view}:refresh",
-            run_id=f"tui:{conversation_id}",
-        )["tool_call"]
+        try:
+            requested = request_tool_call(
+                tool_name,
+                arguments,
+                cfg=self.cfg,
+                requested_by="terminal",
+                reason=f"terminal:{view}:refresh",
+                run_id=f"tui:{conversation_id}",
+            )["tool_call"]
+        except ToolRuntimeError as exc:
+            raise TerminalUIError(exc.status, exc.detail) from exc
         self.view = view
         self.notice = f"Approval required: {requested['tool_call_id']} ({tool_name})"
 
@@ -489,7 +492,10 @@ class TerminalController:
             return
         if name == "autopilot" and len(args) == 2 and args[0] in {"authorize", "run"}:
             checkpoint_id = args[1]
-            checkpoint = get_checkpoint(checkpoint_id, self.cfg)
+            try:
+                checkpoint = get_checkpoint(checkpoint_id, self.cfg)
+            except CheckpointError as exc:
+                raise TerminalUIError(exc.status, exc.detail) from exc
             if checkpoint is None:
                 raise TerminalUIError("ERROR_CHECKPOINT_NOT_FOUND", checkpoint_id)
             try:
@@ -502,7 +508,7 @@ class TerminalController:
                     )
                 else:
                     result = run_autopilot(checkpoint_id, cfg=self.cfg)
-            except AutopilotError as exc:
+            except (AutopilotError, CheckpointError) as exc:
                 raise TerminalUIError(exc.status, exc.detail) from exc
             self.notice = f"{result['status']} {result.get('reason') or ''}".strip()
             return
