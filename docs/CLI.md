@@ -1204,9 +1204,13 @@ mucaro ask "How does source lineage work?" --provider anthropic
 
 If the provider is unavailable, `ask` returns a structured provider error. Use `--allow-mock-fallback` only when an explicit mock fallback is acceptable.
 
-## Coding Agent And Governed Web (`mucaro code`, `mucaro web`)
+## Coding Agent And Governed Web (`mucaro code`, `mucaro web`, `mucaro mcp`, `mucaro plugin`)
 
-All repositories outside the project root need a directory grant first (`mucaro permissions grant <path> --yes`). Every command that mutates a repository, runs containers, or touches the network requires explicit approval: pass `--yes` or answer the interactive prompt. Without either, non-interactive runs stop with a `*_CONFIRMATION_REQUIRED` error and change nothing.
+All repositories outside the project root need a directory grant first (`mucaro permissions grant <path> --yes`). Every command that mutates a repository, runs containers, touches the network, launches a server or installs something requires explicit approval: pass `--yes` or answer the interactive prompt. Without either, a non-interactive run stops with a `*_CONFIRMATION_REQUIRED` error and changes nothing.
+
+**Every decision is audited.** Approvals, refusals (including "there was no terminal to ask") and the outcome of each approved action are appended to the hash-chained tool audit log (`mucaro tools audit`, `mucaro tools verify-audit`) under names such as `coding.patch_apply`, `coding.push`, `web.fetch`, `mcp.call` and `plugin.install`. Only the SHA-256 of the arguments is stored, never the arguments, and `approval_mode` in an event's `reason` says how the decision was reached (`interactive`, `blanket_yes`, `denied_non_tty`, `callback`, `subagent_read_only`). If a decision cannot be recorded, the action does not run (`ERROR_OPERATOR_AUDIT_FAILED`). `--yes` approves everything the command or agent proposes, so use it only for work you have already reviewed.
+
+Success is JSON on stdout. Failure is a JSON `{"status", "detail"}` object on stderr with exit code 2. `code` commands also accept `--format text`.
 
 ```bash
 # Read-only
@@ -1220,17 +1224,24 @@ mucaro code review findings.json --repo ~/proj
 mucaro code branch work/fix --repo ~/proj --yes
 mucaro code apply change.patch --repo ~/proj --yes
 mucaro code commit --path src/app.py -m "Fix bug" --repo ~/proj --yes
-mucaro code pr-request --title "Fix bug" --repo ~/proj      # artifact only, no network
 
-# Containerized checks (network disabled); plan first, then --run
+# Hosted pull request: two separately approved steps, both bound to the request artifact
+mucaro code pr-request --title "Fix bug" --repo ~/proj --output request.json   # no network
+mucaro code push --request request.json --repo ~/proj --dry-run
+mucaro code push --request request.json --repo ~/proj --yes
+mucaro code pr-create --request request.json --repo ~/proj --yes               # a draft; --ready opens it for review
+
+# Containerized checks (network disabled): plan first, then --run
 mucaro code checks --image <pinned-image> --check "test:unit=pytest -q" --repo ~/proj
-mucaro code checks --image <pinned-image> --check "test:unit=pytest -q" --repo ~/proj --run --yes
+mucaro code checks --image <pinned-image> --check "test:unit=pytest -q" --repo ~/proj --run --yes --stream
+mucaro code checks --engine /Applications/Docker.app/Contents/Resources/bin/docker ...  # docker is not on PATH
+mucaro code checks --profile acme:default --repo ~/proj                        # a plugin's image and checks
 
-# Model-driven loop; mutating and web tools are approval-gated per call
-mucaro code agent "add input validation" --repo ~/proj --provider local --session fix1
+# Model-driven loop
+mucaro code agent "add input validation" --repo ~/proj --provider local --session fix1 --stream
 mucaro code chat --session fix1            # one goal per stdin line, /exit to quit
 mucaro code sessions
-mucaro code agent "..." --script replies.json   # deterministic offline replay
+mucaro code agent "..." --script replies.json   # deterministic offline replay, no network
 
 # Governed web access (robots, private-host blocking, hashed snapshots)
 mucaro web fetch https://example.com --yes
@@ -1242,8 +1253,95 @@ mucaro web search "query" --allow-live-search --yes   # needs the Brave API key 
 mucaro mcp servers
 mucaro mcp tools name --yes
 mucaro mcp call name tool --args '{"k": "v"}' --yes
+
+# Plugin bundles
+mucaro plugin inspect ./acme            # validate and show everything it contributes; installs nothing
+mucaro plugin install ./acme --sha256 <manifest-hash> --yes
+mucaro plugin list                      # re-verifies every installed plugin against its install receipt
+mucaro plugin remove acme --yes
 ```
 
-Agent tools: `status`, `read`, `diff`, `check_patch` (direct); `apply_patch`, `create_branch`, `commit`, `web_fetch`, `web_search`, `mcp_call` (approval per call); `delegate` starts a read-only sub-agent (status/read/diff/check_patch only, 6 steps, no further delegation). MCP servers run with a minimal environment plus the `env` you declare, and their output is treated as untrusted data. Provider `local` accepts loopback URLs only; `anthropic` needs the optional SDK and key. Agent output records every step's outcome status and a transcript SHA-256; the model's final summary is not verified evidence.
+### Hosted pull requests (credential-last)
 
-Not yet provided: hosted PR creation, plugin packaging, streaming output, and live-provider validation.
+`code pr-request --output FILE` preserves the request artifact. `code push` and `code pr-create` each take it with `--request FILE`, prove it intact (its `request_sha256` is recomputed from its own content), and rebuild it from the repository to prove HEAD, branch, a clean tree and a non-protected head branch are unchanged, before showing the exact target and asking. Both support `--dry-run`, which runs every local check and prints the exact command without touching the network.
+
+- `push` runs `git push --set-upstream origin HEAD:refs/heads/<branch>`, never forced, then requires `git ls-remote` to report exactly the reviewed commit (`ERROR_CODING_PUSH_REMOTE_SHA_MISMATCH` otherwise).
+- `pr-create` requires the remote branch to already hold the reviewed commit, runs `gh pr create` as a **draft** (`--ready` opts out), and accepts only a pull request URL for the same repository in `gh`'s output. A second pull request for the same request is refused (`ERROR_CODING_PR_ALREADY_CREATED`).
+- `origin` must be a plain `github.com` URL without embedded credentials; the URL is never echoed.
+- Mucaro never reads, stores or logs a token. Authentication is your own `git` and `gh` login. They run with a minimal environment (`PATH`, `HOME`, locale and proxy variables, `SSH_AUTH_SOCK`, and `GH_TOKEN`, `GITHUB_TOKEN` or `GH_HOST` only if you already export them), prompts are disabled so nothing can hang, and token-shaped text is redacted from diagnostics.
+- Receipts (`CODING_PUSH_DONE`, `CODING_PR_CREATED`) are sealed and saved under `data/exports/coding_remote/`.
+
+### Container checks: FAIL versus BLOCKED
+
+A check whose command exits non-zero is `FAIL`. An engine, image or isolation problem is `BLOCKED`, and a suite with a blocked required check can never pass. Before the command runs, `<engine> info` must succeed and `<engine> image inspect` must find the pinned image locally, otherwise the row is `BLOCKED` with `ERROR_CODING_CONTAINER_ENGINE_UNAVAILABLE` or `ERROR_CODING_CONTAINER_IMAGE_MISSING`. An exact local image ID (`sha256:<64 hex>`) is also compared with what the engine reports (`ERROR_CODING_CONTAINER_IMAGE_IDENTITY_MISMATCH`), and the observed ID is recorded in the receipt. Exit code 125 together with an engine-shaped message is also `BLOCKED` (`ERROR_CODING_CONTAINER_ENGINE_ERROR`). The checks work with Docker and Podman. Producing live receipts is covered in `docs/CODING_LIVE_EVIDENCE.md`.
+
+### The agent
+
+The model proposes one JSON action per turn, `{"tool": ..., "args": {...}}` or `{"final": ...}`, and prose around the JSON is tolerated.
+
+- **Direct tools:** `status`, `read`, `diff`, `check_patch`. **Approval per call:** `apply_patch`, `create_branch`, `commit`, `web_fetch`, `web_search`, `mcp_call`, and a `read` of a credential-like path. `delegate` starts a read-only sub-agent (status, read, diff and check_patch only, 6 steps, no further delegation); it cannot read credential-like files even under `--yes`.
+- **What you approve is what you see.** The prompt shows the full URL or query, every path a patch touches with its +/- counts and SHA-256, and MCP arguments, with an explicit "bytes hidden" marker instead of silent truncation. Answer `v` to see the full arguments. Each step records the arguments digest the decision was bound to (`approved_args_sha256`).
+- **Credential-like paths** need approval to read: `.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `id_rsa*`, `id_dsa*`, `id_ecdsa*`, `id_ed25519*`, `.netrc`, `.npmrc`, `.pypirc`, `credentials*`, `secrets.*`, and anything under `.aws/`, `.ssh/` or `.gnupg/`. Matching is case-insensitive and applies to the resolved path, so `docs/../.env`, `./.env` and a symlink to `.env` are caught. Limit: `diff` output of tracked files is not filtered.
+- **Tool output is untrusted data.** Results re-enter the prompt inside `<tool_result tool="..." trust="untrusted">` blocks that cannot be closed from inside, under a system prompt that says so. Instruction-like text is recorded per step as `injection_signals` (evidence only; nothing is blocked because of it).
+- **`--allow-live-search`** is an operator flag. A flag the model supplies in its arguments is ignored.
+- **Providers.** `local` (the default) accepts loopback URLs only (`MUCARO_AI_LOCAL_MODEL_URL`, `MUCARO_AI_LOCAL_MODEL`). `anthropic` sends repository content to a third party, so it needs the same opt-in as `mucaro ask`: `MUCARO_AI_LIVE_MODE=1` and `ANTHROPIC_API_KEY` in your shell environment (the CLI does not read `.env`), the optional SDK (`python -m pip install -e ".[anthropic]"`), and `--model` or `MUCARO_AI_MODEL`. Provider failures end the run with a specific status (`ERROR_LIVE_MODE_DISABLED`, `ERROR_MODEL_API_KEY_MISSING`, `ERROR_MODEL_AUTH_REJECTED`, `ERROR_MODEL_NOT_FOUND`, `ERROR_MODEL_RATE_LIMITED`, `ERROR_MODEL_UNAVAILABLE`, `ERROR_MODEL_REFUSED`, `ERROR_MODEL_TRUNCATED`, `ERROR_MODEL_EMPTY_RESPONSE`); error text is bounded and never contains the key.
+- **Records.** Output carries every step's outcome status and a transcript SHA-256. The model's final summary is not verified evidence.
+
+### Event streams (`--stream`)
+
+`--stream` is opt-in on `code agent`, `code chat` and `code checks --run`; without it nothing changes. With `--format json` the events are NDJSON on stdout, one flushed line each, ending with a `result` event (or an `error` event); with `--format text` readable progress lines go to stderr. `code chat --stream` always shows readable progress. If the reader goes away (for example `| head`), the run stops before any approved action and exits quietly with status 1.
+
+| Event | Fields |
+|---|---|
+| `step_start` | `step` |
+| `model_reply` | `step`, `chars` |
+| `action_invalid` | `step`, `status`, `detail` |
+| `tool_call` | `step`, `tool`, `summary` (bounded), `args_sha256` |
+| `approval` | `step`, `tool`, `approved`, `mode`, `args_sha256` |
+| `tool_result` | `step`, `tool`, `status`, optional `injection_signals` |
+| `final` | `step`, `final` |
+| `check_start`, `check_result` | `check_id`, `kind`, `command` and `check_id`, `state`, optional `error_status` |
+
+### Plugins
+
+A plugin is one `mucaro-plugin.json` that contributes MCP server declarations, container check profiles and agent guidance. It is data: unknown keys, unpinned images and oversized text are rejected, and there are no file references or install hooks. Nothing is executed, fetched or imported when a plugin is installed.
+
+```json
+{
+  "schema": "mucaro-plugin/1.0",
+  "name": "acme",
+  "version": "1.0.0",
+  "description": "Acme tooling",
+  "mcp_servers": {"lint": {"command": ["python3", "-m", "acme_mcp"], "env": {"ACME_MODE": "ci"}}},
+  "check_profiles": {"default": {"image": "ghcr.io/acme/tools@sha256:<64 hex>", "checks": [{"id": "unit", "kind": "test", "command": ["pytest", "-q"]}]}},
+  "instructions": "Prefer small, reviewable patches."
+}
+```
+
+`name` matches `[a-z0-9][a-z0-9-]{0,39}`, `version` is `1.2.3`, the manifest is at most 64 KiB, `instructions` at most 8 KiB, and at least one of the three contributions is required. Images must be `name@sha256:<64 hex>` or a local `sha256:<64 hex>` image ID.
+
+- **Installing is a trust decision.** An MCP server declaration is a command that runs with your user rights whenever you later approve a call. `plugin inspect` and `plugin install` show every server's argv and environment values, every image and check command, and the guidance text in full. Pass the publisher's hash with `--sha256` to refuse a manifest that differs from the one they published.
+- **Hash-pinned.** The exact manifest bytes are stored with a receipt carrying their SHA-256. `plugin list` re-verifies each plugin, and a tampered, receipt-less or symlink-swapped plugin contributes nothing anywhere (`ERROR_PLUGIN_TAMPERED`). Installation is staged and renamed, so a failure leaves nothing behind; a duplicate name is refused.
+- **Explicit activation only.** `mucaro mcp tools|call PLUGIN:SERVER` (each launch still needs approval), `code checks --profile PLUGIN:PROFILE` (still container-isolated, network-off, behind `--run` and approval, with the plugin's version and hash in the audited arguments), and `code agent|chat --plugin NAME`, which gives the guidance to the model and lets `mcp_call` use only that plugin's servers for that run. Installing a plugin activates nothing.
+- **Guidance cannot widen anything.** It is text for the model. Tool access, approvals and the credential-path guard are decided in code.
+- **stderr stays parseable.** At a terminal, `plugin install` prints the full disclosure before its prompt. An unattended refusal is only a JSON error pointing at `plugin inspect`, and a `--yes` success reports the same text as `consent_surface`.
+
+### Live evidence
+
+`scripts/certify_coding_agent_live.py` runs one bounded, read-only agent turn against a real model on a throwaway repository in its own isolated settings (nothing from your repositories is involved). The model must find HEAD with `status` and read `MARKER.txt`, a random nonce that exists only in the tool result, and report both, so a pass shows the tool output reached the model and was used.
+
+```bash
+MUCARO_AI_LIVE_MODE=1 ANTHROPIC_API_KEY=... python scripts/certify_coding_agent_live.py \
+    --provider anthropic --model <a model your key can use> --output receipt.json
+python scripts/certify_coding_agent_live.py --provider local --model llama3.1:8b --output receipt.json
+```
+
+`CODING_AGENT_LIVE_CERT_OK` (exit 0) means every invariant held. `..._FAILED` (exit 2) means a model answered and the agent did not succeed. `..._BLOCKED` (exit 3) means a precondition is missing (live mode off, no key, no reachable server, unknown model, rate limit) and nothing was proven either way; an absent or empty input never counts as a pass. The receipt is bound to the source commit and never contains the key.
+
+### Not provided
+
+- Token-level streaming. Each model reply is a single JSON action, so partial tokens are not displayable; progress is streamed per step instead.
+- Context-window management for long sessions: a resumed session replays its full history.
+- Native provider tool-calling (the JSON-in-text protocol is used), and parallel sub-agents.
+- MCP servers on Windows (stdio polling needs POSIX pipes; the command reports `ERROR_MCP_PLATFORM_UNSUPPORTED`).
+- Live evidence: no live container receipts and no live-provider PASS have been produced. `docs/PRODUCT_AUDIT.md` records why, and the `coding_programming_expertise` product-audit domain remains OPEN.

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from backend.app.coding_container import build_coding_container_plan, run_coding_container_plan
+from backend.app.coding_container import CodingContainerError, build_coding_container_plan, run_coding_container_plan
 from backend.app.config import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,13 +16,18 @@ STATUS_FAILED = "CODING_MUTATION_LIVE_CERT_FAILED"
 
 
 def _run(image: str, mode: str, cfg: Settings) -> dict[str, Any]:
-    plan = build_coding_container_plan(
-        ROOT,
-        image=image,
-        command=["python", "scripts/coding_mutation_probe_inner.py", "--mode", mode],
-        cfg=cfg,
-    )
-    receipt = run_coding_container_plan(plan, cfg=cfg)
+    try:
+        plan = build_coding_container_plan(
+            ROOT,
+            image=image,
+            command=["python", "scripts/coding_mutation_probe_inner.py", "--mode", mode],
+            cfg=cfg,
+        )
+        receipt = run_coding_container_plan(plan, cfg=cfg)
+    except CodingContainerError as exc:
+        # An unavailable engine or image is BLOCKED, not a probe that ran and failed (docs/CODING_CAPABILITY_STATUS.md),
+        # and it must still leave a receipt that says why instead of ending the script with a traceback.
+        return {"execution": {"execution_status": "BLOCKED", "blocked": {"status": exc.status, "detail": exc.detail}}, "payload": {}}
     output_lines = str(receipt.get("stdout", {}).get("text") or "").strip().splitlines()
     payload = json.loads(output_lines[-1]) if output_lines else {}
     return {"execution": receipt, "payload": payload}

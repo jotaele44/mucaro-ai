@@ -45,3 +45,40 @@ Rendered iPhone results use browser emulation, not physical iOS Safari. Live-pro
 3. Use `docs/DEVELOPMENT_GOAL.md`, `docs/MUCARO_FLAGPOLE_V1.md`, and the current release ledgers to order the seven open product domains. For each, require a contract, positive/negative fixtures, reproducible evidence, and an explicit state before claiming completion.
 4. Complete credentialed, hardware, hosted, and signed-distribution gates only in their proper environments. Re-run exact-head certification after changes land.
 5. Continue the UI finish pass using rendered screenshots and keyboard/accessibility checks; reserve new specialized workspaces for validated operator workflows rather than adding surfaces for appearance alone.
+
+## Addendum (2026-10-03): coding CLI checkpoint review
+
+**Scope.** The `mucaro code`, `mucaro web` and `mucaro mcp` checkpoint (commit `4f49330`, on branch `feature/cli-coding-agent`) was reviewed against this repository's own rules: deny-by-default tools, the existing approval-and-audit path, loopback-first provider access, and the contract that engine/image failures are `BLOCKED`, never `FAIL` (`docs/CODING_CAPABILITY_STATUS.md`). Every finding below was confirmed by reading the code and is fixed on the branch with regression tests. **No product-audit domain changes status: `mucaro audit product` still reports 16 PASS / 7 OPEN, and `coding_programming_expertise` remains OPEN.**
+
+| ID | Finding (at the checkpoint) | Evidence | Confidence | Status |
+|---|---|---|---:|---|
+| G1 | The agent's approval prompt cut arguments at 600 characters, so an operator could approve a patch tail they never saw. | `backend/app/cli_code.py:207` | 100% | Fixed `3cb80f7` |
+| G2 | The model, not the operator, supplied the live-search opt-in. | `backend/app/coding_agent.py:113` | 100% | Fixed `3cb80f7` |
+| G3 | Agent `read` ran unprompted with no credential guard (`.env` holds `MUCARO_AI_OPERATOR_TOKEN`); contents are sent to a remote provider. | `coding_agent.py:39,91`; `coding_workspace.py` blocks only `.git` | 100% | Fixed `3cb80f7` |
+| G4 | Tool output re-entered the prompt unfenced, with no untrusted-data rule (INV-014). | `coding_agent.py:141-145` | 100% | Fixed `3cb80f7` |
+| G5 | Agent and CLI approvals never reached the hash-chained tool audit log. | `coding_agent.py:190`; `tools.py:353` | 100% | Fixed `3cb80f7` (agent, `code`, `web`, `mcp`); `348d53a`, `3a9ea1c` (push, PR, plugins) |
+| G6 | `parse_action` rejected any prose around the JSON; MCP server stderr was discarded; `select` on pipes fails on Windows. | `coding_agent.py:65-78`; `mcp_client.py:73,87` | 100% | Fixed `3cb80f7` |
+| G7 | `provider_chat("anthropic")` skipped the `MUCARO_AI_LIVE_MODE=1` opt-in that `mucaro ask` requires, so repository content could go to a third party with live mode off; it also asked for only 2000 tokens, ignored refusals and truncation, and let SDK errors escape as tracebacks. | checkpoint `provider_chat` vs `model_router.py:246-262` | 100% | Fixed `4045003` |
+| G8 | `run_coding_container_plan` recorded a stopped daemon or missing image as a failing check, contradicting the documented BLOCKED contract. | `coding_container.py:313` | 100% | Fixed `0505428` |
+| G9 | Regression introduced by the G8 fix and found by auditing every caller: `scripts/certify_coding_mutation_live.py` would end with a traceback and no receipt when the engine is unavailable. | `scripts/certify_coding_mutation_live.py:25` | 100% | Fixed with the closeout commit |
+
+**Added on the branch (hermetically tested; none of it is certified evidence):** opt-in step events (`--stream`); `code push` and `code pr-create`, bound to the preserved PR request and credential-last; plugin bundles (`mucaro plugin ...`); `code checks --engine` and `--profile`; `scripts/certify_coding_agent_live.py`. Reference: `docs/CLI.md`. Procedure for the live evidence: `docs/CODING_LIVE_EVIDENCE.md`.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| Backend tests | Baseline `1008 passed, 1 skipped`; at the last code commit `1170 passed, 1 skipped` (162 tests added by this review in seven new files, all passing); three more tests were added afterwards for G9 and run separately. |
+| Mutation checks | 70 deliberate breakages of the new guards, each confirmed to fail a test. Four survived at first; each exposed a missing test, which was added and re-verified. |
+| Ruff | 28 changed Python files: no new findings (the four that remain, and the 13 in `cli.py`, exist at the base commit and were deliberately not auto-fixed). |
+| Static security triage | `PASS`: 113 findings (107 at the baseline), 103 LOW and 10 NOT_APPLICABLE, 0 untriaged, 0 stale; the six new findings are covered by the existing rule-wide S603/S607 dispositions. |
+| JSON validation, strict preflight | `JSON_OK checked=38`; `PREFLIGHT_OK`. |
+| Product audit | Unchanged: `PRODUCT_AUDIT_OPEN`, 16 PASS / 7 OPEN. |
+
+### Not run, and still open
+
+- **Live container receipts:** Docker Desktop's daemon was stopped on the reviewing machine and no pinned coding image was present, so nothing was executed in the isolated boundary. The runtime now reports that state as BLOCKED instead of FAIL.
+- **Live-provider PASS:** no API key and no local model server were available. An empty or absent input is not evidence. The certifier reports BLOCKED until they exist.
+- **Authenticated push and pull request:** no live remote action was performed, by design (credential-last, owner-approved).
+- **`make security-gates`** (needs network for dependency audits) and **hosted CI**: not run. The frontend was not rebuilt or re-tested after the earlier UX commit.
+- **Document drift for the owner to adjudicate, not edited here:** `docs/CODING_GOVERNANCE_BLOCKERS.md` CODE-B03 still says the branch/commit/PR lifecycle is not implemented, while `docs/CODING_CAPABILITY_STATUS.md` records the local lifecycle as merged source.
