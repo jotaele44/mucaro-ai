@@ -20,7 +20,6 @@ from .tools import (
     ToolRuntimeError,
     approve_tool_call,
     deny_tool_call,
-    list_tool_calls,
     request_tool_call,
     run_tool_call,
 )
@@ -273,8 +272,6 @@ def render_terminal_snapshot(
     sidebar_width = min(20, max(16, inner_width // 6))
     body_width = inner_width - sidebar_width - 1
     plan_height = min(8, max(4, height // 5))
-    header_height = 2
-    footer_height = 3
     body_height = max(1, height - plan_height - 9)
 
     header = _clip(f"MÚCARO AI  {_status_line(snapshot, mode)}", inner_width)
