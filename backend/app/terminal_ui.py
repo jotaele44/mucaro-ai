@@ -193,7 +193,12 @@ def _github_rows(snapshot: dict[str, Any], width: int, height: int) -> list[str]
     github = snapshot.get("github")
     label = VIEW_LABELS.get(str(view), str(view))
     if not isinstance(github, dict):
-        return [label, "", "No governed GitHub snapshot yet.", "Use :issues OWNER/REPO, :prs OWNER/REPO, or :gists OWNER."]
+        return [
+            label,
+            "",
+            "No governed GitHub snapshot yet.",
+            "Use :issues OWNER/REPO, :prs OWNER/REPO, or :gists OWNER.",
+        ]
     result = github.get("result") or {}
     retrieved = github.get("retrieved_utc") or "unknown"
     lines = [f"{label}  retrieved={retrieved}", ""]
@@ -298,7 +303,10 @@ def render_terminal_snapshot(
     rows.append(f"├{'─' * inner_width}┤")
     prompt = _clip(f"> {input_buffer}", inner_width)
     rows.append(f"│{prompt.ljust(inner_width)}│")
-    help_text = "Tab views • Ctrl-L current • Ctrl-S sessions • Ctrl-O issues • Ctrl-R PRs • Ctrl-G gists • Ctrl-P palette • Ctrl-C stop/exit"
+    help_text = (
+        "Tab views • Ctrl-L current • Ctrl-S sessions • Ctrl-O issues • "
+        "Ctrl-R PRs • Ctrl-G gists • Ctrl-P palette • Ctrl-C stop/exit"
+    )
     rows.append(f"│{_clip(help_text, inner_width).ljust(inner_width)}│")
     rows.append(f"│{_clip(notice, inner_width).ljust(inner_width)}│")
     rows.append(f"└{'─' * inner_width}┘")
@@ -448,7 +456,8 @@ class TerminalController:
         if self.mode == "autopilot":
             raise TerminalUIError(
                 "ERROR_TUI_AUTOPILOT_PROMPT_UNBOUND",
-                "Natural-language Autopilot plan generation is not yet certified; use :autopilot authorize/run with an existing checkpoint.",
+                "Natural-language Autopilot plan generation is not yet certified; "
+                "use :autopilot authorize/run with an existing checkpoint.",
             )
         conversation_id = self.ensure_conversation()
         run_mode = MODE_MAP[self.mode]
