@@ -64,7 +64,8 @@ def main() -> int:
                     "python":sys.version,
                     "platform":sys.platform,
                     "image":args.image,
-                    "engine":suite.get("checks",[{}])[0].get("execution_receipt",{}).get("engine"),
+                    # A BLOCKED row (engine or image unavailable) carries no execution receipt: the key is present but None.
+                    "engine":(suite.get("checks",[{}])[0].get("execution_receipt") or {}).get("engine"),
                 },
                 sort_keys=True,
             ).encode("utf-8")
