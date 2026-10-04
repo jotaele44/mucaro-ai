@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import socket
+import subprocess
 import sys
 from pathlib import Path
 
@@ -21,6 +23,21 @@ def test_secret_patterns_are_detected_and_clean_text_passes(tmp_path: Path) -> N
     clean = tmp_path / "clean.txt"
     clean.write_text("nothing to see\n", encoding="utf-8")
     assert sg.scan_secret_patterns([planted, clean], tmp_path) == ["leak.txt:6"]
+
+
+@pytest.mark.skipif(shutil.which("git") is None or not (ROOT / ".git").exists(), reason="needs a git checkout")
+def test_tracked_files_pass_the_release_secret_scan() -> None:
+    """The release gates fail closed on anything that merely looks like a key, a decoy or placeholder included.
+
+    A placeholder such as an example API-key assignment, or a fake key literal in a test, passes every unit test and then
+    fails `make security-gates` later, which also needs network. So the same scan runs here over the real tracked files.
+    Split decoys in the source (as the planted-secret test above does), and do not write the key assignment shape in examples.
+    scripts/certify_release.py scans with a subset of this pattern, so a clean result here covers it as well.
+    """
+    names = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True).stdout.decode("utf-8").split("\0")
+    files = [ROOT / name for name in names if name and (ROOT / name).is_file()]
+    assert files, "git reported no tracked files"
+    assert sg.scan_secret_patterns(files, ROOT) == []
 
 
 def test_evidence_values_under_secret_keys_are_flagged(tmp_path: Path) -> None:

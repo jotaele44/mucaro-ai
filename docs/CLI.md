@@ -1333,7 +1333,8 @@ A plugin is one `mucaro-plugin.json` that contributes MCP server declarations, c
 `scripts/certify_coding_agent_live.py` runs one bounded, read-only agent turn against a real model on a throwaway repository in its own isolated settings (nothing from your repositories is involved). The model must find HEAD with `status` and read `MARKER.txt`, a random nonce that exists only in the tool result, and report both, so a pass shows the tool output reached the model and was used.
 
 ```bash
-MUCARO_AI_LIVE_MODE=1 ANTHROPIC_API_KEY=... python scripts/certify_coding_agent_live.py \
+# ANTHROPIC_API_KEY must already be set in this shell: never put its value on a command line or in a file.
+MUCARO_AI_LIVE_MODE=1 python scripts/certify_coding_agent_live.py \
     --provider anthropic --model <a model your key can use> --output receipt.json
 python scripts/certify_coding_agent_live.py --provider local --model llama3.1:8b --output receipt.json
 ```

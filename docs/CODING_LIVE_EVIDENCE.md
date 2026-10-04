@@ -81,8 +81,9 @@ and `--network=none`.
 One bounded, read-only turn on a throwaway repository. Nothing from your repositories is sent anywhere.
 
 ```bash
-# Anthropic: the key comes from your environment; name a model your key can use
-MUCARO_AI_LIVE_MODE=1 ANTHROPIC_API_KEY=... \
+# Anthropic: ANTHROPIC_API_KEY must already be set in this shell (type it at your own prompt, never in a file
+# or on a command line that is logged); name a model your key can use
+MUCARO_AI_LIVE_MODE=1 \
   PYTHONPATH="$PWD" python scripts/certify_coding_agent_live.py --provider anthropic --model <model-id> --output /tmp/coding-agent-live-anthropic.json
 
 # A local model on loopback (for example Ollama with the model pulled)

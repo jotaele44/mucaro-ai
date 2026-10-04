@@ -12,7 +12,8 @@ Outcomes follow the other certifiers' honesty rule: PASS needs executed evidence
 agent did not succeed; BLOCKED means a precondition is missing (live mode off, no key, no reachable server, an unknown
 model), so nothing was proven either way. An empty or absent input never counts as a pass.
 
-    MUCARO_AI_LIVE_MODE=1 ANTHROPIC_API_KEY=... python scripts/certify_coding_agent_live.py \
+    # with ANTHROPIC_API_KEY already set in your shell (never on the command line):
+    MUCARO_AI_LIVE_MODE=1 python scripts/certify_coding_agent_live.py \
         --provider anthropic --model <a model your key can use> --output receipt.json
     python scripts/certify_coding_agent_live.py --provider local --model <name> --output receipt.json
 """
