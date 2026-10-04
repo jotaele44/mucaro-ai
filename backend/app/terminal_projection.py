@@ -6,6 +6,7 @@ from .agent_checkpoints import CheckpointError, get_task_dag_state, list_checkpo
 from .config import Settings, settings
 from .conversations import get_conversation, list_conversations
 from .permission_leases import PermissionLeaseError, list_permission_leases
+from .response_flow import get_pending_interaction
 from .tools import list_tool_calls
 from .utils import utc_now
 from .work_runs import get_run, list_run_events, list_runs
@@ -198,6 +199,11 @@ def build_terminal_snapshot(
 
     github = _latest_github_result(view, calls)
     checkpoint = _checkpoint_projection(selected_id, run_id, cfg)
+    pending_interaction = (
+        get_pending_interaction(selected_id, cfg)
+        if selected_id
+        else None
+    )
 
     context_usage = None
     if latest_run and isinstance(latest_run.get("context_usage"), dict):
@@ -217,6 +223,7 @@ def build_terminal_snapshot(
         "permission_leases": leases,
         "permission_lease_errors": lease_errors,
         "checkpoint": checkpoint,
+        "pending_interaction": pending_interaction,
         "github": github,
         "context_usage": context_usage,
         "configured_model": {
