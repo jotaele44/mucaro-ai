@@ -210,6 +210,14 @@ def _render_plan(snapshot: dict[str, Any], width: int, height: int) -> list[str]
         if isinstance(dag, dict) and isinstance(dag.get("tasks"), list):
             for task in dag["tasks"][: max(0, height - 2)]:
                 lines.append(_clip(f"[{task.get('state')}] {task.get('id')}: {task.get('title')}", width))
+    if not lines:
+        work_plan = snapshot.get("work_plan")
+        if isinstance(work_plan, dict):
+            lines.append(_clip("Work plan", width))
+            for step in (work_plan.get("steps") or [])[: max(0, height - 1)]:
+                if isinstance(step, dict):
+                    label = step.get("tool") or step.get("description") or step.get("command") or step
+                    lines.append(_clip(f"• {label}", width))
     pending = snapshot.get("pending_tool_calls") or []
     if pending and len(lines) < height:
         lines.append(_clip(f"Approval needed: {pending[-1].get('tool_name')} {pending[-1].get('tool_call_id')}", width))
