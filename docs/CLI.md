@@ -31,6 +31,8 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | Command | Purpose | Success Exit | Failure Exit |
 |---|---|---:|---:|
 | `mucaro doctor` | Check local assistant readiness | 0 | 2 with `--strict` warnings/failures |
+| `mucaro` / `mucaro tui` / `mucaro agent` | Open the persistent terminal workspace over canonical conversations, runs, agent DAGs, approvals, GitHub receipts, and context telemetry | 0 | 2 on terminal/projection failure |
+| `mucaro tui --snapshot` | Render one deterministic headless terminal frame without requiring a TTY | 0 | 2 |
 | `mucaro release state` | Classify bounded release-state progress | 0 | 2 with `--strict` until governed release is ready |
 | `mucaro release dashboard` | Summarize release state, receipts, handoff artifacts, remote binding, and blockers | 0 | 2 on local evidence failure, or with `--strict` until ready |
 | `mucaro release hosted-governance` | Print hosted GitHub governance blocker evidence and exact operator remediation commands | 0 | 2 with `--strict` until hosted governance is ready |
@@ -132,6 +134,68 @@ Global flags:
 
 - `--version` prints the installed package version for fresh-clone and support
   receipts.
+
+## Terminal workspace
+
+Running `mucaro`, `mucaro tui`, or `mucaro agent` opens the same persistent
+full-screen terminal workspace. The terminal is a projection over canonical
+backend state; it does not maintain a second conversation, run, approval,
+checkpoint, GitHub, or context database.
+
+The left rail contains **Current**, **Sessions**, **Issues**, **Pull Requests**,
+and **Gists**. GitHub views never fetch directly from the renderer. They display
+only results from governed `github.*` tool calls and preserve each result's
+`retrieved_utc`.
+
+Useful terminal commands:
+
+```text
+:mode plan
+:mode interactive
+:mode auto
+:mode autopilot
+
+:new Optional title
+:open CONVERSATION_ID
+
+:issues OWNER/REPO
+:prs OWNER/REPO
+:gists [OWNER]
+:approve
+:approve lease
+:deny
+
+:answer OPTION_ID
+:answer-text FREEFORM TEXT
+:stop
+
+:autopilot authorize CHECKPOINT_ID
+:autopilot run CHECKPOINT_ID
+```
+
+The terminal does not silently turn a natural-language prompt into an Autopilot
+plan. In `autopilot` mode, natural-language submission fails closed until
+model-driven plan generation/replanning is separately implemented and
+certified. Existing canonical Autopilot checkpoints can be authorized and run
+explicitly.
+
+Keyboard controls are `Ctrl-L` Current, `Ctrl-S` Sessions, `Ctrl-O` Issues,
+`Ctrl-R` Pull Requests, `Ctrl-G` Gists, `Ctrl-P` command palette, Tab to
+cycle views, Escape to clear the input buffer, and `Ctrl-C` to stop the active
+run or exit when no run is active. `Ctrl-O` is used for Issues because legacy
+terminal protocols encode `Ctrl-I` and Tab as the same byte.
+
+For deterministic CI and non-interactive inspection:
+
+```bash
+mucaro tui --snapshot --width 120 --height 40
+mucaro agent --snapshot --view sessions
+```
+
+The status bar reports configured/active model, execution mode, run/agent state,
+provenance-classified context status, and Git branch/HEAD only when a governed
+`coding.repo_status` receipt exists. Unknown token or cost telemetry is shown
+as unknown; it is never silently estimated.
 
 ## Run-scoped permission leases
 

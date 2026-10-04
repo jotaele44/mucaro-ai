@@ -165,6 +165,8 @@ from .operator_workflow_certification import (
     format_operator_workflow_certification_text,
 )
 from .services import answer_question
+from .terminal_projection import TERMINAL_VIEWS, TerminalProjectionError, build_terminal_snapshot
+from .terminal_ui import TerminalUIError, render_terminal_snapshot, run_terminal_ui
 from .tools import (
     ToolRuntimeError,
     approve_tool_call,
@@ -289,6 +291,28 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--format", choices=["json", "text"], default="text", help="Output format.")
     doctor.add_argument("--strict", action="store_true", help="Exit nonzero when warnings or failures are present.")
     doctor.set_defaults(handler=run_doctor)
+
+    for command_name, command_help in (
+        ("tui", "Open the persistent full-screen terminal workspace."),
+        ("agent", "Alias for the persistent terminal agent workspace."),
+    ):
+        tui = subcommands.add_parser(command_name, help=command_help)
+        tui.add_argument("--conversation", help="Open an existing conversation id; defaults to the most recently updated session.")
+        tui.add_argument("--view", choices=TERMINAL_VIEWS, default="current", help="Initial terminal workspace view.")
+        tui.add_argument(
+            "--mode",
+            choices=["plan", "interactive", "auto", "autopilot"],
+            default="interactive",
+            help="Initial execution mode. Autopilot requires an existing checkpoint and explicit authorization.",
+        )
+        tui.add_argument(
+            "--snapshot",
+            action="store_true",
+            help="Render one headless terminal frame and exit without requiring a TTY.",
+        )
+        tui.add_argument("--width", type=int, default=120, help="Snapshot width; minimum 72.")
+        tui.add_argument("--height", type=int, default=40, help="Snapshot height; minimum 20.")
+        tui.set_defaults(handler=run_tui)
 
     models = subcommands.add_parser("models", help="Inspect model provider readiness.")
     models_subcommands = models.add_subparsers(dest="models_command", required=True)
@@ -8471,6 +8495,33 @@ def run_permissions_lease_revoke(args: argparse.Namespace, cfg: Settings) -> int
     return 0
 
 
+def run_tui(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        if args.snapshot:
+            snapshot = build_terminal_snapshot(
+                conversation_id=args.conversation,
+                view=args.view,
+                cfg=cfg,
+            )
+            print(
+                render_terminal_snapshot(
+                    snapshot,
+                    width=args.width,
+                    height=args.height,
+                    mode=args.mode,
+                )
+            )
+            return 0
+        return run_terminal_ui(
+            cfg=cfg,
+            conversation_id=args.conversation,
+            view=args.view,
+            mode=args.mode,
+        )
+    except (TerminalUIError, TerminalProjectionError) as exc:
+        raise MucaroCLIError(exc.status, exc.detail) from exc
+
+
 def run_serve(args: argparse.Namespace, cfg: Settings) -> int:
     import uvicorn
 
@@ -8485,7 +8536,10 @@ def run_serve(args: argparse.Namespace, cfg: Settings) -> int:
 
 def main(argv: Sequence[str] | None = None, cfg: Settings = settings) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    effective_argv = list(argv) if argv is not None else sys.argv[1:]
+    if not effective_argv:
+        effective_argv = ["tui"]
+    args = parser.parse_args(effective_argv)
     try:
         return args.handler(args, cfg)
     except MucaroCLIError as exc:
