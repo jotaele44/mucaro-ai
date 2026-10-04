@@ -53,7 +53,7 @@
     "metrics":{
       "type":"object",
       "additionalProperties":false,
-      "required":["raw_context_chars","raw_context_bytes","model_context_chars","model_context_bytes","compacted_summary_chars","recent_context_chars","context_limit_tokens","input_tokens","cache_creation_input_tokens","cache_read_input_tokens","effective_input_tokens","output_tokens","context_consumed_tokens","remaining_context_tokens","context_utilization_ratio","answer_chars","answer_bytes","cost_microunits"],
+      "required":["raw_context_chars","raw_context_bytes","model_context_chars","model_context_bytes","compacted_summary_chars","recent_context_chars","context_limit_tokens","input_tokens","cache_creation_input_tokens","cache_read_input_tokens","effective_input_tokens","output_tokens","total_tokens","context_consumed_tokens","remaining_context_tokens","context_utilization_ratio","answer_chars","answer_bytes","cost_microunits"],
       "properties":{
         "raw_context_chars":{"$ref":"#/$defs/metric"},
         "raw_context_bytes":{"$ref":"#/$defs/metric"},
@@ -67,6 +67,7 @@
         "cache_read_input_tokens":{"$ref":"#/$defs/metric"},
         "effective_input_tokens":{"$ref":"#/$defs/metric"},
         "output_tokens":{"$ref":"#/$defs/metric"},
+        "total_tokens":{"$ref":"#/$defs/metric"},
         "context_consumed_tokens":{"$ref":"#/$defs/metric"},
         "remaining_context_tokens":{"$ref":"#/$defs/metric"},
         "context_utilization_ratio":{"$ref":"#/$defs/metric"},
