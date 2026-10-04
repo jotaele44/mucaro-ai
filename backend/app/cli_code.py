@@ -283,11 +283,26 @@ def _checks_target(args: argparse.Namespace, cfg: Settings) -> tuple[str, list[s
     return args.image, args.check, _parse_checks(args.check), None
 
 
+# Exit status for the check suite, so `code checks --run && git push` cannot mistake a failed or blocked suite for success.
+CHECK_SUITE_EXIT_CODES = {"PASS": 0, "FAIL": 1, "BLOCKED": 3}
+
+
+def _checks_exit_code(payload: dict[str, Any]) -> int:
+    """0 only for a suite that passed (or a plan that is ready); 1 for a failing check; 3 when infrastructure blocked it."""
+    execution = payload.get("execution_status")
+    if execution != "NOT_EXECUTED":  # a run: anything that is not a recognised outcome is not a pass
+        return CHECK_SUITE_EXIT_CODES.get(str(execution), 1)
+    return 3 if payload.get("status") == "CODING_CHECK_SUITE_PLAN_BLOCKED" else 0
+
+
 def run_code_checks(args: argparse.Namespace, cfg: Settings) -> int:
+    outcome: dict[str, Any] = {}
+
     def action() -> dict[str, Any]:
         image, specs, checks, provenance = _checks_target(args, cfg)
         if not args.run:
-            return build_coding_check_suite_plan(args.repo, image=image, checks=checks, cfg=cfg, engine=args.engine)
+            outcome["payload"] = build_coding_check_suite_plan(args.repo, image=image, checks=checks, cfg=cfg, engine=args.engine)
+            return outcome["payload"]
         via = f" with engine {args.engine}" if args.engine else ""
         source = f", from plugin {provenance['plugin']} {provenance['version']}" if provenance else ""
         summary = f"Run {len(checks)} check(s) in container image {image}{via}{source} (network disabled)"
@@ -301,12 +316,14 @@ def run_code_checks(args: argparse.Namespace, cfg: Settings) -> int:
             CLI_ACTOR,
             lambda: execute_coding_check_suite(args.repo, image=image, checks=checks, cfg=cfg, on_event=sink, engine=args.engine),
         )
+        outcome["payload"] = payload
         if _streaming_json(args):
             print(json.dumps({"event": "result", **payload}, ensure_ascii=False), flush=True)
             return None
         return payload
 
-    return _run(action, args)
+    code = _run(action, args)
+    return _checks_exit_code(outcome["payload"]) if code == 0 and "payload" in outcome else code
 
 
 def run_code_pr_request(args: argparse.Namespace, cfg: Settings) -> int:

@@ -193,7 +193,7 @@ def test_cli_engine_option_makes_checks_plannable_without_docker_on_path(
     )
     argv = ["code", "checks", "--repo", str(repo), "--image", PINNED, "--check", "test:unit=pytest -q"]
 
-    assert main(argv, cfg) == 0
+    assert main(argv, cfg) == 3  # a plan that infrastructure blocks is not a success
     row = json.loads(capsys.readouterr().out)["checks"][0]
     assert row["state"] == "BLOCKED" and row["error_status"] == "ERROR_CONTAINER_ENGINE_UNAVAILABLE"
 

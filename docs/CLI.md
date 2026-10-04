@@ -1212,6 +1212,8 @@ All repositories outside the project root need a directory grant first (`mucaro 
 
 Success is JSON on stdout. Failure is a JSON `{"status", "detail"}` object on stderr with exit code 2. `code` commands also accept `--format text`.
 
+**Exit status.** `0` success, `2` an error (nothing ran, or it could not be recorded). `code checks` is stricter, so that `mucaro code checks --run && git push` cannot mistake a failed or blocked suite for success: `0` only when the suite passed (or a plan is ready), `1` when a required check failed, `3` when infrastructure blocked it. `code agent` and `code chat` exit `0` whenever the run ended normally, even if it stopped at its step limit, so scripts must read the result's `status`.
+
 ```bash
 # Read-only
 mucaro code status --repo ~/proj
@@ -1273,7 +1275,7 @@ mucaro plugin remove acme --yes
 
 ### Container checks: FAIL versus BLOCKED
 
-A check whose command exits non-zero is `FAIL`. An engine, image or isolation problem is `BLOCKED`, and a suite with a blocked required check can never pass. Before the command runs, `<engine> info` must succeed and `<engine> image inspect` must find the pinned image locally, otherwise the row is `BLOCKED` with `ERROR_CODING_CONTAINER_ENGINE_UNAVAILABLE` or `ERROR_CODING_CONTAINER_IMAGE_MISSING`. An exact local image ID (`sha256:<64 hex>`) is also compared with what the engine reports (`ERROR_CODING_CONTAINER_IMAGE_IDENTITY_MISMATCH`), and the observed ID is recorded in the receipt. Exit code 125 together with an engine-shaped message is also `BLOCKED` (`ERROR_CODING_CONTAINER_ENGINE_ERROR`). The checks work with Docker and Podman. Producing live receipts is covered in `docs/CODING_LIVE_EVIDENCE.md`.
+A check whose command exits non-zero is `FAIL`. An engine, image or isolation problem is `BLOCKED`, and a suite with a blocked required check can never pass. Before the command runs, `<engine> info` must succeed and `<engine> image inspect` must find the pinned image locally, otherwise the row is `BLOCKED` with `ERROR_CODING_CONTAINER_ENGINE_UNAVAILABLE` or `ERROR_CODING_CONTAINER_IMAGE_MISSING`. An exact local image ID (`sha256:<64 hex>`) is also compared with what the engine reports (`ERROR_CODING_CONTAINER_IMAGE_IDENTITY_MISMATCH`), and the observed ID is recorded in the receipt. Exit code 125 together with an engine-shaped message is also `BLOCKED` (`ERROR_CODING_CONTAINER_ENGINE_ERROR`). The checks work with Docker and Podman. The result is printed either way, and the exit status carries the verdict: `0` passed, `1` a required check failed, `3` blocked. Producing live receipts is covered in `docs/CODING_LIVE_EVIDENCE.md`.
 
 ### The agent
 

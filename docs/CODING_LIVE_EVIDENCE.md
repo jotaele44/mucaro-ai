@@ -74,7 +74,7 @@ PYTHONPATH="$PWD" python scripts/certify_coding_mutation_live.py --image "$IMAGE
 The pull and the image build use the network. The coding runtime itself never does: it runs with `--pull=never`
 and `--network=none`.
 
-`code checks --run` works against the same images, and `--engine PATH` selects a binary that is not on `PATH`.
+`code checks --run` works against the same images, and `--engine PATH` selects a binary that is not on `PATH`. Its exit status is `0` only when the suite passed, `1` when a required check failed and `3` when it was blocked, so it can gate a script.
 
 ## 3. Live provider turn
 
