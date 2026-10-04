@@ -536,10 +536,21 @@ class TerminalController:
         option_tokens: list[str] | None = None,
     ) -> None:
         options = self._lease_options(list(option_tokens or []))
-        if scope_type == "RUN_READ_ONLY" and options["allow_mutating"]:
+        if scope_type == "RUN_READ_ONLY" and (
+            options["allow_mutating"] or options["allow_network"]
+        ):
             raise TerminalUIError(
                 "ERROR_TUI_LEASE_SCOPE",
-                "RUN_READ_ONLY cannot authorize mutation; use :allow-tool TOOL mutating.",
+                "RUN_READ_ONLY remains local/read-only; use :allow-tool TOOL with explicit network/mutating authority.",
+            )
+        if (
+            options["allow_mutating"]
+            and not options["workspace_root"]
+            and not options["arguments_sha256"]
+        ):
+            raise TerminalUIError(
+                "ERROR_TUI_LEASE_MUTATION_BINDING",
+                "Mutating terminal leases require workspace=PATH or args=SHA256.",
             )
         try:
             granted = grant_permission_lease(
