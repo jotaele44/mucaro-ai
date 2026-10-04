@@ -617,17 +617,37 @@ def authorize_tool_call_with_lease(
         return updated
 
     lease = update_json(_leases_path(cfg), [], reserve)
-    _append_audit(
-        {
-            "event": "LEASE_USE_RESERVED",
-            "lease_id": lease_id,
-            "run_id": lease["run_id"],
-            "tool_call_id": tool_call_id,
-            "arguments_sha256": call["arguments_sha256"],
-            "grant_sha256": lease["grant_sha256"],
-        },
-        cfg,
-    )
+    try:
+        _append_audit(
+            {
+                "event": "LEASE_USE_RESERVED",
+                "lease_id": lease_id,
+                "run_id": lease["run_id"],
+                "tool_call_id": tool_call_id,
+                "arguments_sha256": call["arguments_sha256"],
+                "grant_sha256": lease["grant_sha256"],
+            },
+            cfg,
+        )
+    except Exception:
+        def rollback_unlogged_reservation(leases: list[dict[str, Any]]) -> None:
+            for index, row in enumerate(leases):
+                if isinstance(row, dict) and row.get("lease_id") == lease_id:
+                    if tool_call_id in row.get("used_call_ids", []):
+                        updated = {
+                            **row,
+                            "used_call_ids": [
+                                value for value in row["used_call_ids"]
+                                if value != tool_call_id
+                            ],
+                        }
+                        _validate_schema(updated)
+                        leases[index] = updated
+                    return
+            raise PermissionLeaseError("ERROR_PERMISSION_LEASE_NOT_FOUND", lease_id)
+
+        update_json(_leases_path(cfg), [], rollback_unlogged_reservation)
+        raise
     try:
         approved = approve_tool_call(
             tool_call_id,
