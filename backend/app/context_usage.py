@@ -264,6 +264,13 @@ def build_context_usage_status(
     else:
         total_metric = _unknown("tokens", "provider_total_tokens_unavailable")
 
+    if (
+        total_metric["value"] is not None
+        and consumed["value"] is not None
+        and int(total_metric["value"]) != int(consumed["value"])
+    ):
+        warnings.append("WARN_PROVIDER_TOTAL_TOKEN_MISMATCH")
+
     answer = str(trace.get("answer", "")) if trace else ""
     cost = model_usage.get("cost_microunits")
     if cost is None:
