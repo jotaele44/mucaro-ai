@@ -8,9 +8,10 @@ from backend.app import work_runs
 from backend.app.cli import main
 from backend.app.config import Settings
 from backend.app.conversations import create_conversation
+from backend.app.permission_leases import grant_permission_lease, list_permission_leases
 from backend.app.terminal_projection import build_terminal_snapshot
 from backend.app.terminal_ui import TerminalController, TerminalUIError, render_terminal_snapshot
-from backend.app.tools import TOOL_REGISTRY, ToolDefinition, ToolRuntimeError
+from backend.app.tools import TOOL_REGISTRY, ToolDefinition, ToolRuntimeError, list_tool_calls
 from backend.app.work_runs import get_run
 from backend.tests.test_api import make_settings
 
@@ -258,3 +259,35 @@ def test_terminal_resolves_pending_work_run_question_and_resumes(
     assert completed["outcome"] == "ACTIONS_COMPLETED"
     assert controller.snapshot()["pending_interaction"] is None
     assert attempts["count"] == 1
+
+
+def test_terminal_lease_approval_consumes_exact_tui_run_scope(
+    monkeypatch: pytest.MonkeyPatch,
+    cfg: Settings,
+) -> None:
+    monkeypatch.setitem(TOOL_REGISTRY, "github.issues_list", github_issues_tool())
+    controller = TerminalController(cfg=cfg)
+    conversation_id = controller.ensure_conversation()
+    lease = grant_permission_lease(
+        run_id=f"tui:{conversation_id}",
+        scope_type="EXACT_TOOLS",
+        tool_names=["github.issues_list"],
+        granted_by="operator",
+        allow_network=True,
+        max_uses=1,
+        cfg=cfg,
+    )["lease"]
+
+    controller.request_github("issues", "owner/repo")
+    controller.approve_latest(use_lease=True)
+
+    call = next(
+        row
+        for row in list_tool_calls(cfg)["tool_calls"]
+        if row["tool_name"] == "github.issues_list"
+    )
+    assert call["status"] == "EXECUTED"
+    assert call["approved_by"] == f"lease:{lease['lease_id']}"
+    stored = list_permission_leases(run_id=f"tui:{conversation_id}", cfg=cfg)["leases"][0]
+    assert stored["used_call_ids"] == [call["tool_call_id"]]
+    assert stored["effective_state"] == "EXHAUSTED"
