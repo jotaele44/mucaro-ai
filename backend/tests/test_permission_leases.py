@@ -377,3 +377,39 @@ def test_failed_downstream_approval_releases_reserved_use(
         "LEASE_APPROVAL_FAILED",
     ]
     assert verify_permission_lease_audit_chain(cfg)["status"] == "PERMISSION_LEASE_AUDIT_OK"
+
+
+def test_reservation_audit_failure_rolls_back_use_ceiling(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cfg = make_settings(tmp_path)
+    monkeypatch.setitem(TOOL_REGISTRY, "test.read", tool("test.read"))
+    lease = grant_permission_lease(
+        run_id="run-1",
+        scope_type="EXACT_TOOLS",
+        tool_names=["test.read"],
+        granted_by="operator",
+        max_uses=1,
+        cfg=cfg,
+    )["lease"]
+    call = pending("test.read", run_id="run-1", cfg=cfg)
+
+    original_append = permission_leases._append_audit
+
+    def fail_reservation(event, settings):
+        if event.get("event") == "LEASE_USE_RESERVED":
+            raise OSError("audit storage unavailable")
+        return original_append(event, settings)
+
+    monkeypatch.setattr(permission_leases, "_append_audit", fail_reservation)
+
+    with pytest.raises(OSError):
+        authorize_tool_call_with_lease(call["tool_call_id"], cfg=cfg)
+
+    stored = list_permission_leases(run_id="run-1", cfg=cfg)["leases"][0]
+    assert stored["lease_id"] == lease["lease_id"]
+    assert stored["used_call_ids"] == []
+    assert stored["effective_state"] == "ACTIVE"
+    assert list_tool_calls(cfg)["tool_calls"][0]["status"] == "PENDING_APPROVAL"
+    assert verify_permission_lease_audit_chain(cfg)["status"] == "PERMISSION_LEASE_AUDIT_OK"
