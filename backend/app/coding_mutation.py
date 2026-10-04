@@ -8,6 +8,7 @@ from typing import Any
 from .coding_patch import validate_patch_proposal
 from .coding_workspace import inspect_repository, resolve_repository
 from .config import Settings, settings
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .local_tools import resolve_local_tool
 from .permissions import is_within_path
 
@@ -114,6 +115,18 @@ def apply_patch_transaction(
     cfg: Settings = settings,
 ) -> dict[str, Any]:
     context = resolve_repository(repo_root, cfg)
+    try:
+        require(
+            PermissionRequest(
+                capability="filesystem.write",
+                subject="coding_mutation.apply_patch_transaction",
+                target=str(context.repo_root),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise CodingMutationError(exc.status, exc.detail) from exc
     before = inspect_repository(context.repo_root, cfg=cfg)
     if before["head_sha"] != expected_head_sha:
         raise CodingMutationError("ERROR_CODING_MUTATION_HEAD_DRIFT", f"expected {expected_head_sha}, observed {before['head_sha']}")
