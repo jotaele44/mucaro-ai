@@ -55,6 +55,31 @@ def _latest_github_result(view: str, calls: list[dict[str, Any]]) -> dict[str, A
     }
 
 
+def _latest_tool_result(tool_name: str, calls: list[dict[str, Any]]) -> dict[str, Any] | None:
+    candidates = [
+        call
+        for call in calls
+        if call.get("tool_name") == tool_name
+        and call.get("status") == "EXECUTED"
+        and isinstance(call.get("result"), dict)
+    ]
+    if not candidates:
+        return None
+    candidates.sort(
+        key=lambda call: (
+            str(call.get("executed_at") or ""),
+            str(call.get("tool_call_id") or ""),
+        ),
+        reverse=True,
+    )
+    call = candidates[0]
+    return {
+        "tool_call_id": call.get("tool_call_id"),
+        "executed_at": call.get("executed_at"),
+        "result": dict(call["result"]),
+    }
+
+
 def _checkpoint_projection(
     conversation_id: str | None,
     run_id: str | None,
@@ -194,6 +219,11 @@ def build_terminal_snapshot(
         "checkpoint": checkpoint,
         "github": github,
         "context_usage": context_usage,
+        "configured_model": {
+            "provider": cfg.default_model_provider,
+            "name": cfg.default_model_name,
+        },
+        "repository_status": _latest_tool_result("coding.repo_status", calls),
         "invariants": {
             "canonical_conversation_source": "backend.app.conversations",
             "canonical_run_source": "backend.app.work_runs",
