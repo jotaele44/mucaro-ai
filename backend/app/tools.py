@@ -15,6 +15,15 @@ from .config import Settings, settings
 from .contracts import validate_contract
 from .github_ci import GitHubCIError, read_github_ci_status
 from .github_pull_requests import GitHubPullRequestError, open_or_update_pull_request
+from .github_resources import (
+    GitHubResourceError,
+    get_github_gist,
+    get_github_issue,
+    get_github_pull_request,
+    list_github_gists,
+    list_github_issues,
+    list_github_pull_requests,
+)
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
 from .product_audit import build_product_audit
@@ -439,6 +448,68 @@ def _github_ci_status(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any
     except GitHubCIError as exc:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
+def _github_issues_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    del cfg
+    try:
+        return list_github_issues(
+            repo=arguments.get("repo"),
+            state=arguments.get("state", "open"),
+            page=arguments.get("page", 1),
+            per_page=arguments.get("per_page", 30),
+        )
+    except GitHubResourceError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _github_issue_view(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    del cfg
+    try:
+        return get_github_issue(repo=arguments.get("repo"), number=arguments.get("number"))
+    except GitHubResourceError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _github_prs_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    del cfg
+    try:
+        return list_github_pull_requests(
+            repo=arguments.get("repo"),
+            state=arguments.get("state", "open"),
+            page=arguments.get("page", 1),
+            per_page=arguments.get("per_page", 30),
+        )
+    except GitHubResourceError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _github_pr_view(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    del cfg
+    try:
+        return get_github_pull_request(repo=arguments.get("repo"), number=arguments.get("number"))
+    except GitHubResourceError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _github_gists_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    del cfg
+    try:
+        return list_github_gists(
+            owner=arguments.get("owner"),
+            page=arguments.get("page", 1),
+            per_page=arguments.get("per_page", 30),
+        )
+    except GitHubResourceError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _github_gist_view(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    del cfg
+    try:
+        return get_github_gist(gist_id=arguments.get("gist_id"))
+    except GitHubResourceError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
 def _web_fetch(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     url = arguments.get("url")
     if not isinstance(url, str):
@@ -641,6 +712,66 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         handler=_github_ci_status,
         autopilot_success_statuses=("GITHUB_CI_STATUS_OK",),
         autopilot_success_fields=(("ci_state", ("PASS",)),),
+        timeout_seconds=75.0,
+    ),
+    "github.issues_list": ToolDefinition(
+        name="github.issues_list",
+        description="Read one bounded GitHub Issues search page with repository identity and explicit search-ceiling limitations.",
+        mutates_state=False,
+        requires_approval=True,
+        network="remote",
+        handler=_github_issues_list,
+        autopilot_success_statuses=("GITHUB_ISSUES_OK",),
+        timeout_seconds=75.0,
+    ),
+    "github.issue_view": ToolDefinition(
+        name="github.issue_view",
+        description="Read one exact GitHub issue by repository and numeric issue identity; pull requests are rejected from this boundary.",
+        mutates_state=False,
+        requires_approval=True,
+        network="remote",
+        handler=_github_issue_view,
+        autopilot_success_statuses=("GITHUB_ISSUE_OK",),
+        timeout_seconds=75.0,
+    ),
+    "github.prs_list": ToolDefinition(
+        name="github.prs_list",
+        description="Read one bounded GitHub pull-request page with exact repository, head SHA/ref, and base-ref fields.",
+        mutates_state=False,
+        requires_approval=True,
+        network="remote",
+        handler=_github_prs_list,
+        autopilot_success_statuses=("GITHUB_PRS_OK",),
+        timeout_seconds=75.0,
+    ),
+    "github.pr_view": ToolDefinition(
+        name="github.pr_view",
+        description="Read one exact GitHub pull request by repository and numeric PR identity.",
+        mutates_state=False,
+        requires_approval=True,
+        network="remote",
+        handler=_github_pr_view,
+        autopilot_success_statuses=("GITHUB_PR_OK",),
+        timeout_seconds=75.0,
+    ),
+    "github.gists_list": ToolDefinition(
+        name="github.gists_list",
+        description="Read one bounded GitHub Gists page for an owner or the authenticated account without mutating Gists.",
+        mutates_state=False,
+        requires_approval=True,
+        network="remote",
+        handler=_github_gists_list,
+        autopilot_success_statuses=("GITHUB_GISTS_OK",),
+        timeout_seconds=75.0,
+    ),
+    "github.gist_view": ToolDefinition(
+        name="github.gist_view",
+        description="Read one exact GitHub Gist with bounded file count/content and canonical gist identity verification.",
+        mutates_state=False,
+        requires_approval=True,
+        network="remote",
+        handler=_github_gist_view,
+        autopilot_success_statuses=("GITHUB_GIST_OK",),
         timeout_seconds=75.0,
     ),
     "web.render": ToolDefinition(
