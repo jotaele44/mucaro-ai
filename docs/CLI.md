@@ -116,7 +116,15 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro tools run TOOL_CALL_ID` | Execute an approved tool call | 0 | 2 |
 | `mucaro tools audit` | Inspect local tool runtime audit events | 0 | 2 |
 | `mucaro plan REQUEST` | Analyze a task with the Planning Gate | 0 | 2 |
-| `mucaro permissions COMMAND` | Manage user-directory access grants | 0 | 2 |
+| `mucaro permissions grant PATH` | Grant bounded user-directory access | 0 | 2 |
+| `mucaro permissions list` | List directory access grants | 0 | 2 |
+| `mucaro permissions check PATH` | Check directory access | 0 | 2 |
+| `mucaro permissions revoke PATH` | Revoke directory access | 0 | 2 |
+| `mucaro permissions lease-list` | List bounded run-scoped tool permission leases | 0 | 2 |
+| `mucaro permissions lease-grant RUN_ID` | Grant an explicit run-scoped tool permission lease | 0 | 2 |
+
+For consequential actions, add `--arguments-sha256 <64-hex>` to bind the lease to one exact canonical tool-argument payload. A changed argument set will not match that lease.
+| `mucaro permissions lease-revoke LEASE_ID` | Revoke one exact run-scoped permission lease | 0 | 2 |
 | `mucaro validate` | Validate JSON artifacts and schemas | 0 | 2 |
 | `mucaro serve` | Start the local FastAPI server | 0 | 2 |
 
@@ -124,6 +132,38 @@ Global flags:
 
 - `--version` prints the installed package version for fresh-clone and support
   receipts.
+
+## Run-scoped permission leases
+
+`mucaro permissions lease-grant` is the bounded equivalent of a session/run
+"allow" mode. A lease is always tied to one exact `run_id` and one declared
+scope: `RUN_READ_ONLY`, `EXACT_TOOLS`, or `TOOL_PREFIXES`. Mutation and
+network authority are independent opt-ins; an optional `--workspace-root`
+binds repository actions to one canonical path. Leases also have a TTL and a
+maximum-use ceiling.
+
+Grant and revoke commands require interactive confirmation unless `--yes` is
+supplied. Grant identity, use reservations, and revocation are hash-chain
+audited. Overlapping leases that both authorize the same pending call fail
+closed rather than choosing one deterministically. Expired, exhausted, revoked,
+tampered, wrong-run, wrong-workspace, or insufficient mutation/network leases
+cannot authorize a call.
+
+Example:
+
+```bash
+mucaro permissions lease-grant RUN_ID \
+  --scope EXACT_TOOLS \
+  --tool coding.patch_apply \
+  --allow-mutating \
+  --workspace-root /path/to/repo \
+  --ttl-seconds 900 \
+  --max-uses 4 \
+  --yes
+
+mucaro permissions lease-list --run-id RUN_ID
+mucaro permissions lease-revoke LEASE_ID --yes
+```
 
 Supported ingest inputs are TXT, MD, HTML, HTM, DOCX, EML, MSG, CSV, JSON, PDF, PNG,
 JPEG, GIF, WEBP, WAV, MP3, M4A, MP4, MOV, and WEBM. HTML files are parsed as
