@@ -219,9 +219,13 @@
       "state": "PARTIAL",
       "evidence": [
         "frontend/src/App.jsx",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/app/cli.py",
+        "backend/tests/test_terminal_ui.py",
         "docs/DEVELOPMENT_GOAL.md"
       ],
-      "gap": "Conversation-first GUI exists; rendered desktop/mobile/accessibility and flagpole agent/session/certification surfaces remain OPEN."
+      "gap": "Conversation-first GUI plus persistent terminal Current/Sessions/GitHub/agent surfaces are source-backed. Cross-platform PTY/rendered terminal certification, full accessibility evidence, and umbrella flagpole certification presentation remain OPEN."
     },
     {
       "id": "V22",
