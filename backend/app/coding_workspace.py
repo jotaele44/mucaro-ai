@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings, settings
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .local_tools import resolve_local_tool
 from .permissions import DirectoryPermissionError, ensure_directory_permission, is_within_path
 
@@ -87,6 +88,18 @@ def resolve_repository(repo_root: str | Path, cfg: Settings = settings) -> Repos
 
     if not selected.is_dir():
         raise CodingWorkspaceError("ERROR_CODING_REPOSITORY_NOT_DIRECTORY", f"Repository selection is not a directory: {selected}")
+    try:
+        require(
+            PermissionRequest(
+                capability="git.read",
+                subject="coding_workspace.resolve_repository",
+                target=str(selected),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise CodingWorkspaceError(exc.status, exc.detail) from exc
 
     top_proc = _git_process(selected, ["rev-parse", "--show-toplevel"])
     if top_proc.returncode != 0 or not top_proc.stdout.strip():
