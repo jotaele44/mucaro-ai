@@ -96,8 +96,14 @@
     }
   ],
   "supporting_tools": [
-    "coding.pr_request",
     "coding.exec",
+    "coding.pr_request",
+    "github.gist_view",
+    "github.gists_list",
+    "github.issue_view",
+    "github.issues_list",
+    "github.pr_view",
+    "github.prs_list",
     "memory.list",
     "product.audit",
     "source_library.status",

@@ -134,9 +134,16 @@
       "id": "V13",
       "state": "PARTIAL",
       "evidence": [
-        "docs/CODING_GOVERNANCE_BLOCKERS.md"
+        "backend/app/coding_workspace.py",
+        "backend/app/coding_mutation.py",
+        "backend/app/coding_lifecycle.py",
+        "backend/app/github_pull_requests.py",
+        "backend/app/github_resources.py",
+        "backend/app/tools.py",
+        "backend/tests/test_video_cli_governed_tools.py",
+        "backend/tests/test_github_resources.py"
       ],
-      "gap": "Read/diff/patch/review/Git evidence exists; governed branch/commit/PR mutation lifecycle remains OPEN."
+      "gap": "Governed read/diff/patch, isolated execution/regression, branch/commit, exact-head PR open/update, CI status, and bounded GitHub Issues/PRs/Gists provider surfaces are source-backed; live executed evidence, branch-push orchestration, terminal-agent integration, and whole-domain certification remain OPEN."
     },
     {
       "id": "V14",
