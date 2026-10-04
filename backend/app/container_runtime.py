@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .local_tools import bundled_only, resolve_local_tool
 
 CONTAINER_PROTOCOL = "mucaro-container-worker/1.0"
@@ -171,6 +172,17 @@ def run_container_worker(
         cpus=cpus,
         pids_limit=pids_limit,
     )
+    required_permissions = ["subprocess.execute"]
+    if network_allowed:
+        required_permissions.append("network.public_http")
+    for capability in required_permissions:
+        try:
+            require(
+                PermissionRequest(capability=capability, subject=skill_id, target=engine_path, origin="operator"),
+                distribution_channel=distribution_channel,
+            )
+        except PermissionEngineError as exc:
+            raise ContainerRuntimeError(exc.status, exc.detail) from exc
     try:
         proc = subprocess.run(
             command,
