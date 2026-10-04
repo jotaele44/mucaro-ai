@@ -96,6 +96,7 @@ def _usage_metric(raw: Any, name: str) -> dict[str, Any]:
 
 def _context_limit(
     model_provider: str | None,
+    model_name: str | None,
 ) -> tuple[dict[str, Any], str | None, bool | None, list[str]]:
     if not model_provider:
         return _unknown("tokens", "model_provider_unknown"), None, None, ["WARN_CONTEXT_LIMIT_UNKNOWN"]
@@ -104,9 +105,25 @@ def _context_limit(
     except ModelProviderError as exc:
         raise ContextUsageError(exc.status, exc.detail) from exc
     if spec.name == LOCAL_PROVIDER:
-        value = int(local_model_settings()["context_tokens"])
+        local_cfg = local_model_settings()
+        configured_model = str(local_cfg["model"])
+        if model_name and model_name != configured_model:
+            return (
+                _unknown("tokens", "local_model_context_override_unbound"),
+                spec.locality,
+                spec.supports_streaming,
+                ["WARN_CONTEXT_LIMIT_MODEL_OVERRIDE_UNBOUND"],
+            )
+        value = int(local_cfg["context_tokens"])
         source = "local_model_settings.context_tokens"
     else:
+        if model_name and model_name != spec.default_model:
+            return (
+                _unknown("tokens", f"model_provider_spec:{spec.name}.override_unbound"),
+                spec.locality,
+                spec.supports_streaming,
+                ["WARN_CONTEXT_LIMIT_MODEL_OVERRIDE_UNBOUND"],
+            )
         value = int(spec.context_tokens)
         source = f"model_provider_spec:{spec.name}.context_tokens"
     return (
@@ -162,7 +179,8 @@ def build_context_usage_status(
     summary_text = str(context_state.get("compacted_summary", ""))
 
     limit_metric, locality, supports_streaming, warnings = _context_limit(
-        str(provider) if provider else None
+        str(provider) if provider else None,
+        str(name) if name else None,
     )
 
     model_usage = trace.get("model_usage")
@@ -302,6 +320,7 @@ def build_context_usage_status(
             "cache_read_input_tokens": cache_read,
             "effective_input_tokens": effective_input,
             "output_tokens": output_tokens,
+            "total_tokens": total_metric,
             "context_consumed_tokens": consumed,
             "remaining_context_tokens": remaining,
             "context_utilization_ratio": utilization,
