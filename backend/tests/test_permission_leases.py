@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import backend.app.permission_leases as permission_leases
 from backend.app.config import Settings
 from backend.app.permission_leases import (
     PermissionLeaseError,
@@ -15,7 +16,7 @@ from backend.app.permission_leases import (
     revoke_permission_lease,
     verify_permission_lease_audit_chain,
 )
-from backend.app.tools import TOOL_REGISTRY, ToolDefinition, arguments_digest, list_tool_calls, request_tool_call
+from backend.app.tools import TOOL_REGISTRY, ToolDefinition, ToolRuntimeError, arguments_digest, list_tool_calls, request_tool_call
 
 
 def make_settings(root: Path) -> Settings:
@@ -304,3 +305,75 @@ def test_invalid_argument_hash_binding_fails_before_lease_persistence(
         )
     assert exc.value.status == "ERROR_PERMISSION_LEASE_ARGUMENT_HASH"
     assert not (cfg.processed_dir / "permission_leases.json").exists()
+
+
+def test_grant_audit_failure_rolls_back_lease_authority(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cfg = make_settings(tmp_path)
+    monkeypatch.setitem(TOOL_REGISTRY, "test.read", tool("test.read"))
+
+    def fail_audit(event, settings):
+        raise OSError("audit storage unavailable")
+
+    monkeypatch.setattr(permission_leases, "_append_audit", fail_audit)
+
+    with pytest.raises(OSError):
+        grant_permission_lease(
+            run_id="run-1",
+            scope_type="EXACT_TOOLS",
+            tool_names=["test.read"],
+            granted_by="operator",
+            cfg=cfg,
+        )
+
+    lease_path = cfg.processed_dir / "permission_leases.json"
+    assert json.loads(lease_path.read_text(encoding="utf-8")) == []
+    call = pending("test.read", run_id="run-1", cfg=cfg)
+    assert matching_permission_leases(call["tool_call_id"], cfg=cfg)["match_count"] == 0
+
+
+def test_failed_downstream_approval_releases_reserved_use(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cfg = make_settings(tmp_path)
+    monkeypatch.setitem(TOOL_REGISTRY, "test.read", tool("test.read"))
+    lease = grant_permission_lease(
+        run_id="run-1",
+        scope_type="EXACT_TOOLS",
+        tool_names=["test.read"],
+        granted_by="operator",
+        max_uses=1,
+        cfg=cfg,
+    )["lease"]
+    call = pending("test.read", run_id="run-1", cfg=cfg)
+
+    def fail_approval(*args, **kwargs):
+        raise ToolRuntimeError("ERROR_TOOL_DECISION_STALE", "simulated stale approval")
+
+    monkeypatch.setattr(permission_leases, "approve_tool_call", fail_approval)
+
+    with pytest.raises(PermissionLeaseError) as exc:
+        authorize_tool_call_with_lease(call["tool_call_id"], cfg=cfg)
+    assert exc.value.status == "ERROR_TOOL_DECISION_STALE"
+
+    stored = list_permission_leases(run_id="run-1", cfg=cfg)["leases"][0]
+    assert stored["lease_id"] == lease["lease_id"]
+    assert stored["used_call_ids"] == []
+    assert stored["effective_state"] == "ACTIVE"
+
+    audit_path = cfg.processed_dir / "permission_lease_audit.json"
+    events = json.loads(audit_path.read_text(encoding="utf-8"))
+    call_events = [
+        row["event"]
+        for row in events
+        if row.get("tool_call_id") == call["tool_call_id"]
+    ]
+    assert call_events == [
+        "LEASE_USE_RESERVED",
+        "LEASE_USE_RELEASED",
+        "LEASE_APPROVAL_FAILED",
+    ]
+    assert verify_permission_lease_audit_chain(cfg)["status"] == "PERMISSION_LEASE_AUDIT_OK"
