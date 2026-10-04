@@ -46,7 +46,7 @@ MODE_MAP = {
 }
 CTRL_C = "\x03"
 CTRL_G = "\x07"
-CTRL_I = "\x09"
+CTRL_O = "\x0f"
 CTRL_L = "\x0c"
 CTRL_P = "\x10"
 CTRL_R = "\x12"
@@ -237,7 +237,7 @@ def render_terminal_snapshot(
     plan_height = min(8, max(4, height // 5))
     header_height = 2
     footer_height = 3
-    body_height = height - header_height - footer_height - plan_height - 2
+    body_height = max(1, height - plan_height - 10)
 
     header = _clip(f"MÚCARO AI  {_status_line(snapshot, mode)}", inner_width)
     title_rule = "─" * inner_width
@@ -263,7 +263,7 @@ def render_terminal_snapshot(
     rows.append(f"├{'─' * inner_width}┤")
     prompt = _clip(f"> {input_buffer}", inner_width)
     rows.append(f"│{prompt.ljust(inner_width)}│")
-    help_text = "Tab views • Ctrl-L current • Ctrl-S sessions • Ctrl-I issues • Ctrl-R PRs • Ctrl-G gists • Ctrl-P palette • Ctrl-C stop/exit"
+    help_text = "Tab views • Ctrl-L current • Ctrl-S sessions • Ctrl-O issues • Ctrl-R PRs • Ctrl-G gists • Ctrl-P palette • Ctrl-C stop/exit"
     rows.append(f"│{_clip(help_text, inner_width).ljust(inner_width)}│")
     rows.append(f"│{_clip(notice, inner_width).ljust(inner_width)}│")
     rows.append(f"└{'─' * inner_width}┘")
@@ -520,6 +520,10 @@ class _PosixInput(AbstractContextManager["_PosixInput"]):
 
         self.previous = self.termios.tcgetattr(self.fd)
         tty.setcbreak(self.fd)
+        current = self.termios.tcgetattr(self.fd)
+        current[0] &= ~(self.termios.IXON | self.termios.IXOFF)
+        current[3] &= ~self.termios.ISIG
+        self.termios.tcsetattr(self.fd, self.termios.TCSANOW, current)
         return self
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
@@ -656,7 +660,7 @@ def run_terminal_ui(
                 if key == CTRL_S:
                     controller.set_view("sessions")
                     continue
-                if key == CTRL_I:
+                if key == CTRL_O:
                     controller.set_view("issues")
                     continue
                 if key == CTRL_R:
