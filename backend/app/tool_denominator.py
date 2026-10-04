@@ -211,6 +211,7 @@ def build_tool_denominator(
                 "name": name,
                 "mutates_state": tool.mutates_state,
                 "requires_approval": tool.requires_approval,
+                "network": tool.network,
                 "handler": _handler_identity(tool),
                 "classification": classification,
                 "runtime_evidence": evidence[name],
