@@ -8,7 +8,7 @@ from .conversations import get_conversation, list_conversations
 from .permission_leases import PermissionLeaseError, list_permission_leases
 from .tools import list_tool_calls
 from .utils import utc_now
-from .work_runs import get_run, list_runs
+from .work_runs import get_run, list_run_events, list_runs
 
 TERMINAL_VIEWS = ("current", "sessions", "issues", "pull_requests", "gists")
 GITHUB_LIST_TOOLS = {
@@ -142,6 +142,11 @@ def build_terminal_snapshot(
         else None
     )
     run_id = str(latest_run["run_id"]) if latest_run else None
+    work_plan = None
+    if run_id:
+        events = list_run_events(run_id, cfg=cfg, limit=5000)
+        plans = [event.get("data") for event in events if event.get("type") == "plan" and isinstance(event.get("data"), dict)]
+        work_plan = dict(plans[-1]) if plans else None
 
     calls = list_tool_calls(cfg)["tool_calls"]
     relevant_run_ids = {value for value in (run_id, f"tui:{selected_id}" if selected_id else None) if value}
@@ -182,6 +187,7 @@ def build_terminal_snapshot(
         "sessions": conversations,
         "runs": run_summaries,
         "current_run": latest_run,
+        "work_plan": work_plan,
         "pending_tool_calls": pending_calls,
         "permission_leases": leases,
         "permission_lease_errors": lease_errors,
