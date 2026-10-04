@@ -606,7 +606,7 @@ class _PosixInput(AbstractContextManager["_PosixInput"]):
         tty.setcbreak(self.fd)
         current = self.termios.tcgetattr(self.fd)
         current[0] &= ~(self.termios.IXON | self.termios.IXOFF)
-        current[3] &= ~self.termios.ISIG
+        current[3] &= ~(self.termios.ISIG | self.termios.IEXTEN)
         self.termios.tcsetattr(self.fd, self.termios.TCSANOW, current)
         return self
 
