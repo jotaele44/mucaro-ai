@@ -14,6 +14,7 @@ from .autopilot import AutopilotError, authorize_autopilot, run_autopilot
 from .config import Settings, settings
 from .conversations import create_conversation, get_conversation
 from .permission_leases import PermissionLeaseError, authorize_tool_call_with_lease
+from .response_flow import InteractionError, resolve_interaction
 from .terminal_projection import TERMINAL_VIEWS, TerminalProjectionError, build_terminal_snapshot
 from .tools import (
     ToolRuntimeError,
@@ -234,6 +235,19 @@ def _render_plan(snapshot: dict[str, Any], width: int, height: int) -> list[str]
                 if isinstance(step, dict):
                     label = step.get("tool") or step.get("description") or step.get("command") or step
                     lines.append(_clip(f"• {label}", width))
+    interaction = snapshot.get("pending_interaction")
+    if isinstance(interaction, dict) and len(lines) < height:
+        lines.append(_clip(f"Question: {interaction.get('question')}", width))
+        for option in interaction.get("options") or []:
+            if len(lines) >= height:
+                break
+            if isinstance(option, dict):
+                lines.append(
+                    _clip(
+                        f"  {option.get('option_id')}: {option.get('label')} — {option.get('consequence')}",
+                        width,
+                    )
+                )
     pending = snapshot.get("pending_tool_calls") or []
     if pending and len(lines) < height:
         lines.append(_clip(f"Approval needed: {pending[-1].get('tool_name')} {pending[-1].get('tool_call_id')}", width))
@@ -502,6 +516,39 @@ class TerminalController:
         if name == "deny":
             self.deny_latest()
             return
+        if name in {"answer", "answer-text"}:
+            snapshot = self.snapshot()
+            interaction = snapshot.get("pending_interaction")
+            if not isinstance(interaction, dict):
+                raise TerminalUIError("ERROR_TUI_NO_PENDING_INTERACTION", "No pending operator question.")
+            if name == "answer" and len(args) == 1:
+                option_id = args[0]
+                freeform = None
+            elif name == "answer-text" and args:
+                option_id = None
+                freeform = " ".join(args)
+            else:
+                raise TerminalUIError(
+                    "ERROR_TUI_INTERACTION_RESPONSE",
+                    "Use :answer OPTION_ID or :answer-text FREEFORM.",
+                )
+            try:
+                resolved = resolve_interaction(
+                    str(interaction["interaction_id"]),
+                    expected_version=int(interaction["version"]),
+                    resolved_by="terminal",
+                    option_id=option_id,
+                    freeform_text=freeform,
+                    cfg=self.cfg,
+                )
+            except InteractionError as exc:
+                raise TerminalUIError(exc.status, exc.detail) from exc
+            current_run = snapshot.get("current_run")
+            if isinstance(current_run, dict) and current_run.get("state") == "AWAITING_INPUT":
+                resume_waiting_run(str(current_run["run_id"]), self.cfg)
+            resolution = resolved.get("resolution") or {}
+            self.notice = f"Resolved question: {resolution.get('option_id') or resolution.get('freeform_text')}"
+            return
         if name == "stop":
             if not self.stop_active():
                 self.notice = "No active run to stop."
@@ -531,7 +578,8 @@ class TerminalController:
         if name == "help":
             self.notice = (
                 ":mode plan|interactive|auto|autopilot • :new • :open ID • "
-                ":issues REPO • :prs REPO • :gists [OWNER] • :approve [lease] • :deny • :stop"
+                ":issues REPO • :prs REPO • :gists [OWNER] • :approve [lease] • :deny • "
+                ":answer OPTION • :answer-text TEXT • :stop"
             )
             return
         raise TerminalUIError("ERROR_TUI_COMMAND", f"Unknown or invalid command: {command}")
