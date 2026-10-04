@@ -171,7 +171,11 @@ def build_terminal_snapshot(
     work_plan = None
     if run_id:
         events = list_run_events(run_id, cfg=cfg, limit=5000)
-        plans = [event.get("data") for event in events if event.get("type") == "plan" and isinstance(event.get("data"), dict)]
+        plans = [
+            event.get("data")
+            for event in events
+            if event.get("type") == "plan" and isinstance(event.get("data"), dict)
+        ]
         work_plan = dict(plans[-1]) if plans else None
 
     calls = list_tool_calls(cfg)["tool_calls"]
