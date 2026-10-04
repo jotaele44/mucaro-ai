@@ -108,13 +108,29 @@ def _status_line(snapshot: dict[str, Any], mode: str) -> str:
     usage = snapshot.get("context_usage") if isinstance(snapshot.get("context_usage"), dict) else {}
     model = usage.get("model") if isinstance(usage.get("model"), dict) else {}
     metrics = usage.get("metrics") if isinstance(usage.get("metrics"), dict) else {}
-    provider = model.get("provider") or (snapshot.get("checkpoint") or {}).get("provider") or "no-model"
-    name = model.get("name") or (snapshot.get("checkpoint") or {}).get("model") or "default"
+    configured = snapshot.get("configured_model") or {}
+    provider = (
+        model.get("provider")
+        or (snapshot.get("checkpoint") or {}).get("provider")
+        or configured.get("provider")
+        or "no-model"
+    )
+    name = (
+        model.get("name")
+        or (snapshot.get("checkpoint") or {}).get("model")
+        or configured.get("name")
+        or "default"
+    )
     consumed = _metric_text(metrics.get("context_consumed_tokens"))
     limit = _metric_text(metrics.get("context_limit_tokens"))
     run = snapshot.get("current_run") or {}
     state = run.get("state") or (snapshot.get("checkpoint") or {}).get("state") or "IDLE"
-    return f"{provider}/{name} • {mode} • ctx {consumed}/{limit} • {state}"
+    repo_status = snapshot.get("repository_status") or {}
+    repo_result = repo_status.get("result") if isinstance(repo_status, dict) else {}
+    branch = repo_result.get("branch") if isinstance(repo_result, dict) else None
+    head_sha = repo_result.get("head_sha") if isinstance(repo_result, dict) else None
+    git = f" • {branch or 'detached'}@{str(head_sha)[:8]}" if head_sha else ""
+    return f"{provider}/{name} • {mode} • ctx {consumed}/{limit} • {state}{git}"
 
 
 def _sidebar(snapshot: dict[str, Any], height: int, width: int) -> list[str]:
