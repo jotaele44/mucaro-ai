@@ -9,12 +9,11 @@ from .db import init_db, upsert_payload
 from .exports import export_answer_trace
 from .ingestion import get_chunks
 from .injection_guard import scan_chunks, scan_text
-from .agent_checkpoints import CheckpointError
 from .memory_policy import MemorySelectionError, select_memory_context
 from .model_failover import FailoverPolicy, run_with_failover
 from .model_router import generate_answer
 from .model_routing_policy import ModelRoutingError, plan_model_route
-from .provider_recovery import pause_provider_checkpoint
+from .provider_recovery import ProviderRecoveryError, pause_provider_checkpoint
 from .retrieval import retrieve
 from .utils import stable_id, utc_now
 
@@ -154,7 +153,7 @@ def answer_question(
                     provider_error=failover["error_status"],
                     cfg=cfg,
                 )
-            except CheckpointError as exc:
+            except ProviderRecoveryError as exc:
                 return {**failure, "checkpoint_error": exc.status}
             return {
                 **failure,
