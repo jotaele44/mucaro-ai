@@ -5,7 +5,7 @@
   "audit_scope": "Default-branch source evidence plus existing committed runtime/regression evidence. Implementation state is not exact-head parity certification.",
   "implementation_states": ["IMPLEMENTED","PARTIAL","ABSENT","UNVERIFIED"],
   "certification_states": ["PASS","FAIL","OPEN","BLOCKED","PROVISIONAL","AUDIT_ONLY","NONCANONICAL","CANDIDATE_NOT_IDENTITY","UNRESOLVED","SUPERSEDED"],
-  "counts": {"IMPLEMENTED":8,"PARTIAL":17,"ABSENT":2,"UNVERIFIED":0,"TOTAL":27},
+  "counts": {"IMPLEMENTED":8,"PARTIAL":18,"ABSENT":1,"UNVERIFIED":0,"TOTAL":27},
   "rows": [
     {"id":"VCP-001","implementation_state":"PARTIAL","certification_state":"OPEN","evidence":["backend/app/conversations.py","backend/app/work_runs.py","backend/app/agent_checkpoints.py"],"gap":"Durable sessions/runs exist; no persistent terminal-native full-screen session surface exists."},
     {"id":"VCP-002","implementation_state":"IMPLEMENTED","certification_state":"OPEN","evidence":["backend/app/coding_workspace.py","backend/app/tools.py","backend/tests/test_coding_tools.py"],"gap":"Parity-specific exact-head execution receipt remains to be produced."},
@@ -32,7 +32,7 @@
     {"id":"VCP-023","implementation_state":"PARTIAL","certification_state":"OPEN","evidence":["backend/app/cli.py","backend/app/github_ci.py","backend/app/tools.py","backend/tests/test_github_ci.py","backend/tests/test_video_cli_governed_tools.py"],"gap":"Governed read-only CI status with exact-head binding is source-backed; live remote execution evidence and terminal-agent integration remain open."},
     {"id":"VCP-024","implementation_state":"PARTIAL","certification_state":"OPEN","evidence":["backend/app/coding_lifecycle.py","backend/app/github_pull_requests.py","backend/app/tools.py","_architecture/mucaro_flagpole_tool_denominator_v1.json"],"gap":"Exact local PR requests and governed authenticated open/update are source-backed with remote-head verification; live remote execution, branch push orchestration, and terminal-agent integration remain open."},
     {"id":"VCP-025","implementation_state":"PARTIAL","certification_state":"OPEN","evidence":["backend/app/model_routing_policy.py","backend/app/work_runs.py"],"gap":"Model/mode state exists but terminal-native status presentation is absent."},
-    {"id":"VCP-026","implementation_state":"ABSENT","certification_state":"OPEN","evidence":[],"gap":"No canonical live context/token-usage status contract is implemented for the terminal."},
+    {"id":"VCP-026","implementation_state":"PARTIAL","certification_state":"OPEN","evidence":["backend/app/context_usage.py","schemas/context_usage.schema.json","backend/app/model_router.py","backend/app/services.py","backend/app/work_runs.py","backend/tests/test_context_usage.py","backend/tests/test_local_model.py","backend/tests/test_work_runs.py"],"gap":"Canonical context/usage projection is source-backed with exact char/byte counts, provider-declared context limits, provider-reported token usage when available, UNKNOWN rather than estimated missing metrics, contradiction warnings, and work-run persistence; terminal status presentation, complete provider metering, cost telemetry, and executed parity certification remain open."},
     {"id":"VCP-027","implementation_state":"ABSENT","certification_state":"OPEN","evidence":[],"gap":"No persistent full-screen terminal user interface exists."}
   ]
 }

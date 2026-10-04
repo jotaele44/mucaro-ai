@@ -101,6 +101,14 @@ def test_answer_run_streams_an_ordered_feed_and_persists_turns(cfg, conversation
     assert [turn["role"] for turn in turns] == ["user", "assistant"]
     assert turns[1]["content"] == answer
     assert {turn["work_run_id"] for turn in turns} == {run["run_id"]}
+    context_usage = run["context_usage"]
+    assert context_usage["schema_version"] == "mucaro-context-usage/1.0"
+    assert context_usage["model"]["provider"] == "mock"
+    assert context_usage["model"]["run_mode"] == "ask"
+    assert context_usage["metrics"]["input_tokens"]["classification"] == "UNKNOWN"
+    assert context_usage["metrics"]["raw_context_chars"]["classification"] == "COMPUTED"
+    final = next(event for event in events if event["type"] == "final")
+    assert final["data"]["context_usage"] == context_usage
 
 
 def test_idempotent_resubmission_returns_the_original_run(cfg, conversation):

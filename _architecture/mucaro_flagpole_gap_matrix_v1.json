@@ -39,10 +39,15 @@
       "id": "V03",
       "state": "PARTIAL",
       "evidence": [
-        "backend/app/conversations.py: MAX_CONTEXT_TURNS=8, MAX_CONTEXT_CHARS=2400",
-        "backend/app/model_router.py"
+        "backend/app/context_state.py",
+        "backend/app/context_usage.py",
+        "schemas/context_usage.schema.json",
+        "backend/app/conversations.py",
+        "backend/app/model_router.py",
+        "backend/app/work_runs.py",
+        "backend/tests/test_context_usage.py"
       ],
-      "gap": "Bounded context exists; canonical-state-preserving automatic compaction/re-hydration not evidenced."
+      "gap": "Canonical-history-preserving deterministic compaction/rehydration and provenance-classified context/token telemetry are source-backed. Complete provider metering, terminal presentation, long-horizon context stress evidence, and exact-head runtime certification remain OPEN."
     },
     {
       "id": "V04",
