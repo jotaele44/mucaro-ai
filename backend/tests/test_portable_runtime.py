@@ -124,6 +124,21 @@ def test_portable_verifier_accepts_legacy_v1_manifest_without_exclusion_receipt(
     assert checks["application_exclusion_receipt"]["detail"] == "legacy_v1_manifest_without_exclusion_receipt"
 
 
+def test_portable_verifier_rejects_undeclared_physical_nested_app_bundle(tmp_path: Path) -> None:
+    root, runtime = fixture_project(tmp_path)
+    report = build_portable_macos_app(root, runtime, output_dir=root / "out")
+    app = Path(report["app_path"])
+
+    injected = app / "Contents" / "Resources" / "app" / "Injected.app" / "Contents" / "Info.plist"
+    injected.parent.mkdir(parents=True)
+    injected.write_text("<plist/>\n", encoding="utf-8")
+
+    result = verify_portable_macos_app(app)
+
+    assert result["status"] == "PORTABLE_APP_VERIFY_FAILED"
+    assert "application_member_manifest" in result["failed_checks"]
+
+
 def test_portable_verifier_rejects_manifest_declared_nested_app_bundle(tmp_path: Path) -> None:
     root, runtime = fixture_project(tmp_path)
     report = build_portable_macos_app(root, runtime, output_dir=root / "out")
