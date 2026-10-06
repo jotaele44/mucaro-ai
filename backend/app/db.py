@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 from pathlib import Path
 from typing import Any
 
-from .config import settings
+from .config import parse_bool, settings
 
 # Bump when tables change; init_db only ever moves the recorded version forward.
 SCHEMA_VERSION = 2
@@ -111,6 +112,14 @@ def init_db(sqlite_path: Path | None = None) -> None:
         except BaseException:
             conn.execute("ROLLBACK")
             raise
+        # Only after the version check, so a newer database is refused without being touched.
+        # WAL keeps durability (synchronous stays FULL) with one fsync per commit, and readers
+        # stop blocking the writer. It persists in the file; MUCARO_AI_SQLITE_WAL=0 opts out.
+        if parse_bool(os.getenv("MUCARO_AI_SQLITE_WAL") or None, True):
+            try:
+                conn.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.OperationalError:
+                pass  # Best effort: a busy or unsupported file keeps its journal mode.
     finally:
         conn.close()
 
