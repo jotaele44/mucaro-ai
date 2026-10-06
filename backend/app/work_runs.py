@@ -103,6 +103,10 @@ _RUN_LOCKS: dict[str, threading.Lock] = {}
 _RUN_KICKS: set[str] = set()
 _LOCKS_GUARD = threading.Lock()
 _CONVERSATION_DISPATCH_LOCK = threading.Lock()
+# Bumped after every committed write so event streams in this process wake at once instead of
+# waiting out their poll interval; writers in other processes are still seen by the poll.
+_EVENTS_COMMITTED = threading.Condition()
+_COMMIT_GENERATION = [0]
 
 
 class RunError(RuntimeError):
@@ -203,6 +207,10 @@ class _Tx:
             self.conn.execute("ROLLBACK" if exc_type else "COMMIT")
         finally:
             self.conn.close()
+        if not exc_type:
+            with _EVENTS_COMMITTED:
+                _COMMIT_GENERATION[0] += 1
+                _EVENTS_COMMITTED.notify_all()
 
 
 def get_run(run_id: str, cfg: Settings = settings) -> dict[str, Any]:
@@ -1012,11 +1020,14 @@ def stream_run_events(
     started = time.monotonic()
     last_beat = started
     while True:
+        generation = _COMMIT_GENERATION[0]
+        # Read state before events: a run already terminal at this read has committed every event,
+        # so ending on an empty read can never drop events written between the two reads.
+        run = get_run(run_id, cfg)
         events = list_run_events(run_id, after_seq=last, cfg=cfg)
         for event in events:
             last = event["seq"]
             yield f"id: {event['seq']}\nevent: {event['type']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
-        run = get_run(run_id, cfg)
         if run["state"] in TERMINAL_STATES and not events:
             yield f"event: end\ndata: {json.dumps({'run_id': run_id, 'state': run['state'], 'last_seq': last})}\n\n"
             return
@@ -1028,4 +1039,5 @@ def stream_run_events(
             last_beat = now
             yield ": keep-alive\n\n"
         if not events:
-            time.sleep(poll_seconds)
+            with _EVENTS_COMMITTED:
+                _EVENTS_COMMITTED.wait_for(lambda seen=generation: _COMMIT_GENERATION[0] != seen, timeout=poll_seconds)
