@@ -166,7 +166,7 @@ def test_deleted_conversation_is_not_resurrected_by_a_writer(tmp_path):
     from backend.app.conversations import delete_conversation
     cfg = make_settings(tmp_path)
     cid = create_conversation("Deleted", cfg)["conversation_id"]
-    assert delete_conversation(cid, cfg)["removed"] is True
+    assert delete_conversation(cid, cfg)["removed"] == 1
     with pytest.raises(KeyError):
         append_turns(cid, [{"turn_id": "late", "content": "Late answer"}], cfg)
     with pytest.raises(KeyError):
