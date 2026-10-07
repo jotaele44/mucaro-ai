@@ -35,6 +35,7 @@ from .conversations import (
     get_conversation,
     list_conversations,
     rename_conversation,
+    update_conversation,
 )
 from .db import list_payloads
 from .execution_gate import analyze_task
@@ -911,6 +912,15 @@ def build_parser() -> argparse.ArgumentParser:
     conversations_rename.add_argument("title", nargs="+", help="New conversation title.")
     conversations_rename.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     conversations_rename.set_defaults(handler=run_conversations_rename)
+
+    for command, field, value in (
+        ("pin", "pinned", True), ("unpin", "pinned", False),
+        ("archive", "archived", True), ("restore", "archived", False),
+    ):
+        action = conversations_subcommands.add_parser(command, help=f"{command.capitalize()} a saved conversation.")
+        action.add_argument("conversation_id", help="Conversation identifier.")
+        action.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+        action.set_defaults(handler=run_conversations_organize, organization_field=field, organization_value=value)
 
     conversations_delete = conversations_subcommands.add_parser("delete", help="Delete one saved conversation.")
     conversations_delete.add_argument("conversation_id", help="Conversation identifier.")
@@ -8019,6 +8029,16 @@ def run_conversations_delete(args: argparse.Namespace, cfg: Settings) -> int:
     result = delete_conversation(args.conversation_id, cfg)
     emit_payload(result, args.format)
     return 0 if result.get("status") == "CONVERSATION_DELETE_OK" else 2
+
+
+def run_conversations_organize(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = update_conversation(args.conversation_id, {args.organization_field: args.organization_value}, cfg)
+    except KeyError:
+        emit_payload({"status": "ERROR_CONVERSATION_NOT_FOUND", "conversation_id": args.conversation_id}, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
 
 
 def run_conversations_ask(args: argparse.Namespace, cfg: Settings) -> int:

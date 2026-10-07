@@ -28,6 +28,22 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 
 ## Commands
 
+Conversation organization uses the same durable service as the local UI. Pinning
+and archiving are explicit states; restoring preserves the transcript and ID.
+The list includes archived rows and their flags. Permanent deletion has no undo.
+See [Durable Conversation Organization](CONVERSATION_ORGANIZATION.md) for revision,
+concurrency and replay boundaries.
+
+```bash
+mucaro conversations pin CONVERSATION_ID
+mucaro conversations unpin CONVERSATION_ID
+mucaro conversations archive CONVERSATION_ID
+mucaro conversations restore CONVERSATION_ID
+```
+
+Replace CONVERSATION_ID with the saved conversation ID returned by creation or
+listing. Missing targets return the existing error payload and failure exit code.
+
 | Command | Purpose | Success Exit | Failure Exit |
 |---|---|---:|---:|
 | `mucaro doctor` | Check local assistant readiness | 0 | 2 with `--strict` warnings/failures |

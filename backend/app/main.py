@@ -12,6 +12,7 @@ from .auth import auth_status, client_is_remote, is_public_api_path, require_ope
 from .config import Settings, settings
 from .conversations import (
     ConversationMessageEditError,
+    ConversationRevisionError,
     append_answer_turn,
     build_conversation_context,
     create_conversation,
@@ -19,7 +20,7 @@ from .conversations import (
     edit_conversation_message,
     get_conversation,
     list_conversations,
-    rename_conversation,
+    update_conversation,
 )
 from .db import init_db, list_payloads, upsert_payload
 from .execution_gate import analyze_task, approve_execution
@@ -405,17 +406,23 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         return payload
 
     @app.patch("/conversations/{conversation_id}")
-    def rename_chat(
+    def update_chat(
         conversation_id: str,
         req: ConversationUpdateRequest,
         _auth: dict = Depends(require_auth),
     ) -> dict:
         try:
-            return rename_conversation(conversation_id, req.title, cfg)
+            changes = req.model_dump(exclude_unset=True, exclude={"expected_revision"})
+            return update_conversation(conversation_id, changes, cfg, expected_revision=req.expected_revision)
         except KeyError as exc:
             raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
         except ValueError as exc:
-            raise api_error(str(exc), "Conversation title is required.") from exc
+            raise api_error(str(exc), "A valid conversation update is required.") from exc
+        except ConversationRevisionError as exc:
+            raise api_error(
+                "ERROR_CONVERSATION_REVISION_CONFLICT", str(exc), status_code=409,
+                current_revision=exc.current_revision,
+            ) from exc
 
     @app.delete("/conversations/{conversation_id}")
     def delete_chat(conversation_id: str, _auth: dict = Depends(require_auth)) -> dict:
@@ -609,6 +616,8 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             conflict = exc.status in {"ERROR_MESSAGE_EDIT_REVISION_CONFLICT", "ERROR_MESSAGE_EDITS_INVALID"}
             missing = exc.status == "ERROR_CONVERSATION_NOT_FOUND"
             raise api_error(exc.status, exc.detail, status_code=404 if missing else 409 if conflict else 400) from exc
+        except KeyError as exc:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
         return {"status": "MESSAGE_EDITED", "message_edit": edit}
 
     @app.get("/conversations/{conversation_id}/runs")
