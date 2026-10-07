@@ -2783,12 +2783,15 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         for conversation in payload.get("conversations", []):
             print(
                 f"{conversation.get('conversation_id')} {conversation.get('title')} "
-                f"turns={conversation.get('turn_count', 0)} status={conversation.get('last_status')}"
+                f"turns={conversation.get('turn_count', 0)} status={conversation.get('last_status')} "
+                f"pinned={conversation.get('pinned', False)} archived={conversation.get('archived', False)} "
+                f"revision={conversation.get('revision', 0)}"
             )
     elif "conversation_id" in payload and "turns" in payload:
         print(f"conversation_id={payload.get('conversation_id')}")
         print(f"title={payload.get('title')}")
         print(f"turns={len(payload.get('turns', []))}")
+        print(f"pinned={payload.get('pinned', False)} archived={payload.get('archived', False)} revision={payload.get('revision', 0)}")
         for turn in payload.get("turns", []):
             print(f"{turn.get('role')} {turn.get('status')} {turn.get('run_id') or ''}".rstrip())
     elif "runs" in payload:

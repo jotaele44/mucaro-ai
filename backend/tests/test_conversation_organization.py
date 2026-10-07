@@ -192,3 +192,7 @@ def test_cli_organization_uses_shared_persistence(tmp_path, capsys):
         assert get_conversation(cid, cfg)[field] is value
     assert main(["conversations", "archive", "missing"], cfg=cfg) == 2
     assert "ERROR_CONVERSATION_NOT_FOUND" in capsys.readouterr().out
+    assert main(["conversations", "pin", cid, "--format", "text"], cfg=cfg) == 0
+    assert "pinned=True archived=False revision=5" in capsys.readouterr().out
+    assert main(["conversations", "list", "--format", "text"], cfg=cfg) == 0
+    assert "pinned=True archived=False revision=5" in capsys.readouterr().out
