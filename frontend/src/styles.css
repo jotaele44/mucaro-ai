@@ -219,12 +219,37 @@ textarea {
   flex: 1;
 }
 
+.conversation-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.conversation-tabs button {
+  flex: 1;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.conversation-tabs button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+.conversation-error p {
+  margin: 0;
+  font-size: 13px;
+}
+
 .conversation-list {
   overflow-y: auto;
   flex: 1;
 }
 
 .conversation-title {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

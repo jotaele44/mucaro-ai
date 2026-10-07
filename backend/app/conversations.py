@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import threading
+import json
+from contextlib import contextmanager
 from typing import Any
+from uuid import uuid4
 
 from .config import Settings, settings
 from .context_state import build_context_state, build_model_context
-from .db import delete_payload, init_db, list_payloads, upsert_payload
+from .db import delete_payload, get_connection, init_db, list_payloads, upsert_payload
 from .utils import stable_id, utc_now
 
 DEFAULT_TITLE = "New chat"
-# Serializes read-modify-write of a conversation row within this process.
-_CONVERSATION_LOCK = threading.RLock()
 MAX_CONTEXT_TURNS = 8
 MAX_CONTEXT_CHARS = 2400
 
@@ -20,6 +20,42 @@ class ConversationMessageEditError(RuntimeError):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+
+
+class ConversationRevisionError(RuntimeError):
+    def __init__(self, current_revision: int):
+        super().__init__("Conversation changed. Reload it before saving.")
+        self.current_revision = current_revision
+
+
+@contextmanager
+def _conversation_write(conversation_id: str, cfg: Settings):
+    """Serialize every read-modify-write across processes, including message writers."""
+    init_db(cfg.sqlite_path)
+    conn = get_connection(cfg.sqlite_path)
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT payload_json FROM conversations WHERE conversation_id = ?", (conversation_id,)
+        ).fetchone()
+        if row is None:
+            raise KeyError(conversation_id)
+        conversation = json.loads(row["payload_json"])
+        before = json.dumps(conversation, ensure_ascii=False, sort_keys=True)
+        yield conversation
+        if json.dumps(conversation, ensure_ascii=False, sort_keys=True) != before:
+            conversation["revision"] = conversation.get("revision", 0) + 1
+            conversation["updated_at"] = utc_now()
+            conn.execute(
+                "UPDATE conversations SET payload_json = ? WHERE conversation_id = ?",
+                (json.dumps(conversation, ensure_ascii=False, sort_keys=True), conversation_id),
+            )
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _title_from_query(query: str) -> str:
@@ -33,12 +69,15 @@ def create_conversation(title: str | None = None, cfg: Settings = settings) -> d
     now = utc_now()
     resolved_title = (title or DEFAULT_TITLE).strip() or DEFAULT_TITLE
     conversation = {
-        "conversation_id": stable_id("conv", resolved_title, now, length=12),
+        "conversation_id": f"conv_{uuid4().hex}",
         "title": resolved_title,
         "created_at": now,
         "updated_at": now,
         "turns": [],
         "message_edits": {},
+        "pinned": False,
+        "archived": False,
+        "revision": 0,
     }
     upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
     return conversation
@@ -58,29 +97,57 @@ def list_conversations(cfg: Settings = settings) -> list[dict[str, Any]]:
                 "updated_at": conversation.get("updated_at"),
                 "turn_count": len(turns),
                 "last_status": turns[-1].get("status") if turns else "EMPTY",
+                "pinned": conversation.get("pinned", False),
+                "archived": conversation.get("archived", False),
+                "revision": conversation.get("revision", 0),
             }
         )
-    return sorted(summaries, key=lambda item: item.get("updated_at") or "", reverse=True)
+    # Stable ID breaks timestamp ties independently of SQLite row order.
+    summaries.sort(key=lambda item: item["conversation_id"])
+    summaries.sort(key=lambda item: item.get("updated_at") or "", reverse=True)
+    summaries.sort(key=lambda item: (item["archived"], not item["pinned"]))
+    return summaries
 
 
 def get_conversation(conversation_id: str, cfg: Settings = settings) -> dict[str, Any] | None:
     init_db(cfg.sqlite_path)
-    for conversation in list_payloads("conversations", cfg.sqlite_path):
-        if conversation.get("conversation_id") == conversation_id:
-            return conversation
-    return None
+    conn = get_connection(cfg.sqlite_path)
+    try:
+        row = conn.execute(
+            "SELECT payload_json FROM conversations WHERE conversation_id = ?", (conversation_id,)
+        ).fetchone()
+        return json.loads(row["payload_json"]) if row else None
+    finally:
+        conn.close()
 
 
 def rename_conversation(conversation_id: str, title: str, cfg: Settings = settings) -> dict[str, Any]:
-    conversation = get_conversation(conversation_id, cfg)
-    if conversation is None:
-        raise KeyError(conversation_id)
-    resolved_title = " ".join(title.strip().split())
-    if not resolved_title:
-        raise ValueError("ERROR_CONVERSATION_TITLE_REQUIRED")
-    conversation["title"] = resolved_title[:120]
-    conversation["updated_at"] = utc_now()
-    upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
+    return update_conversation(conversation_id, {"title": title}, cfg)
+
+
+def update_conversation(
+    conversation_id: str,
+    changes: dict[str, Any],
+    cfg: Settings = settings,
+    *,
+    expected_revision: int | None = None,
+) -> dict[str, Any]:
+    if not changes or set(changes) - {"title", "pinned", "archived"}:
+        raise ValueError("ERROR_CONVERSATION_UPDATE_INVALID")
+    changes = dict(changes)
+    if "title" in changes:
+        if not isinstance(changes["title"], str) or not changes["title"].strip():
+            raise ValueError("ERROR_CONVERSATION_TITLE_REQUIRED")
+        changes["title"] = " ".join(changes["title"].strip().split())[:120]
+    if any(type(changes[key]) is not bool for key in {"pinned", "archived"} & changes.keys()):
+        raise ValueError("ERROR_CONVERSATION_UPDATE_INVALID")
+    if expected_revision is not None and (type(expected_revision) is not int or expected_revision < 0):
+        raise ValueError("ERROR_CONVERSATION_REVISION_INVALID")
+    with _conversation_write(conversation_id, cfg) as conversation:
+        revision = conversation.get("revision", 0)
+        if expected_revision is not None and expected_revision != revision:
+            raise ConversationRevisionError(revision)
+        conversation.update(changes)
     return conversation
 
 
@@ -104,10 +171,7 @@ def edit_conversation_message(
     """Store a display-only message revision without mutating the canonical turn or run."""
     if not content.strip():
         raise ConversationMessageEditError("ERROR_MESSAGE_EDIT_EMPTY", "Edited message content is required.")
-    with _CONVERSATION_LOCK:
-        conversation = get_conversation(conversation_id, cfg)
-        if conversation is None:
-            raise ConversationMessageEditError("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.")
+    with _conversation_write(conversation_id, cfg) as conversation:
         raw_edits = conversation.get("message_edits") or {}
         if not isinstance(raw_edits, dict):
             raise ConversationMessageEditError(
@@ -145,7 +209,6 @@ def edit_conversation_message(
         edits[message_key] = edit
         conversation["message_edits"] = edits
         conversation["updated_at"] = now
-        upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
         return edit
 
 
@@ -166,18 +229,25 @@ def append_turns(
     *,
     title_hint: str | None = None,
 ) -> dict[str, Any]:
-    """Append pre-built turns; turn IDs already present are not duplicated (idempotent replay)."""
-    with _CONVERSATION_LOCK:
-        conversation = get_conversation(conversation_id, cfg)
-        if conversation is None:
-            raise KeyError(conversation_id)
-        existing = {turn.get("turn_id") for turn in conversation.get("turns", [])}
-        new_turns = [turn for turn in turns if turn.get("turn_id") not in existing]
+    """Replay identical turns without changes; reject conflicting reuse of a turn ID."""
+    with _conversation_write(conversation_id, cfg) as conversation:
+        existing = {turn.get("turn_id"): turn for turn in conversation.get("turns", [])}
+        new_turns = []
+        for turn in turns:
+            turn_id = turn.get("turn_id")
+            if not isinstance(turn_id, str) or not turn_id:
+                raise ValueError("ERROR_TURN_ID_REQUIRED")
+            if turn_id in existing and existing[turn_id] != turn:
+                raise ValueError("ERROR_TURN_ID_CONFLICT")
+            if turn_id not in existing:
+                new_turns.append(turn)
+                existing[turn_id] = turn
+        if not new_turns:
+            return conversation
         conversation["turns"] = list(conversation.get("turns", [])) + new_turns
         if conversation.get("title") == DEFAULT_TITLE and title_hint:
             conversation["title"] = _title_from_query(title_hint)
         conversation["updated_at"] = utc_now()
-        upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
         return conversation
 
 
@@ -187,19 +257,17 @@ def append_answer_turn(
     answer_trace: dict[str, Any],
     cfg: Settings = settings,
 ) -> dict[str, Any]:
-    with _CONVERSATION_LOCK:
-        return _append_answer_turn(conversation_id, query, answer_trace, cfg)
+    with _conversation_write(conversation_id, cfg) as conversation:
+        _append_answer_turn(conversation, conversation_id, query, answer_trace)
+    return conversation
 
 
 def _append_answer_turn(
+    conversation: dict[str, Any],
     conversation_id: str,
     query: str,
     answer_trace: dict[str, Any],
-    cfg: Settings,
 ) -> dict[str, Any]:
-    conversation = get_conversation(conversation_id, cfg)
-    if conversation is None:
-        raise KeyError(conversation_id)
     now = utc_now()
     turns = list(conversation.get("turns", []))
     turns.append(
@@ -231,5 +299,4 @@ def _append_answer_turn(
     if conversation.get("title") == DEFAULT_TITLE:
         conversation["title"] = _title_from_query(query)
     conversation["updated_at"] = now
-    upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
     return conversation
