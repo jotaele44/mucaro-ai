@@ -37,6 +37,7 @@ import time
 from collections.abc import Iterator
 from typing import Any
 
+from . import agent
 from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
 from .db import ensure_db, get_connection
@@ -74,6 +75,7 @@ RUN_STATES = ("QUEUED", "RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT", "COMPL
 ACTIVE_STATES = {"RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT"}
 TERMINAL_STATES = {"COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"}
 MODES = {
+    "agent": "Claude works on its own: web search, its code sandbox and read-only local actions run; changes to files or memory still ask.",
     "plan": "Show the plan and proposed actions; execute nothing.",
     "ask": "Ask before every action (default).",
     "auto": "Pre-approve local read-only actions; anything that changes state or uses the network still asks.",
@@ -81,7 +83,16 @@ MODES = {
 EVENT_TYPES = {
     "queued", "run_started", "route", "plan", "tool_call", "approval_request", "tool_started", "tool_result",
     "tool_summary", "question", "question_resolved", "retry_requested", "user_note", "retrieval", "text_delta",
-    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final",
+    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final", "progress", "usage",
+}
+# Modes in which slash commands that are local and read-only run without asking.
+AUTO_APPROVE_MODES = {"auto", "agent"}
+# What an action that never ran tells Claude, by why its turn ended.
+SALVAGE_REASONS = {
+    "USER_STOP": "Not run: the user stopped this turn.",
+    "SUPERSEDED_BY_NEW_MESSAGE": "Not run: the user sent a new message instead.",
+    "PROCESS_RESTART": "Not run: the app restarted during this turn.",
+    "FAILED": "Not run: this turn failed.",
 }
 MAX_PROMPT_CHARS = 20_000
 TEXT_DELTA_CHARS = 160
@@ -137,7 +148,7 @@ def available_modes() -> dict[str, Any]:
                 "auto_approvable": _auto_approvable(spec["tool"]),
             }
         )
-    return {"status": "RUN_MODES_OK", "default_mode": "ask", "modes": [{"mode": key, "description": value} for key, value in MODES.items()], "commands": commands}
+    return {"status": "RUN_MODES_OK", "default_mode": "agent", "modes": [{"mode": key, "description": value} for key, value in MODES.items()], "commands": commands}
 
 
 def _auto_approvable(tool_name: str) -> bool:
@@ -475,10 +486,31 @@ def stop_run(run_id: str, *, reason: str = "USER_STOP", cfg: Settings = settings
         # Nothing is executing; finalize now under the run lock.
         _with_run_lock(run_id, lambda: _finalize_interrupt(run_id, cfg))
         _dispatch(run["conversation_id"], cfg)
+    else:
+        agent.abort(run_id)
     return get_run(run_id, cfg)
 
 
+def _salvage_agent(run_id: str, reason: str, cfg: Settings) -> None:
+    """Commit the finished part of an unfinished Claude turn so the conversation can continue.
+
+    Never raises: stopping or failing a run must not depend on the history write succeeding.
+    """
+    run = get_run(run_id, cfg)
+    state = run.get("agent")
+    if not isinstance(state, dict) or state.get("committed") or not state.get("started"):
+        return
+    try:
+        agent.salvage_run(run, SALVAGE_REASONS.get(reason, SALVAGE_REASONS["USER_STOP"]), cfg)
+    except Exception:  # noqa: BLE001 - the next turn repairs open tool calls in the stored history
+        return
+    _update(run_id, cfg, lambda current: current.__setitem__("agent", run["agent"]))
+
+
 def _finalize_interrupt(run_id: str, cfg: Settings) -> None:
+    current = get_run(run_id, cfg)
+    if current["state"] not in TERMINAL_STATES:
+        _salvage_agent(run_id, current.get("cancel_reason") or "USER_STOP", cfg)
     calls = _run_calls(get_run(run_id, cfg), cfg)
     cancelled = []
     for call in calls:
@@ -528,6 +560,9 @@ def reconcile_runs_on_startup(cfg: Settings = settings) -> dict[str, Any]:
             _emit(conn, run["run_id"], "interrupted", {"reason": "PROCESS_RESTART"})
             interrupted.append(run["run_id"])
         conversations = [row["conversation_id"] for row in conn.execute("SELECT DISTINCT conversation_id FROM work_runs WHERE state = 'QUEUED'").fetchall()]
+    # After the transaction: the history store takes its own write lock.
+    for run_id in interrupted:
+        _salvage_agent(run_id, "PROCESS_RESTART", cfg)
     for conversation_id in conversations:
         _dispatch(conversation_id, cfg)
     return {"status": "RUN_RECONCILE_OK", "interrupted": interrupted}
@@ -588,6 +623,8 @@ def advance_run(run_id: str, cfg: Settings = settings) -> None:
 
 
 def _fail(run_id: str, status: str, detail: str, cfg: Settings) -> None:
+    if get_run(run_id, cfg)["state"] not in TERMINAL_STATES:
+        _salvage_agent(run_id, "FAILED", cfg)
     with _Tx(cfg) as conn:
         run = _load(conn, run_id)
         if run["state"] in TERMINAL_STATES:
@@ -640,10 +677,86 @@ def _advance_once(run_id: str, cfg: Settings) -> None:
                 return
         elif phase == "answer":
             _phase_answer(run, cfg)
+        elif phase == "agent":
+            if not _phase_agent(run, cfg):
+                return
         elif phase == "done":
             return
         else:
             raise RunError("ERROR_RUN_PHASE_UNKNOWN", phase)
+
+
+ENGINE_AGENT = "claude_agent"
+
+
+class _AgentRoute(Exception):
+    def __init__(self, model: str) -> None:
+        super().__init__(model)
+        self.model = model
+
+
+def _agent_engine(run: dict[str, Any], question: str, cfg: Settings) -> bool:
+    """Claude answers when it is connected and allowed; offline, local-model and plan runs keep the cited-answer path."""
+    options = run.get("options", {})
+    if run["mode"] == "plan" or not question:
+        return False
+    if options.get("require_offline") or options.get("model_provider") == "openai_compatible_local":
+        return False
+    return agent.agent_ready(cfg)
+
+
+def _phase_agent(run: dict[str, Any], cfg: Settings) -> bool:
+    """One Claude turn (``agent.advance_turn``). Returns True only if the run should keep advancing now."""
+    run_id = run["run_id"]
+    if run["state"] != "RUNNING":
+        run = _update(run_id, cfg, lambda current: current.__setitem__("state", "RUNNING"))
+    if not isinstance(run.get("agent"), dict):
+        fresh = agent.new_turn_state(cfg)
+        run = _update(run_id, cfg, lambda current: current.__setitem__("agent", fresh))
+
+    def save(state: dict[str, Any]) -> None:
+        _update(run_id, cfg, lambda current: current.__setitem__("agent", state))
+
+    def should_stop() -> bool:
+        current = get_run(run_id, cfg)
+        return bool(current.get("cancel_requested")) or current["state"] in TERMINAL_STATES
+
+    def register_calls(calls: list[dict[str, Any]]) -> None:
+        ids = [call["tool_call_id"] for call in calls]
+        _update(run_id, cfg, lambda current: current.__setitem__("tool_call_ids", current["tool_call_ids"] + ids),
+                [("tool_call", _call_view(call)) for call in calls])
+
+    hooks = agent.TurnHooks(
+        emit=lambda event_type, data: _emit_only(run_id, cfg, event_type, data),
+        save=save,
+        should_stop=should_stop,
+        register_calls=register_calls,
+    )
+    try:
+        outcome = agent.advance_turn(run, cfg, hooks)
+    finally:
+        agent.release(run_id)
+    if outcome.kind == "completed":
+        _complete(run_id, cfg, outcome=outcome.outcome, assistant_text=agent.plain_answer(outcome.answer), agent_trace=outcome.trace,
+                  action_ledger=[{"tool_call_id": call["tool_call_id"], "tool_name": call["tool_name"], "status": call["status"]}
+                                 for call in _run_calls(get_run(run_id, cfg), cfg)])
+        return False
+    if outcome.kind == "awaiting_approval":
+        current = get_run(run_id, cfg)
+        calls = {call["tool_call_id"]: call for call in _run_calls(current, cfg)}
+        new_ids = [call_id for call_id in outcome.awaiting_call_ids if call_id not in current["approval_requested_ids"] and call_id in calls]
+
+        def wait(state: dict[str, Any]) -> None:
+            state["state"] = "AWAITING_APPROVAL"
+            state["approval_requested_ids"] = sorted(set(state["approval_requested_ids"]) | set(new_ids))
+
+        _update(run_id, cfg, wait, [("approval_request", _call_view(calls[call_id])) for call_id in new_ids])
+        return False
+    if outcome.kind == "stopped":
+        _finalize_interrupt(run_id, cfg)
+        return False
+    _fail(run_id, outcome.status or "ERROR_CLAUDE_REQUEST_FAILED", outcome.detail, cfg)
+    return False
 
 
 def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
@@ -651,7 +764,11 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     options = run.get("options", {})
     commands, question, unknown = _parse_prompt(run["prompt"])
     _emit_only(run_id, cfg, "run_started", {"mode": run["mode"], "prompt": run["prompt"]})
+    use_agent = _agent_engine(run, question, cfg)
     try:
+        if use_agent:
+            model = agent.new_turn_state(cfg)["model"]
+            raise _AgentRoute(model)
         route = plan_model_route(
             task_type="cited_qa",
             preferred_provider=options.get("model_provider"),
@@ -667,6 +784,9 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
             "route_sha256": route["route_sha256"],
             "candidates": [{"provider": row["provider"], "eligible": row["eligible"], "reasons": row["reasons"]} for row in route["candidates"]],
         }
+    except _AgentRoute as chosen:
+        route_event = {"status": "CLAUDE_AGENT_READY", "selected_provider": "anthropic", "selected_model": chosen.model,
+                       "selection_reason": "Claude is connected in Settings"}
     except (ModelRoutingError, ModelProviderError) as exc:
         route_event = {"status": "MODEL_ROUTE_BLOCKED", "error": getattr(exc, "status", type(exc).__name__)}
     _emit_only(run_id, cfg, "route", route_event)
@@ -674,10 +794,12 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
         _emit_only(run_id, cfg, "warning", {"status": "WARN_UNKNOWN_COMMAND", "category": "INPUT_INVALID", "detail": name})
     steps = [
         {"step": f"{command['command']} -> {command['tool']}", "tool": command["tool"], "arguments": command["arguments"],
-         "requires_approval": not (run["mode"] == "auto" and _auto_approvable(command["tool"]))}
+         "requires_approval": not (run["mode"] in AUTO_APPROVE_MODES and _auto_approvable(command["tool"]))}
         for command in commands
     ]
-    if question:
+    if question and use_agent:
+        steps += [{"step": "answer with Claude, using tools as needed"}]
+    elif question:
         steps += [{"step": "retrieve local sources"}, {"step": "compose a cited answer"}]
     _emit_only(run_id, cfg, "plan", {"goal": question or "Run the requested actions.", "mode": run["mode"], "steps": steps})
 
@@ -694,7 +816,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
         except ToolRuntimeError as exc:
             events.append(("warning", {"status": exc.status, "category": classify_error(exc.status), "detail": exc.detail}))
             continue
-        if run["mode"] == "auto" and _auto_approvable(call["tool_name"]):
+        if run["mode"] in AUTO_APPROVE_MODES and _auto_approvable(call["tool_name"]):
             call = approve_tool_call(call["tool_call_id"], cfg=cfg, approved_by="policy:auto-local-read-only", expected_arguments_sha256=call["arguments_sha256"])["tool_call"]
         call_ids.append(call["tool_call_id"])
         events.append(("tool_call", _call_view(call)))
@@ -702,7 +824,9 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     def change(current: dict[str, Any]) -> None:
         current["tool_call_ids"] = call_ids
         current["question"] = question
-        current["phase"] = "tools" if call_ids else "answer"
+        if use_agent:
+            current["engine"] = ENGINE_AGENT
+        current["phase"] = "tools" if call_ids else ("agent" if use_agent and question else "answer")
 
     _update(run_id, cfg, change, events)
 
@@ -844,7 +968,7 @@ def _phase_tools_decision(run: dict[str, Any], cfg: Settings) -> bool:
         for call in failed:
             retry = request_tool_call(call["tool_name"], dict(call.get("arguments") or {}), cfg=cfg, requested_by="user",
                                       reason=f"retry of {call['tool_call_id']}", run_id=run_id, retry_of=call["tool_call_id"])["tool_call"]
-            if run["mode"] == "auto" and _auto_approvable(retry["tool_name"]):
+            if run["mode"] in AUTO_APPROVE_MODES and _auto_approvable(retry["tool_name"]):
                 retry = approve_tool_call(retry["tool_call_id"], cfg=cfg, approved_by="policy:auto-local-read-only", expected_arguments_sha256=retry["arguments_sha256"])["tool_call"]
             new_ids.append(retry["tool_call_id"])
             events.append(("retry_requested", _call_view(retry)))
@@ -881,6 +1005,9 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
         summary = summarize_tool_calls(calls)
         text = f"Completed {summary['by_status'].get('EXECUTED', 0)} of {summary['total']} actions."
         _complete(run_id, cfg, outcome="ACTIONS_COMPLETED", assistant_text=text, action_ledger=ledger)
+        return
+    if run.get("engine") == ENGINE_AGENT:
+        _update(run_id, cfg, lambda current: current.__setitem__("phase", "agent"))
         return
     options = run.get("options", {})
     conversation = get_conversation(run["conversation_id"], cfg) or {"turns": []}
@@ -943,6 +1070,7 @@ def _complete(
     assistant_text: str | None = None,
     answer_trace: dict[str, Any] | None = None,
     action_ledger: list[dict[str, Any]] | None = None,
+    agent_trace: dict[str, Any] | None = None,
 ) -> None:
     run = get_run(run_id, cfg)
     now = utc_now()
@@ -966,9 +1094,13 @@ def _complete(
     else:
         assistant_turn = {"turn_id": stable_id("turn", run["conversation_id"], "assistant", run_id, length=12), "role": "assistant",
                           "content": assistant_text or "", "created_at": now, "status": outcome, "work_run_id": run_id}
+        if agent_trace is not None:
+            assistant_turn["agent_trace"] = agent_trace
     append_turns(run["conversation_id"], [user_turn, assistant_turn], cfg, title_hint=run["prompt"])
     final = {"outcome": outcome, "action_ledger": action_ledger or [], "citation_status": (answer_trace or {}).get("citation_status"),
              "answer_run_id": (answer_trace or {}).get("run_id"), "assistant_turn_id": assistant_turn["turn_id"]}
+    if agent_trace is not None:
+        final["model"] = agent_trace.get("model")
 
     def change(current: dict[str, Any]) -> None:
         current["state"] = "COMPLETED"
@@ -997,7 +1129,11 @@ def run_envelope(run_id: str, cfg: Settings = settings) -> dict[str, Any]:
         interaction = get_interaction(run["pending_interaction_id"], cfg)
         if interaction is not None:
             parts.append(make_question_part(interaction))
-    answer = "".join(event["data"].get("text", "") for event in events if event["type"] == "text_delta")
+    narrated = {event["data"].get("segment") for event in events if event["type"] == "progress" and event["data"].get("kind") == "narration"}
+    answer = agent.plain_answer("".join(
+        event["data"].get("text", "") for event in events
+        if event["type"] == "text_delta" and event["data"].get("segment") not in narrated
+    ))
     if answer:
         parts.append(make_text_part(answer))
     for event in events:

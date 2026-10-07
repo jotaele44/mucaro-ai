@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from .app_settings import AppSettingsError, claude_status, delete_api_key, get_api_key, save_app_settings, store_api_key
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
 from .conversations import (
@@ -39,6 +40,8 @@ from .parser import ParseError
 from .models import (
     ApprovalRequest,
     AskRequest,
+    ClaudeKeyRequest,
+    ClaudeSettingsRequest,
     ConversationCreateRequest,
     ConversationUpdateRequest,
     DirectoryPermissionRequest,
@@ -542,6 +545,61 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             raise api_error(exc.status, exc.detail, status_code=status_code) from exc
         resume_for_interaction(interaction_id)
         return {"status": "INTERACTION_DISMISSED", "interaction": interaction}
+
+    def settings_error(exc: AppSettingsError) -> HTTPException:
+        return api_error(exc.status, exc.detail)
+
+    def require_local_client(request: Request) -> None:
+        # The API key travels in the request body; over the network that may be unencrypted HTTP.
+        if client_is_remote(request.scope):
+            raise api_error("ERROR_CLAUDE_KEY_LOCAL_ONLY", "Change the API key on the Mac that runs Mucaro AI.", status_code=403)
+
+    @app.get("/settings/claude")
+    def claude_settings() -> dict:
+        return claude_status(cfg)
+
+    @app.put("/settings/claude")
+    def update_claude_settings(req: ClaudeSettingsRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            save_app_settings(req.model_dump(exclude_none=True), cfg)
+        except AppSettingsError as exc:
+            raise settings_error(exc) from exc
+        return claude_status(cfg)
+
+    @app.put("/settings/claude/key")
+    def save_claude_key(req: ClaudeKeyRequest, request: Request, _auth: dict = Depends(require_auth)) -> dict:
+        require_local_client(request)
+        try:
+            store = store_api_key(req.api_key, cfg)
+        except AppSettingsError as exc:
+            raise settings_error(exc) from exc
+        return {**claude_status(cfg), "stored_in": store}
+
+    @app.delete("/settings/claude/key")
+    def remove_claude_key(request: Request, _auth: dict = Depends(require_auth)) -> dict:
+        require_local_client(request)
+        delete_api_key(cfg)
+        return claude_status(cfg)
+
+    @app.post("/settings/claude/test")
+    def test_claude_key(_auth: dict = Depends(require_auth)) -> dict:
+        """Checks the key and model with the free Models API; sends no conversation content."""
+        key, _source = get_api_key(cfg)
+        status = claude_status(cfg)
+        if not key:
+            raise api_error("ERROR_CLAUDE_KEY_MISSING", "Add an API key first.")
+        try:
+            import anthropic
+
+            anthropic.Anthropic(api_key=key, max_retries=1, timeout=20.0).models.retrieve(status["model"])
+        except ImportError as exc:
+            raise api_error("ERROR_CLAUDE_SDK_MISSING", "The Anthropic SDK is not installed.") from exc
+        except Exception as exc:  # noqa: BLE001 - reported as a plain-language status, never with the key
+            from .agent import _api_error
+
+            failure = _api_error(exc)
+            raise api_error(failure.status, failure.detail, status_code=400) from exc
+        return {"status": "CLAUDE_KEY_OK", "detail": f"The key works and {status['model']} is available.", "model": status["model"]}
 
     @app.get("/models")
     def models() -> dict:
