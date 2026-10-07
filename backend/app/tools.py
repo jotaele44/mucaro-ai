@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .coding_mutation import CodingMutationError, apply_patch_transaction
@@ -11,8 +12,11 @@ from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_
 from .config import Settings, settings
 from .contracts import validate_contract
 from .ingestion import get_chunks, get_index_status, get_sources
-from .memory import list_memory_items
+from .memory import MemoryError, list_memory_items, remember_memory_item
+from .parser import ParseError, parse_file
+from .permissions import DirectoryPermissionError, check_directory_permission, is_within_path
 from .product_audit import build_product_audit
+from .retrieval import retrieve
 from .utils import canonical_sha256, read_json, stable_id, update_json, utc_now
 from .web_browsing import (
     WebBrowsingError,
@@ -211,6 +215,145 @@ def _web_render(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
+SOURCE_SEARCH_MAX_RESULTS = 10
+SOURCE_TEXT_LIMIT = 200_000
+FILE_TEXT_LIMIT = 200_000
+FILE_READ_MAX_BYTES = 25 * 1024 * 1024
+DIRECTORY_LIST_LIMIT = 500
+
+
+def _bounded_int(value: Any, default: int, low: int, high: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return default
+    return max(low, min(high, value))
+
+
+def _sources_search(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    query = arguments.get("query")
+    if not isinstance(query, str) or not query.strip():
+        raise ToolRuntimeError("ERROR_SOURCE_SEARCH_QUERY_REQUIRED", "sources.search requires a non-empty query string.")
+    top_k = _bounded_int(arguments.get("top_k"), 5, 1, SOURCE_SEARCH_MAX_RESULTS)
+    chunks = get_chunks(cfg)
+    if not chunks:
+        return {"status": "SOURCE_SEARCH_NO_SOURCES", "query": query, "results": []}
+    found = retrieve(query, chunks, top_k=top_k, strategy="hybrid", cfg=cfg)
+    if str(found.get("status", "")).startswith("ERROR_"):
+        raise ToolRuntimeError(str(found["status"]), f"Search of local sources failed: {found.get('warnings') or found['status']}")
+    names = {source.get("source_id"): source.get("file_name") for source in get_sources(cfg)}
+    results = [
+        {
+            "chunk_id": chunk.get("chunk_id"),
+            "source_id": chunk.get("source_id"),
+            "file_name": names.get(chunk.get("source_id")) or chunk.get("source_id"),
+            "chunk_index": chunk.get("chunk_index"),
+            "score": chunk.get("score"),
+            "text": str(chunk.get("text") or "")[:6000],
+        }
+        for chunk in found.get("retrieved_chunks", [])
+        if str(chunk.get("text") or "").strip()
+    ]
+    return {"status": "SOURCE_SEARCH_OK", "query": query, "results": results}
+
+
+def _sources_read(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    source_id = arguments.get("source_id")
+    if not isinstance(source_id, str) or not source_id.strip():
+        raise ToolRuntimeError("ERROR_SOURCE_ID_REQUIRED", "sources.read requires a source_id.")
+    source = next((row for row in get_sources(cfg) if row.get("source_id") == source_id), None)
+    if source is None:
+        raise ToolRuntimeError("ERROR_SOURCE_NOT_FOUND", f"No local source has id {source_id}.")
+    limit = _bounded_int(arguments.get("max_chars"), 60_000, 1_000, SOURCE_TEXT_LIMIT)
+    chunks = sorted(
+        (chunk for chunk in get_chunks(cfg) if chunk.get("source_id") == source_id and str(chunk.get("text") or "").strip()),
+        key=lambda chunk: int(chunk.get("chunk_index") or 0),
+    )
+    selected, total = [], 0
+    for chunk in chunks:
+        text = str(chunk.get("text") or "")
+        if total + len(text) > limit:
+            break
+        selected.append({"chunk_id": chunk.get("chunk_id"), "chunk_index": chunk.get("chunk_index"), "text": text})
+        total += len(text)
+    return {
+        "status": "SOURCE_READ_OK",
+        "source_id": source_id,
+        "file_name": source.get("file_name"),
+        "chunk_count": len(chunks),
+        "chunks": selected,
+        "truncated": len(selected) < len(chunks),
+    }
+
+
+def _memory_remember(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    content = arguments.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise ToolRuntimeError("ERROR_MEMORY_CONTENT_REQUIRED", "memory.remember requires content.")
+    try:
+        return remember_memory_item(content, cfg, kind=str(arguments.get("kind") or "fact"), source="assistant")
+    except MemoryError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _granted_path(raw: Any, cfg: Settings, *, kind: str) -> Path:
+    """Resolve a path inside a folder the user granted; the app's own folder and data are never readable."""
+    if not isinstance(raw, str) or not raw.strip():
+        raise ToolRuntimeError("ERROR_FILE_PATH_REQUIRED", "A path is required.")
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        raise ToolRuntimeError("ERROR_FILE_PATH_INVALID", "Use an absolute path (for example /Users/name/Documents/notes.txt).")
+    try:
+        permission = check_directory_permission(path, cfg)
+    except DirectoryPermissionError as exc:
+        raise ToolRuntimeError("ERROR_FILE_NOT_FOUND", f"Nothing exists at {path}.") from exc
+    resolved = Path(permission["path"])
+    if permission["status"] != "PERMISSION_OK" or permission.get("scope") != "granted_directory":
+        raise ToolRuntimeError(
+            "ERROR_FILE_PERMISSION_REQUIRED",
+            f"Mucaro may only read folders the user granted in Sources > Folder access; {resolved} is not inside one.",
+        )
+    if is_within_path(resolved, cfg.data_dir.resolve()) or resolved.name.startswith(".env"):
+        raise ToolRuntimeError("ERROR_FILE_PERMISSION_DENIED", f"{resolved.name} holds private app data and cannot be read.")
+    if kind == "dir" and not resolved.is_dir():
+        raise ToolRuntimeError("ERROR_FILE_NOT_DIRECTORY", f"{resolved} is not a folder.")
+    if kind == "file" and not resolved.is_file():
+        raise ToolRuntimeError("ERROR_FILE_NOT_FILE", f"{resolved} is not a file.")
+    return resolved
+
+
+def _files_list_directory(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    folder = _granted_path(arguments.get("path"), cfg, kind="dir")
+    entries = []
+    children = sorted(folder.iterdir(), key=lambda child: (not child.is_dir(), child.name.lower()))
+    for child in children[:DIRECTORY_LIST_LIMIT]:
+        try:
+            stat = child.stat()
+        except OSError:
+            continue
+        entries.append({"name": child.name, "type": "folder" if child.is_dir() else "file", "bytes": None if child.is_dir() else stat.st_size})
+    return {"status": "DIRECTORY_LIST_OK", "path": str(folder), "entries": entries, "truncated": len(children) > DIRECTORY_LIST_LIMIT}
+
+
+def _files_read_file(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    path = _granted_path(arguments.get("path"), cfg, kind="file")
+    size = path.stat().st_size
+    if size > FILE_READ_MAX_BYTES:
+        raise ToolRuntimeError("ERROR_FILE_TOO_LARGE", f"{path.name} is {size} bytes; the limit is {FILE_READ_MAX_BYTES}.")
+    try:
+        parsed = parse_file(path)
+    except ParseError as exc:
+        raise ToolRuntimeError(getattr(exc, "status", None) or "ERROR_FILE_PARSE_FAILED", str(exc)) from exc
+    text = str(parsed.get("text") or "")
+    limit = _bounded_int(arguments.get("max_chars"), 100_000, 1_000, FILE_TEXT_LIMIT)
+    return {
+        "status": "FILE_READ_OK",
+        "path": str(path),
+        "bytes": size,
+        "parser": parsed.get("parser"),
+        "text": text[:limit],
+        "truncated": len(text) > limit,
+    }
+
+
 def _web_search(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     query = arguments.get("query")
     if not isinstance(query, str) or not query.strip():
@@ -259,6 +402,41 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_memory_list,
+    ),
+    "memory.remember": ToolDefinition(
+        name="memory.remember",
+        description="Save one explicit memory item the user can inspect, disable or delete.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_memory_remember,
+    ),
+    "sources.search": ToolDefinition(
+        name="sources.search",
+        description="Search the local source library and return ranked passages with chunk and source ids.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_sources_search,
+    ),
+    "sources.read": ToolDefinition(
+        name="sources.read",
+        description="Read one local source's text in chunk order, bounded in size.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_sources_read,
+    ),
+    "files.list_directory": ToolDefinition(
+        name="files.list_directory",
+        description="List one folder inside a user-granted directory; the app's own folder and data are excluded.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_files_list_directory,
+    ),
+    "files.read_file": ToolDefinition(
+        name="files.read_file",
+        description="Read and parse one bounded file inside a user-granted directory; the app's own folder and data are excluded.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_files_read_file,
     ),
     "coding.repo_status": ToolDefinition(
         name="coding.repo_status",
