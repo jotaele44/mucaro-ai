@@ -26,14 +26,15 @@ jobs:
       SHADOW_BASE_OVERRIDE: ${{ inputs.base_sha || '' }}
       SHADOW_CHECKPOINT_SHA: ${{ inputs.checkpoint_sha || github.sha }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           ref: ${{ env.SHADOW_CHECKPOINT_SHA }}
           fetch-depth: 0
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
           cache: npm
@@ -75,7 +76,7 @@ jobs:
         run: python scripts/shadow_qa.py --base "$SHADOW_BASE_SHA" --head "$SHADOW_CHECKPOINT_SHA" --output "$MUCARO_SHADOW_RECEIPT"
       - name: Upload Shadow baseline receipt
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: shadow-baseline-${{ env.SHADOW_CHECKPOINT_SHA }}
           path: ${{ runner.temp }}/mucaro-shadow-baseline-${{ env.SHADOW_CHECKPOINT_SHA }}.json
@@ -83,7 +84,7 @@ jobs:
           archive: false
       - name: Upload Shadow hardening receipt
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: shadow-qa-${{ env.SHADOW_CHECKPOINT_SHA }}
           path: ${{ runner.temp }}/mucaro-shadow-qa-${{ env.SHADOW_CHECKPOINT_SHA }}.json

@@ -7,15 +7,20 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
           cache: npm
@@ -31,7 +36,7 @@ jobs:
         run: python scripts/certify_security_gates.py
       - name: Upload security receipt and SBOMs
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: security-gates-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
@@ -51,7 +56,7 @@ jobs:
           MUCARO_CODING_RECEIPT: ${{ runner.temp }}/mucaro-coding-container-live.json
         run: python scripts/certify_coding_container_live.py --image "$MUCARO_CODING_IMAGE" --output "$MUCARO_CODING_RECEIPT"
       - name: Upload live coding-container receipt
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coding-container-live-${{ github.sha }}
           path: ${{ runner.temp }}/mucaro-coding-container-live.json
@@ -74,7 +79,7 @@ jobs:
           MUCARO_CODING_FULL_RECEIPT: ${{ runner.temp }}/mucaro-coding-full-profile.json
         run: python scripts/certify_coding_full_profile.py --image "$MUCARO_CODING_FULL_IMAGE" --output "$MUCARO_CODING_FULL_RECEIPT"
       - name: Upload full coding-profile receipt
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coding-full-profile-${{ github.sha }}
           path: ${{ runner.temp }}/mucaro-coding-full-profile.json
@@ -85,7 +90,7 @@ jobs:
           MUCARO_CODING_MUTATION_RECEIPT: ${{ runner.temp }}/mucaro-coding-mutation-live.json
         run: python scripts/certify_coding_mutation_live.py --image "$MUCARO_CODING_MUTATION_IMAGE" --output "$MUCARO_CODING_MUTATION_RECEIPT"
       - name: Upload live coding-mutation receipt
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coding-mutation-live-${{ github.sha }}
           path: ${{ runner.temp }}/mucaro-coding-mutation-live.json
@@ -95,9 +100,10 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           # CI tests GitHub's merge commit; the receipt may stand for the PR head only if the trees are identical.
-          git fetch --no-tags --depth=1 origin "$PR_HEAD"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --no-tags --depth=1 origin "$PR_HEAD"
           if [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse "$PR_HEAD^{tree}")" ]; then
             echo "equivalent=true" >> "$GITHUB_OUTPUT"
           else
@@ -147,7 +153,7 @@ jobs:
           print(path)
           PY
       - name: Upload hosted CI evidence receipt
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: hosted-ci-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/mucaro-hosted-ci-evidence.json
