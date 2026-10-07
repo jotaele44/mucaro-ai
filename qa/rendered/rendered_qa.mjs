@@ -1433,12 +1433,14 @@ async function organizationScenario(browser, base) {
         await page.getByRole("menuitem", { name: "Restore conversation", exact: true }).click();
         await page.getByText("Local workspace · Pinned · answers cite your sources", { exact: true }).waitFor();
         check("restore retains pin and stable identity", viewport, !(await row()).archived && (await row()).pinned);
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByRole("menuitem", { name: "Unpin", exact: true }).waitFor();
+        await page.waitForFunction(() => !document.querySelector('[role="menuitem"]')?.disabled);
         const before = await row();
         await fetch(`${base}/conversations/${cid}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: `${name} changed elsewhere`, expected_revision: before.revision }),
         });
-        await page.getByRole("button", { name: "Conversation menu" }).click();
         await page.getByRole("menuitem", { name: "Unpin", exact: true }).click();
         await page.getByText("Conversation changed. Reload it before saving.", { exact: true }).waitFor();
         await page.getByRole("heading", { name: `${name} changed elsewhere`, exact: true }).waitFor();
@@ -1455,6 +1457,16 @@ async function organizationScenario(browser, base) {
         await page.getByText("Update refused by the service.", { exact: true }).waitFor();
         check("refused organization shows an error without false success", viewport, !(await row()).pinned);
         await page.unroute(`**/conversations/${cid}`);
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.route(`**/conversations/${cid}`, async (route) => {
+          if (route.request().method() === "GET") await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: { status: "ERROR_READ_REFUSED", detail: "Conversation refresh refused." } }) });
+          else await route.continue();
+        });
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByText("Conversation refresh refused.", { exact: true }).waitFor();
+        check("failed menu refresh blocks stale mutations", viewport, await page.getByRole("menuitem", { name: "Pin", exact: true }).isDisabled() && !(await row()).pinned);
+        await page.unroute(`**/conversations/${cid}`);
+        await page.getByRole("button", { name: "Retry conversation", exact: true }).click();
         await page.getByRole("menuitem", { name: "Pin", exact: true }).click();
         await page.getByText("Local workspace · Pinned · answers cite your sources", { exact: true }).waitFor();
         await page.route("**/conversations", async (route) => {
@@ -1473,10 +1485,37 @@ async function organizationScenario(browser, base) {
         check("chat list retry recovers acknowledged state", viewport, await nav.getByRole("alert").count() === 0);
         if (viewport === "iphone") await nav.getByRole("button", { name: `${name} changed elsewhere 0 turns`, exact: true }).click();
         await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.waitForFunction(() => !document.querySelector('[role="menuitem"]')?.disabled);
         await page.keyboard.press("End");
         check("conversation menu supports keyboard navigation", viewport, await page.getByRole("menuitem", { name: "Delete…" }).evaluate(el => el === document.activeElement));
         await page.keyboard.press("Escape");
         check("Escape restores focus to the menu trigger", viewport, await page.getByRole("button", { name: "Conversation menu" }).evaluate(el => el === document.activeElement));
+        const stale = await row();
+        let releaseOld;
+        let markRead;
+        const delayedRead = new Promise(resolve => { releaseOld = resolve; });
+        const readStarted = new Promise(resolve => { markRead = resolve; });
+        let reads = 0;
+        await page.route(`**/conversations/${cid}`, async (route) => {
+          if (route.request().method() === "GET" && reads++ === 0) {
+            markRead();
+            await delayedRead;
+            await route.fulfill({ status: 200, contentType: "application/json", headers: { "x-qa-stale-read": "1" }, body: JSON.stringify(stale) });
+          } else await route.continue();
+        });
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await readStarted;
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await fetch(`${base}/conversations/${cid}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: `${name} newest`, expected_revision: stale.revision }) });
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByRole("heading", { name: `${name} newest`, exact: true }).waitFor();
+        const oldResponse = page.waitForResponse(response => response.headers()["x-qa-stale-read"] === "1");
+        releaseOld();
+        await (await oldResponse).finished();
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        check("delayed older read cannot replace a newer conversation revision", viewport, await page.getByRole("heading", { name: `${name} newest`, exact: true }).isVisible());
+        await page.unroute(`**/conversations/${cid}`);
+        await page.keyboard.press("Escape");
         await shot(page, viewport, "conversation-organization");
         const violations = await axe(page, viewport, "organization");
         axeResults.push(violations);

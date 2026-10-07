@@ -13,7 +13,7 @@ import { Sheet } from "./Sheet.jsx";
 const MAX_STREAM_RETRIES = 10;
 const bump = (map, key) => map.set(key, (map.get(key) || 0) + 1);
 
-function ConversationMenu({ conversation, onRename, onUpdate, onDelete, onOpenTasks, announce }) {
+function ConversationMenu({ conversation, onPrepare, onRename, onUpdate, onDelete, onOpenTasks, announce }) {
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState(null);
   const [title, setTitle] = useState(conversation?.title || "");
@@ -21,22 +21,51 @@ function ConversationMenu({ conversation, onRename, onUpdate, onDelete, onOpenTa
   const [renameError, setRenameError] = useState(null);
   const [updating, setUpdating] = useState(false);
   const [actionError, setActionError] = useState(null);
+  const [preparing, setPreparing] = useState(false);
+  const [ready, setReady] = useState(false);
   const menuRef = useRef(null);
+  const preparation = useRef(0);
 
   useEffect(() => {
     if (!open) return;
     const menu = menuRef.current;
-    menu?.querySelector('[role="menuitem"]')?.focus();
+    menu?.querySelector('[role="menuitem"]:not(:disabled)')?.focus();
     const dismiss = (event) => {
       if (!menu?.contains(event.target)) setOpen(false);
     };
     document.addEventListener("pointerdown", dismiss);
     return () => document.removeEventListener("pointerdown", dismiss);
-  }, [open]);
+  }, [open, preparing, ready]);
+
+  async function prepare() {
+    const requestId = ++preparation.current;
+    setReady(false);
+    setPreparing(true);
+    setActionError(null);
+    try {
+      await onPrepare();
+      if (requestId === preparation.current) setReady(true);
+    } catch (err) {
+      if (requestId === preparation.current) setActionError(err.message || "Could not refresh this conversation.");
+    } finally {
+      if (requestId === preparation.current) setPreparing(false);
+    }
+  }
+
+  function toggleMenu() {
+    if (open) {
+      preparation.current++;
+      setOpen(false);
+    }
+    else {
+      setOpen(true);
+      prepare();
+    }
+  }
 
   function menuKey(event) {
     if (!open) return;
-    const items = [...menuRef.current.querySelectorAll('[role="menuitem"]')];
+    const items = [...menuRef.current.querySelectorAll('[role="menuitem"]:not(:disabled)')];
     const index = items.indexOf(document.activeElement);
     if (event.key === "Escape") {
       setOpen(false);
@@ -87,20 +116,22 @@ function ConversationMenu({ conversation, onRename, onUpdate, onDelete, onOpenTa
 
   return (
     <div className="menu-wrap" ref={menuRef} onKeyDown={menuKey}>
-      <button type="button" className="icon-button" aria-haspopup="menu" aria-expanded={open} aria-label="Conversation menu" disabled={updating} onClick={() => setOpen((value) => !value)}>
+      <button type="button" className="icon-button" aria-haspopup="menu" aria-expanded={open} aria-label="Conversation menu" disabled={updating} onClick={toggleMenu}>
         ⋯
       </button>
       {open && (
         <ul className="menu" role="menu">
-          <li role="none"><button role="menuitem" type="button" disabled={updating} onClick={() => organize({ pinned: !conversation.pinned })}>{conversation.pinned ? "Unpin" : "Pin"}</button></li>
-          <li role="none"><button role="menuitem" type="button" disabled={updating} onClick={() => organize({ archived: !conversation.archived })}>{conversation.archived ? "Restore conversation" : "Archive"}</button></li>
-          <li role="none"><button role="menuitem" type="button" onClick={() => { setOpen(false); setTitle(conversation?.title || ""); setRenameError(null); setDialog("rename"); }}>Rename</button></li>
-          <li role="none"><button role="menuitem" type="button" onClick={copyTranscript}>Copy transcript</button></li>
+          <li role="none"><button role="menuitem" type="button" disabled={updating || !ready} onClick={() => organize({ pinned: !conversation.pinned })}>{conversation.pinned ? "Unpin" : "Pin"}</button></li>
+          <li role="none"><button role="menuitem" type="button" disabled={updating || !ready} onClick={() => organize({ archived: !conversation.archived })}>{conversation.archived ? "Restore conversation" : "Archive"}</button></li>
+          <li role="none"><button role="menuitem" type="button" disabled={updating || !ready} onClick={() => { setOpen(false); setTitle(conversation?.title || ""); setRenameError(null); setDialog("rename"); }}>Rename</button></li>
+          <li role="none"><button role="menuitem" type="button" disabled={updating || !ready} onClick={copyTranscript}>Copy transcript</button></li>
           <li role="none"><button role="menuitem" type="button" onClick={() => { setOpen(false); onOpenTasks(); }}>Background tasks</button></li>
-          <li role="none"><button role="menuitem" type="button" className="danger-text" onClick={() => { setOpen(false); setDialog("delete"); }}>Delete…</button></li>
+          <li role="none"><button role="menuitem" type="button" disabled={updating || !ready} className="danger-text" onClick={() => { setOpen(false); setDialog("delete"); }}>Delete…</button></li>
         </ul>
       )}
       {actionError && <p className="error-text" role="alert">{actionError}</p>}
+      {open && preparing && <p className="muted small" role="status">Refreshing conversation…</p>}
+      {open && !preparing && !ready && <button type="button" className="ghost-button" onClick={prepare}>Retry conversation</button>}
       {dialog === "rename" && (
         <Sheet title="Rename conversation" onClose={() => setDialog(null)} side="center">
           <form onSubmit={submitRename}>
@@ -146,6 +177,9 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
   const refreshRef = useRef(null);
   const feedRef = useRef(null);
   const stick = useRef(true);
+  const acceptConversation = useCallback((next) => {
+    setConversation(current => !current || (next.revision ?? 0) >= (current.revision ?? 0) ? next : current);
+  }, []);
 
   // Drops every open stream and pending retry. A page that was suspended keeps stream objects that are dead
   // but still registered, which would block a re-follow.
@@ -219,7 +253,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
   const refresh = useCallback(async () => {
     if (!conversationId) return;
     const [conv, runList] = await Promise.all([api.conversation(conversationId), api.conversationRuns(conversationId)]);
-    setConversation(conv);
+    acceptConversation(conv);
     setSummaries(runList.runs);
     const started = runList.runs.filter((row) => row.state !== "QUEUED" && row.state !== "CANCELLED");
     const loaded = await Promise.all(started.map((row) => api.runEvents(row.run_id)));
@@ -235,7 +269,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
       }
     }
     onConversationsChanged();
-  }, [conversationId, follow, onConversationsChanged]);
+  }, [conversationId, follow, onConversationsChanged, acceptConversation]);
   refreshRef.current = refresh;
 
   useEffect(() => {
@@ -360,10 +394,11 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         {conversation && (
           <ConversationMenu
             conversation={conversation}
+            onPrepare={async () => acceptConversation(await api.conversation(conversation.conversation_id))}
             onRename={async (title) => {
               try {
                 const updated = await api.updateConversation(conversation.conversation_id, { title }, conversation.revision ?? 0);
-                setConversation(updated);
+                acceptConversation(updated);
                 await onConversationsChanged();
               } catch (err) {
                 if (err.status === "ERROR_CONVERSATION_REVISION_CONFLICT") await refresh();
@@ -373,7 +408,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
             onUpdate={async (changes) => {
               try {
                 const updated = await api.updateConversation(conversation.conversation_id, changes, conversation.revision ?? 0);
-                setConversation(updated);
+                acceptConversation(updated);
                 await onConversationsChanged();
               } catch (err) {
                 if (err.status === "ERROR_CONVERSATION_REVISION_CONFLICT") await refresh();
