@@ -129,8 +129,9 @@ async function errorFrom(res) {
   return error;
 }
 
+// `as: "blob"` returns the body as a Blob (a file download) instead of parsing JSON.
 async function request(path, options = {}) {
-  const { timeoutMs = REQUEST_TIMEOUT_MS, ...init } = options;
+  const { timeoutMs = REQUEST_TIMEOUT_MS, as = "json", ...init } = options;
   const controller = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => {
@@ -150,7 +151,7 @@ async function request(path, options = {}) {
     }
     if (!res.ok) throw await errorFrom(res);
     try {
-      return await res.json();
+      return as === "blob" ? await res.blob() : await res.json();
     } catch (err) {
       // The connection died mid-body, or a proxy answered with something that is not JSON.
       throw timedOut ? unreachable(err) : new ApiError("ERROR_BAD_RESPONSE", "The service sent an incomplete answer.", "OFFLINE", { cause: String(err) });
@@ -294,4 +295,6 @@ export const api = {
   updateMemory: (id, enabled) => request(`/memory/${id}`, json("PATCH", { enabled })),
   deleteMemory: (id) => request(`/memory/${id}`, { method: "DELETE" }),
   exportMemory: () => request("/memory/export"),
+  // One of the files saved with an answer: kind is "markdown", "json" or "csv".
+  exportFile: (runId, kind) => request(`/exports/${encodeURIComponent(runId)}/files/${encodeURIComponent(kind)}`, { as: "blob" }),
 };
