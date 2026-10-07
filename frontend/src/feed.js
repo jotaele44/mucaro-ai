@@ -37,6 +37,7 @@ export function deriveRun(run, events) {
     final: null,
     interrupted: null,
     notes: [],
+    preferenceUpdate: null,
     lastSeq: 0,
   };
   for (const event of events) {
@@ -81,6 +82,9 @@ export function deriveRun(run, events) {
         break;
       case "artifact":
         view.artifacts.push(data);
+        break;
+      case "preference_update":
+        view.preferenceUpdate = data;
         break;
       case "warning":
         view.warnings.push(data);

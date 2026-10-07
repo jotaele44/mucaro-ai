@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -27,6 +27,11 @@ class ConversationUpdateRequest(BaseModel):
 class WorkspaceProfileRequest(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     notes: str = Field(default="", max_length=500)
+
+
+class PreferenceUpdateRequest(BaseModel):
+    changes: dict[str, Any] = Field(min_length=1)
+    expected_revision: int | None = Field(default=None, ge=0)
 
 
 class MemoryCreateRequest(BaseModel):

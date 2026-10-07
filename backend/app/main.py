@@ -52,6 +52,7 @@ from .models import (
     MessageRequest,
     RunEditRequest,
     PlanRequest,
+    PreferenceUpdateRequest,
     ToolCallRequest,
     ToolDecisionRequest,
     WorkspaceProfileRequest,
@@ -67,6 +68,7 @@ from .memory import (
     remember_memory_item,
     set_memory_enabled,
 )
+from .preferences import PreferenceError, get_preferences, update_preferences
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -275,6 +277,26 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/security")
     def security_status() -> dict:
         return build_security_report(cfg)
+
+    @app.get("/preferences")
+    def preferences_status() -> dict:
+        try:
+            return get_preferences(cfg)
+        except PreferenceError as exc:
+            raise api_error(exc.status, exc.detail, status_code=500) from exc
+
+    @app.patch("/preferences")
+    def save_preferences(req: PreferenceUpdateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return update_preferences(
+                req.changes,
+                expected_revision=req.expected_revision,
+                source="api",
+                cfg=cfg,
+            )
+        except PreferenceError as exc:
+            status_code = 409 if exc.status == "ERROR_PREFERENCE_VERSION_CONFLICT" else 400
+            raise api_error(exc.status, exc.detail, status_code=status_code) from exc
 
     @app.post("/plan")
     def plan(req: PlanRequest, _auth: dict = Depends(require_auth)) -> dict:

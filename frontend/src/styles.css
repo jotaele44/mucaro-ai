@@ -22,7 +22,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #161615;
     --surface: #1f1f1d;
     --surface-2: #2a2a27;
@@ -41,6 +41,26 @@
     --shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #161615;
+  --surface: #1f1f1d;
+  --surface-2: #2a2a27;
+  --text: #ecebe6;
+  --muted: #a9a79f;
+  --border: #3a3935;
+  --accent: #5fb896;
+  --accent-text: #0d1f18;
+  --accent-soft: #1e3329;
+  --danger: #f08b8f;
+  --danger-soft: #3a1f21;
+  --warn: #f0c46c;
+  --warn-soft: #3a2f16;
+  --user-bubble: #243044;
+  --focus: #7aa7ff;
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
 }
 
 * {
@@ -446,7 +466,15 @@ button:disabled {
 .run {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+}
+
+.assistant-block {
+  align-self: flex-start;
+  width: min(88%, 720px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .bubble {
@@ -472,19 +500,16 @@ button:disabled {
 .user-bubble {
   align-self: flex-end;
   background: var(--user-bubble);
-  max-width: min(85%, 640px);
+  max-width: min(82%, 640px);
   position: relative;
+  border-radius: 18px 18px 4px 18px;
 }
 
 .assistant-bubble {
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-
-.assistant-block {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  background: var(--surface-2);
+  border: 0;
+  max-width: 100%;
+  border-radius: 18px 18px 18px 4px;
 }
 
 .mode-tag {
@@ -1104,6 +1129,23 @@ details summary {
   font-size: 14px;
 }
 
+.appearance-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.appearance-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+}
+
+.settings-receipt {
+  font-size: 12px;
+}
+
 /* ---------- access token gate (phone access) ---------- */
 
 .gate .gate-input {
@@ -1198,6 +1240,14 @@ details summary {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+:root[data-reduced-motion="true"] *,
+:root[data-reduced-motion="true"] *::before,
+:root[data-reduced-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* Touch-first sizing (from the #115 iOS audit): iOS Safari zooms the page when a focused field
