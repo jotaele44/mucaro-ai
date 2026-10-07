@@ -542,7 +542,11 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/contracts.py"
+        "backend/app/contracts.py",
+        "backend/app/execution_records.py",
+        "backend/app/skill_runtime.py",
+        "backend/app/work_runs.py",
+        "backend/app/packaging.py"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -554,7 +558,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "Same residue as TGT-016."
+      "notes": "Common-contract runtime projections are wired for skill execution, work runs and source-package artifact identity. Agent-checkpoint contract enforcement remains separate in PR #116. State remains PROVISIONAL pending composition and executed gates."
     },
     {
       "requirement_id": "INV-006",
@@ -1227,7 +1231,11 @@
       "implementation_state": "PARTIAL",
       "implementation_refs": [
         "backend/app/contracts.py",
-        "schemas/"
+        "schemas/",
+        "backend/app/execution_records.py",
+        "backend/app/skill_runtime.py",
+        "backend/app/work_runs.py",
+        "backend/app/packaging.py"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -1241,7 +1249,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "All nine families have schemas and a registry; runtime enforcement at source, provenance, grant, tool call/audit, citation/answer trace, memory, routing and receipt boundaries. OPEN: runtime enforcement for execution_contract/run_manifest/agent_checkpoint/artifact_identity producers."
+      "notes": "All nine families have schemas and a registry. This branch wires execution_contract to persisted skill executions, run_manifest to the real conversational work-run persistence boundary, and artifact_identity to the governed source-package manifest. agent_checkpoint enforcement remains a separate open dependency owned by PR #116; this branch deliberately does not create a competing checkpoint store. State remains PROVISIONAL pending composition with #116 and executed positive/negative gates."
     },
     {
       "requirement_id": "TGT-017",

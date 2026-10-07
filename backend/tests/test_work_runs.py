@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import work_runs
+from backend.app.contracts import validate_contract
 from backend.app.conversations import create_conversation, get_conversation
 from backend.app.ingestion import ingest_file
 from backend.app.main import create_app
@@ -102,6 +103,33 @@ def test_answer_run_streams_an_ordered_feed_and_persists_turns(cfg, conversation
     assert [turn["role"] for turn in turns] == ["user", "assistant"]
     assert turns[1]["content"] == answer
     assert {turn["work_run_id"] for turn in turns} == {run["run_id"]}
+
+
+def test_real_work_run_persists_validated_terminal_manifest(cfg, conversation):
+    run = _submit(conversation, "How does source lineage work?", cfg)
+    final = get_run(run["run_id"], cfg)
+    manifest = final["run_manifest"]
+    validate_contract("run_manifest", manifest)
+    assert manifest["run_id"] == final["run_id"]
+    assert manifest["task_id"] == conversation
+    assert manifest["state"] == "COMPLETE"
+    assert manifest["completed_at"] == final["finished_at"]
+
+
+def test_work_run_manifest_drift_fails_closed(cfg, conversation):
+    run = _submit(conversation, "How does source lineage work?", cfg)
+    final = get_run(run["run_id"], cfg)
+    with sqlite3.connect(cfg.sqlite_path) as conn:
+        row = conn.execute("SELECT payload_json FROM work_runs WHERE run_id = ?", (final["run_id"],)).fetchone()
+        payload = __import__("json").loads(row[0])
+        payload["run_manifest"]["state"] = "PLANNING"
+        conn.execute(
+            "UPDATE work_runs SET payload_json = ? WHERE run_id = ?",
+            (__import__("json").dumps(payload, sort_keys=True), final["run_id"]),
+        )
+    with pytest.raises(RunError) as exc:
+        get_run(final["run_id"], cfg)
+    assert exc.value.status == "ERROR_RUN_MANIFEST_DRIFT"
 
 
 def test_idempotent_resubmission_returns_the_original_run(cfg, conversation):
