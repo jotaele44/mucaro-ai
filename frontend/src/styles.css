@@ -812,6 +812,23 @@ details summary {
   gap: 8px;
 }
 
+.save-options {
+  display: grid;
+  gap: 8px;
+}
+
+.save-options .secondary-button {
+  width: 100%;
+  text-align: left;
+}
+
+.save-heading {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .message-editor label,
 .message-editor textarea {
   width: 100%;

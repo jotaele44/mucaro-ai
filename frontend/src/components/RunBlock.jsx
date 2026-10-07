@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { api } from "../api.js";
-import { STATE_LABEL, toolSummaryLabel } from "../feed.js";
+import { STATE_LABEL, TERMINAL_STATES, toolSummaryLabel } from "../feed.js";
+import { answerRecords } from "../files.js";
 import { EditableMessage } from "./MessageActions.jsx";
 import { Sheet } from "./Sheet.jsx";
 
@@ -193,6 +194,11 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
   const userEdit = messageEdits[userMessageKey];
   const assistantEdit = messageEdits[assistantMessageKey];
   const compactCompleted = view.state === "COMPLETED" && Boolean(view.answer) && !view.error && !view.interrupted;
+  // Save and Share appear once the answer is complete, never on text that is still streaming.
+  const answerFile =
+    view.answer && TERMINAL_STATES.has(view.state)
+      ? { title: String(userEdit?.content ?? view.prompt ?? ""), citations: view.citations, records: answerRecords(view.artifacts) }
+      : null;
 
   return (
     <article className="run" aria-busy={view.state === "RUNNING"} data-state={view.state}>
@@ -307,6 +313,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
               onSave={(content, revision) => onEditMessage(assistantMessageKey, content, revision)}
               announce={announce}
               allowReadAloud
+              file={answerFile}
             />
           </div>
         )}
