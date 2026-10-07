@@ -441,6 +441,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             allow_live=req.allow_live,
             require_offline=req.require_offline,
             conversation_context=conversation_context,
+            conversation_scope_id=conversation_id,
             cfg=cfg,
         )
         try:
@@ -697,7 +698,14 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.post("/memory")
     def remember(req: MemoryCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
         try:
-            return remember_memory_item(req.content, cfg, kind=req.kind, source="api")
+            return remember_memory_item(
+                req.content,
+                cfg,
+                kind=req.kind,
+                source="api",
+                scope=req.scope,
+                scope_id=req.scope_id,
+            )
         except MemoryError as exc:
             raise api_error(exc.status, exc.detail, status_code=400) from exc
 
@@ -706,6 +714,13 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         result = set_memory_enabled(memory_id, req.enabled, cfg)
         if result["status"] == "ERROR_MEMORY_NOT_FOUND":
             raise api_error("ERROR_MEMORY_NOT_FOUND", "Memory item not found.", status_code=404, memory_id=memory_id)
+        if result["status"] == "ERROR_MEMORY_SCOPE_INVALID":
+            raise api_error(
+                "ERROR_MEMORY_SCOPE_INVALID",
+                "Stored memory scope is malformed and must be repaired before mutation.",
+                status_code=409,
+                memory_id=memory_id,
+            )
         return result
 
     @app.delete("/memory/{memory_id}")

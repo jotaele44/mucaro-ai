@@ -31,6 +31,7 @@ def answer_question(
     allow_live: bool = False,
     require_offline: bool = False,
     conversation_context: list[dict[str, Any]] | None = None,
+    conversation_scope_id: str | None = None,
     memory_context: list[dict[str, Any]] | None = None,
     cfg: Settings = settings,
     persist: bool = True,
@@ -55,7 +56,11 @@ def answer_question(
         return retrieval
     retrieved = retrieval["retrieved_chunks"]
     try:
-        memory_selection = select_memory_context(cfg, items=memory_context)
+        memory_selection = select_memory_context(
+            cfg,
+            items=memory_context,
+            conversation_scope_id=conversation_scope_id,
+        )
     except MemorySelectionError as exc:
         return {
             "status": exc.status,
@@ -162,6 +167,14 @@ def answer_question(
         "memory_context_count": len(selected_memory_context),
         "memory_selection_sha256": memory_selection["selection_sha256"],
         "memory_excluded_count": memory_selection["excluded_count"],
+        "memory_scope_context": {
+            "workspace_scope_id": memory_selection["workspace_scope_id"],
+            "conversation_scope_id": memory_selection["conversation_scope_id"],
+        },
+        "memory_scope_counts": {
+            scope: sum(1 for item in selected_memory_context if item.get("scope") == scope)
+            for scope in ("global", "workspace", "conversation")
+        },
         "memory_ids": [
             str(item.get("memory_id"))
             for item in selected_memory_context

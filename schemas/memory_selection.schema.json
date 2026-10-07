@@ -5,19 +5,114 @@
   "description": "MEMORY contract: bounded, accounted selection of memory rows injected as prompt context.",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schema_version", "status", "source_count", "selected_count", "excluded_count", "selected", "excluded", "invariants"],
+  "required": [
+    "schema_version",
+    "status",
+    "source_count",
+    "selected_count",
+    "excluded_count",
+    "selected",
+    "excluded",
+    "invariants",
+    "workspace_scope_id",
+    "conversation_scope_id"
+  ],
   "properties": {
-    "schema_version": {"type": "string", "pattern": "^mucaro-memory-selection/"},
-    "status": {"type": "string"},
-    "source_count": {"type": "integer", "minimum": 0},
-    "selected_count": {"type": "integer", "minimum": 0},
-    "excluded_count": {"type": "integer", "minimum": 0},
-    "selected": {"type": "array", "items": {"type": "object", "required": ["memory_id", "kind", "content"]}},
-    "excluded": {"type": "array", "items": {"type": "object", "required": ["reason"]}},
+    "schema_version": {
+      "type": "string",
+      "pattern": "^mucaro-memory-selection/"
+    },
+    "status": {
+      "type": "string"
+    },
+    "source_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selected_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "excluded_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "memory_id",
+          "kind",
+          "content",
+          "scope",
+          "scope_id"
+        ],
+        "properties": {
+          "memory_id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "preference",
+              "profile",
+              "instruction",
+              "fact"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope": {
+            "enum": [
+              "global",
+              "workspace",
+              "conversation"
+            ]
+          },
+          "scope_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "excluded": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "reason"
+        ]
+      }
+    },
     "invariants": {
       "type": "object",
-      "required": ["row_accounting_closed"],
-      "properties": {"row_accounting_closed": {"const": true}}
+      "required": [
+        "row_accounting_closed",
+        "all_selected_scopes_match"
+      ],
+      "properties": {
+        "row_accounting_closed": {
+          "const": true
+        },
+        "all_selected_scopes_match": {
+          "const": true
+        }
+      }
+    },
+    "workspace_scope_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "conversation_scope_id": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   }
 }

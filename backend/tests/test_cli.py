@@ -5267,6 +5267,73 @@ def test_cli_tools_require_approval_and_audit_execution(tmp_path: Path, capsys):
     ]
 
 
+def test_cli_memory_scope_controls(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert (
+        main(
+            [
+                "memory",
+                "remember",
+                "Workspace",
+                "preference.",
+                "--kind",
+                "preference",
+                "--scope",
+                "workspace",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    workspace = json.loads(capsys.readouterr().out)["memory"]
+    assert workspace["scope"] == "workspace"
+    assert workspace["scope_id"].startswith("workspace_")
+
+    assert (
+        main(
+            [
+                "memory",
+                "remember",
+                "Conversation",
+                "preference.",
+                "--scope",
+                "conversation",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    missing = json.loads(capsys.readouterr().err)
+    assert missing["status"] == "ERROR_MEMORY_CONVERSATION_SCOPE_REQUIRED"
+
+    assert (
+        main(
+            [
+                "memory",
+                "remember",
+                "Scoped",
+                "conversation.",
+                "--scope",
+                "conversation",
+                "--scope-id",
+                "conv_example",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    conversation = json.loads(capsys.readouterr().out)["memory"]
+    assert conversation["scope"] == "conversation"
+    assert conversation["scope_id"] == "conv_example"
+
+
 def test_cli_memory_controls_and_export(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 
