@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 
 class AskRequest(BaseModel):
@@ -21,7 +21,18 @@ class ConversationCreateRequest(BaseModel):
 
 
 class ConversationUpdateRequest(BaseModel):
-    title: str = Field(min_length=1, max_length=120)
+    model_config = ConfigDict(extra="forbid")
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    pinned: StrictBool | None = None
+    archived: StrictBool | None = None
+    expected_revision: int | None = Field(default=None, ge=0, strict=True)
+
+    @model_validator(mode="after")
+    def require_changes(self):
+        changed = self.model_fields_set - {"expected_revision"}
+        if not changed or any(getattr(self, field) is None for field in changed):
+            raise ValueError("Provide a title, pinned or archived value; null is not a change.")
+        return self
 
 
 class WorkspaceProfileRequest(BaseModel):

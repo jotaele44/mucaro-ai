@@ -45,6 +45,8 @@ export function App() {
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(() => stored("mucaro.activeConversation", null));
   const [filter, setFilter] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [conversationError, setConversationError] = useState(null);
   const [navOpen, setNavOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [modes, setModes] = useState(null);
@@ -59,6 +61,7 @@ export function App() {
   const healthRef = useRef(health);
   const polling = useRef(false);
   const offline = useRef(false);
+  const conversationRequest = useRef(0);
 
   useEffect(() => {
     healthRef.current = health;
@@ -70,11 +73,14 @@ export function App() {
   }, []);
 
   const loadConversations = useCallback(async () => {
+    const requestId = ++conversationRequest.current;
     try {
       const payload = await api.conversations();
+      if (requestId !== conversationRequest.current) return;
       setConversations(payload.conversations || []);
-    } catch {
-      /* surfaced by the health banner */
+      setConversationError(null);
+    } catch (err) {
+      if (requestId === conversationRequest.current) setConversationError(err);
     }
   }, []);
 
@@ -186,7 +192,7 @@ export function App() {
     setNavOpen(false);
   }
 
-  const visible = conversations.filter((row) => row.title.toLowerCase().includes(filter.trim().toLowerCase()));
+  const visible = conversations.filter((row) => Boolean(row.archived) === showArchived && row.title.toLowerCase().includes(filter.trim().toLowerCase()));
   return (
     <div className={`app ${navOpen ? "nav-open" : ""}`}>
       <a className="skip-link" href="#main">Skip to content</a>
@@ -218,20 +224,28 @@ export function App() {
           </li>
         </ul>
         <div className="conversation-section">
+          <div className="conversation-tabs" role="group" aria-label="Conversation scope">
+            <button type="button" aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>Chats</button>
+            <button type="button" aria-pressed={showArchived} onClick={() => setShowArchived(true)}>Archived</button>
+          </div>
           <label className="field compact">
             <span className="sr-only">Filter conversations</span>
             <input type="search" placeholder="Filter conversations" value={filter} onChange={(event) => setFilter(event.target.value)} />
           </label>
+          {conversationError && <div className="conversation-error" role="alert">
+            <p>Could not refresh chats. The list may be out of date.</p>
+            <button type="button" className="ghost-button" onClick={loadConversations}>Retry chats</button>
+          </div>}
           <ul className="conversation-list" aria-label="Conversations">
             {visible.map((row) => (
               <li key={row.conversation_id}>
                 <button type="button" aria-current={row.conversation_id === activeId && view === "chat" ? "true" : undefined} onClick={() => openConversation(row.conversation_id)}>
                   <span className="conversation-title">{row.title}</span>
-                  <span className="muted small">{row.turn_count} turns</span>
+                  <span className="muted small">{row.pinned ? "Pinned · " : ""}{row.turn_count} turns</span>
                 </button>
               </li>
             ))}
-            {!visible.length && <li className="muted small pad">{conversations.length ? "No matches." : "No conversations yet."}</li>}
+            {!visible.length && <li className="muted small pad">{filter.trim() ? "No matches." : showArchived ? "No archived conversations." : "No conversations yet."}</li>}
           </ul>
         </div>
       </nav>
@@ -253,6 +267,7 @@ export function App() {
         {health.state === "locked" && <TokenGate reason={health.reason} busy={gateBusy} onSubmit={submitToken} onRetry={retry} />}
         {health.state === "ok" && view === "chat" && (
           <ChatView
+            key={activeId || "new-conversation"}
             reconnect={reconnect}
             conversationId={activeId}
             onConversationCreated={(id) => setActiveId(id)}
