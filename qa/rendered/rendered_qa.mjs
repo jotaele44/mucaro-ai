@@ -1,7 +1,7 @@
 // Rendered UI QA (MATRIX-015, MOB F01-F20): drives the real built UI against a real local
 // backend at desktop and iPhone widths, saves screenshots, runs axe, and writes a receipt.
 // Usage: node rendered_qa.mjs [--python PATH] [--out DIR] [--browser chromium|webkit] [--only-new] [--scenarios a,b]
-// --only-new runs just the resilience, streams, gate, lan and clipboard scenarios; --scenarios picks some of them
+// --only-new runs just the resilience, streams, gate, lan, clipboard and share scenarios; --scenarios picks some of them
 // (development aids: their receipts are marked partial).
 import AxeBuilder from "@axe-core/playwright";
 import { chromium, webkit, devices } from "playwright";
@@ -18,7 +18,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
 const args = process.argv.slice(2);
 const argValue = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
-const scenarioFilter = argValue("--scenarios", "").split(",").filter(Boolean); // resilience,streams,gate,lan,clipboard
+const scenarioFilter = argValue("--scenarios", "").split(",").filter(Boolean); // resilience,streams,gate,lan,clipboard,share
 const onlyNew = args.includes("--only-new") || scenarioFilter.length > 0;
 const wantScenario = (name) => scenarioFilter.length === 0 || scenarioFilter.includes(name);
 const browserName = argValue("--browser", "chromium");
@@ -234,6 +234,54 @@ async function scenario(browser, base, viewport, contextOptions) {
   await assistantMessage.getByRole("button", { name: "Copy message text" }).click();
   await page.waitForFunction(() => document.querySelector('[role="status"]')?.textContent?.includes("Copied to clipboard."));
   check("copy action reports success", viewport, true);
+
+  // Save and Share: the answer as shown, plus the records Mucaro saved with it, become files.
+  const saveButton = assistantMessage.getByRole("button", { name: "Save answer as a file" });
+  check(
+    "only the received message offers Save and Share",
+    viewport,
+    (await saveButton.count()) === 1 &&
+      (await assistantMessage.getByRole("button", { name: "Share answer" }).count()) === 1 &&
+      (await userMessage.getByRole("button", { name: "Save answer as a file" }).count()) === 0 &&
+      (await userMessage.getByRole("button", { name: "Share answer" }).count()) === 0,
+  );
+  await saveButton.click();
+  const saveSheet = page.getByRole("dialog", { name: "Save answer" });
+  await saveSheet.waitFor();
+  const saveOptions = await saveSheet.getByRole("button").allInnerTexts();
+  const wantedOptions = ["Markdown (.md)", "Plain text (.txt)", "Report with sources (.md)", "Full answer record (.json)", "Citations table (.csv)"];
+  check("the Save sheet offers the answer and the records saved with it", viewport, wantedOptions.every((label) => saveOptions.includes(label)), saveOptions.join(" | "));
+  await shot(page, viewport, "02c-save-sheet");
+  axeRuns.push(await axe(page, viewport, "save sheet"));
+  const [markdownDownload] = await Promise.all([page.waitForEvent("download"), saveSheet.getByRole("button", { name: "Markdown (.md)" }).click()]);
+  const markdown = readFileSync(await markdownDownload.path(), "utf-8");
+  check(
+    "Save as Markdown downloads the answer with its question and sources",
+    viewport,
+    markdownDownload.suggestedFilename() === "mucaro-how-does-source-lineage-work.md" &&
+      markdown.startsWith("# How does source lineage work?\n") &&
+      markdown.includes("Mock cited answer") &&
+      markdown.includes("## Sources"),
+    `${markdownDownload.suggestedFilename()}: ${JSON.stringify(markdown.slice(0, 80))}`,
+  );
+  check("the Save sheet closes after saving", viewport, await saveSheet.waitFor({ state: "detached", timeout: 5000 }).then(() => true, () => false));
+  await saveButton.click();
+  const [recordDownload] = await Promise.all([page.waitForEvent("download"), saveSheet.getByRole("button", { name: "Full answer record (.json)" }).click()]);
+  let savedRecord = {};
+  try {
+    savedRecord = JSON.parse(readFileSync(await recordDownload.path(), "utf-8"));
+  } catch {
+    // Reported by the check below.
+  }
+  check(
+    "Save full answer record downloads the trace Mucaro saved with the answer",
+    viewport,
+    recordDownload.suggestedFilename() === "mucaro-how-does-source-lineage-work-record.json" &&
+      /^run_[0-9a-f]+$/.test(savedRecord.run_id || "") &&
+      savedRecord.query === "How does source lineage work?",
+    `${recordDownload.suggestedFilename()} run_id=${savedRecord.run_id}`,
+  );
+  await saveSheet.waitFor({ state: "detached", timeout: 5000 });
 
   await userMessage.getByRole("button", { name: "Edit message" }).click();
   const userEditor = userMessage.getByLabel("Edit message text");
@@ -1308,6 +1356,112 @@ async function clipboardScenario(browser, base) {
   });
 }
 
+async function shareScenario(browser, base) {
+  const shareStatus = async (page) => {
+    await page.waitForFunction(() => /^(Shared|Sharing|This browser)/.test(document.querySelector('div.sr-only[role="status"]')?.textContent || ""), null, { timeout: 5000 }).catch(() => {});
+    return ((await page.locator('div.sr-only[role="status"]').textContent()) || "").trim();
+  };
+  const answered = async (init) => {
+    const context = await browser.newContext({ ...desktopProfile(), baseURL: base });
+    await context.addInitScript(init);
+    const page = await context.newPage();
+    await page.goto("/");
+    await page.locator("#composer-input").waitFor();
+    await ask(page, "How does source lineage work?");
+    const share = page.locator("article.run").last().locator(".assistant-bubble").getByRole("button", { name: "Share answer" });
+    return { context, page, share };
+  };
+  const NAME = "mucaro-how-does-source-lineage-work.txt";
+
+  await guarded("share sheet", "desktop", async () => {
+    const { context, page, share } = await answered(() => {
+      window.__shared = [];
+      Object.defineProperty(navigator, "canShare", { value: (data) => Array.isArray(data?.files) && data.files.length > 0, configurable: true });
+      Object.defineProperty(navigator, "share", {
+        value: async (data) => {
+          for (const file of data.files) window.__shared.push({ name: file.name, type: file.type, text: await file.text() });
+        },
+        configurable: true,
+      });
+    });
+    try {
+      let downloads = 0;
+      page.on("download", () => downloads++);
+      await share.click();
+      const status = await shareStatus(page);
+      const shared = await page.evaluate(() => window.__shared);
+      const file = shared[0] || {};
+      check(
+        "Share hands the answer to the system share sheet as a text file",
+        "desktop",
+        status === "Shared." && shared.length === 1 && file.name === NAME && String(file.type).startsWith("text/plain") &&
+          String(file.text).startsWith("Question: How does source lineage work?") && String(file.text).includes("Sources:") && downloads === 0,
+        `"${status}", ${shared.length} file(s): ${file.name} ${file.type} ${JSON.stringify(String(file.text).slice(0, 50))}, ${downloads} download(s)`,
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  await guarded("share sheet closed", "desktop", async () => {
+    const { context, page, share } = await answered(() => {
+      Object.defineProperty(navigator, "canShare", { value: () => true, configurable: true });
+      Object.defineProperty(navigator, "share", { value: async () => { throw new DOMException("Share canceled", "AbortError"); }, configurable: true });
+    });
+    try {
+      let downloads = 0;
+      page.on("download", () => downloads++);
+      await share.click();
+      const status = await shareStatus(page);
+      await page.waitForTimeout(500);
+      check("closing the share sheet saves nothing", "desktop", status === "Sharing cancelled." && downloads === 0, `"${status}", ${downloads} download(s)`);
+    } finally {
+      await context.close();
+    }
+  });
+
+  await guarded("share without a share sheet", "desktop", async () => {
+    const { context, page, share } = await answered(() => {
+      Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+      Object.defineProperty(navigator, "canShare", { value: undefined, configurable: true });
+    });
+    try {
+      const [download] = await Promise.all([page.waitForEvent("download"), share.click()]);
+      const text = readFileSync(await download.path(), "utf-8");
+      const status = await shareStatus(page);
+      check(
+        "Share saves the answer instead where no share sheet exists",
+        "desktop",
+        download.suggestedFilename() === NAME && text.startsWith("Question: How does source lineage work?") && status === `This browser cannot share files, so ${NAME} was saved instead.`,
+        `${download.suggestedFilename()}, "${status}"`,
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  await guarded("share over an insecure connection", "desktop", async () => {
+    const { context, page, share } = await answered(() => {
+      Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+      Object.defineProperty(navigator, "canShare", { value: undefined, configurable: true });
+      try {
+        Object.defineProperty(window, "isSecureContext", { value: false, configurable: true });
+        window.__insecureForced = true;
+      } catch {
+        window.__insecureForced = false;
+      }
+    });
+    try {
+      const [download] = await Promise.all([page.waitForEvent("download"), share.click()]);
+      const status = await shareStatus(page);
+      const forced = await page.evaluate(() => window.__insecureForced);
+      const explains = forced ? status === `Sharing needs a secure (https) connection, so ${NAME} was saved instead.` : true;
+      check("over http on a network address, Share saves the file and says sharing needs https", "desktop", download.suggestedFilename() === NAME && explains, `forced=${forced}, "${status}"`);
+    } finally {
+      await context.close();
+    }
+  });
+}
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "mucaro-qa-"));
 const port = await freePort();
@@ -1342,6 +1496,7 @@ try {
     else skippedNotes.push("Network-address checks (remote-client refusal, phone link, cleartext notice, weak-token refusal) did not run: this machine has no non-loopback IPv4 address.");
   }
   if (wantScenario("clipboard")) await clipboardScenario(browser, base);
+  if (wantScenario("share")) await shareScenario(browser, base);
   if (!onlyNew) {
     await offlineScenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } }, async () => {
       backend.kill("SIGTERM");
