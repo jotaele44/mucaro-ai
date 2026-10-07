@@ -24,7 +24,10 @@ so content block types newer than the installed SDK pass through untouched.
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import json
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -60,7 +63,10 @@ STOP_POLL_SECONDS = 0.5
 SEED_TURN_CHARS = 20_000
 AUTO_POLICY = "policy:agent-safe-actions"
 AGENT_MODE = "agent"
+# Modes in which read-only local tools run without asking; "ask" asks before every action.
+AUTO_APPROVE_MODES = {"agent", "auto"}
 CITE_OPEN, CITE_CLOSE = "⟦", "⟧"  # ⟦n⟧ marks a citation in the answer text
+NON_ANSWER_STATUSES = {"PLAN_ONLY", "ACTIONS_COMPLETED", "QUESTION_DISMISSED", "STOPPED_BY_USER_CHOICE"}
 INTERRUPTED_SENTINEL = "This part of the response was interrupted before it finished."
 
 BETA_PROGRESS_UPDATES = "thinking-display-updates-2026-08-18"
@@ -181,9 +187,13 @@ def _tools_config(conversation_id: str, cfg: Settings) -> dict[str, Any]:
     return payload
 
 
-def request_tools(model: str, tools_config: dict[str, Any]) -> list[dict[str, Any]]:
+def request_tools(model: str, tools_config: dict[str, Any], mode: str = AGENT_MODE) -> list[dict[str, Any]]:
+    """Server tools run at Anthropic and cannot wait for an approval, so only the agent mode offers them.
+    Switching modes changes the tool list, which costs a cache miss and drops earlier thinking blocks."""
     info = model_info(model)
     tools: list[dict[str, Any]] = []
+    if mode != AGENT_MODE:
+        return client_tool_definitions()
     if tools_config.get("web"):
         if info["web_tool_version"] == "20260209":
             tools.append({"type": "web_search_20260209", "name": "web_search", "max_uses": 10})
@@ -311,6 +321,10 @@ def _repair_history(conversation_id: str, run_id: str, cfg: Settings) -> None:
             continue
         text = str(turn.get("content") or "").strip()
         if not text or turn.get("role") not in {"user", "assistant"}:
+            continue
+        if turn.get("role") == "assistant" and (
+            (turn.get("answer_trace") or {}).get("model_provider") == "mock" or turn.get("status") in NON_ANSWER_STATUSES
+        ):
             continue
         seeds.append({"role": turn["role"], "content": [{"type": "text", "text": text[:SEED_TURN_CHARS]}], "turn_id": turn.get("turn_id")})
     if seeds:
@@ -482,10 +496,8 @@ class _Stream:
         elif kind == "content_block_start":
             index = int(event.get("index", len(self.message["content"])))
             block = dict(event.get("content_block") or {})
-            self.message["content"][index:index + 1] = [block] if index < len(self.message["content"]) else []
-            if index >= len(self.message["content"]):
-                self._block(index)
-                self.message["content"][index] = block
+            self._block(index)
+            self.message["content"][index] = block
             block_type = block.get("type")
             if block_type in {"tool_use", "server_tool_use"}:
                 self._narrate()
@@ -540,8 +552,8 @@ class _Stream:
                     try:
                         block["input"] = json.loads(raw)
                     except json.JSONDecodeError:
+                        # Stored as an empty input; schema validation then reports it to Claude as invalid.
                         block["input"] = {}
-                        block["_input_invalid"] = raw[:2000]
                 elif not isinstance(block.get("input"), dict):
                     block["input"] = {}
                 if block_type == "server_tool_use":
@@ -581,8 +593,8 @@ class _Stream:
     def finished_message(self) -> dict[str, Any]:
         self.flush()
         for block in self.message["content"]:
-            if isinstance(block, dict):
-                block.pop("_input_invalid", None) if block.get("type") == "server_tool_use" else None
+            if isinstance(block, dict) and block.pop("_input_invalid", None) is not None:
+                block["input"] = {}
         return self.message
 
 
@@ -629,12 +641,23 @@ def _api_error(exc: Exception) -> AgentAPIError:
     return AgentAPIError("ERROR_CLAUDE_REQUEST_FAILED", f"{type(exc).__name__}: {exc}")
 
 
+_CLIENTS: dict[str, Any] = {}
+
+
 def _client(api_key: str) -> Any:
     if CLIENT_FACTORY is not None:
         return CLIENT_FACTORY(api_key)
     import anthropic
 
-    return anthropic.Anthropic(api_key=api_key, max_retries=2, timeout=anthropic.Timeout(600.0, connect=15.0, read=180.0))
+    key_id = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+    with _ACTIVE_LOCK:
+        client = _CLIENTS.get(key_id)
+        if client is None:
+            _CLIENTS.clear()
+            client = _CLIENTS[key_id] = anthropic.Anthropic(
+                api_key=api_key, max_retries=2, timeout=anthropic.Timeout(600.0, connect=15.0, read=180.0)
+            )
+    return client
 
 
 def _request(state: dict[str, Any], messages: list[dict[str, Any]], tools: list[dict[str, Any]], container_id: str | None) -> tuple[dict[str, Any], list[str], dict[str, Any]]:
@@ -668,10 +691,8 @@ def abort(run_id: str) -> None:
         _ABORTED.add(run_id)
         response = _ACTIVE.get(run_id)
     if response is not None:
-        try:
+        with contextlib.suppress(Exception):  # the stream may already be closed
             response.close()
-        except Exception:  # noqa: BLE001 - the stream may already be closed
-            pass
 
 
 def _stream_message(
@@ -808,7 +829,7 @@ def _start_tool_round(
             continue
         hooks.register_calls([call])
         state["steps"].append({"kind": "client_tool", "name": tool.name, "tool_call_id": call["tool_call_id"]})
-        if tool.gate == "auto" and run.get("mode") == AGENT_MODE:
+        if tool.gate == "auto" and run.get("mode") in AUTO_APPROVE_MODES:
             stream.progress("tool", tool.progress(tool_input), tool=tool.name)
             try:
                 call = approve_tool_call(
@@ -911,6 +932,14 @@ def _trace(state: dict[str, Any], run: dict[str, Any], answer: str) -> dict[str,
     }
 
 
+_CITE_MARK = re.compile(re.escape(CITE_OPEN) + r"(\d+)" + re.escape(CITE_CLOSE))
+
+
+def plain_answer(text: str) -> str:
+    """The answer for plain-text places (transcripts, copies, history seeds): ⟦n⟧ citation marks become [n]."""
+    return _CITE_MARK.sub(lambda match: f"[{match.group(1)}]", text or "")
+
+
 def _final_answer(state: dict[str, Any]) -> str:
     answer = state["segment_text"].strip()
     if answer:
@@ -944,7 +973,7 @@ def advance_turn(run: dict[str, Any], cfg: Settings, hooks: TurnHooks) -> TurnOu
         return TurnOutcome("failed", status="ERROR_CLAUDE_KEY_MISSING", detail="Add your Anthropic API key in Settings.")
     client = _client(key)
     tools_config = _tools_config(conversation_id, cfg)
-    tools = request_tools(state["model"], tools_config)
+    tools = request_tools(state["model"], tools_config, str(run.get("mode") or AGENT_MODE))
     history = load_history(conversation_id, cfg)
     retried_container = False
     while True:
@@ -953,7 +982,7 @@ def advance_turn(run: dict[str, Any], cfg: Settings, hooks: TurnHooks) -> TurnOu
         if state["iterations"] >= MAX_ITERATIONS:
             state["stop_reason"] = "iteration_limit"
             hooks.emit("warning", {"status": "WARN_AGENT_STEP_LIMIT", "category": "TOOL_FAILURE", "detail": f"Stopped after {MAX_ITERATIONS} steps."})
-            return _complete(state, run, hooks, "ANSWER_INCOMPLETE")
+            return _complete(state, run, hooks, "ANSWER_INCOMPLETE", cfg)
         messages = history + [{"role": row["role"], "content": json.loads(row["content_json"])} for row in state["pending"]]
         params, betas, extra = _request(state, messages, tools, tools_config.get("container_id"))
         stream = _Stream(state, hooks.emit)
@@ -987,7 +1016,7 @@ def advance_turn(run: dict[str, Any], cfg: Settings, hooks: TurnHooks) -> TurnOu
             if state["pause_turns"] > MAX_PAUSE_TURNS:
                 state["pending"].pop()  # a paused turn cannot be followed by a new user message
                 hooks.emit("warning", {"status": "WARN_AGENT_PAUSE_LIMIT", "category": "TOOL_FAILURE", "detail": "Claude kept pausing; the answer may be incomplete."})
-                return _complete(state, run, hooks, "ANSWER_INCOMPLETE")
+                return _complete(state, run, hooks, "ANSWER_INCOMPLETE", cfg)
             continue
         state["pause_turns"] = 0
         has_tool_use = any(isinstance(block, dict) and block.get("type") == "tool_use" for block in message["content"])
@@ -1005,19 +1034,19 @@ def advance_turn(run: dict[str, Any], cfg: Settings, hooks: TurnHooks) -> TurnOu
             state["pending"].append(_pending("user", _closure(ids, "This call was cut off before it finished; it did not run.")))
         if stop_reason == "max_tokens":
             hooks.emit("warning", {"status": "WARN_ANSWER_LENGTH_LIMIT", "category": "INPUT_INVALID", "detail": "The answer reached the length limit. Send “continue” to keep going."})
-            return _complete(state, run, hooks, "ANSWER_TRUNCATED")
+            return _complete(state, run, hooks, "ANSWER_TRUNCATED", cfg)
         if stop_reason == "refusal":
             details = message.get("stop_details") or {}
             category = details.get("category") if isinstance(details, dict) else None
             hooks.emit("warning", {"status": "WARN_CLAUDE_DECLINED", "category": "BLOCKED_ACTION", "detail": f"Claude declined this request{f' ({category})' if category else ''}."})
-            return _complete(state, run, hooks, "DECLINED")
-        return _complete(state, run, hooks, "ANSWERED")
+            return _complete(state, run, hooks, "DECLINED", cfg)
+        return _complete(state, run, hooks, "ANSWERED", cfg)
 
 
-def _complete(state: dict[str, Any], run: dict[str, Any], hooks: TurnHooks, outcome: str) -> TurnOutcome:
+def _complete(state: dict[str, Any], run: dict[str, Any], hooks: TurnHooks, outcome: str, cfg: Settings) -> TurnOutcome:
     answer = _final_answer(state)
     rows = [{"role": row["role"], "content_json": row["content_json"], "run_id": run["run_id"]} for row in state["pending"]]
-    append_messages(run["conversation_id"], rows, settings_for(run))
+    append_messages(run["conversation_id"], rows, cfg)
     state["committed"] = True
     final_cites = set(state["segment_cites"])
     for row in state["citations"]:
@@ -1029,18 +1058,6 @@ def _complete(state: dict[str, Any], run: dict[str, Any], hooks: TurnHooks, outc
     return TurnOutcome("completed", answer=answer, outcome=outcome, trace=trace)
 
 
-_RUN_CFG: dict[str, Settings] = {}
-
-
-def settings_for(run: dict[str, Any]) -> Settings:
-    return _RUN_CFG.get(run["run_id"], settings)
-
-
-def bind_settings(run_id: str, cfg: Settings) -> None:
-    _RUN_CFG[run_id] = cfg
-
-
 def release(run_id: str) -> None:
-    _RUN_CFG.pop(run_id, None)
     with _ACTIVE_LOCK:
         _ABORTED.discard(run_id)
