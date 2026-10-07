@@ -45,7 +45,7 @@ Residue:
 - open specification bindings: Mucaro AI Release-Grade Workbench Specification
 <!-- END GENERATED: release-scope-status -->
 
-Current package version: `0.1.23`.
+Current package version: `0.1.24`.
 
 ## Authoritative Exact-Head Status
 

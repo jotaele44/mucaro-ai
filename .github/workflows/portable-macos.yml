@@ -1,0 +1,108 @@
+name: Portable macOS release lane
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/app/portable_runtime.py"
+      - "backend/app/portable_runtime_source.py"
+      - "backend/app/portable_install.py"
+      - "backend/app/clean_machine_macos.py"
+      - "scripts/certify_clean_machine_macos.py"
+      - "scripts/certify_portable_release_lane.py"
+      - "packaging/runtime/**"
+      - "frontend/**"
+      - ".github/workflows/portable-macos.yml"
+
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/portable_runtime.py"
+      - "backend/app/portable_runtime_source.py"
+      - "backend/app/portable_install.py"
+      - "backend/app/clean_machine_macos.py"
+      - "scripts/certify_clean_machine_macos.py"
+      - "scripts/certify_portable_release_lane.py"
+      - "packaging/runtime/**"
+      - "frontend/**"
+      - ".github/workflows/portable-macos.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  certify-portable-lane:
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PREVIOUS_SHA: 3fe90a7bd255ec46ea39e409a5c60f3b30cb7f32
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install current source dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Build current frontend
+        working-directory: frontend
+        run: |
+          npm ci --registry=https://registry.npmjs.org/
+          npm run build
+      - name: Materialize current governed x86_64 runtime
+        run: |
+          mkdir -p "$RUNNER_TEMP/evidence"
+          python scripts/mucaro.py package portable-runtime             --output-dir "$RUNNER_TEMP/current-runtime" --format json             > "$RUNNER_TEMP/evidence/current-runtime.json"
+          python scripts/mucaro.py package portable-runtime             --verify "$RUNNER_TEMP/current-runtime" --format json             > "$RUNNER_TEMP/evidence/current-runtime-verify.json"
+      - name: Build current portable app
+        run: |
+          python scripts/mucaro.py package portable-macos-app             --runtime-dir "$RUNNER_TEMP/current-runtime"             --output-dir "$RUNNER_TEMP/current-app" --format json             > "$RUNNER_TEMP/evidence/current-app.json"
+          python scripts/mucaro.py package portable-macos-app             --verify "$RUNNER_TEMP/current-app/Mucaro AI Portable.app"             --expected-head "$HEAD_SHA" --format json             > "$RUNNER_TEMP/evidence/current-app-verify.json"
+      - name: Prepare previous release source
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/previous-src" "$PREVIOUS_SHA"
+          cd "$RUNNER_TEMP/previous-src/frontend"
+          npm ci --registry=https://registry.npmjs.org/
+          npm run build
+      - name: Materialize previous runtime if its lock differs
+        run: |
+          PREV="$RUNNER_TEMP/previous-src"
+          if cmp -s packaging/runtime/macos-x86_64.json "$PREV/packaging/runtime/macos-x86_64.json"             && cmp -s packaging/runtime/requirements-macos-x86_64.lock "$PREV/packaging/runtime/requirements-macos-x86_64.lock"; then
+            echo "PREVIOUS_RUNTIME=$RUNNER_TEMP/current-runtime" >> "$GITHUB_ENV"
+          else
+            PYTHONPATH="$PREV:$PREV/backend" python "$PREV/scripts/mucaro.py" package portable-runtime               --output-dir "$RUNNER_TEMP/previous-runtime" --format json               > "$RUNNER_TEMP/evidence/previous-runtime.json"
+            echo "PREVIOUS_RUNTIME=$RUNNER_TEMP/previous-runtime" >> "$GITHUB_ENV"
+          fi
+      - name: Build previous portable app
+        run: |
+          PREV="$RUNNER_TEMP/previous-src"
+          PYTHONPATH="$PREV:$PREV/backend" python "$PREV/scripts/mucaro.py" package portable-macos-app             --runtime-dir "$PREVIOUS_RUNTIME"             --output-dir "$RUNNER_TEMP/previous-app" --format json             > "$RUNNER_TEMP/evidence/previous-app.json"
+      - name: Verify previous app with current verifier
+        run: |
+          python scripts/mucaro.py package portable-macos-app             --verify "$RUNNER_TEMP/previous-app/Mucaro AI Portable.app"             --format json             > "$RUNNER_TEMP/evidence/previous-app-current-verify.json"
+      - name: Execute distinct-version clean-machine lifecycle
+        run: |
+          python scripts/certify_clean_machine_macos.py             --current-app "$RUNNER_TEMP/current-app/Mucaro AI Portable.app"             --previous-app "$RUNNER_TEMP/previous-app/Mucaro AI Portable.app"             --head "$HEAD_SHA"             --install-root "$RUNNER_TEMP/portable-install"             --output "$RUNNER_TEMP/evidence/clean-machine.json"
+      - name: Certify portable release lane
+        run: |
+          python scripts/certify_portable_release_lane.py             --current-app "$RUNNER_TEMP/current-app/Mucaro AI Portable.app"             --previous-app "$RUNNER_TEMP/previous-app/Mucaro AI Portable.app"             --runtime-dir "$RUNNER_TEMP/current-runtime"             --clean-machine-receipt "$RUNNER_TEMP/evidence/clean-machine.json"             --head "$HEAD_SHA"             --output "$RUNNER_TEMP/evidence/portable-release-lane.json"
+      - name: Archive portable apps
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/current-app/Mucaro AI Portable.app" "$RUNNER_TEMP/evidence/current-portable-app.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/previous-app/Mucaro AI Portable.app" "$RUNNER_TEMP/evidence/previous-portable-app.zip"
+      - name: Upload portable-lane receipts and apps
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: portable-macos-evidence-${{ env.HEAD_SHA }}
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: error
