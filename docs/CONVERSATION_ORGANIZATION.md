@@ -39,7 +39,10 @@ The local UI separates Chats and Archived, sorts pinned chats first, reports
 failed list refreshes without discarding the last good list, and offers retry.
 Organization success is announced only after the backend acknowledges it.
 A revision conflict refreshes the selected chat and requires the user to retry
-the intended action against the updated state. Switching chats creates a fresh
+the intended action against the updated state. Opening the conversation menu
+refreshes its snapshot before mutations become available; a failed read offers
+retry rather than allowing a stale write. Late older responses cannot replace a
+newer revision. Switching chats creates a fresh
 view instance so an old request cannot replace the newly selected transcript.
 
 The Floot demo binds displayed messages to the selected conversation ID. New
