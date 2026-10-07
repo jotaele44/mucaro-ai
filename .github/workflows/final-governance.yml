@@ -1,0 +1,47 @@
+name: Final-head governance capture
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_head:
+        description: Full SHA of the release candidate on main
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.expected_head }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Bind to main and install validator
+        env:
+          EXPECTED_HEAD: ${{ inputs.expected_head }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_HEAD"
+          python -m pip install -e ".[dev]"
+      - name: Capture governance without modifying the source tree
+        env:
+          EXPECTED_HEAD: ${{ inputs.expected_head }}
+        run: |
+          python scripts/capture_final_governance.py \
+            --expected-head "$EXPECTED_HEAD" \
+            --output "$RUNNER_TEMP/final-governance/receipt.json"
+      - name: Archive exact-head receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: final-governance-${{ inputs.expected_head }}
+          path: ${{ runner.temp }}/final-governance
+          if-no-files-found: error
