@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - "backend/app/web_render.py"
+      - "backend/app/tools.py"
       - "backend/tests/test_web_render.py"
       - "scripts/certify_web_render_live.py"
       - "backend/tests/test_web_render_live_cert.py"
@@ -14,6 +15,7 @@ on:
       - main
     paths:
       - "backend/app/web_render.py"
+      - "backend/app/tools.py"
       - "scripts/certify_web_render_live.py"
       - ".github/workflows/web-render-cert.yml"
 
@@ -44,3 +46,4 @@ jobs:
             ${{ runner.temp }}/mucaro-web-render-live.json
             data/exports/web_renders/*.json
             data/exports/web_renders/*.png
+            data/exports/web_renders/downloads/*
