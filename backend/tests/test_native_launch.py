@@ -132,13 +132,18 @@ def test_window_cleans_pid_signal_handlers_and_worker(tmp_path, monkeypatch, fai
         if fail:
             raise RuntimeError("window failed")
 
-    fake = SimpleNamespace(create_window=lambda *args, **kwargs: SimpleNamespace(destroy=lambda: None), start=start)
+    fake = SimpleNamespace(
+        create_window=lambda *args, **kwargs: SimpleNamespace(destroy=lambda: None),
+        start=start,
+        settings={"ALLOW_DOWNLOADS": False},
+    )
     monkeypatch.setitem(sys.modules, "webview", fake)
     if fail:
         with pytest.raises(RuntimeError):
             native_window.run_window("http://127.0.0.1:8000", storage_dir=tmp_path / "webview", pid_file=pid)
     else:
         native_window.run_window("http://127.0.0.1:8000", storage_dir=tmp_path / "webview", pid_file=pid)
+    assert fake.settings["ALLOW_DOWNLOADS"] is True  # Save and Share in the interface download files
     assert not pid.exists()
     assert all(signal.getsignal(sig) == handler for sig, handler in before.items())
     assert not any(t.name == "mucaro-signal" for t in threading.enumerate())
