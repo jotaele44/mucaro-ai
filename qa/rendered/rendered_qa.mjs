@@ -1446,6 +1446,32 @@ async function organizationScenario(browser, base) {
         await page.getByRole("menuitem", { name: "Unpin", exact: true }).click();
         await page.getByText("Local workspace · answers cite your sources", { exact: true }).waitFor();
         check("conflict recovery applies only the retried action", viewport, !(await row()).pinned);
+        await page.route(`**/conversations/${cid}`, async (route) => {
+          if (route.request().method() === "PATCH") await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: { status: "ERROR_UPDATE_REFUSED", detail: "Update refused by the service." } }) });
+          else await route.continue();
+        });
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByRole("menuitem", { name: "Pin", exact: true }).click();
+        await page.getByText("Update refused by the service.", { exact: true }).waitFor();
+        check("refused organization shows an error without false success", viewport, !(await row()).pinned);
+        await page.unroute(`**/conversations/${cid}`);
+        await page.getByRole("menuitem", { name: "Pin", exact: true }).click();
+        await page.getByText("Local workspace · Pinned · answers cite your sources", { exact: true }).waitFor();
+        await page.route("**/conversations", async (route) => {
+          if (route.request().method() === "GET") await route.fulfill({ status: 503, body: "List unavailable" });
+          else await route.continue();
+        });
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByRole("menuitem", { name: "Unpin", exact: true }).click();
+        await openNav();
+        await nav.getByRole("button", { name: "Chats", exact: true }).click();
+        await nav.getByText("Could not refresh chats. The list may be out of date.", { exact: true }).waitFor();
+        check("failed list refresh preserves last-good chat list", viewport, await nav.getByRole("button", { name: `${name} changed elsewhere Pinned · 0 turns`, exact: true }).isVisible());
+        await page.unroute("**/conversations");
+        await nav.getByRole("button", { name: "Retry chats", exact: true }).click();
+        await nav.getByRole("button", { name: `${name} changed elsewhere 0 turns`, exact: true }).waitFor();
+        check("chat list retry recovers acknowledged state", viewport, await nav.getByRole("alert").count() === 0);
+        if (viewport === "iphone") await nav.getByRole("button", { name: `${name} changed elsewhere 0 turns`, exact: true }).click();
         await page.getByRole("button", { name: "Conversation menu" }).click();
         await page.keyboard.press("End");
         check("conversation menu supports keyboard navigation", viewport, await page.getByRole("menuitem", { name: "Delete…" }).evaluate(el => el === document.activeElement));
