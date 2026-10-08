@@ -120,7 +120,8 @@ function ConversationMenu({ conversation, onPrepare, onRename, onUpdate, onDelet
         ⋯
       </button>
       {open && (
-        <ul className="menu" role="menu">
+        <div className="menu" aria-busy={preparing || updating}>
+        <ul className="menu-items" role="menu">
           <li role="none"><button role="menuitem" type="button" disabled={updating || !ready} onClick={() => organize({ pinned: !conversation.pinned })}>{conversation.pinned ? "Unpin" : "Pin"}</button></li>
           <li role="none"><button role="menuitem" type="button" disabled={updating || !ready} onClick={() => organize({ archived: !conversation.archived })}>{conversation.archived ? "Restore conversation" : "Archive"}</button></li>
           <li role="none"><button role="menuitem" type="button" disabled={updating || !ready} onClick={() => { setOpen(false); setTitle(conversation?.title || ""); setRenameError(null); setDialog("rename"); }}>Rename</button></li>
@@ -128,10 +129,11 @@ function ConversationMenu({ conversation, onPrepare, onRename, onUpdate, onDelet
           <li role="none"><button role="menuitem" type="button" onClick={() => { setOpen(false); onOpenTasks(); }}>Background tasks</button></li>
           <li role="none"><button role="menuitem" type="button" disabled={updating || !ready} className="danger-text" onClick={() => { setOpen(false); setDialog("delete"); }}>Delete…</button></li>
         </ul>
+        {actionError && <p className="error-text" role="alert">{actionError}</p>}
+        {preparing && <p className="muted small" role="status">Refreshing conversation…</p>}
+        {!preparing && !ready && <button type="button" className="ghost-button" onClick={prepare}>Retry conversation</button>}
+        </div>
       )}
-      {actionError && <p className="error-text" role="alert">{actionError}</p>}
-      {open && preparing && <p className="muted small" role="status">Refreshing conversation…</p>}
-      {open && !preparing && !ready && <button type="button" className="ghost-button" onClick={prepare}>Retry conversation</button>}
       {dialog === "rename" && (
         <Sheet title="Rename conversation" onClose={() => setDialog(null)} side="center">
           <form onSubmit={submitRename}>
