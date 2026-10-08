@@ -574,6 +574,7 @@ async function guarded(label, viewport, body) {
   try {
     await body();
   } catch (err) {
+    console.error(err.stack || String(err));
     check(`${label}: scenario ran to completion`, viewport, false, String(err.message || err).split("\n")[0]);
   }
 }
@@ -1520,6 +1521,9 @@ async function organizationScenario(browser, base) {
         const violations = await axe(page, viewport, "organization");
         axeResults.push(violations);
         check("organization has no horizontal overflow", viewport, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+      } catch (err) {
+        await shot(page, viewport, "conversation-organization-failure");
+        throw err;
       } finally {
         await context.close();
       }
