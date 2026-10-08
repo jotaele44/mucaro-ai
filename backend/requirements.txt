@@ -5,6 +5,7 @@ pydantic==2.13.4
 python-multipart==0.0.32
 jsonschema==4.26.0
 pytest==9.1.1
+httpx2==2.13.1
 pip-audit==2.10.1
 pypdf==6.19.0
 shapely==2.1.2
