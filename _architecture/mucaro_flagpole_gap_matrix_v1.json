@@ -151,9 +151,11 @@
         "backend/tests/test_github_resources.py",
         "backend/app/terminal_ui.py",
         "backend/tests/test_terminal_ui.py",
-        "_architecture/video_cli_parity_execution_blocker_v1.json"
+        "_architecture/video_cli_parity_execution_blocker_v1.json",
+        "backend/app/github_branch_push.py",
+        "backend/tests/test_github_branch_push.py"
       ],
-      "gap": "Governed read/diff/patch, isolated execution/regression, branch/commit, exact-head PR open/update, CI status, bounded GitHub resources, and terminal invocation are source-backed; branch-push orchestration remains OPEN and exact-head hosted execution is BLOCKED at startup."
+      "gap": "Governed read/diff/patch, isolated execution/regression, branch/commit, exact-request non-force branch push, exact-head PR open/update, CI status, bounded GitHub resources, and terminal invocation are source-backed; exact-head hosted execution remains BLOCKED at startup and whole-domain runtime certification remains OPEN."
     },
     {
       "id": "V14",
