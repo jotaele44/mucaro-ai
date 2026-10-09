@@ -79,6 +79,7 @@ def test_runtime_evidence_is_derived_from_governed_requests() -> None:
     assert tools["github.pr_open_update"]["classification"] == "REQUIRED"
     assert tools["github.pr_open_update"]["mutates_state"] is True
     assert tools["github.branch_push"]["classification"] == "SUPPORTING"
+    assert tools["github.branch_push"]["evidence_state"] == "EXERCISED"
     assert tools["github.branch_push"]["mutates_state"] is True
     assert tools["github.branch_push"]["network"] == "remote"
     for name in (
