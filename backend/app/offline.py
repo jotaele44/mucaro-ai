@@ -62,7 +62,7 @@ _TOOL_LOCAL_DEPENDENCIES: dict[str, tuple[str, str]] = {
     "coding.exec": ("binary_any", "docker,podman"),
     "coding.regression_run": ("binary_any", "docker,podman"),
     "coding.pr_request": ("binary", "git"),
-    "github.branch_push": ("binary", "git"),
+    "github.branch_push": ("binary_all", "git,gh"),
     "github.pr_open_update": ("binary", "gh"),
     "github.ci_status": ("binary", "gh"),
     "github.issues_list": ("binary", "gh"),
@@ -94,6 +94,8 @@ def _dependency_present(kind: str | None, dependency: str | None) -> bool:
         return resolve_local_tool(dependency) is not None
     if kind == "binary_any":
         return any(resolve_local_tool(name) is not None for name in dependency.split(","))
+    if kind == "binary_all":
+        return all(resolve_local_tool(name) is not None for name in dependency.split(","))
     raise ValueError(f"unsupported local dependency kind: {kind}")
 
 
