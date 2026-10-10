@@ -9,7 +9,7 @@ This document records the current source-level implementation boundary without c
 - Patch mutation is limited to an approved Git patch transaction. It revalidates exact HEAD, patch SHA-256, candidate path set, preimages, and dirty overlap; HEAD is conserved; unexpected dirty expansion triggers explicit rollback handling.
 - Test/lint/type/build/security/benchmark checks now have source-level terminal `PASS | FAIL | BLOCKED` execution accounting backed by coding-container receipts. A nonzero command is `FAIL`; engine/image/isolation failure is `BLOCKED`. Source presence alone is not execution evidence.
 - Code-review findings are bound to changed/untracked paths, current source SHA-256, and exact line evidence. No findings is not proof that no defects exist.
-- Governed local Git lifecycle source is implemented: clean exact-HEAD work-branch creation; commit transaction requiring a non-protected branch, exact approved dirty set, no pre-existing staged state, exact parent, exact committed path set, and rollback on failed commit/postconditions; a PR request artifact binds head/base/title/body without performing a remote network mutation.
+- Governed Git lifecycle source is implemented: clean exact-HEAD work-branch creation; exact candidate-set commit transaction; a frozen PR request hash; non-force exact-SHA push to origin with dry-run and post-push remote-head verification; and PR open/update that consumes the same frozen request identity.
 
 ## Certification boundary
 
@@ -20,7 +20,7 @@ The following remain material residue:
 1. Live execution with a frozen pinned coding image and a trustworthy Docker/Podman engine, including preserved receipts for representative positive and negative cases.
 2. Executed test/lint/type/build/security/benchmark receipts from that live isolated boundary.
 3. Executed regression evidence for the new branch/commit rollback lifecycle.
-4. Authenticated remote push/PR submission tied exactly to the preserved PR request artifact; credentials remain a final-stage capability.
+4. Execute and certify the source-backed exact-request branch-push + PR open/update chain with operator-supplied authentication; credentials remain final-stage and are never persisted by the adapters.
 5. Hosted CI admission to executable jobs, or an independently frozen trusted execution surface.
 6. Full coding certification corpus execution with zero unresolved residue.
 
