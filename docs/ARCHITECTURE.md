@@ -193,4 +193,4 @@ Higher-quality embedding providers or stores such as Chroma can still be added b
 
 ## Model layer
 
-Mock mode is the deterministic default. Live Anthropic calls require explicit `model_provider="anthropic"`, `MUCARO_AI_LIVE_MODE=1`, `ANTHROPIC_API_KEY`, and the optional `.[anthropic]` dependency group unless the operator explicitly permits mock fallback.
+Mock mode is the deterministic default. Live Anthropic calls require explicit `model_provider="anthropic"`, `MUCARO_AI_LIVE_MODE=1`, and `ANTHROPIC_API_KEY`. The adapter uses the Python standard library over HTTPS, so no provider SDK package is required. Mock fallback remains explicit.
