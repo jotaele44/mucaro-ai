@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,27 @@ def cfg(root: Path) -> Settings:
         default_model_provider="mock",
         default_model_name="mock",
     )
+
+
+def test_global_offline_mode_blocks_direct_search_before_provider_call(tmp_path: Path, monkeypatch) -> None:
+    offline_cfg = replace(cfg(tmp_path), offline_mode=True)
+    called = False
+
+    def forbidden_urlopen(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("provider request must not run in offline mode")
+
+    monkeypatch.setattr(web_search.urllib.request, "urlopen", forbidden_urlopen)
+    with pytest.raises(WebSearchError) as exc:
+        search_web_brave(
+            "Puerto Rico hydrology",
+            cfg=offline_cfg,
+            api_key="fixture",
+            allow_live_search=True,
+        )
+    assert exc.value.status == "ERROR_OFFLINE_NETWORK_DISABLED"
+    assert called is False
 
 
 def test_live_search_requires_explicit_permission(tmp_path: Path) -> None:
