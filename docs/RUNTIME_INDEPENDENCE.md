@@ -24,7 +24,7 @@ backend, Floot, GitHub, or any other developer tool on the host.
 | Tesseract + Poppler | Optional host binaries | Bundle optional OCR components where platform/licensing permit |
 | Playwright + Chromium | Optional rendered-browser runtime | Bundle an optional governed rendering engine on supported platforms |
 | Local LLM | External loopback server today | Optional bundled model engine/model pack, while retaining user-selected loopback engines |
-| Remote LLM APIs | Explicit remote provider | Keep as an explicit network exception |
+| Remote LLM APIs | Explicit remote provider using built-in HTTPS adapter; no provider SDK required | Keep as an explicit network exception |
 | Web fetch/search/render | Explicit public-network operations | Keep behind the governed network capability gate |
 | GitHub/hosted CI | Development and release governance | Never required by the installed application |
 | Signing/notarization/update delivery | Distribution infrastructure | Never required for ordinary offline execution after install |
@@ -78,6 +78,12 @@ Docker/Podman remains a platform-adapter gap rather than a universal bundle
 candidate. Desktop distributions may adopt a supported isolated execution
 adapter; mobile distributions must use a platform-appropriate sandbox or mark
 that execution class unsupported.
+
+## Application-wide offline mode
+
+Set `MUCARO_AI_OFFLINE=1` to make the installed application fail closed on external-network capabilities. The gate is enforced in model routing, direct remote-model invocation, governed tool execution, web fetch/session, web search, and rendered browsing. The local GUI/API loopback service and an explicitly configured loopback local-model server remain available.
+
+This is an application capability boundary, not an operating-system firewall. Maintainer-side build/release acquisition tools are outside the installed-runtime denominator and may still use the network when explicitly invoked.
 
 ## Certification gate
 
