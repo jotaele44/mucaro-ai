@@ -1,0 +1,97 @@
+{
+  "schema": "mucaro-video-cli-hosted-execution-blocker/1.0",
+  "denominator_id": "VIDEO_CLI_PARITY_V1",
+  "head_sha": "574603c93e1ce131dd4c41a1cf4f52088d36cce9",
+  "branch": "feat/video-cli-terminal-leases",
+  "pull_request": 204,
+  "observed_utc": "2026-10-09T17:48:59Z",
+  "classification": "HOSTED_STARTUP_BLOCKED",
+  "state": "BLOCKED",
+  "invariants": {
+    "exact_head_bound": true,
+    "rerun_failed_jobs_only": true,
+    "nonzero_workflow_attempt": true,
+    "job_step_count": 0,
+    "downloadable_job_logs": false,
+    "product_test_failure_inferred": false
+  },
+  "workflow_runs": [
+    {
+      "name": "CI",
+      "run_id": 37171177524,
+      "run_number": 700,
+      "attempt": 2,
+      "status": "completed",
+      "conclusion": "failure",
+      "run_started_at": "2026-10-09T17:48:32Z",
+      "updated_at": "2026-10-09T17:48:37Z",
+      "jobs": [
+        {
+          "job_id": 113950081117,
+          "name": "validate",
+          "status": "completed",
+          "conclusion": "failure",
+          "step_count": 0,
+          "log_fetch": "BlobNotFound"
+        }
+      ]
+    },
+    {
+      "name": "Rendered UI QA",
+      "run_id": 37171177492,
+      "run_number": 291,
+      "attempt": 2,
+      "status": "completed",
+      "conclusion": "failure",
+      "run_started_at": "2026-10-09T17:48:35Z",
+      "updated_at": "2026-10-09T17:48:40Z",
+      "jobs": [
+        {
+          "job_id": 113950097475,
+          "name": "rendered-qa (chromium)",
+          "status": "completed",
+          "conclusion": "failure",
+          "step_count": 0,
+          "log_fetch": "BlobNotFound"
+        },
+        {
+          "job_id": 113950097859,
+          "name": "rendered-qa (webkit)",
+          "status": "completed",
+          "conclusion": "failure",
+          "step_count": 0,
+          "log_fetch": "BlobNotFound"
+        }
+      ]
+    },
+    {
+      "name": "macOS app",
+      "run_id": 37171177489,
+      "run_number": 292,
+      "attempt": 2,
+      "status": "completed",
+      "conclusion": "failure",
+      "run_started_at": "2026-10-09T17:48:38Z",
+      "updated_at": "2026-10-09T17:48:46Z",
+      "jobs": [
+        {
+          "job_id": 113950117550,
+          "name": "build-and-verify",
+          "status": "completed",
+          "conclusion": "failure",
+          "step_count": 0,
+          "log_fetch": "BlobNotFound"
+        }
+      ]
+    }
+  ],
+  "adjudication": {
+    "supported": "Hosted workflows are triggerable and produce workflow/job records, but attempt 2 on all three lanes terminates before any step summary or downloadable log is available.",
+    "not_supported": [
+      "No product test assertion failure is evidenced.",
+      "No source-code defect can be inferred from the workflow conclusion alone.",
+      "No runtime PASS or parity certification can be claimed."
+    ],
+    "next_action": "Resolve the GitHub Actions startup-layer failure or obtain an independent executable exact-head lane, then rerun the affected tests without changing this frozen snapshot."
+  }
+}
