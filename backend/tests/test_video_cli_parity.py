@@ -26,8 +26,8 @@ def test_committed_video_cli_parity_denominator_and_gap_matrix_close() -> None:
     assert denominator["denominator_id"] == "VIDEO_CLI_PARITY_V1"
     assert len(denominator["capabilities"]) == 27
     assert gap["counts"] == {
-        "IMPLEMENTED": 20,
-        "PARTIAL": 7,
+        "IMPLEMENTED": 24,
+        "PARTIAL": 3,
         "ABSENT": 0,
         "UNVERIFIED": 0,
         "TOTAL": 27,
