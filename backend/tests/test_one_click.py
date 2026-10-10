@@ -193,6 +193,18 @@ def test_runtime_folder_is_git_ignored():
 # --- stage 1 helpers ------------------------------------------------------------------------------
 
 
+def test_end_user_setup_excludes_developer_and_provider_sdk_extras():
+    extras = {item for item in one_click.PYTHON_EXTRAS.split(",") if item}
+    assert "dev" not in extras
+    assert "anthropic" not in extras
+    assert {"httpx", "pytest", "ruff", "pip_audit", "anthropic"}.isdisjoint(set(one_click.KEY_MODULES))
+
+def test_runtime_requirements_file_excludes_developer_tools():
+    requirements = (REPO / "backend" / "requirements.txt").read_text(encoding="utf-8").splitlines()
+    names = {line.split("==", 1)[0].strip().lower() for line in requirements if line.strip() and not line.lstrip().startswith("#")}
+    assert {"pytest", "pip-audit", "ruff", "httpx", "anthropic"}.isdisjoint(names)
+
+
 def test_fingerprint_tracks_parts_file_content_and_missing_files(tmp_path, monkeypatch):
     monkeypatch.setattr(one_click, "ROOT", tmp_path)
     source = tmp_path / "a.txt"
