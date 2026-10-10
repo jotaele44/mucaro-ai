@@ -77,6 +77,8 @@ def render_web_page(
     max_dom_bytes: int = DEFAULT_MAX_DOM_BYTES,
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
+    if cfg.offline_mode:
+        raise WebRenderError("ERROR_OFFLINE_NETWORK_DISABLED", "Rendered web browsing is disabled while MUCARO_AI_OFFLINE is enabled.")
     if not allow_rendered_browser:
         raise WebRenderError(
             "ERROR_WEB_RENDER_NOT_ALLOWED",
