@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { api, streamRunEvents } from "../api.js";
 import { copyFailureMessage, copyText } from "../clipboard.js";
 import { ACTIVE_STATES, deriveRun, transcriptText } from "../feed.js";
+import { isReportableRunObservation } from "../petRuntime.js";
 import { Composer } from "./Composer.jsx";
 import { ConfirmSheet } from "./ConfirmSheet.jsx";
 import { EvidencePanel } from "./EvidencePanel.jsx";
@@ -83,7 +84,7 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
   );
 }
 
-export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions }) {
+export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, onRuntimeEvent, announce, modes, defaultOptions }) {
   const [conversation, setConversation] = useState(null);
   const [runs, setRuns] = useState(new Map());
   const [summaries, setSummaries] = useState([]);
@@ -100,6 +101,8 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
   const refreshRef = useRef(null);
   const feedRef = useRef(null);
   const stick = useRef(true);
+  const lastReportedRuntime = useRef(null);
+  const liveRunIds = useRef(new Set());
 
   // Drops every open stream and pending retry. A page that was suspended keeps stream objects that are dead
   // but still registered, which would block a re-follow.
@@ -127,6 +130,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         runId,
         after,
         (event) => {
+          liveRunIds.current.add(runId);
           failures.current.delete(runId); // data is flowing, so the stream route works
           setRuns((previous) => {
             const entry = previous.get(runId);
@@ -193,6 +197,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
   refreshRef.current = refresh;
 
   useEffect(() => {
+    lastReportedRuntime.current = null;
     resetStreams();
     setRuns(new Map());
     setSummaries([]);
@@ -231,6 +236,16 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
   const activeRun = views.find((view) => ["RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT"].includes(view.state));
   const queued = summaries.filter((row) => row.state === "QUEUED");
   const lastStatus = activeRun ? activeRun.state : views.length ? views[views.length - 1].state : null;
+  const observedRunId = activeRun?.runId || views[views.length - 1]?.runId || null;
+
+  useEffect(() => {
+    if (!onRuntimeEvent || !lastStatus || !observedRunId || conversation?.conversation_id !== conversationId) return;
+    if (!isReportableRunObservation(observedRunId, lastStatus, liveRunIds.current)) return;
+    const signature = observedRunId + ":" + lastStatus;
+    if (signature === lastReportedRuntime.current) return;
+    lastReportedRuntime.current = signature;
+    onRuntimeEvent({ runId: observedRunId, runState: lastStatus, observedAt: Date.now() });
+  }, [lastStatus, observedRunId, conversation?.conversation_id, conversationId, onRuntimeEvent]);
 
   useEffect(() => {
     const node = feedRef.current;
@@ -257,6 +272,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
       if (creating) id = (await api.createConversation(prompt.slice(0, 60))).conversation_id;
       const key = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const result = await api.sendMessage(id, { prompt, mode, idempotency_key: key, options: defaultOptions });
+      liveRunIds.current.add(result.run.run_id);
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
       if (creating) onConversationCreated(id);
       else {
