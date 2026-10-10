@@ -161,6 +161,9 @@ Useful terminal commands:
 :issues OWNER/REPO
 :prs OWNER/REPO
 :gists [OWNER]
+
+:allow-run [uses=N] [ttl=N]
+:allow-tool TOOL [network] [mutating] [uses=N] [ttl=N] [workspace=PATH] [args=SHA256]
 :approve
 :approve lease
 :deny
@@ -172,6 +175,12 @@ Useful terminal commands:
 :autopilot authorize CHECKPOINT_ID
 :autopilot run CHECKPOINT_ID
 ```
+
+Terminal permission grants are deliberately narrower than a literal
+"Allow All". `:allow-run` grants only local read-only authority for the active
+run. Remote or mutating authority must use `:allow-tool` for one exact tool;
+mutating grants additionally require `workspace=PATH` or an exact
+`args=SHA256` binding.
 
 The terminal does not silently turn a natural-language prompt into an Autopilot
 plan. In `autopilot` mode, natural-language submission fails closed until
