@@ -77,11 +77,14 @@
         "backend/app/skill_runtime.py",
         "backend/app/distribution_policy.py",
         "backend/app/permission_leases.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
         "schemas/permission_lease.schema.json",
         "backend/tests/test_permission_leases.py",
+        "backend/tests/test_terminal_ui.py",
         "docs/ARCHITECTURE.md"
       ],
-      "gap": "Fail-closed capability/distribution controls and bounded run-scoped permission leases exist with audit-chain, run/scope, mutation/network, workspace, TTL/use and revocation controls; terminal integration and broader adversarial certification remain open."
+      "gap": "Fail-closed capability/distribution controls and bounded run-scoped permission leases now include terminal-native safe-default grant and exact-tool consumption paths with audit-chain, run/scope, mutation/network, workspace/argument, TTL/use and revocation controls; broader adversarial and exact-head runtime certification remain open."
     },
     {
       "id": "V07",
