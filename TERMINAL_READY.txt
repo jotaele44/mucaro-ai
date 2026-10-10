@@ -1,0 +1,111 @@
+MUCARO AI — TERMINAL READY
+==========================
+
+STATUS
+------
+Artifact class: SOURCE CHECKOUT
+Offline-independent certification: NOT_APPLICABLE / NOT_CERTIFIED
+Reason: the source one-click path still acquires private runtimes and dependencies on first setup.
+Prepared platform artifacts must be certified separately under docs/RUNTIME_INDEPENDENCE.md.
+
+SUPPORTED SOURCE STARTUP
+------------------------
+macOS:
+  Double-click "Mucaro AI.app" in the checkout, or:
+  ./"Mucaro AI.command"
+
+Windows:
+  Double-click "Mucaro AI.cmd"
+
+Linux x86_64:
+  ./"Mucaro AI.command"
+
+GLOBAL OFFLINE MODE
+-------------------
+For an already prepared runtime:
+  export MUCARO_AI_OFFLINE=1
+
+Windows PowerShell:
+  $env:MUCARO_AI_OFFLINE="1"
+
+Expected behavior:
+- local GUI/API loopback remains available;
+- local source ingestion/retrieval/memory/planning/provenance/export remain local;
+- explicitly configured loopback local-model service may remain available;
+- remote model APIs, web fetch/session, web search, rendered public-web browsing,
+  and governed tools requiring external networking fail closed with
+  ERROR_OFFLINE_NETWORK_DISABLED.
+
+MUCARO_AI_OFFLINE is an application capability boundary, not an OS firewall.
+
+DEVELOPER VERIFICATION
+----------------------
+macOS/Linux:
+  python3 -m venv .venv
+  source .venv/bin/activate
+  python -m pip install -e ".[dev]"
+  npm ci --prefix frontend
+  python scripts/preflight.py --strict-imports
+  python scripts/validate_json.py
+  python scripts/release_check.py
+  python -m pytest -q
+  npm run build --prefix frontend
+
+Windows PowerShell:
+  py -3.12 -m venv .venv
+  .\.venv\Scripts\Activate.ps1
+  python -m pip install -e ".[dev]"
+  npm ci --prefix frontend
+  python scripts/preflight.py --strict-imports
+  python scripts/validate_json.py
+  python scripts/release_check.py
+  python -m pytest -q
+  npm run build --prefix frontend
+
+FULL RELEASE CERTIFICATION
+--------------------------
+  npm ci --registry=https://registry.npmjs.org/ --prefix frontend
+  python3 scripts/certify_release.py
+
+Expected success marker:
+  CERTIFY_RELEASE_OK
+
+RUNTIME-INDEPENDENCE CONTRACT
+-----------------------------
+Human-readable:
+  docs/RUNTIME_INDEPENDENCE.md
+
+Machine-readable:
+  _architecture/runtime_independence_v1.json
+
+Certification rule:
+Do not label a platform OFFLINE_INDEPENDENT until a complete prepared artifact
+installs and first-launches on a clean controlled device with public networking
+disabled, exercises every declared offline capability, persists local state,
+shows no unexplained external connections, requires no mandatory host developer
+tools, and has exact artifact hashes/manifests/receipts.
+
+ARTIFACT / HASH VERIFICATION
+----------------------------
+macOS:
+  shasum -a 256 <artifact>
+Linux:
+  sha256sum <artifact>
+Windows PowerShell:
+  Get-FileHash <artifact> -Algorithm SHA256
+
+Compare the computed digest byte-for-byte with the release manifest/receipt.
+A mismatch is a hard failure. Do not install, promote, or certify that artifact.
+
+FAILURE HANDLING
+----------------
+- Preserve failing logs and exact commit/artifact SHA-256.
+- Do not convert BLOCKED, OPEN, PROVISIONAL, or failed gates into PASS.
+- Repair the narrow failing layer, then rerun affected and full regression gates.
+- Remote/network failure under MUCARO_AI_OFFLINE=1 is expected only when the
+  explicit offline-disabled status is returned; silent fallback is not PASS.
+
+CURRENT SOURCE CHECKOUT CLAIM
+-----------------------------
+This file provides copy/paste-ready startup and verification instructions.
+It does NOT certify the source checkout as an offline-installable release.
