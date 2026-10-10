@@ -150,6 +150,14 @@ only results from governed `github.*` tool calls and preserve each result's
 Useful terminal commands:
 
 ```text
+:tool coding.repo_status '{"repo_root":"/path/to/repo"}'
+:tool coding.exec '{"repo_root":"/path/to/repo","argv":["python","-m","pytest"],"image":"IMAGE@sha256:..."}'
+:tool coding.branch_create '{"repo_root":"/path/to/repo","branch_name":"feat/example","expected_head_sha":"..."}'
+:tool coding.commit '{"repo_root":"/path/to/repo","message":"...","expected_head_sha":"...","candidate_paths":["..."]}'
+:tool coding.regression_run '{"repo_root":"/path/to/repo","profile":"test","image":"IMAGE@sha256:..."}'
+:tool github.ci_status '{"repo":"OWNER/REPO","head_sha":"..."}'
+:tool github.pr_open_update '{"repo":"OWNER/REPO","request_sha256":"...","repo_root":"/path/to/repo"}'
+
 :mode plan
 :mode interactive
 :mode auto
@@ -181,6 +189,12 @@ Terminal permission grants are deliberately narrower than a literal
 run. Remote or mutating authority must use `:allow-tool` for one exact tool;
 mutating grants additionally require `workspace=PATH` or an exact
 `args=SHA256` binding.
+
+The generic `:tool TOOL_NAME JSON_OBJECT` command only creates a governed
+`PENDING_APPROVAL` call bound to the active run/checkpoint (or
+`tui:<conversation_id>`). It never auto-approves or executes a tool. The
+existing `:approve`, `:approve lease`, and `:deny` boundaries remain
+authoritative, including mutation/network lease requirements.
 
 The terminal does not silently turn a natural-language prompt into an Autopilot
 plan. In `autopilot` mode, natural-language submission fails closed until
