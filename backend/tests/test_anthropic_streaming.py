@@ -109,6 +109,18 @@ def test_tokens_stream_live_over_stdlib_https_with_low_effort_by_default(fake_ht
     assert call["headers"]["Anthropic-version"] == model_router.ANTHROPIC_API_VERSION
 
 
+def test_truncated_sse_stream_fails_closed(fake_http, monkeypatch):
+    def incomplete_urlopen(request, timeout):
+        return FakeResponse(
+            _event("content_block_delta", {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "Partial"}})
+        )
+
+    monkeypatch.setattr(model_router.urllib.request, "urlopen", incomplete_urlopen)
+    with pytest.raises(ModelProviderError) as exc:
+        generate_answer("How?", CHUNK, model_provider="anthropic", model_name="claude-sonnet-5")
+    assert exc.value.status == "ERROR_MODEL_PROVIDER_RESPONSE_INVALID"
+
+
 def test_answer_without_listener_is_complete_but_not_marked_streamed(fake_http):
     result = generate_answer("How?", CHUNK, model_provider="anthropic", model_name="claude-sonnet-5")
     assert result["answer"] == "".join(fake_http.deltas)
