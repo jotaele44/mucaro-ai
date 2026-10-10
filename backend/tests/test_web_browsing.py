@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from dataclasses import replace
 import json
 import socket
 import threading
@@ -137,6 +138,25 @@ def test_validate_web_fetch_url_blocks_private_dns_resolution(monkeypatch):
         assert exc.status == "ERROR_WEB_PRIVATE_HOST_BLOCKED"
     else:
         raise AssertionError("expected DNS private-address block")
+
+
+def test_global_offline_mode_blocks_direct_fetch_before_network(tmp_path: Path, monkeypatch):
+    cfg = replace(make_settings(tmp_path), offline_mode=True)
+    called = False
+
+    def forbidden_getaddrinfo(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("DNS must not be consulted in offline mode")
+
+    monkeypatch.setattr(socket, "getaddrinfo", forbidden_getaddrinfo)
+    try:
+        fetch_web_snapshot("https://example.com", cfg=cfg)
+    except WebBrowsingError as exc:
+        assert exc.status == "ERROR_OFFLINE_NETWORK_DISABLED"
+    else:
+        raise AssertionError("expected offline network block")
+    assert called is False
 
 
 def test_fetch_web_snapshot_records_policy_and_bytes(tmp_path: Path):
