@@ -9,6 +9,7 @@ import stat
 import subprocess
 import sys
 import time
+import types
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -181,3 +182,32 @@ def test_frozen_bundle_sets_resource_root(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert os.environ["MUCARO_AI_ROOT"] == str(tmp_path / "bundle")
     assert os.environ["MUCARO_AI_DATA_DIR"] == str(tmp_path / "data")
     assert os.environ["MUCARO_AI_OPERATOR_TOKEN"] == "launch-token"
+
+
+class _Event:
+    def __init__(self) -> None:
+        self.handlers: list = []
+
+    def __iadd__(self, handler):
+        self.handlers.append(handler)
+        return self
+
+
+def test_window_allows_downloads_so_save_and_share_work(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    started: list[dict] = []
+    window = types.SimpleNamespace(events=types.SimpleNamespace(shown=_Event(), closing=_Event()), destroy=lambda: None)
+    fake = types.ModuleType("webview")
+    fake.settings = {"ALLOW_DOWNLOADS": False}
+    fake.create_window = lambda *args, **kwargs: window
+    fake.start = lambda **kwargs: started.append(kwargs)
+    monkeypatch.setitem(sys.modules, "webview", fake)
+    monkeypatch.setattr(desktop_shell, "_graceful_sigterm", lambda on_signal: None)
+
+    outcome = desktop_shell._open_window(
+        "http://127.0.0.1:1/", tmp_path, instance=tmp_path / "instance.json", started=time.monotonic(), on_closing=lambda: None
+    )
+
+    assert outcome == "NATIVE_WINDOW_CLOSED"
+    assert fake.settings["ALLOW_DOWNLOADS"] is True
+    assert started == [{"private_mode": False, "storage_path": str(tmp_path / "webview")}]
+

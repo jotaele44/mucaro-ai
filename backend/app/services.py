@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from typing import Any
 
 from .citations import build_citation_records, score_confidence, validate_citations
 from .config import Settings, settings
-from .db import init_db, upsert_payload
+from .db import ensure_db, upsert_payload
 from .exports import export_answer_trace
 from .ingestion import get_chunks
 from .injection_guard import scan_chunks, scan_text
@@ -46,8 +47,10 @@ def answer_question(
             "warnings": [f"TOP_K_RANGE:{MIN_TOP_K}-{MAX_TOP_K}"],
         }
     cfg.ensure_dirs()
-    init_db(cfg.sqlite_path)
+    ensure_db(cfg.sqlite_path)
+    retrieval_started = time.perf_counter()
     retrieval = retrieve(normalized_query, get_chunks(cfg), top_k=top_k, strategy=retrieval_strategy, cfg=cfg)
+    retrieval_ms = _elapsed_ms(retrieval_started)
     if retrieval["status"].startswith("ERROR_"):
         return retrieval
     retrieved = retrieval["retrieved_chunks"]
@@ -110,6 +113,14 @@ def answer_question(
                 "model_route": model_route,
             }
 
+    model_started = time.perf_counter()
+    first_token_ms: list[float] = []
+
+    def timed_text_delta(text: str) -> None:
+        if not first_token_ms:
+            first_token_ms.append(_elapsed_ms(model_started))
+        on_text_delta(text)  # type: ignore[misc]
+
     try:
         model = generate_answer(
             normalized_query,
@@ -119,7 +130,7 @@ def answer_question(
             allow_mock_fallback=False,
             conversation_context=conversation_context or [],
             memory_context=selected_memory_context,
-            on_text_delta=on_text_delta,
+            on_text_delta=timed_text_delta if on_text_delta is not None else None,
             cfg=cfg,
         )
     except ModelProviderError as exc:
@@ -130,6 +141,7 @@ def answer_question(
             "detail": exc.detail,
             "model_route": model_route,
         }
+    model_ms = _elapsed_ms(model_started)
     # Advisory only: instruction-like text in sources or output is surfaced, never acted on (TGT-022).
     source_signals = scan_chunks(retrieved)
     signals_by_chunk = {row["chunk_id"]: row["signals"] for row in source_signals}
@@ -168,9 +180,19 @@ def answer_question(
         "answer_streamed": bool(model.get("streamed")),
         "confidence": score_confidence(cited_ids, source_ids, bool(retrieved)),
         "validation_flags": (["WARN_UNTRUSTED_INSTRUCTIONS_IN_SOURCES"] if source_signals else [])
-        + (["WARN_MODEL_OUTPUT_CONTAINS_INSTRUCTIONS"] if output_scan["suspected"] else []),
+        + (["WARN_MODEL_OUTPUT_CONTAINS_INSTRUCTIONS"] if output_scan["suspected"] else [])
+        + (["WARN_MODEL_OUTPUT_TRUNCATED"] if model.get("stop_reason") == "max_tokens" else [])
+        + (["WARN_MODEL_REFUSAL"] if model.get("stop_reason") == "refusal" else []),
         "untrusted_content_signals": source_signals,
         "model_output_signals": output_scan["signals"],
+        "model_stop_reason": model.get("stop_reason"),
+        "model_effort": model.get("effort"),
+        # Time to the first streamed token; providers that do not stream deliver everything at model_ms.
+        "timings_ms": {
+            "retrieval_ms": retrieval_ms,
+            "model_first_token_ms": first_token_ms[0] if first_token_ms else model_ms,
+            "model_ms": model_ms,
+        },
         "created_at": utc_now(),
     }
     answer_trace = validate_citations(answer_trace)
@@ -178,3 +200,7 @@ def answer_question(
     if persist:
         upsert_payload("runs", "run_id", answer_trace, cfg.sqlite_path)
     return answer_trace
+
+
+def _elapsed_ms(started: float) -> float:
+    return round((time.perf_counter() - started) * 1000, 1)

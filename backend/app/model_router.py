@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import ipaddress
 import json
@@ -63,6 +64,7 @@ MODEL_PROVIDER_SPECS: dict[str, ModelProviderSpec] = {
         locality="remote",
         modalities=("text",),
         context_tokens=200_000,
+        supports_streaming=True,
     ),
     "openai_compatible_local": ModelProviderSpec(
         name="openai_compatible_local",
@@ -86,6 +88,23 @@ LOCAL_PROVIDER = "openai_compatible_local"
 DEFAULT_LOCAL_MODEL_URL = "http://127.0.0.1:11434/v1"
 _PROBE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _PROBE_TTL_SECONDS = 5.0
+
+# Thinking tokens share this budget with the answer, so it is a ceiling, not a target length.
+ANTHROPIC_MAX_OUTPUT_TOKENS = 4096
+MODEL_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
+DEFAULT_MODEL_EFFORT = "low"
+# Models that accept output_config.effort; others (claude-haiku-4-5, for one) reject the field.
+_EFFORT_MODEL_PREFIXES = (
+    "claude-sonnet-5",
+    "claude-opus-5",
+    "claude-fable-5",
+    "claude-opus-4-6",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-sonnet-4-6",
+)
+# One client per API key, so connections are reused across questions instead of reopened.
+_ANTHROPIC_CLIENT: dict[str, Any] = {}
 
 
 def normalize_model_provider(model_provider: str | None) -> str:
@@ -301,6 +320,7 @@ def generate_answer(
         allow_mock_fallback=allow_mock_fallback,
         conversation_context=conversation_context or [],
         memory_context=memory_context or [],
+        on_text_delta=on_text_delta,
     )
 
 
@@ -389,6 +409,50 @@ def _mock_answer(
     }
 
 
+def anthropic_effort(model: str) -> str | None:
+    """Effort level to send for this model, or None to leave output_config out of the request."""
+    effort = (os.getenv("MUCARO_AI_MODEL_EFFORT") or DEFAULT_MODEL_EFFORT).strip().lower()
+    if effort == "default":
+        return None
+    if effort not in MODEL_EFFORT_LEVELS:
+        raise ModelProviderError(
+            "ERROR_MODEL_EFFORT_INVALID",
+            f"MUCARO_AI_MODEL_EFFORT must be one of {', '.join(MODEL_EFFORT_LEVELS)} or default, not {effort!r}.",
+        )
+    return effort if model.startswith(_EFFORT_MODEL_PREFIXES) else None
+
+
+def _anthropic_client(sdk: Any) -> Any:
+    key_id = hashlib.sha256((os.getenv("ANTHROPIC_API_KEY") or "").encode("utf-8")).hexdigest()
+    client = _ANTHROPIC_CLIENT.get(key_id)
+    if client is None:
+        _ANTHROPIC_CLIENT.clear()
+        client = _ANTHROPIC_CLIENT[key_id] = sdk.Anthropic()
+    return client
+
+
+def _anthropic_error(sdk: Any, exc: Exception) -> ModelProviderError:
+    detail = str(getattr(exc, "message", None) or exc)
+    # Most specific first: RateLimitError is an APIStatusError, APITimeoutError an APIConnectionError.
+    if isinstance(exc, sdk.RateLimitError):
+        return ModelProviderError("ERROR_MODEL_PROVIDER_RATE_LIMIT", detail)
+    if isinstance(exc, sdk.APITimeoutError):
+        return ModelProviderError("ERROR_MODEL_PROVIDER_TIMEOUT", detail)
+    if isinstance(exc, sdk.APIConnectionError):
+        return ModelProviderError("ERROR_MODEL_PROVIDER_UNAVAILABLE", detail)
+    if isinstance(exc, sdk.APIStatusError):
+        status_code = int(getattr(exc, "status_code", 0) or 0)
+        # An error that arrives mid-stream comes with the stream's HTTP 200, so read the API error type too.
+        body = getattr(exc, "body", None)
+        error_type = (body.get("error") or {}).get("type") if isinstance(body, dict) else None
+        if error_type == "rate_limit_error":
+            return ModelProviderError("ERROR_MODEL_PROVIDER_RATE_LIMIT", detail)
+        if status_code >= 500 or error_type in {"overloaded_error", "api_error"}:
+            return ModelProviderError("ERROR_MODEL_PROVIDER_UNAVAILABLE", f"HTTP {status_code}: {detail}")
+        return ModelProviderError("ERROR_MODEL_PROVIDER_REQUEST_REJECTED", f"HTTP {status_code}: {detail}")
+    return ModelProviderError("ERROR_MODEL_PROVIDER_RESPONSE_INVALID", detail)
+
+
 def _anthropic_answer(
     query: str,
     retrieved_chunks: list[dict[str, Any]],
@@ -397,9 +461,10 @@ def _anthropic_answer(
     allow_mock_fallback: bool,
     conversation_context: list[dict[str, Any]],
     memory_context: list[dict[str, Any]],
+    on_text_delta: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     try:
-        from anthropic import Anthropic  # type: ignore
+        import anthropic as sdk  # type: ignore
     except Exception:
         return _fallback_or_error(
             query,
@@ -410,21 +475,37 @@ def _anthropic_answer(
             conversation_context=conversation_context,
             memory_context=memory_context,
         )
-    client = Anthropic()
+    model = model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model)
+    effort = anthropic_effort(model)
     system, user = build_grounded_prompt(query, retrieved_chunks, conversation_context, memory_context)
-    response = client.messages.create(
-        model=model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model),
-        max_tokens=900,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
-    text = "\n".join(block.text for block in response.content if getattr(block, "type", None) == "text")
+    request: dict[str, Any] = {
+        "model": model,
+        "max_tokens": ANTHROPIC_MAX_OUTPUT_TOKENS,
+        "system": system,
+        "messages": [{"role": "user", "content": user}],
+    }
+    if effort:
+        # The pinned SDK predates the typed output_config parameter; the API reads it from the body.
+        request["extra_body"] = {"output_config": {"effort": effort}}
+    try:
+        with _anthropic_client(sdk).messages.stream(**request) as stream:
+            if on_text_delta is not None:
+                for text in stream.text_stream:
+                    if text:
+                        on_text_delta(text)
+            final = stream.get_final_message()
+    except sdk.APIError as exc:
+        raise _anthropic_error(sdk, exc) from exc
+    text = "\n".join(block.text for block in final.content if getattr(block, "type", None) == "text")
     cited = [c["chunk_id"] for c in retrieved_chunks if c["chunk_id"] in text]
     return {
         "model_provider": "anthropic",
-        "model_name": model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model),
+        "model_name": model,
         "answer": text,
         "cited_chunk_ids": cited,
+        "streamed": on_text_delta is not None,
+        "stop_reason": getattr(final, "stop_reason", None),
+        "effort": effort,
     }
 
 
