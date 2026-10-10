@@ -477,6 +477,7 @@ def _anthropic_answer(
     )
     text_parts: list[str] = []
     stop_reason: str | None = None
+    saw_message_stop = False
     try:
         with urllib.request.urlopen(request, timeout=120) as response:
             event_name = ""
@@ -513,6 +514,8 @@ def _anthropic_answer(
                     delta = event.get("delta") if isinstance(event.get("delta"), dict) else {}
                     if delta.get("stop_reason") is not None:
                         stop_reason = str(delta["stop_reason"])
+                elif event.get("type") == "message_stop":
+                    saw_message_stop = True
                 event_name = ""
                 data_lines = []
     except urllib.error.HTTPError as exc:
@@ -524,6 +527,8 @@ def _anthropic_answer(
     except (urllib.error.URLError, OSError) as exc:
         raise ModelProviderError("ERROR_MODEL_PROVIDER_UNAVAILABLE", str(exc)) from exc
 
+    if not saw_message_stop:
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_RESPONSE_INVALID", "Anthropic SSE stream ended without message_stop.")
     text = "".join(text_parts).strip()
     if not text:
         raise ModelProviderError("ERROR_MODEL_PROVIDER_RESPONSE_INVALID", "Anthropic SSE stream returned no text content.")
