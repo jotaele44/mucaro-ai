@@ -131,6 +131,8 @@ def test_anthropic_uses_direct_messages_http_adapter(monkeypatch):
             f'data: {json.dumps({"type": "content_block_delta", "delta": {"type": "text_delta", "text": text}})}\n\n'
             'event: message_delta\n'
             f'data: {json.dumps({"type": "message_delta", "delta": {"stop_reason": "end_turn"}})}\n\n'
+            'event: message_stop\n'
+            f'data: {json.dumps({"type": "message_stop"})}\n\n'
         )
         return FakeResponse(stream.encode("utf-8"))
 
