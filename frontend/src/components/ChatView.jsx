@@ -353,9 +353,10 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
             <p className="muted">Ask about your sources, or use a command such as <code>/status</code> or <code>/fetch https://…</code>. Actions always ask before they run unless you choose Auto for local read-only tools.</p>
           </div>
         )}
-        {legacyTurns.map((turn) => {
+        {legacyTurns.map((turn, index) => {
           const messageKey = `turn:${turn.turn_id}`;
           const edit = messageEdits[messageKey];
+          const question = turn.role === "assistant" ? legacyTurns.slice(0, index).reverse().find((row) => row.role === "user") : null;
           return (
             <div key={turn.turn_id} className={`bubble ${turn.role === "user" ? "user-bubble" : "assistant-bubble"}`}>
               <EditableMessage
@@ -365,6 +366,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
                 onSave={(content, revision) => saveMessageEdit(messageKey, content, revision)}
                 announce={announce}
                 allowReadAloud={turn.role === "assistant"}
+                file={turn.role === "assistant" ? { title: question?.content || conversation?.title || "", citations: [], records: [] } : null}
               />
             </div>
           );

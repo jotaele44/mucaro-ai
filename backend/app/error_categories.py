@@ -40,6 +40,8 @@ _RULES: tuple[tuple[str, str], ...] = (
     ("EXECUTABLE_PAYLOAD", "UNSUPPORTED_FORMAT"),
     ("ARCHIVE", "UNSUPPORTED_FORMAT"),
     ("PARSE_FAILED", "UNSUPPORTED_FORMAT"),
+    ("MODEL_REFUSAL", "BLOCKED_ACTION"),  # the model declined to answer
+    ("MODEL_OUTPUT_TRUNCATED", "MODEL_UNAVAILABLE"),  # the answer hit the output limit
     ("MODEL_PROVIDER", "MODEL_UNAVAILABLE"),
     ("MODEL_ROUTING", "MODEL_UNAVAILABLE"),
     ("PROVIDER_UNAVAILABLE", "MODEL_UNAVAILABLE"),
