@@ -31,10 +31,10 @@ BUILD_REQUIREMENTS = LOCK_DIR / "build-requirements.in"
 COMPILE_COMMAND = "python scripts/lock_python_deps.py"
 # uv --python-platform target -> extras the setup installs there (desktop draws the native window).
 TARGETS = {
-    "aarch64-apple-darwin": ("dev", "anthropic", "desktop"),
-    "x86_64-apple-darwin": ("dev", "anthropic", "desktop"),
-    "x86_64-unknown-linux-gnu": ("dev", "anthropic"),
-    "x86_64-pc-windows-msvc": ("dev", "anthropic", "desktop"),
+    "aarch64-apple-darwin": ("desktop",),
+    "x86_64-apple-darwin": ("desktop",),
+    "x86_64-unknown-linux-gnu": (),
+    "x86_64-pc-windows-msvc": ("desktop",),
 }
 
 
