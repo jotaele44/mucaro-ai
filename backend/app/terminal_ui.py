@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import select
 import shlex
@@ -579,6 +580,28 @@ class TerminalController:
             f"scope={lease['scope_type']} authority={','.join(authority) or 'local-readonly'}"
         )
 
+    def request_governed_tool(self, tool_name: str, arguments: dict[str, Any]) -> None:
+        if not isinstance(arguments, dict):
+            raise TerminalUIError(
+                "ERROR_TUI_TOOL_ARGUMENTS",
+                "Tool arguments must be a JSON object.",
+            )
+        try:
+            requested = request_tool_call(
+                tool_name,
+                arguments,
+                cfg=self.cfg,
+                requested_by="terminal",
+                reason="terminal generic governed tool request",
+                run_id=self._lease_target_run_id(),
+            )["tool_call"]
+        except ToolRuntimeError as exc:
+            raise TerminalUIError(exc.status, exc.detail) from exc
+        self.notice = (
+            f"Approval required: {requested['tool_call_id']} "
+            f"{requested['tool_name']} sha256={requested['arguments_sha256'][:12]}…"
+        )
+
     def command(self, command: str) -> None:
         try:
             parts = shlex.split(command.strip())
@@ -624,6 +647,27 @@ class TerminalController:
             return
         if name == "gists" and len(args) <= 1:
             self.request_github("gists", args[0] if args else "")
+            return
+        if name == "tool":
+            if not args or len(args) > 2:
+                raise TerminalUIError(
+                    "ERROR_TUI_TOOL_USAGE",
+                    'Use :tool TOOL_NAME \'{"key":"value"}\' or :tool TOOL_NAME for {}.',
+                )
+            tool_name = args[0]
+            if len(args) == 1:
+                arguments = {}
+            else:
+                try:
+                    arguments = json.loads(args[1])
+                except json.JSONDecodeError as exc:
+                    raise TerminalUIError("ERROR_TUI_TOOL_JSON", str(exc)) from exc
+                if not isinstance(arguments, dict):
+                    raise TerminalUIError(
+                        "ERROR_TUI_TOOL_ARGUMENTS",
+                        "Tool arguments must be a JSON object.",
+                    )
+            self.request_governed_tool(tool_name, arguments)
             return
         if name == "allow-run":
             self._grant_terminal_lease(
@@ -706,8 +750,9 @@ class TerminalController:
         if name == "help":
             self.notice = (
                 ":mode plan|interactive|auto|autopilot • :new • :open ID • "
-                ":issues REPO • :prs REPO • :gists [OWNER] • :allow-run [network] • "
-                ":allow-tool TOOL [network] [mutating] [uses=N] [ttl=N] • :approve [lease] • :deny • "
+                ":issues REPO • :prs REPO • :gists [OWNER] • :tool TOOL JSON • "
+                ":allow-run • :allow-tool TOOL [network] [mutating] [uses=N] [ttl=N] • "
+                ":approve [lease] • :deny • "
                 ":answer OPTION • :answer-text TEXT • :stop"
             )
             return

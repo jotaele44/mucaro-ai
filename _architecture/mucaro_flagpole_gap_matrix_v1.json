@@ -66,9 +66,11 @@
         "backend/app/skill_runtime.py",
         "backend/app/execution_router.py",
         "backend/app/local_worker.py",
-        "backend/app/container_runtime.py"
+        "backend/app/container_runtime.py",
+        "backend/app/terminal_ui.py",
+        "_architecture/video_cli_parity_execution_blocker_v1.json"
       ],
-      "gap": "Execution adapters exist; full flagpole tool denominator and live execution remain incompletely certified."
+      "gap": "Execution adapters and governed terminal invocation are source-backed; exact-head live execution certification is BLOCKED because hosted attempt 2 terminates before any job step/log."
     },
     {
       "id": "V06",
@@ -149,9 +151,12 @@
         "backend/app/github_resources.py",
         "backend/app/tools.py",
         "backend/tests/test_video_cli_governed_tools.py",
-        "backend/tests/test_github_resources.py"
+        "backend/tests/test_github_resources.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py",
+        "_architecture/video_cli_parity_execution_blocker_v1.json"
       ],
-      "gap": "Governed read/diff/patch, isolated execution/regression, branch/commit, exact-head PR open/update, CI status, and bounded GitHub Issues/PRs/Gists provider surfaces are source-backed; live executed evidence, branch-push orchestration, terminal-agent integration, and whole-domain certification remain OPEN."
+      "gap": "Governed read/diff/patch, isolated execution/regression, branch/commit, exact-head PR open/update, CI status, bounded GitHub resources, and terminal invocation are source-backed; branch-push orchestration remains OPEN and exact-head hosted execution is BLOCKED at startup."
     },
     {
       "id": "V14",
