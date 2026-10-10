@@ -87,6 +87,9 @@ network address Mucaro still works, with these differences:
 
 - `navigator.clipboard` does not exist, so **Copy** uses the older selection-based copy. If a
   browser refuses that too, Mucaro says the browser copies only over a secure connection.
+- The share sheet (`navigator.share`) does not exist, so **Share** saves the answer as a `.txt`
+  file instead and says that sharing needs https. Safari asks whether to download it and keeps
+  it in Files. **Save** works the same over http and https.
 - An installable web app and offline caching are unavailable. Mucaro does not ship either.
 
 ## If something is wrong

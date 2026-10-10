@@ -5,7 +5,7 @@ from pathlib import Path, PurePath
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
@@ -23,6 +23,7 @@ from .conversations import (
 )
 from .db import init_db, list_payloads, upsert_payload
 from .execution_gate import analyze_task, approve_execution
+from .exports import EXPORT_FILES, export_file_path
 from .ingestion import (
     FOLDER_SUPPORTED_SUFFIXES,
     IngestLimitError,
@@ -811,6 +812,13 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         if not path.exists():
             raise api_error("ERROR_EXPORT_NOT_FOUND", "Export not found.", status_code=404, run_id=run_id)
         return {"run_id": run_id, "path": str(path), "content": path.read_text(encoding="utf-8")}
+
+    @app.get("/exports/{run_id}/files/{kind}")
+    def export_file(run_id: str, kind: str) -> FileResponse:
+        path = export_file_path(run_id, kind, cfg)
+        if path is None:
+            raise api_error("ERROR_EXPORT_NOT_FOUND", "Export not found.", status_code=404, run_id=run_id, kind=kind)
+        return FileResponse(path, media_type=EXPORT_FILES[kind][1], filename=path.name)
 
     @app.post("/validate")
     def validate() -> dict:
