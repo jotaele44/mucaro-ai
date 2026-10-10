@@ -1192,10 +1192,9 @@ runtime state and should not be committed.
 
 ## Live Model Mode
 
-Mock mode is the default. To use Anthropic live mode, install the optional dependency group and opt in explicitly:
+Mock mode is the default. Anthropic live mode uses Mucaro's built-in HTTPS adapter, so no provider SDK install is required; opt in explicitly:
 
 ```bash
-python -m pip install -e ".[anthropic]"
 read -s ANTHROPIC_API_KEY
 export ANTHROPIC_API_KEY
 export MUCARO_AI_LIVE_MODE=1
