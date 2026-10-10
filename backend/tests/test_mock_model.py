@@ -1,4 +1,5 @@
-import builtins
+import io
+import json
 
 import pytest
 
@@ -72,23 +73,78 @@ def test_anthropic_requires_api_key_when_live_mode_enabled(monkeypatch):
     assert exc.value.status == "ERROR_MODEL_API_KEY_MISSING"
 
 
-def test_anthropic_missing_sdk_can_explicitly_fallback_to_mock(monkeypatch):
+def test_global_offline_mode_disables_remote_provider_and_direct_invocation(monkeypatch):
     monkeypatch.setenv("MUCARO_AI_LIVE_MODE", "1")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    real_import = builtins.__import__
+    monkeypatch.setenv("MUCARO_AI_OFFLINE", "1")
 
-    def fake_import(name, *args, **kwargs):
-        if name == "anthropic":
-            raise ImportError("missing")
-        return real_import(name, *args, **kwargs)
+    status = model_provider_status("anthropic")
+    assert status["status"] == "MODEL_PROVIDER_DISABLED"
+    assert status["system_offline"] is True
+    assert "SYSTEM_OFFLINE" in status["warnings"]
 
-    monkeypatch.setattr(builtins, "__import__", fake_import)
+    with pytest.raises(ModelProviderError) as exc:
+        generate_answer(
+            "What is required?",
+            [{"chunk_id": "chunk_a", "source_id": "src_a", "text": "Source lineage requires citations."}],
+            model_provider="anthropic",
+        )
+    assert exc.value.status == "ERROR_OFFLINE_NETWORK_DISABLED"
+
+
+def test_anthropic_provider_status_needs_no_sdk_when_live_and_key_present(monkeypatch):
+    monkeypatch.setenv("MUCARO_AI_LIVE_MODE", "1")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    status = model_provider_status("anthropic")
+
+    assert status["status"] == "MODEL_PROVIDER_READY"
+    assert status["optional_dependency"] is None
+    assert status["dependency_available"] is None
+    assert status["warnings"] == []
+
+
+def test_anthropic_uses_direct_messages_http_adapter(monkeypatch):
+    monkeypatch.setenv("MUCARO_AI_LIVE_MODE", "1")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     chunks = [{"chunk_id": "chunk_a", "source_id": "src_a", "text": "Source lineage requires citations."}]
+    observed = {}
 
-    answer = generate_answer("What is required?", chunks, model_provider="anthropic", allow_mock_fallback=True)
+    class FakeResponse(io.BytesIO):
+        status = 200
 
-    assert answer["model_provider"] == "mock"
-    assert answer["provider_warning"] == "ERROR_MODEL_SDK_MISSING"
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.close()
+            return False
+
+    def fake_urlopen(request, timeout):
+        observed["url"] = request.full_url
+        observed["headers"] = dict(request.header_items())
+        observed["timeout"] = timeout
+        observed["payload"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse(
+            json.dumps(
+                {
+                    "content": [
+                        {"type": "text", "text": "Source lineage requires citations. (chunk_id=chunk_a)"}
+                    ]
+                }
+            ).encode("utf-8")
+        )
+
+    monkeypatch.setattr("backend.app.model_router.urllib.request.urlopen", fake_urlopen)
+
+    answer = generate_answer("What is required?", chunks, model_provider="anthropic")
+
+    assert observed["url"] == "https://api.anthropic.com/v1/messages"
+    assert observed["headers"]["X-api-key"] == "test-key"
+    assert observed["headers"]["Anthropic-version"] == "2023-06-01"
+    assert observed["payload"]["messages"][0]["role"] == "user"
+    assert answer["model_provider"] == "anthropic"
+    assert answer["cited_chunk_ids"] == ["chunk_a"]
 
 
 def test_unsupported_provider_raises_structured_error():
