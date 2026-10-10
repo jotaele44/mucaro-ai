@@ -302,6 +302,28 @@ def test_offline_manifest_exposes_git_backed_coding_as_a_bundle_candidate(monkey
         assert rows[capability]["operator_external_setup_required"] is True
 
 
+def test_branch_push_requires_both_git_and_gh(monkeypatch):
+    import backend.app.offline as offline
+
+    real_resolve = offline.resolve_local_tool
+    for missing in ("git", "gh"):
+        monkeypatch.setattr(
+            offline,
+            "resolve_local_tool",
+            lambda name, missing=missing: None if name == missing else real_resolve(name),
+        )
+        rows = {
+            row["capability"]: row
+            for row in build_offline_manifest()["capabilities"]
+        }
+        branch_push = rows["tool:github.branch_push"]
+        assert branch_push["state_now"] == "LOCAL_DEPENDENCY_MISSING"
+        assert branch_push["local_dependency"] == "git,gh"
+        assert branch_push["local_dependency_kind"] == "binary_all"
+        assert branch_push["runtime_network_required"] is True
+        assert "KEEP_EXPLICIT_NETWORK_GATE" in branch_push["independence_actions"]
+
+
 def test_frozen_manifest_reports_packaging_residue_not_operator_setup(monkeypatch):
     import backend.app.offline as offline
 

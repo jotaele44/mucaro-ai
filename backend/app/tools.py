@@ -13,6 +13,7 @@ from .coding_patch import validate_patch_proposal
 from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
 from .contracts import validate_contract
+from .github_branch_push import GitHubBranchPushError, push_pull_request_branch
 from .github_ci import GitHubCIError, read_github_ci_status
 from .github_pull_requests import GitHubPullRequestError, open_or_update_pull_request
 from .github_resources import (
@@ -367,6 +368,48 @@ def _coding_pr_request(arguments: dict[str, Any], cfg: Settings) -> dict[str, An
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
+def _github_branch_push(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    required = (
+        "repo_root",
+        "remote_repo",
+        "expected_head_sha",
+        "head_branch",
+        "base_branch",
+        "title",
+        "expected_request_sha256",
+    )
+    missing = [
+        key
+        for key in required
+        if not isinstance(arguments.get(key), str) or not arguments.get(key).strip()
+    ]
+    if missing:
+        raise ToolRuntimeError(
+            "ERROR_GITHUB_PUSH_ARGUMENT_REQUIRED",
+            f"missing required string arguments: {','.join(missing)}",
+        )
+    body = arguments.get("body", "")
+    if not isinstance(body, str):
+        raise ToolRuntimeError(
+            "ERROR_GITHUB_PUSH_BODY_INVALID",
+            "github.branch_push body must be a string.",
+        )
+    try:
+        return push_pull_request_branch(
+            arguments["repo_root"],
+            remote_repo=arguments["remote_repo"],
+            expected_head_sha=arguments["expected_head_sha"],
+            head_branch=arguments["head_branch"],
+            base_branch=arguments["base_branch"],
+            title=arguments["title"],
+            body=body,
+            expected_request_sha256=arguments["expected_request_sha256"],
+            cfg=cfg,
+        )
+    except GitHubBranchPushError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
 def _github_pr_open_update(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     required = (
         "repo_root",
@@ -682,6 +725,19 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         handler=_coding_pr_request,
         autopilot_success_statuses=("CODING_PR_REQUEST_READY",),
         timeout_seconds=60.0,
+    ),
+    "github.branch_push": ToolDefinition(
+        name="github.branch_push",
+        description=(
+            "Push the exact frozen PR-request head SHA to origin without force, "
+            "after request-hash, local branch/HEAD/clean-state, and repository identity revalidation."
+        ),
+        mutates_state=True,
+        requires_approval=True,
+        network="remote",
+        handler=_github_branch_push,
+        autopilot_success_statuses=("GITHUB_BRANCH_PUSH_OK",),
+        timeout_seconds=180.0,
     ),
     "github.pr_open_update": ToolDefinition(
         name="github.pr_open_update",

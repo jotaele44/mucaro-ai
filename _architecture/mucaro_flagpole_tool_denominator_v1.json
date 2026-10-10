@@ -98,6 +98,7 @@
   "supporting_tools": [
     "coding.exec",
     "coding.pr_request",
+    "github.branch_push",
     "github.gist_view",
     "github.gists_list",
     "github.issue_view",
