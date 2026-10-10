@@ -125,15 +125,14 @@ def test_anthropic_uses_direct_messages_http_adapter(monkeypatch):
         observed["headers"] = dict(request.header_items())
         observed["timeout"] = timeout
         observed["payload"] = json.loads(request.data.decode("utf-8"))
-        return FakeResponse(
-            json.dumps(
-                {
-                    "content": [
-                        {"type": "text", "text": "Source lineage requires citations. (chunk_id=chunk_a)"}
-                    ]
-                }
-            ).encode("utf-8")
+        text = "Source lineage requires citations. (chunk_id=chunk_a)"
+        stream = (
+            'event: content_block_delta\n'
+            f'data: {json.dumps({"type": "content_block_delta", "delta": {"type": "text_delta", "text": text}})}\n\n'
+            'event: message_delta\n'
+            f'data: {json.dumps({"type": "message_delta", "delta": {"stop_reason": "end_turn"}})}\n\n'
         )
+        return FakeResponse(stream.encode("utf-8"))
 
     monkeypatch.setattr("backend.app.model_router.urllib.request.urlopen", fake_urlopen)
 
@@ -143,6 +142,7 @@ def test_anthropic_uses_direct_messages_http_adapter(monkeypatch):
     assert observed["headers"]["X-api-key"] == "test-key"
     assert observed["headers"]["Anthropic-version"] == "2023-06-01"
     assert observed["payload"]["messages"][0]["role"] == "user"
+    assert observed["payload"]["stream"] is True
     assert answer["model_provider"] == "anthropic"
     assert answer["cited_chunk_ids"] == ["chunk_a"]
 
