@@ -685,6 +685,13 @@ def run_tool_call(
             raise ToolRuntimeError("ERROR_TOOL_CALL_NOT_APPROVED", f"Tool call is not approved: {tool_call_id}")
         if call.get("tool_name") not in TOOL_REGISTRY:
             raise ToolRuntimeError("ERROR_TOOL_NOT_ALLOWED", f"Tool is not in the local allowlist: {call.get('tool_name')}")
+        tool = TOOL_REGISTRY[str(call["tool_name"])]
+        if cfg.offline_mode and tool.network != "none":
+            result = {
+                "status": "ERROR_OFFLINE_NETWORK_DISABLED",
+                "detail": f"{tool.name} requires external network access while MUCARO_AI_OFFLINE is enabled.",
+            }
+            return {**call, "status": "FAILED", "executed_at": utc_now(), "executed_by": executed_by, "result": result}
         failure = _binding_failure(call, cfg, anchors=("TOOL_CALL_REQUESTED", "TOOL_CALL_APPROVED"))
         if failure:
             # Ends FAILED rather than staying APPROVED, so a work run sees the call finish and reports it.
