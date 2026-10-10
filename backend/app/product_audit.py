@@ -218,7 +218,7 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Assistant can perform coding and programming work with transparent patches, tests, and repository safety boundaries.",
             "OPEN",
             "Governed repository read/discovery, exact dirty-state accounting, Git-native patch identity, controlled patch mutation with rollback, isolated coding-container plans/execution receipts, test/lint/type/build suite contracts, line-bound review evidence, guarded local Git lifecycle, deterministic PR request artifacts, and a fail-closed regression certification ledger are merged.",
-            "Live pinned-image container execution and complete executed coding-regression closure remain material evidence gaps; authenticated remote push/PR remains a credential-last action.",
+            "Live pinned-image container execution, complete executed coding-regression closure, and live authenticated exact-request push/PR receipts remain material evidence gaps; remote credentials remain credential-last and are not persisted.",
             "Use live isolated-container receipts and the frozen coding regression manifest to close executed evidence without weakening the host-write, network, identity, or approval boundaries.",
         ),
         ProductRequirement(
