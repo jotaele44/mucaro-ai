@@ -46,6 +46,8 @@ capabilities by design. See `docs/RUNTIME_INDEPENDENCE.md` and
 The current source one-click path still needs internet on first setup. Do not treat it as an
 offline-installable release artifact.
 
+For an already prepared runtime, set `MUCARO_AI_OFFLINE=1` to make the application fail closed on external-network capabilities. This is an application capability gate, not an operating-system firewall; loopback traffic used by the local GUI/API and optional local model server remains allowed.
+
 ### Developer setup (manual)
 
 Requirements: Python 3.11-3.13 and Node 20+ already installed.
@@ -116,6 +118,7 @@ shell instead.
 
 - `ANTHROPIC_API_KEY`: required for Anthropic mode when `MUCARO_AI_LIVE_MODE=1`.
 - `MUCARO_AI_LIVE_MODE=1`: permits live Anthropic calls. Default is deterministic mock mode.
+- `MUCARO_AI_OFFLINE=1`: enables the application-wide offline gate. Mucaro blocks remote model/API, web fetch/search, and rendered-web execution before network activity while keeping its own loopback service and local model server available.
 - `MUCARO_AI_MODEL_PROVIDER`: default model provider. Default is `mock`.
 - `MUCARO_AI_MODEL`: model name for live mode.
 - `MUCARO_AI_MODEL_EFFORT`: how much the live Anthropic model thinks before it answers: `low` (default, fastest first word), `medium`, `high`, `xhigh`, `max`, or `default` to leave it to the model. It is sent only to models that accept it.
@@ -377,10 +380,9 @@ skills, and disables governed subprocess, local-worker, and container execution
 before process creation. This source control does not make
 the local browser wrapper a Store candidate or replace Apple signing and review.
 
-Live Anthropic mode is explicit:
+Live Anthropic mode is explicit and uses the built-in HTTPS adapter; no provider SDK install is required:
 
 ```bash
-python -m pip install -e ".[anthropic]"
 read -s ANTHROPIC_API_KEY
 export ANTHROPIC_API_KEY
 export MUCARO_AI_LIVE_MODE=1
