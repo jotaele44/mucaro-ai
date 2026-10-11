@@ -144,7 +144,7 @@ def answer_question(
         length=24,
     )
 
-    def invoke(provider: str, model_id: str | None) -> dict[str, Any]:
+    def _invoke(provider: str, model_id: str | None) -> dict[str, Any]:
         def operation() -> dict[str, Any]:
             return generate_answer(
                 normalized_query,
@@ -182,6 +182,14 @@ def answer_question(
                 raise ModelProviderError("ERROR_PROVIDER_RESULT_INVALID", "accepted provider result is not an object")
             return result
         raise ModelProviderError("ERROR_PROVIDER_EXECUTION_STATE", str(execution["status"]))
+
+    def invoke(provider: str, model_id: str | None) -> dict[str, Any]:
+        try:
+            return _invoke(provider, model_id)
+        except ModelProviderError as exc:
+            # Text already reached the listener: a retry or another provider would repeat it.
+            exc.partial_output = bool(first_token_ms)
+            raise
 
     failover = run_with_failover(
         failover_order,
