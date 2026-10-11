@@ -5,6 +5,8 @@ Scope: first-run setup (bootstrap, launcher, `.env`), browser UI usability, and
 iOS/iPadOS Safari rendering of the local web UI.
 Out of scope by decision: a LAN-serving mode or native iOS app. The backend
 stays loopback-only by default; nothing about network exposure changes.
+*Superseded 2026-10-02 for the LAN part: phone access is now a supported mode
+(`SD-012`, `docs/PHONE_ACCESS.md`). A native iOS app stays out of scope (`SD-010`).*
 
 ## Method
 
@@ -121,14 +123,13 @@ that the finding is real as stated.
 8. **Home-screen app.** A standalone PWA would need `viewport-fit=cover` plus
    safe-area padding.
 
-## Existing network opt-in (unchanged)
+## Network access (corrected 2026-10-02)
 
-The backend remains loopback-only. Serving to another device on the network
-still requires an explicit opt-in: set `MUCARO_AI_ALLOW_PUBLIC_BIND=1` and a
-strong `MUCARO_AI_OPERATOR_TOKEN`, then run `mucaro serve --host <interface>`.
-With U1 fixed, the UI served that way sends requests to the host it was loaded
-from. Enter the operator token under Settings on the device before using
-actions that change data.
+The backend is loopback-only unless phone access is switched on; see
+`docs/PHONE_ACCESS.md`. That document supersedes this section's earlier advice
+to "enter the operator token under Settings on the device": a token-protected
+service now shows an **Enter the access token** screen, because the Settings
+workspace was never reachable without a token.
 
 ## Follow-up (2026-09-28)
 
@@ -150,3 +151,106 @@ Still open, and not code work: the signed and notarized installer (BLK-SIGN-001,
 needs an Apple Developer ID); live-mode answer length with a real API key
 (queued lead 1); `mucaro serve` and raw `uvicorn` not reading `.env`
 (documented).
+
+## Follow-up (2026-10-02): mobile web re-audit
+
+Re-audit of the responsive web UI at `f2ee905`, after #110 replaced `frontend/src`
+with the conversation-first UI. Method: static reading of all of `frontend/src`,
+then live measurement in Chromium 141 device emulation against a real backend,
+with a small fault-injecting proxy for lost responses, silent streams and
+refused streams. Evidence tiers as above; there is no T3 source. **Not
+observed:** a physical iPhone or Android phone, and WebKit (it is not installed
+in the audit environment, and the hosted runners that would run it are not
+executing jobs, see `BLK-ACTIONS-001`).
+
+### Regression ledger: the 2026-09-25 findings against the current UI
+
+#115 fixed the pre-rebuild UI; #110 then replaced it, so the "Fixed" statuses
+above could not be assumed. Counts at those commits: `100dvh` 3→0,
+`hover: hover` 1→0, `PlanningGate.jsx` 1→0.
+
+| Prior ID | At `f2ee905` | After this change |
+|---|---|---|
+| U1 same-origin API | Holds | Holds |
+| U2 provider not forced to mock | **Regressed**: `mock` is persisted and sent with every message (`App.jsx`, `ChatView.jsx`) | Unchanged (queued lead L1) |
+| U3 offline alert on phones | Holds, but latched until Retry and mislabelled a 401 as "not reachable" | Reworked (M2, M7) |
+| U5 confirm deletes | **Partial**: conversation only | Fixed again for sources, memory and folder access (M5) |
+| U6 double submit, composer | Holds; Return sent on touch keyboards | Fixed (M4) |
+| U7 file `accept` | **Regressed** | Unchanged (M17) |
+| U9 host-path copy | Holds; the component has no styles | Unchanged (M16) |
+| I1 16 px fields | Holds | Holds |
+| I2 `100dvh` | **Absent**: sheets use `vh` | Unchanged |
+| I3 44 px targets, hover gating | Height only; hover not gated | Unchanged (M15, M24) |
+| I4 meta tags | Holds | Holds |
+| I5 no horizontal overflow | Holds through `.main{min-width:0}` | Holds |
+
+### Findings
+
+Confidence is the probability that the finding is real as stated, after
+measurement where one was possible.
+
+| ID | Finding | Measured | Conf. | After this change |
+|---|---|---|---|---|
+| M1 | `Sheet` re-ran its focus effect on every render | Typing "abc" in Rename left "a" with focus on ✕; focus in Background tasks was reset within 5.5 s | 95% | **Fixed** |
+| M2 | The health watchdog latched into an error state, re-rendered the tree every 4 s and had no timeout | 5 React commits in 12 idle seconds; one failed `/health` unmounted the chat for good; 3 hung polls at once | 97% | **Fixed** |
+| M3 | The event stream had no idle or lifecycle handling | The server run completed while the page still showed `AWAITING_APPROVAL` 45 s later | 90% | **Fixed** (25 s idle watchdog; reconnect on visibility, page show and online) |
+| M3b | No backoff when a stream route fails | 655 stream attempts and 3,275 requests in 10 s against a 502 | 95% | **Fixed** (backoff, then paused with a Resume button) |
+| M4 | Return sent on touch keyboards, which have no Shift+Enter | The iPhone profile sent on Return | 95% | **Fixed** |
+| M5 | Destructive actions had lost their confirmation | No dialog for source removal or memory delete | 97% | **Fixed** |
+| M6 | `request()` threw a raw `TypeError` on a non-JSON error body | A plain-text 500 showed "body stream already read" | 99% | **Fixed** |
+| M7 | A phone had no way to enter a token; a public bind skipped the bind guard; `/health` and `/config` disclosed host paths | `uvicorn --host <network address>` served `/conversations`, `/memory/export` and a `POST /memory` without a token | 95% | **Fixed**, as a supported mode (`SD-012`) |
+| M8 | Landscape phones get the desktop layout | Conversation list 0 px high at 844×390, 844×340 and 915×412; nav clipping only at 340 px height | 90% | Open (P1) |
+| M9 | No left or right safe-area insets under `viewport-fit=cover` | Content at x=12 under a 47 px inset | 95% | Open (P1) |
+| M10 | Drawer and menu semantics | 13 of 14 Tab stops off-screen; menus survive an outside tap and Escape | 92% | Open (P1) |
+| M11 | The back gesture leaves the app | Back left the app | 95% | Open (P1) |
+| M12 | A new idempotency key on every send | One intent produced 2 conversations and 2 runs after a lost response | 90% | Open (P1) |
+| M13 | Approval arguments scroll sideways; Deny and Allow once are 8 px apart | About 40 of 84 characters of a URL visible | 85% | Open (P1) |
+| M14 | A long unbroken title pushes the ⋯ menu off-screen | ⋯ at x=678..718 on a 390 px screen | 90% | Open (P1) |
+| M15 | Undersized touch targets | Narrower than first reported: icon buttons 38×44 and 37×44, `summary` 19.5 px, the Memory on/off label 21 px | 90% | Open (P2) |
+| M16 | `DirectoryIntake` has no styles | 11 classes with no rules | 95% | Open (P1) |
+| M17 | Upload: `accept` dropped, no size check or progress, no HEIC | Confirmed in code | 90% | Open (P1) |
+| M18 | Data volume: event-log refetch, all chunks, no gzip, no cache headers | JS served uncompressed (about 262 kB, versus about 80 kB gzipped) | 85% | Open (P2) |
+| M19 | Per-token cost grows quadratically | **Refuted:** linear, 1.1 ms per event at 100 events and 1.2 ms at 900, under 4× CPU throttle | 90% | Not a problem |
+| M20 | SSE pins a thread in the shared pool | `/health` median 3 ms with 20 streams open, 9.9 s with 45, 19.8 s with 70 | 90% | Open (P1) |
+| M21 | No error boundary; a malformed `%` in the token fragment threw at load | `/#token=%E0%A4%A` blanked the app | 90% | Fragment guard **fixed**; the error boundary stays open (P2) |
+| M22 | Unhandled rejections, missing busy states, duplicate rows on double-tap | Confirmed in code | 85% | Open (P2); Rename and Delete now show errors and busy states |
+| M23 | A stored `mucaro.activeConversation` is never cleared on a 404 | Confirmed | 90% | Open (P2) |
+| M24 | Visual and platform polish | Mixed | 60-90% | Open (P2) |
+| M25 | `navigator.clipboard` is undefined on `http://<network address>`; Copy blamed a permission and had no fallback | Wrong reason announced | 95% | **Fixed** |
+
+### What this change adds
+
+- The fixes for M1-M7, M21 (fragment guard) and M25, with 37 new checks in
+  `qa/rendered/rendered_qa.mjs` (130 in all, every one passing in Chromium 141).
+  Run against the base commit's UI and backend, 24 of the 37 fail, 9 cannot run
+  because the feature they exercise (the token gate, the Resume button) does not
+  exist there, and 4 guard behaviour that already worked and pass on both:
+  Ctrl+Enter on a touch device, the token deciding over the network, the link
+  fragment, and Copy's fallback (which #176 had already added for messages).
+  Run them alone with `node rendered_qa.mjs --only-new`.
+- Phone access (`docs/PHONE_ACCESS.md`, `SD-012`, PROVISIONAL).
+- The 2026-09-25 findings above are re-stated against the current code; the
+  claims in `docs/release/UI_ACCESSIBILITY.md` about the Return key and safe-area
+  insets were corrected.
+
+### Still open, and needing a person with a phone
+
+Rename typing and keyboard avoidance on an iPhone, landscape layout and the
+notch, edge-swipe back, HEIC upload, VoiceOver through a sheet, resume after a
+60 s lock with a pending approval, and signing in with the phone link.
+
+### Queued leads (not changed here)
+
+- **L1** The default `model_provider: "mock"` overrides a server-configured provider (U2).
+- **L2** `GET /work-runs/{id}/events` returns at most 500 events while the client replaces its list, so a long streamed run may lose its tail.
+- **L3** `/security` and `/tools` are public; review `PUBLIC_API_PATHS`.
+- **L4** An upload with an existing name overwrites `data/input/<name>`; check it against source lineage.
+- **L5** Settings offers retrieval strategies beyond the README's set.
+- **L6** The archived rendered-QA receipt is bound to an older commit.
+- **L7** The content security policy allows `style-src 'unsafe-inline'`, which may be unnecessary.
+- **L8** `frontend/package.json` has no lint or test scripts.
+- **L9** A pairing code exchanged for a per-device token, revocable in Settings, would replace typing a 43-character token.
+- **L10** The token check has no failed-attempt throttling.
+- **L11** A QR code for the phone link needs a dependency decision (the runtime graph is hash-locked).
+- **L12** Whether WebKit's device emulation reports `(pointer: coarse)` is unknown; the touch-keyboard check forces the report so it does not depend on it. With no executing CI runner there is no WebKit evidence at all.
+- **L13** On an iPad with a hardware keyboard the primary pointer is still coarse, so Return adds a line (Cmd or Ctrl+Enter, or the Send button, sends). `any-pointer: fine` could refine this, but its behaviour on iPadOS is unverified.

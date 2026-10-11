@@ -153,6 +153,28 @@
         "TGT-026",
         "TGT-028"
       ]
+    },
+    {
+      "contradiction_id": "RC-009",
+      "type": "RUNTIME",
+      "observation_a": {
+        "claim": "The release class is Apple Silicon (arm64) only, and release-grade certification requires both packaged lanes, including the portable embedded-runtime lane",
+        "evidence": "_architecture/release/release_scope_manifest_v1.json release_class.architectures; docs/release/RELEASE_ENGINEERING_STATE.md A3 and A7; scripts/certify_release_grade.py PORTABLE_RUNTIME_GATES"
+      },
+      "observation_b": {
+        "claim": "The only governed portable runtime source is x86_64 (CPython 3.13 install_only build), and the portable-lane replays run on macos-15-intel",
+        "evidence": "packaging/runtime/macos-x86_64.json; packaging/runtime/requirements-macos-x86_64.lock; portable-macos.yml in PR #132 and PR #136 (runs-on: macos-15-intel)"
+      },
+      "adjudication": "Resolved in favour of the release class by the project-owner scope decision of 2026-09-29 (docs/RELEASE_SCOPE_2026-09-29.md): keep the two-lane requirement and certify the portable lane from a frozen, independently verified native arm64 runtime on Apple Silicon. x86_64 portable runs, including under Rosetta, are compatibility observations and cannot satisfy portable_embedded_runtime, portable_install_reinstall_smoke, distinct_version_upgrade_rollback or the packaged-lifecycle gate for this release. Remaining work: an arm64 runtime manifest and hash-locked lock under packaging/runtime/, and a portable-lane run on an Apple Silicon runner.",
+      "state": "ADJUDICATED",
+      "material": true,
+      "materiality_reason": "Decides which architecture the portable-lane packaging, upgrade and rollback evidence must come from (MATRIX-004: packaging behavior).",
+      "related_requirement_ids": [
+        "TGT-026",
+        "TGT-029",
+        "MATRIX-018",
+        "MATRIX-019"
+      ]
     }
   ]
 }

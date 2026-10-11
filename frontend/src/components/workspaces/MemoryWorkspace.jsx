@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../../api.js";
+import { ConfirmSheet } from "../ConfirmSheet.jsx";
 
 // Explicit memory (TGT-013, INV-021): what is retained, where it came from, and on/off/delete controls.
 export function MemoryWorkspace({ announce }) {
@@ -7,6 +8,7 @@ export function MemoryWorkspace({ announce }) {
   const [content, setContent] = useState("");
   const [kind, setKind] = useState("preference");
   const [error, setError] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -68,12 +70,26 @@ export function MemoryWorkspace({ announce }) {
               <input type="checkbox" checked={row.enabled} onChange={() => api.updateMemory(row.memory_id, !row.enabled).then(load)} />
               <span>{row.enabled ? "On" : "Off"}</span>
             </label>
-            <button type="button" className="ghost-button" onClick={() => api.deleteMemory(row.memory_id).then(load).then(() => announce("Memory deleted."))} aria-label={`Delete memory: ${row.content}`}>
+            <button type="button" className="ghost-button" onClick={() => setPendingDelete(row)} aria-label={`Delete memory: ${row.content}`}>
               Delete
             </button>
           </li>
         ))}
       </ul>
+      {pendingDelete && (
+        <ConfirmSheet
+          title="Delete this memory?"
+          confirmLabel="Delete memory"
+          onConfirm={async () => {
+            await api.deleteMemory(pendingDelete.memory_id);
+            await load();
+            announce("Memory deleted.");
+          }}
+          onClose={() => setPendingDelete(null)}
+        >
+          <p>“{pendingDelete.content}” will stop shaping answers and is permanently removed.</p>
+        </ConfirmSheet>
+      )}
     </section>
   );
 }

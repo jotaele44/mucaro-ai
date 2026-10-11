@@ -235,10 +235,16 @@ def test_offline_manifest_classifies_every_capability_and_closes():
         assert manifest["arithmetic_closes"] is True
     by_name = {row["capability"]: row for row in offline["capabilities"]}
     assert by_name["tool:web.fetch"]["state_now"] == "UNAVAILABLE_OFFLINE"
+    assert by_name["tool:web.fetch"]["runtime_network_required"] is True
+    assert "KEEP_EXPLICIT_NETWORK_GATE" in by_name["tool:web.fetch"]["independence_actions"]
     assert by_name["tool:source_library.status"]["state_now"] == "AVAILABLE_LOCALLY"
     assert by_name["model:mock"]["state_now"] == "AVAILABLE_LOCALLY"
+    assert by_name["model:mock"]["independence_actions"] == []
     assert by_name["model:anthropic"]["availability_class"] == "REQUIRES_REMOTE_SERVICE"
+    assert "KEEP_EXPLICIT_NETWORK_GATE" in by_name["model:anthropic"]["independence_actions"]
     assert {row["capability"] for row in online["capabilities"]} == set(by_name)
+    assert online["independence"]["target"] == "ZERO_MANDATORY_EXTERNAL_RUNTIME_WORK_EXCEPT_EXPLICIT_NETWORK_OPERATIONS"
+    assert "tool:web.fetch" in online["independence"]["network_exceptions"]
 
 
 def test_offline_manifest_reports_missing_packages_even_for_network_capabilities(monkeypatch):
@@ -254,6 +260,43 @@ def test_offline_manifest_reports_missing_packages_even_for_network_capabilities
     monkeypatch.setattr(offline, "_module_present", lambda name: True)
     rows = {row["capability"]: row for row in build_offline_manifest(system_offline=True)["capabilities"]}
     assert rows["tool:web.render"]["state_now"] == "UNAVAILABLE_OFFLINE"
+
+
+def test_offline_manifest_exposes_git_backed_coding_as_a_bundle_candidate(monkeypatch):
+    import backend.app.offline as offline
+
+    real_resolve = offline.resolve_local_tool
+    monkeypatch.setattr(offline, "resolve_local_tool", lambda name: None if name == "git" else real_resolve(name))
+    rows = {row["capability"]: row for row in build_offline_manifest()["capabilities"]}
+
+    for capability in (
+        "tool:coding.repo_status",
+        "tool:coding.read_file",
+        "tool:coding.diff",
+        "tool:coding.patch_check",
+        "tool:coding.patch_apply",
+    ):
+        assert rows[capability]["state_now"] == "LOCAL_DEPENDENCY_MISSING"
+        assert rows[capability]["local_dependency"] == "git"
+        assert rows[capability]["local_dependency_kind"] == "binary"
+        assert "BUNDLE_LOCAL_COMPONENT" in rows[capability]["independence_actions"]
+        assert rows[capability]["operator_external_setup_required"] is True
+
+
+def test_frozen_manifest_reports_packaging_residue_not_operator_setup(monkeypatch):
+    import backend.app.offline as offline
+
+    monkeypatch.setattr(offline, "bundled_only", lambda: True)
+    monkeypatch.setattr(offline, "resolve_local_tool", lambda name: None)
+    manifest = build_offline_manifest()
+    rows = {row["capability"]: row for row in manifest["capabilities"]}
+
+    assert rows["tool:coding.repo_status"]["resolution_policy"] == "BUNDLED_ONLY"
+    assert rows["tool:coding.repo_status"]["operator_external_setup_required"] is False
+    assert rows["tool:coding.repo_status"]["release_packaging_residue"] is True
+    assert rows["execution.container"]["state_now"] == "LOCAL_DEPENDENCY_MISSING"
+    assert rows["execution.container"]["operator_external_setup_required"] is False
+    assert "PLATFORM_ADAPTER_REQUIRED" in rows["execution.container"]["independence_actions"]
 
 
 def test_offline_manifest_reports_a_missing_remote_sdk(monkeypatch):

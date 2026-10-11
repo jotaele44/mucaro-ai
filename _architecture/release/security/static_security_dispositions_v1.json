@@ -126,10 +126,18 @@
     {
       "rule": "S310",
       "path": "scripts/launch_app.py",
-      "code": "with urllib.request.urlopen(health_url(port), timeout=1.5) as response:",
+      "code": "with urllib.request.urlopen(url, timeout=1.5, context=context) as response:",
       "classification": "NOT_APPLICABLE",
-      "rationale": "Maintainer launcher polls the local service's /health on 127.0.0.1 only.",
-      "evidence": "scripts/launch_app.py"
+      "rationale": "Maintainer launcher polls the local service's /health on 127.0.0.1 only; the scheme is a choice between http and https made by the launcher's own --tls-cert/--tls-key flags, never from input. With TLS the certificate is not verified because the probe asks only whether the service this launcher just started answers on loopback.",
+      "evidence": "backend/tests/test_phone_access.py::test_health_probe_only_ever_targets_loopback_and_skips_certificate_checks_only_for_tls"
+    },
+    {
+      "rule": "S104",
+      "path": "scripts/launch_app.py",
+      "code": "PHONE_BIND_HOST = \"0.0.0.0\"",
+      "classification": "MEDIUM",
+      "rationale": "Intentional and opt-in (SD-012): the launcher binds all interfaces only for --phone or MUCARO_AI_PHONE_ACCESS=1; the default launch stays on 127.0.0.1. The service then refuses to start without an operator token of 32+ characters (the launcher generates one per launch), and refuses a remote client that has no valid token. Residual risk, accepted and documented in docs/PHONE_ACCESS.md: over plain http the token and content are readable by anyone able to observe the local network, so the launcher prints a cleartext warning and offers --tls-cert/--tls-key. The packaged desktop app is not affected and stays loopback-only (network_exposure gate).",
+      "evidence": "backend/tests/test_phone_access.py"
     },
     {
       "rule": "S310",

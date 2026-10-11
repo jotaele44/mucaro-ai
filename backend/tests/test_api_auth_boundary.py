@@ -24,6 +24,7 @@ PROTECTED_READS = [
     ("get", "/permissions/directories", None),
     ("get", "/workspaces", None),
     ("get", "/exports/run_missing", None),
+    ("get", "/exports/run_deadbeef/files/json", None),
     ("post", "/permissions/directories/check", {"path": "/etc"}),
     ("post", "/validate", None),
 ]
