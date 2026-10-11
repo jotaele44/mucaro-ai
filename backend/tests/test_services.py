@@ -463,3 +463,30 @@ def test_answer_trace_records_stage_timings(tmp_path: Path):
     assert timings["model_first_token_ms"] == timings["model_ms"]
     assert result["answer_streamed"] is False
 
+
+def test_single_provider_retry_never_repeats_streamed_text(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    monkeypatch.setattr("backend.app.services.plan_model_route", lambda **kwargs: _failover_route("anthropic"))
+    calls: list[int] = []
+
+    def drops_mid_stream(*args, on_text_delta=None, **kwargs):
+        calls.append(1)
+        on_text_delta("Partial answer ")
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_TIMEOUT", "stream timed out")
+
+    monkeypatch.setattr("backend.app.services.generate_answer", drops_mid_stream)
+    deltas: list[str] = []
+
+    result = answer_question(
+        "What does source lineage require?",
+        cfg=cfg,
+        persist=False,
+        on_text_delta=deltas.append,
+        failover_policy=FailoverPolicy(max_attempts_per_provider=2, backoff_seconds=()),
+    )
+
+    assert calls == [1]
+    assert deltas == ["Partial answer "]
+    assert result["status"] == "ERROR_MODEL_PROVIDER_TIMEOUT"
+    assert [attempt["status"] for attempt in result["model_attempts"]] == ["ERROR_MODEL_PROVIDER_TIMEOUT"]
