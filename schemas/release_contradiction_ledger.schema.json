@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/release_contradiction_ledger.schema.json",
+  "title": "Mucaro Release Contradiction Ledger 1.0",
+  "description": "KERNEL-014 contradiction records. Both observations are preserved; records are never deleted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contradictions"],
+  "properties": {
+    "schema_version": {"const": "mucaro-release-contradiction-ledger/1.0"},
+    "contradictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["contradiction_id", "type", "observation_a", "observation_b", "adjudication", "state", "material", "materiality_reason"],
+        "properties": {
+          "contradiction_id": {"type": "string", "pattern": "^RC-[0-9]{3}$"},
+          "type": {"enum": ["BYTE", "SCHEMA", "GEOMETRY", "NAME", "COUNT", "CLASS", "IDENTITY", "TIME", "SCOPE", "RUNTIME", "SECURITY", "PERMISSION", "TEST"]},
+          "observation_a": {"type": "object", "required": ["claim", "evidence"], "properties": {"claim": {"type": "string"}, "evidence": {"type": "string"}}},
+          "observation_b": {"type": "object", "required": ["claim", "evidence"], "properties": {"claim": {"type": "string"}, "evidence": {"type": "string"}}},
+          "adjudication": {"type": "string"},
+          "state": {"enum": ["UNRESOLVED", "ADJUDICATED", "SUPERSEDED"]},
+          "material": {"type": "boolean"},
+          "materiality_reason": {"type": "string", "minLength": 1},
+          "related_requirement_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

@@ -139,3 +139,25 @@ Resulting overlay arithmetic:
 - CODING: `70.0%` — `PASS=4 / PROVISIONAL=6`
 
 This remains an evidence-state overlay, not coding-domain or release certification.
+
+
+## RT-09 real-world corpus PROVISIONAL
+
+Audit head: `f70ebd8e815bd4f4044b67455c8a33c7ef05789b`.
+
+- `RT-09 OPEN → PROVISIONAL`: PR #127 merged the current-release-main real-world retrieval corpus lane.
+- Dedicated run `36382763249` passed; artifact `10952734875` digest `sha256:1eb4198e783fbaa84ae60610c7048d6e889c077aaf59aa70c7db29cebd4badac`.
+- Frozen manifestation: 24 authoritative IETF/W3C/NIST sources, 24 bound queries, TXT/HTML/PDF, 8,277,197 bytes, 4,933 chunks.
+- Hybrid top-5 evaluation hit every expected source: hit rate `1.0`, zero missed queries.
+- Corpus manifest SHA-256: `8b450c8f3a587d5c39ecc6a9e94480592d5ddb3565021c4373cc65587ae48fb5`.
+- Certification report SHA-256: `0249b023d286c9e6332fbd98e633b49797cd98e631c0efcad34c123f0fb3fe6e`.
+- The corpus gate itself authorizes at most PROVISIONAL; RT-10 production-scale stress remains unresolved.
+
+Resulting legacy overlay arithmetic:
+
+- current raw completion: `75.5%`
+- current weighted completion: `76.8%`
+- applied events: `24`
+- RETRIEVAL: `90.0%` — `PASS=8 / PROVISIONAL=2`
+
+This is not retrieval-domain or release certification.

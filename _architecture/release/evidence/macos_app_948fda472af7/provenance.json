@@ -1,0 +1,28 @@
+{
+  "schema_version": "mucaro-evidence-provenance/1.0",
+  "source": "GitHub Actions workflow 'macOS app' (.github/workflows/macos-app.yml), pull_request event on jotaele44/mucaro-ai#110",
+  "workflow_run_id": 36069511157,
+  "job_id": 107866921452,
+  "runner": "macos-14 (arm64)",
+  "evidence_artifact": {
+    "artifact_id": 10837786491,
+    "name": "macos-app-evidence-948fda472af7e75a906edade68482e06b4b198f3",
+    "sha256": "3c456364eb155ce3af074fe0cfa346d4224592532876d745b37e9a70af97317a"
+  },
+  "app_artifact": {
+    "artifact_id": 10837716630,
+    "name": "mucaro-ai-macos-arm64-948fda472af7e75a906edade68482e06b4b198f3",
+    "zip_sha256_from_build_receipt": "a6c4baadf6734eff2ffcd634b4abe3323b32f5fc464f137716a00ee6c6cd2f12"
+  },
+  "tested_commit": "948fda472af7e75a906edade68482e06b4b198f3",
+  "tested_commit_note": "The workflow checks out the pull-request head itself; both receipts carry head_sha 948fda4 exactly.",
+  "files": {
+    "build_receipt.json": "11070d83b3ba2c07bc7b8cec1ef021c25600ca23e0a6c1f5706e1e70a81f6a7e",
+    "e2e_receipt.json": "855c4d5e61b1b4055e19d6dfae9090b967fd099184de0a516e96f6329d340ea4",
+    "window.png": "c11575e80f15c38eea48fcf1957f2a01a7403b0f3e9d27d4d793ac45515b5468"
+  },
+  "omitted": {
+    "bundle_manifest.json": "per-file hash list; its digest is build_receipt.json bundle.tree_sha256",
+    "pyinstaller.log": "kept in the CI artifact"
+  }
+}

@@ -1,8 +1,35 @@
 # First Run Guide
 
-This guide is the safest path before opening the full app.
+## Recommended: double-click
 
-## macOS recommended path
+Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows) beside `pyproject.toml`.
+Setup runs quietly, then the native app window opens. Keep the whole checkout together when
+moving it. `Mucaro AI.command` and `Mucaro AI.cmd` are legacy console launchers that open
+Terminal or a console window.
+
+The first run prepares everything inside the project folder and then opens the app:
+
+| Step | Marker when done | First run | Later runs |
+|---|---|---|---|
+| 0. Private uv, Node.js 22, Python 3.12 (SHA-256 verified), `.venv` | `UV_OK`, `NODE_OK`, `VENV_OK` | downloads | `cached` |
+| 1. Python packages | `PY_DEPS_OK` | installs | `PY_DEPS_CACHED` |
+| 2. Web interface packages | `FRONTEND_DEPS_OK` | `npm ci` | `FRONTEND_DEPS_CACHED` |
+| 3. Web interface build | `FRONTEND_BUILD_OK` | builds | rebuilt only when `frontend/` changed |
+| 4. `.env` and readiness check | `PREFLIGHT_OK` | runs | `PREFLIGHT_CACHED` |
+| 5. Sample documents | `INGEST_FOLDER_OK` | loads `data/input` samples (skipped if you already have sources) | `SAMPLES_CACHED` |
+| 6. Start and open the native window (macOS) | `BACKEND_READY`, `OPENING_NATIVE_WINDOW` | | |
+
+`ONE_CLICK_SETUP_OK` marks a run that did setup work; `ONE_CLICK_FAST_PATH` marks a run that had
+nothing to do. If port 8000 is taken by another program the app moves to the next free port
+(`PORT_FALLBACK`). If Mucaro AI is already running, a second double-click just opens it
+(`DESKTOP_LAUNCH_REUSED`). The markers above are written to logs rather than shown in a console.
+If setup stops, a dialog names the log file; fix it
+(usually the internet connection) and double-click again: setup resumes where it stopped. Details
+and error codes: `docs/ONE_CLICK_SETUP.md`.
+
+## Manual developer path (macOS)
+
+Use this only if you manage Python 3.11-3.13 and Node 20+ yourself.
 
 From the folder containing `mucaro-ai/`:
 
@@ -19,7 +46,30 @@ RELEASE_CHECK_OK
 BOOTSTRAP_OK
 ```
 
-Then start the backend:
+### Start the app (one command)
+
+```bash
+source .venv/bin/activate
+python scripts/launch_app.py
+```
+
+Or double-click `Mucaro AI.command`, or run `make start`. The launcher builds
+`frontend/dist` if it is missing, starts the backend on `127.0.0.1:8000`, opens
+the browser, and stops everything on `Ctrl+C`. It reads `.env`; variables
+exported in your shell take precedence.
+
+Open:
+
+```text
+http://127.0.0.1:8000
+```
+
+If the page shows **Backend not reachable**, the launcher is not running (or is
+on another port). Start it and press **Retry**.
+
+### Developer mode (two processes, hot reload)
+
+Start the backend:
 
 ```bash
 source .venv/bin/activate
@@ -59,12 +109,15 @@ cd mucaro-ai
 .\scripts\bootstrap_windows.ps1
 ```
 
-Then:
+Then start the app:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-python scripts\dev_start.py --backend-only
+python scripts\launch_app.py
 ```
+
+For developer mode, use `python scripts\dev_start.py --backend-only` and
+`python scripts\dev_start.py --frontend-only` in two terminals.
 
 ## Manual verification commands
 
@@ -97,8 +150,15 @@ Common failures:
 
 | Error | Fix |
 |---|---|
-| `ERROR_PYTHON_MISSING` | Install Python 3.11+ |
+| `ERROR_DOWNLOAD_FAILED` | Double-click setup: no internet connection during first setup; reconnect and double-click again |
+| `ERROR_MACOS_TOO_OLD` / `ERROR_PLATFORM_UNSUPPORTED` | Double-click setup: see the supported platforms in `docs/ONE_CLICK_SETUP.md` |
+| `ERROR_PYTHON_MISSING` | Install Python 3.11+ (`brew install python@3.12` or python.org) |
+| `ERROR_PYTHON_TOO_OLD` | Bootstrap found only an older Python; install 3.11+ and rerun |
+| `ERROR_PYTHON_UNSUPPORTED` | Developer bootstrap found only Python 3.14+; install 3.11-3.13, or use the double-click setup (it brings Python 3.12) |
+| `ERROR_PYTHON_UNSUPPORTED_OR_MISSING` | Windows developer bootstrap: install Python 3.11-3.13 from python.org with "Add to PATH", or double-click `Mucaro AI.cmd` |
 | `PYTHON_TOO_OLD` | Use Python 3.11+ explicitly |
+| `BOOTSTRAP_FAILED step=...` | Windows: the named step failed; its output is printed just above |
+| `ENV_MODEL_RETIRED` (warning) | Your `.env` pins a retired model; set `MUCARO_AI_MODEL=claude-sonnet-5` |
 | `ERROR_NPM_MISSING` | Install Node 20+ or run backend-only |
 | `PY_IMPORT_MISSING` | Run `python -m pip install -r backend/requirements.txt` inside `.venv` |
 | `ERROR_FRONTEND_DEPS_MISSING` | Run `cd frontend && npm ci` |

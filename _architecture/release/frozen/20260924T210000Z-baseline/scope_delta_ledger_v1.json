@@ -1,0 +1,167 @@
+{
+  "schema_version": "mucaro-release-scope-delta-ledger/1.0",
+  "deltas": [
+    {
+      "delta_id": "SD-001",
+      "classification": "DEFECT_REVEALED",
+      "title": "ingest_folder follows symlinks and does not re-check the directory grant per file, allowing reads outside a granted folder",
+      "discovered_by": "trust-boundary audit 2026-09-24",
+      "evidence": [
+        "backend/app/ingestion.py ingest_folder uses Path.is_file() on rglob results"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "TGT-023",
+        "TGT-025",
+        "INV-015"
+      ]
+    },
+    {
+      "delta_id": "SD-002",
+      "classification": "DEFECT_REVEALED",
+      "title": "DOCX parsing reads word/document.xml with no decompressed-size or ratio cap (decompression bomb)",
+      "discovered_by": "trust-boundary audit 2026-09-24",
+      "evidence": [
+        "backend/app/parser.py archive.read('word/document.xml')"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "TGT-023",
+        "INV-015"
+      ]
+    },
+    {
+      "delta_id": "SD-003",
+      "classification": "DEFECT_REVEALED",
+      "title": "Sensitive GET routes (memory export, tool calls/audit, chunks, runs, exports) are readable without the operator token when one is configured",
+      "discovered_by": "trust-boundary audit 2026-09-24",
+      "evidence": [
+        "backend/app/main.py GET routes lack require_operator_token"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "TGT-025",
+        "INV-015",
+        "TGT-024"
+      ]
+    },
+    {
+      "delta_id": "SD-004",
+      "classification": "DEFECT_REVEALED",
+      "title": "Operator token comparison is not constant-time",
+      "discovered_by": "trust-boundary audit 2026-09-24",
+      "evidence": [
+        "backend/app/auth.py compares tokens with =="
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "INV-015"
+      ]
+    },
+    {
+      "delta_id": "SD-005",
+      "classification": "DEFECT_REVEALED",
+      "title": "test_web_render performs a real DNS lookup (hidden network dependency; fails offline)",
+      "discovered_by": "test audit 2026-09-24",
+      "evidence": [
+        "backend/tests/test_web_render.py calls validate_web_fetch_url('https://example.com') without mocking getaddrinfo"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "TGT-019"
+      ]
+    },
+    {
+      "delta_id": "SD-006",
+      "classification": "DEFECT_REVEALED",
+      "title": "Application data directory resolves inside the application bundle (project_root/data)",
+      "discovered_by": "packaging audit 2026-09-24",
+      "evidence": [
+        "backend/app/config.py data_dir = project_root / 'data'"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "TGT-017",
+        "TGT-026"
+      ]
+    },
+    {
+      "delta_id": "SD-007",
+      "classification": "DEFECT_REVEALED",
+      "title": "Built UI calls a hard-coded API base (127.0.0.1:8000); any other launch port breaks the GUI",
+      "discovered_by": "frontend audit 2026-09-24",
+      "evidence": [
+        "frontend/src/api.js API_BASE default http://127.0.0.1:8000"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "TGT-001"
+      ]
+    },
+    {
+      "delta_id": "SD-008",
+      "classification": "DEFECT_REVEALED",
+      "title": "Tool audit log and JSON ledgers use unlocked read-modify-write; concurrent writers can lose events",
+      "discovered_by": "storage audit 2026-09-24",
+      "evidence": [
+        "backend/app/tools.py _append_audit_event rewrites tool_audit_log.json"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "TGT-035",
+        "INV-010"
+      ]
+    },
+    {
+      "delta_id": "SD-009",
+      "classification": "ENHANCEMENT",
+      "title": "Mac App Store distribution lane (sandbox, provisioning, App Review)",
+      "discovered_by": "packaging audit 2026-09-24",
+      "evidence": [
+        "_architecture/macos_app_store_security_profile.json"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "TGT-026"
+      ]
+    },
+    {
+      "delta_id": "SD-010",
+      "classification": "ENHANCEMENT",
+      "title": "Native iOS client for the mobile interaction rows (F01-F20 are satisfied by responsive UI per assumption A5)",
+      "discovered_by": "mobile brief review 2026-09-24",
+      "evidence": [
+        "docs/release/MOBILE_INTERACTION_EXTRACTION_V1.md"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "MOB-F01"
+      ]
+    },
+    {
+      "delta_id": "SD-011",
+      "classification": "DEFECT_REVEALED",
+      "title": "Web fetch validates DNS before urllib reconnects (DNS-rebinding window to private hosts)",
+      "discovered_by": "trust-boundary audit 2026-09-24",
+      "evidence": [
+        "backend/app/web_browsing.py validate_web_fetch_url then urllib.request.urlopen"
+      ],
+      "adopted": false,
+      "adoption_authority": null,
+      "parent_requirement_ids": [
+        "TGT-006",
+        "INV-015"
+      ]
+    }
+  ]
+}

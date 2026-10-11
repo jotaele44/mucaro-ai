@@ -9,7 +9,7 @@ from backend.app.clean_machine_macos import CleanMachineMacOSError, certify_clea
 
 
 def main() -> int:
-    parser=argparse.ArgumentParser(description="Run distinct-version clean-machine Mucaro macOS certification.")
+    parser=argparse.ArgumentParser(description="Run the distinct-version packaged macOS lifecycle; host cleanliness is a separate gate.")
     parser.add_argument("--current-app", type=Path, required=True)
     parser.add_argument("--previous-app", type=Path, required=True)
     parser.add_argument("--head", required=True)
@@ -23,7 +23,7 @@ def main() -> int:
         print(json.dumps({"status":exc.status,"detail":exc.detail},sort_keys=True))
         return 2
     print(json.dumps(receipt,sort_keys=True))
-    return 0 if receipt["status"] == "CLEAN_MACHINE_MACOS_VERIFIED" else 2
+    return 0 if receipt["status"] == "PACKAGED_LIFECYCLE_VERIFIED" else 2
 
 
 if __name__ == "__main__":

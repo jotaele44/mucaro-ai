@@ -1,0 +1,120 @@
+{
+  "blocking_checks": [],
+  "created_utc": "2026-09-24T22:49:59.194507+00:00",
+  "data_dir": "/Users/runner/Library/Application Support/Mucaro AI",
+  "data_dir_preexisting": false,
+  "gui": {
+    "first_path": "/work-runs/modes",
+    "seconds_to_ui": 3.105,
+    "status": "GUI_CONNECTED",
+    "webkit": true
+  },
+  "head_sha": "948fda472af7e75a906edade68482e06b4b198f3",
+  "install": {
+    "app": "/Users/runner/Applications/Mucaro AI.app",
+    "ok": true
+  },
+  "launch": {
+    "pid": 3934,
+    "seconds_to_service": 0.747
+  },
+  "mode": "MACOS_LAUNCHSERVICES",
+  "quit": {
+    "instance_removed": true,
+    "method": "APPLE_EVENT_QUIT",
+    "ok": true
+  },
+  "reinstall": {
+    "conversation_status": 200,
+    "note": "Cross-version upgrade needs a previous release artifact; schema upgrade is covered by backend/tests/test_db_upgrade.py.",
+    "ok": true,
+    "source_status": 200,
+    "turns": 2
+  },
+  "relaunch": {
+    "conversation_status": 200,
+    "new_port_and_token": true,
+    "ok": true,
+    "source_status": 200,
+    "turns": 2
+  },
+  "schema_version": "mucaro-macos-app-e2e/1.0",
+  "screenshot": {
+    "bytes": 84989,
+    "ok": true,
+    "path": "/Users/runner/work/_temp/macos-e2e/window.png",
+    "stderr": ""
+  },
+  "sigterm": {
+    "instance_removed": true,
+    "ok": true
+  },
+  "single_instance": {
+    "instance_pid_unchanged": true,
+    "ok": true,
+    "processes": 1
+  },
+  "status": "MACOS_APP_E2E_PASS",
+  "window": {
+    "ok": true,
+    "windows": [
+      {
+        "height": 840.0,
+        "layer": 0,
+        "number": 25,
+        "owner": "Mucaro AI",
+        "width": 1280.0
+      }
+    ]
+  },
+  "window_event": {
+    "seconds_to_window": 0.562,
+    "status": "WINDOW_SHOWN"
+  },
+  "workflow": {
+    "answer_chars": 382,
+    "citation_status": "CITATION_OK",
+    "citations": 1,
+    "cites_ingested_source": true,
+    "conversation_id": "conv_33b9f979cd5a",
+    "export_has_trace": true,
+    "export_status": 200,
+    "gui_served": true,
+    "offline_manifest": {
+      "AVAILABLE_LOCALLY": [
+        "answer.cited",
+        "exports",
+        "gis.vector_raster",
+        "ingest.files",
+        "memory",
+        "model:mock",
+        "retrieve.local",
+        "tool:coding.diff",
+        "tool:coding.patch_apply",
+        "tool:coding.patch_check",
+        "tool:coding.read_file",
+        "tool:coding.repo_status",
+        "tool:memory.list",
+        "tool:product.audit",
+        "tool:source_library.status",
+        "tool:workspace_profiles.list"
+      ],
+      "LOCAL_DEPENDENCY_MISSING": [
+        "model:anthropic",
+        "model:openai_compatible_local",
+        "ocr.image",
+        "ocr.pdf_render",
+        "tool:web.render"
+      ],
+      "REQUIRES_REMOTE_SERVICE": [
+        "tool:web.fetch",
+        "tool:web.fetch_session",
+        "tool:web.search"
+      ]
+    },
+    "ok": true,
+    "private_route_without_token": 401,
+    "run_state": "COMPLETED",
+    "source_id": "src_c811b7b3850e1db3"
+  }
+}

@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path, PurePosixPath
+import tomllib
 from typing import Any
 
 PORTABLE_APP_SCHEMA_VERSION = "mucaro-portable-app/1.0"
@@ -79,6 +80,20 @@ def _git_head(root: Path) -> str:
     return proc.stdout.strip()
 
 
+def _require_tracked_files_at_head(root: Path) -> None:
+    proc = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise PortableRuntimeError("ERROR_PORTABLE_GIT_STATUS", proc.stderr.strip())
+    if proc.stdout.strip():
+        raise PortableRuntimeError("ERROR_PORTABLE_WORKTREE_DIRTY", proc.stdout.strip())
+
+
 def _safe_relative(value: str) -> Path:
     parsed = PurePosixPath(value)
     if parsed.is_absolute() or ".." in parsed.parts or not parsed.parts:
@@ -92,6 +107,7 @@ def build_portable_macos_app(
     *,
     output_dir: Path,
     runtime_python: str = DEFAULT_RUNTIME_PYTHON,
+    runtime_provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     root = root.resolve()
     runtime_dir = runtime_dir.resolve()
@@ -113,6 +129,7 @@ def build_portable_macos_app(
             "ERROR_PORTABLE_FRONTEND_DIST",
             "frontend/dist/index.html is required before portable packaging",
         )
+    _require_tracked_files_at_head(root)
 
     app_path = output_dir / PORTABLE_APP_NAME
     if app_path.exists():
@@ -149,9 +166,15 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 RESOURCES="$(cd "${HERE}/../Resources" && pwd)"
 APP_ROOT="${RESOURCES}/app"
 PYTHON_EXECUTABLE="${RESOURCES}/runtime/bin/python3"
+: "${HOME:?HOME is required to select the Mucaro AI data directory}"
 cd "${APP_ROOT}"
 export PYTHONPATH="${APP_ROOT}:${APP_ROOT}/backend"
-exec "${PYTHON_EXECUTABLE}" scripts/launch_app.py "$@"
+export MUCARO_AI_DATA_DIR="${MUCARO_AI_DATA_DIR:-${HOME}/Library/Application Support/Mucaro AI}"
+unset PYTHONHOME PYTHONINSPECT PYTHONSTARTUP
+export PYTHONNOUSERSITE=1
+export PYTHONSAFEPATH=1
+export PYTHONDONTWRITEBYTECODE=1
+exec "${PYTHON_EXECUTABLE}" -E -s -P -B scripts/launch_app.py "$@"
 """
     launcher_path.write_text(launcher, encoding="utf-8")
     launcher_path.chmod(launcher_path.stat().st_mode | 0o755)
@@ -178,11 +201,13 @@ exec "${PYTHON_EXECUTABLE}" scripts/launch_app.py "$@"
         "schema_version": PORTABLE_APP_SCHEMA_VERSION,
         "status": "PORTABLE_APP_SOURCE_READY",
         "head_sha": _git_head(root),
+        "release_version": tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"],
         "runtime": {
             "python_path": f"Contents/Resources/runtime/{runtime_python_rel.as_posix()}",
             "source_member_count": len(runtime_source_rows),
             "member_count": len(runtime_rows),
             "members": runtime_rows,
+            "provenance": runtime_provenance,
         },
         "application": {
             "tracked_source_count": len(copied_tracked),
@@ -232,6 +257,19 @@ def verify_portable_macos_app(app_path: Path, *, expected_head: str | None = Non
     def check(name: str, ok: bool, detail: str) -> None:
         checks.append({"name": name, "status": "PASS" if ok else "FAIL", "detail": detail})
 
+    package_metadata = resources / "app" / "pyproject.toml"
+    try:
+        package_version = tomllib.loads(package_metadata.read_text(encoding="utf-8"))["project"]["version"]
+    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError):
+        package_version = None
+    check(
+        "release_version_matches_package",
+        isinstance(payload.get("release_version"), str)
+        and bool(payload["release_version"])
+        and payload["release_version"] == package_version,
+        f"manifest={payload.get('release_version')!r} package={package_version!r}",
+    )
+
     runtime_python = app_path / _safe_relative(payload["runtime"]["python_path"])
     frontend_index = app_path / _safe_relative(payload["application"]["frontend_index"])
     entrypoint = app_path / _safe_relative(payload["application"]["entrypoint"])
@@ -243,6 +281,20 @@ def verify_portable_macos_app(app_path: Path, *, expected_head: str | None = Non
     launcher_text = launcher_path.read_text(encoding="utf-8") if launcher_path.is_file() else ""
     check("bundle_relative_launcher", "RESOURCES=" in launcher_text and "runtime/bin/python3" in launcher_text, "launcher resolves embedded resources relative to itself")
     check("launcher_no_source_root", payload["launcher"].get("source_bound_absolute_paths") is False, "manifest declares no source-bound absolute path")
+    check(
+        "launcher_disables_host_user_site",
+        "PYTHONNOUSERSITE=1" in launcher_text
+        and "PYTHONSAFEPATH=1" in launcher_text
+        and '"${PYTHON_EXECUTABLE}" -E -s -P -B' in launcher_text,
+        "launcher excludes host user-site packages and unsafe implicit paths",
+    )
+    check(
+        "launcher_preserves_bundle_immutability",
+        "MUCARO_AI_DATA_DIR" in launcher_text
+        and "/Library/Application Support/Mucaro AI" in launcher_text
+        and '"${PYTHON_EXECUTABLE}" -E -s -P -B' in launcher_text,
+        "launcher directs mutable data outside the bundle and disables bytecode writes",
+    )
 
     for section_name in ("runtime", "application"):
         base = resources / ("runtime" if section_name == "runtime" else "app")
@@ -252,6 +304,17 @@ def verify_portable_macos_app(app_path: Path, *, expected_head: str | None = Non
             f"{section_name}_member_manifest",
             expected_rows == actual_rows,
             f"expected={len(expected_rows)} actual={len(actual_rows)}",
+        )
+
+    runtime_provenance = payload["runtime"].get("provenance")
+    if runtime_provenance is not None:
+        provenance_path = resources / "runtime" / "runtime-provenance.json"
+        check(
+            "runtime_provenance_receipt",
+            provenance_path.is_file()
+            and runtime_provenance.get("receipt_sha256") == _sha256(provenance_path)
+            and runtime_provenance.get("status") == "PORTABLE_RUNTIME_VERIFIED",
+            str(provenance_path),
         )
 
     failed = [row for row in checks if row["status"] != "PASS"]

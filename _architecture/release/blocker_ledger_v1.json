@@ -1,0 +1,148 @@
+{
+  "schema_version": "mucaro-release-blocker-ledger/1.0",
+  "blockers": [
+    {
+      "blocker_id": "BLK-SPEC-001",
+      "blocked_node": "N26",
+      "reason": "The 'Mucaro AI Release-Grade Workbench Specification' named by KERNEL-003 is not present in the repository or the connected Google Drive.",
+      "external_dependency": "User must supply the specification document.",
+      "evidence": [
+        "repository search 2026-09-24 for 'Workbench Specification'/'release-grade' found no specification file",
+        "Google Drive search 2026-09-24 (title/fullText 'Mucaro', 'Workbench', 'Release-Grade') returned no files"
+      ],
+      "what_would_unblock": "Commit the specification under docs/release/, bind its hash in the manifest, and re-enumerate requirements (new IDs enter via scope delta).",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "N02",
+        "N03",
+        "N05",
+        "N06",
+        "N07",
+        "N13",
+        "N15",
+        "N16",
+        "N17",
+        "N19"
+      ],
+      "status": "ACTIVE",
+      "resolution": null
+    },
+    {
+      "blocker_id": "BLK-SIGN-001",
+      "blocked_node": "N23",
+      "reason": "Developer ID signing, notarization and stapling require Apple Developer Program credentials that are not available to the agent.",
+      "external_dependency": "Apple Developer ID Application certificate + notarytool credentials (operator-held).",
+      "evidence": [
+        "current_state_snapshot_v1.json credentials: APPLE_DEVELOPER_ID_APPLICATION present=false, APPLE_NOTARY_KEYCHAIN_PROFILE present=false",
+        "docs/PACKAGING_POLICY.md: no signed installer or notarized app claim"
+      ],
+      "what_would_unblock": "Operator provides signing identity and notary profile to a macOS signing environment; run codesign/notarytool/stapler and certify_macos_distribution.py.",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "N19",
+        "N20",
+        "N22",
+        "N24"
+      ],
+      "status": "ACTIVE",
+      "resolution": null
+    },
+    {
+      "blocker_id": "BLK-WEB-001",
+      "blocked_node": "N11",
+      "reason": "Live governed web search (WEB-08 lane) requires a commercial search API key.",
+      "external_dependency": "MUCARO_BRAVE_SEARCH_API_KEY (operator-held).",
+      "evidence": [
+        "backend/app/web_search.py requires MUCARO_BRAVE_SEARCH_API_KEY and allow_live_search",
+        "current_state_snapshot_v1.json credentials: MUCARO_BRAVE_SEARCH_API_KEY present=false"
+      ],
+      "what_would_unblock": "Operator supplies the key to the certification environment and runs the WEB-08 live evaluation.",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "open/capture/freeze/cite/injection work in N11 and N16"
+      ],
+      "status": "ACTIVE",
+      "resolution": null
+    },
+    {
+      "blocker_id": "BLK-LLM-001",
+      "blocked_node": "N13",
+      "reason": "Live remote-model execution evidence requires an Anthropic API key.",
+      "external_dependency": "ANTHROPIC_API_KEY (operator-held).",
+      "evidence": [
+        "backend/app/model_router.py anthropic provider requires ANTHROPIC_API_KEY and MUCARO_AI_LIVE_MODE=1",
+        "current_state_snapshot_v1.json credentials: ANTHROPIC_API_KEY present=false"
+      ],
+      "what_would_unblock": "Operator runs the remote-provider evaluation with a key in a permissioned environment.",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "local provider, routing policy, offline behavior"
+      ],
+      "status": "ACTIVE",
+      "resolution": null
+    },
+    {
+      "blocker_id": "BLK-PHYS-001",
+      "blocked_node": "N20",
+      "reason": "A literal physical double-click on the user's Mac is physical-device interaction unavailable to the agent.",
+      "external_dependency": "User performs and reports the double-click launch on a supported Mac.",
+      "evidence": [
+        "agent runs in a Linux container; macOS evidence is limited to hosted runners using LaunchServices `open`"
+      ],
+      "what_would_unblock": "User double-clicks the built app on a supported Mac and records the result (or accepts LaunchServices `open` evidence as equivalent).",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "LaunchServices `open` launch evidence on a hosted macOS runner"
+      ],
+      "status": "ACTIVE",
+      "resolution": null
+    },
+    {
+      "blocker_id": "BLK-ACTIONS-001",
+      "blocked_node": "N09",
+      "reason": "GitHub-hosted Actions jobs for the active RT-10/MATRIX-007 certification vector are created but terminate before runner execution, with zero executed steps and no job logs. The same zero-step admission failure is reproduced by unrelated Linux and macOS workflows in the repository.",
+      "external_dependency": "GitHub Actions runner admission for this private repository/account must become available. The exact account-specific cause remains UNKNOWN because billing and sensitive Actions settings are not exposed through the connected GitHub tool.",
+      "evidence": [
+        "PR #138 exact head 81b7a2d1128f4c20331b2ef46ce7ac9b4f7eced7",
+        "RT10 run 36643492834 job 109660981702: failure, zero executed steps, no log blob",
+        "CI run 36643492787 job 109660981494: failure, zero executed steps, no log blob",
+        "macOS app run 36643492852 job 109660982065: failure, zero executed steps, no log blob",
+        "unrelated CI run 36643574731 job 109661244135: failure, zero executed steps",
+        "unrelated CI run 36643530930 job 109661104259: failure, zero executed steps",
+        "unrelated CI run 36643523897 job 109661081061: failure, zero executed steps",
+        "unrelated macOS app run 36643515928 job 109661055456: failure, zero executed steps",
+        "GitHub public status on 2026-09-29 reported Actions operational and no incident; this does not identify the account-specific cause",
+        "2026-09-30 PR #150 head e5d486fc53c93d81d274739e29e00ae811f85965: CI run 36737793172 job 109963955403, macOS run 36737793091 job 109963955463, Rendered UI run 36737793224 jobs 109963955450/109963955724; all zero executed steps",
+        "2026-09-30 PR #151 head e5699b60c842530e54e45ddebab4d466cfd735df: CI run 36738206842 job 109965381426, macOS run 36738206992 job 109965381902, Rendered UI run 36738206893 jobs 109965381195/109965381603; all zero executed steps",
+        "_architecture/release/evidence/actions_runner_admission_20260930.json",
+        "_architecture/release/evidence/actions_runner_admission_transition_20260929.json",
+        "Last executed hosted boundary 2026-09-29T16:22:37Z: CI 24 steps, WebKit 13, Chromium 13, macOS 15",
+        "First confirmed universal zero-step boundary 2026-09-29T16:31:25Z: CI/macOS/WebKit/Chromium all 0 steps",
+        "CI, macOS app and Rendered UI workflow blobs are identical across the 8m48s transition window",
+        "Current main 6c5e2868fa35a984d715e80554bb93ea37373370: CI run 36740205293 job 109972306901 and Shadow QA run 36740205210 job 109972306723 both 0 steps"
+      ],
+      "what_would_unblock": "Restore GitHub-hosted runner admission, then execute PR #138 v1.2 unchanged on its exact head. The first valid run must execute steps and emit benchmark evidence; a zero-step retry is not unblocking evidence.",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "Preserve PR #138 v1.2 source and thresholds unchanged.",
+        "Continue release work outside N09 where evidence does not depend on GitHub-hosted runner execution.",
+        "Verify account Actions usage/billing/policy in GitHub UI when operator access is available; do not infer the cause from zero-step jobs alone.",
+        "Preserve PR #150 and PR #151 exact source heads without state promotion until hosted execution resumes."
+      ],
+      "status": "ACTIVE",
+      "resolution": null
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+name: Rendered UI QA
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "backend/app/**"
+      - "qa/rendered/**"
+      - ".github/workflows/rendered-qa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rendered-qa:
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install backend
+        run: python -m pip install -e ".[dev]"
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Install QA harness and browser engine
+        working-directory: qa/rendered
+        run: |
+          npm ci
+          npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Run rendered QA (desktop 1440x900, iPhone 390x844)
+        working-directory: qa/rendered
+        run: node rendered_qa.mjs --browser "${{ matrix.browser }}" --python "$(which python)" --out "$RUNNER_TEMP/rendered-qa-${{ matrix.browser }}"
+      - name: Upload screenshots and receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-qa-${{ matrix.browser }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/rendered-qa-${{ matrix.browser }}
+          if-no-files-found: warn

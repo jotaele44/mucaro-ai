@@ -1,0 +1,180 @@
+{
+  "schema_version": "mucaro-release-contradiction-ledger/1.0",
+  "contradictions": [
+    {
+      "contradiction_id": "RC-001",
+      "type": "TIME",
+      "observation_a": {
+        "claim": "backend/app/response_flow.py and docs/RESPONSE_FLOW.md return 404",
+        "evidence": "MOBILE_INTERACTION_EXTRACTION_V1 inspection at a3be73c"
+      },
+      "observation_b": {
+        "claim": "backend/app/response_flow.py exists with envelope and pending-interaction state machine",
+        "evidence": "HEAD 0bf5bf8 (PR #109)"
+      },
+      "adjudication": "Both observations are correct for their revisions. The brief's observation is SUPERSEDED for HEAD 0bf5bf8; F10-F14 backend primitives exist, UI integration remains OPEN.",
+      "state": "SUPERSEDED",
+      "material": false,
+      "materiality_reason": "Revision-scoped observations; does not affect any certification claim once bound to HEAD.",
+      "related_requirement_ids": [
+        "MOB-F10",
+        "MOB-F11",
+        "MOB-F12",
+        "MOB-F13",
+        "MOB-F14"
+      ]
+    },
+    {
+      "contradiction_id": "RC-002",
+      "type": "COUNT",
+      "observation_a": {
+        "claim": "Exact-head local release requires 7 receipts",
+        "evidence": "docs/RELEASE_STATUS.md"
+      },
+      "observation_b": {
+        "claim": "Exact-head local release requires 8 receipts (adds GIS_QUALITY_CERT_OK)",
+        "evidence": "docs/DEVELOPMENT_GOAL.md"
+      },
+      "adjudication": "The later requirement (8, including GIS quality) governs; RELEASE_STATUS.md predates the GIS quality receipt. The new release control plane does not depend on either count.",
+      "state": "ADJUDICATED",
+      "material": false,
+      "materiality_reason": "Documentation drift between legacy receipt lists; the release verdict is computed from the acceptance ledger.",
+      "related_requirement_ids": []
+    },
+    {
+      "contradiction_id": "RC-003",
+      "type": "COUNT",
+      "observation_a": {
+        "claim": "Denominator overlay has 22 events (75.5% weighted)",
+        "evidence": "docs/MUCARO_V1_DENOMINATOR_AUDIT.md"
+      },
+      "observation_b": {
+        "claim": "Denominator overlay has 23 events (76.3% weighted)",
+        "evidence": "_architecture/mucaro_v1_denominator_events.json"
+      },
+      "adjudication": "The JSON ledger is authoritative; the markdown audit is stale by one event.",
+      "state": "ADJUDICATED",
+      "material": false,
+      "materiality_reason": "Legacy V1 percentages are not used by the release verdict.",
+      "related_requirement_ids": []
+    },
+    {
+      "contradiction_id": "RC-004",
+      "type": "CLASS",
+      "observation_a": {
+        "claim": "All 24 flagpole domains UNVERIFIED/OPEN",
+        "evidence": "_architecture/mucaro_flagpole_v1.json"
+      },
+      "observation_b": {
+        "claim": "Flagpole gap matrix: 2 IMPLEMENTED, 17 PARTIAL, 3 ABSENT, 2 UNVERIFIED",
+        "evidence": "_architecture/mucaro_flagpole_gap_matrix_v1.json"
+      },
+      "adjudication": "Different axes: the flagpole file records frozen certification state; the gap matrix records source-evidence implementation state. Both preserved; neither is certification.",
+      "state": "ADJUDICATED",
+      "material": false,
+      "materiality_reason": "Implementation classification versus certification state; no claim depends on reconciling them.",
+      "related_requirement_ids": []
+    },
+    {
+      "contradiction_id": "RC-005",
+      "type": "TIME",
+      "observation_a": {
+        "claim": "Hosted governance OPEN: startup_failure with zero jobs",
+        "evidence": "docs/RELEASE_STATUS.md"
+      },
+      "observation_b": {
+        "claim": "GOV-07/GOV-08 promoted to PASS (current-head CI admission)",
+        "evidence": "_architecture/mucaro_v1_denominator_events.json"
+      },
+      "adjudication": "Later event evidence supersedes the earlier hosted-governance observation; hosted CI must still be re-proven at the release SHA (MATRIX-019).",
+      "state": "SUPERSEDED",
+      "material": false,
+      "materiality_reason": "Historical; release certification re-establishes CI at the frozen SHA.",
+      "related_requirement_ids": [
+        "MATRIX-019"
+      ]
+    },
+    {
+      "contradiction_id": "RC-006",
+      "type": "SCOPE",
+      "observation_a": {
+        "claim": "Desktop launcher opens the system browser and runs until Ctrl+C; this passes as the local macOS application",
+        "evidence": "docs/DESKTOP_LAUNCHER.md; backend/app/packaging.py build_macos_app_bundle"
+      },
+      "observation_b": {
+        "claim": "GOAL-001/TGT-001 require double-click -> GUI opens -> user can begin work with no terminal or developer setup",
+        "evidence": "docs/release/MUCARO_RELEASE_ENGINEERING_CONTRACT_V1.md"
+      },
+      "adjudication": "Resolved in favour of GOAL-001/TGT-001. The release artifact is now Mucaro AI.app: a frozen PyInstaller bundle whose native pywebview window hosts the GUI, with an in-process loopback service and no browser, terminal or source tree (backend/app/desktop_shell.py, packaging/macos/mucaro.spec). Proven on a hosted macOS 14 runner: _architecture/release/evidence/macos_app_1d32e8ce1d02. Amended 2026-09-26 (user decision, assumption A7): release-grade certification requires two packaged lanes, the native app above and the portable embedded-runtime app (backend/app/portable_runtime.py, backend/app/clean_machine_macos.py); scripts/certify_release_grade.py requires the gates of both. The one-click files (Mucaro AI.command / Mucaro AI.cmd, docs/ONE_CLICK_SETUP.md) are the supported source setup and, like the browser launcher (docs/DESKTOP_LAUNCHER.md), are not a release lane. Remaining launch residue is tracked as BLK-PHYS-001 and BLK-SIGN-001, not as this contradiction.",
+      "state": "ADJUDICATED",
+      "material": true,
+      "materiality_reason": "Directly affects launch behavior and packaging claims (MATRIX-004: launch behavior, packaging behavior).",
+      "related_requirement_ids": [
+        "TGT-001",
+        "GOAL-001",
+        "TGT-026"
+      ]
+    },
+    {
+      "contradiction_id": "RC-007",
+      "type": "CLASS",
+      "observation_a": {
+        "claim": "Coding capability classified ABSENT",
+        "evidence": "docs/INTELLIGENCE_PLANE_GAP_MODEL.md"
+      },
+      "observation_b": {
+        "claim": "Coding read/diff/patch/review/container modules and receipts exist",
+        "evidence": "backend/app/coding_*.py; docs/CODING_CAPABILITY_STATUS.md"
+      },
+      "adjudication": "Implementation exists but is uncertified; classify as PARTIAL (matches flagpole CONTRA-001).",
+      "state": "ADJUDICATED",
+      "material": false,
+      "materiality_reason": "Classification drift in a legacy doc; TGT-007 state is tracked in the acceptance ledger.",
+      "related_requirement_ids": [
+        "TGT-007"
+      ]
+    },
+    {
+      "contradiction_id": "RC-008",
+      "type": "RUNTIME",
+      "observation_a": {
+        "claim": "Release class declared minimum macOS 13.0 (assumption, M0 manifest)",
+        "evidence": "_architecture/release/release_scope_manifest_v1.json (release_class.minimum_os, frozen baseline 20260924T210000Z)"
+      },
+      "observation_b": {
+        "claim": "Pinned arm64 wheels pyproj==3.7.2 and rasterio==1.4.3 are published only as macosx_14_0_arm64; pip finds no macOS 13 arm64 wheel for either",
+        "evidence": "pip download --only-binary=:all: --platform macosx_13_0_arm64 --python-version 3.11 (2026-09-24); packaging/macos/requirements-macos-arm64.lock"
+      },
+      "adjudication": "Raise the release-class minimum to macOS 14.0 (Info.plist LSMinimumSystemVersion, build script, manifest). Supporting 13.x would need GDAL/PROJ built from source or older GIS pins, which would invalidate the frozen GIS evidence. Reversible: a later source build can lower the minimum again.",
+      "state": "ADJUDICATED",
+      "material": true,
+      "materiality_reason": "Changes which Macs can install the release (TGT-026 release class).",
+      "related_requirement_ids": [
+        "TGT-026",
+        "TGT-028"
+      ]
+    },
+    {
+      "contradiction_id": "RC-009",
+      "type": "RUNTIME",
+      "observation_a": {
+        "claim": "The release class is Apple Silicon (arm64) only, and release-grade certification requires both packaged lanes, including the portable embedded-runtime lane",
+        "evidence": "_architecture/release/release_scope_manifest_v1.json release_class.architectures; docs/release/RELEASE_ENGINEERING_STATE.md A3 and A7; scripts/certify_release_grade.py PORTABLE_RUNTIME_GATES"
+      },
+      "observation_b": {
+        "claim": "The only governed portable runtime source is x86_64 (CPython 3.13 install_only build), and the portable-lane replays run on macos-15-intel",
+        "evidence": "packaging/runtime/macos-x86_64.json; packaging/runtime/requirements-macos-x86_64.lock; portable-macos.yml in PR #132 and PR #136 (runs-on: macos-15-intel)"
+      },
+      "adjudication": "Resolved in favour of the release class by the project-owner scope decision of 2026-09-29 (docs/RELEASE_SCOPE_2026-09-29.md): keep the two-lane requirement and certify the portable lane from a frozen, independently verified native arm64 runtime on Apple Silicon. x86_64 portable runs, including under Rosetta, are compatibility observations and cannot satisfy portable_embedded_runtime, portable_install_reinstall_smoke, distinct_version_upgrade_rollback or the packaged-lifecycle gate for this release. Remaining work: an arm64 runtime manifest and hash-locked lock under packaging/runtime/, and a portable-lane run on an Apple Silicon runner.",
+      "state": "ADJUDICATED",
+      "material": true,
+      "materiality_reason": "Decides which architecture the portable-lane packaging, upgrade and rollback evidence must come from (MATRIX-004: packaging behavior).",
+      "related_requirement_ids": [
+        "TGT-026",
+        "TGT-029",
+        "MATRIX-018",
+        "MATRIX-019"
+      ]
+    }
+  ]
+}

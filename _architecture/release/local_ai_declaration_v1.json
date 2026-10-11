@@ -1,0 +1,48 @@
+{
+  "schema_version": "mucaro-local-ai-declaration/1.0",
+  "requirement_ids": ["TGT-008", "TGT-009", "TGT-010", "TGT-019"],
+  "supported_model_backends": [
+    {
+      "provider": "mock",
+      "locality": "local",
+      "kind": "deterministic cited-answer synthesizer",
+      "purpose": "offline default, tests and certification fixtures; not a language model"
+    },
+    {
+      "provider": "openai_compatible_local",
+      "locality": "local",
+      "kind": "OpenAI-compatible chat-completions API on a loopback address",
+      "tested_protocol": "GET /v1/models, POST /v1/chat/completions (stream and non-stream)",
+      "compatible_servers": ["Ollama (OpenAI-compatible endpoint)", "llama.cpp server", "LM Studio local server"],
+      "default_endpoint": "http://127.0.0.1:11434/v1",
+      "configuration": ["MUCARO_AI_LOCAL_MODEL_URL", "MUCARO_AI_LOCAL_MODEL", "MUCARO_AI_LOCAL_MODEL_TIMEOUT", "MUCARO_AI_LOCAL_MODEL_CONTEXT"],
+      "network_boundary": "loopback addresses only; non-loopback URLs are refused before any request; environment proxies are bypassed"
+    },
+    {
+      "provider": "anthropic",
+      "locality": "remote",
+      "kind": "Anthropic Messages API",
+      "gating": "requires MUCARO_AI_LIVE_MODE=1, ANTHROPIC_API_KEY and allow_live=true per request; never selected implicitly"
+    }
+  ],
+  "supported_hardware_baseline": {
+    "platform": "macOS 14 or later",
+    "architecture": "Apple Silicon (arm64)",
+    "minimum_memory_gb": 16,
+    "minimum_free_storage_gb": 10,
+    "notes": "Model weights are not bundled. Storage for weights depends on the model the user installs in their local server (for example about 5 GB for an 8B model at 4-bit quantization)."
+  },
+  "offline_capabilities": "See `mucaro offline manifest` / GET /offline-manifest: ingestion, retrieval, cited answers (mock or local model), GIS, memory and exports work offline; web tools and the remote model require a network.",
+  "known_limitations": [
+    "Mucaro does not ship or download model weights; a local model server must be installed and running for openai_compatible_local.",
+    "No claim of universal local-model compatibility: only the OpenAI-compatible chat-completions protocol subset above is exercised by tests.",
+    "Answer quality and citation compliance depend on the selected local model; uncited answers are flagged ERROR_UNCITED_ANSWER rather than accepted.",
+    "Models do not call tools; tool actions are explicit user commands through the approval gate.",
+    "Text-only modality; image/audio modalities route as MODALITY_UNSUPPORTED.",
+    "Remote-provider behaviour is verified with gating tests only; live remote evaluation is blocked on credentials (BLK-LLM-001)."
+  ],
+  "evidence": [
+    "backend/tests/test_local_model.py",
+    "backend/tests/test_model_routing_policy.py"
+  ]
+}

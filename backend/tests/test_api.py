@@ -169,6 +169,7 @@ def test_api_tool_runtime_requires_approval_and_audits_execution(tmp_path: Path)
     assert [event["event"] for event in audit.json()["events"]] == [
         "TOOL_CALL_REQUESTED",
         "TOOL_CALL_APPROVED",
+        "TOOL_CALL_STARTED",
         "TOOL_CALL_EXECUTED",
     ]
 

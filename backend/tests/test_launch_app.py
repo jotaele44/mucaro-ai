@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 import sys
 import tarfile
@@ -30,6 +31,49 @@ def test_launch_app_self_test():
     assert "LAUNCH_APP_SELF_TEST_OK" in proc.stdout
 
 
+def test_launch_environment_replaces_host_python_controls(monkeypatch):
+    monkeypatch.setenv("PYTHONPATH", "/untrusted/path")
+    monkeypatch.setenv("PYTHONHOME", "/untrusted/home")
+    monkeypatch.setenv("PYTHONSTARTUP", "/untrusted/startup.py")
+
+    env = launch_app.build_env()
+
+    assert env["PYTHONPATH"] == f"{launch_app.ROOT}{launch_app.os.pathsep}{launch_app.ROOT / 'backend'}"
+    assert "PYTHONHOME" not in env
+    assert "PYTHONSTARTUP" not in env
+    assert env["PYTHONNOUSERSITE"] == "1"
+    assert env["PYTHONSAFEPATH"] == "1"
+
+
+def test_launch_environment_loads_app_settings_but_rejects_python_controls_from_env_file(monkeypatch, tmp_path):
+    (tmp_path / ".env").write_text(
+        "MUCARO_AI_LIVE_MODE=1\nPYTHONHOME=/untrusted/file-home\nPYTHONPATH=/untrusted/file-path\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+
+    env = launch_app.build_env()
+
+    assert env["MUCARO_AI_LIVE_MODE"] == "1"
+    assert "PYTHONHOME" not in env
+    assert env["PYTHONPATH"] == f"{tmp_path}{launch_app.os.pathsep}{tmp_path / 'backend'}"
+
+
+def test_backend_process_uses_isolated_path_flags(monkeypatch):
+    observed = {}
+
+    def fake_popen(command, *, cwd, env):
+        observed.update(command=command, cwd=cwd, env=env)
+        return object()
+
+    monkeypatch.setattr(launch_app.subprocess, "Popen", fake_popen)
+    launch_app.start_backend(8123)
+
+    assert observed["command"][1:4] == ["-s", "-P", "-B"]
+    assert observed["env"]["PYTHONNOUSERSITE"] == "1"
+    assert observed["env"]["PYTHONSAFEPATH"] == "1"
+
+
 def test_package_desktop_self_test():
     proc = subprocess.run(
         [sys.executable, "scripts/package_desktop.py", "--self-test"],
@@ -45,7 +89,8 @@ def test_package_desktop_self_test():
 def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     (tmp_path / "scripts").mkdir()
     (tmp_path / "frontend" / "dist").mkdir(parents=True)
-    (tmp_path / "scripts" / "launch_app.py").write_text("# launcher\n", encoding="utf-8")
+    for name in ("native_start.sh", "one_click.sh", "one_click.py"):
+        (tmp_path / "scripts" / name).write_text("# launcher\n", encoding="utf-8")
     (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n', encoding="utf-8")
 
@@ -58,7 +103,7 @@ def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     assert app_path.is_dir()
     assert executable.exists()
     assert executable.stat().st_mode & 0o111
-    assert "scripts/launch_app.py" in executable.read_text(encoding="utf-8")
+    assert "scripts/native_start.sh" in executable.read_text(encoding="utf-8")
     assert '"$@"' in executable.read_text(encoding="utf-8")
     assert json.loads(receipt.read_text(encoding="utf-8"))["scope"] == "source_bound_local_macos_app_wrapper"
 
@@ -73,6 +118,27 @@ def test_verify_macos_app_bundle_rejects_missing_bundle(tmp_path):
     failed_names = {check["name"] for check in result["checks"] if check["status"] == "FAIL"}
     assert "app_bundle_exists" in failed_names
     assert "launcher_executable" in failed_names
+
+
+def test_certify_release_large_file_allowlist_is_path_specific_and_bounded(monkeypatch, tmp_path):
+    monkeypatch.setattr(certify_release, "ROOT", tmp_path)
+    icon = tmp_path / "Mucaro AI.app" / "Contents" / "Resources" / "MucaroAI.icns"
+    icon.parent.mkdir(parents=True)
+    icon.write_bytes(b"x" * 2_500_000)
+
+    gate = certify_release.gate_no_large_files([icon])
+    assert gate.status == "PASS"
+
+    icon.write_bytes(b"x" * 3_000_001)
+    gate = certify_release.gate_no_large_files([icon])
+    assert gate.status == "FAIL"
+    assert "Mucaro AI.app/Contents/Resources/MucaroAI.icns:3000001" in gate.detail
+
+    unrelated = tmp_path / "unexpected.bin"
+    unrelated.write_bytes(b"x" * 1_000_001)
+    gate = certify_release.gate_no_large_files([unrelated])
+    assert gate.status == "FAIL"
+    assert "unexpected.bin:1000001" in gate.detail
 
 
 def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
@@ -116,6 +182,22 @@ def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
     assert "PASS package_artifact manifest_member_count=1" in output
     assert "PASS package_artifact_verify manifest_member_count=1" in output
     assert "CERTIFY_RELEASE_OK" in output
+    assert (
+        "python_runtime_lock_audit",
+        [
+            sys.executable,
+            "-m",
+            "pip_audit",
+            "-r",
+            "packaging/runtime/requirements-macos-x86_64.lock",
+            "--no-deps",
+            "--disable-pip",
+            "--strict",
+            "--progress-spinner",
+            "off",
+        ],
+        certify_release.ROOT,
+    ) in calls
 
 
 def test_certify_release_npm_audit_uses_working_node_fallback(monkeypatch):
@@ -523,12 +605,175 @@ def test_launch_app_reports_missing_frontend_deps(tmp_path, monkeypatch):
     assert str(exc.value) == "ERROR_FRONTEND_DEPS_MISSING run: cd frontend && npm ci"
 
 
+
+def _frontend_tree(root: Path, *, node_modules: bool = True, source_newer: bool = True) -> Path:
+    frontend = root / "frontend"
+    (frontend / "src").mkdir(parents=True)
+    (frontend / "dist").mkdir()
+    (frontend / "package.json").write_text("{}", encoding="utf-8")
+    source = frontend / "src" / "App.jsx"
+    source.write_text("export default 1;\n", encoding="utf-8")
+    dist_index = frontend / "dist" / "index.html"
+    dist_index.write_text("<html></html>\n", encoding="utf-8")
+    if node_modules:
+        (frontend / "node_modules").mkdir()
+    built, edited = (1_000_000, 2_000_000) if source_newer else (2_000_000, 1_000_000)
+    os.utime(dist_index, (built, built))
+    for path in (source, frontend / "package.json"):
+        os.utime(path, (edited, edited))
+    return frontend
+
+
+def _record_builds(monkeypatch, *, npm: str | None = "/usr/bin/npm") -> list:
+    builds = []
+    monkeypatch.setattr(launch_app.shutil, "which", lambda name: npm if name == "npm" else None)
+    monkeypatch.setattr(launch_app, "run_checked", lambda cmd, **kwargs: builds.append((cmd, kwargs.get("cwd"))))
+    return builds
+
+
+def test_launch_app_rebuilds_stale_frontend_dist(tmp_path, monkeypatch, capsys):
+    frontend = _frontend_tree(tmp_path)
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    builds = _record_builds(monkeypatch)
+
+    launch_app.ensure_frontend_dist()
+
+    assert builds == [(["npm", "run", "build"], frontend)]
+    assert "FRONTEND_DIST_STALE_REBUILT" in capsys.readouterr().out
+
+
+def test_launch_app_keeps_fresh_frontend_dist(tmp_path, monkeypatch, capsys):
+    _frontend_tree(tmp_path, source_newer=False)
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    builds = _record_builds(monkeypatch)
+
+    launch_app.ensure_frontend_dist()
+
+    assert builds == []
+    assert "OK_FRONTEND_DIST" in capsys.readouterr().out
+
+
+def test_launch_app_trusts_verified_frontend_dist(tmp_path, monkeypatch):
+    _frontend_tree(tmp_path)
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    builds = _record_builds(monkeypatch)
+
+    launch_app.ensure_frontend_dist(verified=True)
+
+    assert builds == []
+
+
+@pytest.mark.parametrize(
+    "skip_build, node_modules, npm",
+    [(True, True, "/usr/bin/npm"), (False, False, "/usr/bin/npm"), (False, True, None)],
+)
+def test_launch_app_only_warns_when_stale_dist_cannot_be_rebuilt(tmp_path, monkeypatch, capsys, skip_build, node_modules, npm):
+    _frontend_tree(tmp_path, node_modules=node_modules)
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    builds = _record_builds(monkeypatch, npm=npm)
+
+    launch_app.ensure_frontend_dist(skip_build=skip_build)
+
+    output = capsys.readouterr().out
+    assert builds == []
+    assert "WARN_FRONTEND_DIST_STALE" in output
+    assert "OK_FRONTEND_DIST" in output
+
+
+
+def test_launch_app_serves_previous_dist_when_rebuild_fails(tmp_path, monkeypatch, capsys):
+    _frontend_tree(tmp_path)
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    monkeypatch.setattr(launch_app.shutil, "which", lambda name: "/usr/bin/npm")
+
+    def failing_build(cmd, **kwargs):
+        raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(launch_app, "run_checked", failing_build)
+
+    launch_app.ensure_frontend_dist()
+
+    output = capsys.readouterr().out
+    assert "WARN_FRONTEND_REBUILD_FAILED" in output
+    assert "OK_FRONTEND_DIST" in output
+
+def test_launch_app_frontend_verified_flag_reaches_dist_check(monkeypatch):
+    calls = []
+    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False, verified=False: calls.append(verified))
+    monkeypatch.setattr(launch_app, "port_open", lambda port: True)
+    monkeypatch.setattr(launch_app, "health_ok", lambda port: False)
+
+    launch_app.main(["--smoke-test", "--no-browser", "--port", "54321", "--frontend-verified"])
+
+    assert calls == [True]
+
 def test_launch_app_rejects_non_mucaro_port_conflict(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["launch_app.py", "--smoke-test", "--no-browser", "--port", "54321"])
-    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False: None)
+    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda skip_build=False, verified=False: None)
     monkeypatch.setattr(launch_app, "port_open", lambda port: True)
     monkeypatch.setattr(launch_app, "health_ok", lambda port: False)
 
     assert launch_app.main() == 5
     error_output = capsys.readouterr().err
     assert "ERROR_PORT_IN_USE_NON_MUCARO_AI port=54321" in error_output
+
+
+def test_launch_app_build_env_loads_project_env_without_overriding_shell(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text(
+        "MUCARO_AI_LIVE_MODE=1\nMUCARO_AI_MODEL=from-file\nMUCARO_AI_OPERATOR_TOKEN=\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(launch_app, "ROOT", tmp_path)
+    monkeypatch.setenv("MUCARO_AI_MODEL", "from-shell")
+    monkeypatch.delenv("MUCARO_AI_LIVE_MODE", raising=False)
+    monkeypatch.delenv("MUCARO_AI_OPERATOR_TOKEN", raising=False)
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+
+    env = launch_app.build_env()
+
+    assert env["MUCARO_AI_LIVE_MODE"] == "1"
+    assert env["MUCARO_AI_MODEL"] == "from-shell"
+    assert "MUCARO_AI_OPERATOR_TOKEN" not in env
+    assert env["PYTHONPATH"].split(launch_app.os.pathsep) == [str(tmp_path), str(tmp_path / "backend")]
+
+
+def test_release_check_pythonpath_uses_platform_separator(tmp_path, monkeypatch):
+    calls = []
+
+    class StopAfterFirstRun(Exception):
+        pass
+
+    def fake_run(cmd, *, env=None, cwd=release_check.ROOT):
+        calls.append(env)
+        raise StopAfterFirstRun
+
+    monkeypatch.setattr(release_check, "ROOT", tmp_path)
+    monkeypatch.setattr(release_check, "run", fake_run)
+    # Simulate Windows, where ":" would corrupt drive-letter paths.
+    monkeypatch.setattr(release_check.os, "pathsep", ";")
+
+    with pytest.raises(StopAfterFirstRun):
+        release_check.main()
+
+    assert calls[0]["PYTHONPATH"] == f"{tmp_path};{tmp_path / 'backend'}"
+
+
+def test_native_mode_never_falls_back_to_a_browser(monkeypatch, capsys):
+    opened = []
+    dialogs = []
+    monkeypatch.setattr(launch_app, "ensure_frontend_dist", lambda **_: None)
+    monkeypatch.setattr(launch_app, "port_open", lambda port: True)
+    monkeypatch.setattr(launch_app, "health_ok", lambda port: True)
+    monkeypatch.setattr(launch_app.webbrowser, "open", lambda url: opened.append(url))
+    monkeypatch.setattr(launch_app.native_window, "show_dialog", lambda message: dialogs.append(message))
+
+    def no_window(*args, **kwargs):
+        raise ImportError("No module named 'webview'")
+
+    monkeypatch.setattr(launch_app.native_window, "run_window", no_window)
+
+    assert launch_app.main(["--native"]) == 10
+
+    assert opened == []
+    assert len(dialogs) == 1 and "could not start" in dialogs[0]
+    assert "ERROR_NATIVE_WINDOW_UNAVAILABLE" in capsys.readouterr().err

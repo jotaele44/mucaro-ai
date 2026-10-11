@@ -1,6 +1,33 @@
 # Desktop Launcher Mode
 
+> **Source setup, not a release artifact.** Double-click the tracked `Mucaro AI.app` beside
+> `pyproject.toml` on macOS. It runs setup quietly and opens a native window without Terminal or
+> a browser. Release-grade certification requires two packaged lanes,
+> and neither is this launcher:
+>
+> - the native app, `Mucaro AI.app` with its own window: see [release/MACOS_APP.md](release/MACOS_APP.md);
+> - the portable embedded-runtime app: see [PACKAGING_POLICY.md](PACKAGING_POLICY.md#portable-runtime-and-application).
+>
+> The source-bound bundle needs the checkout and provisions its own Python environment. It is
+> distinct from the signed, embedded-runtime release app. Native Finder/WKWebView behavior
+> still requires verification on macOS; Linux regression tests do not certify it.
+
 Desktop Launcher Mode lets Mucaro AI run with one command.
+
+## Legacy console setup and launch
+
+`Mucaro AI.command` (macOS) and `Mucaro AI.cmd` (Windows) set up everything on first use and then
+run `scripts/launch_app.py --auto-port --exit-if-running`. `Mucaro AI.app` and `Mucaro AI.exe` run
+the same setup silently and add `--native` (own window, no browser). See `docs/ONE_CLICK_SETUP.md`.
+
+Launcher options used by the double-click files:
+
+| Option | Behavior |
+|---|---|
+| `--auto-port` | If the port is used by another program, use the next free port (up to 20 higher) and print `PORT_FALLBACK from=... to=...` |
+| `--exit-if-running` | If a healthy Mucaro AI backend is already running, open it in the browser, print `DESKTOP_LAUNCH_REUSED`, and exit 0 |
+
+Closing the terminal window (SIGHUP) or SIGTERM stops the backend the same way `Ctrl+C` does.
 
 It starts the private local backend on `127.0.0.1:8000`, serves the built React UI through FastAPI, opens the browser, and stops cleanly with `Ctrl+C`.
 
@@ -24,8 +51,10 @@ The generated app is:
 data/exports/desktop_apps/Mucaro AI.app
 ```
 
-Double-clicking that app launches this checked-out source tree with the Python
-executable recorded at build time, then runs `scripts/launch_app.py`.
+Double-clicking that app runs `scripts/native_start.sh`, which redirects output into logs and
+starts `scripts/one_click.sh --native`. Setup installs the desktop extra and checks Cocoa/WebKit
+imports before launching. No pre-existing Python environment is required. A failed setup or
+launch produces one dialog and leaves its log available for troubleshooting.
 
 Verify an existing bundle with:
 

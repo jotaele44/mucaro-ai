@@ -66,6 +66,8 @@ class ToolCallRequest(BaseModel):
 
 class ToolDecisionRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
+    # When supplied, the decision binds to the exact arguments the decider saw.
+    arguments_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 class InteractionOptionInput(BaseModel):
@@ -90,3 +92,32 @@ class InteractionResolveRequest(BaseModel):
 class InteractionDismissRequest(BaseModel):
     expected_version: int = Field(ge=1)
     reason: str = Field(min_length=1, max_length=400)
+
+
+class RunOptions(BaseModel):
+    top_k: int = Field(default=5, ge=1, le=20)
+    retrieval_strategy: Literal["hybrid", "lexical", "vector", "bm25", "persistent", "semantic"] = "hybrid"
+    model_provider: str | None = None
+    model_name: str | None = None
+    allow_mock_fallback: bool = False
+    allow_live: bool = False
+    require_offline: bool = False
+
+
+class MessageRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=20000)
+    mode: Literal["plan", "ask", "auto"] = "ask"
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=128)
+    interrupt: bool = False
+    dismiss_pending_question: bool = False
+    options: RunOptions = Field(default_factory=RunOptions)
+
+
+class MessageEditRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=20000)
+    expected_revision: int = Field(default=0, ge=0)
+
+
+class RunEditRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=20000)
+    expected_version: int = Field(ge=1)

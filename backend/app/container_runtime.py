@@ -3,13 +3,13 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
+from .local_tools import bundled_only, resolve_local_tool
 from .permission_engine import PermissionEngineError, PermissionRequest, require
 
 CONTAINER_PROTOCOL = "mucaro-container-worker/1.0"
@@ -75,12 +75,21 @@ def get_container_binding(skill_id: str) -> ContainerBinding:
 
 def resolve_container_engine(preferred: str | None = None) -> str:
     if preferred:
-        resolved = shutil.which(preferred)
+        preferred_path = Path(preferred)
+        logical = preferred_path.name.lower()
+        if logical.endswith(".exe"):
+            logical = logical[:-4]
+        if logical not in {"docker", "podman"}:
+            raise ContainerRuntimeError("ERROR_CONTAINER_ENGINE_UNAVAILABLE", preferred)
+        # Explicit absolute host paths remain a developer-mode convenience only.
+        if preferred_path.is_absolute() and not bundled_only() and preferred_path.is_file():
+            return str(preferred_path)
+        resolved = resolve_local_tool(logical)
         if resolved:
             return resolved
-        raise ContainerRuntimeError("ERROR_CONTAINER_ENGINE_UNAVAILABLE", preferred)
+        raise ContainerRuntimeError("ERROR_CONTAINER_ENGINE_UNAVAILABLE", logical)
     for candidate in ("docker", "podman"):
-        resolved = shutil.which(candidate)
+        resolved = resolve_local_tool(candidate)
         if resolved:
             return resolved
     raise ContainerRuntimeError("ERROR_CONTAINER_ENGINE_UNAVAILABLE", "docker,podman")

@@ -2,31 +2,65 @@
 
 Local-first prototype for a custom LLM workflow with file ingestion, source lineage, cited retrieval, mock/Claude model routing, and a Planning-to-Execution Gate.
 
-## Fastest first run
+## Quick start
 
-### macOS/Linux
+**Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows) in this checkout.** It runs
+setup quietly and opens Mucaro in its own native window. Keep it next to `pyproject.toml`; move
+the whole folder together. No Terminal, console or browser opens. `Mucaro AI.command` and
+`Mucaro AI.cmd` are legacy console launchers. On Windows the window needs the Microsoft Edge
+WebView2 Runtime, which Windows 11 and current Windows 10 include.
+
+The first double-click downloads private, checksum-verified copies of Python 3.12 and Node.js
+into this folder (about 200 MB to download, about 700 MB on disk, 2-5 minutes on a typical
+connection), installs everything, builds
+the interface, loads two sample documents, and starts the app. Setup output is saved in
+`.mucaro-runtime/logs/` and failures appear in a dialog. Nothing
+needs to be installed beforehand and nothing is written outside the project folder. Later
+double-clicks reuse completed setup steps and can work offline. Close the native window to stop
+the backend it started. API calls and remote fetches still require internet access.
+
+Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, Windows 11 on ARM
+(through x64 emulation; not yet run on ARM hardware), and Linux x86_64 (run `./"Mucaro AI.command"`
+from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
+does, its error codes, and how to remove it.
+
+Settings go in `.env` (created from `.env.example` on first run). The launcher reads it at
+startup; variables already exported in your shell take precedence. If the UI shows **Backend not
+reachable**, double-click the launcher again and press **Retry**.
+
+See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
+`docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
+
+To use Mucaro from a phone on the same Wi-Fi or VPN, see `docs/PHONE_ACCESS.md`. It is off by
+default and needs an access token.
+
+### Runtime independence target
+
+The release target is stricter than "offline after setup": a prepared platform package should
+install and launch with the public network disabled, without requiring host Python, Node, Git,
+package managers, compilers, containers, Floot, GitHub, or another hosted service for the declared
+offline core. Explicit remote model APIs and governed web fetch/search/render remain network
+capabilities by design. See `docs/RUNTIME_INDEPENDENCE.md` and
+`_architecture/runtime_independence_v1.json`.
+
+The current source one-click path still needs internet on first setup. Do not treat it as an
+offline-installable release artifact.
+
+### Developer setup (manual)
+
+Requirements: Python 3.11-3.13 and Node 20+ already installed.
 
 ```bash
 cd mucaro-ai
-bash scripts/bootstrap_macos.sh
+bash scripts/bootstrap_macos.sh        # macOS/Linux
+# .\scripts\bootstrap_windows.ps1      # Windows PowerShell
+source .venv/bin/activate
+python scripts/launch_app.py           # or: make start
 ```
 
-Expected final markers:
-
-```text
-PREFLIGHT_OK
-RELEASE_CHECK_OK
-BOOTSTRAP_OK
-```
-
-### Windows PowerShell
-
-```powershell
-cd mucaro-ai
-.\scripts\bootstrap_windows.ps1
-```
-
-See `docs/FIRST_RUN.md` for step-by-step startup and error recovery.
+Expected bootstrap markers: `PREFLIGHT_OK`, `RELEASE_CHECK_OK`, `BOOTSTRAP_OK`. The bootstrap and
+the double-click setup share `.venv`; the double-click setup rebuilds it on its private Python
+3.12 if it finds a venv made from another interpreter.
 
 ## Safe startup helpers
 
@@ -57,58 +91,43 @@ python scripts/dev_start.py
 - Not a clone of Dify, AnythingLLM, RAGFlow, Open WebUI, LlamaIndex, or GraphRAG.
 - Not a tool that executes destructive actions without approval.
 
-## Setup
+## Manual install (without the bootstrap)
 
-### macOS/Linux
+Prefer the double-click setup or `scripts/bootstrap_*`. If you install by hand, use Python
+3.11-3.13 (pinned `rasterio` has no wheels for 3.14+) and `npm ci`, which installs exactly what
+`package-lock.json` pins and never rewrites it:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3.12 -m venv .venv                # Windows: py -3.12 -m venv .venv
+source .venv/bin/activate               # Windows: .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+(cd frontend && npm ci)
 python scripts/release_check.py
-```
-
-### Windows PowerShell
-
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-python scripts\release_check.py
+python scripts/launch_app.py            # or python scripts/dev_start.py for hot reload
 ```
 
 ## Optional environment variables
 
-Copy `.env.example` to `.env` and fill only what you need.
+Copy `.env.example` to `.env` and fill only what you need. `scripts/launch_app.py`
+and `scripts/dev_start.py` load `.env` automatically (shell-exported values win);
+when running `uvicorn` or `mucaro serve` directly, export the variables in your
+shell instead.
 
 - `ANTHROPIC_API_KEY`: required for Anthropic mode when `MUCARO_AI_LIVE_MODE=1`.
 - `MUCARO_AI_LIVE_MODE=1`: permits live Anthropic calls. Default is deterministic mock mode.
 - `MUCARO_AI_MODEL_PROVIDER`: default model provider. Default is `mock`.
 - `MUCARO_AI_MODEL`: model name for live mode.
+- `MUCARO_AI_MODEL_EFFORT`: how much the live Anthropic model thinks before it answers: `low` (default, fastest first word), `medium`, `high`, `xhigh`, `max`, or `default` to leave it to the model. It is sent only to models that accept it.
 - `MUCARO_AI_MAX_UPLOAD_BYTES`: API upload limit. Default is 25 MB.
+- `MUCARO_AI_SQLITE_WAL=0`: keep SQLite's rollback journal instead of WAL (the default), for example when the data directory is on a network share.
 - `MUCARO_AI_CORS_ORIGINS`: comma-separated browser origins for local frontend development.
 - `MUCARO_AI_OPERATOR_TOKEN`: optional local operator token required for mutating API actions when set.
 - `MUCARO_AI_WORKSPACE_PROFILE`: runtime workspace profile name. Default is `default`.
 - `MUCARO_AI_DEPLOYMENT_PROFILE`: `local` or `production`. Production mode requires a strong operator token and explicit CORS origins.
 - `MUCARO_AI_DISTRIBUTION_CHANNEL`: `local` or `mac_app_store`. The Store channel requires production mode, loopback binding, and disables subprocess, local-worker, and container execution.
-- `MUCARO_AI_ALLOW_PUBLIC_BIND=1`: explicitly permits non-loopback binding in local mode.
-
-## Run backend
-
-```bash
-source .venv/bin/activate
-uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-## Run frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
+- `MUCARO_AI_ALLOW_PUBLIC_BIND=1`: explicitly permits non-loopback binding in local mode. It requires `MUCARO_AI_OPERATOR_TOKEN` of at least 32 characters in every profile; Mucaro refuses to start without one.
+- `MUCARO_AI_PHONE_ACCESS=1`: lets a phone on the same private network or VPN use Mucaro (`--phone` on `scripts/launch_app.py` does the same). The launcher listens on all interfaces, requires an access token (generated for each launch unless `MUCARO_AI_OPERATOR_TOKEN` has 32 or more characters) and prints the link. See `docs/PHONE_ACCESS.md`.
 
 ## Ingest files
 
@@ -128,6 +147,30 @@ until a multimodal model adapter is added.
 ```bash
 python scripts/ask.py "How does source lineage work?"
 ```
+
+## Saving and sharing answers
+
+Each finished answer has **Save** and **Share** next to Copy and Edit. **Save** offers the answer as
+Markdown or plain text (as shown, edits included, with its sources), and the files Mucaro wrote for
+it in `data/exports/`: a report with sources (`.md`), the full answer record (`.json`) and the
+citations table (`.csv`). A browser keeps the file with its downloads (a phone puts it in Files);
+the desktop app asks where to save it. **Share** opens the system share sheet with the answer as a
+`.txt` file. Browsers offer the share sheet only on https or on the computer itself, so a phone
+that opens Mucaro over plain http saves the file instead; see `docs/PHONE_ACCESS.md`.
+
+## Measuring latency
+
+```bash
+python scripts/bench_latency.py --provider mock --runs 20
+python scripts/bench_latency.py --provider anthropic --runs 10   # needs MUCARO_AI_LIVE_MODE=1 and ANTHROPIC_API_KEY in .env
+```
+
+The benchmark prints p50 and p95 time to first word and total time, measured through the same
+work-run and event-stream path the app uses, in a throwaway data directory (your conversations are
+not touched). Every answer trace also records `timings_ms` (retrieval, first model token, model).
+Answers from Anthropic stream token by token. Run state lives in SQLite in WAL mode with full
+fsync; set `MUCARO_AI_SQLITE_WAL=0` to keep the rollback journal, for example when the data
+directory is on a network share.
 
 ## Command line interface
 
@@ -269,10 +312,30 @@ receipts for the archive and every member.
 
 Use `mucaro package macos-app --format text` to build a local source-bound
 `Mucaro AI.app` under `data/exports/desktop_apps`. Double-clicking that app
-launches this checkout with the Python executable recorded at build time and
-opens the browser UI through `scripts/launch_app.py`. This is not yet a portable
+launches this checkout through silent setup and opens the native window. It provisions private
+runtimes on first use. This is not yet a portable
 signed installer with embedded runtime, reinstall, upgrade, and rollback
 guarantees.
+
+The portable lane starts by materializing the governed x86_64 macOS runtime,
+then embedding that verified input into an exact-head app bundle:
+
+```bash
+mucaro package portable-runtime --format text
+mucaro package portable-runtime \
+  --verify data/exports/portable_runtimes/macos-x86_64 \
+  --format text
+mucaro package portable-macos-app \
+  --runtime-dir data/exports/portable_runtimes/macos-x86_64 \
+  --format text
+```
+
+Runtime acquisition verifies the pinned upstream archive size and SHA-256,
+safe archive paths and types, the frozen logical member counts, a hash-locked
+wheel-only dependency graph, importability, relocation, and exclusion of host
+user-site packages. This tracked runtime source is architecture-specific; it is
+not arm64, universal-binary, signing, notarization, sandbox, or App Store
+evidence.
 
 The browser app includes the same permission workflow in the Directory Access panel.
 
@@ -387,7 +450,7 @@ python scripts/extract_reference_patterns.py
 - Execution Gate approval is required before mutation-oriented execution.
 - Tool calls require explicit approval and are recorded in a local audit log.
 - Uploaded files are stored locally under `data/input/`.
-- Set `MUCARO_AI_OPERATOR_TOKEN` before exposing the local API beyond a trusted loopback-only development session.
+- Set `MUCARO_AI_OPERATOR_TOKEN` before exposing the local API beyond a trusted loopback-only development session. A request from another device is refused unless a token is set, and a public bind needs one of 32 or more characters (`docs/PHONE_ACCESS.md`).
 - Every answer trace must include source IDs and cited chunk IDs or validation flags.
 
 ## Phase 2 roadmap
@@ -409,3 +472,13 @@ Then rerun:
 ```bash
 bash scripts/bootstrap_macos.sh
 ```
+
+<!-- PROJECT-OPERATING-CONTRACT:START -->
+## Current development and certification contract
+
+Mucaro AI is being developed as a local-first, conversation-centered orchestration environment with durable Run/Event/Action/Evidence/Receipt history, source lineage, memory, planning gates, isolated coding execution, controlled mutation, and reproducible verification.
+
+The orchestration-kernel v1 substrate is append-only. DEMO_CANDIDATE fixtures are not execution evidence. Current priority is Git path-identity hardening, isolated coding/container execution, patch preimage/HEAD/dirty-state revalidation with rollback, test/lint/type/build receipts, branch/commit/PR safety, retrieval/OCR/GIS/browser/model/memory closure, conversation-first UI, and zero-setup packaged desktop delivery.
+
+Certification requires a fresh-clone → install → build → test → security → representative workflows → package → reinstall/rollback chain with preserved evidence. Script success alone is not release certification. Passed artifacts survive downstream failure and provisional behavior must not be used to train reusable automation.
+<!-- PROJECT-OPERATING-CONTRACT:END -->

@@ -6,6 +6,7 @@ from typing import Any
 
 from .memory import MEMORY_KINDS, active_memory_context
 from .config import Settings, settings
+from .contracts import validate_contract
 
 MEMORY_SELECTION_SCHEMA_VERSION = "mucaro-memory-selection/1.0"
 DEFAULT_MAX_ITEMS = 12
@@ -136,4 +137,4 @@ def select_memory_context(
         ],
     }
     payload["selection_sha256"] = _stable_hash(payload)
-    return payload
+    return validate_contract("memory_selection", payload)

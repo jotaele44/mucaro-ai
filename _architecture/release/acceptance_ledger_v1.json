@@ -1,0 +1,2843 @@
+{
+  "schema_version": "mucaro-release-acceptance-ledger/1.0",
+  "updated_utc": "2026-10-02T15:01:08Z",
+  "rows": [
+    {
+      "requirement_id": "GOAL-001",
+      "requirement_text": "Product outcome",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/desktop_shell.py",
+        "packaging/macos/mucaro.spec",
+        "scripts/build_macos_app.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+      "negative_gate": "backend/tests/test_desktop_shell.py::test_no_window_service_enforces_the_launch_token_and_single_instance",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/window.png",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
+        "_architecture/release/evidence/macos_app_1d32e8ce1d02/provenance.json"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Launch path proven on a hosted macOS 14 arm64 runner: install from zip, LaunchServices open (the Finder double-click path), native window shown in 0.6 s, GUI connected with the launch token in 3.1 s (run at 0a806c1), and ingest, cited answer and export, with no terminal or setup. Residue: a literal double-click by the user (BLK-PHYS-001), Developer ID signing so a downloaded copy opens without a Gatekeeper override (BLK-SIGN-001), and the workbench vectors still OPEN (GIS, OCR and code workspaces, benchmarks)."
+    },
+    {
+      "requirement_id": "GOAL-002",
+      "requirement_text": "Primary interaction model",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Ask/plan/execute/stream/inspect/refine flows render; export and GIS/OCR workspaces still open."
+    },
+    {
+      "requirement_id": "GOAL-003",
+      "requirement_text": "Governing objective",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-001",
+      "requirement_text": "Instruction precedence",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-002",
+      "requirement_text": "Binding target and denominator",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/release_scope.py",
+        "_architecture/release/release_scope_manifest_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_silent_scope_loss_is_detected",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_duplicate_requirement_is_rejected",
+        "backend/tests/test_release_scope.py::test_not_applicable_requires_justification",
+        "backend/tests/test_release_scope.py::test_silent_scope_loss_is_detected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-003",
+      "requirement_text": "Binding specification discovery",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "_architecture/release/release_scope_manifest_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-SPEC-001",
+      "dag_node": "N26",
+      "notes": "Contract and mobile brief are bound by hash; the separate Workbench Specification is missing (SPECIFICATION_BINDING=OPEN)."
+    },
+    {
+      "requirement_id": "KERNEL-004",
+      "requirement_text": "Current-state snapshot",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/release_scope.py",
+        "_architecture/release/current_state_snapshot_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_snapshot_records_credential_presence_not_values",
+      "negative_gate": "backend/tests/test_release_scope.py::test_snapshot_never_contains_secret_values",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/current_state_snapshot_v1.json",
+        "backend/tests/test_release_scope.py::test_snapshot_never_contains_secret_values",
+        "backend/tests/test_release_scope.py::test_snapshot_records_credential_presence_not_values"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N00",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-005",
+      "requirement_text": "Reuse validated work",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-006",
+      "requirement_text": "Dependency DAG",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/release_dag_v1.json",
+        "backend/app/release_scope.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_dag_cycle_is_detected",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/release_dag_v1.json",
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_dag_cycle_is_detected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-007",
+      "requirement_text": "Autonomous priority selection",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-008",
+      "requirement_text": "Preferred dependency vector",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-009",
+      "requirement_text": "Autonomous execution authority",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-010",
+      "requirement_text": "Credentials-last rule",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-011",
+      "requirement_text": "Execution cycle",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-012",
+      "requirement_text": "Preemptive hardening",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-013",
+      "requirement_text": "Anti-loop rule",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-014",
+      "requirement_text": "Contradiction handling",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/contradiction_ledger_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_frozen_checkpoint_detects_dropped_records",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/contradiction_ledger_v1.json",
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_frozen_checkpoint_detects_dropped_records"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-015",
+      "requirement_text": "Testing escalation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-016",
+      "requirement_text": "Positive and negative gates",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-017",
+      "requirement_text": "Tool-routing preference",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-018",
+      "requirement_text": "Source refresh and artifact reuse",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-019",
+      "requirement_text": "Scope-delta control",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/scope_delta_ledger_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_scope_delta_defect_must_enter_denominator",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_scope_delta_defect_must_enter_denominator",
+        "backend/tests/test_release_scope.py::test_unadopted_enhancement_cannot_enter_denominator"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-020",
+      "requirement_text": "Blocker behavior",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/blocker_ledger_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_blocked_state_requires_active_blocker",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/blocker_ledger_v1.json",
+        "backend/tests/test_release_scope.py::test_blocked_state_requires_active_blocker",
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "KERNEL-021",
+      "requirement_text": "Progress communication",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "KERNEL-022",
+      "requirement_text": "Hard stop conditions",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+    },
+    {
+      "requirement_id": "INV-001",
+      "requirement_text": "Epistemic classification",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/capability_contracts.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N03",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-002",
+      "requirement_text": "Certification state",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "schemas/release_acceptance_ledger.schema.json",
+        "schemas/release_dag.schema.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_state_outside_denominator_is_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_state_outside_denominator_is_rejected",
+        "schemas/release_acceptance_ledger.schema.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": "Certification states enforced for the release ledgers; subsystem receipts adopt them through TGT-016."
+    },
+    {
+      "requirement_id": "INV-003",
+      "requirement_text": "Completion truthfulness",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-004",
+      "requirement_text": "Local-first privacy",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/model_router.py",
+        "backend/app/model_routing_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_local_model.py::test_non_loopback_local_url_is_refused_before_any_request",
+        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N13",
+      "notes": "Defaults are local (mock/loopback model); remote transmission requires explicit live mode, key and per-request allow_live; loopback-only enforcement for the local provider. Remote prompt fencing lands in M5."
+    },
+    {
+      "requirement_id": "INV-005",
+      "requirement_text": "Common contracts",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/contracts.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N03",
+      "notes": "Same residue as TGT-016."
+    },
+    {
+      "requirement_id": "INV-006",
+      "requirement_text": "Consequential actions",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/tools.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_ask_mode_waits_for_approval_then_resumes",
+      "negative_gate": "backend/tests/test_work_runs.py::test_auto_mode_preapproves_only_local_read_only_tools",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_contracts.py::test_decision_against_stale_arguments_is_refused",
+        "backend/tests/test_work_runs.py::test_retry_in_ask_mode_needs_a_fresh_approval",
+        "backend/tests/test_work_runs.py::test_plan_mode_executes_nothing"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N05",
+      "notes": "All run actions use the approval-gated tool runtime; auto mode pre-approves only local, non-mutating tools; retries need fresh approval; approvals bind to immutable calls."
+    },
+    {
+      "requirement_id": "INV-007",
+      "requirement_text": "Data ingestion",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/file_signatures.py",
+        "backend/app/parser.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_ingestion_safety.py::test_mislabeled_and_executable_payloads_fail_closed"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": "Container/signature/extension/MIME checks enforced; CSV header-location and preamble detection still assume the sniffed header row."
+    },
+    {
+      "requirement_id": "INV-008",
+      "requirement_text": "Raw / normalized / canonical separation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/capability_contracts.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-009",
+      "requirement_text": "Identity proof",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/gis_processing.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N10",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-010",
+      "requirement_text": "Data conservation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/gis_processing.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-011",
+      "requirement_text": "Whole-record integrity",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-012",
+      "requirement_text": "Spatial correctness",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/gis_processing.py",
+        "backend/app/gis_crs.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N10",
+      "notes": "FULLY_WITHIN/TOUCH_ONLY/OUTSIDE/NULL_EMPTY/UNRESOLVED implemented for point-in-polygon; PARTIAL state absent (no polygon-polygon join)."
+    },
+    {
+      "requirement_id": "INV-013",
+      "requirement_text": "Source acquisition",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/web_search.py",
+        "backend/app/web_browsing.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N11",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-014",
+      "requirement_text": "Untrusted content",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/injection_guard.py",
+        "backend/app/provenance.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_prompt_injection.py::test_ingested_source_records_the_instruction_like_text",
+      "negative_gate": "backend/tests/test_prompt_injection.py::test_injected_web_snapshot_is_evidence_only",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_prompt_injection.py::test_model_output_cannot_trigger_actions",
+        "backend/tests/test_prompt_injection.py::test_injected_document_cannot_create_tool_calls_or_approvals"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N16",
+      "notes": "Documents, archives, uploads and web snapshots are labelled UNTRUSTED_CONTENT; model output is never parsed for actions."
+    },
+    {
+      "requirement_id": "INV-015",
+      "requirement_text": "Security boundary",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/security.py",
+        "backend/app/permissions.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-016",
+      "requirement_text": "Measurable vulnerability gate",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/security_gates.py",
+        "scripts/certify_security_gates.py",
+        "_architecture/release/security/static_security_dispositions_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_security_gates.py::test_repository_dispositions_cover_every_current_finding",
+      "negative_gate": "backend/tests/test_security_gates.py::test_untriaged_high_and_stale_findings_fail_the_triage",
+      "benchmark": null,
+      "evidence_refs": [
+        "docs/release/SECURITY_GATES.md",
+        "backend/tests/test_security_gates.py::test_listening_addresses_see_a_real_all_interfaces_bind",
+        "backend/tests/test_ingestion_safety.py::test_docx_entity_amplification_is_refused_quickly"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N22",
+      "notes": "SBOMs (CycloneDX) from the hashed locks. pip-audit of the 45 shipped Python components and npm audit: 0 known vulnerabilities. Secret scan covers tracked files and generated evidence. Every one of 89 static findings has a disposition (80 LOW, 9 NOT_APPLICABLE; no MEDIUM or above). Fixed: SQL identifier validation, asserts that vanished under -O, and a /tmp fallback. The service listens on loopback only, with data dir 0700 and instance file 0600. XML amplification and external entities are refused. Makes no claim that unknown vulnerabilities are absent."
+    },
+    {
+      "requirement_id": "INV-017",
+      "requirement_text": "Determinism versus evidence",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-018",
+      "requirement_text": "Provenance",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/provenance.py",
+        "backend/app/ingestion.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_contracts.py::test_real_producer_payloads_satisfy_contracts",
+        "backend/tests/test_contracts.py::test_web_snapshot_with_a_non_hash_content_digest_is_refused"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N04",
+      "notes": "Provenance records attached to every ingested file and web snapshot; derived artifacts do not yet carry them (N04)."
+    },
+    {
+      "requirement_id": "INV-019",
+      "requirement_text": "Archive comparison",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/packaging.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N04",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-020",
+      "requirement_text": "Citation integrity",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/citations.py",
+        "backend/app/answer_trace_eval.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N09",
+      "notes": "Structural citation checks exist; claim-level faithfulness absent."
+    },
+    {
+      "requirement_id": "INV-021",
+      "requirement_text": "Memory authority",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/memory.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N14",
+      "notes": ""
+    },
+    {
+      "requirement_id": "INV-022",
+      "requirement_text": "User-interface uniqueness",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Planning lives only in the Plan mode (PlanningGate removed); one settings home. No mechanical uniqueness check."
+    },
+    {
+      "requirement_id": "INV-023",
+      "requirement_text": "Packaging truthfulness",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        ".github/workflows/macos-app.yml",
+        "scripts/build_macos_app.py",
+        "scripts/verify_macos_app.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/provenance.json",
+      "negative_gate": "backend/tests/test_macos_packaging.py::test_build_refuses_a_non_macos_host_without_structural_mode",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/provenance.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N20",
+      "notes": "Packaging evidence comes from a fresh hosted macOS runner that builds from a clean checkout with the hash-locked inputs, not from a development machine. Local Linux structural builds are labelled non-distributable and make no window claims."
+    },
+    {
+      "requirement_id": "TGT-001",
+      "requirement_text": "Executable macOS application",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/desktop_shell.py",
+        "packaging/macos/desktop_entry.py",
+        "packaging/macos/mucaro.spec"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+      "negative_gate": "backend/tests/test_desktop_shell.py::test_startup_failure_exits_with_status_and_writes_a_log",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/window.png",
+        "backend/tests/test_desktop_shell.py::test_smoke_starts_serves_and_stops_with_data_outside_the_code_tree"
+      ],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-PHYS-001",
+      "dag_node": "N19",
+      "notes": "Valid .app (codesign --verify passes, arm64, Info.plist checked). Opened through LaunchServices, it shows the native window and a working GUI; there is no terminal, dev server or source tree. Every agent-executable check passes. The only residue is a literal physical double-click on a user's Mac (BLK-PHYS-001, or acceptance of LaunchServices evidence as equivalent)."
+    },
+    {
+      "requirement_id": "TGT-002",
+      "requirement_text": "Conversation-first work feed",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/work_runs.py",
+        "backend/app/main.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
+        "backend/tests/test_work_runs.py::test_api_message_stream_replays_and_ends",
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Feed renders plans, actions, approvals, results, text, citations, artifacts, warnings and outcomes. OPEN: maps, tables and code-execution output in the feed (GIS/coding workspaces)."
+    },
+    {
+      "requirement_id": "TGT-003",
+      "requirement_text": "Specialized workspaces",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Sources/Memory/Settings exist; GIS/OCR/Code/Provenance/Artifacts surfaces absent."
+    },
+    {
+      "requirement_id": "TGT-004",
+      "requirement_text": "GIS and spatial engine",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/gis_processing.py",
+        "backend/app/gis_raster.py",
+        "backend/app/gis_hydrology.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N10",
+      "notes": "Remote sensing, bathymetry and temporal GIS absent."
+    },
+    {
+      "requirement_id": "TGT-005",
+      "requirement_text": "OCR and document intelligence",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/ocr_analysis.py",
+        "backend/app/ocr_pdf.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N08",
+      "notes": "Tables/forms absent; OCR not wired into ingestion."
+    },
+    {
+      "requirement_id": "TGT-006",
+      "requirement_text": "Governed web research",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/web_browsing.py",
+        "backend/app/web_search.py",
+        "backend/app/web_render.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N11",
+      "notes": "Live search needs BLK-WEB-001; prompt-injection resistance absent."
+    },
+    {
+      "requirement_id": "TGT-007",
+      "requirement_text": "Software engineering engine",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/coding_workspace.py",
+        "backend/app/coding_mutation.py",
+        "backend/app/coding_container.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N12",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-008",
+      "requirement_text": "Local AI execution",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/model_router.py",
+        "_architecture/release/local_ai_declaration_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_local_model.py::test_local_answer_is_grounded_cited_and_fences_untrusted_sources",
+        "backend/tests/test_local_model.py::test_run_streams_local_tokens_live",
+        "backend/tests/test_local_model.py::test_local_ai_declaration_matches_the_provider_registry",
+        "_architecture/release/local_ai_declaration_v1.json"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N13",
+      "notes": "Loopback OpenAI-compatible provider with streaming, readiness probing and declarations (backends, hardware baseline, memory/storage, offline, limitations). OPEN: evaluation against a real local model on the declared Apple Silicon baseline (tests use a protocol-faithful fake server)."
+    },
+    {
+      "requirement_id": "TGT-009",
+      "requirement_text": "Permissioned remote AI",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/model_router.py",
+        "backend/app/model_routing_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_mock_model.py",
+        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider"
+      ],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-LLM-001",
+      "dag_node": "N13",
+      "notes": "Credential-free work complete: remote use requires live mode + key + per-request allow_live, never implicit; the remote prompt uses the same fenced grounded prompt. Live remote evaluation needs an operator key."
+    },
+    {
+      "requirement_id": "TGT-010",
+      "requirement_text": "Model routing",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/model_routing_policy.py",
+        "backend/app/model_router.py",
+        "backend/app/work_runs.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_local_model.py::test_local_only_excludes_remote_and_default_stays_offline",
+      "negative_gate": "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_local_model.py::test_modality_and_context_constraints_make_providers_ineligible",
+        "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+        "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N13",
+      "notes": "Routing over declared locality, modalities, context size, permissions (allow_live), offline state and readiness; each run emits an inspectable route event with candidates, reasons and route_sha256."
+    },
+    {
+      "requirement_id": "TGT-011",
+      "requirement_text": "Retrieval-augmented generation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/retrieval.py",
+        "backend/app/retrieval_eval.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N09",
+      "notes": "Faithfulness/unsupported-claim metrics absent."
+    },
+    {
+      "requirement_id": "TGT-012",
+      "requirement_text": "Multimodal file handling",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/parser.py",
+        "backend/app/multimodal.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": "No declared format registry artifact."
+    },
+    {
+      "requirement_id": "TGT-013",
+      "requirement_text": "Explicit memory",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/memory.py",
+        "backend/app/memory_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N14",
+      "notes": "Memory has no scope."
+    },
+    {
+      "requirement_id": "TGT-014",
+      "requirement_text": "Governed tool execution",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/tools.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_contracts.py::test_api_cancel_and_summary_routes",
+        "backend/tests/test_contracts.py::test_summary_counts_close_arithmetically"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N05",
+      "notes": "Permission-aware, audited (hash chain), attributable, cancellable before start, failure-aware. OPEN: feed-level observability (M3/M6) and model-initiated calls through the same gate."
+    },
+    {
+      "requirement_id": "TGT-015",
+      "requirement_text": "Artifact generation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/artifact_identity.py",
+        "backend/app/exports.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N04",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-016",
+      "requirement_text": "Common execution contracts",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/contracts.py",
+        "schemas/"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_contracts.py::test_every_contract_family_has_present_valid_schemas",
+        "backend/tests/test_contracts.py::test_real_producer_payloads_satisfy_contracts",
+        "backend/tests/test_contracts.py::test_contract_violations_are_rejected"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N03",
+      "notes": "All nine families have schemas and a registry; runtime enforcement at source, provenance, grant, tool call/audit, citation/answer trace, memory, routing and receipt boundaries. OPEN: runtime enforcement for execution_contract/run_manifest/agent_checkpoint/artifact_identity producers."
+    },
+    {
+      "requirement_id": "TGT-017",
+      "requirement_text": "Local-first storage and workspace state",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/config.py",
+        "backend/app/desktop_shell.py",
+        "backend/app/work_runs.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_desktop_shell.py::test_smoke_starts_serves_and_stops_with_data_outside_the_code_tree",
+      "negative_gate": "backend/tests/test_db_upgrade.py",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "backend/tests/test_work_runs.py::test_restart_interrupts_running_runs_and_resumes_waiting_ones",
+        "backend/tests/test_desktop_shell.py::test_macos_data_dir_is_application_support"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N06",
+      "notes": "State lives in ~/Library/Application Support/Mucaro AI (mode 0700), outside the replaceable bundle. It is local by default and survives quit/relaunch and reinstall (macOS E2E). Runs are reconciled on restart."
+    },
+    {
+      "requirement_id": "TGT-018",
+      "requirement_text": "Recovery and restartability",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/work_runs.py",
+        "backend/app/tools.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_restart_interrupts_running_runs_and_resumes_waiting_ones",
+      "negative_gate": "backend/tests/test_work_runs.py::test_stop_during_a_running_tool_records_it_in_flight_and_halts_later_steps",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_work_runs.py::test_idempotent_resubmission_returns_the_original_run",
+        "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
+        "backend/tests/test_work_runs.py::test_stop_while_awaiting_approval_interrupts_and_cancels_pending_calls",
+        "backend/tests/test_contracts.py::test_restart_marks_running_calls_interrupted_without_retrying"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Conversation runs support restart (RUNNING->INTERRUPTED), resume of waiting runs after restart, cancel/stop, partial-failure recovery via targeted retry, and idempotent resubmission. App-level restart of the packaged app is MATRIX-016."
+    },
+    {
+      "requirement_id": "TGT-019",
+      "requirement_text": "Offline behavior",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/offline.py",
+        "backend/app/model_routing_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_local_model.py::test_offline_manifest_classifies_every_capability_and_closes",
+        "backend/tests/test_web_render.py::offline_dns"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N21",
+      "notes": "Every capability classified AVAILABLE_LOCALLY / UNAVAILABLE_OFFLINE / REQUIRES_REMOTE_SERVICE (plus LOCAL_DEPENDENCY_MISSING); remote providers ineligible when offline. OPEN: UI offline states and network-interruption tests (MATRIX-016)."
+    },
+    {
+      "requirement_id": "TGT-020",
+      "requirement_text": "Performance",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N21",
+      "notes": "No frozen performance thresholds."
+    },
+    {
+      "requirement_id": "TGT-021",
+      "requirement_text": "Security",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/security.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": ""
+    },
+    {
+      "requirement_id": "TGT-022",
+      "requirement_text": "Prompt-injection resistance",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/injection_guard.py",
+        "backend/app/model_router.py",
+        "backend/app/work_runs.py",
+        "backend/app/services.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_prompt_injection.py::test_answer_trace_surfaces_signals_per_citation",
+      "negative_gate": "backend/tests/test_prompt_injection.py::test_injected_document_cannot_create_tool_calls_or_approvals",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_prompt_injection.py::test_model_output_cannot_trigger_actions",
+        "backend/tests/test_prompt_injection.py::test_memory_instructions_cannot_authorize_tools",
+        "backend/tests/test_prompt_injection.py::test_source_fence_cannot_be_broken_by_content",
+        "backend/tests/test_prompt_injection.py::test_prompts_and_exports_never_contain_credentials",
+        "backend/tests/test_prompt_injection.py::test_injected_web_snapshot_is_evidence_only"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N16",
+      "notes": "Structural guarantees: tool calls only from the user's own message, approvals only from user decisions or the documented auto policy, fenced sources with unforgeable closing tags, prompts never include credentials, grants only via explicit grant. Detection is advisory (documented false positives) and never gates or triggers actions."
+    },
+    {
+      "requirement_id": "TGT-023",
+      "requirement_text": "Archive safety",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/archive_safety.py",
+        "backend/app/file_signatures.py",
+        "backend/app/parser.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_ingestion_safety.py::test_safe_extract_writes_non_executable_files_inside_destination",
+      "negative_gate": "backend/tests/test_ingestion_safety.py::test_traversal_members_make_archive_unsafe_and_nothing_escapes",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_ingestion_safety.py::test_symlink_executable_and_encrypted_members_are_flagged",
+        "backend/tests/test_ingestion_safety.py::test_malformed_and_truncated_archives_fail_closed",
+        "backend/tests/test_ingestion_safety.py::test_mislabeled_and_executable_payloads_fail_closed",
+        "backend/tests/test_ingestion_safety.py::test_extracted_executable_payload_is_refused"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": "Covers path traversal, absolute/backslash paths, bombs (ratio + actual bytes), symlink/executable/encrypted members, malformed/truncated archives, extension/content mismatch, executable payloads. Scope: ZIP-family archives (zip, docx); tar/7z/rar are UNSUPPORTED and never extracted."
+    },
+    {
+      "requirement_id": "TGT-024",
+      "requirement_text": "Secrets isolation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/security_gates.py",
+        "scripts/verify_macos_app.py",
+        "backend/app/desktop_shell.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_security_gates.py::test_evidence_values_under_secret_keys_are_flagged",
+      "negative_gate": "backend/tests/test_security_gates.py::test_secret_patterns_are_detected_and_clean_text_passes",
+      "benchmark": null,
+      "evidence_refs": [
+        "docs/release/SECURITY_GATES.md",
+        "backend/tests/test_prompt_injection.py"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N22",
+      "notes": "Secrets are not committed (secret scan) or surfaced in evidence (evidence-field scan). The launch token stays out of receipts and logs, is kept in a 0600 instance file, and reaches the window only through the URL fragment. Prompts and exports never contain credentials. Residue: production API keys still come from environment variables; macOS Keychain storage is not implemented."
+    },
+    {
+      "requirement_id": "TGT-025",
+      "requirement_text": "Permission boundaries",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/permissions.py",
+        "backend/app/tools.py",
+        "backend/app/model_routing_policy.py",
+        "backend/app/web_browsing.py",
+        "backend/app/auth.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_permissions.py::test_external_path_requires_then_accepts_directory_grant",
+      "negative_gate": "backend/tests/test_tools.py::test_tool_runtime_requires_approval_before_execution",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_permissions.py::test_directory_grant_rejects_filesystem_root",
+        "backend/tests/test_web_browsing.py::test_validate_web_fetch_url_blocks_private_dns_resolution",
+        "backend/tests/test_local_model.py::test_non_loopback_local_url_is_refused_before_any_request",
+        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider",
+        "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+        "backend/tests/test_tools.py::test_tool_runtime_denies_unknown_tools_and_audits_rejection",
+        "backend/tests/test_contracts.py::test_decision_against_stale_arguments_is_refused",
+        "backend/tests/test_tools.py::test_tool_runtime_web_search_stays_fail_closed_without_live_permission",
+        "backend/tests/test_work_runs.py::test_retry_in_ask_mode_needs_a_fresh_approval",
+        "backend/tests/test_prompt_injection.py::test_injected_document_cannot_create_tool_calls_or_approvals",
+        "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_reject_missing_token_when_configured"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N05",
+      "notes": "Permissions and their negative gates:\n- Filesystem: directory grants.\n- Network: remote tools need approval; SSRF/private-address blocking; the service listens on loopback only.\n- Models: loopback-only local provider; routing modes local-only, remote-forbidden and offline.\n- Tools: per-call approval bound to the argument digest; unknown tools are refused.\n- External services: web search stays fail-closed without live permission and a key.\n- Consequential actions: mutating tools need approval; a retry needs a fresh approval; untrusted content cannot create approvals.\n- API: token boundary.\nThe security gate permission_boundaries checks the registry on every run."
+    },
+    {
+      "requirement_id": "TGT-026",
+      "requirement_text": "macOS packaging",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "scripts/build_macos_app.py",
+        "packaging/macos/mucaro.spec",
+        "packaging/macos/requirements-macos-arm64.lock"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
+      "negative_gate": "backend/tests/test_macos_packaging.py::test_build_refuses_a_non_macos_host_without_structural_mode",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "backend/tests/test_macos_packaging.py::test_lock_is_fully_hash_pinned_and_covers_every_input"
+      ],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-SIGN-001",
+      "dag_node": "N20",
+      "notes": "Both release lanes are required (A7). Native app lane: all eight TGT-026 verifications pass on macOS: bundle validity, launch, resources, runtime dependencies, and no dev server, terminal or source tree; clean reinstall is covered by the E2E reinstall step. The artifact is ad-hoc signed, so it is not yet distributable under the declared Developer ID release class; Gatekeeper rejects it (BLK-SIGN-001). Portable embedded-runtime lane: assembly and verification exist (backend/app/portable_runtime.py); its release-grade gates (portable_embedded_runtime, portable_install_reinstall_smoke) have no exact-head evidence yet."
+    },
+    {
+      "requirement_id": "TGT-027",
+      "requirement_text": "Signing and notarization",
+      "scope_state": "EXTERNALLY_BLOCKED",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/macos_distribution.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-SIGN-001",
+      "dag_node": "N23",
+      "notes": "Verification tooling exists; signing/notarization credentials unavailable (SIGNING_NOTARIZATION = BLOCKED)."
+    },
+    {
+      "requirement_id": "TGT-028",
+      "requirement_text": "Installation",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "scripts/verify_macos_app.py",
+        "docs/release/MACOS_APP.md"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "docs/release/MACOS_APP.md"
+      ],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-SIGN-001",
+      "dag_node": "N20",
+      "notes": "Install path: unzip into Applications, then open. The installed app satisfies every TGT-001 check. A downloaded (quarantined) copy needs a Gatekeeper override until it is Developer ID signed and notarized (BLK-SIGN-001)."
+    },
+    {
+      "requirement_id": "TGT-029",
+      "requirement_text": "Upgrade and rollback",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/db.py",
+        "docs/release/MACOS_APP.md",
+        "backend/app/clean_machine_macos.py",
+        "scripts/certify_release_grade.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_db_upgrade.py",
+      "negative_gate": "backend/tests/test_clean_machine_macos.py::test_same_head_previous_version_is_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_db_upgrade.py",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "docs/release/MACOS_APP.md",
+        "backend/tests/test_clean_machine_macos.py::test_distinct_version_flow_emits_all_required_evidence"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N20",
+      "notes": "Both release lanes are required (user decision 2026-09-26, assumption A7). Native app lane: bundle replacement keeps data; schema upgrades are atomic and forward-only; a too-new database fails safely with ERROR_DATABASE_SCHEMA_TOO_NEW. Tested: upgrade, interrupted upgrade (rolled back), compatibility refusal, and app reinstall keeping data (macOS E2E). Portable embedded-runtime lane: the distinct-version upgrade/rollback check and the clean-machine flow are implemented and unit-tested, but no receipt from two distinct packaged portable versions exists yet, so this row is PROVISIONAL rather than PASS."
+    },
+    {
+      "requirement_id": "TGT-030",
+      "requirement_text": "Source and evidence inspection",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/EvidencePanel.jsx",
+        "frontend/src/components/workspaces/SourcesWorkspace.jsx",
+        "backend/app/main.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation",
+      "benchmark": null,
+      "evidence_refs": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Citation -> source manifestation, byte identity, parser/processor, trust, cited chunk, provenance record."
+    },
+    {
+      "requirement_id": "TGT-031",
+      "requirement_text": "Citation interaction",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/citations.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation",
+      "benchmark": null,
+      "evidence_refs": [
+        "frontend/src/components/EvidencePanel.jsx"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Traceable to source, chunk and chunk index; page-level location is available only where the parser records it."
+    },
+    {
+      "requirement_id": "TGT-032",
+      "requirement_text": "Provenance inspection",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/workspaces/ProvenanceWorkspace.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering",
+      "benchmark": null,
+      "evidence_refs": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Verified audit chain, per-action records behind disclosure."
+    },
+    {
+      "requirement_id": "TGT-033",
+      "requirement_text": "Configuration and settings",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "backend/tests/test_api_auth_boundary.py::test_status_routes_remain_public_so_clients_can_discover_auth",
+      "benchmark": null,
+      "evidence_refs": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Single settings surface: model (with readiness and remote consent), retrieval, token, offline capability view."
+    },
+    {
+      "requirement_id": "TGT-034",
+      "requirement_text": "Error behavior",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/error_categories.py",
+        "backend/app/work_runs.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_work_runs.py::test_crashing_step_ends_the_run_failed_with_a_category",
+        "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Run errors, warnings and tool results carry TGT-034 categories; plain API error payloads do not yet include a category."
+    },
+    {
+      "requirement_id": "TGT-035",
+      "requirement_text": "Observability",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/work_runs.py",
+        "backend/app/tools.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_work_runs.py::test_run_envelope_takes_tool_state_from_records",
+        "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Structured run events cover workflow transitions, tool calls, approvals, errors, routing and artifacts; tool audit is hash-chained. Source acquisition and permission changes are not yet in one event stream."
+    },
+    {
+      "requirement_id": "TGT-036",
+      "requirement_text": "Accessibility and interaction quality",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/Sheet.jsx",
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+        "docs/release/UI_ACCESSIBILITY.md"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Declared behaviours verified in Chromium with zero axe violations; VoiceOver/WKWebView on macOS pending (M7)."
+    },
+    {
+      "requirement_id": "TGT-037",
+      "requirement_text": "Minimalist UI",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/styles.css"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "qa/rendered/rendered_qa.mjs",
+      "benchmark": null,
+      "evidence_refs": [
+        "docs/release/UI_ACCESSIBILITY.md"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Plan, route and JSON behind disclosure; permission, trust, provenance and failures are always visible (approval card, untrusted-content notice, error category)."
+    },
+    {
+      "requirement_id": "TGT-038",
+      "requirement_text": "Coherent architecture",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/tools.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N03",
+      "notes": "GIS/OCR/coding extras are CLI-only, outside the governed tool registry."
+    },
+    {
+      "requirement_id": "MATRIX-001",
+      "requirement_text": "Required evidence model",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/release_scope.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_pass_without_evidence_is_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_fabricated_evidence_reference_is_rejected",
+        "backend/tests/test_release_scope.py::test_pass_without_evidence_is_rejected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-002",
+      "requirement_text": "Acceptance ledger schema",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/acceptance_ledger_v1.json",
+        "schemas/release_acceptance_ledger.schema.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_ledger_drift_is_detected",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/acceptance_ledger_v1.json",
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_ledger_drift_is_detected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-003",
+      "requirement_text": "Denominator arithmetic",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/release_scope.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_denominator_arithmetic_closes",
+      "negative_gate": "backend/tests/test_release_scope.py::test_state_outside_denominator_is_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_denominator_arithmetic_closes",
+        "backend/tests/test_release_scope.py::test_state_outside_denominator_is_rejected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-004",
+      "requirement_text": "Material unresolved residue",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/release/contradiction_ledger_v1.json"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_materiality_cannot_be_redefined_after_freeze",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_materiality_cannot_be_redefined_after_freeze",
+        "schemas/release_contradiction_ledger.schema.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-005",
+      "requirement_text": "GIS benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/gis_eval.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N10",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-006",
+      "requirement_text": "OCR/document benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "_architecture/ocr_v1_corpus_manifest.json"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N08",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-007",
+      "requirement_text": "Retrieval benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/retrieval_eval.py",
+        "_architecture/retrieval_real_world_corpus_v1.json",
+        "scripts/certify_retrieval_real_world_live.py",
+        ".github/workflows/rt09-real-world-cert.yml"
+      ],
+      "dependencies": [],
+      "positive_gate": ".github/workflows/rt09-real-world-cert.yml",
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/retrieval_real_world_corpus_v1.json",
+        "scripts/certify_retrieval_real_world_live.py",
+        "_architecture/mucaro_v1_denominator_events.json"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": "BLK-ACTIONS-001",
+      "dag_node": "N09",
+      "notes": "PR #127 merged a frozen 24-document IETF/W3C/NIST real-world corpus lane. Run 36382763249 passed with 24/24 source-bound queries hitting expected sources in top-5, 3 parser formats, 8,277,197 source bytes and 4,933 chunks; artifact 10952734875 digest sha256:1eb4198e783fbaa84ae60610c7048d6e889c077aaf59aa70c7db29cebd4badac. MATRIX-007 remains PROVISIONAL because its crosswalk also includes RT-10 production-scale stress/scalability, which is not closed by this corpus. PR #138 v1.2 is frozen at 81b7a2d1128f4c20331b2ef46ce7ac9b4f7eced7. Exact-head RT-10, normal CI, and macOS jobs terminate with zero executed steps; unrelated repository workflows reproduce the same condition. MATRIX-007 remains PROVISIONAL and N09 is BLOCKED on BLK-ACTIONS-001 until runner admission executes the frozen lane."
+    },
+    {
+      "requirement_id": "MATRIX-008",
+      "requirement_text": "Web research benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/web_browsing.py",
+        "backend/app/injection_guard.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_prompt_injection.py::test_injected_web_snapshot_is_evidence_only",
+        "backend/tests/test_web_browsing.py"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N11",
+      "notes": "Instruction-bearing source content verified inert; OPEN/CAPTURE/FREEZE/CITE covered by existing web tests. SEARCH needs BLK-WEB-001; COMPARE/SYNTHESIZE workflow benchmark not yet frozen."
+    },
+    {
+      "requirement_id": "MATRIX-009",
+      "requirement_text": "Coding benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "_architecture/coding_regression_manifest.json"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N12",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-010",
+      "requirement_text": "File-ingestion benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/tests/test_ingestion_safety.py",
+        "backend/tests/test_parser.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_ingestion_safety.py",
+        "backend/tests/test_parser.py"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N07",
+      "notes": "Malformed, mislabeled, empty, truncated, encrypted, oversized, archive-attack and unsupported cases are covered; a declared format registry and a frozen benchmark receipt remain OPEN (TGT-012)."
+    },
+    {
+      "requirement_id": "MATRIX-011",
+      "requirement_text": "Tool-governance benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/tools.py",
+        "backend/app/work_runs.py",
+        "backend/app/error_categories.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_contracts.py::test_allowed_approved_action_executes_once_and_duplicate_invocation_is_refused",
+      "negative_gate": "backend/tests/test_tools.py::test_a_hung_handler_times_out_and_is_never_recorded_as_executed",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_contracts.py::test_denied_and_cancelled_actions_never_execute",
+        "backend/tests/test_tools.py::test_tool_runtime_requires_approval_before_execution",
+        "backend/tests/test_contracts.py::test_handler_crash_and_tool_error_end_failed_not_running",
+        "backend/tests/test_tools.py::test_a_hung_handler_times_out_and_is_never_recorded_as_executed",
+        "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
+        "backend/tests/test_contracts.py::test_restart_marks_running_calls_interrupted_without_retrying",
+        "backend/tests/test_contracts.py::test_concurrent_runs_execute_the_handler_exactly_once",
+        "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N05",
+      "notes": "All nine action classes are covered with audit and state truthfulness: allowed, denied, approval-required, cancelled, tool error/crash (FAILED, never left RUNNING), TIMEOUT, retry (failed target only, fresh approval), restart (RUNNING -> INTERRUPTED, no auto-retry) and duplicate invocation (atomic claim, handler runs exactly once). TIMEOUT: every handler runs under a per-tool wall-clock bound (default 120 s). On expiry the call is FAILED with ERROR_TOOL_TIMEOUT (category TOOL_FAILURE) and handler_abandoned=true. A mutating tool is marked side_effects=UNKNOWN because Python cannot kill the thread. A late return is discarded and never recorded as EXECUTED. The audit log is hash-chained and tamper-evident."
+    },
+    {
+      "requirement_id": "MATRIX-012",
+      "requirement_text": "Model-routing benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/tests/test_local_model.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_local_model.py::test_local_only_excludes_remote_and_default_stays_offline",
+      "negative_gate": "backend/tests/test_local_model.py::test_remote_allowed_but_unavailable_is_blocked_not_silently_substituted",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_local_model.py::test_remote_forbidden_blocks_a_preferred_remote_provider",
+        "backend/tests/test_local_model.py::test_unavailable_local_model_blocks_the_route",
+        "backend/tests/test_local_model.py::test_modality_and_context_constraints_make_providers_ineligible",
+        "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+        "backend/tests/test_local_model.py::test_conflicting_constraints_fail_closed"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N13",
+      "notes": "Local-only, remote allowed, remote forbidden, unavailable local, unavailable remote, modality mismatch, context constraint and offline state; no case violates permissions."
+    },
+    {
+      "requirement_id": "MATRIX-013",
+      "requirement_text": "Memory benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/tests/test_memory_policy.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N14",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-014",
+      "requirement_text": "Security benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "scripts/certify_security_gates.py",
+        ".github/workflows/ci.yml"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_security_gates.py::test_sboms_are_deterministic_and_scope_the_gui_runtime",
+      "negative_gate": "backend/tests/test_security_gates.py::test_secret_patterns_are_detected_and_clean_text_passes",
+      "benchmark": null,
+      "evidence_refs": [
+        "docs/release/SECURITY_GATES.md",
+        "backend/tests/test_api_auth_boundary.py",
+        "backend/tests/test_prompt_injection.py",
+        "backend/tests/test_ingestion_safety.py"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N22",
+      "notes": "All listed checks run in one gate (dependency scan, SBOM, secrets, static triage, permission, archive, prompt-injection, unsafe-path and network-boundary regressions, and packaging checks via the macOS build receipt). It runs in CI on every PR."
+    },
+    {
+      "requirement_id": "MATRIX-015",
+      "requirement_text": "UI benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "qa/rendered/rendered_qa.mjs",
+        ".github/workflows/rendered-qa.yml"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N18",
+      "notes": "70 rendered checks pass (navigation, feed, progressive disclosure, settings, provenance, sources, error/loading/empty/offline-service states, keyboard). OPEN: GIS and OCR surfaces, and rendering on the supported macOS environment (WKWebView)."
+    },
+    {
+      "requirement_id": "MATRIX-016",
+      "requirement_text": "Recovery benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/tests/test_agent_checkpoint_process_recovery.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N21",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-017",
+      "requirement_text": "Performance benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "ABSENT",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N21",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MATRIX-018",
+      "requirement_text": "Packaging benchmark",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        ".github/workflows/macos-app.yml",
+        "scripts/verify_macos_app.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/window.png",
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json"
+      ],
+      "state": "BLOCKED",
+      "blocker_id": "BLK-PHYS-001",
+      "dag_node": "N20",
+      "notes": "Both release lanes are required (A7). Native app lane: build -> verify bundle -> install -> open (LaunchServices) -> verify GUI (window list, screenshot, GUI-connected signal) -> ingest/ask/cite/export -> quit (Apple Event) -> relaunch -> verify state: all pass on a hosted runner. Portable lane benchmark: not yet run end to end. A literal double-click is BLK-PHYS-001."
+    },
+    {
+      "requirement_id": "MATRIX-019",
+      "requirement_text": "Clean-environment certification",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "scripts/certify_release_grade.py",
+        "scripts/certify_fresh_clone.py",
+        ".github/workflows/macos-app.yml"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_grade_certification.py::test_certified_only_when_every_gate_and_the_terminal_rule_hold",
+      "negative_gate": "backend/tests/test_release_grade_certification.py::test_every_gate_passing_is_still_provisional_while_the_ledgers_are_not_certified",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_grade_certification.py::test_receipt_gate_binds_head_status_schema_and_blocking_checks",
+        "backend/tests/test_release_grade_certification.py::test_both_release_lanes_are_required",
+        "backend/tests/test_release_grade_certification.py::test_clean_machine_receipt_must_prove_the_bundle_stayed_immutable",
+        "_architecture/release/evidence/release_grade_0a806c1e8c98/release_grade_receipt.json",
+        "_architecture/release/evidence/release_grade_0a806c1e8c98/provenance.json"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N24",
+      "notes": "The sequence is wired and requires both release lanes (A7). First end-to-end run at 0a806c1 (evidence: release_grade_0a806c1e8c98) with the exact-head native-app build and E2E receipts and the hosted-CI receipt (merge e3cfb5f, tree-equivalent to the head): clean worktree, local release, fresh clone, Python distribution, operator workflow, retrieval and GIS benchmarks, security gates, the packaged app's security profile, source-artifact installability, native-app build and E2E, hosted CI and the final manifest all PASS. Verdict PROVISIONAL, blocked by the four portable-lane gates (no portable inputs produced yet), signed_notarized_installer (BLK-SIGN-001) and release_scope."
+    },
+    {
+      "requirement_id": "MATRIX-020",
+      "requirement_text": "Final release manifest",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/release_manifest.py",
+        "scripts/certify_release_grade.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_grade_certification.py::test_final_release_manifest_names_every_missing_or_blocked_entry",
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/app/release_manifest.py",
+        "_architecture/release/evidence/release_grade_0a806c1e8c98/final_release_manifest.json"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": "The builder freezes every MATRIX-020 entry. An entry that is unavailable is recorded explicitly as BLOCKED, NOT_APPLICABLE or MISSING, never omitted. Frozen at 0a806c1 with no missing entries (complete_except_blocked); signing and notarization are recorded as BLOCKED. A certified-release manifest cannot exist until signing (BLK-SIGN-001) and the remaining gates close."
+    },
+    {
+      "requirement_id": "CERT-RULE-001",
+      "requirement_text": "TERMINAL CERTIFICATION RULE",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/release_scope.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_release_scope.py::test_release_status_certifies_only_when_every_condition_holds",
+      "negative_gate": "backend/tests/test_release_scope.py::test_release_status_is_provisional_with_residue",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_release_scope.py::test_release_status_certifies_only_when_every_condition_holds",
+        "backend/tests/test_release_scope.py::test_release_status_is_provisional_with_residue"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N01",
+      "notes": ""
+    },
+    {
+      "requirement_id": "EXEC-DIRECTIVE-001",
+      "requirement_text": "FINAL AUTONOMOUS EXECUTION DIRECTIVE",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N25",
+      "notes": ""
+    },
+    {
+      "requirement_id": "LEARN-GATE-001",
+      "requirement_text": "POST-CERTIFICATION LEARNING GATE 🚩",
+      "scope_state": "NOT_APPLICABLE",
+      "implementation_state": "NOT_APPLICABLE",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "NOT_APPLICABLE",
+      "blocker_id": null,
+      "dag_node": null,
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F01",
+      "requirement_text": "Mobile conversation shell and long transcript",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/styles.css",
+        "frontend/src/App.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Rendered at 390x844 (Chromium iPhone profile): header, off-canvas nav, safe-area insets, scroll anchoring, no overflow. OPEN: software-keyboard avoidance on real iOS/WKWebView."
+    },
+    {
+      "requirement_id": "MOB-F02",
+      "requirement_text": "User/assistant/tool turns, time separators",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/work_runs.py",
+        "frontend/src/components/ChatView.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
+      "negative_gate": "backend/tests/test_work_runs.py::test_invalid_messages_are_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: reload reproduces the transcript at both widths."
+    },
+    {
+      "requirement_id": "MOB-F03",
+      "requirement_text": "Incremental thinking/working indication and stop",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/work_runs.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_stop_while_awaiting_approval_interrupts_and_cancels_pending_calls",
+      "negative_gate": "backend/tests/test_work_runs.py::test_stop_during_a_running_tool_records_it_in_flight_and_halts_later_steps",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: Stop interrupts, the queued message then runs."
+    },
+    {
+      "requirement_id": "MOB-F04",
+      "requirement_text": "Queue for after this turn",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/work_runs.py",
+        "frontend/src/components/Composer.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_messages_queue_fifo_and_dequeue_exactly_once",
+      "negative_gate": "backend/tests/test_work_runs.py::test_messages_queue_fifo_and_dequeue_exactly_once",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: queue, edit and cancel before dispatch. Backend: FIFO, stale edit refused, exactly-once dequeue."
+    },
+    {
+      "requirement_id": "MOB-F05",
+      "requirement_text": "Text composer, send, keyboard interaction",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/Composer.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "backend/tests/test_work_runs.py::test_invalid_messages_are_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Rendered: empty send disabled, Enter sends, Shift+Enter newline; drafts persisted per conversation; IME guard in code."
+    },
+    {
+      "requirement_id": "MOB-F06",
+      "requirement_text": "Model/mode chip and Auto/Accept edits/Plan sheet",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/Composer.jsx",
+        "backend/app/work_runs.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_plan_mode_executes_nothing",
+      "negative_gate": "backend/tests/test_work_runs.py::test_auto_mode_preapproves_only_local_read_only_tools",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Modes discovered from /work-runs/modes; rendered plan mode executes nothing; auto cannot bypass the gate for network or mutating tools."
+    },
+    {
+      "requirement_id": "MOB-F07",
+      "requirement_text": "Per-tool permission sheet with arguments, Deny/Allow once",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/tools.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_ask_mode_waits_for_approval_then_resumes",
+      "negative_gate": "backend/tests/test_contracts.py::test_decision_against_stale_arguments_is_refused",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Approval request carries call id and argument digest; stale decisions refused; UI sheet pending."
+    },
+    {
+      "requirement_id": "MOB-F08",
+      "requirement_text": "Tool activity summary and failure count",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_denied_action_is_a_distinct_outcome_and_counts_close",
+      "negative_gate": "backend/tests/test_work_runs.py::test_run_envelope_takes_tool_state_from_records",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: 'Used 2 tools (1 failed, 1 denied)' after retry and deny."
+    },
+    {
+      "requirement_id": "MOB-F09",
+      "requirement_text": "Tool detail drawer and output",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/RunBlock.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_run_envelope_takes_tool_state_from_records",
+      "negative_gate": "backend/tests/test_contracts.py::test_handler_crash_and_tool_error_end_failed_not_running",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Tool drawer shows exact status, input, output and error; JSON rendered inertly."
+    },
+    {
+      "requirement_id": "MOB-F10",
+      "requirement_text": "Pending multiple-choice question with descriptions",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
+      "negative_gate": "backend/tests/test_response_flow.py",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: options with consequences."
+    },
+    {
+      "requirement_id": "MOB-F11",
+      "requirement_text": "Disabled submit until valid choice; selection feedback",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
+      "negative_gate": "backend/tests/test_work_runs.py::test_stale_and_duplicate_question_answers_are_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: submit disabled until a choice, and for an empty Other."
+    },
+    {
+      "requirement_id": "MOB-F12",
+      "requirement_text": "Other and freeform override",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_freeform_answer_is_recorded_as_a_user_note",
+      "negative_gate": "backend/tests/test_response_flow.py",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Backend state machine verified (test_response_flow.py); UI and rendered evidence OPEN."
+    },
+    {
+      "requirement_id": "MOB-F13",
+      "requirement_text": "Question/choice receipt in transcript",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
+      "negative_gate": "backend/tests/test_work_runs.py::test_stale_and_duplicate_question_answers_are_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: 'You chose:' receipt persists."
+    },
+    {
+      "requirement_id": "MOB-F14",
+      "requirement_text": "Interruption and return to pending question",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/response_flow.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_new_message_keeps_the_pending_question_unless_dismissed",
+      "negative_gate": "backend/tests/test_work_runs.py::test_new_message_keeps_the_pending_question_unless_dismissed",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+        "backend/tests/test_response_flow.py"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: a new message queues while the same question stays open."
+    },
+    {
+      "requirement_id": "MOB-F15",
+      "requirement_text": "Side-effect reconciliation after contradictory status",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/work_runs.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_work_runs.py::test_run_envelope_takes_tool_state_from_records"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Action state comes from call records (final.action_ledger, envelope); narration-vs-receipt conflict flagging for model prose is not implemented (mock/local models do not narrate actions yet)."
+    },
+    {
+      "requirement_id": "MOB-F16",
+      "requirement_text": "Multi-action batch with partial failure and retry",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_failed_action_asks_and_retry_repeats_only_the_failed_target",
+      "negative_gate": "backend/tests/test_work_runs.py::test_retry_in_ask_mode_needs_a_fresh_approval",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: retry raises a fresh approval for the failed target only."
+    },
+    {
+      "requirement_id": "MOB-F17",
+      "requirement_text": "Context menu: share, copy branch, rename, feedback, archive",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/ChatView.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "qa/rendered/rendered_qa.mjs",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Rename, copy transcript, background tasks and confirmed permanent delete (the dialog states there is no archive). Share-to-external and feedback are intentionally absent: no corresponding Mucaro object exists (per the brief's own rule)."
+    },
+    {
+      "requirement_id": "MOB-F18",
+      "requirement_text": "Background tasks with state, metrics, transcript, load more",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/work_runs.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_work_runs.py::test_background_task_list_paginates_with_receipt_metrics",
+      "negative_gate": "backend/tests/test_work_runs.py::test_crashing_step_ends_the_run_failed_with_a_category",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": "Rendered: tasks with metrics and transcript drill-down."
+    },
+    {
+      "requirement_id": "MOB-F19",
+      "requirement_text": "Linked pull-request list and exact PR detail",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/artifact_identity.py",
+        "backend/app/coding_lifecycle.py"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [],
+      "state": "OPEN",
+      "blocker_id": null,
+      "dag_node": "N15",
+      "notes": ""
+    },
+    {
+      "requirement_id": "MOB-F20",
+      "requirement_text": "Copy and read-aloud message actions",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/MessageActions.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": null,
+      "negative_gate": null,
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "Copy and Read aloud controls with accessible start/stop render; activation (clipboard permission, speech synthesis) is not exercised headlessly."
+    },
+    {
+      "requirement_id": "SD-001",
+      "requirement_text": "ingest_folder follows symlinks and does not re-check the directory grant per file, allowing reads outside a granted folder",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/ingestion.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_ingestion_safety.py::test_folder_ingest_accounts_for_failures_without_aborting",
+      "negative_gate": "backend/tests/test_ingestion_safety.py::test_symlink_inside_granted_folder_is_not_followed",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_ingestion_safety.py"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "Symlinks are never followed; each entry is ingested, skipped with a reason, or failed with a status (entries_seen closes)."
+    },
+    {
+      "requirement_id": "SD-002",
+      "requirement_text": "DOCX parsing reads word/document.xml with no decompressed-size or ratio cap (decompression bomb)",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/parser.py",
+        "backend/app/archive_safety.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_ingestion_safety.py::test_safe_zip_is_inventoried_and_extracts_text_members",
+      "negative_gate": "backend/tests/test_ingestion_safety.py::test_docx_decompression_bomb_is_rejected",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_ingestion_safety.py::test_decompression_bomb_is_rejected_by_ratio_and_by_actual_bytes"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "DOCX is inspected with inspect_zip (ratio/size/member limits) and XML members are read with bounded actual-byte reads."
+    },
+    {
+      "requirement_id": "SD-003",
+      "requirement_text": "Sensitive GET routes (memory export, tool calls/audit, chunks, runs, exports) are readable without the operator token when one is configured",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/auth.py",
+        "backend/app/main.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_accept_correct_token",
+      "negative_gate": "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_reject_missing_token_when_configured",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_api_auth_boundary.py::test_status_routes_remain_public_so_clients_can_discover_auth"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "Default-deny app dependency; only /health, /config, /security, /tools stay public."
+    },
+    {
+      "requirement_id": "SD-004",
+      "requirement_text": "Operator token comparison is not constant-time",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/auth.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_api_auth_boundary.py::test_data_bearing_routes_accept_correct_token",
+      "negative_gate": "backend/tests/test_api_auth_boundary.py::test_wrong_tokens_are_rejected_including_prefix_and_length_variants",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/app/auth.py"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "hmac.compare_digest on UTF-8 bytes."
+    },
+    {
+      "requirement_id": "SD-005",
+      "requirement_text": "test_web_render performs a real DNS lookup (hidden network dependency; fails offline)",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/tests/test_web_render.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_web_render.py::test_render_receipt_binds_engine_dom_and_screenshot",
+      "negative_gate": "backend/tests/test_web_render.py::test_render_rejects_oversized_dom",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_web_render.py::offline_dns"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "Falsified: under `unshare -rn` the baseline file fails 2/4, the fixed file passes 4/4."
+    },
+    {
+      "requirement_id": "SD-006",
+      "requirement_text": "Application data directory resolves inside the application bundle (project_root/data)",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/config.py",
+        "backend/app/desktop_shell.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_desktop_shell.py::test_smoke_starts_serves_and_stops_with_data_outside_the_code_tree",
+      "negative_gate": "backend/tests/test_desktop_shell.py::test_frozen_bundle_sets_resource_root",
+      "benchmark": null,
+      "evidence_refs": [
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N06",
+      "notes": "Repaired by MUCARO_AI_DATA_DIR and the shell's Application Support default. The build receipt check no_user_data_or_secrets_in_bundle passes."
+    },
+    {
+      "requirement_id": "SD-007",
+      "requirement_text": "Built UI calls a hard-coded API base (127.0.0.1:8000); any other launch port breaks the GUI",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/api.js",
+        "frontend/vite.config.js"
+      ],
+      "dependencies": [],
+      "positive_gate": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "negative_gate": "qa/rendered/rendered_qa.mjs",
+      "benchmark": null,
+      "evidence_refs": [
+        "frontend/src/api.js"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N19",
+      "notes": "Same-origin API base; the rendered QA serves the UI from a random free port and every workflow works."
+    },
+    {
+      "requirement_id": "SD-008",
+      "requirement_text": "Tool audit log and JSON ledgers use unlocked read-modify-write; concurrent writers can lose events",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/utils.py",
+        "backend/app/tools.py",
+        "backend/app/memory.py",
+        "backend/app/permissions.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_contracts.py::test_concurrent_ledger_writers_do_not_lose_updates",
+      "negative_gate": "backend/tests/test_contracts.py::test_concurrent_approvals_resolve_exactly_once",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_contracts.py::test_concurrent_runs_execute_the_handler_exactly_once"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N06",
+      "notes": "Locked read-modify-write (fcntl + thread lock) and per-writer fsynced temp files. Falsified: the old pattern kept 7 of 24 concurrent updates with FileNotFoundError/JSONDecodeError; the locked writer keeps 24 of 24."
+    },
+    {
+      "requirement_id": "SD-011",
+      "requirement_text": "Web fetch validates DNS before urllib reconnects (DNS-rebinding window to private hosts)",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/web_browsing.py"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_web_browsing.py",
+      "negative_gate": "backend/tests/test_ingestion_safety.py::test_dns_rebinding_to_private_address_is_blocked_at_connect_time",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/app/web_browsing.py"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
+      "dag_node": "N02",
+      "notes": "Direct connections re-resolve and vet every address at connect time; proxied connections delegate resolution to the configured proxy."
+    },
+    {
+      "requirement_id": "SD-012",
+      "requirement_text": "Phone access to a local Mucaro service over a private network or VPN, token-authenticated with optional TLS, through the source launcher (not an installable web app, a native client or the packaged app)",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/auth.py",
+        "backend/app/main.py",
+        "backend/app/security.py",
+        "scripts/launch_app.py",
+        "scripts/native_window.py",
+        "frontend/src/App.jsx",
+        "frontend/src/api.js",
+        "frontend/src/clipboard.js",
+        "frontend/src/components/TokenGate.jsx",
+        "frontend/src/components/CleartextNotice.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_phone_access.py::test_remote_client_with_the_right_token_is_served_and_other_tokens_get_401",
+      "negative_gate": "backend/tests/test_phone_access.py::test_remote_client_without_a_configured_token_is_refused",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_phone_access.py::test_public_bind_requires_a_strong_token_in_every_profile",
+        "backend/tests/test_phone_access.py::test_remote_clients_do_not_see_host_paths",
+        "backend/tests/test_phone_access.py::test_phone_launch_binds_all_interfaces_with_a_token_and_prints_the_links",
+        "backend/tests/test_phone_access.py::test_native_phone_launch_keeps_the_token_out_of_the_log_and_offers_the_link_in_a_dialog",
+        "qa/rendered/rendered_qa.mjs",
+        "docs/PHONE_ACCESS.md"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "PROVISIONAL, not PASS. The automated gates simulate a remote peer in-process (TestClient client=(ip, port)) and drive an emulated iPhone in Chromium against a real backend reached through a non-loopback address of the test machine. No physical iPhone or real network session has been observed. OPEN: signing in on a real iPhone, the on-screen keyboard and password field, resume after the phone locks, the macOS firewall prompt, a network that isolates clients, and WebKit (hosted runners are not executing jobs, BLK-ACTIONS-001). Not part of this requirement: an installable web app, a native client (SD-010) and serving from the packaged app, which stays loopback-only."
+    }
+  ]
+}

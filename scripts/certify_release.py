@@ -43,6 +43,11 @@ GENERATED_PATH_PARTS = {
     ".serena",
 }
 GENERATED_SUFFIXES = {".sqlite", ".sqlite3", ".db", ".pyc"}
+TRACKED_LARGE_FILE_ALLOWLIST = {
+    # Deliberate native application asset. Keep the exception path-specific and bounded
+    # so unrelated large tracked files still fail closed.
+    "Mucaro AI.app/Contents/Resources/MucaroAI.icns": 3_000_000,
+}
 
 
 @dataclass
@@ -89,8 +94,18 @@ def gate_no_secret_patterns(files: list[Path]) -> Gate:
 
 
 def gate_no_large_files(files: list[Path], *, max_bytes: int = 1_000_000) -> Gate:
-    hits = [f"{path.relative_to(ROOT)}:{path.stat().st_size}" for path in files if path.stat().st_size > max_bytes]
-    return Gate("large_file_scan", "PASS" if not hits else "FAIL", ",".join(hits) or f"<= {max_bytes} bytes")
+    hits = []
+    for path in files:
+        size = path.stat().st_size
+        if size <= max_bytes:
+            continue
+        rel = path.relative_to(ROOT).as_posix()
+        exception_limit = TRACKED_LARGE_FILE_ALLOWLIST.get(rel)
+        if exception_limit is not None and size <= exception_limit:
+            continue
+        hits.append(f"{rel}:{size}")
+    detail = ",".join(hits) or f"<= {max_bytes} bytes except bounded allowlist"
+    return Gate("large_file_scan", "PASS" if not hits else "FAIL", detail)
 
 
 def gate_no_generated_tracked(files: list[Path]) -> Gate:
@@ -256,7 +271,7 @@ def git_head() -> str:
 
 def main() -> int:
     env = os.environ.copy()
-    env["PYTHONPATH"] = f"{ROOT}:{ROOT / 'backend'}"
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT), str(ROOT / "backend")])
     head_sha = git_head()
     files = tracked_files()
     gates = [
@@ -296,6 +311,21 @@ def main() -> int:
                     "pip_audit",
                     "-r",
                     "backend/requirements.txt",
+                    "--progress-spinner",
+                    "off",
+                ],
+            ),
+            gate_command(
+                "python_runtime_lock_audit",
+                [
+                    sys.executable,
+                    "-m",
+                    "pip_audit",
+                    "-r",
+                    "packaging/runtime/requirements-macos-x86_64.lock",
+                    "--no-deps",
+                    "--disable-pip",
+                    "--strict",
                     "--progress-spinner",
                     "off",
                 ],
