@@ -1461,6 +1461,15 @@
       "scope_state": "IN_SCOPE",
       "verification_method": "AUTOMATED_TEST",
       "crosswalk": []
+    },
+    {
+      "requirement_id": "SD-012",
+      "title": "Phone access to a local Mucaro service over a private network or VPN, token-authenticated with optional TLS, through the source launcher (not an installable web app, a native client or the packaged app)",
+      "source": "SCOPE_DELTA",
+      "requirement_class": "PRODUCT",
+      "scope_state": "IN_SCOPE",
+      "verification_method": "AUTOMATED_TEST",
+      "crosswalk": []
     }
   ]
 }

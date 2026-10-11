@@ -4,8 +4,11 @@ set -uo pipefail
 ROOT="$1"
 shift
 
+# MUCARO_OSASCRIPT lets tests stub the dialog; normal use is always /usr/bin/osascript.
+OSASCRIPT="${MUCARO_OSASCRIPT:-/usr/bin/osascript}"
+
 failure_dialog() {
-  /usr/bin/osascript -e 'on run argv' \
+  "${OSASCRIPT}" -e 'on run argv' \
     -e 'display dialog (item 1 of argv) with title "Mucaro AI" buttons {"OK"} default button "OK" with icon caution' \
     -e 'end run' -- "$1" </dev/null >/dev/null 2>&1 || true
 }
