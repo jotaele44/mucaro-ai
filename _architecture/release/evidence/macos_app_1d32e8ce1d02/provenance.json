@@ -1,0 +1,29 @@
+{
+  "schema_version": "mucaro-evidence-provenance/1.0",
+  "source": "GitHub Actions workflow 'macOS app' (.github/workflows/macos-app.yml), pull_request event on jotaele44/mucaro-ai#110",
+  "workflow_run_id": 36067681353,
+  "job_id": 107861150967,
+  "runner": "macos-14 (arm64), macOS 14.8.9, Python 3.11.9",
+  "evidence_artifact": {
+    "artifact_id": 10836948630,
+    "name": "macos-app-evidence-ba034783d60643073682927b6aac71b7ce78a618",
+    "sha256": "1d3af1b9e7454e42cf70c0bcaf43bef103edb20c552c1f794ea1e1f4389dbac2"
+  },
+  "app_artifact": {
+    "artifact_id": 10837197746,
+    "name": "mucaro-ai-macos-arm64-ba034783d60643073682927b6aac71b7ce78a618",
+    "zip_sha256_from_build_receipt": "83bb1c1a9e662287aaa758dbd66d89a49896228e34dcc220aa8ae708db7a7cf3"
+  },
+  "tested_commit": "ba034783d60643073682927b6aac71b7ce78a618",
+  "tested_commit_note": "GitHub's pull-request merge commit 'Merge 1d32e8ce1d02ffaa481d9e783721794c4c1c8fd0 into 0bf5bf88a9088042688f1d77af5ad3dad144afce'. 0bf5bf8 is an ancestor of 1d32e8c, so the merged tree equals the tree of branch head 1d32e8c. Later runs check out the PR head itself (workflow fix in the following commit).",
+  "branch_head": "1d32e8ce1d02ffaa481d9e783721794c4c1c8fd0",
+  "files": {
+    "build_receipt.json": "27e56db9c64ad99c96e885c0c08501453100f6c1173d8e765ece968a0aa34168",
+    "e2e_receipt.json": "f3d9d086cc2e4f28b7594d3a0094d46780b4bc1a25623508d156a2cd7ed1799c",
+    "window.png": "c11575e80f15c38eea48fcf1957f2a01a7403b0f3e9d27d4d793ac45515b5468"
+  },
+  "omitted": {
+    "bundle_manifest.json": "175 KB per-file hash list; its digest is build_receipt.json bundle.tree_sha256",
+    "pyinstaller.log": "build log, kept in the CI artifact"
+  }
+}

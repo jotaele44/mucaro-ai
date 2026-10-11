@@ -4,7 +4,8 @@ import hashlib
 import json
 from typing import Any
 
-from .model_router import ModelProviderError, get_model_provider_spec, list_model_providers, normalize_model_provider
+from .contracts import validate_contract
+from .model_router import list_model_providers, normalize_model_provider
 
 MODEL_ROUTING_SCHEMA_VERSION = "mucaro-model-routing/1.0"
 TASK_TYPES = {"cited_qa", "coding", "analysis", "summarization", "extraction", "conversation"}
@@ -34,7 +35,16 @@ def plan_model_route(
     require_offline: bool = False,
     require_citations: bool = True,
     allow_offline_failover: bool = False,
+    required_modalities: list[str] | None = None,
+    min_context_tokens: int | None = None,
+    system_offline: bool = False,
 ) -> dict[str, Any]:
+    """Select a provider under explicit constraints (TGT-010, MATRIX-012).
+
+    require_offline / allow_live=False keep content on this machine; system_offline
+    reports that the network is unavailable, which makes remote providers ineligible
+    rather than hanging on a connection attempt.
+    """
     task = task_type.strip().lower() if isinstance(task_type, str) else ""
     if task not in TASK_TYPES:
         raise ModelRoutingError("ERROR_MODEL_ROUTING_TASK", f"Unsupported task_type: {task_type}")
@@ -64,12 +74,23 @@ def plan_model_route(
     if preferred is not None and preferred not in allowed:
         raise ModelRoutingError("ERROR_MODEL_ROUTING_PROVIDER_NOT_ALLOWED", preferred)
 
+    modalities_needed = sorted({str(item).lower() for item in (required_modalities or ["text"])})
     candidates: list[dict[str, Any]] = []
     for provider in allowed:
         status = provider_rows[provider]
         live = bool(status["live"])
         reasons: list[str] = []
         eligible = True
+        missing_modalities = [item for item in modalities_needed if item not in status.get("modalities", ["text"])]
+        if missing_modalities:
+            eligible = False
+            reasons.append(f"MODALITY_UNSUPPORTED:{','.join(missing_modalities)}")
+        if min_context_tokens is not None and int(status.get("context_tokens") or 0) < min_context_tokens:
+            eligible = False
+            reasons.append(f"CONTEXT_TOO_SMALL:{status.get('context_tokens')}<{min_context_tokens}")
+        if system_offline and status.get("locality") == "remote":
+            eligible = False
+            reasons.append("SYSTEM_OFFLINE")
         if live and not allow_live:
             eligible = False
             reasons.append("LIVE_PROVIDER_NOT_EXPLICITLY_ALLOWED")
@@ -87,6 +108,7 @@ def plan_model_route(
                 "provider": provider,
                 "default_model": status["default_model"],
                 "live": live,
+                "locality": status.get("locality"),
                 "provider_status": status["status"],
                 "warnings": list(status.get("warnings") or []),
                 "eligible": eligible,
@@ -94,26 +116,26 @@ def plan_model_route(
             }
         )
 
-    eligible = [row for row in candidates if row["eligible"]]
+    eligible_rows = [row for row in candidates if row["eligible"]]
     selected: dict[str, Any] | None = None
     selection_reason = None
     if preferred is not None:
-        selected = next((row for row in eligible if row["provider"] == preferred), None)
+        selected = next((row for row in eligible_rows if row["provider"] == preferred), None)
         if selected is None:
             selection_reason = "PREFERRED_PROVIDER_NOT_ELIGIBLE"
         else:
             selection_reason = "EXPLICIT_PREFERRED_PROVIDER"
     else:
         # Never escalate to a live provider merely because credentials happen to exist.
-        offline = [row for row in eligible if not row["live"]]
+        offline = [row for row in eligible_rows if not row["live"]]
         if require_live:
-            selected = eligible[0] if eligible else None
+            selected = eligible_rows[0] if eligible_rows else None
             selection_reason = "EXPLICIT_LIVE_REQUIREMENT" if selected else "NO_ELIGIBLE_LIVE_PROVIDER"
         elif offline:
             selected = offline[0]
             selection_reason = "SAFE_OFFLINE_DEFAULT"
-        elif allow_live and eligible:
-            selected = eligible[0]
+        elif allow_live and eligible_rows:
+            selected = eligible_rows[0]
             selection_reason = "EXPLICIT_LIVE_FALLBACK_ALLOWED"
         else:
             selection_reason = "NO_ELIGIBLE_PROVIDER"
@@ -122,22 +144,24 @@ def plan_model_route(
     selected_model = preferred_model.strip() if isinstance(preferred_model, str) and preferred_model.strip() else (
         selected["default_model"] if selected else None
     )
-    status = "MODEL_ROUTE_READY" if selected else "MODEL_ROUTE_BLOCKED"
+    route_status = "MODEL_ROUTE_READY" if selected else "MODEL_ROUTE_BLOCKED"
     # Ordered failover: the selected provider first, then other eligible providers in allowlist order.
     # A live provider is only ever eligible with allow_live, and an offline provider (mock) is only
     # a failover target when explicitly permitted, so an outage never silently degrades a live answer.
     failover_order: list[dict[str, Any]] = []
     if selected is not None:
         failover_order.append({"provider": selected["provider"], "model": selected_model})
-        for row in eligible:
+        for row in eligible_rows:
             if row["provider"] == selected["provider"]:
                 continue
-            if not row["live"] and not (allow_offline_failover or not selected["live"]):
+            if row["provider"] == "mock" and selected["provider"] != "mock" and not allow_offline_failover:
+                continue
+            if selected["live"] and not row["live"] and not allow_offline_failover:
                 continue
             failover_order.append({"provider": row["provider"], "model": row["default_model"]})
     payload: dict[str, Any] = {
         "schema_version": MODEL_ROUTING_SCHEMA_VERSION,
-        "status": status,
+        "status": route_status,
         "task_type": task,
         "constraints": {
             "preferred_provider": preferred,
@@ -148,6 +172,9 @@ def plan_model_route(
             "require_offline": require_offline,
             "require_citations": require_citations,
             "allow_offline_failover": allow_offline_failover,
+            "required_modalities": modalities_needed,
+            "min_context_tokens": min_context_tokens,
+            "system_offline": system_offline,
         },
         "selected_provider": selected_provider,
         "selected_model": selected_model,
@@ -164,6 +191,7 @@ def plan_model_route(
             "no_implicit_offline_failover_from_live": selected is None or not selected["live"] or allow_offline_failover or all(
                 next(c for c in candidates if c["provider"] == row["provider"])["live"] for row in failover_order
             ),
+            "no_remote_provider_while_offline": not system_offline or selected is None or selected.get("locality") != "remote",
         },
         "limitations": [
             "Routing is policy selection over registered providers; it does not estimate answer quality or cost from unobserved future outputs.",
@@ -178,4 +206,4 @@ def plan_model_route(
         ],
     }
     payload["route_sha256"] = _stable_hash(payload)
-    return payload
+    return validate_contract("model_route_decision", payload)

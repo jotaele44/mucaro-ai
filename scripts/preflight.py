@@ -31,11 +31,16 @@ REQUIRED_FILES = [
     "README.md",
     ".env.example",
     "backend/requirements.txt",
+    "packaging/runtime/macos-x86_64.json",
+    "packaging/runtime/requirements-macos-x86_64.lock",
     "backend/app/main.py",
     "scripts/release_check.py",
     "schemas/execution_gate.schema.json",
 ]
 PY_IMPORTS = ["fastapi", "pydantic", "jsonschema", "pytest", "pypdf"]
+# .env files copied from older .env.example versions may still pin these retired model ids.
+RETIRED_MODEL_IDS = {"claude-3-5-sonnet-latest"}
+CURRENT_DEFAULT_MODEL = "claude-sonnet-5"
 
 
 def status_line(level: str, code: str, detail: str) -> None:
@@ -62,9 +67,18 @@ def command_version(cmd: str, args: list[str] | None = None) -> tuple[bool, str]
     return proc.returncode == 0, version
 
 
+def warn_retired_env_model(env_file: Path) -> None:
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        key, sep, value = line.strip().partition("=")
+        model = value.split("#", 1)[0].strip().strip("\"'")
+        if sep and key.strip() == "MUCARO_AI_MODEL" and model in RETIRED_MODEL_IDS:
+            status_line("WARN", "ENV_MODEL_RETIRED", f"{model} in {env_file.name}; set MUCARO_AI_MODEL={CURRENT_DEFAULT_MODEL}")
+
+
 def ensure_env_file(create_env: bool) -> bool:
     if ENV_FILE.exists():
         status_line("OK", "ENV_PRESENT", str(ENV_FILE))
+        warn_retired_env_model(ENV_FILE)
         return True
     if not ENV_EXAMPLE.exists():
         status_line("ERROR", "ENV_EXAMPLE_MISSING", str(ENV_EXAMPLE))
@@ -112,6 +126,9 @@ def check_python(strict_imports: bool) -> bool:
     version = sys.version_info
     if version >= (3, 11):
         status_line("OK", "PYTHON_VERSION", platform.python_version())
+        if version >= (3, 14):
+            # Pinned rasterio 1.4.3 publishes wheels only through CPython 3.13.
+            status_line("WARN", "PYTHON_UNTESTED", f"found={platform.python_version()} supported=3.11-3.13")
     else:
         status_line("ERROR", "PYTHON_TOO_OLD", f"found={platform.python_version()} required>=3.11")
         ok = False
@@ -155,6 +172,11 @@ def check_tools(strict_frontend: bool) -> bool:
     return ok
 
 
+def skip_tool_probe() -> bool:
+    status_line("OK", "TOOL_PROBE_SKIPPED", "private runtimes from the double-click setup are used instead of PATH tools")
+    return True
+
+
 def check_sample_data() -> bool:
     sample = ROOT / "data" / "input" / "sample_mucaro_ai.txt"
     if sample.exists():
@@ -169,6 +191,12 @@ def main() -> int:
     parser.add_argument("--create-env", action="store_true", help="Create .env from .env.example when missing.")
     parser.add_argument("--strict-imports", action="store_true", help="Fail if Python dependencies are not importable.")
     parser.add_argument("--strict-frontend", action="store_true", help="Fail if Node/npm/frontend dependencies are missing.")
+    parser.add_argument(
+        "--skip-tool-probe",
+        action="store_true",
+        help="Do not run git/node/npm from PATH (the double-click setup uses private runtimes; on macOS "
+        "without developer tools, /usr/bin/git opens an install dialog).",
+    )
     args = parser.parse_args()
 
     print(f"PREFLIGHT_ROOT {ROOT}")
@@ -176,7 +204,7 @@ def main() -> int:
         check_paths(),
         ensure_env_file(args.create_env),
         check_python(args.strict_imports),
-        check_tools(args.strict_frontend),
+        skip_tool_probe() if args.skip_tool_probe else check_tools(args.strict_frontend),
         check_sample_data(),
     ]
     if all(checks):

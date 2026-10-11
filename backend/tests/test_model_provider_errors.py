@@ -46,22 +46,46 @@ def test_classified_statuses_are_exactly_what_recovery_pauses_on() -> None:
     assert classify_provider_exception(_exc("BadRequestError", status_code=400)).status not in PROVIDER_INTERRUPTION_STATUSES
 
 
+class _FakeStream:
+    """The streaming surface the adapter uses: a context manager with text_stream and get_final_message."""
+
+    def __init__(self, behavior):
+        self._behavior = behavior
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    @property
+    def text_stream(self):
+        return iter(())
+
+    def get_final_message(self):
+        return self._behavior()
+
+
 class _FakeClient:
     def __init__(self, behavior):
         self.messages = self
         self._behavior = behavior
 
-    def create(self, **kwargs):
-        return self._behavior()
+    def stream(self, **kwargs):
+        return _FakeStream(self._behavior)
 
 
 def _install_fake_anthropic(monkeypatch: pytest.MonkeyPatch, behavior) -> None:
+    import importlib.machinery
     import sys
     import types
 
     module = types.ModuleType("anthropic")
+    module.__spec__ = importlib.machinery.ModuleSpec("anthropic", None)  # readiness reads it via find_spec()
     module.Anthropic = lambda: _FakeClient(behavior)  # type: ignore[attr-defined]
+    module.APIError = type("APIError", (Exception,), {})  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "anthropic", module)
+    monkeypatch.setattr(model_router, "_ANTHROPIC_CLIENT", {})  # never reuse a client cached by another test
     monkeypatch.setenv("MUCARO_AI_LIVE_MODE", "1")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 

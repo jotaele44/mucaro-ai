@@ -69,10 +69,16 @@ def run_with_failover(
             except ModelProviderError as exc:
                 attempts.append(_record(len(attempts) + 1, provider, model, exc.status, exc.detail, started_at, started, monotonic))
                 last_status, last_detail = exc.status, exc.detail
-                if exc.status in RETRY_STATUSES and attempt_in_provider < policy.max_attempts_per_provider:
+                # Part of the answer already reached the listener: neither a retry nor another provider may repeat it.
+                recoverable = not getattr(exc, "partial_output", False)
+                if (
+                    recoverable
+                    and exc.status in RETRY_STATUSES
+                    and attempt_in_provider < policy.max_attempts_per_provider
+                ):
                     sleep(policy.delay_before_retry(attempt_in_provider))
                     continue
-                if exc.status in NEXT_PROVIDER_STATUSES:
+                if recoverable and exc.status in NEXT_PROVIDER_STATUSES:
                     break
                 return {
                     "schema_version": FAILOVER_SCHEMA_VERSION,

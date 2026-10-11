@@ -1,0 +1,89 @@
+{
+  "schema_version": "mucaro-evidence-provenance/1.0",
+  "source": "Local run of scripts/certify_release_grade.py on a clean worktree at the tested head",
+  "tested_commit": "0a806c1e8c98cc159568fea898a76a30189b0d1c",
+  "command": [
+    "python",
+    "scripts/certify_release_grade.py",
+    "--macos-build-receipt",
+    "<macos_app_0a806c1e8c98/build_receipt.json>",
+    "--macos-e2e-receipt",
+    "<macos_app_0a806c1e8c98/e2e_receipt.json>",
+    "--hosted-ci-receipt",
+    "<hosted_ci_evidence.json>"
+  ],
+  "inputs": {
+    "macos_build_receipt": {
+      "path": "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
+      "sha256": "ccd63d49ccbbbc213d25f7c941437d471b9c8def9777ccd20bbbb2f5c4235661"
+    },
+    "macos_e2e_receipt": {
+      "path": "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+      "sha256": "387d8cb7fbe43a286bdce1a8b03073948c748e447c7ba49d46282b75768b4e6d"
+    },
+    "hosted_ci_receipt": {
+      "path": "_architecture/release/evidence/release_grade_0a806c1e8c98/hosted_ci_evidence.json",
+      "sha256": "344bf89ad5894dfe129f40970bb9e5afc269572e6161b6d28eb85cfa6a8e9c7f"
+    }
+  },
+  "inputs_bound_in_receipt": {
+    "macos_build_receipt": true,
+    "macos_e2e_receipt": true,
+    "hosted_ci_receipt": true
+  },
+  "hosted_ci_artifact": {
+    "workflow_run_id": 36268886568,
+    "artifact_id": 10914564071,
+    "name": "mucaro-hosted-ci-evidence.json",
+    "sha256": "344bf89ad5894dfe129f40970bb9e5afc269572e6161b6d28eb85cfa6a8e9c7f",
+    "tested_merge": "e3cfb5fc03dfc22be3046e34f7fe75467eb0dfd9",
+    "tree_equivalent_to_pull_request_head": true
+  },
+  "verdict": {
+    "receipt_status": "MUCARO_AI_RELEASE_GRADE_BLOCKED",
+    "release_status_line": "MUCARO AI RELEASE STATUS = PROVISIONAL",
+    "gates": {
+      "clean_worktree": "PASS",
+      "local_release": "PASS",
+      "fresh_clone": "PASS",
+      "python_distribution": "PASS",
+      "representative_operator_workflow": "PASS",
+      "retrieval_benchmark": "PASS",
+      "gis_benchmark": "PASS",
+      "security_gates": "PASS",
+      "security_profile": "PASS",
+      "developer_environment_security": "INFO",
+      "package_build": "PASS",
+      "source_artifact_installability": "PASS",
+      "macos_app_build": "PASS",
+      "macos_app_e2e": "PASS",
+      "signed_notarized_installer": "BLOCKED",
+      "portable_embedded_runtime": "BLOCKED",
+      "portable_install_reinstall_smoke": "BLOCKED",
+      "distinct_version_upgrade_rollback": "BLOCKED",
+      "clean_machine_macos": "BLOCKED",
+      "hosted_ci_current_head": "PASS",
+      "final_release_manifest": "PASS",
+      "release_scope": "BLOCKED"
+    },
+    "blocking_gates": [
+      "clean_machine_macos",
+      "distinct_version_upgrade_rollback",
+      "portable_embedded_runtime",
+      "portable_install_reinstall_smoke",
+      "release_scope",
+      "signed_notarized_installer"
+    ],
+    "lane_decision": "Both release lanes are required for release-grade certification (user decision 2026-09-26)."
+  },
+  "files": {
+    "release_grade_receipt.json": "1186c315d7955c8ae816a58d43359459683ec4150f4efbd54cfd196eb2cb6f05",
+    "final_release_manifest.json": "7732133bc44c37e094e2453de177b0ad310e39f1f24ffaac63b5a5a49d7564ad",
+    "hosted_ci_evidence.json": "344bf89ad5894dfe129f40970bb9e5afc269572e6161b6d28eb85cfa6a8e9c7f"
+  },
+  "notes": {
+    "paths": "The receipt and manifest name the macOS and hosted-CI inputs by the scratch-directory paths they had at run time. The SHA-256 values are the binding: each input committed here hashes to the value recorded inside the receipt.",
+    "timing": "The evidence is committed one commit after the tested head, as for the 948fda4 macOS evidence; the receipt stays bound to 0a806c1.",
+    "portable_lane": "The four portable-lane gates are BLOCKED because no portable runtime, previous portable release, install root or clean-machine receipt was supplied; none has been produced yet."
+  }
+}

@@ -5,7 +5,6 @@ import json
 import os
 import shlex
 import subprocess
-import sys
 import tomllib
 import zipfile
 from collections import Counter
@@ -42,6 +41,8 @@ REQUIRED_PACKAGE_INPUTS = [
     "_architecture/schemas/macos-app-store-malware-scan.schema.json",
     "packaging/macos/MucaroAI-AppStore.entitlements",
     "packaging/macos/PrivacyInfo.xcprivacy",
+    "packaging/runtime/macos-x86_64.json",
+    "packaging/runtime/requirements-macos-x86_64.lock",
     "frontend/package.json",
     "frontend/package-lock.json",
 ]
@@ -177,6 +178,8 @@ def build_desktop_package_manifest(root: Path = ROOT) -> dict[str, Any]:
         "scripts/bootstrap_windows.ps1",
         "frontend/package-lock.json",
         "pyproject.toml",
+        "packaging/runtime/macos-x86_64.json",
+        "packaging/runtime/requirements-macos-x86_64.lock",
     ]
     missing = [path for path in required if not (root / path).exists()]
     metadata_error = None
@@ -222,17 +225,18 @@ def build_macos_app_bundle(
     executable_path = macos_dir / "mucaro-ai"
     plist_path = contents / "Info.plist"
     receipt_path = resources_dir / "mucaro-app-receipt.json"
-    runtime_python = python_executable or sys.executable
+    # Kept as an API compatibility argument; setup provisions its own interpreter.
+    del python_executable
 
     checks: list[dict[str, str]] = []
     required_files = [
-        root / "scripts" / "launch_app.py",
-        root / "frontend" / "dist" / "index.html",
+        root / "scripts" / "native_start.sh",
+        root / "scripts" / "one_click.sh",
+        root / "scripts" / "one_click.py",
         root / "pyproject.toml",
     ]
     missing_files = [str(path.relative_to(root)) for path in required_files if not path.exists()]
     checks.append(_check("required_runtime_inputs", "PASS" if not missing_files else "FAIL", "all present" if not missing_files else f"missing={','.join(missing_files)}"))
-    checks.append(_check("python_executable", "PASS" if Path(runtime_python).exists() else "FAIL", runtime_python))
 
     ok, head_sha = _git_output(root, ["rev-parse", "HEAD"])
     checks.append(_check("git_head", "PASS" if ok else "WARN", head_sha or "unavailable"))
@@ -248,12 +252,11 @@ def build_macos_app_bundle(
             "failed_checks": [check["name"] for check in failed],
         }
 
-    launcher = f"""#!/usr/bin/env bash
+    launcher = f"""#!/bin/bash
 set -euo pipefail
 REPO_ROOT={shlex.quote(str(root))}
-PYTHON_EXECUTABLE={shlex.quote(runtime_python)}
 cd "${{REPO_ROOT}}"
-exec "${{PYTHON_EXECUTABLE}}" scripts/launch_app.py "$@"
+exec /bin/bash scripts/native_start.sh "${{REPO_ROOT}}" "$@"
 """
     info_plist = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -266,13 +269,13 @@ exec "${{PYTHON_EXECUTABLE}}" scripts/launch_app.py "$@"
   <key>CFBundleExecutable</key>
   <string>mucaro-ai</string>
   <key>CFBundleIdentifier</key>
-  <string>ai.mucaro.local</string>
+  <string>ai.mucaro.source-launcher</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
   <string>{_project_version(root)}</string>
   <key>LSMinimumSystemVersion</key>
-  <string>12.0</string>
+  <string>13.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
 </dict>
@@ -291,8 +294,8 @@ exec "${{PYTHON_EXECUTABLE}}" scripts/launch_app.py "$@"
         "app_path": str(app_path),
         "bundle_name": MACOS_APP_BUNDLE_NAME,
         "head_sha": head_sha if ok else None,
-        "python_executable": runtime_python,
-        "entrypoint": "scripts/launch_app.py",
+        "python_executable": "provisioned by scripts/one_click.sh",
+        "entrypoint": "scripts/native_start.sh",
         "frontend_dist": "frontend/dist/index.html",
         "scope": "source_bound_local_macos_app_wrapper",
         "limitations": [
@@ -346,7 +349,7 @@ def verify_macos_app_bundle(app_path: Path, *, root: Path = ROOT) -> dict[str, A
         try:
             receipt = _load_json(receipt_path)
             checks.append(_check("receipt_schema", "PASS" if receipt.get("schema_version") == MACOS_APP_BUNDLE_SCHEMA_VERSION else "FAIL", str(receipt.get("schema_version"))))
-            checks.append(_check("receipt_entrypoint", "PASS" if receipt.get("entrypoint") == "scripts/launch_app.py" else "FAIL", str(receipt.get("entrypoint"))))
+            checks.append(_check("receipt_entrypoint", "PASS" if receipt.get("entrypoint") == "scripts/native_start.sh" else "FAIL", str(receipt.get("entrypoint"))))
         except (OSError, json.JSONDecodeError, ValueError) as exc:
             checks.append(_check("receipt_parse", "FAIL", str(exc)))
 
@@ -358,7 +361,7 @@ def verify_macos_app_bundle(app_path: Path, *, root: Path = ROOT) -> dict[str, A
     if executable_path.exists():
         launcher_text = executable_path.read_text(encoding="utf-8", errors="replace")
         checks.append(_check("launcher_points_to_repo", "PASS" if str(root) in launcher_text else "FAIL", str(root)))
-        checks.append(_check("launcher_points_to_launch_app", "PASS" if "scripts/launch_app.py" in launcher_text else "FAIL", "scripts/launch_app.py"))
+        checks.append(_check("launcher_points_to_native_start", "PASS" if "scripts/native_start.sh" in launcher_text else "FAIL", "scripts/native_start.sh"))
         checks.append(_check("launcher_forwards_arguments", "PASS" if '"$@"' in launcher_text else "FAIL", "bundle executable forwards launch_app arguments"))
 
     failed = [check for check in checks if check["status"] == "FAIL"]
@@ -641,8 +644,8 @@ def build_release_artifacts(
         }
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    assert version is not None
-    assert head_sha is not None
+    if version is None or head_sha is None:  # guarded by the checks above; explicit so it survives python -O
+        raise RuntimeError("package version and head must be known before writing the artifact")
     archive_path = output_dir / f"{PYTHON_PACKAGE_NAME}-{version}-{head_sha[:12]}-source.zip"
     manifest_path = output_dir / f"{PYTHON_PACKAGE_NAME}-{version}-{head_sha[:12]}-artifact-manifest.json"
     archive_root = f"{PYTHON_PACKAGE_NAME}-{version}"

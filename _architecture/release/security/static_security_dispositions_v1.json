@@ -1,0 +1,192 @@
+{
+  "schema_version": "mucaro-static-security-dispositions/1.0",
+  "requirement_ids": [
+    "INV-016",
+    "MATRIX-014"
+  ],
+  "scanner": "ruff flake8-bandit rules (--select S) over backend/app, packaging, scripts",
+  "classification_scale": [
+    "CRITICAL",
+    "HIGH",
+    "MEDIUM",
+    "LOW",
+    "NOT_APPLICABLE"
+  ],
+  "rule_dispositions": [
+    {
+      "rule": "S603",
+      "classification": "LOW",
+      "rationale": "subprocess is always called with argument lists and never with shell=True (checked by the gate); arguments come from fixed tool names or validated paths.",
+      "evidence": "backend/app/security_gates.py::shell_true_uses"
+    },
+    {
+      "rule": "S607",
+      "classification": "LOW",
+      "rationale": "Partial executable names (git, codesign, lsof, tesseract, pdftoppm, npm, ditto) resolve through the user's PATH. An attacker able to edit that PATH already runs code as the user; residual risk accepted for local tooling.",
+      "evidence": "docs/release/SECURITY_GATES.md"
+    }
+  ],
+  "finding_dispositions": [
+    {
+      "rule": "S608",
+      "path": "backend/app/db.py",
+      "code": "cursor = conn.execute(f\"DELETE FROM {table} WHERE {key_field} = ?\", (key,))",
+      "classification": "LOW",
+      "rationale": "Table names are checked against PAYLOAD_TABLES and key fields against a strict identifier pattern in _checked_identifiers before interpolation; all values are bound parameters.",
+      "evidence": "backend/app/db.py::_checked_identifiers"
+    },
+    {
+      "rule": "S608",
+      "path": "backend/app/db.py",
+      "code": "f\"INSERT OR REPLACE INTO {table} ({key_field}, payload_json) VALUES (?, ?)\",",
+      "classification": "LOW",
+      "rationale": "Table names are checked against PAYLOAD_TABLES and key fields against a strict identifier pattern in _checked_identifiers before interpolation; all values are bound parameters.",
+      "evidence": "backend/app/db.py::_checked_identifiers"
+    },
+    {
+      "rule": "S608",
+      "path": "backend/app/db.py",
+      "code": "rows = conn.execute(f\"SELECT payload_json FROM {table} ORDER BY rowid ASC\").fetchall()",
+      "classification": "LOW",
+      "rationale": "Table names are checked against PAYLOAD_TABLES and key fields against a strict identifier pattern in _checked_identifiers before interpolation; all values are bound parameters.",
+      "evidence": "backend/app/db.py::_checked_identifiers"
+    },
+    {
+      "rule": "S310",
+      "path": "backend/app/model_router.py",
+      "code": "request = urllib.request.Request(",
+      "classification": "NOT_APPLICABLE",
+      "rationale": "The local model URL must pass _is_loopback_url (http/https scheme and loopback host) before any request; proxies are bypassed.",
+      "evidence": "backend/tests/test_local_model.py"
+    },
+    {
+      "rule": "S314",
+      "path": "backend/app/parser.py",
+      "code": "root = ElementTree.fromstring(read_member_limited(archive, \"docProps/core.xml\", DOCX_XML_BYTE_LIMIT))",
+      "classification": "NOT_APPLICABLE",
+      "rationale": "ElementTree over expat >= 2.4.1 refuses entity amplification and does not resolve external entities; DOCX members are size-limited before parsing. Regressions prove both.",
+      "evidence": "backend/tests/test_ingestion_safety.py::test_docx_entity_amplification_is_refused_quickly"
+    },
+    {
+      "rule": "S314",
+      "path": "backend/app/parser.py",
+      "code": "root = ElementTree.fromstring(read_member_limited(archive, \"word/document.xml\", DOCX_XML_BYTE_LIMIT))",
+      "classification": "NOT_APPLICABLE",
+      "rationale": "ElementTree over expat >= 2.4.1 refuses entity amplification and does not resolve external entities; DOCX members are size-limited before parsing. Regressions prove both.",
+      "evidence": "backend/tests/test_ingestion_safety.py::test_docx_entity_amplification_is_refused_quickly"
+    },
+    {
+      "rule": "S104",
+      "path": "backend/app/web_browsing.py",
+      "code": "if lowered in {\"localhost\", \"0.0.0.0\"} or lowered.endswith(\".localhost\") or lowered.endswith(\".local\"):",
+      "classification": "NOT_APPLICABLE",
+      "rationale": "'0.0.0.0' appears in the private-host deny list used to block SSRF targets; nothing binds to it.",
+      "evidence": "backend/app/web_browsing.py::_is_private_host"
+    },
+    {
+      "rule": "S310",
+      "path": "backend/app/web_browsing.py",
+      "code": "request = urllib.request.Request(",
+      "classification": "LOW",
+      "rationale": "Web fetches go through the governed opener: http/https only, DNS-pinned connections, private-address and redirect checks, approval required per call (web.* tools).",
+      "evidence": "backend/tests/test_web_browsing.py"
+    },
+    {
+      "rule": "S310",
+      "path": "backend/app/web_browsing.py",
+      "code": "request = urllib.request.Request(",
+      "classification": "LOW",
+      "rationale": "Web fetches go through the governed opener: http/https only, DNS-pinned connections, private-address and redirect checks, approval required per call (web.* tools).",
+      "evidence": "backend/tests/test_web_browsing.py"
+    },
+    {
+      "rule": "S310",
+      "path": "backend/app/web_search.py",
+      "code": "request = urllib.request.Request(",
+      "classification": "NOT_APPLICABLE",
+      "rationale": "Requests only the fixed https Brave Search endpoint constant; query text is URL-encoded parameters; the tool needs approval and a key (BLK-WEB-001).",
+      "evidence": "backend/app/web_search.py::BRAVE_WEB_SEARCH_ENDPOINT"
+    },
+    {
+      "rule": "S310",
+      "path": "backend/app/web_search.py",
+      "code": "with urllib.request.urlopen(request, timeout=timeout_seconds) as response:",
+      "classification": "NOT_APPLICABLE",
+      "rationale": "Requests only the fixed https Brave Search endpoint constant; query text is URL-encoded parameters; the tool needs approval and a key (BLK-WEB-001).",
+      "evidence": "backend/app/web_search.py::BRAVE_WEB_SEARCH_ENDPOINT"
+    },
+    {
+      "rule": "S608",
+      "path": "backend/app/work_runs.py",
+      "code": "rows = conn.execute(f\"SELECT * FROM work_runs {where} ORDER BY queue_seq DESC LIMIT ?\", (*params, limit + 1)).fetchall()",
+      "classification": "NOT_APPLICABLE",
+      "rationale": "The WHERE clause is assembled only from constant fragments ('conversation_id = ?', 'state IN (?,...)', 'queue_seq < ?'); every value is a bound parameter.",
+      "evidence": "backend/app/work_runs.py::list_runs"
+    },
+    {
+      "rule": "S310",
+      "path": "scripts/launch_app.py",
+      "code": "with urllib.request.urlopen(url, timeout=1.5, context=context) as response:",
+      "classification": "NOT_APPLICABLE",
+      "rationale": "Maintainer launcher polls the local service's /health on 127.0.0.1 only; the scheme is a choice between http and https made by the launcher's own --tls-cert/--tls-key flags, never from input. With TLS the certificate is not verified because the probe asks only whether the service this launcher just started answers on loopback.",
+      "evidence": "backend/tests/test_phone_access.py::test_health_probe_only_ever_targets_loopback_and_skips_certificate_checks_only_for_tls"
+    },
+    {
+      "rule": "S104",
+      "path": "scripts/launch_app.py",
+      "code": "PHONE_BIND_HOST = \"0.0.0.0\"",
+      "classification": "MEDIUM",
+      "rationale": "Intentional and opt-in (SD-012): the launcher binds all interfaces only for --phone or MUCARO_AI_PHONE_ACCESS=1; the default launch stays on 127.0.0.1. The service then refuses to start without an operator token of 32+ characters (the launcher generates one per launch), and refuses a remote client that has no valid token. Residual risk, accepted and documented in docs/PHONE_ACCESS.md: over plain http the token and content are readable by anyone able to observe the local network, so the launcher prints a cleartext warning and offers --tls-cert/--tls-key. The packaged desktop app is not affected and stays loopback-only (network_exposure gate).",
+      "evidence": "backend/tests/test_phone_access.py"
+    },
+    {
+      "rule": "S310",
+      "path": "scripts/verify_macos_app.py",
+      "code": "request = urllib.request.Request(base + path, data=data, method=method, headers=headers)",
+      "classification": "NOT_APPLICABLE",
+      "rationale": "Verifier calls the app's own loopback service (http://127.0.0.1:<port>) only.",
+      "evidence": "scripts/verify_macos_app.py::call"
+    },
+    {
+      "rule": "S310",
+      "path": "backend/app/portable_runtime_source.py",
+      "code": "request = urllib.request.Request(source[\"url\"], headers={\"User-Agent\": \"mucaro-ai-runtime-materializer/1.0\"})",
+      "classification": "LOW",
+      "rationale": "Maintainer-side runtime materialization only (not reachable from the app or its tools). load_runtime_source_manifest rejects any source URL that is not https://github.com; the response URL after redirects must still be https; the download is capped at the pinned byte count and is rejected before extraction unless its size and SHA-256 match the repository-tracked manifest.",
+      "evidence": "backend/tests/test_portable_runtime_source.py::test_runtime_source_url_must_be_https_github"
+    },
+    {
+      "rule": "S310",
+      "path": "backend/app/portable_runtime_source.py",
+      "code": "with urllib.request.urlopen(request, timeout=120) as response, target.open(\"wb\") as output:",
+      "classification": "LOW",
+      "rationale": "Maintainer-side runtime materialization only (not reachable from the app or its tools). load_runtime_source_manifest rejects any source URL that is not https://github.com; the response URL after redirects must still be https; the download is capped at the pinned byte count and is rejected before extraction unless its size and SHA-256 match the repository-tracked manifest.",
+      "evidence": "backend/tests/test_portable_runtime_source.py::test_runtime_source_url_must_be_https_github"
+    },
+    {
+      "rule": "S310",
+      "path": "scripts/certify_retrieval_real_world_live.py",
+      "code": "request = urllib.request.Request(url, headers={\"User-Agent\": \"Mucaro-RT09-Cert/1.0\"})",
+      "classification": "LOW",
+      "rationale": "Maintainer-side RT-09 certification only. The source denominator is repository-frozen; acquisition accepts only HTTPS URLs whose requested/final host is in the explicit IETF/W3C/NIST allowlist, caps response bytes, and freezes final URL/status/time/SHA-256 before parsing or evaluation.",
+      "evidence": "backend/tests/test_rt09_real_world_corpus.py::test_rt09_denominator_is_large_real_world_and_mixed_format"
+    },
+    {
+      "rule": "S310",
+      "path": "scripts/certify_retrieval_real_world_live.py",
+      "code": "with urllib.request.urlopen(request, timeout=timeout) as response:",
+      "classification": "LOW",
+      "rationale": "Maintainer-side RT-09 certification only. Redirects are accepted only when the final host remains in the frozen allowlist; response bytes are bounded and exact source identities are hashed before any retrieval-quality claim.",
+      "evidence": "scripts/certify_retrieval_real_world_live.py::acquire"
+    },
+    {
+      "rule": "S310",
+      "path": "scripts/resolve_shadow_baseline.py",
+      "code": "with urllib.request.urlopen(request, timeout=30) as response:",
+      "classification": "LOW",
+      "rationale": "Maintainer-side Shadow QA baseline resolution only. Requests are confined to the fixed https://api.github.com host; repository input is constrained to owner/name, the workflow identifier is URL-encoded, and the scoped GitHub Actions token is used only for read-only workflow-run metadata.",
+      "evidence": "backend/tests/test_shadow_baseline.py"
+    }
+  ],
+  "vulnerability_dispositions": []
+}

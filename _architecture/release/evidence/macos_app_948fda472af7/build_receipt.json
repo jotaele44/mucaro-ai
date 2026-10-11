@@ -1,0 +1,109 @@
+{
+  "artifact": {
+    "app": "/Users/runner/work/_temp/macos-app/Mucaro AI.app",
+    "zip": "/Users/runner/work/_temp/macos-app/Mucaro-AI-0.1.23-326-macos-arm64.zip",
+    "zip_bytes": 49687027,
+    "zip_sha256": "a6c4baadf6734eff2ffcd634b4abe3323b32f5fc464f137716a00ee6c6cd2f12"
+  },
+  "blocking_checks": [],
+  "build_number": "326",
+  "bundle": {
+    "bytes": 131181924,
+    "files": 909,
+    "tree_sha256": "64d857498410a799467f2d407e11ecc642fb0fd9b169e91fa9c9c8647dadcea4"
+  },
+  "bundle_id": "ai.mucaro.app",
+  "checks": {
+    "architecture": {
+      "archs": [
+        "arm64"
+      ],
+      "ok": true
+    },
+    "ats_local_only": {
+      "ok": true,
+      "value": {
+        "NSAllowsLocalNetworking": true
+      }
+    },
+    "bundled_gui": {
+      "ok": true
+    },
+    "bundled_schemas": {
+      "ok": true
+    },
+    "codesign": {
+      "identity": "ad-hoc",
+      "ok": true,
+      "verify_output": "rameworks/AppKit/_AppKit.cpython-311-darwin.so\n--validated:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/AppKit/_AppKit.cpython-311-darwin.so\n--prepared:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/objc/_machsignals.cpython-311-darwin.so\n--validated:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/objc/_machsignals.cpython-311-darwin.so\n--prepared:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/CoreFoundation/_inlines.cpython-311-darwin.so\n--validated:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/CoreFoundation/_inlines.cpython-311-darwin.so\n--prepared:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/CoreFoundation/_CoreFoundation.cpython-311-darwin.so\n--validated:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/CoreFoundation/_CoreFoundation.cpython-311-darwin.so\n--prepared:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/libncursesw.5.dylib\n--prepared:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/objc/_objc.cpython-311-darwin.so\n--validated:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/libncursesw.5.dylib\n--validated:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/objc/_objc.cpython-311-darwin.so\n--prepared:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/pydantic_core/_pydantic_core.cpython-311-darwin.so\n--validated:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/pydantic_core/_pydantic_core.cpython-311-darwin.so\n--prepared:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/Python.framework/Versions/Current/.\n--validated:/Users/runner/work/_temp/macos-app/Mucaro AI.app/Contents/Frameworks/Python.framework/Versions/Current/.\n/Users/runner/work/_temp/macos-app/Mucaro AI.app: valid on disk\n/Users/runner/work/_temp/macos-app/Mucaro AI.app: satisfies its Designated Requirement"
+    },
+    "gatekeeper": {
+      "accepted": false,
+      "note": "Ad-hoc builds are expected to be rejected; Developer ID + notarization is BLK-SIGN-001.",
+      "output": "/Users/runner/work/_temp/macos-app/Mucaro AI.app: rejected"
+    },
+    "info_plist": {
+      "CFBundleIdentifier": {
+        "actual": "ai.mucaro.app",
+        "expected": "ai.mucaro.app",
+        "ok": true
+      },
+      "CFBundlePackageType": {
+        "actual": "APPL",
+        "expected": "APPL",
+        "ok": true
+      },
+      "CFBundleShortVersionString": {
+        "actual": "0.1.23",
+        "expected": "0.1.23",
+        "ok": true
+      },
+      "CFBundleVersion": {
+        "actual": "326",
+        "expected": "326",
+        "ok": true
+      },
+      "LSMinimumSystemVersion": {
+        "actual": "14.0",
+        "expected": "14.0",
+        "ok": true
+      }
+    },
+    "no_user_data_or_secrets_in_bundle": {
+      "found": [],
+      "ok": true
+    },
+    "smoke": {
+      "ok": true,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "DESKTOP_SMOKE_OK port=49178 data_dir=/private/var/folders/s6/5hzmn6lx4dz5nxs7k_0slzph0000gn/T/mucaro-smoke-curz3713"
+    }
+  },
+  "created_utc": "2026-09-24T22:49:26.849968+00:00",
+  "head_sha": "948fda472af7e75a906edade68482e06b4b198f3",
+  "host": {
+    "mac_ver": "14.8.9",
+    "machine": "arm64",
+    "platform": "darwin",
+    "python": "3.11.9"
+  },
+  "inputs": {
+    "frontend_index_sha256": "3b888e319ed6071343c0bdd8a35b16b4861549258a32dedf08d3c17bc34fcfe4",
+    "lock_sha256": "d4e75fbd89cdcd046598c443951482c4af286666a9935ae0a823fff554d8b48e",
+    "spec_sha256": "38d2d304c60a601e11285233d708f22daea9925bfc091496431918ffcb345916"
+  },
+  "minimum_os": "14.0",
+  "pyinstaller": "6.22.3",
+  "schema_version": "mucaro-macos-app-build/1.0",
+  "signing": {
+    "blocker": "BLK-SIGN-001",
+    "developer_id": false,
+    "identity": "ad-hoc",
+    "notarized": false,
+    "stapled": false
+  },
+  "status": "MACOS_APP_BUILD_OK",
+  "version": "0.1.23",
+  "worktree_clean": true
+}

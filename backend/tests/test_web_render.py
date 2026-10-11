@@ -1,3 +1,4 @@
+import socket
 from pathlib import Path
 
 import pytest
@@ -5,6 +6,20 @@ import pytest
 import backend.app.web_render as render
 from backend.app.config import Settings
 from backend.app.web_render import WebRenderError, render_web_page
+
+
+@pytest.fixture(autouse=True)
+def offline_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep these tests hermetic: public names resolve to a documentation-range
+    public address without touching the network (SD-005)."""
+    real_getaddrinfo = socket.getaddrinfo
+
+    def fake_getaddrinfo(host, *args, **kwargs):
+        if host in {"example.com", "www.example.com"}:
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.215.14", 0))]
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
 
 
 def make_settings(root: Path) -> Settings:

@@ -9,6 +9,7 @@ from typing import Any, Callable
 from pypdf import PdfReader
 
 from .config import Settings, settings
+from .local_tools import resolve_tool_request
 from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
 from .utils import stable_id, utc_now, write_json
@@ -100,12 +101,12 @@ def analyze_pdf_ocr(
     if not isinstance(dpi, int) or isinstance(dpi, bool) or dpi < MIN_DPI or dpi > MAX_DPI:
         raise PDFOCRAnalysisError("ERROR_OCR_PDF_DPI", f"dpi must be an integer from {MIN_DPI} through {MAX_DPI}.")
 
-    renderer = renderer_path or shutil.which("pdftoppm")
+    renderer = resolve_tool_request("pdftoppm", renderer_path)
     if not renderer:
-        raise PDFOCRAnalysisError("ERROR_OCR_PDF_RENDERER_UNAVAILABLE", "Local pdftoppm executable was not found.")
-    tesseract = tesseract_path or shutil.which("tesseract")
+        raise PDFOCRAnalysisError("ERROR_OCR_PDF_RENDERER_UNAVAILABLE", "pdftoppm is not bundled in this Mucaro runtime.")
+    tesseract = resolve_tool_request("tesseract", tesseract_path)
     if not tesseract:
-        raise PDFOCRAnalysisError("ERROR_OCR_ENGINE_UNAVAILABLE", "Local tesseract executable was not found.")
+        raise PDFOCRAnalysisError("ERROR_OCR_ENGINE_UNAVAILABLE", "Tesseract is not bundled in this Mucaro runtime.")
     for engine in (renderer, tesseract):
         try:
             require(PermissionRequest(capability="subprocess.execute", subject="ocr_pdf", target=engine, origin="operator"), cfg=cfg)

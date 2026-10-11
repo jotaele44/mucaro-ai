@@ -20,14 +20,19 @@ FACADE_IMPORT = re.compile(r"from \.permission_engine import|import permission_e
 EXEMPT = {
     "answer_trace_eval.py": "certification harness spawning the project's own CLI",
     "clean_machine_macos.py": "release tooling",
+    "desktop_shell.py": "native desktop shell uses loopback self-probes; not a model/skill public-network boundary",
     "flagpole_inventory.py": "read-only git tree listing of the project itself",
     "gis_eval.py": "certification harness spawning the project's own CLI",
+    "local_tools.py": "read-only xcode-select -p probe while resolving local helper paths; runs no model/skill-chosen command",
     "macos_app_store.py": "release tooling",
     "macos_distribution.py": "release tooling",
     "packaging.py": "release tooling",
     "portable_runtime.py": "release tooling",
+    "portable_runtime_source.py": "release/runtime acquisition tooling",
+    "release_manifest.py": "release tooling",
+    "release_scope.py": "release-state tooling",
     "retrieval_quality_certification.py": "certification harness spawning the project's own CLI",
-    "runtime_identity.py": "read-only git rev-parse of the project itself",
+    "security_gates.py": "release/security certification tooling",
 }
 
 

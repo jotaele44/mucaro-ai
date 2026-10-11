@@ -8,6 +8,7 @@ from typing import Any
 from .coding_patch import validate_patch_proposal
 from .coding_workspace import inspect_repository, resolve_repository
 from .config import Settings, settings
+from .local_tools import resolve_local_tool
 from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .permissions import is_within_path
 
@@ -23,7 +24,10 @@ class CodingMutationError(RuntimeError):
 
 
 def _git_apply(repo_root: Path, patch_bytes: bytes, *, reverse: bool = False) -> tuple[bool, str]:
-    argv = ["git", "apply"]
+    git = resolve_local_tool("git")
+    if not git:
+        raise CodingMutationError("ERROR_CODING_GIT_UNAVAILABLE", "Git is not bundled in this Mucaro runtime.")
+    argv = [git, "apply"]
     if reverse:
         argv.append("--reverse")
     argv.extend(["--whitespace=error-all" if not reverse else "--whitespace=nowarn", "-"])
@@ -36,8 +40,8 @@ def _git_apply(repo_root: Path, patch_bytes: bytes, *, reverse: bool = False) ->
             check=False,
             timeout=30,
         )
-    except FileNotFoundError as exc:
-        raise CodingMutationError("ERROR_CODING_GIT_UNAVAILABLE", "git executable is not available") from exc
+    except OSError as exc:
+        raise CodingMutationError("ERROR_CODING_GIT_UNAVAILABLE", "Bundled Git could not be started.") from exc
     except subprocess.TimeoutExpired as exc:
         raise CodingMutationError("ERROR_CODING_MUTATION_TIMEOUT", "git apply timed out") from exc
     detail = proc.stderr.decode("utf-8", errors="replace").strip() or proc.stdout.decode("utf-8", errors="replace").strip()

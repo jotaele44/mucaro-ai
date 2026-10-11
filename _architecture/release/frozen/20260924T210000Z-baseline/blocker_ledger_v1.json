@@ -1,0 +1,111 @@
+{
+  "schema_version": "mucaro-release-blocker-ledger/1.0",
+  "blockers": [
+    {
+      "blocker_id": "BLK-SPEC-001",
+      "blocked_node": "N26",
+      "reason": "The 'Mucaro AI Release-Grade Workbench Specification' named by KERNEL-003 is not present in the repository or the connected Google Drive.",
+      "external_dependency": "User must supply the specification document.",
+      "evidence": [
+        "repository search 2026-09-24 for 'Workbench Specification'/'release-grade' found no specification file",
+        "Google Drive search 2026-09-24 (title/fullText 'Mucaro', 'Workbench', 'Release-Grade') returned no files"
+      ],
+      "what_would_unblock": "Commit the specification under docs/release/, bind its hash in the manifest, and re-enumerate requirements (new IDs enter via scope delta).",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "N02",
+        "N03",
+        "N05",
+        "N06",
+        "N07",
+        "N13",
+        "N15",
+        "N16",
+        "N17",
+        "N19"
+      ],
+      "status": "ACTIVE",
+      "resolution": null
+    },
+    {
+      "blocker_id": "BLK-SIGN-001",
+      "blocked_node": "N23",
+      "reason": "Developer ID signing, notarization and stapling require Apple Developer Program credentials that are not available to the agent.",
+      "external_dependency": "Apple Developer ID Application certificate + notarytool credentials (operator-held).",
+      "evidence": [
+        "current_state_snapshot_v1.json credentials: APPLE_DEVELOPER_ID_APPLICATION present=false, APPLE_NOTARY_KEYCHAIN_PROFILE present=false",
+        "docs/PACKAGING_POLICY.md: no signed installer or notarized app claim"
+      ],
+      "what_would_unblock": "Operator provides signing identity and notary profile to a macOS signing environment; run codesign/notarytool/stapler and certify_macos_distribution.py.",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "N19",
+        "N20",
+        "N22",
+        "N24"
+      ],
+      "status": "ACTIVE",
+      "resolution": null
+    },
+    {
+      "blocker_id": "BLK-WEB-001",
+      "blocked_node": "N11",
+      "reason": "Live governed web search (WEB-08 lane) requires a commercial search API key.",
+      "external_dependency": "MUCARO_BRAVE_SEARCH_API_KEY (operator-held).",
+      "evidence": [
+        "backend/app/web_search.py requires MUCARO_BRAVE_SEARCH_API_KEY and allow_live_search",
+        "current_state_snapshot_v1.json credentials: MUCARO_BRAVE_SEARCH_API_KEY present=false"
+      ],
+      "what_would_unblock": "Operator supplies the key to the certification environment and runs the WEB-08 live evaluation.",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "open/capture/freeze/cite/injection work in N11 and N16"
+      ],
+      "status": "ACTIVE",
+      "resolution": null
+    },
+    {
+      "blocker_id": "BLK-LLM-001",
+      "blocked_node": "N13",
+      "reason": "Live remote-model execution evidence requires an Anthropic API key.",
+      "external_dependency": "ANTHROPIC_API_KEY (operator-held).",
+      "evidence": [
+        "backend/app/model_router.py anthropic provider requires ANTHROPIC_API_KEY and MUCARO_AI_LIVE_MODE=1",
+        "current_state_snapshot_v1.json credentials: ANTHROPIC_API_KEY present=false"
+      ],
+      "what_would_unblock": "Operator runs the remote-provider evaluation with a key in a permissioned environment.",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "local provider, routing policy, offline behavior"
+      ],
+      "status": "ACTIVE",
+      "resolution": null
+    },
+    {
+      "blocker_id": "BLK-PHYS-001",
+      "blocked_node": "N20",
+      "reason": "A literal physical double-click on the user's Mac is physical-device interaction unavailable to the agent.",
+      "external_dependency": "User performs and reports the double-click launch on a supported Mac.",
+      "evidence": [
+        "agent runs in a Linux container; macOS evidence is limited to hosted runners using LaunchServices `open`"
+      ],
+      "what_would_unblock": "User double-clicks the built app on a supported Mac and records the result (or accepts LaunchServices `open` evidence as equivalent).",
+      "dependent_nodes": [
+        "N25"
+      ],
+      "independent_work_remaining": [
+        "LaunchServices `open` launch evidence on a hosted macOS runner"
+      ],
+      "status": "ACTIVE",
+      "resolution": null
+    }
+  ]
+}

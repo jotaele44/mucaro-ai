@@ -150,7 +150,7 @@ def test_answer_question_carries_web_snapshot_citation_metadata(tmp_path: Path):
             "retrieval_utc": "2026-09-10T00:00:01Z",
             "http_status": 200,
             "content_type": "text/html; charset=utf-8",
-            "content_sha256": "contenthash",
+            "content_sha256": "4d70936fef2a7cae9c35d7adeccf0fb553981e9f1df96a20d27cc3f5b7173fbb",
             "content_size_bytes": 80,
             "content_base64": "",
             "parser_name": "web_snapshot_preview_v1",
@@ -171,7 +171,7 @@ def test_answer_question_carries_web_snapshot_citation_metadata(tmp_path: Path):
     assert citation["source_url"] == "https://example.com/brief"
     assert citation["snapshot_id"] == "websnap_fixture"
     assert citation["snapshot_sha256"] == ingested["snapshot_sha256"]
-    assert citation["content_sha256"] == "contenthash"
+    assert citation["content_sha256"] == "4d70936fef2a7cae9c35d7adeccf0fb553981e9f1df96a20d27cc3f5b7173fbb"
     assert citation["retrieval_utc"] == "2026-09-10T00:00:01Z"
     md_text = Path(result["export_paths"]["markdown"]).read_text(encoding="utf-8")
     assert "source_format=web_snapshot" in md_text
@@ -362,3 +362,42 @@ def test_successful_answer_records_single_ok_attempt(tmp_path: Path, monkeypatch
 
     assert result["model_failed_over"] is False
     assert [a["status"] for a in result["model_attempts"]] == ["OK"]
+
+
+def test_answer_trace_records_stage_timings(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+
+    result = answer_question("What does source lineage require?", model_provider="mock", cfg=cfg, persist=False)
+
+    timings = result["timings_ms"]
+    assert set(timings) == {"retrieval_ms", "model_first_token_ms", "model_ms"}
+    assert all(value >= 0 for value in timings.values())
+    # mock does not stream, so its first token arrives with the whole answer
+    assert timings["model_first_token_ms"] == timings["model_ms"]
+    assert result["answer_streamed"] is False
+
+
+def test_single_provider_retry_never_repeats_streamed_text(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    _live_ready(monkeypatch)
+    calls: list[int] = []
+
+    def drops_mid_stream(*args, on_text_delta=None, **kwargs):
+        calls.append(1)
+        on_text_delta("Partial answer ")
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_TIMEOUT", "stream timed out")
+
+    monkeypatch.setattr("backend.app.services.generate_answer", drops_mid_stream)
+    deltas: list[str] = []
+
+    result = answer_question(
+        "What does source lineage require?", model_provider="anthropic", allow_live=True, cfg=cfg,
+        on_text_delta=deltas.append, failover_policy=NO_SLEEP, persist=False,
+    )
+
+    assert calls == [1]
+    assert deltas == ["Partial answer "]
+    assert result["status"] == "ERROR_MODEL_PROVIDER_TIMEOUT"
+    assert [attempt["status"] for attempt in result["model_attempts"]] == ["ERROR_MODEL_PROVIDER_TIMEOUT"]
