@@ -511,3 +511,18 @@ def test_single_provider_path_preserves_live_stream_callback(tmp_path: Path, mon
     assert deltas == ["delta"]
     assert result["model_failover_streaming_suppressed"] is False
     assert result["answer_streamed"] is True
+
+
+def test_answer_trace_records_stage_timings(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+
+    result = answer_question("What does source lineage require?", model_provider="mock", cfg=cfg, persist=False)
+
+    timings = result["timings_ms"]
+    assert set(timings) == {"retrieval_ms", "model_first_token_ms", "model_ms"}
+    assert all(value >= 0 for value in timings.values())
+    # mock does not stream, so its first token arrives with the whole answer
+    assert timings["model_first_token_ms"] == timings["model_ms"]
+    assert result["answer_streamed"] is False
+
