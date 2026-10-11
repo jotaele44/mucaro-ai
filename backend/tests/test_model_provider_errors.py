@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import importlib.machinery
 import sys
 import types
 
 import pytest
 
+from backend.app import model_router
 from backend.app.model_router import ModelProviderError, classify_provider_exception, generate_answer
 
 
@@ -43,19 +45,42 @@ def test_classification_detail_does_not_copy_provider_exception_text() -> None:
     assert "secret prompt contents" not in classified.detail
 
 
+class _FakeStream:
+    """The streaming surface the adapter uses: a context manager with text_stream and get_final_message."""
+
+    def __init__(self, behavior):
+        self._behavior = behavior
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    @property
+    def text_stream(self):
+        return iter(())
+
+    def get_final_message(self):
+        return self._behavior()
+
+
 class _FakeClient:
     def __init__(self, behavior):
         self.messages = self
         self._behavior = behavior
 
-    def create(self, **kwargs):
-        return self._behavior()
+    def stream(self, **kwargs):
+        return _FakeStream(self._behavior)
 
 
 def _install_fake_anthropic(monkeypatch: pytest.MonkeyPatch, behavior) -> None:
     module = types.ModuleType("anthropic")
+    module.__spec__ = importlib.machinery.ModuleSpec("anthropic", None)  # readiness reads it via find_spec()
     module.Anthropic = lambda: _FakeClient(behavior)  # type: ignore[attr-defined]
+    module.APIError = type("APIError", (Exception,), {})  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "anthropic", module)
+    monkeypatch.setattr(model_router, "_ANTHROPIC_CLIENT", {})  # never reuse a client cached by another test
     monkeypatch.setenv("MUCARO_AI_LIVE_MODE", "1")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 

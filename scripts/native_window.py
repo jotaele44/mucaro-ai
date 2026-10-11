@@ -313,6 +313,9 @@ def run_window(url: str, *, storage_dir: Path, pid_file: Path) -> None:
         if windows_renderer() != "edgechromium":
             raise WebView2Missing(f"The Microsoft Edge WebView2 Runtime is not installed (install it from {WEBVIEW2_DOWNLOAD}).")
         _windows_identity()
+    # Save and Share in the interface download files; pywebview drops downloads unless this is on, and then asks
+    # where to save each one (an NSSavePanel on macOS, a Save File dialog on Windows).
+    webview.settings["ALLOW_DOWNLOADS"] = True
     window = webview.create_window(APP_NAME, url=url, width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], min_size=WINDOW_MIN_SIZE)
     if sys.platform == "win32":
         window.events.shown += lambda: _set_windows_icon(window)
