@@ -12,7 +12,7 @@ from .ingestion import get_chunks
 from .injection_guard import scan_chunks, scan_text
 from .memory_policy import MemorySelectionError, select_memory_context
 from .model_failover import FailoverPolicy, run_with_failover
-from .model_router import generate_answer
+from .model_router import ModelProviderError, generate_answer
 from .model_routing_policy import ModelRoutingError, plan_model_route
 from .provider_recovery import ProviderRecoveryError, pause_provider_checkpoint
 from .retrieval import retrieve
@@ -159,19 +159,28 @@ def answer_question(
         on_text_delta(text)  # type: ignore[misc]
 
     stream_callback = None if streaming_suppressed or on_text_delta is None else timed_text_delta
+
+    def attempt(provider: str, model_id: str | None) -> dict[str, Any]:
+        try:
+            return generate_answer(
+                normalized_query,
+                retrieved,
+                model_provider=provider,
+                model_name=model_id,
+                allow_mock_fallback=False,
+                conversation_context=conversation_context or [],
+                memory_context=selected_memory_context,
+                on_text_delta=stream_callback,
+                cfg=cfg,
+            )
+        except ModelProviderError as exc:
+            # Text already reached the listener: a retry or another provider would repeat it.
+            exc.partial_output = bool(first_token_ms)
+            raise
+
     failover = run_with_failover(
         failover_order,
-        lambda provider, model_id: generate_answer(
-            normalized_query,
-            retrieved,
-            model_provider=provider,
-            model_name=model_id,
-            allow_mock_fallback=False,
-            conversation_context=conversation_context or [],
-            memory_context=selected_memory_context,
-            on_text_delta=stream_callback,
-            cfg=cfg,
-        ),
+        attempt,
         policy=failover_policy,
     )
     if failover["status"] != "FAILOVER_OK":
