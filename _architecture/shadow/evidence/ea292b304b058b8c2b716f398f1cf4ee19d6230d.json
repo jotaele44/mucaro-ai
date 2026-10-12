@@ -1,0 +1,102 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "6c5e2868fa35a984d715e80554bb93ea37373370",
+  "checkpoint_sha": "ea292b304b058b8c2b716f398f1cf4ee19d6230d",
+  "provenance": {
+    "source": "PR #156 runner transition boundary",
+    "historical_execution_claim": "Governance evidence only.",
+    "hosted_execution": "Records runner-admission transition evidence."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "schema_drift",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only release-governance blocker/evidence records for the runner-admission transition; no executable application/runtime/vector behavior changes.",
+      "evidence": []
+    }
+  ]
+}
