@@ -124,6 +124,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run bounded MUCARO Shadow QA against an exact frozen checkpoint.")
     parser.add_argument("--base", default="HEAD^", help="Base commit/ref for the changed-surface denominator.")
     parser.add_argument("--head", default="HEAD", help="Frozen checkpoint commit/ref.")
+    parser.add_argument("--evidence-manifest", type=Path, help="Checkpoint-bound vector evidence manifest.")
+    parser.add_argument("--historical-replay", action="store_true", help="Adjudicate a historical checkpoint from frozen evidence without claiming its gates were rerun.")
     parser.add_argument(
         "--output",
         default=os.environ.get("MUCARO_SHADOW_RECEIPT", "artifacts/shadow-qa-receipt.json"),
