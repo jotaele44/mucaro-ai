@@ -1,0 +1,116 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "1a64e90094624907fca059ba49725bc856e42d2a",
+  "checkpoint_sha": "858a8a69fa742e2539e3adaae94a595f9517dcc1",
+  "provenance": {
+    "source": "PR #159 branding checkpoint",
+    "pr_number": 159,
+    "historical_execution_claim": "PR records 90 local tests but no machine-readable exact-checkpoint receipt.",
+    "hosted_execution": "Mac Finder/Dock icon verification explicitly not performed."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    },
+    {
+      "vector": "schema_drift",
+      "state": "BLOCKED",
+      "rationale": "The checkpoint changes Info.plist icon binding and native-window/web icon manifestation, but no exact-checkpoint execution/rendered receipt exists and PR #159 explicitly leaves Mac Finder/Dock verification unverified.",
+      "evidence": [
+        {
+          "evidence_id": "858-schema-plist-icon",
+          "kind": "CHECKPOINT_FILE",
+          "path": "Mucaro AI.app/Contents/Info.plist",
+          "selector": "CFBundleIconFile"
+        },
+        {
+          "evidence_id": "858-schema-native-icon",
+          "kind": "CHECKPOINT_FILE",
+          "path": "scripts/native_window.py",
+          "selector": "MucaroAI.png"
+        }
+      ]
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This branding checkpoint does not change this adversarial runtime vector.",
+      "evidence": []
+    }
+  ]
+}
