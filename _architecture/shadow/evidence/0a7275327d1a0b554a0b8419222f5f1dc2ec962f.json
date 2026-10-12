@@ -1,0 +1,130 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "037d2a9264e32babd503004321b5571f98159545",
+  "checkpoint_sha": "0a7275327d1a0b554a0b8419222f5f1dc2ec962f",
+  "provenance": {
+    "source": "provider annotation atomicity checkpoint",
+    "historical_execution_claim": "Runtime provider recovery mutation changed; no exact Shadow execution receipt frozen.",
+    "hosted_execution": "BLOCKED."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-annotation atomicity checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-annotation atomicity checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-annotation atomicity checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-annotation atomicity checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "BLOCKED",
+      "rationale": "Provider/model annotations move inside the atomic checkpoint transition instead of a second write, reducing write-race exposure, but no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "0a7-race",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/provider_recovery.py",
+          "selector": "provider=provider"
+        }
+      ]
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-annotation atomicity checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-annotation atomicity checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-annotation atomicity checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "BLOCKED",
+      "rationale": "resume_with_provider now passes provider/model through resume_checkpoint atomically, but no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "0a7-resume",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/provider_recovery.py",
+          "selector": "resumed = resume_checkpoint"
+        }
+      ]
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-annotation atomicity checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-annotation atomicity checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "BLOCKED",
+      "rationale": "Provider resume preserves canonical session/run/checkpoint identity and explicitly rejects drift, but no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "0a7-orphan_state_transition",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/provider_recovery.py",
+          "selector": "ERROR_PROVIDER_IDENTITY_DRIFT"
+        }
+      ]
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "BLOCKED",
+      "rationale": "The former second upsert is removed and provider/model metadata is persisted in the atomic transition, but no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "0a7-persistence_loss",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/provider_recovery.py",
+          "selector": "state=\"PAUSED_PROVIDER\""
+        }
+      ]
+    },
+    {
+      "vector": "schema_drift",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-annotation atomicity checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-annotation atomicity checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    }
+  ]
+}
