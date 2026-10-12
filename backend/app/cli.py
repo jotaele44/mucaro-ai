@@ -4080,10 +4080,16 @@ def build_release_dashboard_report(
     head_sha = git_payload.get("head_sha") if isinstance(git_payload.get("head_sha"), str) else None
     branch = git_payload.get("branch") if isinstance(git_payload.get("branch"), str) else None
     receipts = list_release_receipts(cfg.project_root)
-    current_head_receipts = [row for row in receipts if row.get("head_sha") == head_sha]
-    receipt_summary = summarize_release_receipts(current_head_receipts)
+    all_current_head_receipts = [row for row in receipts if row.get("head_sha") == head_sha]
     receipt_payloads = release_state.get("receipts", {})
     expected_receipt_types = sorted(receipt_payloads) if isinstance(receipt_payloads, dict) else []
+    current_head_receipts = [
+        row for row in all_current_head_receipts if row.get("receipt_type") in expected_receipt_types
+    ]
+    additional_current_head_receipts = [
+        row for row in all_current_head_receipts if row.get("receipt_type") not in expected_receipt_types
+    ]
+    receipt_summary = summarize_release_receipts(current_head_receipts)
     missing_receipts = [
         receipt_type
         for receipt_type in expected_receipt_types
@@ -4236,6 +4242,7 @@ def build_release_dashboard_report(
         ),
         "current_head_receipts_summary": receipt_summary,
         "current_head_receipts": current_head_receipts,
+        "additional_current_head_receipts": additional_current_head_receipts,
         "checks": checks,
         "blockers": sorted(set(blockers)),
         "release_states": release_state.get("states", []),

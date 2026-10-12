@@ -2729,6 +2729,14 @@ def test_cli_release_dashboard_summarizes_current_handoff_artifacts(tmp_path: Pa
     ).stdout.strip()
     subprocess.run(["git", "tag", "v0.1.23-dashboard"], cwd=tmp_path, check=True)
     write_distribution_manifest_fixture_receipts(tmp_path, head_sha)
+    write_release_receipt(
+        tmp_path,
+        receipt_type="security_gates",
+        status="SECURITY_GATES_PASS",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_security_gates.py"],
+        payload={"checks": []},
+    )
     assert main(["package", "distribution-manifest", "--save", "--format", "json"], cfg=cfg) == 0
     capsys.readouterr()
     write_dashboard_governance_report_fixture(tmp_path, head_sha)
@@ -2761,6 +2769,7 @@ def test_cli_release_dashboard_summarizes_current_handoff_artifacts(tmp_path: Pa
     assert payload["governance_report_status"] == "GOVERNANCE_REPORT_VERIFIED"
     assert payload["remote_branch_status"] == "PASS"
     assert payload["current_head_receipts_summary"]["total"] == 8
+    assert [row["receipt_type"] for row in payload["additional_current_head_receipts"]] == ["security_gates"]
     assert checks["current_head_receipts"]["status"] == "PASS"
     assert checks["distribution_manifest"]["status"] == "PASS"
     assert checks["governance_report"]["status"] == "PASS"
