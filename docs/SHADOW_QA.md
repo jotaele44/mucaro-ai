@@ -182,9 +182,11 @@ and `checkpoint_sha`.
 The manifest contains exactly one row for every required vector. Allowed terminal
 states are `PASS`, `NOT_APPLICABLE`, `BLOCKED`, and `UNRESOLVED`.
 
-- `PASS` requires at least one uniquely identified checkpoint file/test evidence
-  reference. The referenced path must exist at the checkpoint; test evidence must
-  name a selector present in that checkpoint file.
+- `PASS` requires at least one exact-checkpoint execution receipt plus any
+  supporting checkpoint file/test evidence. The execution receipt must itself bind
+  the checkpoint SHA and report PASS. Test presence alone never proves execution.
+  Referenced checkpoint paths must exist at the checkpoint; test evidence must name
+  an exact test definition present in that checkpoint file.
 - `NOT_APPLICABLE` requires an explicit scope rationale and carries no positive
   evidence. Vocabulary absence, nearest-name matching, or generic test success is
   not a valid rationale.
