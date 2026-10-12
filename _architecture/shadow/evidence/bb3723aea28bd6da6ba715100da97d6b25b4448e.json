@@ -1,0 +1,179 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "88052d49573262369a60961163b9e9fa38a8aa09",
+  "checkpoint_sha": "bb3723aea28bd6da6ba715100da97d6b25b4448e",
+  "provenance": {
+    "source": "V02 core-state replay branch manifestation",
+    "historical_execution_claim": "Compare from selected ancestor 88052d4 reports ahead_by=6. The base defines the cumulative evidence window; parent identity is not asserted.",
+    "hosted_execution": "No exact execution receipt frozen."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "BLOCKED",
+      "rationale": "The cumulative branch manifestation carries hardened checkpoint-state behavior for this vector, but no exact execution receipt is frozen.",
+      "evidence": [
+        {
+          "evidence_id": "bb3-null_empty",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def _decode"
+        }
+      ]
+    },
+    {
+      "vector": "duplicate",
+      "state": "BLOCKED",
+      "rationale": "The cumulative branch manifestation carries hardened checkpoint-state behavior for this vector, but no exact execution receipt is frozen.",
+      "evidence": [
+        {
+          "evidence_id": "bb3-duplicate",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def begin_step"
+        }
+      ]
+    },
+    {
+      "vector": "stale",
+      "state": "BLOCKED",
+      "rationale": "The cumulative branch manifestation carries hardened checkpoint-state behavior for this vector, but no exact execution receipt is frozen.",
+      "evidence": [
+        {
+          "evidence_id": "bb3-stale",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "expected_sequence"
+        }
+      ]
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative V02 evidence window.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "BLOCKED",
+      "rationale": "The cumulative branch manifestation carries hardened checkpoint-state behavior for this vector, but no exact execution receipt is frozen.",
+      "evidence": [
+        {
+          "evidence_id": "bb3-race",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "BEGIN IMMEDIATE"
+        }
+      ]
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "BLOCKED",
+      "rationale": "The cumulative branch manifestation carries hardened checkpoint-state behavior for this vector, but no exact execution receipt is frozen.",
+      "evidence": [
+        {
+          "evidence_id": "bb3-replay_idempotency",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def complete_step"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative V02 evidence window.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "BLOCKED",
+      "rationale": "The cumulative branch manifestation carries hardened checkpoint-state behavior for this vector, but no exact execution receipt is frozen.",
+      "evidence": [
+        {
+          "evidence_id": "bb3-restart_reconstruction",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def get_checkpoint"
+        }
+      ]
+    },
+    {
+      "vector": "resume",
+      "state": "BLOCKED",
+      "rationale": "The cumulative branch manifestation carries hardened checkpoint-state behavior for this vector, but no exact execution receipt is frozen.",
+      "evidence": [
+        {
+          "evidence_id": "bb3-resume",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def resume_checkpoint"
+        }
+      ]
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative V02 evidence window.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative V02 evidence window.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "BLOCKED",
+      "rationale": "The cumulative branch manifestation carries hardened checkpoint-state behavior for this vector, but no exact execution receipt is frozen.",
+      "evidence": [
+        {
+          "evidence_id": "bb3-orphan_state_transition",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "TRANSITIONS:"
+        }
+      ]
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "BLOCKED",
+      "rationale": "The cumulative branch manifestation carries hardened checkpoint-state behavior for this vector, but no exact execution receipt is frozen.",
+      "evidence": [
+        {
+          "evidence_id": "bb3-persistence_loss",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "ERROR_CHECKPOINT_CONTRADICTION_DROPPED"
+        }
+      ]
+    },
+    {
+      "vector": "schema_drift",
+      "state": "BLOCKED",
+      "rationale": "The cumulative branch manifestation carries hardened checkpoint-state behavior for this vector, but no exact execution receipt is frozen.",
+      "evidence": [
+        {
+          "evidence_id": "bb3-schema_drift",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def _validate_payload"
+        }
+      ]
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "The cumulative branch manifestation carries hardened checkpoint-state behavior for this vector, but no exact execution receipt is frozen.",
+      "evidence": [
+        {
+          "evidence_id": "bb3-unexpected_codes",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "ERROR_CHECKPOINT_CONFLICT"
+        }
+      ]
+    }
+  ]
+}
