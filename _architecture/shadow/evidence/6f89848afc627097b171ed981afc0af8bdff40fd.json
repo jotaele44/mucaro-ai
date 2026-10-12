@@ -1,0 +1,102 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "f2ee9056fa3ea7f880c464b6b054ba2d85e8eea8",
+  "checkpoint_sha": "6f89848afc627097b171ed981afc0af8bdff40fd",
+  "provenance": {
+    "source": "PR #144 Actions runner-admission governance evidence",
+    "historical_execution_claim": "No runtime vector PASS claimed.",
+    "hosted_execution": "Checkpoint records runner-admission evidence; no executable application behavior changed."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "schema_drift",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes release-governance ledgers and runner-admission evidence only; it changes no application runtime, state machine, tool consumer, persistence engine, or executable schema contract.",
+      "evidence": []
+    }
+  ]
+}
