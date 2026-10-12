@@ -88,16 +88,21 @@ REQUIRED_ADVERSARIAL_VECTORS = [
 SHADOW_BOOTSTRAP_PATHS = {
     ".github/workflows/shadow-qa.yml",
     "backend/tests/test_shadow_baseline.py",
+    "backend/tests/test_shadow_evidence.py",
     "backend/tests/test_shadow_qa.py",
     "docs/SHADOW_QA.md",
     "scripts/resolve_shadow_baseline.py",
+    "scripts/shadow_evidence.py",
     "scripts/shadow_qa.py",
 }
 
 
 def adversarial_vector_results(paths: list[str]) -> dict[str, dict[str, str]]:
     path_set = set(paths)
-    bootstrap_only = bool(path_set) and path_set <= SHADOW_BOOTSTRAP_PATHS
+    bootstrap_only = bool(path_set) and all(
+        path in SHADOW_BOOTSTRAP_PATHS or path.startswith("_architecture/shadow/evidence/")
+        for path in path_set
+    )
     if bootstrap_only:
         reason = (
             "NOT_APPLICABLE: checkpoint changes only Shadow QA infrastructure; "
