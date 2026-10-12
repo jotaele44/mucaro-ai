@@ -148,6 +148,16 @@ until a multimodal model adapter is added.
 python scripts/ask.py "How does source lineage work?"
 ```
 
+## Saving and sharing answers
+
+Each finished answer has **Save** and **Share** next to Copy and Edit. **Save** offers the answer as
+Markdown or plain text (as shown, edits included, with its sources), and the files Mucaro wrote for
+it in `data/exports/`: a report with sources (`.md`), the full answer record (`.json`) and the
+citations table (`.csv`). A browser keeps the file with its downloads (a phone puts it in Files);
+the desktop app asks where to save it. **Share** opens the system share sheet with the answer as a
+`.txt` file. Browsers offer the share sheet only on https or on the computer itself, so a phone
+that opens Mucaro over plain http saves the file instead; see `docs/PHONE_ACCESS.md`.
+
 ## Measuring latency
 
 ```bash

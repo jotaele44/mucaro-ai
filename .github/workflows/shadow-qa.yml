@@ -11,6 +11,10 @@ on:
         description: Exact frozen checkpoint SHA to audit
         required: true
         type: string
+      evidence_manifest:
+        description: Repository path to the checkpoint-bound evidence manifest
+        required: true
+        type: string
   push:
     branches:
       - main
@@ -25,11 +29,12 @@ jobs:
     env:
       SHADOW_BASE_OVERRIDE: ${{ inputs.base_sha || '' }}
       SHADOW_CHECKPOINT_SHA: ${{ inputs.checkpoint_sha || github.sha }}
+      SHADOW_EVIDENCE_MANIFEST: ${{ inputs.evidence_manifest || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-          ref: ${{ env.SHADOW_CHECKPOINT_SHA }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || env.SHADOW_CHECKPOINT_SHA }}
           fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
@@ -61,7 +66,9 @@ jobs:
         run: |
           test -n "$SHADOW_BASE_SHA"
           test -n "$SHADOW_CHECKPOINT_SHA"
-          test "$(git rev-parse HEAD)" = "$SHADOW_CHECKPOINT_SHA"
+          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            test "$(git rev-parse HEAD)" = "$SHADOW_CHECKPOINT_SHA"
+          fi
           test "$SHADOW_BASE_SHA" != "$SHADOW_CHECKPOINT_SHA"
           git cat-file -e "$SHADOW_BASE_SHA^{commit}"
           git merge-base --is-ancestor "$SHADOW_BASE_SHA" "$SHADOW_CHECKPOINT_SHA"
@@ -73,7 +80,14 @@ jobs:
       - name: Run bounded Shadow QA
         env:
           MUCARO_SHADOW_RECEIPT: ${{ runner.temp }}/mucaro-shadow-qa-${{ env.SHADOW_CHECKPOINT_SHA }}.json
-        run: python scripts/shadow_qa.py --base "$SHADOW_BASE_SHA" --head "$SHADOW_CHECKPOINT_SHA" --output "$MUCARO_SHADOW_RECEIPT"
+        shell: bash
+        run: |
+          args=(--base "$SHADOW_BASE_SHA" --head "$SHADOW_CHECKPOINT_SHA" --output "$MUCARO_SHADOW_RECEIPT")
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            test -n "$SHADOW_EVIDENCE_MANIFEST"
+            args+=(--historical-replay --evidence-manifest "$SHADOW_EVIDENCE_MANIFEST")
+          fi
+          python scripts/shadow_qa.py "${args[@]}"
       - name: Upload Shadow baseline receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
