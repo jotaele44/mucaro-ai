@@ -1,0 +1,155 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "0ed16437fc8f419905aec9d64e461a77e9067f4d",
+  "checkpoint_sha": "016ec7b916abd7ea56b03f75d97919e1a9f9ec5e",
+  "provenance": {
+    "source": "PR #124 merged checkpoint",
+    "pr_number": 124,
+    "historical_execution_claim": "PR #124 records pytest backend/tests = 960 passed plus validate_json/source-boundary/smoke evidence; Windows bootstrap was explicitly not executed.",
+    "hosted_execution": "Not promoted to current hosted PASS; historical replay remains fail-closed."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "PASS",
+      "rationale": "Launcher regression explicitly covers absent node_modules and absent npm while stale dist exists.",
+      "evidence": [
+        {
+          "evidence_id": "016-null-empty-launcher",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_launch_app.py",
+          "selector": "test_launch_app_only_warns_when_stale_dist_cannot_be_rebuilt"
+        }
+      ]
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes bootstrap/frontend-build selection and launcher setup; it introduces no keyed collection, duplicate callback, or uniqueness contract.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "PASS",
+      "rationale": "Exact checkpoint regressions distinguish stale frontend dist from fresh dist and require rebuild only for stale inputs.",
+      "evidence": [
+        {
+          "evidence_id": "016-stale-rebuild",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_launch_app.py",
+          "selector": "test_launch_app_rebuilds_stale_frontend_dist"
+        },
+        {
+          "evidence_id": "016-fresh-noop",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_launch_app.py",
+          "selector": "test_launch_app_keeps_fresh_frontend_dist"
+        }
+      ]
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No join, fan-out, membership multiplication, or cardinality-transforming data surface changes in this checkpoint.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "NOT_APPLICABLE",
+      "rationale": "The checkpoint does not introduce concurrent mutation or shared-state synchronization behavior; its launcher build check is single-process.",
+      "evidence": []
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "PASS",
+      "rationale": "Exact regressions prove a fresh build is a no-op and a caller-verified build bypasses redundant rebuild work.",
+      "evidence": [
+        {
+          "evidence_id": "016-idempotent-fresh",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_launch_app.py",
+          "selector": "test_launch_app_keeps_fresh_frontend_dist"
+        },
+        {
+          "evidence_id": "016-idempotent-verified",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_launch_app.py",
+          "selector": "test_launch_app_trusts_verified_frontend_dist"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No cancellable run/task lifecycle is changed by this bootstrap and launcher checkpoint.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No durable orchestration/checkpoint reconstruction contract is changed; launcher startup behavior is not persisted run reconstruction.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No interrupted workflow resume state machine is introduced or modified in this checkpoint.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No tool-call or tool-result schema/consumer is changed.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No asynchronous or partial tool-result consumption surface is changed.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No application state machine transition graph is changed; launcher setup branches are direct procedural error paths.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No persistent application records, database schema, or durable event ledger are changed by this checkpoint.",
+      "evidence": []
+    },
+    {
+      "vector": "schema_drift",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No JSON/schema/database contract file is changed and no serialized application schema is introduced.",
+      "evidence": []
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "POSIX bootstrap tests assert deterministic unsupported/too-old exit code behavior, but the changed Windows PowerShell bootstrap was explicitly not executed in PR #124; cross-platform code-path closure is therefore blocked.",
+      "evidence": [
+        {
+          "evidence_id": "016-code-new-python",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_bootstrap.py",
+          "selector": "test_bootstrap_rejects_python_newer_than_supported"
+        },
+        {
+          "evidence_id": "016-code-old-python",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_bootstrap.py",
+          "selector": "test_bootstrap_rejects_python_older_than_supported"
+        },
+        {
+          "evidence_id": "016-code-prefer-supported",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_bootstrap.py",
+          "selector": "test_bootstrap_prefers_supported_versioned_python_over_newer_python3"
+        }
+      ]
+    }
+  ]
+}
