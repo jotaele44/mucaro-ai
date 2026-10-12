@@ -1,0 +1,151 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "9a20b75e35dbcfd09322b0bd6f0210193e011ccd",
+  "checkpoint_sha": "184842155c5cb3c2282e76ffc702d291c50005c7",
+  "provenance": {
+    "source": "replay-safe provider attempt identity checkpoint",
+    "historical_execution_claim": "Runtime provider replay behavior changed without exact Shadow execution receipt.",
+    "hosted_execution": "BLOCKED."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "BLOCKED",
+      "rationale": "Empty operation_key is explicitly rejected, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "184-null_empty",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/provider_recovery.py",
+          "selector": "ERROR_PROVIDER_OPERATION_KEY"
+        }
+      ]
+    },
+    {
+      "vector": "duplicate",
+      "state": "BLOCKED",
+      "rationale": "A previously ACCEPTED attempt returns its stored result instead of re-running the provider operation, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "184-duplicate",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/provider_recovery.py",
+          "selector": "PROVIDER_EXECUTION_ALREADY_ACCEPTED"
+        }
+      ]
+    },
+    {
+      "vector": "stale",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This replay-safe provider-attempt checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This replay-safe provider-attempt checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "BLOCKED",
+      "rationale": "Attempt claiming delegates to atomic record_provider_attempt and detects an already-started attempt, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "184-race",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/provider_recovery.py",
+          "selector": "record_provider_attempt"
+        }
+      ]
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "BLOCKED",
+      "rationale": "provider_attempt_id binds one logical operation to session/run/checkpoint/operation_key independent of provider/model and accepted operations are replay-safe, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "184-replay_idempotency",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/provider_recovery.py",
+          "selector": "def provider_attempt_id"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This replay-safe provider-attempt checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This replay-safe provider-attempt checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This replay-safe provider-attempt checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This replay-safe provider-attempt checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This replay-safe provider-attempt checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "BLOCKED",
+      "rationale": "Crashes/interruptions are recorded as INTERRUPTED_UNKNOWN rather than ACCEPTED, preserving terminal truth, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "184-orphan_state_transition",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/provider_recovery.py",
+          "selector": "ATTEMPT_INTERRUPTED_UNKNOWN"
+        }
+      ]
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "BLOCKED",
+      "rationale": "Accepted result/outcome is persisted into checkpoint provider_attempt metadata before success is returned, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "184-persistence_loss",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/provider_recovery.py",
+          "selector": "state\": \"ACCEPTED\""
+        }
+      ]
+    },
+    {
+      "vector": "schema_drift",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This replay-safe provider-attempt checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "The new path emits explicit operation-key, attempt-state, checkpoint-missing and identity-drift statuses, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "184-unexpected_codes",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/provider_recovery.py",
+          "selector": "ERROR_PROVIDER_CHECKPOINT_MISSING"
+        }
+      ]
+    }
+  ]
+}
