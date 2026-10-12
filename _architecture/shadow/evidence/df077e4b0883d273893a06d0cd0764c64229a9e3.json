@@ -1,0 +1,151 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "5643c3c9ff655f3d1db6b70929f98362e84cc132",
+  "checkpoint_sha": "df077e4b0883d273893a06d0cd0764c64229a9e3",
+  "provenance": {
+    "source": "PR #185 Windows launcher side-branch manifestation",
+    "historical_execution_claim": "Exact one-commit relation from 5643c3c; local Linux evidence only, real Windows/macOS runners blocked.",
+    "hosted_execution": "BLOCKED by BLK-ACTIONS-001."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "BLOCKED",
+      "rationale": "Missing WebView2 and unavailable local helper states fail closed, but no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "df0-null_empty",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_windows_native.py",
+          "selector": "test_missing_webview2_gets_its_own_exit_code_and_message"
+        }
+      ]
+    },
+    {
+      "vector": "duplicate",
+      "state": "BLOCKED",
+      "rationale": "Existing Windows window/process discovery brings the existing window forward rather than opening another, but no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "df0-duplicate",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_windows_native.py",
+          "selector": "test_existing_window_is_found_by_process_and_brought_forward"
+        }
+      ]
+    },
+    {
+      "vector": "stale",
+      "state": "BLOCKED",
+      "rationale": "The launcher binary is checked against its recorded SHA-256 build hash, but no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "df0-stale",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_windows_launcher.py",
+          "selector": "test_launcher_matches_its_recorded_build_hash"
+        }
+      ]
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Windows launcher side-branch checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Windows launcher side-branch checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "BLOCKED",
+      "rationale": "Existing-window reuse and deterministic build identity bound repeated launch behavior, but no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "df0-replay_idempotency",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_windows_native.py",
+          "selector": "test_existing_window_is_found_by_process_and_brought_forward"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Windows launcher side-branch checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Windows launcher side-branch checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Windows launcher side-branch checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Windows launcher side-branch checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Windows launcher side-branch checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Windows launcher side-branch checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "BLOCKED",
+      "rationale": "Per-platform Python dependency locks are hash-pinned for reproducible setup, but no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "df0-persistence_loss",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_python_locks.py",
+          "selector": "test_lock_is_fully_hash_pinned"
+        }
+      ]
+    },
+    {
+      "vector": "schema_drift",
+      "state": "BLOCKED",
+      "rationale": "PE machine/subsystem, product version metadata and platform locks define the Windows launcher/package contract, but no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "df0-schema_drift",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_windows_launcher.py",
+          "selector": "test_launcher_is_a_small_x64_gui_executable"
+        }
+      ]
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "Missing WebView2 gets a dedicated process exit code and message, but no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "df0-unexpected_codes",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_windows_native.py",
+          "selector": "test_missing_webview2_gets_its_own_exit_code_and_message"
+        }
+      ]
+    }
+  ]
+}
