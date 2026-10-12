@@ -1,0 +1,165 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "7f104bf9114c85df92c24eeaecaf2260465b4568",
+  "checkpoint_sha": "ba1d5faee6f7caae57a6d75297d11dcc1a7f9dd5",
+  "provenance": {
+    "source": "PR #209 Anthropic streaming/latency checkpoint",
+    "historical_execution_claim": "PR records 1,195 passed/8 skipped and targeted certifications, but no machine-readable exact-checkpoint Shadow execution receipt is frozen.",
+    "hosted_execution": "GitHub Actions zero-step under BLK-ACTIONS-001; live Anthropic call not executed without API key."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "BLOCKED",
+      "rationale": "Invalid model effort is rejected before a provider request and unavailable model/provider paths are explicitly mapped, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "ba1-null_empty",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_anthropic_streaming.py",
+          "selector": "test_invalid_effort_is_refused_before_any_request"
+        }
+      ]
+    },
+    {
+      "vector": "duplicate",
+      "state": "BLOCKED",
+      "rationale": "Anthropic client reuse is keyed by API key and rebuilt on key rotation rather than duplicated per question, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "ba1-duplicate",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_anthropic_streaming.py",
+          "selector": "test_client_is_reused_across_questions_and_rebuilt_for_a_new_key"
+        }
+      ]
+    },
+    {
+      "vector": "stale",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This streaming/latency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This streaming/latency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "BLOCKED",
+      "rationale": "Run-event streaming fixes terminal-event loss at the run-finish boundary and WAL changes concurrent database behavior, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "ba1-race",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_db_upgrade.py",
+          "selector": "test_database_uses_wal_and_keeps_full_sync"
+        }
+      ]
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "BLOCKED",
+      "rationale": "Database initialization remains idempotent across upgrades while preserving data, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "ba1-replay_idempotency",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_db_upgrade.py",
+          "selector": "test_upgrade_from_v1_adds_tables_and_preserves_data"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This streaming/latency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This streaming/latency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This streaming/latency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This streaming/latency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "BLOCKED",
+      "rationale": "The analogous changed surface is partial/delayed model streaming rather than tool results; a mid-stream provider error preserves partial text then terminates FAILED, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "ba1-partial_delayed_tool_result",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_anthropic_streaming.py",
+          "selector": "test_failure_mid_stream_keeps_the_partial_text_and_fails_the_run"
+        }
+      ]
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "BLOCKED",
+      "rationale": "A mid-stream provider failure produces ordered error/final events and terminal FAILED run state, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "ba1-orphan_state_transition",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_anthropic_streaming.py",
+          "selector": "test_failure_mid_stream_keeps_the_partial_text_and_fails_the_run"
+        }
+      ]
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "BLOCKED",
+      "rationale": "Database upgrade rollback preserves old data and failed schema upgrades do not partially apply, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "ba1-persistence_loss",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_db_upgrade.py",
+          "selector": "test_interrupted_upgrade_rolls_back_completely"
+        }
+      ]
+    },
+    {
+      "vector": "schema_drift",
+      "state": "BLOCKED",
+      "rationale": "Newer database schemas are refused without mutation and existing schemas upgrade transactionally, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "ba1-schema_drift",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_db_upgrade.py",
+          "selector": "test_newer_schema_is_refused_and_left_untouched"
+        }
+      ]
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "SDK errors including HTTP-200 mid-stream error bodies map to explicit provider statuses, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "ba1-unexpected_codes",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_anthropic_streaming.py",
+          "selector": "test_sdk_errors_map_to_provider_statuses"
+        }
+      ]
+    }
+  ]
+}
