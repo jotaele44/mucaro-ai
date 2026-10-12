@@ -136,32 +136,46 @@ def main() -> int:
     base_sha = git("rev-parse", args.base)
     head_sha = git("rev-parse", args.head)
     actual_head = git("rev-parse", "HEAD")
-    if head_sha != actual_head:
+    if head_sha != actual_head and not args.historical_replay:
         print(f"ERROR_SHADOW_HEAD_MISMATCH requested={head_sha} checkout={actual_head}", file=sys.stderr)
         return 2
+    if args.historical_replay and not args.evidence_manifest:
+        print("ERROR_SHADOW_EVIDENCE historical replay requires --evidence-manifest", file=sys.stderr)
+        return 7
 
     paths = changed_paths(base_sha, head_sha)
     adjacency = adjacent_paths(paths)
 
-    gates = [
-        run([sys.executable, "-m", "pytest", "backend/tests", "-q"]),
-        run([sys.executable, "scripts/validate_json.py"]),
-        run([sys.executable, "scripts/certify_release.py"]),
-    ]
-
-    frontend = ROOT / "frontend"
-    if (frontend / "package.json").exists() and (frontend / "node_modules").exists():
-        gates.append(run(["npm", "run", "build"], cwd=frontend))
-    else:
-        gates.append(
+    if args.historical_replay:
+        gates = [
             {
-                "command": ["npm", "run", "build"],
-                "cwd": "frontend",
+                "command": [],
+                "cwd": ".",
                 "returncode": None,
                 "state": "BLOCKED",
-                "reason": "frontend/node_modules is absent; build not silently treated as PASS",
+                "reason": "Historical replay preserves evidence but does not rerun checkpoint code from the tooling checkout.",
             }
-        )
+        ]
+    else:
+        gates = [
+            run([sys.executable, "-m", "pytest", "backend/tests", "-q"]),
+            run([sys.executable, "scripts/validate_json.py"]),
+            run([sys.executable, "scripts/certify_release.py"]),
+        ]
+
+        frontend = ROOT / "frontend"
+        if (frontend / "package.json").exists() and (frontend / "node_modules").exists():
+            gates.append(run(["npm", "run", "build"], cwd=frontend))
+        else:
+            gates.append(
+                {
+                    "command": ["npm", "run", "build"],
+                    "cwd": "frontend",
+                    "returncode": None,
+                    "state": "BLOCKED",
+                    "reason": "frontend/node_modules is absent; build not silently treated as PASS",
+                }
+            )
 
     failed = [gate for gate in gates if isinstance(gate.get("returncode"), int) and gate["returncode"] != 0]
     blocked = [gate for gate in gates if gate.get("state") == "BLOCKED"]
