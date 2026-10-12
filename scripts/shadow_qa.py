@@ -9,6 +9,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scripts import shadow_evidence
+
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_VERSION = "mucaro-shadow-hardening-receipt/1.0"
 
