@@ -1,0 +1,102 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "8b4ba6dc128a761b885f8209ff4453d24e1b1236",
+  "checkpoint_sha": "189e917984d5b71047fab37a3aa2849fb5d758e0",
+  "provenance": {
+    "source": "native runtime fixture test-only checkpoint",
+    "historical_execution_claim": "Test-only delta.",
+    "hosted_execution": "No runtime-vector PASS claimed."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "schema_drift",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "NOT_APPLICABLE",
+      "rationale": "Relative to its exact parent, this checkpoint changes only backend/tests/test_cli.py; no executable application behavior changes.",
+      "evidence": []
+    }
+  ]
+}
