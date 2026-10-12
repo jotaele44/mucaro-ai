@@ -1,8 +1,12 @@
+import hashlib
+import json
+
 from backend.app.capability_contracts import (
     CAPABILITY_CONTRACT_SCHEMA_VERSION,
     CAPABILITY_OUTPUT_CONTRACT_FAILED,
     CAPABILITY_OUTPUT_CONTRACT_OK,
     build_capability_contract_report,
+    validate_coding_certification_contract,
     validate_gis_report_contract,
     validate_ocr_report_contract,
 )
@@ -586,3 +590,96 @@ def test_validate_ocr_report_contract_rejects_weak_image_ocr_receipts():
     assert "low_confidence_has_warning" in failed_names
     assert "limitations_non_empty" in failed_names
     assert "falsification_criteria_non_empty" in failed_names
+
+
+def test_validate_coding_certification_contract_accepts_provisional_report():
+    report = {
+        "schema_version": "mucaro-coding-certification/1.0",
+        "status": "CODING_CERTIFICATION_PROVISIONAL",
+        "certification_ready": False,
+        "manifest": {"sha256": "a" * 64, "requirement_count": 1},
+        "identity": {
+            "source_head_sha": None,
+            "runtime_identity_sha256": None,
+            "coding_image_digest": None,
+            "source_identity_valid": False,
+            "runtime_identity_valid": False,
+            "image_identity_valid": False,
+            "identity_closed": False,
+        },
+        "state_counts": {"PASS": 0, "FAIL": 0, "BLOCKED": 0, "UNRESOLVED": 1},
+        "row_count": 1,
+        "rows": [{
+            "requirement_id": "CODE-R20",
+            "state": "UNRESOLVED",
+            "evidence": [],
+            "evidence_sha256": hashlib.sha256(json.dumps([], sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+        }],
+        "material_residue_count": 4,
+        "material_residue": [{"requirement_id": "CODE-R20", "state": "UNRESOLVED", "gate": "image"}],
+        "identity_residue": ["SOURCE_HEAD_IDENTITY", "RUNTIME_IDENTITY", "CODING_IMAGE_IDENTITY"],
+        "invariants": {
+            "row_accounting_closed": True,
+            "manifest_identity_frozen": True,
+            "no_unknown_requirements": True,
+            "every_requirement_has_terminal_state": True,
+            "pass_requires_evidence": True,
+            "certification_requires_all_pass": True,
+            "certification_requires_identity_closure": True,
+        },
+        "certification_statement_allowed": False,
+        "allowed_certification_statement": None,
+        "falsification_criteria": ["missing image identity prevents certification"],
+    }
+
+    result = validate_coding_certification_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    failed_names = {check["name"] for check in result["failed_checks"]}
+    assert not failed_names
+
+
+def test_validate_coding_certification_contract_rejects_tampered_ready_report():
+    report = {
+        "schema_version": "mucaro-coding-certification/1.0",
+        "status": "CODING_CERTIFICATION_READY",
+        "certification_ready": True,
+        "manifest": {"sha256": "a" * 64, "requirement_count": 1},
+        "identity": {
+            "source_head_sha": "a" * 40,
+            "runtime_identity_sha256": "b" * 64,
+            "coding_image_digest": "sha256:" + "c" * 64,
+            "source_identity_valid": True,
+            "runtime_identity_valid": True,
+            "image_identity_valid": True,
+            "identity_closed": True,
+        },
+        "state_counts": {"PASS": 1, "FAIL": 0, "BLOCKED": 0, "UNRESOLVED": 0},
+        "row_count": 1,
+        "rows": [{
+            "requirement_id": "CODE-R01",
+            "state": "PASS",
+            "evidence": ["receipt:one"],
+            "evidence_sha256": "d" * 64,
+        }],
+        "material_residue_count": 0,
+        "material_residue": [],
+        "identity_residue": [],
+        "invariants": {
+            "row_accounting_closed": True,
+            "manifest_identity_frozen": True,
+            "no_unknown_requirements": True,
+            "every_requirement_has_terminal_state": True,
+            "pass_requires_evidence": True,
+            "certification_requires_all_pass": True,
+            "certification_requires_identity_closure": True,
+        },
+        "certification_statement_allowed": True,
+        "allowed_certification_statement": "MUCARO AI CODING PLANE CERTIFIED",
+        "falsification_criteria": ["evidence hashes must match"],
+    }
+
+    result = validate_coding_certification_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "rows.0.evidence_hash_matches" in {check["name"] for check in result["failed_checks"]}

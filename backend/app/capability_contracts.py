@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from .coding_certification import ALLOWED_EVIDENCE_STATES, CODING_CERTIFICATION_SCHEMA_VERSION
 
 CAPABILITY_CONTRACT_SCHEMA_VERSION = "mucaro_advanced_capability_contracts_v1"
 CAPABILITY_OUTPUT_CONTRACT_OK = "CAPABILITY_OUTPUT_CONTRACT_OK"
 CAPABILITY_OUTPUT_CONTRACT_FAILED = "CAPABILITY_OUTPUT_CONTRACT_FAILED"
 GIS_REPORT_SCHEMA_VERSION = "mucaro_gis_report_v1"
 OCR_REPORT_SCHEMA_VERSION = "mucaro_ocr_report_v1"
+CODING_CERTIFICATION_REPORT_SCHEMA_VERSION = CODING_CERTIFICATION_SCHEMA_VERSION
 CRS_ENGINE_ADAPTERS = {
     "pyproj_transformer_group_always_xy_v1",
     "pyproj_governed_local_grid_always_xy_v1",
@@ -81,6 +86,12 @@ def _dotted(payload: Any, dotted_path: str) -> Any:
 
 def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _stable_hash(payload: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
 
 
 def _non_empty_string_list(value: Any) -> bool:
@@ -1276,6 +1287,164 @@ def validate_ocr_report_file(path: Path) -> dict[str, Any]:
     if not isinstance(report, dict):
         report = {}
     return validate_ocr_report_contract(report, report_path=str(path))
+
+
+def validate_coding_certification_contract(report: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
+    """Validate coding-plane evidence without promoting runtime gaps to certification."""
+
+    checks: list[dict[str, str]] = [
+        _contract_check("payload_object", isinstance(report, dict), "coding certification report must be a JSON object"),
+        _contract_check(
+            "schema_version",
+            isinstance(report, dict) and report.get("schema_version") == CODING_CERTIFICATION_REPORT_SCHEMA_VERSION,
+            f"schema_version must be {CODING_CERTIFICATION_REPORT_SCHEMA_VERSION}",
+        ),
+        _contract_check("status_present", isinstance(report, dict) and isinstance(report.get("status"), str), "coding status is required"),
+        _contract_check("manifest_object", isinstance(report, dict) and isinstance(report.get("manifest"), dict), "manifest metadata is required"),
+        _contract_check("identity_object", isinstance(report, dict) and isinstance(report.get("identity"), dict), "identity metadata is required"),
+        _contract_check("state_counts_object", isinstance(report, dict) and isinstance(report.get("state_counts"), dict), "state_counts is required"),
+        _contract_check("rows_array", isinstance(report, dict) and isinstance(report.get("rows"), list), "rows is required"),
+        _contract_check("invariants_object", isinstance(report, dict) and isinstance(report.get("invariants"), dict), "invariants are required"),
+        _contract_check(
+            "falsification_criteria_non_empty",
+            isinstance(report, dict) and _non_empty_string_list(report.get("falsification_criteria")),
+            "falsification criteria must be non-empty strings",
+        ),
+    ]
+    if not isinstance(report, dict):
+        report = {}
+
+    manifest = report.get("manifest")
+    if isinstance(manifest, dict):
+        checks.extend(
+            [
+                _contract_check("manifest.sha256", bool(re.fullmatch(r"[0-9a-f]{64}", str(manifest.get("sha256") or ""))), "manifest SHA-256 is required"),
+                _contract_check("manifest.requirement_count", isinstance(manifest.get("requirement_count"), int) and manifest["requirement_count"] >= 0, "manifest requirement count must be non-negative"),
+            ]
+        )
+
+    identity = report.get("identity")
+    identity_flags = ("source_identity_valid", "runtime_identity_valid", "image_identity_valid")
+    if isinstance(identity, dict):
+        source_sha_valid = bool(re.fullmatch(r"[0-9a-f]{40}", str(identity.get("source_head_sha") or "")))
+        runtime_sha_valid = bool(re.fullmatch(r"[0-9a-f]{64}", str(identity.get("runtime_identity_sha256") or "")))
+        image_digest_valid = bool(re.fullmatch(r"sha256:[0-9a-f]{64}", str(identity.get("coding_image_digest") or "")))
+        checks.extend(
+            [
+                _contract_check("identity.source_head_sha", not identity.get("source_identity_valid") or source_sha_valid, "a valid source HEAD SHA-1 is required when source identity is valid"),
+                _contract_check("identity.runtime_identity_sha256", not identity.get("runtime_identity_valid") or runtime_sha_valid, "a valid runtime identity SHA-256 is required when runtime identity is valid"),
+                _contract_check("identity.coding_image_digest", not identity.get("image_identity_valid") or image_digest_valid, "a pinned coding image digest is required when image identity is valid"),
+                *[_contract_check(f"identity.{flag}", isinstance(identity.get(flag), bool), f"{flag} must be boolean") for flag in identity_flags],
+                _contract_check("identity.identity_closed_type", isinstance(identity.get("identity_closed"), bool), "identity_closed must be boolean"),
+                _contract_check(
+                    "identity.identity_closed_matches_flags",
+                    identity.get("identity_closed") is all(identity.get(flag) is True for flag in identity_flags),
+                    "identity_closed must equal the conjunction of identity validity flags",
+                ),
+            ]
+        )
+
+    rows = report.get("rows")
+    row_counts = {state: 0 for state in ("PASS", "FAIL", "BLOCKED", "UNRESOLVED")}
+    row_ids: set[str] = set()
+    if isinstance(rows, list):
+        for index, row in enumerate(rows):
+            valid_row = isinstance(row, dict)
+            checks.append(_contract_check(f"rows.{index}.object", valid_row, "coding rows must be objects"))
+            if not valid_row:
+                continue
+            requirement_id = row.get("requirement_id")
+            state = row.get("state")
+            evidence = row.get("evidence")
+            checks.extend(
+                [
+                    _contract_check(f"rows.{index}.requirement_id", isinstance(requirement_id, str) and bool(requirement_id), "requirement_id is required"),
+                    _contract_check(f"rows.{index}.state", state in ALLOWED_EVIDENCE_STATES, "row state must be terminal and known"),
+                    _contract_check(f"rows.{index}.evidence", isinstance(evidence, list) and all(isinstance(item, str) and item for item in evidence), "row evidence must be non-empty strings"),
+                    _contract_check(f"rows.{index}.evidence_sha256", bool(re.fullmatch(r"[0-9a-f]{64}", str(row.get("evidence_sha256") or ""))), "row evidence SHA-256 is required"),
+                ]
+            )
+            if isinstance(requirement_id, str) and requirement_id:
+                checks.append(_contract_check(f"rows.{index}.unique_requirement_id", requirement_id not in row_ids, "requirement IDs must be unique"))
+                row_ids.add(requirement_id)
+            if state in row_counts:
+                row_counts[state] += 1
+                checks.append(_contract_check(f"rows.{index}.evidence_hash_matches", row.get("evidence_sha256") == _stable_hash(evidence), "evidence hash must match the saved evidence"))
+                if state == "PASS":
+                    checks.append(_contract_check(f"rows.{index}.pass_has_evidence", isinstance(evidence, list) and bool(evidence), "PASS rows require evidence"))
+
+    state_counts = report.get("state_counts")
+    if isinstance(state_counts, dict):
+        checks.append(_contract_check("state_counts.exact_keys", set(state_counts) == set(row_counts), "state_counts must use the exact terminal-state codebook"))
+        checks.append(_contract_check("state_counts.matches_rows", state_counts == row_counts, "state_counts must equal the row-state arithmetic"))
+
+    row_count = report.get("row_count")
+    checks.extend(
+        [
+            _contract_check("row_count.matches_rows", isinstance(row_count, int) and isinstance(rows, list) and row_count == len(rows), "row_count must equal rows length"),
+            _contract_check("manifest.requirement_count_matches_rows", isinstance(manifest, dict) and manifest.get("requirement_count") == row_count, "manifest requirement count must equal row_count"),
+            _contract_check("material_residue_array", isinstance(report.get("material_residue"), list), "material_residue must be an array"),
+            _contract_check("identity_residue_array", isinstance(report.get("identity_residue"), list), "identity_residue must be an array"),
+        ]
+    )
+    identity_residue = report.get("identity_residue")
+    expected_residue_count = sum(row_counts[state] for state in ("FAIL", "BLOCKED", "UNRESOLVED")) + (len(identity_residue) if isinstance(identity_residue, list) else -1)
+    checks.append(_contract_check("material_residue_count.closes", report.get("material_residue_count") == expected_residue_count, "material residue count must close to row and identity residue"))
+
+    invariants = report.get("invariants")
+    required_invariants = (
+        "row_accounting_closed",
+        "manifest_identity_frozen",
+        "no_unknown_requirements",
+        "every_requirement_has_terminal_state",
+        "pass_requires_evidence",
+        "certification_requires_all_pass",
+        "certification_requires_identity_closure",
+    )
+    if isinstance(invariants, dict):
+        for name in required_invariants:
+            checks.append(_contract_check(f"invariants.{name}", invariants.get(name) is True, f"{name} must be true"))
+
+    certification_ready = report.get("certification_ready")
+    identity_closed = isinstance(identity, dict) and identity.get("identity_closed") is True
+    all_pass = row_counts == {"PASS": len(rows) if isinstance(rows, list) else -1, "FAIL": 0, "BLOCKED": 0, "UNRESOLVED": 0}
+    checks.extend(
+        [
+            _contract_check("certification_ready_type", isinstance(certification_ready, bool), "certification_ready must be boolean"),
+            _contract_check("certification_ready_matches", certification_ready is (all_pass and identity_closed and report.get("material_residue_count") == 0), "certification_ready must match row, identity, and residue closure"),
+            _contract_check("statement_allowed_matches", report.get("certification_statement_allowed") is certification_ready, "statement permission must match certification readiness"),
+            _contract_check("statement_value", report.get("allowed_certification_statement") == ("MUCARO AI CODING PLANE CERTIFIED" if certification_ready else None), "certification statement must be absent unless readiness is true"),
+        ]
+    )
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": CAPABILITY_OUTPUT_CONTRACT_OK if not failed else CAPABILITY_OUTPUT_CONTRACT_FAILED,
+        "schema_version": "mucaro_capability_output_contract_v1",
+        "capability_id": "coding_programming_expertise",
+        "report_path": report_path,
+        "report_status": report.get("status"),
+        "checks": checks,
+        "counts": {"pass": sum(check["status"] == "PASS" for check in checks), "fail": len(failed), "total": len(checks)},
+        "failed_checks": failed,
+    }
+
+
+def validate_coding_certification_file(path: Path) -> dict[str, Any]:
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        failed_check = _contract_check("report_file_readable", False, str(exc))
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "coding_programming_expertise",
+            "report_path": str(path),
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    return validate_coding_certification_contract(report if isinstance(report, dict) else {}, report_path=str(path))
 
 
 def list_advanced_capability_contracts() -> list[dict[str, Any]]:
