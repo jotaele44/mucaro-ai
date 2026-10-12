@@ -1,0 +1,144 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "706cff1b2091f17cdfb38d6963deddfd010eeb46",
+  "checkpoint_sha": "9a20b75e35dbcfd09322b0bd6f0210193e011ccd",
+  "provenance": {
+    "source": "atomic provider-attempt claim checkpoint",
+    "historical_execution_claim": "Runtime attempt claim logic changed without exact Shadow execution receipt.",
+    "hosted_execution": "BLOCKED."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-attempt claim checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "duplicate",
+      "state": "BLOCKED",
+      "rationale": "Provider attempts reject already ACCEPTED and already STARTED claims, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "9a2-duplicate",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "ERROR_CHECKPOINT_ATTEMPT_IN_FLIGHT"
+        }
+      ]
+    },
+    {
+      "vector": "stale",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-attempt claim checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-attempt claim checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "BLOCKED",
+      "rationale": "Provider operation claiming is written through the checkpoint atomic mutation path so two executors cannot both claim the same attempt, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "9a2-race",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def record_provider_attempt"
+        }
+      ]
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "BLOCKED",
+      "rationale": "An ACCEPTED provider attempt is final and cannot be overwritten/re-executed, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "9a2-replay_idempotency",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "PROVIDER_ATTEMPT_ACCEPTED"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-attempt claim checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-attempt claim checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-attempt claim checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-attempt claim checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-attempt claim checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "BLOCKED",
+      "rationale": "Terminal checkpoints cannot start provider attempts and in-flight attempts have explicit state, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "9a2-orphan_state_transition",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "terminal checkpoint cannot start a provider attempt"
+        }
+      ]
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "BLOCKED",
+      "rationale": "Provider attempt state is stored under checkpoint metadata through atomic mutation, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "9a2-persistence_loss",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "metadata[\"provider_attempts\"]"
+        }
+      ]
+    },
+    {
+      "vector": "schema_drift",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This provider-attempt claim checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "Attempt accepted/in-flight/terminal guards introduce explicit checkpoint errors, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "9a2-unexpected_codes",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "ERROR_CHECKPOINT_ATTEMPT_ACCEPTED"
+        }
+      ]
+    }
+  ]
+}
