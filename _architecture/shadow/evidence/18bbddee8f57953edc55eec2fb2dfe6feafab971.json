@@ -1,0 +1,165 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "4f5cced7426ba19d14b732008611ee0568cfd7d2",
+  "checkpoint_sha": "18bbddee8f57953edc55eec2fb2dfe6feafab971",
+  "provenance": {
+    "source": "Mobile web P0 resiliency checkpoint",
+    "historical_execution_claim": "Rendered QA scenarios were added in the checkpoint, but no machine-readable exact-checkpoint execution receipt is frozen.",
+    "hosted_execution": "Rendered Chromium evidence was historically described on a pre-merge head; WebKit/physical iPhone remained unverified."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "BLOCKED",
+      "rationale": "Plain-text/non-JSON error responses, malformed token fragments and clipboard absence get explicit fallback handling, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "18b-null_empty",
+          "kind": "CHECKPOINT_FILE",
+          "path": "frontend/src/api.js",
+          "selector": "response.text"
+        }
+      ]
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This mobile-web resiliency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "BLOCKED",
+      "rationale": "Health state no longer latches and token rejection can return the client to the token gate, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "18b-stale",
+          "kind": "CHECKPOINT_FILE",
+          "path": "frontend/src/App.jsx",
+          "selector": "health"
+        }
+      ]
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This mobile-web resiliency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "BLOCKED",
+      "rationale": "Event-stream reconnect/backoff and focus lifecycle changes address repeated render/reconnect races, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "18b-race",
+          "kind": "CHECKPOINT_FILE",
+          "path": "frontend/src/App.jsx",
+          "selector": "visibilitychange"
+        }
+      ]
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "BLOCKED",
+      "rationale": "Reconnect logic has retry/backoff controls instead of unbounded rapid repeated connections, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "18b-replay_idempotency",
+          "kind": "CHECKPOINT_FILE",
+          "path": "frontend/src/App.jsx",
+          "selector": "backoff"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "BLOCKED",
+      "rationale": "Event-stream watchdog/reconnect state can be stopped/restarted on lifecycle events, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "18b-cancellation",
+          "kind": "CHECKPOINT_FILE",
+          "path": "frontend/src/App.jsx",
+          "selector": "AbortController"
+        }
+      ]
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This mobile-web resiliency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "BLOCKED",
+      "rationale": "A stalled stream exposes an explicit Resume/reconnect path, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "18b-resume",
+          "kind": "CHECKPOINT_FILE",
+          "path": "frontend/src/components/ChatView.jsx",
+          "selector": "Resume"
+        }
+      ]
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This mobile-web resiliency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This mobile-web resiliency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "BLOCKED",
+      "rationale": "Confirmation sheets restore explicit destructive-action confirmation instead of allowing detached destructive UI state, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "18b-orphan_state_transition",
+          "kind": "CHECKPOINT_FILE",
+          "path": "frontend/src/components/ConfirmSheet.jsx",
+          "selector": "Confirm"
+        }
+      ]
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This mobile-web resiliency checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "schema_drift",
+      "state": "BLOCKED",
+      "rationale": "Token gate, cleartext notice and shared API/clipboard behavior change the client-side access contract, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "18b-schema_drift",
+          "kind": "CHECKPOINT_FILE",
+          "path": "frontend/src/components/TokenGate.jsx",
+          "selector": "Token"
+        }
+      ]
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "Plain-text failures, token rejection and clipboard failure receive explicit user-visible error handling, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "18b-unexpected_codes",
+          "kind": "CHECKPOINT_FILE",
+          "path": "frontend/src/api.js",
+          "selector": "status"
+        }
+      ]
+    }
+  ]
+}
