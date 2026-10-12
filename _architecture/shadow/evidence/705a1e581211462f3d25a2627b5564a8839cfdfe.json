@@ -1,0 +1,130 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "8a758bf0089ce3972c7255ef02839919684576a2",
+  "checkpoint_sha": "705a1e581211462f3d25a2627b5564a8839cfdfe",
+  "provenance": {
+    "source": "PR #174 packaged helper self-containment",
+    "historical_execution_claim": "Checkpoint includes helper-resolution regressions but no frozen Shadow execution receipt.",
+    "hosted_execution": "BLOCKED."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "BLOCKED",
+      "rationale": "Frozen/bundled-only mode explicitly returns no helper when the bundle lacks it, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "705-null_empty",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_local_tools.py",
+          "selector": "test_bundled_only_mode_never_falls_back_to_host"
+        }
+      ]
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This packaged-helper checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "BLOCKED",
+      "rationale": "A bundled helper must win over a host PATH helper and frozen runtime may not fall back to host tools, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "705-stale",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_local_tools.py",
+          "selector": "test_bundled_tool_wins_over_host_path"
+        }
+      ]
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This packaged-helper checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This packaged-helper checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This packaged-helper checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This packaged-helper checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This packaged-helper checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This packaged-helper checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This packaged-helper checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This packaged-helper checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This packaged-helper checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This packaged-helper checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "schema_drift",
+      "state": "BLOCKED",
+      "rationale": "The runtime-independence contract changes packaged/source host-path fallback semantics, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "705-schema_drift",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_local_tools.py",
+          "selector": "test_frozen_runtime_is_implicitly_bundled_only"
+        }
+      ]
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "Unknown/missing helpers fail closed and coding paths emit explicit unavailable-helper statuses, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "705-unexpected_codes",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_local_tools.py",
+          "selector": "test_unknown_tool_fails_closed"
+        }
+      ]
+    }
+  ]
+}
