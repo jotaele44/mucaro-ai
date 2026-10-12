@@ -78,6 +78,7 @@
     }
   ],
   "supporting_tools": [
+    "coding.exec",
     "memory.list",
     "product.audit",
     "source_library.status",
