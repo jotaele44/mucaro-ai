@@ -152,8 +152,19 @@ def test_duplicate_evidence_id_is_rejected_across_vectors():
 
 def test_pass_test_selector_must_exist_at_checkpoint(monkeypatch):
     monkeypatch.setattr(shadow_evidence, "_git_show_text", lambda checkpoint, path: "def other():\n    pass\n")
-    with pytest.raises(shadow_evidence.ShadowEvidenceError, match="selector"):
+    with pytest.raises(shadow_evidence.ShadowEvidenceError, match="exact test definition"):
         validate(manifest())
+
+
+def test_checkpoint_file_selector_must_exist_at_checkpoint():
+    payload = manifest()
+    payload["vectors"][0]["evidence"][0]["kind"] = "CHECKPOINT_FILE"
+    payload["vectors"][0]["evidence"][0]["selector"] = "MISSING_SYMBOL"
+    with pytest.raises(
+        shadow_evidence.ShadowEvidenceError,
+        match="selector for stale-test is absent from checkpoint file",
+    ):
+        validate(payload)
 
 
 def test_unknown_vector_is_rejected():
