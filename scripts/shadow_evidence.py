@@ -63,9 +63,10 @@ def _normalize_evidence(
         if not selector:
             raise ShadowEvidenceError(f"test evidence {evidence_id} requires selector")
         symbol = selector.split("::")[-1].strip()
-        if not symbol or symbol not in text:
+        definitions = {f"def {symbol}(", f"async def {symbol}("}
+        if not symbol or not any(token in text for token in definitions):
             raise ShadowEvidenceError(
-                f"test selector for {evidence_id} is absent from checkpoint file: {selector}"
+                f"exact test definition for {evidence_id} is absent from checkpoint file: {selector}"
             )
     elif selector and selector not in text:
         raise ShadowEvidenceError(
