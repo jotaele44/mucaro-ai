@@ -1,0 +1,102 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "3fe90a7bd255ec46ea39e409a5c60f3b30cb7f32",
+  "checkpoint_sha": "6cc0a9f0b136d2d4574e0bf3b2101bb8a0d8fb48",
+  "provenance": {
+    "source": "PR #135 cumulative Shadow baseline infrastructure",
+    "historical_execution_claim": "No runtime vector PASS claimed; checkpoint scope is control-plane/documentation evidence.",
+    "hosted_execution": "Not required for NOT_APPLICABLE runtime-vector classification."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "schema_drift",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint changes only Shadow QA cumulative-baseline/control-plane infrastructure and its tests/docs; no application runtime/state/tool/data behavior enters the adversarial-vector denominator.",
+      "evidence": []
+    }
+  ]
+}
