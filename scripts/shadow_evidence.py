@@ -9,6 +9,7 @@ from typing import Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_VERSION = "mucaro-shadow-vector-evidence/1.0"
+EXECUTION_RECEIPT_SCHEMA_VERSION = "mucaro-shadow-execution-receipt/1.0"
 TERMINAL_STATES = {"PASS", "NOT_APPLICABLE", "BLOCKED", "UNRESOLVED"}
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
@@ -39,6 +40,24 @@ def _git_show_text(checkpoint_sha: str, path: str) -> str:
     return completed.stdout
 
 
+def _load_execution_receipt(path: str, *, checkpoint_sha: str) -> None:
+    target = (ROOT / path).resolve()
+    try:
+        target.relative_to(ROOT)
+    except ValueError as exc:
+        raise ShadowEvidenceError(f"execution receipt escapes repository root: {path}") from exc
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ShadowEvidenceError(f"unable to read execution receipt {path}: {exc}") from exc
+    if payload.get("schema_version") != EXECUTION_RECEIPT_SCHEMA_VERSION:
+        raise ShadowEvidenceError(f"invalid execution receipt schema: {path}")
+    if _require_sha(payload.get("checkpoint_sha"), label="execution receipt checkpoint_sha") != checkpoint_sha:
+        raise ShadowEvidenceError(f"execution receipt checkpoint mismatch: {path}")
+    if payload.get("status") != "PASS":
+        raise ShadowEvidenceError(f"execution receipt is not PASS: {path}")
+
+
 def _normalize_evidence(
     entry: object,
     *,
@@ -56,9 +75,13 @@ def _normalize_evidence(
     if evidence_id in seen_ids:
         raise ShadowEvidenceError(f"duplicate evidence_id: {evidence_id}")
     seen_ids.add(evidence_id)
-    if kind not in {"CHECKPOINT_FILE", "CHECKPOINT_TEST"}:
+    if kind not in {"CHECKPOINT_FILE", "CHECKPOINT_TEST", "EXECUTION_RECEIPT"}:
         raise ShadowEvidenceError(f"unsupported evidence kind for {evidence_id}: {kind}")
-    text = _git_show_text(checkpoint_sha, path)
+    if kind == "EXECUTION_RECEIPT":
+        _load_execution_receipt(path, checkpoint_sha=checkpoint_sha)
+        text = ""
+    else:
+        text = _git_show_text(checkpoint_sha, path)
     if kind == "CHECKPOINT_TEST":
         if not selector:
             raise ShadowEvidenceError(f"test evidence {evidence_id} requires selector")
@@ -138,8 +161,11 @@ def validate_manifest(
             for item in evidence_rows
         ]
 
-        if state == "PASS" and not evidence:
-            raise ShadowEvidenceError(f"PASS vector requires executable/checkpoint evidence: {vector}")
+        if state == "PASS":
+            if not evidence:
+                raise ShadowEvidenceError(f"PASS vector requires executable/checkpoint evidence: {vector}")
+            if not any(item["kind"] == "EXECUTION_RECEIPT" for item in evidence):
+                raise ShadowEvidenceError(f"PASS vector requires exact-checkpoint execution receipt: {vector}")
         if state in {"NOT_APPLICABLE", "BLOCKED", "UNRESOLVED"} and not rationale:
             raise ShadowEvidenceError(f"{state} vector requires rationale: {vector}")
         if state == "NOT_APPLICABLE" and evidence:
