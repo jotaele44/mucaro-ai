@@ -1,0 +1,144 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "6b885a3eabbc8f4e2b7b39c8422051cc7cf574ed",
+  "checkpoint_sha": "5643c3c9ff655f3d1db6b70929f98362e84cc132",
+  "provenance": {
+    "source": "PR #176 editable/selectable message checkpoint",
+    "historical_execution_claim": "Backend and rendered regression gates are described, but no machine-readable exact-checkpoint execution receipt is frozen.",
+    "hosted_execution": "Rendered/hosted evidence remains BLOCKED under the exact Shadow contract."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "BLOCKED",
+      "rationale": "Message edits reject empty content, missing messages, malformed keys and invalid stored edit mappings, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "564-null_empty",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_message_edits.py",
+          "selector": "test_message_edit_rejects_unknown_keys_empty_content_and_missing_auth"
+        }
+      ]
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This editable-message/UI checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "BLOCKED",
+      "rationale": "expected_revision rejects stale writers with ERROR_MESSAGE_EDIT_REVISION_CONFLICT, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "564-stale",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_message_edits.py",
+          "selector": "test_legacy_message_edit_is_revisioned_and_preserves_canonical_turn"
+        }
+      ]
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This editable-message/UI checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "BLOCKED",
+      "rationale": "Conversation edits are serialized under the conversation lock and optimistic revision checks prevent stale concurrent overwrite, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "564-race",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_message_edits.py",
+          "selector": "test_legacy_message_edit_is_revisioned_and_preserves_canonical_turn"
+        }
+      ]
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This editable-message/UI checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This editable-message/UI checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This editable-message/UI checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This editable-message/UI checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This editable-message/UI checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This editable-message/UI checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This editable-message/UI checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "BLOCKED",
+      "rationale": "Display revisions are persisted separately while canonical conversation turns remain unchanged, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "564-persistence_loss",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_message_edits.py",
+          "selector": "test_legacy_message_edit_is_revisioned_and_preserves_canonical_turn"
+        }
+      ]
+    },
+    {
+      "vector": "schema_drift",
+      "state": "BLOCKED",
+      "rationale": "MessageEditRequest and persistent message_edits introduce a new API/storage contract, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "564-schema_drift",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_message_edits.py",
+          "selector": "test_run_prompt_and_answer_edits_are_bound_to_the_owning_conversation"
+        }
+      ]
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "Unknown/malformed/cross-conversation/stale edit paths have explicit 400/404/409 error statuses, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "564-unexpected_codes",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_message_edits.py",
+          "selector": "test_message_edit_rejects_unknown_keys_empty_content_and_missing_auth"
+        }
+      ]
+    }
+  ]
+}
