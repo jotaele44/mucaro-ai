@@ -9,6 +9,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scripts import shadow_evidence
+
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_VERSION = "mucaro-shadow-hardening-receipt/1.0"
 
@@ -86,16 +88,21 @@ REQUIRED_ADVERSARIAL_VECTORS = [
 SHADOW_BOOTSTRAP_PATHS = {
     ".github/workflows/shadow-qa.yml",
     "backend/tests/test_shadow_baseline.py",
+    "backend/tests/test_shadow_evidence.py",
     "backend/tests/test_shadow_qa.py",
     "docs/SHADOW_QA.md",
     "scripts/resolve_shadow_baseline.py",
+    "scripts/shadow_evidence.py",
     "scripts/shadow_qa.py",
 }
 
 
 def adversarial_vector_results(paths: list[str]) -> dict[str, dict[str, str]]:
     path_set = set(paths)
-    bootstrap_only = bool(path_set) and path_set <= SHADOW_BOOTSTRAP_PATHS
+    bootstrap_only = bool(path_set) and all(
+        path in SHADOW_BOOTSTRAP_PATHS or path.startswith("_architecture/shadow/evidence/")
+        for path in path_set
+    )
     if bootstrap_only:
         reason = (
             "NOT_APPLICABLE: checkpoint changes only Shadow QA infrastructure; "
@@ -122,6 +129,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run bounded MUCARO Shadow QA against an exact frozen checkpoint.")
     parser.add_argument("--base", default="HEAD^", help="Base commit/ref for the changed-surface denominator.")
     parser.add_argument("--head", default="HEAD", help="Frozen checkpoint commit/ref.")
+    parser.add_argument("--evidence-manifest", type=Path, help="Checkpoint-bound vector evidence manifest.")
+    parser.add_argument("--historical-replay", action="store_true", help="Adjudicate a historical checkpoint from frozen evidence without claiming its gates were rerun.")
     parser.add_argument(
         "--output",
         default=os.environ.get("MUCARO_SHADOW_RECEIPT", "artifacts/shadow-qa-receipt.json"),
@@ -132,40 +141,71 @@ def main() -> int:
     base_sha = git("rev-parse", args.base)
     head_sha = git("rev-parse", args.head)
     actual_head = git("rev-parse", "HEAD")
-    if head_sha != actual_head:
+    if head_sha != actual_head and not args.historical_replay:
         print(f"ERROR_SHADOW_HEAD_MISMATCH requested={head_sha} checkout={actual_head}", file=sys.stderr)
         return 2
+    if args.historical_replay and not args.evidence_manifest:
+        print("ERROR_SHADOW_EVIDENCE historical replay requires --evidence-manifest", file=sys.stderr)
+        return 7
 
     paths = changed_paths(base_sha, head_sha)
     adjacency = adjacent_paths(paths)
 
-    gates = [
-        run([sys.executable, "-m", "pytest", "backend/tests", "-q"]),
-        run([sys.executable, "scripts/validate_json.py"]),
-        run([sys.executable, "scripts/certify_release.py"]),
-    ]
-
-    frontend = ROOT / "frontend"
-    if (frontend / "package.json").exists() and (frontend / "node_modules").exists():
-        gates.append(run(["npm", "run", "build"], cwd=frontend))
-    else:
-        gates.append(
+    if args.historical_replay:
+        gates = [
             {
-                "command": ["npm", "run", "build"],
-                "cwd": "frontend",
+                "command": [],
+                "cwd": ".",
                 "returncode": None,
                 "state": "BLOCKED",
-                "reason": "frontend/node_modules is absent; build not silently treated as PASS",
+                "reason": "Historical replay preserves evidence but does not rerun checkpoint code from the tooling checkout.",
             }
-        )
+        ]
+    else:
+        gates = [
+            run([sys.executable, "-m", "pytest", "backend/tests", "-q"]),
+            run([sys.executable, "scripts/validate_json.py"]),
+            run([sys.executable, "scripts/certify_release.py"]),
+        ]
+
+        frontend = ROOT / "frontend"
+        if (frontend / "package.json").exists() and (frontend / "node_modules").exists():
+            gates.append(run(["npm", "run", "build"], cwd=frontend))
+        else:
+            gates.append(
+                {
+                    "command": ["npm", "run", "build"],
+                    "cwd": "frontend",
+                    "returncode": None,
+                    "state": "BLOCKED",
+                    "reason": "frontend/node_modules is absent; build not silently treated as PASS",
+                }
+            )
 
     failed = [gate for gate in gates if isinstance(gate.get("returncode"), int) and gate["returncode"] != 0]
     blocked = [gate for gate in gates if gate.get("state") == "BLOCKED"]
 
     rendered_state, rendered_reason = classify_rendered(paths)
-    vector_results = adversarial_vector_results(paths)
+    try:
+        vector_results = (
+            shadow_evidence.load_manifest(
+                args.evidence_manifest,
+                base_sha=base_sha,
+                checkpoint_sha=head_sha,
+                required_vectors=REQUIRED_ADVERSARIAL_VECTORS,
+            )
+            if args.evidence_manifest
+            else adversarial_vector_results(paths)
+        )
+    except shadow_evidence.ShadowEvidenceError as exc:
+        print(f"ERROR_SHADOW_EVIDENCE {exc}", file=sys.stderr)
+        return 7
+
     unresolved_vectors = [
         name for name, result in vector_results.items() if result["state"] == "UNRESOLVED"
+    ]
+    blocked_vectors = [
+        name for name, result in vector_results.items() if result["state"] == "BLOCKED"
     ]
 
     # A gate can verify the declared changed-file denominator only when every executable gate passes
@@ -175,7 +215,7 @@ def main() -> int:
         verified: list[str] = []
         unresolved = list(paths)
         overall = "FAIL"
-    elif blocked or unresolved_vectors:
+    elif blocked or unresolved_vectors or blocked_vectors:
         verified = []
         unresolved = list(paths)
         overall = "PROVISIONAL"
@@ -224,8 +264,12 @@ def main() -> int:
             "required": len(REQUIRED_ADVERSARIAL_VECTORS),
             "classified": len(vector_results),
             "unresolved": len(unresolved_vectors),
+            "blocked": len(blocked_vectors),
             "closes": len(vector_results) == len(REQUIRED_ADVERSARIAL_VECTORS),
         },
+        "execution_mode": "HISTORICAL_EVIDENCE_REPLAY" if args.historical_replay else "EXACT_CHECKPOINT_EXECUTION",
+        "evidence_manifest": str(args.evidence_manifest) if args.evidence_manifest else None,
+        "tooling_head_sha": actual_head,
         "overall_state": overall,
         "scope_note": "This receipt is bounded to the exact checkpoint and declared gates; it does not claim universal defect freedom.",
     }
