@@ -170,3 +170,35 @@ A primary checkpoint is Shadow-closed only when:
 ## Training gate 🚩
 
 Do not promote this workflow into a reusable skill/agent after a single successful run. Train it only after multiple checkpoint -> audit -> repair -> rerun cycles reproduce the same contract and receipt semantics without hidden manual assumptions.
+
+
+## Checkpoint-specific adversarial evidence
+
+Generic release or pytest success never implies that every adversarial vector passed.
+A real application checkpoint may close a vector only through a
+`mucaro-shadow-vector-evidence/1.0` manifest bound to the exact `base_sha`
+and `checkpoint_sha`.
+
+The manifest contains exactly one row for every required vector. Allowed terminal
+states are `PASS`, `NOT_APPLICABLE`, `BLOCKED`, and `UNRESOLVED`.
+
+- `PASS` requires at least one uniquely identified checkpoint file/test evidence
+  reference. The referenced path must exist at the checkpoint; test evidence must
+  name a selector present in that checkpoint file.
+- `NOT_APPLICABLE` requires an explicit scope rationale and carries no positive
+  evidence. Vocabulary absence, nearest-name matching, or generic test success is
+  not a valid rationale.
+- `BLOCKED` and `UNRESOLVED` require explicit reasons and remain non-green.
+- Duplicate vector dispositions, duplicate evidence IDs, unknown vectors, missing
+  vectors, malformed SHAs, stale base/head bindings, PASS without evidence, and
+  evidence absent from the checkpoint fail closed.
+
+Historical replay is evidence adjudication, not execution equivalence. The verifier
+may run from a later tooling checkout against an older exact checkpoint, but that
+mode records its execution gate as BLOCKED and must not claim the older code was
+rerun. A later exact-checkpoint execution can supersede that blocked execution
+observation.
+
+Checkpoint manifests live under `_architecture/shadow/evidence/<checkpoint_sha>.json`.
+They are append-only provenance records; a later correction supersedes rather than
+silently rewrites an earlier receipt.
