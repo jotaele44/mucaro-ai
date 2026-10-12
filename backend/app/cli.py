@@ -78,6 +78,7 @@ from .gis_eval import (
 )
 from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .ocr_structure import OCRStructureError, reconstruct_ocr_report
 from .ingestion import (
     IngestLimitError,
     delete_source,
@@ -889,6 +890,20 @@ def build_parser() -> argparse.ArgumentParser:
     ocr_analyze.add_argument("--timeout-seconds", type=int, default=30, help="OCR engine timeout.")
     ocr_analyze.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     ocr_analyze.set_defaults(handler=run_ocr_analyze)
+
+    ocr_structure = ocr_subcommands.add_parser(
+        "structure",
+        help="Derive a bounded multi-column, table, or form structure receipt from a saved image OCR receipt.",
+    )
+    ocr_structure.add_argument("report_path", help="Path to a saved mucaro_ocr_report_v1 JSON receipt.")
+    ocr_structure.add_argument(
+        "--kind",
+        choices=["multi_column", "table", "form"],
+        required=True,
+        help="Bounded structure reconstruction mode.",
+    )
+    ocr_structure.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    ocr_structure.set_defaults(handler=run_ocr_structure)
 
     flagpole = subcommands.add_parser("flagpole", help="Flagpole evidence tooling bound to exact Git SHAs.")
     flagpole_subcommands = flagpole.add_subparsers(dest="flagpole_command", required=True)
@@ -3316,6 +3331,19 @@ def run_ocr_analyze(args: argparse.Namespace, cfg: Settings) -> int:
         return 2
     emit_payload(result, args.format)
     return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_ocr_structure(args: argparse.Namespace, cfg: Settings) -> int:
+    path = Path(args.report_path)
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        result = reconstruct_ocr_report(path, kind=args.kind, cfg=cfg)
+    except OCRStructureError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if result.get("status") != "OCR_STRUCTURE_UNRESOLVED" else 2
 
 
 def run_flagpole_inventory_generate(args: argparse.Namespace, cfg: Settings) -> int:

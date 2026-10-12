@@ -5450,3 +5450,104 @@ def test_cli_ask_invalid_top_k_returns_error_status(tmp_path: Path, capsys):
         assert exc.code == 2
     error_output = capsys.readouterr().err
     assert "TOP_K_RANGE:1-20" in error_output
+
+
+def test_cli_ocr_structure_derives_saved_form_receipt(tmp_path: Path, capsys) -> None:
+    cfg = make_settings(tmp_path)
+    report_path = tmp_path / "ocr-form.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "mucaro_ocr_report_v1",
+                "report_id": "ocrreport_cli_form",
+                "source": {"sha256": "c" * 64},
+                "engine": {"name": "tesseract", "version": "fixture"},
+                "spans": [
+                    {
+                        "span_index": 0,
+                        "raw_text": "Name:",
+                        "page_index": 0,
+                        "block_num": 1,
+                        "paragraph_num": 1,
+                        "line_num": 1,
+                        "word_num": 1,
+                        "bbox": {"x": 100, "y": 100, "width": 120, "height": 24},
+                    },
+                    {
+                        "span_index": 1,
+                        "raw_text": "Alice",
+                        "page_index": 0,
+                        "block_num": 1,
+                        "paragraph_num": 1,
+                        "line_num": 1,
+                        "word_num": 2,
+                        "bbox": {"x": 300, "y": 100, "width": 130, "height": 24},
+                    },
+                    {
+                        "span_index": 2,
+                        "raw_text": "City:",
+                        "page_index": 0,
+                        "block_num": 1,
+                        "paragraph_num": 1,
+                        "line_num": 2,
+                        "word_num": 1,
+                        "bbox": {"x": 100, "y": 190, "width": 120, "height": 24},
+                    },
+                    {
+                        "span_index": 3,
+                        "raw_text": "Ponce",
+                        "page_index": 0,
+                        "block_num": 1,
+                        "paragraph_num": 1,
+                        "line_num": 2,
+                        "word_num": 2,
+                        "bbox": {"x": 300, "y": 190, "width": 130, "height": 24},
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert main(["ocr", "structure", str(report_path), "--kind", "form", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "OCR_FORM_RECONSTRUCTION_OK"
+    assert payload["structure"]["field_count"] == 2
+    assert payload["structure"]["certification_state"] == "CANDIDATE_NOT_IDENTITY"
+
+
+def test_cli_ocr_structure_returns_nonzero_for_unresolved(tmp_path: Path, capsys) -> None:
+    cfg = make_settings(tmp_path)
+    report_path = tmp_path / "ocr-single-column.json"
+    spans = []
+    for index, y in enumerate((50, 120, 190, 260)):
+        spans.append(
+            {
+                "span_index": index,
+                "raw_text": f"Line{index}",
+                "page_index": 0,
+                "block_num": 1,
+                "paragraph_num": 1,
+                "line_num": index + 1,
+                "word_num": 1,
+                "bbox": {"x": 50, "y": y, "width": 180, "height": 24},
+            }
+        )
+    report_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "mucaro_ocr_report_v1",
+                "report_id": "ocrreport_cli_single",
+                "source": {"sha256": "d" * 64},
+                "engine": {"name": "tesseract"},
+                "spans": spans,
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert main(
+        ["ocr", "structure", str(report_path), "--kind", "multi_column", "--format", "json"],
+        cfg=cfg,
+    ) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "OCR_STRUCTURE_UNRESOLVED"
+    assert payload["structure"]["certification_state"] == "UNRESOLVED"
