@@ -15,6 +15,13 @@ MAX_CONTEXT_TURNS = 8
 MAX_CONTEXT_CHARS = 2400
 
 
+class ConversationMessageEditError(RuntimeError):
+    def __init__(self, status: str, detail: str):
+        super().__init__(detail)
+        self.status = status
+        self.detail = detail
+
+
 def _title_from_query(query: str) -> str:
     compact = " ".join(query.strip().split())
     return compact[:64] or DEFAULT_TITLE
@@ -31,6 +38,7 @@ def create_conversation(title: str | None = None, cfg: Settings = settings) -> d
         "created_at": now,
         "updated_at": now,
         "turns": [],
+        "message_edits": {},
     }
     upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
     return conversation
@@ -84,6 +92,61 @@ def delete_conversation(conversation_id: str, cfg: Settings = settings) -> dict[
         "conversation_id": conversation_id,
         "removed": removed,
     }
+
+
+def edit_conversation_message(
+    conversation_id: str,
+    message_key: str,
+    content: str,
+    expected_revision: int,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Store a display-only message revision without mutating the canonical turn or run."""
+    if not content.strip():
+        raise ConversationMessageEditError("ERROR_MESSAGE_EDIT_EMPTY", "Edited message content is required.")
+    with _CONVERSATION_LOCK:
+        conversation = get_conversation(conversation_id, cfg)
+        if conversation is None:
+            raise ConversationMessageEditError("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.")
+        raw_edits = conversation.get("message_edits") or {}
+        if not isinstance(raw_edits, dict):
+            raise ConversationMessageEditError(
+                "ERROR_MESSAGE_EDITS_INVALID",
+                "Stored message edits are not a valid mapping.",
+            )
+        edits = dict(raw_edits)
+        previous = edits.get(message_key)
+        if previous is not None and not isinstance(previous, dict):
+            raise ConversationMessageEditError(
+                "ERROR_MESSAGE_EDITS_INVALID",
+                "Stored message edit entry is not a valid mapping.",
+            )
+        try:
+            current_revision = int(previous.get("revision", 0)) if previous is not None else 0
+        except (TypeError, ValueError) as exc:
+            raise ConversationMessageEditError(
+                "ERROR_MESSAGE_EDITS_INVALID",
+                "Stored message edit revision is not valid.",
+            ) from exc
+        if expected_revision != current_revision:
+            raise ConversationMessageEditError(
+                "ERROR_MESSAGE_EDIT_REVISION_CONFLICT",
+                f"Expected revision {expected_revision}, current revision is {current_revision}.",
+            )
+        now = utc_now()
+        edit = {
+            "message_key": message_key,
+            "content": content,
+            "revision": current_revision + 1,
+            "edited_at": now,
+            "scope": "DISPLAY_OVERRIDE",
+            "original_preserved": True,
+        }
+        edits[message_key] = edit
+        conversation["message_edits"] = edits
+        conversation["updated_at"] = now
+        upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
+        return edit
 
 
 def build_conversation_context(conversation: dict[str, Any]) -> list[dict[str, Any]]:

@@ -101,6 +101,9 @@ the brief's own denominator, unless noted):
 - No mobile UI/rendering. There is no iPhone-width client for any of
   this; F01, F05, F06, F17, F20, and the "rendered QA" step in the brief's
   implementation order are untouched.
+  *Update 2026-10-02: superseded. The conversation-first UI (#110) renders
+  the question, choice and receipt rows at iPhone width, and
+  `qa/rendered/rendered_qa.mjs` checks them at 390×844.*
 - No queued-message-while-a-turn-is-active semantics (F04) — this module
   only manages one pending *question*, not a message queue.
 - No tool-call/tool-result parts are populated from `backend/app/tools.py`

@@ -1,0 +1,89 @@
+{
+  "schema_version": "mucaro-actions-runner-admission-evidence/1.0",
+  "observed_utc": "2026-09-29T23:18:31Z",
+  "repository": "jotaele44/mucaro-ai",
+  "repository_visibility": "private",
+  "repository_admin_access_observed": true,
+  "public_github_status": {
+    "date": "2026-09-29",
+    "actions_status": "operational",
+    "incident_reported": false,
+    "source": "https://www.githubstatus.com/"
+  },
+  "active_vector": {
+    "pull_request": 138,
+    "head_sha": "81b7a2d1128f4c20331b2ef46ce7ac9b4f7eced7",
+    "benchmark_revision": "mucaro-rt10-matrix007-scale-v1.2",
+    "disposition": "BLOCKED_RUNNER_ADMISSION"
+  },
+  "exact_head_jobs": [
+    {
+      "workflow": "RT10 Retrieval Scale Certification",
+      "run_id": 36643492834,
+      "job_id": 109660981702,
+      "conclusion": "failure",
+      "executed_steps": 0,
+      "logs": "ABSENT"
+    },
+    {
+      "workflow": "CI",
+      "run_id": 36643492787,
+      "job_id": 109660981494,
+      "conclusion": "failure",
+      "executed_steps": 0,
+      "logs": "ABSENT"
+    },
+    {
+      "workflow": "macOS app",
+      "run_id": 36643492852,
+      "job_id": 109660982065,
+      "conclusion": "failure",
+      "executed_steps": 0,
+      "logs": "ABSENT"
+    }
+  ],
+  "independent_reproduction": [
+    {
+      "workflow": "CI",
+      "run_id": 36643574731,
+      "job_id": 109661244135,
+      "conclusion": "failure",
+      "executed_steps": 0
+    },
+    {
+      "workflow": "CI",
+      "run_id": 36643530930,
+      "job_id": 109661104259,
+      "conclusion": "failure",
+      "executed_steps": 0
+    },
+    {
+      "workflow": "CI",
+      "run_id": 36643523897,
+      "job_id": 109661081061,
+      "conclusion": "failure",
+      "executed_steps": 0
+    },
+    {
+      "workflow": "macOS app",
+      "run_id": 36643515928,
+      "job_id": 109661055456,
+      "conclusion": "failure",
+      "executed_steps": 0
+    }
+  ],
+  "classification": {
+    "fact": "GitHub creates the workflow jobs but no step executes and no log blob exists.",
+    "binding": "BLOCKED infrastructure evidence; not benchmark PASS and not code/benchmark FAIL.",
+    "hypothesis": [
+      "Private-repository Actions quota/billing admission",
+      "repository/account Actions policy or runner eligibility"
+    ],
+    "unknown": "The account-specific admission cause is not readable from the available GitHub connector endpoints."
+  },
+  "falsification": [
+    "Any later job on the same account/repository that executes at least one runner step falsifies the claim that runner admission is universally blocked at that later time.",
+    "A future RT-10 job that executes steps must be adjudicated from its actual test/benchmark outputs rather than this blocker.",
+    "A public GitHub Actions incident would broaden the cause class but would not retroactively prove that these jobs were caused by that incident."
+  ]
+}

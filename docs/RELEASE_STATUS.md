@@ -10,7 +10,7 @@ This block is generated from the ledgers in `_architecture/release/` by
 fails when it drifts from the computed state. Older sections below are
 historical and are not the current verdict.
 
-Requirement denominator: 138 (arithmetic closes: yes).
+Requirement denominator: 139 (arithmetic closes: yes).
 
 | State | Requirements |
 | --- | ---: |
@@ -18,7 +18,7 @@ Requirement denominator: 138 (arithmetic closes: yes).
 | FAIL | 0 |
 | OPEN | 49 |
 | BLOCKED | 7 |
-| PROVISIONAL | 26 |
+| PROVISIONAL | 27 |
 | NOT_APPLICABLE | 1 |
 
 | Terminal-rule condition | Holds |
@@ -38,9 +38,9 @@ Residue:
 - fail (0): none
 - blocked (6): `KERNEL-003`, `MATRIX-018`, `TGT-001`, `TGT-009`, `TGT-026`, `TGT-028`
 - externally blocked (1): `TGT-027`
-- provisional (26): 26 requirements (see `mucaro release scope status`)
+- provisional (27): 27 requirements (see `mucaro release scope status`)
 - open (49): 49 requirements (see `mucaro release scope status`)
-- active blockers: `BLK-LLM-001`, `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-SPEC-001`, `BLK-WEB-001`
+- active blockers: `BLK-ACTIONS-001`, `BLK-LLM-001`, `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-SPEC-001`, `BLK-WEB-001`
 - unresolved material contradictions: none
 - open specification bindings: Mucaro AI Release-Grade Workbench Specification
 <!-- END GENERATED: release-scope-status -->

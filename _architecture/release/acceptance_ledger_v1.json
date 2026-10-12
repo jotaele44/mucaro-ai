@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-09-27T03:40:07Z",
+  "updated_utc": "2026-10-02T15:01:08Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1877,9 +1877,9 @@
         "_architecture/mucaro_v1_denominator_events.json"
       ],
       "state": "PROVISIONAL",
-      "blocker_id": null,
+      "blocker_id": "BLK-ACTIONS-001",
       "dag_node": "N09",
-      "notes": "PR #127 merged a frozen 24-document IETF/W3C/NIST real-world corpus lane. Run 36382763249 passed with 24/24 source-bound queries hitting expected sources in top-5, 3 parser formats, 8,277,197 source bytes and 4,933 chunks; artifact 10952734875 digest sha256:1eb4198e783fbaa84ae60610c7048d6e889c077aaf59aa70c7db29cebd4badac. MATRIX-007 remains PROVISIONAL because its crosswalk also includes RT-10 production-scale stress/scalability, which is not closed by this corpus."
+      "notes": "PR #127 merged a frozen 24-document IETF/W3C/NIST real-world corpus lane. Run 36382763249 passed with 24/24 source-bound queries hitting expected sources in top-5, 3 parser formats, 8,277,197 source bytes and 4,933 chunks; artifact 10952734875 digest sha256:1eb4198e783fbaa84ae60610c7048d6e889c077aaf59aa70c7db29cebd4badac. MATRIX-007 remains PROVISIONAL because its crosswalk also includes RT-10 production-scale stress/scalability, which is not closed by this corpus. PR #138 v1.2 is frozen at 81b7a2d1128f4c20331b2ef46ce7ac9b4f7eced7. Exact-head RT-10, normal CI, and macOS jobs terminate with zero executed steps; unrelated repository workflows reproduce the same condition. MATRIX-007 remains PROVISIONAL and N09 is BLOCKED on BLK-ACTIONS-001 until runner admission executes the frozen lane."
     },
     {
       "requirement_id": "MATRIX-008",
@@ -2804,6 +2804,40 @@
       "blocker_id": null,
       "dag_node": "N02",
       "notes": "Direct connections re-resolve and vet every address at connect time; proxied connections delegate resolution to the configured proxy."
+    },
+    {
+      "requirement_id": "SD-012",
+      "requirement_text": "Phone access to a local Mucaro service over a private network or VPN, token-authenticated with optional TLS, through the source launcher (not an installable web app, a native client or the packaged app)",
+      "scope_state": "IN_SCOPE",
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/auth.py",
+        "backend/app/main.py",
+        "backend/app/security.py",
+        "scripts/launch_app.py",
+        "scripts/native_window.py",
+        "frontend/src/App.jsx",
+        "frontend/src/api.js",
+        "frontend/src/clipboard.js",
+        "frontend/src/components/TokenGate.jsx",
+        "frontend/src/components/CleartextNotice.jsx"
+      ],
+      "dependencies": [],
+      "positive_gate": "backend/tests/test_phone_access.py::test_remote_client_with_the_right_token_is_served_and_other_tokens_get_401",
+      "negative_gate": "backend/tests/test_phone_access.py::test_remote_client_without_a_configured_token_is_refused",
+      "benchmark": null,
+      "evidence_refs": [
+        "backend/tests/test_phone_access.py::test_public_bind_requires_a_strong_token_in_every_profile",
+        "backend/tests/test_phone_access.py::test_remote_clients_do_not_see_host_paths",
+        "backend/tests/test_phone_access.py::test_phone_launch_binds_all_interfaces_with_a_token_and_prints_the_links",
+        "backend/tests/test_phone_access.py::test_native_phone_launch_keeps_the_token_out_of_the_log_and_offers_the_link_in_a_dialog",
+        "qa/rendered/rendered_qa.mjs",
+        "docs/PHONE_ACCESS.md"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N17",
+      "notes": "PROVISIONAL, not PASS. The automated gates simulate a remote peer in-process (TestClient client=(ip, port)) and drive an emulated iPhone in Chromium against a real backend reached through a non-loopback address of the test machine. No physical iPhone or real network session has been observed. OPEN: signing in on a real iPhone, the on-screen keyboard and password field, resume after the phone locks, the macOS firewall prompt, a network that isolates clients, and WebKit (hosted runners are not executing jobs, BLK-ACTIONS-001). Not part of this requirement: an installable web app, a native client (SD-010) and serving from the packaged app, which stays loopback-only."
     }
   ]
 }
