@@ -28,7 +28,13 @@ def manifest():
                         "kind": "CHECKPOINT_TEST",
                         "path": "backend/tests/test_example.py",
                         "selector": "test_stale",
-                    }
+                    },
+                    {
+                        "evidence_id": "stale-execution",
+                        "kind": "EXECUTION_RECEIPT",
+                        "path": "_architecture/shadow/execution/example.json",
+                        "selector": "",
+                    },
                 ],
             },
             {
@@ -48,6 +54,7 @@ def fake_checkpoint(monkeypatch):
         "_git_show_text",
         lambda checkpoint, path: "def test_stale():\n    pass\n",
     )
+    monkeypatch.setattr(shadow_evidence, "_load_execution_receipt", lambda path, checkpoint_sha: None)
 
 
 def validate(payload):
@@ -97,6 +104,13 @@ def test_pass_requires_evidence():
     payload = manifest()
     payload["vectors"][0]["evidence"] = []
     with pytest.raises(shadow_evidence.ShadowEvidenceError, match="PASS vector requires"):
+        validate(payload)
+
+
+def test_pass_requires_exact_checkpoint_execution_receipt():
+    payload = manifest()
+    payload["vectors"][0]["evidence"] = payload["vectors"][0]["evidence"][:1]
+    with pytest.raises(shadow_evidence.ShadowEvidenceError, match="execution receipt"):
         validate(payload)
 
 
