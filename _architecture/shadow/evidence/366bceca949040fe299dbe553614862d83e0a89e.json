@@ -1,0 +1,151 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "ba1d5faee6f7caae57a6d75297d11dcc1a7f9dd5",
+  "checkpoint_sha": "366bceca949040fe299dbe553614862d83e0a89e",
+  "provenance": {
+    "source": "PR #211 Save/Share/export checkpoint",
+    "historical_execution_claim": "PR records 1,206 passed/7 skipped and Chromium rendered QA 146/146, but no machine-readable exact-checkpoint Shadow execution receipt is frozen.",
+    "hosted_execution": "GitHub Actions zero-step; WebKit, physical iPhone, and real macOS/Windows save dialogs explicitly not run."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "BLOCKED",
+      "rationale": "Unknown export kinds, malformed run IDs and missing export files fail closed with no path escape, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "366-null_empty",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_exports.py",
+          "selector": "test_export_file_refuses_unknown_kinds_and_malformed_or_missing_runs"
+        }
+      ]
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Save/Share/export checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "BLOCKED",
+      "rationale": "Export downloads are tied to exact run IDs/files rather than nearest-name lookup, and desktop single-instance/token state remains exact, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "366-stale",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_exports.py",
+          "selector": "test_export_file_path_never_leaves_the_export_dir"
+        }
+      ]
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Save/Share/export checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "BLOCKED",
+      "rationale": "Desktop shell single-instance locking prevents duplicate packaged service instances while Save/Share enables downloads, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "366-race",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_desktop_shell.py",
+          "selector": "test_instance_lock_is_exclusive"
+        }
+      ]
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "BLOCKED",
+      "rationale": "A second desktop-shell launch against an active instance is explicitly rejected instead of creating a duplicate service, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "366-replay_idempotency",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_desktop_shell.py",
+          "selector": "test_no_window_service_enforces_the_launch_token_and_single_instance"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Save/Share/export checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Save/Share/export checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Save/Share/export checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Save/Share/export checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Save/Share/export checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This Save/Share/export checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "BLOCKED",
+      "rationale": "Exported Markdown/JSON/CSV artifacts are served byte-for-byte from the governed export directory and display edits remain represented in the answer surface, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "366-persistence_loss",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_exports.py",
+          "selector": "test_export_files_download_with_their_type_and_name"
+        }
+      ]
+    },
+    {
+      "vector": "schema_drift",
+      "state": "BLOCKED",
+      "rationale": "The new export-file route/kind contract and native download capability alter the API/desktop shell surface, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "366-schema_drift",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_exports.py",
+          "selector": "test_export_files_download_with_their_type_and_name"
+        }
+      ]
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "Protected export routes, malformed export references, startup failure, and duplicate desktop instances have explicit HTTP/process error states, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "366-unexpected_codes",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_api_auth_boundary.py",
+          "selector": "test_data_bearing_routes_reject_missing_token_when_configured"
+        }
+      ]
+    }
+  ]
+}
