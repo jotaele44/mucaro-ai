@@ -1,0 +1,116 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "51871c99d9b2baf9f96baf74619f431151f40be3",
+  "checkpoint_sha": "eab770d2c19d54f4aa248866a0fb7db87bd394b9",
+  "provenance": {
+    "source": "context identity hardening checkpoint",
+    "historical_execution_claim": "Runtime identity code changed before its dedicated regression commit.",
+    "hosted_execution": "No exact execution receipt frozen."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "BLOCKED",
+      "rationale": "Context identity is newly bound to turn role/content so rewritten stale content must not retain identity, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "eab-stale-turn-digest",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/context_state.py",
+          "selector": "def _turn_digest"
+        }
+      ]
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "BLOCKED",
+      "rationale": "Context identity becomes deterministic over turn id/role/content digests, materially affecting replay identity, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "eab-replay-turn-digest",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/context_state.py",
+          "selector": "def _context_identity"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "schema_drift",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This context-identity checkpoint does not change this adversarial vector.",
+      "evidence": []
+    }
+  ]
+}
