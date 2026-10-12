@@ -1,0 +1,116 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "1064c6bf9f13db0bfa2bdc1809dc005c46062146",
+  "checkpoint_sha": "88052d49573262369a60961163b9e9fa38a8aa09",
+  "provenance": {
+    "source": "context replay branch manifestation",
+    "historical_execution_claim": "Compare from selected ancestor 1064c6b reports ahead_by=3. The base defines the evidence window; parent identity is not asserted.",
+    "hosted_execution": "No exact execution receipt frozen."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "BLOCKED",
+      "rationale": "Context identity is bound to turn role/content; no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "880-stale",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/context_state.py",
+          "selector": "def _turn_digest"
+        }
+      ]
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "BLOCKED",
+      "rationale": "Context identity is deterministic over turn content digests; no exact execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "880-replay",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/context_state.py",
+          "selector": "def _context_identity"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "schema_drift",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "NOT_APPLICABLE",
+      "rationale": "No material change for this vector in the selected cumulative context window.",
+      "evidence": []
+    }
+  ]
+}
