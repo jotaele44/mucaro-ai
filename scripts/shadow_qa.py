@@ -181,9 +181,26 @@ def main() -> int:
     blocked = [gate for gate in gates if gate.get("state") == "BLOCKED"]
 
     rendered_state, rendered_reason = classify_rendered(paths)
-    vector_results = adversarial_vector_results(paths)
+    try:
+        vector_results = (
+            shadow_evidence.load_manifest(
+                args.evidence_manifest,
+                base_sha=base_sha,
+                checkpoint_sha=head_sha,
+                required_vectors=REQUIRED_ADVERSARIAL_VECTORS,
+            )
+            if args.evidence_manifest
+            else adversarial_vector_results(paths)
+        )
+    except shadow_evidence.ShadowEvidenceError as exc:
+        print(f"ERROR_SHADOW_EVIDENCE {exc}", file=sys.stderr)
+        return 7
+
     unresolved_vectors = [
         name for name, result in vector_results.items() if result["state"] == "UNRESOLVED"
+    ]
+    blocked_vectors = [
+        name for name, result in vector_results.items() if result["state"] == "BLOCKED"
     ]
 
     # A gate can verify the declared changed-file denominator only when every executable gate passes
@@ -193,7 +210,7 @@ def main() -> int:
         verified: list[str] = []
         unresolved = list(paths)
         overall = "FAIL"
-    elif blocked or unresolved_vectors:
+    elif blocked or unresolved_vectors or blocked_vectors:
         verified = []
         unresolved = list(paths)
         overall = "PROVISIONAL"
@@ -242,8 +259,12 @@ def main() -> int:
             "required": len(REQUIRED_ADVERSARIAL_VECTORS),
             "classified": len(vector_results),
             "unresolved": len(unresolved_vectors),
+            "blocked": len(blocked_vectors),
             "closes": len(vector_results) == len(REQUIRED_ADVERSARIAL_VECTORS),
         },
+        "execution_mode": "HISTORICAL_EVIDENCE_REPLAY" if args.historical_replay else "EXACT_CHECKPOINT_EXECUTION",
+        "evidence_manifest": str(args.evidence_manifest) if args.evidence_manifest else None,
+        "tooling_head_sha": actual_head,
         "overall_state": overall,
         "scope_note": "This receipt is bounded to the exact checkpoint and declared gates; it does not claim universal defect freedom.",
     }
