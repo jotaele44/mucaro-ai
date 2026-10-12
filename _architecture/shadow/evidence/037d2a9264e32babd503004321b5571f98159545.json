@@ -1,0 +1,179 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "9c0f4bf884482f8d9c90f3414028b5eee44bcea6",
+  "checkpoint_sha": "037d2a9264e32babd503004321b5571f98159545",
+  "provenance": {
+    "source": "hardened V02 checkpoint-state runtime delta",
+    "historical_execution_claim": "Executable state-machine code landed before its later dedicated regression commits.",
+    "hosted_execution": "No exact-checkpoint execution receipt frozen."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "BLOCKED",
+      "rationale": "Checkpoint decoding explicitly rejects invalid JSON/non-object payloads, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "037-null_empty",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def _decode"
+        }
+      ]
+    },
+    {
+      "vector": "duplicate",
+      "state": "BLOCKED",
+      "rationale": "Step and contradiction logic explicitly rejects duplicate/in-flight/completed identities, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "037-duplicate",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def begin_step"
+        }
+      ]
+    },
+    {
+      "vector": "stale",
+      "state": "BLOCKED",
+      "rationale": "expected_sequence conflict detection prevents stale concurrent mutation, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "037-stale",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "expected_sequence"
+        }
+      ]
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "BLOCKED",
+      "rationale": "BEGIN IMMEDIATE serializes checkpoint writers across threads/processes, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "037-race",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "BEGIN IMMEDIATE"
+        }
+      ]
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "BLOCKED",
+      "rationale": "complete_step makes repeated completion of an idempotency key a no-op, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "037-replay_idempotency",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def complete_step"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "BLOCKED",
+      "rationale": "Stored checkpoint payloads are decoded and schema-validated on retrieval, materially affecting restart reconstruction, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "037-restart_reconstruction",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def get_checkpoint"
+        }
+      ]
+    },
+    {
+      "vector": "resume",
+      "state": "BLOCKED",
+      "rationale": "resume_checkpoint restricts resumable states and binds expected_sequence for resume-once semantics, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "037-resume",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def resume_checkpoint"
+        }
+      ]
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "BLOCKED",
+      "rationale": "TRANSITIONS defines legal state edges and terminal states have no outgoing transitions, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "037-orphan_state_transition",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "TRANSITIONS:"
+        }
+      ]
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "BLOCKED",
+      "rationale": "Atomic read-modify-write plus contradiction-drop prevention protects stored checkpoint state, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "037-persistence_loss",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "ERROR_CHECKPOINT_CONTRADICTION_DROPPED"
+        }
+      ]
+    },
+    {
+      "vector": "schema_drift",
+      "state": "BLOCKED",
+      "rationale": "Checkpoint payloads are validated against the agent checkpoint JSON schema before/after mutation, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "037-schema_drift",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "def _validate_payload"
+        }
+      ]
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "The new checkpoint guards emit explicit ERROR_CHECKPOINT_* statuses for corrupt, conflict, terminal, transition, step and contradiction failures, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "037-unexpected_codes",
+          "kind": "CHECKPOINT_FILE",
+          "path": "backend/app/agent_checkpoints.py",
+          "selector": "ERROR_CHECKPOINT_CONFLICT"
+        }
+      ]
+    }
+  ]
+}
