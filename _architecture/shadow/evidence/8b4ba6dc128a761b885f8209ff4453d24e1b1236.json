@@ -1,0 +1,109 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "2b78fcf3e6ff577b065f4396f9ffc874174b0c7c",
+  "checkpoint_sha": "8b4ba6dc128a761b885f8209ff4453d24e1b1236",
+  "provenance": {
+    "source": "bounded native-icon large-file release exception",
+    "historical_execution_claim": "No exact Shadow execution receipt frozen.",
+    "hosted_execution": "BLOCKED by BLK-ACTIONS-001 lineage."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "schema_drift",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This release-policy checkpoint does not change this application adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "The release large-file gate changes PASS/FAIL classification via a bounded icon allowlist, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "8b4-release-large-file-gate",
+          "kind": "CHECKPOINT_FILE",
+          "path": "scripts/certify_release.py",
+          "selector": "TRACKED_LARGE_FILE_ALLOWLIST"
+        }
+      ]
+    }
+  ]
+}
