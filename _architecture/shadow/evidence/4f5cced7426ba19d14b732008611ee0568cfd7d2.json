@@ -1,0 +1,158 @@
+{
+  "schema_version": "mucaro-shadow-vector-evidence/1.0",
+  "base_sha": "5643c3c9ff655f3d1db6b70929f98362e84cc132",
+  "checkpoint_sha": "4f5cced7426ba19d14b732008611ee0568cfd7d2",
+  "provenance": {
+    "source": "Phone access/security M7 checkpoint",
+    "historical_execution_claim": "55 checkpoint tests exist; no machine-readable exact-checkpoint Shadow execution receipt is frozen.",
+    "hosted_execution": "BLOCKED by BLK-ACTIONS-001 / physical phone evidence independently OPEN."
+  },
+  "vectors": [
+    {
+      "vector": "null_empty",
+      "state": "BLOCKED",
+      "rationale": "Missing/empty/short tokens and missing peers/addresses are explicitly classified, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "4f5-null_empty",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_phone_access.py",
+          "selector": "test_public_bind_requires_a_strong_token_in_every_profile"
+        }
+      ]
+    },
+    {
+      "vector": "duplicate",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This phone-access/security checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "stale",
+      "state": "BLOCKED",
+      "rationale": "An already-running backend owned by another launch is not given newly minted phone links/tokens, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "4f5-stale",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_phone_access.py",
+          "selector": "test_phone_launch_does_not_claim_links_for_a_backend_it_did_not_start"
+        }
+      ]
+    },
+    {
+      "vector": "m_to_n_cardinality",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This phone-access/security checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "race",
+      "state": "BLOCKED",
+      "rationale": "Per-launch phone tokens and native link dialogs are generated within one launch ownership path, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "4f5-race",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_phone_access.py",
+          "selector": "test_phone_plan_generates_a_strong_per_launch_token_when_none_is_configured"
+        }
+      ]
+    },
+    {
+      "vector": "replay_idempotency",
+      "state": "BLOCKED",
+      "rationale": "Existing healthy backend reuse does not re-advertise unknown token state, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "4f5-replay_idempotency",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_phone_access.py",
+          "selector": "test_phone_launch_does_not_claim_links_for_a_backend_it_did_not_start"
+        }
+      ]
+    },
+    {
+      "vector": "cancellation",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This phone-access/security checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "restart_reconstruction",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This phone-access/security checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "resume",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This phone-access/security checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "malformed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This phone-access/security checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "partial_delayed_tool_result",
+      "state": "NOT_APPLICABLE",
+      "rationale": "This phone-access/security checkpoint does not materially change this adversarial vector.",
+      "evidence": []
+    },
+    {
+      "vector": "orphan_state_transition",
+      "state": "BLOCKED",
+      "rationale": "Remote clients are denied before writes when no token is configured, preserving no-write state, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "4f5-orphan_state_transition",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_phone_access.py",
+          "selector": "test_remote_client_cannot_write_without_a_configured_token"
+        }
+      ]
+    },
+    {
+      "vector": "persistence_loss",
+      "state": "BLOCKED",
+      "rationale": "Remote host-path redaction and denied remote writes protect local state/data exposure, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "4f5-persistence_loss",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_phone_access.py",
+          "selector": "test_remote_clients_do_not_see_host_paths"
+        }
+      ]
+    },
+    {
+      "vector": "schema_drift",
+      "state": "BLOCKED",
+      "rationale": "Security/config/auth response behavior changes for remote callers and public-bind token requirements, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "4f5-schema_drift",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_phone_access.py",
+          "selector": "test_public_status_routes_stay_reachable_for_remote_clients"
+        }
+      ]
+    },
+    {
+      "vector": "unexpected_codes",
+      "state": "BLOCKED",
+      "rationale": "Remote auth, TLS argument and public-bind security paths have explicit 401/403/error-code regressions, but no exact-checkpoint execution receipt exists.",
+      "evidence": [
+        {
+          "evidence_id": "4f5-unexpected_codes",
+          "kind": "CHECKPOINT_TEST",
+          "path": "backend/tests/test_phone_access.py",
+          "selector": "test_tls_arguments_are_validated_before_anything_starts"
+        }
+      ]
+    }
+  ]
+}
