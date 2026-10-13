@@ -296,6 +296,7 @@ def main() -> int:
             ],
         ),
         gate_command("json_validation", [sys.executable, "scripts/validate_json.py"]),
+        gate_command("flagpole_inventory", [sys.executable, "scripts/mucaro.py", "flagpole", "inventory", "verify", "--require-clean", "--format", "text"]),
         gate_command("desktop_package_self_test", [sys.executable, "scripts/package_desktop.py", "--self-test"]),
     ]
     package_gate, package_artifact = gate_package_artifact()

@@ -1,0 +1,49 @@
+name: RT10 Retrieval Scale Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "_architecture/retrieval_scale_benchmark_v1.json"
+      - "_architecture/retrieval_scale_benchmark_v1_1.json"
+      - "_architecture/retrieval_scale_benchmark_v1_2.json"
+      - "backend/app/retrieval_scale_benchmark.py"
+      - "backend/tests/test_retrieval_scale_benchmark.py"
+      - "scripts/certify_retrieval_scale.py"
+      - ".github/workflows/rt10-retrieval-scale-cert.yml"
+  push:
+    branches: [main]
+    paths:
+      - "_architecture/retrieval_scale_benchmark_v1.json"
+      - "_architecture/retrieval_scale_benchmark_v1_1.json"
+      - "_architecture/retrieval_scale_benchmark_v1_2.json"
+      - "backend/app/retrieval_scale_benchmark.py"
+      - "backend/tests/test_retrieval_scale_benchmark.py"
+      - "scripts/certify_retrieval_scale.py"
+      - ".github/workflows/rt10-retrieval-scale-cert.yml"
+
+jobs:
+  certify-retrieval-scale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install Mucaro
+        run: python -m pip install -e ".[dev]"
+      - name: Validate RT10 benchmark harness and falsification gates
+        run: python -m pytest backend/tests/test_retrieval_scale_benchmark.py -q
+      - name: Execute frozen RT10 scale benchmark
+        env:
+          RT10_OUT: ${{ runner.temp }}/rt10/rt10-scale-cert.json
+        run: python scripts/certify_retrieval_scale.py --output "$RT10_OUT"
+      - name: Upload RT10 exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rt10-retrieval-scale-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/rt10
+          if-no-files-found: warn
+          archive: true
