@@ -1,0 +1,30 @@
+{
+  "schema_version": "MUCARO_OCR08_STRUCTURE_BENCHMARK/1.0",
+  "benchmark_id": "mucaro-ocr08-bounded-structure-v1",
+  "scope": "Bounded printed multi-column, rectangular table, and colon-labeled form reconstruction from OCR engine word boxes.",
+  "historical_boundary": {
+    "ocr_v1_manifest": "_architecture/ocr_v1_corpus_manifest.json",
+    "rule": "Historical OCRV1-09 TABLE and OCRV1-10 FORM unsupported states are not rewritten. This benchmark is a new capability denominator."
+  },
+  "case_count": 6,
+  "cases": [
+    {"id": "OCR08-01", "class": "MULTI_COLUMN", "expected_status": "OCR_MULTI_COLUMN_OK", "expected_columns": 2},
+    {"id": "OCR08-02", "class": "TABLE", "expected_status": "OCR_TABLE_RECONSTRUCTION_OK", "expected_rows": 3, "expected_columns": 3},
+    {"id": "OCR08-03", "class": "FORM", "expected_status": "OCR_FORM_RECONSTRUCTION_OK", "expected_fields": 3},
+    {"id": "OCR08-N01", "class": "MULTI_COLUMN_SINGLE_COLUMN", "expected_status": "OCR_STRUCTURE_UNRESOLVED"},
+    {"id": "OCR08-N02", "class": "TABLE_AMBIGUOUS_GEOMETRY", "expected_status": "OCR_STRUCTURE_UNRESOLVED"},
+    {"id": "OCR08-N03", "class": "FORM_DUPLICATE_LABEL", "expected_status": "OCR_STRUCTURE_UNRESOLVED"}
+  ],
+  "thresholds": {
+    "positive_case_pass_rate": 1.0,
+    "negative_fail_closed_rate": 1.0,
+    "span_accounting_rate": 1.0
+  },
+  "certification_rule": "PASS requires exact benchmark identity, all six cases executed, every positive reconstruction correct, every negative case unresolved, span arithmetic closed, real Tesseract execution for positive fixtures, and zero unexplained residue inside this bounded scope.",
+  "limitations": [
+    "This denominator does not claim arbitrary document-layout understanding.",
+    "Merged/headerless/rotated/nested tables and non-colon or multiline form semantics remain outside the bounded positive scope.",
+    "Handwriting and difficult-scan performance remain OCR-09.",
+    "Representative real-world breadth remains OCR-10."
+  ]
+}

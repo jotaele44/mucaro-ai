@@ -1,0 +1,2380 @@
+{
+  "schema": "mucaro-flagpole-exact-tree-inventory/1.0",
+  "source_sha": "5780e96ee212baafae921c2b25be924265450b5b",
+  "tree_sha": "84ba9e35a627be1aeb3e2a456320eee89e598235",
+  "scope": "complete tracked Git blob tree at exact HEAD",
+  "exclusions": [],
+  "file_count": 337,
+  "classification_counts": {
+    "configuration": 4,
+    "data": 22,
+    "documentation": 39,
+    "other": 10,
+    "schema": 24,
+    "source": 133,
+    "test": 100,
+    "workflow": 5
+  },
+  "files": [
+    {
+      "path": ".env.example",
+      "mode": "100644",
+      "blob_sha": "de369524f2655bf08422204f9d373d0164a8700d",
+      "size": 263,
+      "classification": "other"
+    },
+    {
+      "path": ".github/workflows/ci-startup-probe.yml",
+      "mode": "100644",
+      "blob_sha": "056e0b7a0203755c53a0166f68c1f2d99e9a9dc5",
+      "size": 188,
+      "classification": "workflow"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "mode": "100644",
+      "blob_sha": "17fa7c12fb05a7c1706ddf1889f0e152271d3d30",
+      "size": 5475,
+      "classification": "workflow"
+    },
+    {
+      "path": ".github/workflows/coding-review-cert.yml",
+      "mode": "100644",
+      "blob_sha": "bcecf1cf0b981700ec5c6fdcaf2089c6ca288b2a",
+      "size": 1429,
+      "classification": "workflow"
+    },
+    {
+      "path": ".github/workflows/ocr-live-cert.yml",
+      "mode": "100644",
+      "blob_sha": "db680a5124ed1570bcef7de24d8a01098e5fc6f6",
+      "size": 1868,
+      "classification": "workflow"
+    },
+    {
+      "path": ".github/workflows/web-render-cert.yml",
+      "mode": "100644",
+      "blob_sha": "d373af658e626f58ed4895a6df8593b1746c6513",
+      "size": 1648,
+      "classification": "workflow"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "blob_sha": "220599956e0d3f9be40571f5d82db570624d04cf",
+      "size": 456,
+      "classification": "configuration"
+    },
+    {
+      "path": ".mucaro/BUILD_CONTRACT_V1.json",
+      "mode": "100644",
+      "blob_sha": "18be2edd0f26e883540ea40e54b5f7d1dee6d96d",
+      "size": 1036,
+      "classification": "data"
+    },
+    {
+      "path": ".mucaro/FAILURE_TAXONOMY_V1.json",
+      "mode": "100644",
+      "blob_sha": "6d520ccdb13fe0a589b4167a945ddffac7a90a1c",
+      "size": 938,
+      "classification": "data"
+    },
+    {
+      "path": ".mucaro/MUCARO_REPO_MANIFEST_V1.json",
+      "mode": "100644",
+      "blob_sha": "edc6d1fe8a02918e9fb0ce4b657134186bfe8b2c",
+      "size": 968,
+      "classification": "data"
+    },
+    {
+      "path": "Makefile",
+      "mode": "100644",
+      "blob_sha": "e1366262ed71ee1f76b9ba42094c9d73866128c8",
+      "size": 1860,
+      "classification": "other"
+    },
+    {
+      "path": "Mucaro AI.command",
+      "mode": "100755",
+      "blob_sha": "4c203689d02229cdb2cf52406a67ecfc3ec93ee7",
+      "size": 287,
+      "classification": "other"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "blob_sha": "c575636081cdf83dd436f552669121f1e680f5ac",
+      "size": 16379,
+      "classification": "documentation"
+    },
+    {
+      "path": "_architecture/DO_NOT_COPY_LEDGER.md",
+      "mode": "100644",
+      "blob_sha": "6577e533ca873570540f648a870c892f93dc9138",
+      "size": 129,
+      "classification": "documentation"
+    },
+    {
+      "path": "_architecture/LICENSE_AUDIT.md",
+      "mode": "100644",
+      "blob_sha": "5c58de78f172ca732d0cf886191fb4ceddbcaca1",
+      "size": 121,
+      "classification": "documentation"
+    },
+    {
+      "path": "_architecture/PATTERN_MATRIX.csv",
+      "mode": "100644",
+      "blob_sha": "ab8d898bbd6fe46aa4058c76011b7a80427c139a",
+      "size": 1849,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/REFERENCE_FINDINGS.md",
+      "mode": "100644",
+      "blob_sha": "70af11f8e68294ce9353d00a74014e7b02174241",
+      "size": 3456,
+      "classification": "documentation"
+    },
+    {
+      "path": "_architecture/coding_regression_manifest.json",
+      "mode": "100644",
+      "blob_sha": "17407f38b28eda192114208bddf7c276a45112fc",
+      "size": 3941,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/gis_real_corpus_manifest.json",
+      "mode": "100644",
+      "blob_sha": "d3383b7888b5de0086a60f7340194b5393498cf3",
+      "size": 5884,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/gis_v1_control_manifest.json",
+      "mode": "100644",
+      "blob_sha": "a0219bc8e5ba42d1a1d62ab8785736aa849d765e",
+      "size": 6683,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/macos_app_store_security_profile.json",
+      "mode": "100644",
+      "blob_sha": "7223091a34474706cd4f71200be42d2d72f34d9e",
+      "size": 6702,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/mucaro_flagpole_gap_matrix_v1.json",
+      "mode": "100644",
+      "blob_sha": "1df0880d3f32d7badbc908059df5720c2d74ddff",
+      "size": 7341,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/mucaro_flagpole_inventory_v1.json",
+      "mode": "100644",
+      "blob_sha": "5fd1850cae353a6eda7c004d615a7f88d5849d9a",
+      "size": 4480,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/mucaro_flagpole_v1.json",
+      "mode": "100644",
+      "blob_sha": "65d61a3a760324e90d170f5f572ac2863c63cbdf",
+      "size": 6421,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/mucaro_v1_denominator.json",
+      "mode": "100644",
+      "blob_sha": "8a7be2d17281c05303f2cb7edf43e630a743959d",
+      "size": 10948,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/mucaro_v1_denominator_events.json",
+      "mode": "100644",
+      "blob_sha": "ff0530f8c44fc2197f24c6c355489a2a46158b15",
+      "size": 17772,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/ocr_v1_corpus_manifest.json",
+      "mode": "100644",
+      "blob_sha": "bcdb73eb3bcf9c04b48a2da49e75bbcda9509f4c",
+      "size": 3323,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/schemas/macos-app-store-candidate-receipt.schema.json",
+      "mode": "100644",
+      "blob_sha": "4a8ab88cc9ddb0105b29f77651feb586047aca6a",
+      "size": 1578,
+      "classification": "schema"
+    },
+    {
+      "path": "_architecture/schemas/macos-app-store-malware-scan.schema.json",
+      "mode": "100644",
+      "blob_sha": "f6d832f13861380836e3b2d7c93b6325e4dabcef",
+      "size": 1695,
+      "classification": "schema"
+    },
+    {
+      "path": "_architecture/schemas/macos-app-store-vulnerability-scan.schema.json",
+      "mode": "100644",
+      "blob_sha": "2b7dfc63876a6614e4c081a0a9329867fef65b79",
+      "size": 1955,
+      "classification": "schema"
+    },
+    {
+      "path": "_architecture/web08_live_search_eval_manifest.json",
+      "mode": "100644",
+      "blob_sha": "312631712babbaf825b0e1c8dd00f4acd3bc2c98",
+      "size": 2138,
+      "classification": "data"
+    },
+    {
+      "path": "_references/.gitkeep",
+      "mode": "100644",
+      "blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "classification": "other"
+    },
+    {
+      "path": "backend/__init__.py",
+      "mode": "100644",
+      "blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/__init__.py",
+      "mode": "100644",
+      "blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/agent_checkpoints.py",
+      "mode": "100644",
+      "blob_sha": "9088eadd751761cb59172c58cf3b51501d8940f2",
+      "size": 5174,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/answer_trace_eval.py",
+      "mode": "100644",
+      "blob_sha": "93dd3481321898e9ff8861ea71920232c0b3409a",
+      "size": 22325,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/artifact_identity.py",
+      "mode": "100644",
+      "blob_sha": "ad8e65aa239533bd131522e97ecb93c170ad1aab",
+      "size": 7612,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/auth.py",
+      "mode": "100644",
+      "blob_sha": "20d53fb38f20329c6b4f93740bc3c3f88737f0f7",
+      "size": 1202,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/capability_contracts.py",
+      "mode": "100644",
+      "blob_sha": "0681978e96887696d9e267e902f8f6f57f4caf26",
+      "size": 136047,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/capability_policy.py",
+      "mode": "100644",
+      "blob_sha": "b6553852acddca77541c291ce6de5f5e2ce67dde",
+      "size": 3991,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/chunker.py",
+      "mode": "100644",
+      "blob_sha": "b695e787247d5d6100ed00b4fad9c4eb7cda4afa",
+      "size": 1361,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/citations.py",
+      "mode": "100644",
+      "blob_sha": "4445736377b78b2b9863fddea972797d57e64f5f",
+      "size": 3098,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/clean_machine_macos.py",
+      "mode": "100644",
+      "blob_sha": "214d51e469d7673f5ffb575cc2534fe9fd6d402f",
+      "size": 6703,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/cli.py",
+      "mode": "100644",
+      "blob_sha": "c8dc782e7fa1994f0f03e22e1f8522cf67071931",
+      "size": 374692,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/coding_certification.py",
+      "mode": "100644",
+      "blob_sha": "73876b4ffce481b3e23f522837fd5b0be534d490",
+      "size": 9564,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/coding_checks.py",
+      "mode": "100644",
+      "blob_sha": "6ee85c16e34d43b2e6189164990075d1c89d3c7a",
+      "size": 9016,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/coding_container.py",
+      "mode": "100644",
+      "blob_sha": "d988a19159589827acc577ac725ace8a9407a264",
+      "size": 14354,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/coding_lifecycle.py",
+      "mode": "100644",
+      "blob_sha": "0b21e1f49f5d2bb5925b9f47a4826ecedbeb407b",
+      "size": 14797,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/coding_mutation.py",
+      "mode": "100644",
+      "blob_sha": "623be6a356532b2f5c888b9e91c9b50acf571e8a",
+      "size": 8953,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/coding_patch.py",
+      "mode": "100644",
+      "blob_sha": "8982bdf57dace2021e6d25d5b01c6007f108b280",
+      "size": 9373,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/coding_review.py",
+      "mode": "100644",
+      "blob_sha": "3ba01f3906a869d491a69c3f0988b1b8aa771f36",
+      "size": 8839,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/coding_workspace.py",
+      "mode": "100644",
+      "blob_sha": "e532968390cd547f105410a3664161f5f9081611",
+      "size": 12714,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/config.py",
+      "mode": "100644",
+      "blob_sha": "98304b87aa52a7255013f3f9e00b88bbb85e6a75",
+      "size": 3429,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/container_runtime.py",
+      "mode": "100644",
+      "blob_sha": "3f94f2a93c4f7c607f37eb9a4a40676539f387b0",
+      "size": 7119,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/container_worker_entry.py",
+      "mode": "100644",
+      "blob_sha": "82073b976e6ed9fa451d1fbd2e7a42edfad03724",
+      "size": 2345,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/context_state.py",
+      "mode": "100644",
+      "blob_sha": "65532cb67d50e8f4341df6cefef043f3e75566cc",
+      "size": 6621,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/conversations.py",
+      "mode": "100644",
+      "blob_sha": "fa542d18f42f3dc779e744d2ff8ddda0c75af0bc",
+      "size": 5273,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/db.py",
+      "mode": "100644",
+      "blob_sha": "572d69221cbab05e67c3d44fdc4840220406ee8b",
+      "size": 3879,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/denominator_audit.py",
+      "mode": "100644",
+      "blob_sha": "957957dfd9ed533239012ee2dab140fe8ee2b8b9",
+      "size": 6119,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/distribution_policy.py",
+      "mode": "100644",
+      "blob_sha": "ec26fe8ba6ad5dbb8f49fb6d23b5c0c7712b333e",
+      "size": 3513,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/execution_gate.py",
+      "mode": "100644",
+      "blob_sha": "0ca4f7e27cc0dbafeb8747e4873581e7ced28f28",
+      "size": 7640,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/execution_router.py",
+      "mode": "100644",
+      "blob_sha": "c1e1e4d76a9cab6f7bda52f676162571bc22c3c0",
+      "size": 4013,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/exports.py",
+      "mode": "100644",
+      "blob_sha": "b92611cc5068fbb77c30c0df6486d4b76d387292",
+      "size": 3850,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/flagpole_inventory.py",
+      "mode": "100644",
+      "blob_sha": "4af696af6bfc682a8bfbdb5a05bbd2d8d815b0c1",
+      "size": 7993,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/gis_corpus.py",
+      "mode": "100644",
+      "blob_sha": "b538ca04384ea42b517df17f279210153775cfae",
+      "size": 20834,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/gis_crs.py",
+      "mode": "100644",
+      "blob_sha": "582652cd4fb9ab5d4782589f637f5a124dfff6c7",
+      "size": 24597,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/gis_eval.py",
+      "mode": "100644",
+      "blob_sha": "312c1c1c45bd82686526c20adad7684d7941778b",
+      "size": 27513,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/gis_export.py",
+      "mode": "100644",
+      "blob_sha": "22e9678c47e3195385ee915fafe1278c7c97076b",
+      "size": 4163,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/gis_geodesy.py",
+      "mode": "100644",
+      "blob_sha": "ba3dbaf5e80d0b248aa8cc5f6e075e3e23226b5b",
+      "size": 9930,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/gis_grids/NOTICE.md",
+      "mode": "100644",
+      "blob_sha": "c2c7c56c707382a8182ff28a6b88a1e282e12c2a",
+      "size": 603,
+      "classification": "documentation"
+    },
+    {
+      "path": "backend/app/gis_grids/manifest.json",
+      "mode": "100644",
+      "blob_sha": "b8741f6e4d4d6e28e19cb104468cf7abdf16933a",
+      "size": 2003,
+      "classification": "data"
+    },
+    {
+      "path": "backend/app/gis_grids/us_noaa_pvhpgn.tif",
+      "mode": "100644",
+      "blob_sha": "791955a89ba1c2d1c46a47bc15464303eaef1cb6",
+      "size": 3644,
+      "classification": "data"
+    },
+    {
+      "path": "backend/app/gis_hydrology.py",
+      "mode": "100644",
+      "blob_sha": "5c8eac7f8393d2e70935badfcbe0a37c65b6fc60",
+      "size": 46384,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/gis_processing.py",
+      "mode": "100644",
+      "blob_sha": "a95cd470652604f53773635910d21e30052c9b0f",
+      "size": 115876,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/gis_raster.py",
+      "mode": "100644",
+      "blob_sha": "78758a78ed565b5f2a103fef52a10476885eaef8",
+      "size": 44724,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/gis_topology_repair.py",
+      "mode": "100644",
+      "blob_sha": "26ab0fa6d36b92613e418f772577063cdf7a4ae7",
+      "size": 7221,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/gis_vector_formats.py",
+      "mode": "100644",
+      "blob_sha": "a33d441a6e933bbbb00fdefdf9fb1410a5d03a91",
+      "size": 6073,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/gis_vector_raster.py",
+      "mode": "100644",
+      "blob_sha": "31f1267dfa1324616e7775a6698e0ad462189750",
+      "size": 9591,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/ingestion.py",
+      "mode": "100644",
+      "blob_sha": "a7f1d55dad1d79f16b3b68e6fc35cc53caba9836",
+      "size": 13041,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/intelligence_plane.py",
+      "mode": "100644",
+      "blob_sha": "e65c3fc5467f877866fe6fce1cc66a80141cb17d",
+      "size": 6482,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/local_worker.py",
+      "mode": "100644",
+      "blob_sha": "077274c7b11506ba156ecd9a3b2f85268484670e",
+      "size": 5444,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/local_worker_entry.py",
+      "mode": "100644",
+      "blob_sha": "d4f60e7c6274caa251081ac46cc6766fa9629524",
+      "size": 2387,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/macos_app_store.py",
+      "mode": "100644",
+      "blob_sha": "c48bbcb44fa59d40c82731840c0d833b8a350396",
+      "size": 52318,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/macos_distribution.py",
+      "mode": "100644",
+      "blob_sha": "76540e242a11a9c3f55ea800e186d393d08b26fa",
+      "size": 4739,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/main.py",
+      "mode": "100644",
+      "blob_sha": "d8324b4fe5e9e308f18eea88b1e40415ff53c2d9",
+      "size": 22653,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/memory.py",
+      "mode": "100644",
+      "blob_sha": "a7aa9ed57ff9b7c683e13fc10c1c7a8fac33f3b5",
+      "size": 4143,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/memory_policy.py",
+      "mode": "100644",
+      "blob_sha": "4ec809744a81d71929cff70be4fcbfe147563a69",
+      "size": 5827,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/model_router.py",
+      "mode": "100644",
+      "blob_sha": "1d9c12362242ebe0e36308ec69f9259d438f3c9f",
+      "size": 10604,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/model_routing_policy.py",
+      "mode": "100644",
+      "blob_sha": "d1de8a4b59136654c136ddcc2ba4799c60956f3f",
+      "size": 7264,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/models.py",
+      "mode": "100644",
+      "blob_sha": "6638a14c1584d1c9d5178e1871e081316f798775",
+      "size": 2637,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/multimodal.py",
+      "mode": "100644",
+      "blob_sha": "199089f8305efd84eff3fb17e6a9cb2d28e6dc68",
+      "size": 6160,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/ocr_analysis.py",
+      "mode": "100644",
+      "blob_sha": "dce2735fae5b701afb04e268cc74d9559a21c0eb",
+      "size": 9760,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/ocr_corpus_evidence.py",
+      "mode": "100644",
+      "blob_sha": "7d9ce6210eeecda17afc56f3645624e52f63a857",
+      "size": 8012,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/ocr_layout.py",
+      "mode": "100644",
+      "blob_sha": "a92cee39511feeb07d135f5e58086451df17f2cb",
+      "size": 3122,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/ocr_pdf.py",
+      "mode": "100644",
+      "blob_sha": "47516c9b1e6e26fa9cf15ac15575a624336ad924",
+      "size": 9418,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/operator_workflow_certification.py",
+      "mode": "100644",
+      "blob_sha": "3167af92824c5966fc412a3dcaa1eea0376bbe98",
+      "size": 13827,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/packaging.py",
+      "mode": "100644",
+      "blob_sha": "311daa7dd6c6d7c316ce215bd43a6238d939b3e9",
+      "size": 46118,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/parser.py",
+      "mode": "100644",
+      "blob_sha": "04c68bb85756d31b624c18ebe4b533ad936c75d7",
+      "size": 21286,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/permissions.py",
+      "mode": "100644",
+      "blob_sha": "13e15c9e31e8802c6e2f8c5da9e8f1402bda02b6",
+      "size": 4810,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/portable_install.py",
+      "mode": "100644",
+      "blob_sha": "8ff88c43a7852f79f59744ba0bb9f0b8a93aba9a",
+      "size": 9195,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/portable_runtime.py",
+      "mode": "100644",
+      "blob_sha": "703576171bee7ecdd35858565a502ad35bc7dffa",
+      "size": 10651,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/product_audit.py",
+      "mode": "100644",
+      "blob_sha": "75d9ea46976e4f3a85d131462e031d0b9608196b",
+      "size": 29765,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/program_denominator.py",
+      "mode": "100644",
+      "blob_sha": "015c2f93ec261b1a595b3bda2085067de4ee3170",
+      "size": 6542,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/provider_recovery.py",
+      "mode": "100644",
+      "blob_sha": "71e9c5c426085cf591f7c897a7b00e3225d48317",
+      "size": 3324,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/release_receipts.py",
+      "mode": "100644",
+      "blob_sha": "a6c74e536d1859f9b8cc9eddb88548fc10424411",
+      "size": 5900,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/response_flow.py",
+      "mode": "100644",
+      "blob_sha": "3a89c6ad4c094769305facd7ffd52b0a4975c418",
+      "size": 17760,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/retrieval.py",
+      "mode": "100644",
+      "blob_sha": "582b849ff4911f2d785fcd5d09b168f002d4275c",
+      "size": 15390,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/retrieval_corpus_certification.py",
+      "mode": "100644",
+      "blob_sha": "4b09785725d172fb0fff7a3980de832d34088a82",
+      "size": 12840,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/retrieval_corpus_materializer.py",
+      "mode": "100644",
+      "blob_sha": "96e23f8d47226153f6b07469029bb36f12cbdda0",
+      "size": 5824,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/retrieval_eval.py",
+      "mode": "100644",
+      "blob_sha": "5ff41e49e09b4ff37d7e7c6f584a520ea31986be",
+      "size": 30112,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/retrieval_quality_certification.py",
+      "mode": "100644",
+      "blob_sha": "7afa10f516db78028fce9c326fa3777a6ec16831",
+      "size": 9373,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/runtime_identity.py",
+      "mode": "100644",
+      "blob_sha": "c443bc5d89f95c24ba418687f86a4562c93652b7",
+      "size": 2141,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/schemas.py",
+      "mode": "100644",
+      "blob_sha": "e881dcf51f0d96477df857b63af75c9af331d1fa",
+      "size": 152,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/security.py",
+      "mode": "100644",
+      "blob_sha": "0939169916a8b3d57e039d5b03b571743913102f",
+      "size": 5356,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/self_build_controller.py",
+      "mode": "100644",
+      "blob_sha": "688270ee8b13887564d3290979eda548d5736c61",
+      "size": 2582,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/self_build_fixture.py",
+      "mode": "100644",
+      "blob_sha": "4f1e0c2e89ec871d778d37bef0a20b470d48b842",
+      "size": 831,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/semantic_store.py",
+      "mode": "100644",
+      "blob_sha": "4c6fb1ed3b8514e13fced805fbe4fbcdd35a1ba5",
+      "size": 9650,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/services.py",
+      "mode": "100644",
+      "blob_sha": "77b10aae95378e0fccf0053024714f7ed2a0b11d",
+      "size": 6403,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/skill_runtime.py",
+      "mode": "100644",
+      "blob_sha": "0a233b8f6e1367f873dcd648fbef9185ab374389",
+      "size": 12777,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/tools.py",
+      "mode": "100644",
+      "blob_sha": "36c7b026a5ee3f67ca9bd866b05e584ae7ef784b",
+      "size": 21293,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/utils.py",
+      "mode": "100644",
+      "blob_sha": "536f2c5ffe1e5decc741b40ff4f8541cb4060d65",
+      "size": 1624,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/validation.py",
+      "mode": "100644",
+      "blob_sha": "4595e51507f520fbc4729dc4817886a79b12e7b0",
+      "size": 1077,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/vector_index.py",
+      "mode": "100644",
+      "blob_sha": "ffd4da02338ede0125987fbb1ca41e5c61a3981d",
+      "size": 4675,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/web_browsing.py",
+      "mode": "100644",
+      "blob_sha": "93eb1c3735032b09dccb596e9bba13763891d6ad",
+      "size": 32051,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/web_discovery.py",
+      "mode": "100644",
+      "blob_sha": "d60567804bbc4ccdabf86649b90027c80ab1df5e",
+      "size": 11987,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/web_render.py",
+      "mode": "100644",
+      "blob_sha": "7686ea4f78753085ba93b15c43d32f119b76dc66",
+      "size": 7720,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/web_search.py",
+      "mode": "100644",
+      "blob_sha": "03a4cc8ab0df0038b54c7cbf9e9baa43a19bedc7",
+      "size": 9063,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/web_traversal.py",
+      "mode": "100644",
+      "blob_sha": "205206de3dca2c3f95d9ab310245cfad5ddb6b82",
+      "size": 12668,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/workspaces.py",
+      "mode": "100644",
+      "blob_sha": "73bdb860bb8719c631ba3ea4c3c54baf34a0578b",
+      "size": 2326,
+      "classification": "source"
+    },
+    {
+      "path": "backend/requirements.txt",
+      "mode": "100644",
+      "blob_sha": "f96a6ef60e33c2a6ca1ab15bdc1178cd09e085fd",
+      "size": 221,
+      "classification": "other"
+    },
+    {
+      "path": "backend/tests/fixtures/answer_trace_eval.json",
+      "mode": "100644",
+      "blob_sha": "7d3dd1bb91d417424017a0bf04eb4cc140b3a9b4",
+      "size": 9142,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/coding_mutation_live_probe.txt",
+      "mode": "100644",
+      "blob_sha": "4a58007052a65fbc2fc3f910f2855f45a4058e74",
+      "size": 6,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/gis_corpus/census_tigerweb_pr_municipios.geojson",
+      "mode": "100644",
+      "blob_sha": "aeda873864964f4622e95fdda9a03a9d17f03590",
+      "size": 296070,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/gis_corpus/usgs_3dep_pr_elevation_utm20n_64x64.tif",
+      "mode": "100644",
+      "blob_sha": "f96944f88627b0fe2eff2571edab380e545ed7f2",
+      "size": 66656,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/gis_corpus/usgs_pr_earthquakes_2020-01-06_2020-01-08.geojson",
+      "mode": "100644",
+      "blob_sha": "dabfc50b73bd46ea35aa06741faece76dbdd259d",
+      "size": 23142,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/gis_eval.json",
+      "mode": "100644",
+      "blob_sha": "4d479d49a0de7e4878a372c1117b6a2cd7c4bc29",
+      "size": 88168,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/retrieval_eval.json",
+      "mode": "100644",
+      "blob_sha": "1cd4fae30e819e64f463bab91b38b1d4d479b5c1",
+      "size": 11770,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/retrieval_eval_large.json",
+      "mode": "100644",
+      "blob_sha": "c3122843487cc3b141669e8ed919d784f89b6aa6",
+      "size": 22172,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/retrieval_eval_mixed_formats.json",
+      "mode": "100644",
+      "blob_sha": "e503987c9f8e4a4fd3bd287f401b09cc8019a47d",
+      "size": 15096,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_agent_checkpoint_process_recovery.py",
+      "mode": "100644",
+      "blob_sha": "9ad00a5d120b8cdddeb3fc86ebeca0aad1e3ae8d",
+      "size": 5549,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_agent_checkpoints.py",
+      "mode": "100644",
+      "blob_sha": "683a6926bbd82dfd42cdeecc95994e93826bbdc6",
+      "size": 2792,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_api.py",
+      "mode": "100644",
+      "blob_sha": "738387f59c8e700c2e250e9ccc5f8e54dd008e59",
+      "size": 21482,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_artifact_identity.py",
+      "mode": "100644",
+      "blob_sha": "8de390cb35780af02b4f3e8f6fe589ba3fe4ee09",
+      "size": 4482,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_capability_contracts.py",
+      "mode": "100644",
+      "blob_sha": "739b6a2f201b60dad6ec265c2d9f79b4c869b133",
+      "size": 22056,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_capability_policy.py",
+      "mode": "100644",
+      "blob_sha": "5ab71e288a2e78145b65265d12efa9108b2331af",
+      "size": 3593,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_chunking.py",
+      "mode": "100644",
+      "blob_sha": "29d340c9ac023469f9c3b9d8c9cbaf8298216023",
+      "size": 340,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_citations.py",
+      "mode": "100644",
+      "blob_sha": "be251255eacc500d84770b86ab3063853ea0fddd",
+      "size": 2964,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_clean_machine_macos.py",
+      "mode": "100644",
+      "blob_sha": "4c8d377d27e9c354dfbad572c25388c735e17b0e",
+      "size": 3031,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_cli.py",
+      "mode": "100644",
+      "blob_sha": "877781e7c15567a39a1d117bbf2c94373b9c5524",
+      "size": 236996,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_capability_status.py",
+      "mode": "100644",
+      "blob_sha": "5c80d222d0d0b748c066980be49eb77959426617",
+      "size": 541,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_certification.py",
+      "mode": "100644",
+      "blob_sha": "3ab71a1ecdcd2324552b144b28187c9dbc806e19",
+      "size": 7170,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_checks.py",
+      "mode": "100644",
+      "blob_sha": "45304c583257400616d07869fce100664c762202",
+      "size": 6889,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_container.py",
+      "mode": "100644",
+      "blob_sha": "d33e3cfce288bc086a9d0f604201dbe7c60ac07f",
+      "size": 11031,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_container_live_cert.py",
+      "mode": "100644",
+      "blob_sha": "a250ebc20f7cfed5be7dd7fdcd5d333e834dcc73",
+      "size": 272,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_full_profile_cert.py",
+      "mode": "100644",
+      "blob_sha": "f9a399ce460025d213e990981464907242be26c6",
+      "size": 241,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_lifecycle.py",
+      "mode": "100644",
+      "blob_sha": "99280fabecb553398123f3e8a420b6b5910a703f",
+      "size": 9645,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_mutation.py",
+      "mode": "100644",
+      "blob_sha": "a1ab50593c0049a80d7aef9086b0cb3bfb4d06c5",
+      "size": 4935,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_mutation_live_cert.py",
+      "mode": "100644",
+      "blob_sha": "181f15cc92967738200f9fca47f9559fde817d97",
+      "size": 252,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_patch.py",
+      "mode": "100644",
+      "blob_sha": "25469413dd3e0b4dd6911f5ff4c4ec0fd1e883f4",
+      "size": 5469,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_patch_quoted_paths.py",
+      "mode": "100644",
+      "blob_sha": "57f0a9010366c8412aede81f3f7a22a44c4b9ea1",
+      "size": 2228,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_review.py",
+      "mode": "100644",
+      "blob_sha": "cc28026924439c6b79c31facede60beccc0f0e31",
+      "size": 3515,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_review_live_cert.py",
+      "mode": "100644",
+      "blob_sha": "cf968f928303db794da9f9b36759d8416b8e41c0",
+      "size": 244,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_tools.py",
+      "mode": "100644",
+      "blob_sha": "47a94f0dcf759174880365185b62757c2fd786e8",
+      "size": 5620,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_coding_workspace.py",
+      "mode": "100644",
+      "blob_sha": "fc1d5a3a6b9c41478605e676646abced2ac0cacb",
+      "size": 7252,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_config.py",
+      "mode": "100644",
+      "blob_sha": "2e11478e2f26e305d66ac4474cf20114f8b58e66",
+      "size": 706,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_container_runtime.py",
+      "mode": "100644",
+      "blob_sha": "71ba59e54531fb1db2d40201cc2c4f42bfe115d1",
+      "size": 2764,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_context_rehydration.py",
+      "mode": "100644",
+      "blob_sha": "8fd43b13ab98f0d641b40999c68eb7ac2200b8c6",
+      "size": 3179,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_context_state.py",
+      "mode": "100644",
+      "blob_sha": "d2ff0a7da1ef9c2f7db9f013d57619e20ad2dce9",
+      "size": 2600,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_denominator_audit.py",
+      "mode": "100644",
+      "blob_sha": "35b24971fb119a0bcd01983537301ee45f26cffb",
+      "size": 4608,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_distribution_policy.py",
+      "mode": "100644",
+      "blob_sha": "b58bbcbb713966e1b37b0e1a158b7d3f2870ab54",
+      "size": 2498,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_execution_gate.py",
+      "mode": "100644",
+      "blob_sha": "46233a9ef575d4e71e9a47e39be07dd8899eccc0",
+      "size": 719,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_execution_router.py",
+      "mode": "100644",
+      "blob_sha": "601cb836a435e0715b66226003a1340fca8f2096",
+      "size": 3438,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_exports.py",
+      "mode": "100644",
+      "blob_sha": "6ba1832b3de3640da18eb403376ca02c672c72cb",
+      "size": 1180,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_flagpole_inventory.py",
+      "mode": "100644",
+      "blob_sha": "b3df14adbfe87151a7acbd95f56bd129601ad03e",
+      "size": 6729,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_advanced_cli_contracts.py",
+      "mode": "100644",
+      "blob_sha": "d3275341e654ec7f992930d6c4aa8305b3291863",
+      "size": 26312,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_corpus.py",
+      "mode": "100644",
+      "blob_sha": "22a602a54c14455abb5034f187550a784ba55435",
+      "size": 5919,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_crs.py",
+      "mode": "100644",
+      "blob_sha": "cc126350cb5fd37bf1644557dfc970a31e755edc",
+      "size": 10886,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_eval.py",
+      "mode": "100644",
+      "blob_sha": "22396dcb4839bc6c851907443c0c6a520180bdc4",
+      "size": 10262,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_export.py",
+      "mode": "100644",
+      "blob_sha": "0117d83cff8d07316e9d9f9b03b55fde22ebdf51",
+      "size": 3855,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_geodesy.py",
+      "mode": "100644",
+      "blob_sha": "b123377de01f752cbc437e7186262876d879a452",
+      "size": 2179,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_hydrology.py",
+      "mode": "100644",
+      "blob_sha": "1145a768cad570d15863a28d967fc02e1fe86cdb",
+      "size": 14400,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_processing.py",
+      "mode": "100644",
+      "blob_sha": "b17b6ed878def344732f800e67964e49c8d96057",
+      "size": 45964,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_raster.py",
+      "mode": "100644",
+      "blob_sha": "b6a661f01a3646b180d4efbc3754c9ba0855dd53",
+      "size": 16841,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_topology_repair.py",
+      "mode": "100644",
+      "blob_sha": "c081e4a25022c9bac8eaaff8c531863be525bffa",
+      "size": 2887,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_v1_independent_controls.py",
+      "mode": "100644",
+      "blob_sha": "b7fc554e38fa1c8f1ee8b4c5db3509c51240a27d",
+      "size": 10388,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_vector_formats.py",
+      "mode": "100644",
+      "blob_sha": "91ed7ddbfa8f7ad81ce77c9814223dd003ebf2ce",
+      "size": 3251,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_gis_vector_raster.py",
+      "mode": "100644",
+      "blob_sha": "29e4e9ebd8c7433ff0649fe76ffa48640114fefc",
+      "size": 6412,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_ingestion.py",
+      "mode": "100644",
+      "blob_sha": "9c8e4def9b8e0b9607a9ecd0aed121f358147047",
+      "size": 4383,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_ingestion_no_cascade.py",
+      "mode": "100644",
+      "blob_sha": "c8e0fe748380c405588c4c8af565238ccc6c0340",
+      "size": 1078,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_intelligence_plane.py",
+      "mode": "100644",
+      "blob_sha": "9aa8908bd61fd97455bf340256b558298d35a6ee",
+      "size": 1898,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_launch_app.py",
+      "mode": "100644",
+      "blob_sha": "8ded2912140805f871073a56c00179c40faa13e9",
+      "size": 22388,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_local_worker.py",
+      "mode": "100644",
+      "blob_sha": "086f6cefbc7d266313c681b8269f38c104f5932c",
+      "size": 2442,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_macos_app_store.py",
+      "mode": "100644",
+      "blob_sha": "ca74e62cf411ae8ada3df065644315a9df377037",
+      "size": 19917,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_macos_distribution.py",
+      "mode": "100644",
+      "blob_sha": "85522bef5a434561c92beb5524c25bd458de54b1",
+      "size": 2466,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_memory_policy.py",
+      "mode": "100644",
+      "blob_sha": "abb615611583eb9caf68a7dd822c0c74b97e130c",
+      "size": 3027,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_mock_model.py",
+      "mode": "100644",
+      "blob_sha": "afc4cb4556b4aaf2940101748a5d6d6e01dea830",
+      "size": 3792,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_model_routing_policy.py",
+      "mode": "100644",
+      "blob_sha": "ababa326955f105be3bf4db708a947e3ff219619",
+      "size": 3778,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_ocr_analysis.py",
+      "mode": "100644",
+      "blob_sha": "7c4c500385812e105c746cc6a6c497ed544c8a8c",
+      "size": 5772,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_ocr_corpus_evidence.py",
+      "mode": "100644",
+      "blob_sha": "37d26599640cdb7c2890b65d47d6c2805baebb66",
+      "size": 3898,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_ocr_layout.py",
+      "mode": "100644",
+      "blob_sha": "99fab75d67f478518d24d347c0a65a2140c4f9ed",
+      "size": 1557,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_ocr_live_runtime_cert.py",
+      "mode": "100644",
+      "blob_sha": "590091922503b1b24fafbe62e83e8e553f0b54dd",
+      "size": 236,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_ocr_pdf.py",
+      "mode": "100644",
+      "blob_sha": "e5d37ddece451f97a33c0e01245904fc45517fa4",
+      "size": 4774,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_ocr_v1_corpus_manifest.py",
+      "mode": "100644",
+      "blob_sha": "e559c01106d0c5c0a1ba165fa5fa07443b06a2c8",
+      "size": 1107,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_parser.py",
+      "mode": "100644",
+      "blob_sha": "3c43f7f74b5a338d6339a9948591417627641361",
+      "size": 17365,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_permissions.py",
+      "mode": "100644",
+      "blob_sha": "a39bd6d1e859e25739d78cd448a6e4d37b6baf50",
+      "size": 2581,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_portable_install.py",
+      "mode": "100644",
+      "blob_sha": "0a4b1a07730df451389cbbec3644cb7a000df64a",
+      "size": 2856,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_portable_runtime.py",
+      "mode": "100644",
+      "blob_sha": "1655f01d9cb4261f95b240697cc3079a9f1198ec",
+      "size": 3200,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_program_denominator.py",
+      "mode": "100644",
+      "blob_sha": "ddf4c71565d31523546d4ddbe2ff7c84972c3225",
+      "size": 4727,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_provider_recovery.py",
+      "mode": "100644",
+      "blob_sha": "7d71c0fac127c1b0fa55e58318c9df3a1829e342",
+      "size": 3118,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_release_grade_certification.py",
+      "mode": "100644",
+      "blob_sha": "1617233c1782f151fa61c5069f31df0d323a26e3",
+      "size": 1746,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_response_flow.py",
+      "mode": "100644",
+      "blob_sha": "d0a978300c1fd754ae66d61fbcc50beb91cbdec6",
+      "size": 15592,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_retrieval.py",
+      "mode": "100644",
+      "blob_sha": "e2c33a53ee28a25620ba558c16f38c09713b9a20",
+      "size": 11317,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_retrieval_corpus_certification.py",
+      "mode": "100644",
+      "blob_sha": "db35c10c76b9ae5ab1762c8464a2c0059f961f7f",
+      "size": 6694,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_retrieval_corpus_materializer.py",
+      "mode": "100644",
+      "blob_sha": "5a010494751c8e2faf3df401e8bef9b184ea1ca3",
+      "size": 3315,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_runtime_identity.py",
+      "mode": "100644",
+      "blob_sha": "b22faa4cc8dcd38bb00bf8ea49f3dd32bc8a0e95",
+      "size": 2388,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_schema_validation.py",
+      "mode": "100644",
+      "blob_sha": "8aa9145deb035dc3baaf4d5be2e1e5ec26de18f2",
+      "size": 295,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_security.py",
+      "mode": "100644",
+      "blob_sha": "7d55ad64abefa3f2f7257a7f1d17c84a7099a279",
+      "size": 4350,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_self_build_controller.py",
+      "mode": "100644",
+      "blob_sha": "9f2bf7aca235a422ccf169e9db2dfb176771a9c4",
+      "size": 2021,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_self_build_fixture.py",
+      "mode": "100644",
+      "blob_sha": "3c09cff5b9c75e3858e72624392fd75d713643a0",
+      "size": 871,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_services.py",
+      "mode": "100644",
+      "blob_sha": "7b3e98a9ac5ba05baa3dbab40a74c4fb5c6cc294",
+      "size": 9580,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_skill_runtime.py",
+      "mode": "100644",
+      "blob_sha": "4196ca1ca5db9266dc9e0cb408602dbd06fe4a47",
+      "size": 8092,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_skill_runtime_routing.py",
+      "mode": "100644",
+      "blob_sha": "8d56f281e893f5fb3e62d05bbec36acbc3e52d73",
+      "size": 1520,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_tools.py",
+      "mode": "100644",
+      "blob_sha": "b2034009dde4ccfaa867be58abd07b730fd32ca0",
+      "size": 9488,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_web08_live_search_eval_manifest.py",
+      "mode": "100644",
+      "blob_sha": "e2dc7cef2710521b552b5debe1d0a7c3979304c4",
+      "size": 773,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_web_browsing.py",
+      "mode": "100644",
+      "blob_sha": "d104c610970dd6af563f34adfd6c88d3ca81f594",
+      "size": 21211,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_web_discovery.py",
+      "mode": "100644",
+      "blob_sha": "fee1ee2cb18650eddb78e4645abc5b0654bf160a",
+      "size": 5356,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_web_render.py",
+      "mode": "100644",
+      "blob_sha": "ea8d54a6fa1bb4ea1f00b194ef043682855cb125",
+      "size": 3522,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_web_render_live_cert.py",
+      "mode": "100644",
+      "blob_sha": "05268924c057e1757b0106fa867f7f9dd8343f80",
+      "size": 232,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_web_search.py",
+      "mode": "100644",
+      "blob_sha": "48a3739e3c95ccedb267f933eec4ffba9049d56c",
+      "size": 3140,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_web_traversal.py",
+      "mode": "100644",
+      "blob_sha": "a5d27d19c59630006213f3c34bd96cc98b223907",
+      "size": 6808,
+      "classification": "test"
+    },
+    {
+      "path": "data/exports/.gitkeep",
+      "mode": "100644",
+      "blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "classification": "data"
+    },
+    {
+      "path": "data/indexes/.gitkeep",
+      "mode": "100644",
+      "blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "classification": "data"
+    },
+    {
+      "path": "data/input/.gitkeep",
+      "mode": "100644",
+      "blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "classification": "data"
+    },
+    {
+      "path": "data/input/sample_mucaro_ai.txt",
+      "mode": "100644",
+      "blob_sha": "041cf11b5c2014f1d9573193a5e1ba194e467bc8",
+      "size": 745,
+      "classification": "data"
+    },
+    {
+      "path": "data/input/sample_source_lineage.md",
+      "mode": "100644",
+      "blob_sha": "7b761276e1b15857198bbae734deeec82e745a8d",
+      "size": 230,
+      "classification": "documentation"
+    },
+    {
+      "path": "data/processed/.gitkeep",
+      "mode": "100644",
+      "blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "classification": "data"
+    },
+    {
+      "path": "docker/coding.Dockerfile",
+      "mode": "100644",
+      "blob_sha": "4821a677a3142eafb9a4831661794feca548a376",
+      "size": 547,
+      "classification": "other"
+    },
+    {
+      "path": "docs/APPLE_APP_STORE_SECURITY.md",
+      "mode": "100644",
+      "blob_sha": "63d0d9b50ca5dcdcc299c6060122f955acd8faeb",
+      "size": 7307,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "mode": "100644",
+      "blob_sha": "e35b3d7d75a48e54a6098800bfb6ac9922adcf19",
+      "size": 12345,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CERTIFICATION.md",
+      "mode": "100644",
+      "blob_sha": "a183d589fcd79f7ebf5bc2e0ff5b9dc23c0280ee",
+      "size": 8433,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CLI.md",
+      "mode": "100644",
+      "blob_sha": "1dfbb237c6f4e2d2c78fe6a61b802ecbeb4661fe",
+      "size": 89721,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CODING_CAPABILITY_STATUS.md",
+      "mode": "100644",
+      "blob_sha": "6dd6526739a59844d8ed001dcd788077a572e23c",
+      "size": 2890,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CODING_GOVERNANCE_ACCEPTANCE.md",
+      "mode": "100644",
+      "blob_sha": "a5fad7dfb331e8cffccd3de5b5dc3df5138154ea",
+      "size": 581,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CODING_GOVERNANCE_ADJUDICATION.md",
+      "mode": "100644",
+      "blob_sha": "6dad73d09a67c06ef88ca606521b249cd14369d0",
+      "size": 733,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CODING_GOVERNANCE_BLOCKERS.md",
+      "mode": "100644",
+      "blob_sha": "1891290eba8f2e439d1b7155f820956b4fbb68c4",
+      "size": 1184,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CODING_GOVERNANCE_CHANGESET.md",
+      "mode": "100644",
+      "blob_sha": "c5bce72d6174e25fbcc6764fd51cea8b2740032d",
+      "size": 684,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CODING_GOVERNANCE_IMPLEMENTATION.md",
+      "mode": "100644",
+      "blob_sha": "6fdfc251ad8b0599e9b9f7bb4265fcfbdc834a33",
+      "size": 1477,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CODING_GOVERNANCE_INVARIANTS.md",
+      "mode": "100644",
+      "blob_sha": "9a777d9924d6e494cf842c6c7c50aa30941b0ff7",
+      "size": 1091,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CODING_GOVERNANCE_NO_OVERCLAIM.md",
+      "mode": "100644",
+      "blob_sha": "e65caf509523b49ca269fd719f158ae61801af88",
+      "size": 490,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CODING_GOVERNANCE_QUEUE.md",
+      "mode": "100644",
+      "blob_sha": "da8ff693b5f82394e85c35169918f9965d8c5ef1",
+      "size": 1710,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CODING_GOVERNANCE_RECEIPT.md",
+      "mode": "100644",
+      "blob_sha": "1a6c7bf2b61c97069b8a7252ddbc72bbd257cf56",
+      "size": 781,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/CODING_GOVERNANCE_SCOPE.md",
+      "mode": "100644",
+      "blob_sha": "ddd6c639f349b0b95149f1ce6dfce1e15b4bfa49",
+      "size": 760,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/DESKTOP_LAUNCHER.md",
+      "mode": "100644",
+      "blob_sha": "7546e5737a6f224db3565c347b0abd4482b46617",
+      "size": 2221,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/DEVELOPMENT_GOAL.md",
+      "mode": "100644",
+      "blob_sha": "f49fcb8c8a51376a74ce0b88570045b703f94b9a",
+      "size": 14627,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/DIRECTORY_PERMISSIONS.md",
+      "mode": "100644",
+      "blob_sha": "29f71a570af1dabb81bc11ab97eca4debbe220ba",
+      "size": 1857,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/EXECUTION_GATE.md",
+      "mode": "100644",
+      "blob_sha": "5326cfa5a48afdd5431c34aa0a2b162144af372f",
+      "size": 736,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/FILE_TREE.txt",
+      "mode": "100644",
+      "blob_sha": "176d601b9aa8754925a197343a6acbaedb242e1d",
+      "size": 2026,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/FIRST_RUN.md",
+      "mode": "100644",
+      "blob_sha": "aede93239ad8e6f5ef00274f4a57fc503fee7fbf",
+      "size": 2877,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/GIS_V1_SUPPORT_MATRIX.md",
+      "mode": "100644",
+      "blob_sha": "c6d20095a71e114c71de2a9a8a381e00f459d502",
+      "size": 3774,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/GITHUB_ACTIONS_STARTUP_DIAGNOSTIC.md",
+      "mode": "100644",
+      "blob_sha": "f963927363edf3ab4f6e48c425c1deb541b99523",
+      "size": 5096,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/INTELLIGENCE_PLANE_GAP_MODEL.md",
+      "mode": "100644",
+      "blob_sha": "0bd20014fe0ea817765f3d50c3daa66a0247fa89",
+      "size": 7679,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/MUCARO_FLAGPOLE_V1.md",
+      "mode": "100644",
+      "blob_sha": "c4960d1531f509c3454d111cee1e60bada446074",
+      "size": 2871,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/MUCARO_V1_DENOMINATOR_AUDIT.md",
+      "mode": "100644",
+      "blob_sha": "5b2be8f8271862a02b6ae4a3f725242e467e582c",
+      "size": 8375,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/PACKAGING_POLICY.md",
+      "mode": "100644",
+      "blob_sha": "c350437063205777752a800a0a6240f560770b93",
+      "size": 7831,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/PHASE2_QUEUE.md",
+      "mode": "100644",
+      "blob_sha": "1401aeb23630a7dfa53399518af4b4daed930252",
+      "size": 9495,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/RELEASE_STATUS.md",
+      "mode": "100644",
+      "blob_sha": "e9466606446487f64d0f2320d1bca637d22c2b1e",
+      "size": 33590,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/RESPONSE_FLOW.md",
+      "mode": "100644",
+      "blob_sha": "5818b63f3843785833c68a94b77279e808e1f177",
+      "size": 6935,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/RETRIEVAL_UPGRADE_PLAN.md",
+      "mode": "100644",
+      "blob_sha": "4ab1c5f8b37589b7ade004a7d5451a59872d9016",
+      "size": 8402,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/SCHEMA_LOCK.md",
+      "mode": "100644",
+      "blob_sha": "9118bda81a78bf951d5ac148760045033c38b616",
+      "size": 772,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/SOURCE_LINEAGE.md",
+      "mode": "100644",
+      "blob_sha": "89c91111b0be5686a682031fc20d2b7d3aaef3bd",
+      "size": 3176,
+      "classification": "documentation"
+    },
+    {
+      "path": "frontend/.npmrc",
+      "mode": "100644",
+      "blob_sha": "c040fa6a8d3a20a448758e73aff788a52a08459f",
+      "size": 59,
+      "classification": "other"
+    },
+    {
+      "path": "frontend/index.html",
+      "mode": "100644",
+      "blob_sha": "845057f00c2bf1c17f85af9063575c36128c3f25",
+      "size": 295,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/package-lock.json",
+      "mode": "100644",
+      "blob_sha": "b569a738597692706d126630bc4991b2fdd0a5f0",
+      "size": 56751,
+      "classification": "configuration"
+    },
+    {
+      "path": "frontend/package.json",
+      "mode": "100644",
+      "blob_sha": "01ca36fbfee512253339da6d6708d4b9b5a50d69",
+      "size": 408,
+      "classification": "configuration"
+    },
+    {
+      "path": "frontend/src/App.jsx",
+      "mode": "100644",
+      "blob_sha": "6ca7d6ac522009bd7144e389a85f1462d4d973f4",
+      "size": 19990,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/api.js",
+      "mode": "100644",
+      "blob_sha": "7d2c3cd4589463cbd8812fcbff394e2434b69c6d",
+      "size": 4616,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/DirectoryIntake.jsx",
+      "mode": "100644",
+      "blob_sha": "0913994e829eaccca09bce52d254e17b10aad8d2",
+      "size": 6402,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/PlanningGate.jsx",
+      "mode": "100644",
+      "blob_sha": "7854896bb7d4d9267ab8704c24080467444c136b",
+      "size": 2111,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/styles.css",
+      "mode": "100644",
+      "blob_sha": "5ec74a77e949acbc8cf1561717fb9cbcda3ced4a",
+      "size": 10092,
+      "classification": "source"
+    },
+    {
+      "path": "packaging/macos/MucaroAI-AppStore.entitlements",
+      "mode": "100644",
+      "blob_sha": "4536840bba3d1608e63cde0a19e5c87a40872171",
+      "size": 440,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/macos/PrivacyInfo.xcprivacy",
+      "mode": "100644",
+      "blob_sha": "8a9617d0824baf8b8bfaab2130b01286742c6617",
+      "size": 381,
+      "classification": "other"
+    },
+    {
+      "path": "pyproject.toml",
+      "mode": "100644",
+      "blob_sha": "2b2acecb5ea27fafb961c15bea0e189ea2dcb239",
+      "size": 1054,
+      "classification": "configuration"
+    },
+    {
+      "path": "schemas/agent_checkpoint.schema.json",
+      "mode": "100644",
+      "blob_sha": "cb9fe49810bb06c1a018012c948657f0ed83bf97",
+      "size": 2066,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/answer_trace.schema.json",
+      "mode": "100644",
+      "blob_sha": "0456df5346a8a4995ae686adbc60125d89500dad",
+      "size": 1281,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/artifact_identity.schema.json",
+      "mode": "100644",
+      "blob_sha": "ec5a8e57dc3ffd435eb316590c4028a7dcfaa9ca",
+      "size": 1245,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/capability_policy.schema.json",
+      "mode": "100644",
+      "blob_sha": "0ee7c54b428dd7ec72ac57d9d82538d53f5dad80",
+      "size": 1115,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/container_binding.schema.json",
+      "mode": "100644",
+      "blob_sha": "6062d2a7dd66603e2131385152b4f47f932b1d57",
+      "size": 592,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/context_state.schema.json",
+      "mode": "100644",
+      "blob_sha": "33fc03a78e0c951b87a8606228f623953d7b7c77",
+      "size": 2009,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/document_chunk.schema.json",
+      "mode": "100644",
+      "blob_sha": "beb3bc0d9e7e253d06c08e02f41bf307c0ca2533",
+      "size": 747,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/execution_contract.schema.json",
+      "mode": "100644",
+      "blob_sha": "37f643a7d2b0abbf8a1a912bd8ed095ba8e5799d",
+      "size": 1163,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/execution_gate.schema.json",
+      "mode": "100644",
+      "blob_sha": "a5f462f6ebacd5b3cfbee6e7463bb333d05bb570",
+      "size": 1774,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/federation_skill.schema.json",
+      "mode": "100644",
+      "blob_sha": "670c4e0d6ae48cd34dc1e3ba3ecf557cb1ffdf24",
+      "size": 1221,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/flagpole_inventory.schema.json",
+      "mode": "100644",
+      "blob_sha": "063ccdf39ecee41c7d80a5ee5af1746cbdf76aa6",
+      "size": 1986,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/local_worker_execution.schema.json",
+      "mode": "100644",
+      "blob_sha": "91067e1a99adc66870fb78df4afe1fc06b89d868",
+      "size": 979,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/model_runtime.schema.json",
+      "mode": "100644",
+      "blob_sha": "657d6c6b0d27923454e8edcf260bfec3175010cf",
+      "size": 893,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/prompt_template.schema.json",
+      "mode": "100644",
+      "blob_sha": "e9514ec34ee3c3d059dc2156b5075f576cee253c",
+      "size": 702,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/repo_capability.schema.json",
+      "mode": "100644",
+      "blob_sha": "99ac5d994b7f0299d15f78c1f560e3e8801510a7",
+      "size": 1223,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/retrieval_result.schema.json",
+      "mode": "100644",
+      "blob_sha": "9a63a04c8a1505ff3a82e856b6515e349979bdec",
+      "size": 1082,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/run_manifest.schema.json",
+      "mode": "100644",
+      "blob_sha": "cd7ee4e9ce91114782d7ef301229532e30a3c447",
+      "size": 824,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/runtime_identity.schema.json",
+      "mode": "100644",
+      "blob_sha": "561cc1299c90594b6a78b9147fc4a8682de6bafe",
+      "size": 1369,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/self_build_receipt.schema.json",
+      "mode": "100644",
+      "blob_sha": "8dd7d17d4b8d30fac462773881c3430e7e9249af",
+      "size": 1354,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/skill_mount.schema.json",
+      "mode": "100644",
+      "blob_sha": "d4811ccb1fdceb922504d820760580933a0f2a38",
+      "size": 1161,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/source_manifest.schema.json",
+      "mode": "100644",
+      "blob_sha": "17d9adea4b443e54cc276fa5fca9aef419790292",
+      "size": 1325,
+      "classification": "schema"
+    },
+    {
+      "path": "scripts/ask.py",
+      "mode": "100755",
+      "blob_sha": "ab0089e78e266a358af2134c8b95d478429f8ee3",
+      "size": 778,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/bootstrap_macos.sh",
+      "mode": "100755",
+      "blob_sha": "2a033b7f366807dd7c68f9de4c2ee6270fda0733",
+      "size": 1366,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/bootstrap_windows.ps1",
+      "mode": "100644",
+      "blob_sha": "8adc24ea4e7412ac742e135fb73e41f3a3fa171e",
+      "size": 1325,
+      "classification": "other"
+    },
+    {
+      "path": "scripts/certify_answer_trace_quality.py",
+      "mode": "100755",
+      "blob_sha": "bbc80d11a1355dd71d6340abc2d8aa5404bc88a1",
+      "size": 2367,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_clean_machine_macos.py",
+      "mode": "100644",
+      "blob_sha": "ffcf28c2f6122c2c541ba99cd9bb62581aab9e60",
+      "size": 1249,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_coding_container_live.py",
+      "mode": "100644",
+      "blob_sha": "986e2a23d3fb1cb8dc7fb828885e58e6e9c5345b",
+      "size": 4152,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_coding_full_profile.py",
+      "mode": "100644",
+      "blob_sha": "b15767fa3f7740b7984a468656e8725e8cdf3c70",
+      "size": 4929,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_coding_mutation_live.py",
+      "mode": "100644",
+      "blob_sha": "96750c8efe0c050ad0af56698c32bbb25580e00a",
+      "size": 4103,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_coding_review_live.py",
+      "mode": "100644",
+      "blob_sha": "faada22786736ec2e01355897937c7ae7dd3cca4",
+      "size": 6888,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_fresh_clone.py",
+      "mode": "100755",
+      "blob_sha": "3bc23f1c28b1614a792f30a01e0abe8215b1dfb5",
+      "size": 6800,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_gis_quality.py",
+      "mode": "100755",
+      "blob_sha": "cd0e84c5c76b27912a60e844624115cc85877073",
+      "size": 1792,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_macos_distribution.py",
+      "mode": "100644",
+      "blob_sha": "c202122b3c975f4dd9daf78bf1efed576ce27ab8",
+      "size": 984,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_ocr_live_runtime.py",
+      "mode": "100644",
+      "blob_sha": "34fefa455e34ea76f44a65993cc52abd6ae44b44",
+      "size": 8219,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_operator_workflow.py",
+      "mode": "100644",
+      "blob_sha": "61b5e17c8af3e758642b675abc13cb86ed3819fa",
+      "size": 1383,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_python_distribution.py",
+      "mode": "100755",
+      "blob_sha": "6e6c20c9e75c3560890efed41c6c2377892f0fd3",
+      "size": 19247,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_release.py",
+      "mode": "100755",
+      "blob_sha": "9797d505d9a9457c2cb9423150eb8f605dd6d0a2",
+      "size": 12850,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_release_grade.py",
+      "mode": "100644",
+      "blob_sha": "388e4d2d4fca64b8f71892e91eddf8967f90e5aa",
+      "size": 14925,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_retrieval_quality.py",
+      "mode": "100755",
+      "blob_sha": "86c15b6542087d71d2a1d0e2864e8d565672c78d",
+      "size": 2090,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_source_artifact.py",
+      "mode": "100755",
+      "blob_sha": "858c93c451457d2f23f0d0267d2a2b2c71e03e19",
+      "size": 7774,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_web_render_live.py",
+      "mode": "100644",
+      "blob_sha": "27f626e877f29fb74dec042a1878562456d80189",
+      "size": 4244,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/clone_references.sh",
+      "mode": "100755",
+      "blob_sha": "b4b02f48174610dd0c36920e94147bace100f568",
+      "size": 836,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/coding_mutation_probe_inner.py",
+      "mode": "100644",
+      "blob_sha": "01fee930217b3ba4572618ea114c31bc201356c7",
+      "size": 5158,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/dev_start.py",
+      "mode": "100755",
+      "blob_sha": "4f717de2339b7c24b3af30010ba003544bcbbed6",
+      "size": 3255,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/evaluate_answer_trace.py",
+      "mode": "100755",
+      "blob_sha": "edf6afd3ee33bf1af5c523e8f2e4bf37b0a0af4f",
+      "size": 1580,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/evaluate_retrieval.py",
+      "mode": "100644",
+      "blob_sha": "8576f6d1f163b5f660017f02af1d0b66cecd5d93",
+      "size": 3567,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/extract_reference_patterns.py",
+      "mode": "100755",
+      "blob_sha": "fca5148dee5aa46a6df68f64744234e9082bf846",
+      "size": 2970,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/ingest_folder.py",
+      "mode": "100755",
+      "blob_sha": "ab9a7abe01244853ca5d3278807817ecb911307f",
+      "size": 556,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/launch_app.py",
+      "mode": "100755",
+      "blob_sha": "d0b5a921a292bb538c6a9bc519e2cb996dab474a",
+      "size": 6767,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/mucaro.py",
+      "mode": "100644",
+      "blob_sha": "5c0c7cd073a8418be157f5f85b16226d79300b1a",
+      "size": 317,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/package_desktop.py",
+      "mode": "100644",
+      "blob_sha": "7e9b8b14451040e212ff90e1ae780eb7f912fcc9",
+      "size": 2321,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/preflight.py",
+      "mode": "100755",
+      "blob_sha": "621bf9403da62a57e1828b0da395f006018fa48c",
+      "size": 6424,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/release_check.py",
+      "mode": "100755",
+      "blob_sha": "ebbf97a982a5054cda1916622725703fd10cb945",
+      "size": 2996,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/repair_npm_registry.sh",
+      "mode": "100755",
+      "blob_sha": "f0c6fa29c4798ff2cf54d1accc3f2b19e6e8f8b6",
+      "size": 1079,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/validate_json.py",
+      "mode": "100755",
+      "blob_sha": "3e71e9302697b42ff5530a3adb8feadead3586a0",
+      "size": 958,
+      "classification": "source"
+    }
+  ],
+  "inventory_sha256": "8d4de69eeee347f8f73a76e8ca463be9330805e29983337001d1843e30cf453b"
+}

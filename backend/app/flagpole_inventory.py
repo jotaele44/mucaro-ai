@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 SCHEMA = "mucaro-flagpole-exact-tree-inventory/1.0"
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOWED_TYPES = {"source", "test", "schema", "workflow", "documentation", "configuration", "data", "other"}
 
 
@@ -26,7 +28,7 @@ def classify(path: str) -> str:
     suffix = p.suffix.lower()
     if path.startswith("backend/tests/") or "/tests/" in path or p.name.startswith("test_"):
         return "test"
-    if path.startswith("schemas/") or suffix == ".schema.json":
+    if path.startswith("schemas/") or p.name.endswith(".schema.json"):
         return "schema"
     if path.startswith(".github/workflows/"):
         return "workflow"
@@ -46,14 +48,21 @@ def _canonical_payload(inventory: dict[str, Any]) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
-def generate(repo: Path) -> dict[str, Any]:
+def generate(repo: Path, ref: str = "HEAD") -> dict[str, Any]:
     repo = repo.resolve()
-    source_sha = _git(repo, "rev-parse", "HEAD")
-    tree_sha = _git(repo, "rev-parse", "HEAD^{tree}")
-    raw = _git(repo, "ls-tree", "-r", "-l", "--full-tree", "HEAD")
+    if ref != "HEAD" and not SHA_RE.match(ref):
+        raise ValueError(f"ref must be HEAD or a full lowercase commit SHA: {ref!r}")
+    # Resolve once, to a commit: a tree or blob SHA is not a source commit, and HEAD must not move between calls.
+    source_sha = _git(repo, "rev-parse", "--verify", f"{ref}^{{commit}}")
+    tree_sha = _git(repo, "rev-parse", f"{source_sha}^{{tree}}")
+    # -z keeps paths raw: without it Git C-quotes non-ASCII and control characters, and a newline in a
+    # tracked name would split one record into two.
+    raw = _git(repo, "ls-tree", "-r", "-l", "-z", "--full-tree", source_sha)
     files: list[dict[str, Any]] = []
-    for line in raw.splitlines():
-        meta, path = line.split("\t", 1)
+    for record in raw.split("\0"):
+        if not record:
+            continue
+        meta, path = record.split("\t", 1)
         mode, obj_type, blob_sha, size_text = meta.split()
         if obj_type != "blob":
             continue
@@ -131,3 +140,55 @@ def write_inventory(repo: Path, output: Path) -> dict[str, Any]:
 
 def load_and_validate(repo: Path, path: Path, *, require_current_head: bool = True) -> list[str]:
     return validate(repo, json.loads(path.read_text(encoding="utf-8")), require_current_head=require_current_head)
+
+
+def dirty_paths(repo: Path) -> list[str]:
+    """Tracked-but-modified and untracked paths; the HEAD-tree inventory silently ignores both."""
+    # Not _git(): its .strip() would eat the leading status space of " M path".
+    result = subprocess.run(
+        ["git", "-C", str(repo.resolve()), "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    entries = result.stdout.split("\0")
+    paths: list[str] = []
+    i = 0
+    while i < len(entries):
+        entry = entries[i]
+        i += 1
+        if len(entry) < 4:
+            continue
+        paths.append(entry[3:])
+        if entry[0] in "RC":  # rename/copy entries are followed by the original path
+            i += 1
+    return paths
+
+
+def validate_schema(inventory: dict[str, Any], schema_path: Path) -> list[str]:
+    import jsonschema
+
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    validator = jsonschema.Draft202012Validator(schema)
+    return [f"SCHEMA_VIOLATION:{'/'.join(str(p) for p in e.absolute_path) or '<root>'}" for e in validator.iter_errors(inventory)]
+
+
+def verify_receipt(repo: Path, inventory: dict[str, Any]) -> list[str]:
+    """Verify a stored inventory against the exact commit it claims, not against HEAD.
+
+    A committed inventory can never match the HEAD that contains it (adding the file changes the
+    tree), so a stored inventory is a receipt for its own source_sha.
+    """
+    errors = validate(repo, inventory, require_current_head=False)
+    source_sha = inventory.get("source_sha")
+    if not isinstance(source_sha, str) or not SHA_RE.match(source_sha):
+        return [*errors, "RECEIPT_SHA_INVALID"]
+    try:
+        expected = generate(repo, ref=source_sha)
+    except subprocess.CalledProcessError:
+        return [*errors, "RECEIPT_SHA_UNKNOWN"]
+    if inventory.get("tree_sha") != expected["tree_sha"]:
+        errors.append("RECEIPT_TREE_MISMATCH")
+    if inventory.get("inventory_sha256") != expected["inventory_sha256"]:
+        errors.append("RECEIPT_CONTENT_MISMATCH")
+    return errors
