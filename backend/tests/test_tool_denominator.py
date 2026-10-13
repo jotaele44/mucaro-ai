@@ -131,7 +131,7 @@ def test_removed_tool_and_approval_regressions_fail_validation(monkeypatch: pyte
         (lambda d: d["required_capabilities"][0].update(state="MAYBE"), "UNKNOWN_STATE:TOOL-01"),
         (lambda d: d["required_capabilities"][0].update(owner_domain="V99"), "UNKNOWN_DOMAIN:TOOL-01"),
         (lambda d: d["required_capabilities"][1].update(satisfied_by=[]), "PRESENT_WITHOUT_TOOL:TOOL-02"),
-        (lambda d: d["required_capabilities"][4].update(satisfied_by=["web.fetch"]), "ABSENT_WITH_TOOL:TOOL-05"),
+        (lambda d: d["required_capabilities"][4].update(state="ABSENT"), "ABSENT_WITH_TOOL:TOOL-05"),
         (lambda d: d["supporting_tools"].append("coding.diff"), "DOUBLE_CLASSIFIED_TOOL:coding.diff"),
         (lambda d: d["supporting_tools"].append("web.fetch"), "DOUBLE_CLASSIFIED_TOOL:web.fetch"),
         (lambda d: d["supporting_tools"].remove("web.render"), "UNCLASSIFIED_TOOL:web.render"),
