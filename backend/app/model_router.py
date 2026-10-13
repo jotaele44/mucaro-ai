@@ -599,7 +599,7 @@ def generate_text(
             "ERROR_MODEL_TEXT_MAX_TOKENS",
             f"max_tokens must be 1..{MAX_GENERIC_COMPLETION_TOKENS}",
         )
-    if not isinstance(temperature, int | float) or isinstance(temperature, bool) or not 0.0 <= float(temperature) <= 1.0:
+    if not isinstance(temperature, (int, float)) or isinstance(temperature, bool) or not 0.0 <= float(temperature) <= 1.0:
         raise ModelProviderError("ERROR_MODEL_TEXT_TEMPERATURE", "temperature must be within 0..1")
 
     spec = get_model_provider_spec(model_provider)
