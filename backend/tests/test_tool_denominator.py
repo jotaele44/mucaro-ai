@@ -64,6 +64,10 @@ def test_runtime_evidence_is_derived_from_governed_requests() -> None:
     for name in ("coding.repo_status", "coding.read_file", "coding.diff", "coding.patch_check", "coding.patch_apply"):
         assert tools[name]["evidence_state"] == "EXERCISED", name
         assert tools[name]["classification"] == "REQUIRED"
+    assert tools["coding.file_edit"]["evidence_state"] == "EXERCISED"
+    assert tools["coding.file_edit"]["classification"] == "SUPPORTING"
+    assert tools["coding.file_edit"]["mutates_state"] is True
+    assert tools["coding.file_edit"]["network"] == "none"
     assert tools["coding.exec"]["evidence_state"] == "EXERCISED"
     assert tools["coding.exec"]["classification"] == "SUPPORTING"
     for name in ("coding.regression_run", "github.ci_status"):
