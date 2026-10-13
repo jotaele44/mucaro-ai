@@ -390,7 +390,11 @@ def apply_file_edit_transaction(
         if operation == "DELETE":
             target.unlink()
         else:
-            assert proposed_bytes is not None
+            if proposed_bytes is None:
+                raise CodingMutationError(
+                    "ERROR_CODING_FILE_EDIT_CONTENT_REQUIRED",
+                    f"{operation} reached mutation without an approved UTF-8 postimage",
+                )
             mode = original_mode if original_mode is not None else 0o644
             _atomic_write_file(target, proposed_bytes, mode=mode)
     except OSError as exc:
