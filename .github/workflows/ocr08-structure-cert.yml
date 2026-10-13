@@ -1,0 +1,53 @@
+name: OCR08 Structure Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "_architecture/ocr08_structure_benchmark_v1.json"
+      - "backend/app/ocr_structure.py"
+      - "backend/app/cli.py"
+      - "backend/tests/test_ocr_structure.py"
+      - "backend/tests/test_cli.py"
+      - "backend/tests/test_ocr08_structure_live_cert.py"
+      - "scripts/certify_ocr08_structure_live.py"
+      - ".github/workflows/ocr08-structure-cert.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "_architecture/ocr08_structure_benchmark_v1.json"
+      - "backend/app/ocr_structure.py"
+      - "scripts/certify_ocr08_structure_live.py"
+      - ".github/workflows/ocr08-structure-cert.yml"
+
+jobs:
+  certify-ocr08-structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install Tesseract and deterministic font
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng fonts-dejavu-core
+      - name: Install Mucaro and fixture generator
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip install "Pillow==11.3.0"
+      - name: Run OCR08 structure regressions
+        run: python -m pytest backend/tests/test_ocr_structure.py backend/tests/test_ocr08_structure_live_cert.py backend/tests/test_cli.py -q
+      - name: Execute live OCR08 structure certification
+        env:
+          MUCARO_OCR08_RECEIPT: ${{ runner.temp }}/mucaro-ocr08-structure.json
+        run: python scripts/certify_ocr08_structure_live.py --output "$MUCARO_OCR08_RECEIPT"
+      - name: Upload OCR08 structure evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ocr08-structure-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mucaro-ocr08-structure.json
+          if-no-files-found: warn
+          archive: false

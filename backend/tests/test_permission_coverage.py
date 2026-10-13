@@ -32,6 +32,7 @@ EXEMPT = {
     "release_manifest.py": "release tooling",
     "release_scope.py": "release tooling and state snapshot diagnostics",
     "retrieval_quality_certification.py": "certification harness spawning the project's own CLI",
+    "retrieval_scale_benchmark.py": "RT-10 certification harness; read-only git rev-parse of the project itself",
     "runtime_identity.py": "read-only git rev-parse of the project itself",
     "security_gates.py": "certification/security harness",
     "tool_denominator.py": "read-only governance inventory",
