@@ -8,7 +8,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .coding_patch import validate_patch_proposal
-from .coding_workspace import inspect_repository, resolve_repository
+from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
 from .local_tools import resolve_local_tool
 from .permissions import is_within_path
@@ -293,7 +293,7 @@ def _rollback_file_edit_and_raise(
     restored = _current_preimage(repo_root, path)
     try:
         after_rollback = inspect_repository(repo_root, cfg=cfg)
-    except Exception as exc:  # fail closed: repository status itself is part of rollback proof
+    except CodingWorkspaceError as exc:  # fail closed: repository status itself is part of rollback proof
         after_rollback = {"head_sha": None, "dirty_paths": []}
         rollback_error = rollback_error or str(exc)
     rollback_succeeded = bool(
