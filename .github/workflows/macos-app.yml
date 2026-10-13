@@ -28,14 +28,15 @@ jobs:
       # Receipts bind to the commit under review, not the synthetic pull-request merge commit.
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           ref: ${{ env.HEAD_SHA }}
           fetch-depth: 0  # CFBundleVersion is the commit count
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
           cache: npm
@@ -67,13 +68,13 @@ jobs:
           cp "$HOME/Library/Application Support/Mucaro AI/logs/"*.log "$RUNNER_TEMP/evidence/" 2>/dev/null || true
       - name: Upload receipts and screenshot
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: macos-app-evidence-${{ env.HEAD_SHA }}
           path: ${{ runner.temp }}/evidence
           if-no-files-found: warn
       - name: Upload the app archive
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: mucaro-ai-macos-arm64-${{ env.HEAD_SHA }}
           path: ${{ runner.temp }}/macos-app/Mucaro-AI-*-macos-arm64.zip

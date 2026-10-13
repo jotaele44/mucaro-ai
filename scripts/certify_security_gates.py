@@ -44,6 +44,8 @@ PACKAGE_LOCK = ROOT / "frontend" / "package-lock.json"
 DISPOSITIONS = ROOT / "_architecture" / "release" / "security" / "static_security_dispositions_v1.json"
 STATIC_TARGETS = ["backend/app", "packaging", "scripts"]
 SECURITY_REGRESSIONS = [
+    "backend/tests/test_audit_gate_fail_closed.py",
+    "backend/tests/test_browser_security.py",
     "backend/tests/test_api_auth_boundary.py",
     "backend/tests/test_ingestion_safety.py",
     "backend/tests/test_prompt_injection.py",
@@ -90,16 +92,19 @@ def static_gate() -> dict[str, Any]:
     return gate("static_security_triage", ok, detail)
 
 
-def python_vulnerability_gate(out: Path, dispositions: dict[str, Any]) -> dict[str, Any]:
+def python_vulnerability_gate(out: Path, dispositions: dict[str, Any], *, lock: Path = LOCK) -> dict[str, Any]:
     proc = subprocess.run(
-        [sys.executable, "-m", "pip_audit", "-r", str(LOCK), "--disable-pip", "--format", "json", "--progress-spinner", "off"],
+        [sys.executable, "-m", "pip_audit", "-r", str(lock), "--disable-pip", "--format", "json", "--progress-spinner", "off"],
         cwd=ROOT, capture_output=True, text=True, check=False,
     )
     try:
         report = json.loads(proc.stdout)
     except json.JSONDecodeError:
         return gate("python_vulnerabilities", False, f"pip-audit produced no report: {proc.stderr.strip()[-400:]}")
-    (out / "pip-audit-macos-lock.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    if proc.returncode not in (0, 1) or not isinstance(report, dict) or not isinstance(report.get("dependencies"), list):
+        return gate("python_vulnerabilities", False, "pip-audit failed or produced an invalid report")
+    report_name = "pip-audit-macos-lock.json" if lock == LOCK else f"pip-audit-{lock.stem}.json"
+    (out / report_name).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     accepted = {row["id"] for row in dispositions.get("vulnerability_dispositions", [])}
     found = [
         {"package": dep["name"], "version": dep["version"], "id": vuln["id"], "fix_versions": vuln.get("fix_versions", [])}
@@ -108,7 +113,19 @@ def python_vulnerability_gate(out: Path, dispositions: dict[str, Any]) -> dict[s
     ]
     unresolved = [row for row in found if row["id"] not in accepted]
     audited = len(report.get("dependencies", []))
-    return gate("python_vulnerabilities", not unresolved and audited > 0, {"audited": audited, "known": found, "unresolved": unresolved})
+    ok = not unresolved and audited > 0 and (proc.returncode == 0 or bool(found))
+    return gate("python_vulnerabilities", ok, {"audited": audited, "known": found, "unresolved": unresolved})
+
+
+def platform_vulnerability_gate(out: Path, dispositions: dict[str, Any]) -> dict[str, Any]:
+    locks = sorted(path for path in (ROOT / "packaging").rglob("*.lock") if path != LOCK)
+    results = {
+        str(path.relative_to(ROOT)): python_vulnerability_gate(out, dispositions, lock=path)
+        for path in locks
+    }
+    return gate("python_platform_vulnerabilities", bool(results) and all(
+        result["status"] == "PASS" for result in results.values()
+    ), results)
 
 
 def npm_vulnerability_gate(out: Path, dispositions: dict[str, Any]) -> dict[str, Any]:
@@ -117,11 +134,21 @@ def npm_vulnerability_gate(out: Path, dispositions: dict[str, Any]) -> dict[str,
         report = json.loads(proc.stdout)
     except json.JSONDecodeError:
         return gate("npm_vulnerabilities", False, f"npm audit produced no report: {proc.stderr.strip()[-400:]}")
+    if (
+        proc.returncode not in (0, 1)
+        or not isinstance(report, dict)
+        or report.get("error")
+        or not isinstance(report.get("vulnerabilities"), dict)
+        or not isinstance(report.get("metadata"), dict)
+        or not report["metadata"].get("dependencies", {}).get("total", 0)
+    ):
+        return gate("npm_vulnerabilities", False, "npm audit failed or produced an incomplete report")
     (out / "npm-audit-frontend.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     counts = report.get("metadata", {}).get("vulnerabilities", {})
     accepted = {row["id"] for row in dispositions.get("vulnerability_dispositions", [])}
     unresolved = sorted(name for name in report.get("vulnerabilities", {}) if f"npm:{name}" not in accepted)
-    return gate("npm_vulnerabilities", not unresolved, {"counts": counts, "unresolved": unresolved})
+    ok = not unresolved and (proc.returncode == 0 or bool(report["vulnerabilities"]))
+    return gate("npm_vulnerabilities", ok, {"counts": counts, "unresolved": unresolved})
 
 
 def network_exposure_gate() -> dict[str, Any]:
@@ -215,6 +242,7 @@ def main() -> int:
         gate("dependency_integrity", integrity["ok"], integrity),
         gate("sbom", all(row["components"] > 0 for row in sbom_rows.values()), sbom_rows),
         python_vulnerability_gate(out, dispositions),
+        platform_vulnerability_gate(out, dispositions),
         npm_vulnerability_gate(out, dispositions),
         network_exposure_gate(),
         permission_boundary_gate(),

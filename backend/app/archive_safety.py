@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import hashlib
 import stat
+import tempfile
+import unicodedata
 import zipfile
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -54,6 +57,18 @@ def _member_path_problem(name: str) -> str | None:
         return "PATH_TRAVERSAL"
     if "\x00" in name:
         return "NUL_IN_NAME"
+    # Windows treats these as streams, device names, or aliases of other paths.
+    # Reject them on every platform so a SAFE receipt is portable.
+    for part in name.rstrip("/").split("/"):
+        if not part or part == "." or part.endswith((".", " ")):
+            return "AMBIGUOUS_PATH"
+        if any(ord(char) < 32 or char in ':<>"|?*' for char in part):
+            return "INVALID_PATH_CHARACTER"
+        stem = part.split(".", 1)[0].rstrip(" ").upper()
+        if stem in {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"} or (
+            len(stem) == 4 and stem[:3] in {"COM", "LPT"} and stem[3] in "123456789¹²³"
+        ):
+            return "RESERVED_DEVICE_NAME"
     return None
 
 
@@ -61,14 +76,14 @@ def _unix_mode(info: zipfile.ZipInfo) -> int:
     return (info.external_attr >> 16) & 0xFFFF
 
 
-def inspect_zip(path: Path, limits: ArchiveLimits = DEFAULT_LIMITS) -> dict[str, Any]:
+def inspect_zip(path: Path | zipfile.ZipFile, limits: ArchiveLimits = DEFAULT_LIMITS) -> dict[str, Any]:
     """Inventory members and classify the archive as SAFE or UNSAFE without extracting."""
     findings: list[dict[str, Any]] = []
     try:
-        archive = zipfile.ZipFile(path)
+        archive = path if isinstance(path, zipfile.ZipFile) else zipfile.ZipFile(path)
     except (zipfile.BadZipFile, OSError) as exc:
         return {"status": "ARCHIVE_MALFORMED", "detail": str(exc), "members": [], "findings": [{"finding": "MALFORMED"}]}
-    with archive:
+    with nullcontext(archive) if isinstance(path, zipfile.ZipFile) else archive:
         infos = archive.infolist()
         if len(infos) > limits.max_members:
             findings.append({"finding": "TOO_MANY_MEMBERS", "count": len(infos), "limit": limits.max_members})
@@ -80,12 +95,15 @@ def inspect_zip(path: Path, limits: ArchiveLimits = DEFAULT_LIMITS) -> dict[str,
             problem = _member_path_problem(name)
             if problem:
                 findings.append({"finding": problem, "member": name})
-            if name in seen:
+            identity = unicodedata.normalize("NFC", name.rstrip("/")).casefold()
+            if identity in seen:
                 findings.append({"finding": "DUPLICATE_MEMBER", "member": name})
-            seen.add(name)
+            seen.add(identity)
             mode = _unix_mode(info)
             if stat.S_ISLNK(mode):
                 findings.append({"finding": "SYMLINK_MEMBER", "member": name})
+            elif stat.S_IFMT(mode) not in {0, stat.S_IFREG, stat.S_IFDIR}:
+                findings.append({"finding": "SPECIAL_FILE_MEMBER", "member": name})
             is_dir = info.is_dir()
             if not is_dir and (mode & 0o111 or PurePosixPath(name).suffix.lower() in EXECUTABLE_SUFFIXES):
                 findings.append({"finding": "EXECUTABLE_MEMBER", "member": name})
@@ -134,39 +152,60 @@ def safe_extract_zip(path: Path, destination: Path, limits: ArchiveLimits = DEFA
     report = inspect_zip(path, limits)
     if report["status"] != "ARCHIVE_SAFE":
         raise ArchiveSafetyError("ERROR_ARCHIVE_UNSAFE", path.name, report["findings"])
-    root = destination.resolve()
-    root.mkdir(parents=True, exist_ok=True)
+    # Extract privately, then publish the complete tree. Never follow existing
+    # destination links or overwrite files/hardlinks belonging to the operator.
+    destination = destination.absolute()
+    if destination.exists() or destination.is_symlink():
+        raise ArchiveSafetyError("ERROR_ARCHIVE_DESTINATION_EXISTS", destination.name)
+    destination.parent.mkdir(parents=True, exist_ok=True)
     extracted = []
     total = 0
+    with tempfile.TemporaryDirectory(prefix=".mucaro-extract-", dir=destination.parent) as staging:
+        root = Path(staging)
+        with zipfile.ZipFile(path) as archive:
+            # Validate the handle actually read, even if the source pathname was
+            # replaced after the initial inventory.
+            opened_report = inspect_zip(archive, limits)
+            if opened_report["status"] != "ARCHIVE_SAFE":
+                raise ArchiveSafetyError("ERROR_ARCHIVE_UNSAFE", path.name, opened_report["findings"])
+            for info in archive.infolist():
+                target = root / info.filename
+                if info.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                data = read_member_limited(archive, info.filename, limits.max_member_bytes)
+                total += len(data)
+                if total > limits.max_total_bytes:
+                    raise ArchiveSafetyError("ERROR_ARCHIVE_TOTAL_TOO_LARGE", f">{limits.max_total_bytes}")
+                detected = detect_signature(data[:4096])
+                if detected and detected.endswith(("_executable", "_java_class")):
+                    raise ArchiveSafetyError("ERROR_ARCHIVE_EXECUTABLE_PAYLOAD", f"{info.filename}:{detected}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open("xb") as handle:
+                    handle.write(data)
+                target.chmod(0o644)
+                extracted.append({"path": info.filename, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+        root.rename(destination)
+    return {"status": "ARCHIVE_EXTRACTED", "destination": str(destination), "members": extracted}
+
+
+def member_manifest(path: Path, limits: ArchiveLimits = DEFAULT_LIMITS) -> list[dict[str, Any]]:
+    """INV-019 member identity: path, uncompressed size, SHA-256 (bounded reads)."""
+    report = inspect_zip(path, limits)
+    if report["status"] != "ARCHIVE_SAFE":
+        raise ArchiveSafetyError("ERROR_ARCHIVE_UNSAFE", path.name, report["findings"])
+    rows = []
+    total = 0
     with zipfile.ZipFile(path) as archive:
+        opened_report = inspect_zip(archive, limits)
+        if opened_report["status"] != "ARCHIVE_SAFE":
+            raise ArchiveSafetyError("ERROR_ARCHIVE_UNSAFE", path.name, opened_report["findings"])
         for info in archive.infolist():
-            target = (root / info.filename).resolve()
-            if target != root and root not in target.parents:
-                raise ArchiveSafetyError("ERROR_ARCHIVE_UNSAFE_MEMBER", f"{info.filename}:ESCAPES_DESTINATION")
             if info.is_dir():
-                target.mkdir(parents=True, exist_ok=True)
                 continue
             data = read_member_limited(archive, info.filename, limits.max_member_bytes)
             total += len(data)
             if total > limits.max_total_bytes:
                 raise ArchiveSafetyError("ERROR_ARCHIVE_TOTAL_TOO_LARGE", f">{limits.max_total_bytes}")
-            detected = detect_signature(data[:4096])
-            if detected and detected.endswith(("_executable", "_java_class")):
-                raise ArchiveSafetyError("ERROR_ARCHIVE_EXECUTABLE_PAYLOAD", f"{info.filename}:{detected}")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
-            target.chmod(0o644)
-            extracted.append({"path": info.filename, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
-    return {"status": "ARCHIVE_EXTRACTED", "destination": str(root), "members": extracted}
-
-
-def member_manifest(path: Path, limits: ArchiveLimits = DEFAULT_LIMITS) -> list[dict[str, Any]]:
-    """INV-019 member identity: path, uncompressed size, SHA-256 (bounded reads)."""
-    rows = []
-    with zipfile.ZipFile(path) as archive:
-        for info in archive.infolist():
-            if info.is_dir():
-                continue
-            data = read_member_limited(archive, info.filename, limits.max_member_bytes)
             rows.append({"path": info.filename, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
     return sorted(rows, key=lambda row: row["path"])

@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.app import archive_safety
 from backend.app.archive_safety import (
     ArchiveLimits,
     ArchiveSafetyError,
@@ -74,6 +75,66 @@ def _docx(path: Path, document_xml: bytes) -> Path:
 
 
 # --- archive safety (TGT-023) -------------------------------------------------
+
+
+@pytest.mark.parametrize("member", ["CON.txt", "dir/NUL", "LPT1.csv", "COM¹.txt", "a.txt:stream", "a. ", "./a.txt", "a//b"])
+def test_windows_unsafe_archive_names_rejected_on_every_platform(tmp_path, member):
+    archive = _zip(tmp_path / "windows.zip", [(member, b"payload")])
+    assert inspect_zip(archive)["status"] == "ARCHIVE_UNSAFE"
+    with pytest.raises(ArchiveSafetyError):
+        member_manifest(archive)
+
+
+@pytest.mark.parametrize("names", [("A.txt", "a.txt"), ("é.txt", "e\u0301.txt"), ("dir/", "dir")])
+def test_portable_archive_aliases_are_duplicates(tmp_path, names):
+    archive = _zip(tmp_path / "aliases.zip", [(name, b"x") for name in names])
+    assert "DUPLICATE_MEMBER" in {row["finding"] for row in inspect_zip(archive)["findings"]}
+
+
+def test_manifest_honors_aggregate_and_member_count_limits(tmp_path):
+    archive = _zip(tmp_path / "many.zip", [(f"f{i}.txt", b"1234") for i in range(3)])
+    for limits in (ArchiveLimits(max_members=2), ArchiveLimits(max_total_bytes=8)):
+        with pytest.raises(ArchiveSafetyError):
+            member_manifest(archive, limits)
+
+
+def test_extract_refuses_existing_destination_and_preserves_hardlinks(tmp_path):
+    archive = _zip(tmp_path / "ok.zip", [("note.txt", b"replacement")])
+    destination = tmp_path / "out"
+    destination.mkdir()
+    original = tmp_path / "original.txt"
+    original.write_bytes(b"operator data")
+    os.link(original, destination / "note.txt")
+    with pytest.raises(ArchiveSafetyError) as exc:
+        safe_extract_zip(archive, destination)
+    assert exc.value.status == "ERROR_ARCHIVE_DESTINATION_EXISTS"
+    assert original.read_bytes() == b"operator data"
+
+
+def test_failed_extract_leaves_no_partial_tree(tmp_path):
+    archive = _zip(tmp_path / "evil.zip", [("note.txt", b"safe"), ("hidden.txt", ELF_HEADER)])
+    with pytest.raises(ArchiveSafetyError):
+        safe_extract_zip(archive, tmp_path / "out")
+    assert not (tmp_path / "out").exists()
+    assert not list(tmp_path.glob(".mucaro-extract-*"))
+
+
+def test_extraction_revalidates_source_replaced_after_inventory(tmp_path, monkeypatch):
+    archive = _zip(tmp_path / "swapped.zip", [("note.txt", b"safe")])
+    replacement = _zip(tmp_path / "replacement.zip", [("../escape/", b"")])
+    original_inspect = archive_safety.inspect_zip
+
+    def inspect_and_swap(source, limits):
+        report = original_inspect(source, limits)
+        if isinstance(source, Path):
+            replacement.replace(archive)
+        return report
+
+    monkeypatch.setattr(archive_safety, "inspect_zip", inspect_and_swap)
+    with pytest.raises(ArchiveSafetyError):
+        safe_extract_zip(archive, tmp_path / "out")
+    assert not (tmp_path / "escape").exists()
+    assert not (tmp_path / "out").exists()
 
 
 def test_safe_zip_is_inventoried_and_extracts_text_members(tmp_path):
