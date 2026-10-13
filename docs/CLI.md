@@ -182,6 +182,7 @@ Useful terminal commands:
 
 :autopilot authorize CHECKPOINT_ID
 :autopilot run CHECKPOINT_ID
+:autopilot replan CHECKPOINT_ID
 ```
 
 Terminal permission grants are deliberately narrower than a literal
@@ -196,11 +197,27 @@ The generic `:tool TOOL_NAME JSON_OBJECT` command only creates a governed
 existing `:approve`, `:approve lease`, and `:deny` boundaries remain
 authoritative, including mutation/network lease requirements.
 
-The terminal does not silently turn a natural-language prompt into an Autopilot
-plan. In `autopilot` mode, natural-language submission fails closed until
-model-driven plan generation/replanning is separately implemented and
-certified. Existing canonical Autopilot checkpoints can be authorized and run
-explicitly.
+In `autopilot` mode, natural-language submission generates a bounded plan only
+after a governed `coding.repo_status` receipt establishes exact repository root
+and HEAD identity for the current terminal session. The planner uses an eligible
+generative local model by default; a remote model is eligible only when live mode
+is explicitly enabled. The deterministic cited-QA mock is never treated as a
+planning model.
+
+Model output is untrusted. It must parse as strict JSON, validate against the
+Autopilot proposal schema, preserve the operator objective exactly, reference only
+registered tools with explicit Autopilot success contracts, and build a valid
+canonical DAG before any checkpoint is created. A successful proposal is shown as
+**Plan Ready for Review** in `READY_FOR_APPROVAL`; planning itself grants no tool,
+network, mutation, or lease authority. The operator must still run
+`:autopilot authorize CHECKPOINT_ID` before execution.
+
+`:autopilot replan CHECKPOINT_ID` is allowed only when the predecessor has
+FAILED/BLOCKED task residue, no active task, no unresolved contradiction, a
+remaining replan budget, and a fresh governed repository-status receipt obtained
+after the predecessor stopped. Replanning creates a new unauthorized successor
+checkpoint with a new run identity. The predecessor DAG and its planning receipts
+remain immutable lineage; authority is not inherited by the successor.
 
 Keyboard controls are `Ctrl-L` Current, `Ctrl-S` Sessions, `Ctrl-O` Issues,
 `Ctrl-R` Pull Requests, `Ctrl-G` Gists, `Ctrl-P` command palette, Tab to
