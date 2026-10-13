@@ -225,11 +225,12 @@ def _route_and_generate(
     model: str | None,
 ) -> tuple[dict[str, Any], dict[str, Any], str]:
     preferred = provider.strip() if isinstance(provider, str) and provider.strip() and provider.strip() != "mock" else None
+    preferred_model = model if preferred is not None else None
     try:
         route = plan_model_route(
             task_type="coding",
             preferred_provider=preferred,
-            preferred_model=model,
+            preferred_model=preferred_model,
             allowed_providers=["openai_compatible_local", "anthropic"],
             allow_live=os.getenv("MUCARO_AI_LIVE_MODE") == "1",
             require_citations=False,
