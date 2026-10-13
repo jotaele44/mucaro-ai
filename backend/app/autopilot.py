@@ -150,6 +150,7 @@ def plan_autopilot(
             f"initial_replans {initial_replans} exceeds max_replans {replan_budget}",
         )
     state["counters"]["replans"] = initial_replans
+    state = _validate_state(state)
     try:
         dag = build_task_dag(task_definitions)
     except TaskDagError as exc:
