@@ -130,7 +130,9 @@ shell instead.
 - `MUCARO_AI_LIVE_MODE=1`: permits live Anthropic calls. Default is deterministic mock mode.
 - `MUCARO_AI_MODEL_PROVIDER`: default model provider. Default is `mock`.
 - `MUCARO_AI_MODEL`: model name for live mode.
+- `MUCARO_AI_MODEL_EFFORT`: how much the live Anthropic model thinks before it answers: `low` (default, fastest first word), `medium`, `high`, `xhigh`, `max`, or `default` to leave it to the model. It is sent only to models that accept it.
 - `MUCARO_AI_MAX_UPLOAD_BYTES`: API upload limit. Default is 25 MB.
+- `MUCARO_AI_SQLITE_WAL=0`: keep SQLite's rollback journal instead of WAL (the default), for example when the data directory is on a network share.
 - `MUCARO_AI_CORS_ORIGINS`: comma-separated browser origins for local frontend development.
 - `MUCARO_AI_OPERATOR_TOKEN`: optional local operator token required for mutating API actions when set.
 - `MUCARO_AI_WORKSPACE_PROFILE`: runtime workspace profile name. Default is `default`.
@@ -157,6 +159,30 @@ until a multimodal model adapter is added.
 ```bash
 python scripts/ask.py "How does source lineage work?"
 ```
+
+## Saving and sharing answers
+
+Each finished answer has **Save** and **Share** next to Copy and Edit. **Save** offers the answer as
+Markdown or plain text (as shown, edits included, with its sources), and the files Mucaro wrote for
+it in `data/exports/`: a report with sources (`.md`), the full answer record (`.json`) and the
+citations table (`.csv`). A browser keeps the file with its downloads (a phone puts it in Files);
+the desktop app asks where to save it. **Share** opens the system share sheet with the answer as a
+`.txt` file. Browsers offer the share sheet only on https or on the computer itself, so a phone
+that opens Mucaro over plain http saves the file instead; see `docs/PHONE_ACCESS.md`.
+
+## Measuring latency
+
+```bash
+python scripts/bench_latency.py --provider mock --runs 20
+python scripts/bench_latency.py --provider anthropic --runs 10   # needs MUCARO_AI_LIVE_MODE=1 and ANTHROPIC_API_KEY in .env
+```
+
+The benchmark prints p50 and p95 time to first word and total time, measured through the same
+work-run and event-stream path the app uses, in a throwaway data directory (your conversations are
+not touched). Every answer trace also records `timings_ms` (retrieval, first model token, model).
+Answers from Anthropic stream token by token. Run state lives in SQLite in WAL mode with full
+fsync; set `MUCARO_AI_SQLITE_WAL=0` to keep the rollback journal, for example when the data
+directory is on a network share.
 
 ## Command line interface
 

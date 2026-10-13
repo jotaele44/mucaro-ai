@@ -76,3 +76,40 @@ def test_app_refuses_to_start_on_a_newer_database(tmp_path):
         conn.execute("UPDATE schema_meta SET value = '99' WHERE key = 'schema_version'")
     with pytest.raises(SchemaVersionError):
         create_app(cfg)
+
+
+def _journal_mode(path):
+    with sqlite3.connect(path) as conn:
+        return conn.execute("PRAGMA journal_mode").fetchone()[0]
+
+
+def test_database_uses_wal_and_keeps_full_sync(tmp_path, monkeypatch):
+    monkeypatch.delenv("MUCARO_AI_SQLITE_WAL", raising=False)
+    path = tmp_path / "fresh.sqlite3"
+    init_db(path)
+    assert _journal_mode(path) == "wal"
+    conn = db.get_connection(path)
+    try:
+        assert conn.execute("PRAGMA synchronous").fetchone()[0] == 2  # FULL: durability is unchanged
+    finally:
+        conn.close()
+
+
+def test_wal_can_be_turned_off(tmp_path, monkeypatch):
+    monkeypatch.setenv("MUCARO_AI_SQLITE_WAL", "0")
+    path = tmp_path / "rollback.sqlite3"
+    init_db(path)
+    assert _journal_mode(path) == "delete"
+
+
+def test_newer_schema_is_refused_without_switching_its_journal_mode(tmp_path, monkeypatch):
+    path = tmp_path / "future.sqlite3"
+    monkeypatch.setenv("MUCARO_AI_SQLITE_WAL", "0")
+    init_db(path)
+    with sqlite3.connect(path) as conn:
+        conn.execute("UPDATE schema_meta SET value = '99' WHERE key = 'schema_version'")
+    monkeypatch.delenv("MUCARO_AI_SQLITE_WAL")
+    with pytest.raises(SchemaVersionError):
+        init_db(path)
+    assert _journal_mode(path) == "delete"
+

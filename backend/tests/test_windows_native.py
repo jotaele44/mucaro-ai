@@ -114,6 +114,7 @@ def _fake_webview(monkeypatch):
     module = types.ModuleType("webview")
     module.create_window = lambda *args, **kwargs: window
     module.start = lambda **kwargs: started.append(kwargs)
+    module.settings = {"ALLOW_DOWNLOADS": False}
     monkeypatch.setitem(sys.modules, "webview", module)
     return started
 
@@ -124,6 +125,7 @@ def test_window_uses_webview2_when_it_is_installed(windows, monkeypatch, tmp_pat
     monkeypatch.setattr(native_window, "windows_renderer", lambda: "edgechromium")
     native_window.run_window("http://127.0.0.1:8000", storage_dir=tmp_path / "webview", pid_file=tmp_path / "window.pid")
     assert started and started[0]["gui"] == "edgechromium"
+    assert sys.modules["webview"].settings["ALLOW_DOWNLOADS"] is True  # WebView2 cancels downloads otherwise
     assert not (tmp_path / "window.pid").exists()
 
 
