@@ -13,6 +13,11 @@ from typing import Any
 
 from .agent_checkpoints import CheckpointError, get_checkpoint
 from .autopilot import AutopilotError, authorize_autopilot, run_autopilot
+from .autopilot_planner import (
+    AutopilotPlannerError,
+    plan_autopilot_from_model,
+    replan_autopilot_from_model,
+)
 from .config import Settings, settings
 from .conversations import create_conversation, get_conversation
 from .permission_leases import (
@@ -29,6 +34,7 @@ from .tools import (
     request_tool_call,
     run_tool_call,
 )
+from .utils import stable_id, utc_now
 from .work_runs import (
     ACTIVE_STATES,
     RunError,
@@ -232,7 +238,9 @@ def _render_plan(snapshot: dict[str, Any], width: int, height: int) -> list[str]
     lines: list[str] = []
     checkpoint = snapshot.get("checkpoint")
     if isinstance(checkpoint, dict) and checkpoint.get("checkpoint_id"):
-        lines.append(_clip(f"Agent • {checkpoint.get('state')} • {checkpoint.get('objective')}", width))
+        planning = checkpoint.get("autopilot_planning")
+        plan_label = "Plan Ready for Review" if checkpoint.get("state") == "READY_FOR_APPROVAL" and isinstance(planning, dict) else "Agent"
+        lines.append(_clip(f"{plan_label} • {checkpoint.get('state')} • {checkpoint.get('objective')}", width))
         dag = checkpoint.get("task_dag")
         if isinstance(dag, dict) and isinstance(dag.get("tasks"), list):
             for task in dag["tasks"][: max(0, height - 2)]:
@@ -460,11 +468,34 @@ class TerminalController:
             self.command(stripped[1:])
             return
         if self.mode == "autopilot":
-            raise TerminalUIError(
-                "ERROR_TUI_AUTOPILOT_PROMPT_UNBOUND",
-                "Natural-language Autopilot plan generation is not yet certified; "
-                "use :autopilot authorize/run with an existing checkpoint.",
+            conversation_id = self.ensure_conversation()
+            context = self._autopilot_repository_context()
+            repository = context["repository"]
+            run_id = stable_id(
+                "autopilot",
+                conversation_id,
+                repository["head_sha"],
+                stripped,
+                utc_now(),
+                length=16,
             )
+            try:
+                planned = plan_autopilot_from_model(
+                    session_id=conversation_id,
+                    run_id=run_id,
+                    objective=stripped,
+                    source_sha=repository["head_sha"],
+                    context=context,
+                    provider=self.cfg.default_model_provider,
+                    model=self.cfg.default_model_name,
+                    cfg=self.cfg,
+                )
+            except AutopilotPlannerError as exc:
+                raise TerminalUIError(exc.status, exc.detail) from exc
+            checkpoint = planned["checkpoint"]
+            self.view = "current"
+            self.notice = f"Plan Ready for Review: {checkpoint['checkpoint_id']} • authorize explicitly to execute"
+            return
         conversation_id = self.ensure_conversation()
         run_mode = MODE_MAP[self.mode]
         try:
@@ -478,6 +509,53 @@ class TerminalController:
             raise TerminalUIError(exc.status, exc.detail) from exc
         self.view = "current"
         self.notice = f"Run {submitted['run']['run_id']} submitted ({self.mode})"
+
+    def _autopilot_repository_context(
+        self,
+        *,
+        fresh_after: str | None = None,
+    ) -> dict[str, Any]:
+        snapshot = self.snapshot()
+        receipt = snapshot.get("repository_status")
+        if not isinstance(receipt, dict) or not isinstance(receipt.get("result"), dict):
+            raise TerminalUIError(
+                "ERROR_TUI_AUTOPILOT_REPOSITORY_REQUIRED",
+                "Run :tool coding.repo_status with the target repo_root, approve it, then submit the Autopilot objective.",
+            )
+        executed_at = receipt.get("executed_at")
+        if fresh_after is not None and (
+            not isinstance(executed_at, str)
+            or executed_at < fresh_after
+        ):
+            raise TerminalUIError(
+                "ERROR_TUI_AUTOPILOT_REPOSITORY_STALE",
+                "Refresh coding.repo_status after the predecessor stopped before requesting a replan.",
+            )
+        result = receipt["result"]
+        if result.get("status") != "CODING_REPOSITORY_STATUS_OK":
+            raise TerminalUIError(
+                "ERROR_TUI_AUTOPILOT_REPOSITORY_REQUIRED",
+                "The latest governed repository status receipt is not usable.",
+            )
+        head_sha = result.get("head_sha")
+        repo_root = result.get("repo_root")
+        if not isinstance(head_sha, str) or len(head_sha) != 40 or not isinstance(repo_root, str) or not repo_root:
+            raise TerminalUIError(
+                "ERROR_TUI_AUTOPILOT_REPOSITORY_REQUIRED",
+                "The governed repository status receipt lacks exact repo_root/head_sha identity.",
+            )
+        return {
+            "repository": {
+                "repo_root": repo_root,
+                "head_sha": head_sha,
+                "branch": result.get("branch"),
+                "head_state": result.get("head_state"),
+                "dirty_status": result.get("dirty_status"),
+                "dirty_paths": list(result.get("dirty_paths") or []),
+                "status_tool_call_id": receipt.get("tool_call_id"),
+                "status_executed_at": executed_at,
+            }
+        }
 
     def _lease_target_run_id(self) -> str:
         snapshot = self.snapshot()
@@ -725,7 +803,7 @@ class TerminalController:
             if not self.stop_active():
                 self.notice = "No active run to stop."
             return
-        if name == "autopilot" and len(args) == 2 and args[0] in {"authorize", "run"}:
+        if name == "autopilot" and len(args) == 2 and args[0] in {"authorize", "run", "replan"}:
             checkpoint_id = args[1]
             try:
                 checkpoint = get_checkpoint(checkpoint_id, self.cfg)
@@ -741,11 +819,27 @@ class TerminalController:
                         expected_sequence=int(checkpoint["sequence"]),
                         cfg=self.cfg,
                     )
-                else:
+                elif args[0] == "run":
                     result = run_autopilot(checkpoint_id, cfg=self.cfg)
-            except (AutopilotError, CheckpointError) as exc:
+                else:
+                    context = self._autopilot_repository_context(
+                        fresh_after=str(checkpoint.get("updated_at") or ""),
+                    )
+                    result = replan_autopilot_from_model(
+                        checkpoint_id,
+                        source_sha=context["repository"]["head_sha"],
+                        context=context,
+                        provider=self.cfg.default_model_provider,
+                        model=self.cfg.default_model_name,
+                        cfg=self.cfg,
+                    )
+            except (AutopilotError, AutopilotPlannerError, CheckpointError) as exc:
                 raise TerminalUIError(exc.status, exc.detail) from exc
-            self.notice = f"{result['status']} {result.get('reason') or ''}".strip()
+            if args[0] == "replan":
+                successor = result["checkpoint"]
+                self.notice = f"Plan Ready for Review: {successor['checkpoint_id']} • predecessor={checkpoint_id}"
+            else:
+                self.notice = f"{result['status']} {result.get('reason') or ''}".strip()
             return
         if name == "help":
             self.notice = (
@@ -753,7 +847,7 @@ class TerminalController:
                 ":issues REPO • :prs REPO • :gists [OWNER] • :tool TOOL JSON • "
                 ":allow-run • :allow-tool TOOL [network] [mutating] [uses=N] [ttl=N] • "
                 ":approve [lease] • :deny • "
-                ":answer OPTION • :answer-text TEXT • :stop"
+                ":answer OPTION • :answer-text TEXT • :autopilot authorize|run|replan ID • :stop"
             )
             return
         raise TerminalUIError("ERROR_TUI_COMMAND", f"Unknown or invalid command: {command}")
