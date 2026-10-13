@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from copy import deepcopy
@@ -31,6 +32,10 @@ MAX_MODEL_RESPONSE_CHARS = 120_000
 MAX_ACTION_ARGUMENT_BYTES = 64 * 1024
 DEFAULT_MODEL_PLANNER_REPLANS = 2
 ACTIVE_TASK_STATES = {"RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT"}
+
+
+def _text_sha256(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 class AutopilotPlannerError(RuntimeError):
@@ -281,12 +286,12 @@ def _planning_receipt(
     receipt: dict[str, Any] = {
         "schema_version": PLANNING_RECEIPT_SCHEMA_VERSION,
         "kind": kind,
-        "objective_sha256": canonical_sha256(objective),
+        "objective_sha256": _text_sha256(objective),
         "source_sha": source_sha,
         "provider": generated["model_provider"],
         "model": generated["model_name"],
         "model_route_sha256": route.get("route_sha256"),
-        "raw_response_sha256": canonical_sha256(raw_response),
+        "raw_response_sha256": _text_sha256(raw_response),
         "proposal_sha256": canonical_sha256(proposal),
         "dag_definition_sha256": dag_summary["definition_sha256"],
         "task_count": dag_summary["task_count"],
