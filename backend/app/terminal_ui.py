@@ -525,7 +525,7 @@ class TerminalController:
         executed_at = receipt.get("executed_at")
         if fresh_after is not None and (
             not isinstance(executed_at, str)
-            or executed_at < fresh_after
+            or executed_at <= fresh_after
         ):
             raise TerminalUIError(
                 "ERROR_TUI_AUTOPILOT_REPOSITORY_STALE",
