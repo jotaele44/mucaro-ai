@@ -910,6 +910,8 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert by_id["governed_web_browsing"]["status"] == "OPEN"
     assert by_id["coding_programming_expertise"]["status"] == "OPEN"
     assert by_id["transparency_objectivity_governance"]["status"] == "OPEN"
+    assert "coding certification reports" in by_id["transparency_objectivity_governance"]["evidence"]
+    assert "live coding runtime output remains unproven" in by_id["transparency_objectivity_governance"]["gap"]
     assert by_id["multimodal_interface"]["status"] == "PASS"
     assert by_id["personalization_memory"]["status"] == "PASS"
     assert by_id["production_security"]["status"] == "PASS"
