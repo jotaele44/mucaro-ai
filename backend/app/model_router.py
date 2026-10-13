@@ -13,7 +13,9 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
+from .config import Settings, settings
 from .injection_guard import neutralize_fence
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 
 
 class ModelProviderError(RuntimeError):
@@ -243,8 +245,24 @@ def generate_answer(
     conversation_context: list[dict[str, Any]] | None = None,
     memory_context: list[dict[str, Any]] | None = None,
     on_text_delta: Callable[[str], None] | None = None,
+    cfg: Settings = settings,
+    permission_origin: str = "operator",
+    permission_approved: bool = False,
 ) -> dict[str, Any]:
     spec = get_model_provider_spec(model_provider)
+    try:
+        require(
+            PermissionRequest(
+                capability="model.invoke",
+                subject=f"model_router.{spec.name}",
+                target=model_name or spec.default_model,
+                origin=permission_origin,
+                approved=permission_approved,
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise ModelProviderError(exc.status, exc.detail) from exc
     if spec.name == LOCAL_PROVIDER:
         return _local_answer(
             query,
@@ -282,6 +300,19 @@ def generate_answer(
             conversation_context=conversation_context or [],
             memory_context=memory_context or [],
         )
+    try:
+        require(
+            PermissionRequest(
+                capability="network.public_http",
+                subject="model_router.anthropic",
+                target="api.anthropic.com",
+                origin=permission_origin,
+                approved=permission_approved,
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise ModelProviderError(exc.status, exc.detail) from exc
     return _anthropic_answer(
         query,
         retrieved_chunks,

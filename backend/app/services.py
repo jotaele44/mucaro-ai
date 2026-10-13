@@ -131,6 +131,7 @@ def answer_question(
             conversation_context=conversation_context or [],
             memory_context=selected_memory_context,
             on_text_delta=timed_text_delta if on_text_delta is not None else None,
+            cfg=cfg,
         )
     except ModelProviderError as exc:
         return {
