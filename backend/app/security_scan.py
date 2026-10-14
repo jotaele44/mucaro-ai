@@ -82,7 +82,7 @@ def _read_file(root: Path, relative: str) -> tuple[str, bytes | None]:
             os.close(fd)
 
 
-def scan_repository(path: str, expected_head: str, *, cfg: Settings = settings, max_files: int = 500) -> dict:
+def scan_repository(path: str, expected_head: str, *, cfg: Settings = settings, max_files: int = 1000) -> dict:
     if not isinstance(max_files, int) or isinstance(max_files, bool) or not 1 <= max_files <= 1000:
         raise SecurityScanError("ERROR_SCAN_LIMIT", "max_files must be 1..1000.")
     if not isinstance(expected_head, str) or not HEAD_PATTERN.fullmatch(expected_head):
