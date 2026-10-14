@@ -126,12 +126,45 @@ def _unresolved(kind: str, spans: list[dict[str, Any]], reasons: list[str]) -> d
     }
 
 
-def _horizontal_overlap(left: dict[str, int], right: dict[str, int]) -> int:
-    return max(0, min(left["x"] + left["width"], right["x"] + right["width"]) - max(left["x"], right["x"]))
-
-
 def _vertical_overlap(left: dict[str, int], right: dict[str, int]) -> int:
     return max(0, min(left["y"] + left["height"], right["y"] + right["height"]) - max(left["y"], right["y"]))
+
+
+def _spatial_column_components(
+    spans: list[dict[str, Any]],
+    *,
+    overlap_ratio: float,
+) -> tuple[list[list[dict[str, Any]]], float]:
+    """Partition spans into conservative x-runs before grouping their lines.
+
+    Tesseract may reuse one line key for words that sit on the same visual row
+    in different columns. Grouping by that key first therefore destroys the
+    very column boundary this reconstruction needs to infer. A bounded x-run
+    partition keeps raw spans intact and only joins nearby horizontal words;
+    wide or ambiguous gaps remain separate candidates and are still rejected
+    later when each candidate lacks enough lines or vertical support.
+    """
+    heights = [row["bbox"]["height"] for row in spans]
+    widths = [row["bbox"]["width"] for row in spans]
+    gap_tolerance = max(
+        8.0,
+        statistics.median(heights) * (1.0 + overlap_ratio),
+        statistics.median(widths) * overlap_ratio,
+    )
+    ordered = sorted(spans, key=lambda row: (row["bbox"]["x"], row["bbox"]["y"], row["span_index"]))
+    components: list[list[dict[str, Any]]] = []
+    current: list[dict[str, Any]] = []
+    current_right = 0
+    for row in ordered:
+        box = row["bbox"]
+        if current and box["x"] - current_right > gap_tolerance:
+            components.append(current)
+            current = []
+        current.append(row)
+        current_right = max(current_right, box["x"] + box["width"])
+    if current:
+        components.append(current)
+    return components, gap_tolerance
 
 
 def reconstruct_multicolumn(
@@ -145,52 +178,18 @@ def reconstruct_multicolumn(
     rows = _validated_spans(spans)
     if not _one_page(rows):
         return _unresolved("MULTI_COLUMN", rows, ["MULTI_PAGE_SCOPE_NOT_SUPPORTED"])
-    lines = _group_lines(rows)
-    if len(lines) < min_columns * min_lines_per_column:
-        return _unresolved("MULTI_COLUMN", rows, ["INSUFFICIENT_LINE_DENOMINATOR"])
-
-    parents = list(range(len(lines)))
-
-    def find(index: int) -> int:
-        while parents[index] != index:
-            parents[index] = parents[parents[index]]
-            index = parents[index]
-        return index
-
-    def union(left: int, right: int) -> None:
-        a = find(left)
-        b = find(right)
-        if a != b:
-            parents[b] = a
-
-    for left_index, left in enumerate(lines):
-        for right_index in range(left_index + 1, len(lines)):
-            right = lines[right_index]
-            overlap = _horizontal_overlap(left["bbox"], right["bbox"])
-            minimum_width = min(left["bbox"]["width"], right["bbox"]["width"])
-            if minimum_width > 0 and overlap / minimum_width >= overlap_ratio:
-                union(left_index, right_index)
-
-    components: dict[int, list[dict[str, Any]]] = defaultdict(list)
-    for index, line in enumerate(lines):
-        components[find(index)].append(line)
+    components, gap_tolerance = _spatial_column_components(rows, overlap_ratio=overlap_ratio)
     columns = []
-    for component in components.values():
-        ordered = sorted(component, key=lambda row: (row["bbox"]["y"], row["bbox"]["x"], row["key"]))
-        bbox = _union_bbox(
-            [
-                {
-                    "bbox": line["bbox"],
-                }
-                for line in ordered
-            ]
-        )
+    for component in components:
+        ordered = sorted(component, key=lambda row: (row["bbox"]["y"], row["bbox"]["x"], row["span_index"]))
+        lines = _group_lines(ordered)
+        bbox = _union_bbox(ordered)
         columns.append(
             {
                 "bbox": bbox,
-                "line_count": len(ordered),
-                "raw_lines": [line["raw_text"] for line in ordered],
-                "span_indices": [index for line in ordered for index in line["span_indices"]],
+                "line_count": len(lines),
+                "raw_lines": [line["raw_text"] for line in lines],
+                "span_indices": [index for line in lines for index in line["span_indices"]],
             }
         )
     columns.sort(key=lambda row: (row["bbox"]["x"], row["bbox"]["y"]))
@@ -225,6 +224,10 @@ def reconstruct_multicolumn(
         "column_count": len(columns),
         "columns": columns,
         "reading_order_span_indices": assigned,
+        "geometry": {
+            "x_gap_tolerance_px": gap_tolerance,
+            "partition": "conservative_spatial_x_runs",
+        },
         "invariants": {
             "input_span_count": len(rows),
             "assigned_span_count": len(assigned),
@@ -237,7 +240,8 @@ def reconstruct_multicolumn(
             "semantic_structure_claimed": True,
         },
         "limitations": [
-            "This bounded reconstruction assumes column lines have materially overlapping horizontal intervals within each column.",
+            "This bounded reconstruction partitions nearby word boxes into conservative spatial x-runs before grouping OCR lines.",
+            "Large intentional intra-column gaps, spanning headings and nested columns may remain unresolved rather than being synthesized.",
             "Spanning headings, nested columns, rotated text and multi-page column continuity remain unresolved.",
         ],
     }
