@@ -1,7 +1,7 @@
 {
   "schema": "mucaro-flagpole-exact-tree-inventory/1.0",
-  "source_sha": "534033390f56ac43857295f053df584cc47b2e90",
-  "tree_sha": "791ea0d3beb000351127f48c0e89cf1072b28d83",
+  "source_sha": "d588efebe89b2be44c0d90bc8bb4d87321dab10a",
+  "tree_sha": "e46ae411caa544dd8d72f74ca170fa5f291f6016",
   "scope": "complete tracked Git blob tree at exact HEAD",
   "exclusions": [],
   "file_count": 557,
@@ -61,8 +61,8 @@
     {
       "path": ".github/workflows/ocr-corpus-cert.yml",
       "mode": "100644",
-      "blob_sha": "0b242ffcc364afbc6409f2dfc516db0e8a1f6b48",
-      "size": 2141,
+      "blob_sha": "4420127ea2e5de0a0c175cd7d864968d2e81b486",
+      "size": 2140,
       "classification": "workflow"
     },
     {
@@ -292,8 +292,8 @@
     {
       "path": "_architecture/mucaro_flagpole_tree_inventory_v1.json",
       "mode": "100644",
-      "blob_sha": "84aedad53f63d821e830429278c10b28a348a6e2",
-      "size": 69021,
+      "blob_sha": "367705f01442ddeb4f5f909bae7c098e375c1b13",
+      "size": 115518,
       "classification": "data"
     },
     {
@@ -3916,5 +3916,5 @@
       "classification": "source"
     }
   ],
-  "inventory_sha256": "a534a15143ac27742a12ac44fd26e39801284883fb4e5d7c6526ac907ba9c073"
+  "inventory_sha256": "378cabfa30615c9caf0011db8596fe49de511816c67053118ae6d9c02d7ec63e"
 }
