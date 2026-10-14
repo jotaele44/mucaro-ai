@@ -59,7 +59,7 @@ def test_answer_question_flags_uncited_live_answer(tmp_path: Path, monkeypatch):
 
     def fake_generate_answer(*args, **kwargs):
         return {
-            "model_provider": "anthropic",
+            "model_provider": "mock",
             "model_name": "fake-live",
             "answer": "This answer intentionally lacks chunk citations.",
             "cited_chunk_ids": [],
@@ -71,6 +71,28 @@ def test_answer_question_flags_uncited_live_answer(tmp_path: Path, monkeypatch):
 
     assert result["citation_status"] == "CITATION_ERROR"
     assert "ERROR_UNCITED_ANSWER" in result["validation_flags"]
+
+
+def test_answer_question_rejects_provider_identity_mismatch(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+
+    def fake_generate_answer(*args, **kwargs):
+        return {
+            "model_provider": "anthropic",
+            "model_name": "wrong-provider",
+            "answer": "This response came from a different provider.",
+            "cited_chunk_ids": ["chunk_a"],
+        }
+
+    monkeypatch.setattr("backend.app.services.generate_answer", fake_generate_answer)
+
+    result = answer_question("What does source lineage require?", model_provider="mock", cfg=cfg, persist=False)
+
+    assert result["status"] == "ERROR_MODEL_PROVIDER_IDENTITY_MISMATCH"
+    assert result["expected_provider"] == "mock"
+    assert result["observed_provider"] == "anthropic"
+    assert result["model_route"]["selected_provider"] == "mock"
 
 
 def test_answer_question_accepts_persistent_retrieval_strategy(tmp_path: Path):
