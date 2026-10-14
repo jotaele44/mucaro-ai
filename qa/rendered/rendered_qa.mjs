@@ -493,8 +493,20 @@ async function scenario(browser, base, viewport, contextOptions) {
     const scanButton = page.getByRole("button", { name: "Start scan" });
     check("security scan starts disabled until validation", viewport, await scanButton.isDisabled());
     await page.getByRole("textbox", { name: "Repository path on this computer" }).fill(path.join(scanFixture, "missing-directory"));
+    const beforeExpectedHttpError = consoleErrors.length;
+    const negativeResponse = page.waitForResponse((response) =>
+      response.url().endsWith("/security-scans/preflight") && response.request().method() === "POST",
+    );
     await page.getByRole("button", { name: "Validate target" }).click();
+    const deniedTarget = await negativeResponse;
     await page.getByRole("alert").getByText(/ERROR_INPUT_PATH_NOT_FOUND/).waitFor();
+    await page.waitForTimeout(100);
+    const expectedConsole = consoleErrors.slice(beforeExpectedHttpError);
+    const expectedNegative = deniedTarget.status() === 409 && expectedConsole.length === 1 &&
+      /Failed to load resource:.*409/.test(expectedConsole[0]);
+    check("security scan negative target produces exact expected HTTP 409", viewport, expectedNegative);
+    // Remove only the single matched intentional negative-case resource message, never arbitrary errors.
+    if (expectedNegative) consoleErrors.splice(beforeExpectedHttpError, 1);
     check("security scan rejects an absent repository and offers Retry", viewport, await scanButton.isDisabled() && await page.getByRole("button", { name: "Retry" }).isVisible());
     await page.getByRole("textbox", { name: "Repository path on this computer" }).fill(scanFixture);
     await page.getByRole("button", { name: "Validate target" }).click();
