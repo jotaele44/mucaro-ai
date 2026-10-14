@@ -1,26 +1,33 @@
 {
   "schema": "mucaro-flagpole-exact-tree-inventory/1.0",
-  "source_sha": "5780e96ee212baafae921c2b25be924265450b5b",
-  "tree_sha": "84ba9e35a627be1aeb3e2a456320eee89e598235",
+  "source_sha": "534033390f56ac43857295f053df584cc47b2e90",
+  "tree_sha": "791ea0d3beb000351127f48c0e89cf1072b28d83",
   "scope": "complete tracked Git blob tree at exact HEAD",
   "exclusions": [],
-  "file_count": 337,
+  "file_count": 557,
   "classification_counts": {
-    "configuration": 4,
-    "data": 22,
-    "documentation": 39,
-    "other": 10,
-    "schema": 24,
-    "source": 133,
-    "test": 100,
-    "workflow": 5
+    "configuration": 6,
+    "data": 69,
+    "documentation": 55,
+    "other": 37,
+    "schema": 41,
+    "source": 192,
+    "test": 144,
+    "workflow": 13
   },
   "files": [
     {
       "path": ".env.example",
       "mode": "100644",
-      "blob_sha": "de369524f2655bf08422204f9d373d0164a8700d",
-      "size": 263,
+      "blob_sha": "09b2fe5f08f86741199202faaf51a12c8bdfc2d5",
+      "size": 514,
+      "classification": "other"
+    },
+    {
+      "path": ".gitattributes",
+      "mode": "100644",
+      "blob_sha": "edcda7c4a1c0dedf595aa0c276958abe51ae746c",
+      "size": 390,
       "classification": "other"
     },
     {
@@ -33,8 +40,8 @@
     {
       "path": ".github/workflows/ci.yml",
       "mode": "100644",
-      "blob_sha": "17fa7c12fb05a7c1706ddf1889f0e152271d3d30",
-      "size": 5475,
+      "blob_sha": "9d0333ac1cd585c54641e0e3a77bb4dd8495f5f1",
+      "size": 7071,
       "classification": "workflow"
     },
     {
@@ -45,10 +52,66 @@
       "classification": "workflow"
     },
     {
+      "path": ".github/workflows/macos-app.yml",
+      "mode": "100644",
+      "blob_sha": "81652ef376aadaf283cdea07b1122d902f632086",
+      "size": 3276,
+      "classification": "workflow"
+    },
+    {
+      "path": ".github/workflows/ocr-corpus-cert.yml",
+      "mode": "100644",
+      "blob_sha": "0b242ffcc364afbc6409f2dfc516db0e8a1f6b48",
+      "size": 2141,
+      "classification": "workflow"
+    },
+    {
       "path": ".github/workflows/ocr-live-cert.yml",
       "mode": "100644",
       "blob_sha": "db680a5124ed1570bcef7de24d8a01098e5fc6f6",
       "size": 1868,
+      "classification": "workflow"
+    },
+    {
+      "path": ".github/workflows/ocr08-structure-cert.yml",
+      "mode": "100644",
+      "blob_sha": "522346d2e85895eeafb51f35123234ba361096df",
+      "size": 2025,
+      "classification": "workflow"
+    },
+    {
+      "path": ".github/workflows/one-click-setup.yml",
+      "mode": "100644",
+      "blob_sha": "b799330afc31fcf41118b14b7ca5f157044367e0",
+      "size": 11428,
+      "classification": "workflow"
+    },
+    {
+      "path": ".github/workflows/rendered-qa.yml",
+      "mode": "100644",
+      "blob_sha": "8000e0ba829dad577c63d9028ebc6799a5db0c30",
+      "size": 1647,
+      "classification": "workflow"
+    },
+    {
+      "path": ".github/workflows/rt09-real-world-cert.yml",
+      "mode": "100644",
+      "blob_sha": "36b3f543414281dd1c225d657cc889eeb7bd194b",
+      "size": 1460,
+      "classification": "workflow"
+    },
+    {
+      "path": ".github/workflows/rt10-retrieval-scale-cert.yml",
+      "mode": "100644",
+      "blob_sha": "842f8006d45ab2929348c98982ffff0c4d9e012f",
+      "size": 1873,
+      "classification": "workflow"
+    },
+    {
+      "path": ".github/workflows/shadow-qa.yml",
+      "mode": "100644",
+      "blob_sha": "9f22a1664cc99e2b0bd1f5240accacc10b48a43a",
+      "size": 4101,
       "classification": "workflow"
     },
     {
@@ -61,8 +124,8 @@
     {
       "path": ".gitignore",
       "mode": "100644",
-      "blob_sha": "220599956e0d3f9be40571f5d82db570624d04cf",
-      "size": 456,
+      "blob_sha": "5058a2e021b7c032bb8435a6936cda9ad204b9e1",
+      "size": 599,
       "classification": "configuration"
     },
     {
@@ -89,22 +152,64 @@
     {
       "path": "Makefile",
       "mode": "100644",
-      "blob_sha": "e1366262ed71ee1f76b9ba42094c9d73866128c8",
-      "size": 1860,
+      "blob_sha": "26db70dbc55f8943e1286aa19ee6d41955b6c5bc",
+      "size": 3125,
+      "classification": "other"
+    },
+    {
+      "path": "Mucaro AI.app/Contents/Info.plist",
+      "mode": "100644",
+      "blob_sha": "38231d0c99120542cc82917f6cb1ca18633e7321",
+      "size": 704,
+      "classification": "other"
+    },
+    {
+      "path": "Mucaro AI.app/Contents/MacOS/mucaro-ai",
+      "mode": "100755",
+      "blob_sha": "4a2237f17ac5c4a143e70f527efb91a12111c8b0",
+      "size": 222,
+      "classification": "other"
+    },
+    {
+      "path": "Mucaro AI.app/Contents/Resources/MucaroAI.icns",
+      "mode": "100644",
+      "blob_sha": "081353e08791c2639176357df8eed8bb6a65159e",
+      "size": 2453453,
+      "classification": "other"
+    },
+    {
+      "path": "Mucaro AI.app/Contents/Resources/MucaroAI.png",
+      "mode": "100644",
+      "blob_sha": "aebad6c177eb292a72d1e63d6525edc9f3087de4",
+      "size": 418927,
+      "classification": "other"
+    },
+    {
+      "path": "Mucaro AI.cmd",
+      "mode": "100644",
+      "blob_sha": "85a54b16638c78097a8429fd8bb54c4d6eeb9698",
+      "size": 668,
       "classification": "other"
     },
     {
       "path": "Mucaro AI.command",
       "mode": "100755",
-      "blob_sha": "4c203689d02229cdb2cf52406a67ecfc3ec93ee7",
-      "size": 287,
+      "blob_sha": "bb33d97efe0aac89f3493e6fe1cbae50e7feebc6",
+      "size": 375,
+      "classification": "other"
+    },
+    {
+      "path": "Mucaro AI.exe",
+      "mode": "100755",
+      "blob_sha": "d3bff871edd6e57fcf4a6cfff6713c4bae73be73",
+      "size": 249856,
       "classification": "other"
     },
     {
       "path": "README.md",
       "mode": "100644",
-      "blob_sha": "c575636081cdf83dd436f552669121f1e680f5ac",
-      "size": 16379,
+      "blob_sha": "79a90d85c36a70996853f3de936b90874e9fffd0",
+      "size": 23915,
       "classification": "documentation"
     },
     {
@@ -178,6 +283,20 @@
       "classification": "data"
     },
     {
+      "path": "_architecture/mucaro_flagpole_tool_denominator_v1.json",
+      "mode": "100644",
+      "blob_sha": "148fc999860dc883cba050bb1a45bd8237b01b96",
+      "size": 2973,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/mucaro_flagpole_tree_inventory_v1.json",
+      "mode": "100644",
+      "blob_sha": "84aedad53f63d821e830429278c10b28a348a6e2",
+      "size": 69021,
+      "classification": "data"
+    },
+    {
       "path": "_architecture/mucaro_flagpole_v1.json",
       "mode": "100644",
       "blob_sha": "65d61a3a760324e90d170f5f572ac2863c63cbdf",
@@ -194,8 +313,15 @@
     {
       "path": "_architecture/mucaro_v1_denominator_events.json",
       "mode": "100644",
-      "blob_sha": "ff0530f8c44fc2197f24c6c355489a2a46158b15",
-      "size": 17772,
+      "blob_sha": "0bf44803d1bfc296003c01a69b38a61d5462c27e",
+      "size": 19160,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/ocr08_structure_benchmark_v1.json",
+      "mode": "100644",
+      "blob_sha": "d2aecd6adb6b6b39ce3fd1e314c52ad24d70274f",
+      "size": 1989,
       "classification": "data"
     },
     {
@@ -203,6 +329,286 @@
       "mode": "100644",
       "blob_sha": "bcdb73eb3bcf9c04b48a2da49e75bbcda9509f4c",
       "size": 3323,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/ocr_v1_representative_corpus.json",
+      "mode": "100644",
+      "blob_sha": "1a061929beed3e13db09a7d6c1061942cb3a9044",
+      "size": 4894,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/acceptance_ledger_v1.json",
+      "mode": "100644",
+      "blob_sha": "9278a8a0532b36d02e997070bf80d5949dc26bf4",
+      "size": 118137,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/blocker_ledger_v1.json",
+      "mode": "100644",
+      "blob_sha": "2acfb8e107dbaef264b9dcb16b29e27cc3d2c973",
+      "size": 8033,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/contradiction_ledger_v1.json",
+      "mode": "100644",
+      "blob_sha": "ce5b69c1c749ae2244f508b11e6a1faa167dbb82",
+      "size": 9957,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/current_state_snapshot_v1.json",
+      "mode": "100644",
+      "blob_sha": "eaacb4c7c9b31df9727877081dbbfa88270a0089",
+      "size": 4782,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/actions_runner_admission_20260929.json",
+      "mode": "100644",
+      "blob_sha": "ed1aa3d8925b852b4f9170213adb8da3157089b6",
+      "size": 2848,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/actions_runner_admission_20260930.json",
+      "mode": "100644",
+      "blob_sha": "41ddcbc48898448986a46a47c9534f0ba34e478e",
+      "size": 3625,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/actions_runner_admission_transition_20260929.json",
+      "mode": "100644",
+      "blob_sha": "5e182716ca7670f7cfcd9717e43191f188f0f28e",
+      "size": 3734,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
+      "mode": "100644",
+      "blob_sha": "417e7f5fe500cced3c1dafb7e9d17d488799b1d2",
+      "size": 4943,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
+      "mode": "100644",
+      "blob_sha": "d9b4c83867c57efc9ba81090aca21821c3aaea39",
+      "size": 3164,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_0a806c1e8c98/provenance.json",
+      "mode": "100644",
+      "blob_sha": "cfa31948c7ce0707bcf7f52283a04a061fade00d",
+      "size": 2070,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_0a806c1e8c98/window.png",
+      "mode": "100644",
+      "blob_sha": "d23430a388052a2ab2f74c7221a04b8b1bc6bb45",
+      "size": 84989,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_1d32e8ce1d02/build_receipt.json",
+      "mode": "100644",
+      "blob_sha": "2d1c98c0b00fca9fa476fd1baab4c8a20ecccb4b",
+      "size": 4943,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_1d32e8ce1d02/e2e_receipt.json",
+      "mode": "100644",
+      "blob_sha": "e0ae82db3cc888c59edc8f0dbf3f2257c0b5f65c",
+      "size": 2951,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_1d32e8ce1d02/provenance.json",
+      "mode": "100644",
+      "blob_sha": "4b8b6a5f5ae8c148640e12ff5f2152002f4a514f",
+      "size": 1702,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_1d32e8ce1d02/window.png",
+      "mode": "100644",
+      "blob_sha": "d23430a388052a2ab2f74c7221a04b8b1bc6bb45",
+      "size": 84989,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_948fda472af7/build_receipt.json",
+      "mode": "100644",
+      "blob_sha": "82c1614fada5d688b126539158e98a5eabd6666a",
+      "size": 4943,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_948fda472af7/e2e_receipt.json",
+      "mode": "100644",
+      "blob_sha": "9c432965588f4b48f8d0d9d072c1b8a8d3e8ffa9",
+      "size": 2951,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_948fda472af7/provenance.json",
+      "mode": "100644",
+      "blob_sha": "6f010d9507c00cf5fdb580780d150dd532f660cc",
+      "size": 1389,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/macos_app_948fda472af7/window.png",
+      "mode": "100644",
+      "blob_sha": "d23430a388052a2ab2f74c7221a04b8b1bc6bb45",
+      "size": 84989,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/release_grade_0a806c1e8c98/final_release_manifest.json",
+      "mode": "100644",
+      "blob_sha": "8a8fe770c3521ea4153386fa987395fed81bf1b5",
+      "size": 10772,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/release_grade_0a806c1e8c98/hosted_ci_evidence.json",
+      "mode": "100644",
+      "blob_sha": "fcca8a635ef7bca03a607abc129f69e20fcf612c",
+      "size": 661,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/release_grade_0a806c1e8c98/provenance.json",
+      "mode": "100644",
+      "blob_sha": "563988132c047af734fed87ae0debab21a5d15d8",
+      "size": 3933,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/release_grade_0a806c1e8c98/release_grade_receipt.json",
+      "mode": "100644",
+      "blob_sha": "2470afce23d2ed7f45aa1affcba0d319b765a775",
+      "size": 10282,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+      "mode": "100644",
+      "blob_sha": "1db617a5a6a62c6a6304f905ae1b047000e9fd39",
+      "size": 17742,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/frozen/20260924T210000Z-baseline/blocker_ledger_v1.json",
+      "mode": "100644",
+      "blob_sha": "884e30345e46bea523845cdd9cc851c7f8a312ac",
+      "size": 4534,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/frozen/20260924T210000Z-baseline/checkpoint.json",
+      "mode": "100644",
+      "blob_sha": "8a82dc197c21a51c4eb82917b527c455ae72c60d",
+      "size": 836,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/frozen/20260924T210000Z-baseline/contradiction_ledger_v1.json",
+      "mode": "100644",
+      "blob_sha": "9f3abb23013fa394341a4c243a6ccbc2a2d0c9aa",
+      "size": 5860,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/frozen/20260924T210000Z-baseline/release_scope_manifest_v1.json",
+      "mode": "100644",
+      "blob_sha": "d7a734c870c71bf806ad74009b73fc3be80fe7ed",
+      "size": 45569,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/frozen/20260924T210000Z-baseline/scope_delta_ledger_v1.json",
+      "mode": "100644",
+      "blob_sha": "7d064552d7e132ca9c716468ea6906285d10b849",
+      "size": 5428,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/local_ai_declaration_v1.json",
+      "mode": "100644",
+      "blob_sha": "aea782ef3bdf8e893b3264af788b6484a5b7ca8a",
+      "size": 2816,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/release_dag_v1.json",
+      "mode": "100644",
+      "blob_sha": "351f3afefe1c0ae756714c16cf1f1deec5a20d58",
+      "size": 16826,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/release_scope_manifest_v1.json",
+      "mode": "100644",
+      "blob_sha": "228020490106e6b80bace7e86cd7050f840a8cdc",
+      "size": 46132,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/scope_delta_ledger_v1.json",
+      "mode": "100644",
+      "blob_sha": "307a86a6b745346e726b15c3bcba726d26ae8902",
+      "size": 7423,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/release/security/static_security_dispositions_v1.json",
+      "mode": "100644",
+      "blob_sha": "c1bae3133d8cf210713d1175ca8ca1170d8491c3",
+      "size": 11769,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/retrieval_real_world_corpus_v1.json",
+      "mode": "100644",
+      "blob_sha": "cccfe5786927b6e2ab3f853d99aa9b7c81a39f2c",
+      "size": 10303,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/retrieval_scale_benchmark_v1.json",
+      "mode": "100644",
+      "blob_sha": "e736febbf31fa48259d055b8a25d94a0c1c8ddad",
+      "size": 2220,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/retrieval_scale_benchmark_v1_1.json",
+      "mode": "100644",
+      "blob_sha": "57331b6ce8894aa039a0aad285d313362bc2ff53",
+      "size": 2654,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/retrieval_scale_benchmark_v1_2.json",
+      "mode": "100644",
+      "blob_sha": "06c307757cdf1dc03b459e5cf13a5702243a7d39",
+      "size": 3113,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/runtime_independence_v1.json",
+      "mode": "100644",
+      "blob_sha": "5a495dff9937a488a9f3a49d8b4acac75fdf72ed",
+      "size": 4270,
       "classification": "data"
     },
     {
@@ -225,6 +631,27 @@
       "blob_sha": "2b7dfc63876a6614e4c081a0a9329867fef65b79",
       "size": 1955,
       "classification": "schema"
+    },
+    {
+      "path": "_architecture/shadow/evidence/016ec7b916abd7ea56b03f75d97919e1a9f9ec5e.json",
+      "mode": "100644",
+      "blob_sha": "8d60bfd968afb0e8f90d6f4d71eb8233ac613978",
+      "size": 6535,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/video_cli_parity_gap_matrix_v1.json",
+      "mode": "100644",
+      "blob_sha": "f9a5e31006bcab9acfb2ba330c60463bdffd3259",
+      "size": 7210,
+      "classification": "data"
+    },
+    {
+      "path": "_architecture/video_cli_parity_v1.json",
+      "mode": "100644",
+      "blob_sha": "d2c7c853d4fff31d80bff5c2c448890d6718b7e3",
+      "size": 6743,
+      "classification": "data"
     },
     {
       "path": "_architecture/web08_live_search_eval_manifest.json",
@@ -257,8 +684,8 @@
     {
       "path": "backend/app/agent_checkpoints.py",
       "mode": "100644",
-      "blob_sha": "9088eadd751761cb59172c58cf3b51501d8940f2",
-      "size": 5174,
+      "blob_sha": "5cac9208500513a858e03d1cc09378c8b03f028a",
+      "size": 19400,
       "classification": "source"
     },
     {
@@ -266,6 +693,13 @@
       "mode": "100644",
       "blob_sha": "93dd3481321898e9ff8861ea71920232c0b3409a",
       "size": 22325,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/archive_safety.py",
+      "mode": "100644",
+      "blob_sha": "0dca5295a2a49fdb9a93929b52daf1272b1cb792",
+      "size": 7482,
       "classification": "source"
     },
     {
@@ -278,15 +712,15 @@
     {
       "path": "backend/app/auth.py",
       "mode": "100644",
-      "blob_sha": "20d53fb38f20329c6b4f93740bc3c3f88737f0f7",
-      "size": 1202,
+      "blob_sha": "658741a795be65489189bc26bf50a1ceee82f92f",
+      "size": 3515,
       "classification": "source"
     },
     {
       "path": "backend/app/capability_contracts.py",
       "mode": "100644",
-      "blob_sha": "0681978e96887696d9e267e902f8f6f57f4caf26",
-      "size": 136047,
+      "blob_sha": "02ef8c4d741aeb596866e19bed6b4804a9ee109e",
+      "size": 177077,
       "classification": "source"
     },
     {
@@ -306,22 +740,22 @@
     {
       "path": "backend/app/citations.py",
       "mode": "100644",
-      "blob_sha": "4445736377b78b2b9863fddea972797d57e64f5f",
-      "size": 3098,
+      "blob_sha": "1270a402198ebcd6f0459d12942e723acf3fd567",
+      "size": 3152,
       "classification": "source"
     },
     {
       "path": "backend/app/clean_machine_macos.py",
       "mode": "100644",
-      "blob_sha": "214d51e469d7673f5ffb575cc2534fe9fd6d402f",
-      "size": 6703,
+      "blob_sha": "54c65c988ae9b3b705fc041dc75e3acd516ae876",
+      "size": 8173,
       "classification": "source"
     },
     {
       "path": "backend/app/cli.py",
       "mode": "100644",
-      "blob_sha": "c8dc782e7fa1994f0f03e22e1f8522cf67071931",
-      "size": 374692,
+      "blob_sha": "12e299c9adbf3b54ee52429571898fade8804092",
+      "size": 404869,
       "classification": "source"
     },
     {
@@ -348,22 +782,22 @@
     {
       "path": "backend/app/coding_lifecycle.py",
       "mode": "100644",
-      "blob_sha": "0b21e1f49f5d2bb5925b9f47a4826ecedbeb407b",
-      "size": 14797,
+      "blob_sha": "103251b3192720a9aaac8ef9449074d6a77d5201",
+      "size": 14996,
       "classification": "source"
     },
     {
       "path": "backend/app/coding_mutation.py",
       "mode": "100644",
-      "blob_sha": "623be6a356532b2f5c888b9e91c9b50acf571e8a",
-      "size": 8953,
+      "blob_sha": "b80ab93cab6755eba299a59edb89889b41ed7cb5",
+      "size": 9151,
       "classification": "source"
     },
     {
       "path": "backend/app/coding_patch.py",
       "mode": "100644",
-      "blob_sha": "8982bdf57dace2021e6d25d5b01c6007f108b280",
-      "size": 9373,
+      "blob_sha": "940a8b36108b85058d2e9012264f1e44ae9f21a2",
+      "size": 9653,
       "classification": "source"
     },
     {
@@ -376,22 +810,22 @@
     {
       "path": "backend/app/coding_workspace.py",
       "mode": "100644",
-      "blob_sha": "e532968390cd547f105410a3664161f5f9081611",
-      "size": 12714,
+      "blob_sha": "20c5ebe7ee9146cf288b6b7faae622d55957d690",
+      "size": 12947,
       "classification": "source"
     },
     {
       "path": "backend/app/config.py",
       "mode": "100644",
-      "blob_sha": "98304b87aa52a7255013f3f9e00b88bbb85e6a75",
-      "size": 3429,
+      "blob_sha": "839a9753675eef336bfb7d1bdeca5dea2d79fbda",
+      "size": 4473,
       "classification": "source"
     },
     {
       "path": "backend/app/container_runtime.py",
       "mode": "100644",
-      "blob_sha": "3f94f2a93c4f7c607f37eb9a4a40676539f387b0",
-      "size": 7119,
+      "blob_sha": "37105fb033e7356b464af1344277ca7829f5d392",
+      "size": 7680,
       "classification": "source"
     },
     {
@@ -404,22 +838,29 @@
     {
       "path": "backend/app/context_state.py",
       "mode": "100644",
-      "blob_sha": "65532cb67d50e8f4341df6cefef043f3e75566cc",
-      "size": 6621,
+      "blob_sha": "75206863f17298bdc8097c158e7d0128db6c5bd2",
+      "size": 7051,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/contracts.py",
+      "mode": "100644",
+      "blob_sha": "f2c7c3232d9e0ea4bcd5cf21bbc0cfe20a093ba3",
+      "size": 4770,
       "classification": "source"
     },
     {
       "path": "backend/app/conversations.py",
       "mode": "100644",
-      "blob_sha": "fa542d18f42f3dc779e744d2ff8ddda0c75af0bc",
-      "size": 5273,
+      "blob_sha": "0400d1ab7162c13e9aa64bc1d87490cfa0b4f3c2",
+      "size": 11853,
       "classification": "source"
     },
     {
       "path": "backend/app/db.py",
       "mode": "100644",
-      "blob_sha": "572d69221cbab05e67c3d44fdc4840220406ee8b",
-      "size": 3879,
+      "blob_sha": "ac4754e629a5e2abd6c86fb296f6aa31d3cd8b28",
+      "size": 8025,
       "classification": "source"
     },
     {
@@ -430,10 +871,31 @@
       "classification": "source"
     },
     {
+      "path": "backend/app/desktop_shell.py",
+      "mode": "100644",
+      "blob_sha": "3952430f16395d0fd44db5aa6d950cea0284e4cc",
+      "size": 14297,
+      "classification": "source"
+    },
+    {
       "path": "backend/app/distribution_policy.py",
       "mode": "100644",
       "blob_sha": "ec26fe8ba6ad5dbb8f49fb6d23b5c0c7712b333e",
       "size": 3513,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/env_file.py",
+      "mode": "100644",
+      "blob_sha": "fccc49d126a4e712ed244c2321a1fe81a1b51f1f",
+      "size": 1800,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/error_categories.py",
+      "mode": "100644",
+      "blob_sha": "413e58f459e655e4a91fd5d46e48f4a5ce6438a3",
+      "size": 2808,
       "classification": "source"
     },
     {
@@ -453,22 +915,29 @@
     {
       "path": "backend/app/exports.py",
       "mode": "100644",
-      "blob_sha": "b92611cc5068fbb77c30c0df6486d4b76d387292",
-      "size": 3850,
+      "blob_sha": "e1940dcf3df294a66b622a34c642ed6a7b8ae6b0",
+      "size": 5001,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/file_signatures.py",
+      "mode": "100644",
+      "blob_sha": "128ab01ce11dd43ccdc8b27d79de86de00a08b03",
+      "size": 4399,
       "classification": "source"
     },
     {
       "path": "backend/app/flagpole_inventory.py",
       "mode": "100644",
-      "blob_sha": "4af696af6bfc682a8bfbdb5a05bbd2d8d815b0c1",
-      "size": 7993,
+      "blob_sha": "c9cfa004d0494fc700ab3d76d3b915a7722079d4",
+      "size": 8357,
       "classification": "source"
     },
     {
       "path": "backend/app/gis_corpus.py",
       "mode": "100644",
-      "blob_sha": "b538ca04384ea42b517df17f279210153775cfae",
-      "size": 20834,
+      "blob_sha": "d981002591eb1a6aafcf6f4e068dc7f7db23a1a3",
+      "size": 20966,
       "classification": "source"
     },
     {
@@ -488,8 +957,8 @@
     {
       "path": "backend/app/gis_export.py",
       "mode": "100644",
-      "blob_sha": "22e9678c47e3195385ee915fafe1278c7c97076b",
-      "size": 4163,
+      "blob_sha": "fcf2786b8238f50f77366d2f61f20a81ca28ac40",
+      "size": 4298,
       "classification": "source"
     },
     {
@@ -523,22 +992,22 @@
     {
       "path": "backend/app/gis_hydrology.py",
       "mode": "100644",
-      "blob_sha": "5c8eac7f8393d2e70935badfcbe0a37c65b6fc60",
-      "size": 46384,
+      "blob_sha": "e2dbffdea98ed95768ed128c07776461a03b27d4",
+      "size": 46509,
       "classification": "source"
     },
     {
       "path": "backend/app/gis_processing.py",
       "mode": "100644",
-      "blob_sha": "a95cd470652604f53773635910d21e30052c9b0f",
-      "size": 115876,
+      "blob_sha": "b18c2776caec8e04adc28aa5d8ba379df3105e3b",
+      "size": 116001,
       "classification": "source"
     },
     {
       "path": "backend/app/gis_raster.py",
       "mode": "100644",
-      "blob_sha": "78758a78ed565b5f2a103fef52a10476885eaef8",
-      "size": 44724,
+      "blob_sha": "c1cb642aaacff2c54d2d7f050e756b3f645868a1",
+      "size": 44849,
       "classification": "source"
     },
     {
@@ -551,22 +1020,29 @@
     {
       "path": "backend/app/gis_vector_formats.py",
       "mode": "100644",
-      "blob_sha": "a33d441a6e933bbbb00fdefdf9fb1410a5d03a91",
-      "size": 6073,
+      "blob_sha": "75a77c60c1f91a2397262043b660ad05b5a0a2fa",
+      "size": 6198,
       "classification": "source"
     },
     {
       "path": "backend/app/gis_vector_raster.py",
       "mode": "100644",
-      "blob_sha": "31f1267dfa1324616e7775a6698e0ad462189750",
-      "size": 9591,
+      "blob_sha": "c0e5b39ac8eb1bc2fe098a4fa396f0ece7a6ea59",
+      "size": 9723,
       "classification": "source"
     },
     {
       "path": "backend/app/ingestion.py",
       "mode": "100644",
-      "blob_sha": "a7f1d55dad1d79f16b3b68e6fc35cc53caba9836",
-      "size": 13041,
+      "blob_sha": "530ec1c457d245a160a9fd09138a8d6e35683816",
+      "size": 16860,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/injection_guard.py",
+      "mode": "100644",
+      "blob_sha": "2f1e1e4a306289173858e5aedf38ff884db77741",
+      "size": 3344,
       "classification": "source"
     },
     {
@@ -574,6 +1050,13 @@
       "mode": "100644",
       "blob_sha": "e65c3fc5467f877866fe6fce1cc66a80141cb17d",
       "size": 6482,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/local_tools.py",
+      "mode": "100644",
+      "blob_sha": "9b8a017cfad77f4489a80f3cbcff2b85052ea2c7",
+      "size": 6076,
       "classification": "source"
     },
     {
@@ -607,43 +1090,43 @@
     {
       "path": "backend/app/main.py",
       "mode": "100644",
-      "blob_sha": "d8324b4fe5e9e308f18eea88b1e40415ff53c2d9",
-      "size": 22653,
+      "blob_sha": "a821cd2acaba0d8a72d0cd7d32cd4cc6f0b76447",
+      "size": 35634,
       "classification": "source"
     },
     {
       "path": "backend/app/memory.py",
       "mode": "100644",
-      "blob_sha": "a7aa9ed57ff9b7c683e13fc10c1c7a8fac33f3b5",
-      "size": 4143,
+      "blob_sha": "ca68a461e3cc506508d0e375e437547bf6dd97e3",
+      "size": 4581,
       "classification": "source"
     },
     {
       "path": "backend/app/memory_policy.py",
       "mode": "100644",
-      "blob_sha": "4ec809744a81d71929cff70be4fcbfe147563a69",
-      "size": 5827,
+      "blob_sha": "94b05134b043fe38d07c0069c6a2a2dcdf97d34c",
+      "size": 5907,
       "classification": "source"
     },
     {
       "path": "backend/app/model_router.py",
       "mode": "100644",
-      "blob_sha": "1d9c12362242ebe0e36308ec69f9259d438f3c9f",
-      "size": 10604,
+      "blob_sha": "9d5711f8352bd2fd30aafc5444156f4c51921717",
+      "size": 23239,
       "classification": "source"
     },
     {
       "path": "backend/app/model_routing_policy.py",
       "mode": "100644",
-      "blob_sha": "d1de8a4b59136654c136ddcc2ba4799c60956f3f",
-      "size": 7264,
+      "blob_sha": "763fb08c161ad56c3ce6da42ce38131fa017ee56",
+      "size": 8847,
       "classification": "source"
     },
     {
       "path": "backend/app/models.py",
       "mode": "100644",
-      "blob_sha": "6638a14c1584d1c9d5178e1871e081316f798775",
-      "size": 2637,
+      "blob_sha": "9b62552846e8162af23135db912a3c6099d13f51",
+      "size": 4381,
       "classification": "source"
     },
     {
@@ -656,15 +1139,22 @@
     {
       "path": "backend/app/ocr_analysis.py",
       "mode": "100644",
-      "blob_sha": "dce2735fae5b701afb04e268cc74d9559a21c0eb",
-      "size": 9760,
+      "blob_sha": "971a3891a74d72ee0ea11aac1eb89d64d089b5ee",
+      "size": 9930,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/ocr_corpus_eval.py",
+      "mode": "100644",
+      "blob_sha": "e9a26663f547b2eb5412885547ab9a806819ebec",
+      "size": 20984,
       "classification": "source"
     },
     {
       "path": "backend/app/ocr_corpus_evidence.py",
       "mode": "100644",
-      "blob_sha": "7d9ce6210eeecda17afc56f3645624e52f63a857",
-      "size": 8012,
+      "blob_sha": "ce9ff518ad70cba8be45c0542668bf6e7ff93dde",
+      "size": 9073,
       "classification": "source"
     },
     {
@@ -677,36 +1167,50 @@
     {
       "path": "backend/app/ocr_pdf.py",
       "mode": "100644",
-      "blob_sha": "47516c9b1e6e26fa9cf15ac15575a624336ad924",
-      "size": 9418,
+      "blob_sha": "84d589877dc7568ca648543f0992330271e80911",
+      "size": 9721,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/ocr_structure.py",
+      "mode": "100644",
+      "blob_sha": "92aa73d29bf7b53366d69933594725dc5fa77805",
+      "size": 23546,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/offline.py",
+      "mode": "100644",
+      "blob_sha": "782542b26bf2642c8f574b75b3a41afdae8c988b",
+      "size": 8622,
       "classification": "source"
     },
     {
       "path": "backend/app/operator_workflow_certification.py",
       "mode": "100644",
-      "blob_sha": "3167af92824c5966fc412a3dcaa1eea0376bbe98",
-      "size": 13827,
+      "blob_sha": "4a3258f9a61ee4af16738ac39eb38c6d34afac5a",
+      "size": 13848,
       "classification": "source"
     },
     {
       "path": "backend/app/packaging.py",
       "mode": "100644",
-      "blob_sha": "311daa7dd6c6d7c316ce215bd43a6238d939b3e9",
-      "size": 46118,
+      "blob_sha": "cb54240716deb2a78d317ce75936d52f0f0add97",
+      "size": 46421,
       "classification": "source"
     },
     {
       "path": "backend/app/parser.py",
       "mode": "100644",
-      "blob_sha": "04c68bb85756d31b624c18ebe4b533ad936c75d7",
-      "size": 21286,
+      "blob_sha": "34b338821b4b5957a6ebba302c30edf65a44c8f5",
+      "size": 24535,
       "classification": "source"
     },
     {
       "path": "backend/app/permissions.py",
       "mode": "100644",
-      "blob_sha": "13e15c9e31e8802c6e2f8c5da9e8f1402bda02b6",
-      "size": 4810,
+      "blob_sha": "7363c42510a8d0ed7f3f9160cdf059b82b75e932",
+      "size": 5108,
       "classification": "source"
     },
     {
@@ -719,15 +1223,22 @@
     {
       "path": "backend/app/portable_runtime.py",
       "mode": "100644",
-      "blob_sha": "703576171bee7ecdd35858565a502ad35bc7dffa",
-      "size": 10651,
+      "blob_sha": "f6689f7b09bb80030e553560b429f253e1a7274a",
+      "size": 13411,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/portable_runtime_source.py",
+      "mode": "100644",
+      "blob_sha": "1515945026fcf0232f769fa6e7c28787ffc19fd6",
+      "size": 28530,
       "classification": "source"
     },
     {
       "path": "backend/app/product_audit.py",
       "mode": "100644",
-      "blob_sha": "75d9ea46976e4f3a85d131462e031d0b9608196b",
-      "size": 29765,
+      "blob_sha": "861dfcdafb5ad3f5d9e58aea552c3ba35aea1517",
+      "size": 29868,
       "classification": "source"
     },
     {
@@ -738,17 +1249,38 @@
       "classification": "source"
     },
     {
+      "path": "backend/app/provenance.py",
+      "mode": "100644",
+      "blob_sha": "31b82175e48f6fc73ee9639a584e3a12c05f6798",
+      "size": 2443,
+      "classification": "source"
+    },
+    {
       "path": "backend/app/provider_recovery.py",
       "mode": "100644",
-      "blob_sha": "71e9c5c426085cf591f7c897a7b00e3225d48317",
-      "size": 3324,
+      "blob_sha": "51e3428558ead3121f4f90a22221f449ea9e2474",
+      "size": 7039,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/release_manifest.py",
+      "mode": "100644",
+      "blob_sha": "255495cea14901f25001aa44d74ba5a2dd4ba41e",
+      "size": 9202,
       "classification": "source"
     },
     {
       "path": "backend/app/release_receipts.py",
       "mode": "100644",
-      "blob_sha": "a6c74e536d1859f9b8cc9eddb88548fc10424411",
-      "size": 5900,
+      "blob_sha": "b5a3975646a574ac3da5780d2fe95654cb6d00e0",
+      "size": 6488,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/release_scope.py",
+      "mode": "100644",
+      "blob_sha": "becf7b4a5d7bed3800d56efff1a1f1f8f1ccfdef",
+      "size": 32437,
       "classification": "source"
     },
     {
@@ -789,15 +1321,22 @@
     {
       "path": "backend/app/retrieval_quality_certification.py",
       "mode": "100644",
-      "blob_sha": "7afa10f516db78028fce9c326fa3777a6ec16831",
-      "size": 9373,
+      "blob_sha": "539d5c5226c79cbd63b0cbdd3d50093bb9c6623f",
+      "size": 10204,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/retrieval_scale_benchmark.py",
+      "mode": "100644",
+      "blob_sha": "a5f66e6c76a70128b29990f23680c6fe820103fa",
+      "size": 19165,
       "classification": "source"
     },
     {
       "path": "backend/app/runtime_identity.py",
       "mode": "100644",
-      "blob_sha": "c443bc5d89f95c24ba418687f86a4562c93652b7",
-      "size": 2141,
+      "blob_sha": "2d4fb45a95459ecfe456f5d8d3bda5faf124bd25",
+      "size": 5020,
       "classification": "source"
     },
     {
@@ -810,8 +1349,15 @@
     {
       "path": "backend/app/security.py",
       "mode": "100644",
-      "blob_sha": "0939169916a8b3d57e039d5b03b571743913102f",
-      "size": 5356,
+      "blob_sha": "e44c2465ba704f6380c77ed35428facbda563c31",
+      "size": 5925,
+      "classification": "source"
+    },
+    {
+      "path": "backend/app/security_gates.py",
+      "mode": "100644",
+      "blob_sha": "af8a180183873da151958a414da557732395dfe6",
+      "size": 12270,
       "classification": "source"
     },
     {
@@ -838,8 +1384,8 @@
     {
       "path": "backend/app/services.py",
       "mode": "100644",
-      "blob_sha": "77b10aae95378e0fccf0053024714f7ed2a0b11d",
-      "size": 6403,
+      "blob_sha": "8b0532c75eb2bd91af745ffd13f8caa539f914ce",
+      "size": 9095,
       "classification": "source"
     },
     {
@@ -850,17 +1396,24 @@
       "classification": "source"
     },
     {
+      "path": "backend/app/tool_denominator.py",
+      "mode": "100644",
+      "blob_sha": "4c61a2b4864e04d98824a820853c576a0718dd62",
+      "size": 11074,
+      "classification": "source"
+    },
+    {
       "path": "backend/app/tools.py",
       "mode": "100644",
-      "blob_sha": "36c7b026a5ee3f67ca9bd866b05e584ae7ef784b",
-      "size": 21293,
+      "blob_sha": "8a84ea85cf3a1b02a6ac84045d2c58151789df0a",
+      "size": 32788,
       "classification": "source"
     },
     {
       "path": "backend/app/utils.py",
       "mode": "100644",
-      "blob_sha": "536f2c5ffe1e5decc741b40ff4f8541cb4060d65",
-      "size": 1624,
+      "blob_sha": "992b9fd3df9febb9efe4603445d6288107ec291b",
+      "size": 3589,
       "classification": "source"
     },
     {
@@ -878,10 +1431,17 @@
       "classification": "source"
     },
     {
+      "path": "backend/app/video_cli_parity.py",
+      "mode": "100644",
+      "blob_sha": "9285355d938f74c4c236c0624b54a44d213e34ea",
+      "size": 9207,
+      "classification": "source"
+    },
+    {
       "path": "backend/app/web_browsing.py",
       "mode": "100644",
-      "blob_sha": "93eb1c3735032b09dccb596e9bba13763891d6ad",
-      "size": 32051,
+      "blob_sha": "a38cb4be29037927b660348d823688071f6713c9",
+      "size": 36456,
       "classification": "source"
     },
     {
@@ -913,6 +1473,13 @@
       "classification": "source"
     },
     {
+      "path": "backend/app/work_runs.py",
+      "mode": "100644",
+      "blob_sha": "bac63a3036036c68158bdcd0df4c1a87bcfdbe99",
+      "size": 47308,
+      "classification": "source"
+    },
+    {
       "path": "backend/app/workspaces.py",
       "mode": "100644",
       "blob_sha": "73bdb860bb8719c631ba3ea4c3c54baf34a0578b",
@@ -922,15 +1489,15 @@
     {
       "path": "backend/requirements.txt",
       "mode": "100644",
-      "blob_sha": "f96a6ef60e33c2a6ca1ab15bdc1178cd09e085fd",
-      "size": 221,
+      "blob_sha": "2fcc043f3fd902cbf34c9c82d2c2357e10c4e744",
+      "size": 236,
       "classification": "other"
     },
     {
       "path": "backend/tests/fixtures/answer_trace_eval.json",
       "mode": "100644",
-      "blob_sha": "7d3dd1bb91d417424017a0bf04eb4cc140b3a9b4",
-      "size": 9142,
+      "blob_sha": "91853992f883915f2aa95cad161b195171be7d5d",
+      "size": 9181,
       "classification": "test"
     },
     {
@@ -969,6 +1536,48 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/fixtures/ocr_v1_representative/clean-english.pdf",
+      "mode": "100644",
+      "blob_sha": "3021da6217f19127af4ab7779a27c85f1176f4f4",
+      "size": 20444,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/ocr_v1_representative/clean-english.png",
+      "mode": "100644",
+      "blob_sha": "0e14525fa063843c2c587fa738ed8da90961ce9e",
+      "size": 19969,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/ocr_v1_representative/clean-spanish.png",
+      "mode": "100644",
+      "blob_sha": "13ef0b6c0991142a6d5006020fcc4e7b12d672c2",
+      "size": 13719,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/ocr_v1_representative/low-contrast.png",
+      "mode": "100644",
+      "blob_sha": "9c997a6c23351415c224badb86e597cb701ad500",
+      "size": 21048,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/ocr_v1_representative/multi-column.png",
+      "mode": "100644",
+      "blob_sha": "069988bd87e54a392066b30206738fce6cadaed1",
+      "size": 24078,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/fixtures/ocr_v1_representative/no-text.png",
+      "mode": "100644",
+      "blob_sha": "93c2638bedc7e3a5f1e399ad9c7296c318238c6b",
+      "size": 759,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/fixtures/retrieval_eval.json",
       "mode": "100644",
       "blob_sha": "1cd4fae30e819e64f463bab91b38b1d4d479b5c1",
@@ -992,22 +1601,43 @@
     {
       "path": "backend/tests/test_agent_checkpoint_process_recovery.py",
       "mode": "100644",
-      "blob_sha": "9ad00a5d120b8cdddeb3fc86ebeca0aad1e3ae8d",
-      "size": 5549,
+      "blob_sha": "3c92bb5cdcb4fd2bcf9be7ab40da90c34472069e",
+      "size": 5568,
       "classification": "test"
     },
     {
       "path": "backend/tests/test_agent_checkpoints.py",
       "mode": "100644",
-      "blob_sha": "683a6926bbd82dfd42cdeecc95994e93826bbdc6",
-      "size": 2792,
+      "blob_sha": "b42961233c0f9f3c06e9124d6f8a7622195388ea",
+      "size": 16196,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_anthropic_streaming.py",
+      "mode": "100644",
+      "blob_sha": "f51734190d8a7a9ae7cf4e2fd549062448fbbba3",
+      "size": 12237,
       "classification": "test"
     },
     {
       "path": "backend/tests/test_api.py",
       "mode": "100644",
-      "blob_sha": "738387f59c8e700c2e250e9ccc5f8e54dd008e59",
-      "size": 21482,
+      "blob_sha": "d224d9496df49794530bb2c042bd9cba19002b38",
+      "size": 21511,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_api_auth_boundary.py",
+      "mode": "100644",
+      "blob_sha": "95c840f34217330da4923cd5468d8bf795ad17ad",
+      "size": 3267,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_api_version_contract.py",
+      "mode": "100644",
+      "blob_sha": "80a95738c5489fb3f3d6f0b74f87f23a21947d82",
+      "size": 752,
       "classification": "test"
     },
     {
@@ -1018,10 +1648,17 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/test_bootstrap.py",
+      "mode": "100644",
+      "blob_sha": "b115ac39890979877d78e3e55a075ee366b50557",
+      "size": 2667,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/test_capability_contracts.py",
       "mode": "100644",
-      "blob_sha": "739b6a2f201b60dad6ec265c2d9f79b4c869b133",
-      "size": 22056,
+      "blob_sha": "ab8a5b9eddbf6eea1c5b75ecc0806dccbec24c6e",
+      "size": 31703,
       "classification": "test"
     },
     {
@@ -1048,15 +1685,15 @@
     {
       "path": "backend/tests/test_clean_machine_macos.py",
       "mode": "100644",
-      "blob_sha": "4c8d377d27e9c354dfbad572c25388c735e17b0e",
-      "size": 3031,
+      "blob_sha": "dbf7c6785e662f9994e9879313a509ee2e1244a6",
+      "size": 6719,
       "classification": "test"
     },
     {
       "path": "backend/tests/test_cli.py",
       "mode": "100644",
-      "blob_sha": "877781e7c15567a39a1d117bbf2c94373b9c5524",
-      "size": 236996,
+      "blob_sha": "527e2878d9b7cae4b700b4315c01511c9c7dc0d1",
+      "size": 250508,
       "classification": "test"
     },
     {
@@ -1167,8 +1804,8 @@
     {
       "path": "backend/tests/test_config.py",
       "mode": "100644",
-      "blob_sha": "2e11478e2f26e305d66ac4474cf20114f8b58e66",
-      "size": 706,
+      "blob_sha": "1b0dd383fd10af9bf566435084b13a9fefae4666",
+      "size": 3448,
       "classification": "test"
     },
     {
@@ -1181,8 +1818,8 @@
     {
       "path": "backend/tests/test_context_rehydration.py",
       "mode": "100644",
-      "blob_sha": "8fd43b13ab98f0d641b40999c68eb7ac2200b8c6",
-      "size": 3179,
+      "blob_sha": "bc2c8e7e171aa2c86baaf2486d95fb8cae039363",
+      "size": 4666,
       "classification": "test"
     },
     {
@@ -1193,10 +1830,38 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/test_contracts.py",
+      "mode": "100644",
+      "blob_sha": "79301e4ec7f55fa152703e1864cb4d9b9e854dab",
+      "size": 16417,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_conversation_organization.py",
+      "mode": "100644",
+      "blob_sha": "504644027976dfb8ff74826308f89929f84f57d6",
+      "size": 9861,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_db_upgrade.py",
+      "mode": "100644",
+      "blob_sha": "4f2396b5de96c7ef0a4bf26a024a796ea55e0552",
+      "size": 4234,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/test_denominator_audit.py",
       "mode": "100644",
-      "blob_sha": "35b24971fb119a0bcd01983537301ee45f26cffb",
-      "size": 4608,
+      "blob_sha": "58a38a2275edc8672227e23a888432af51f4c400",
+      "size": 4858,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_desktop_shell.py",
+      "mode": "100644",
+      "blob_sha": "2934d76b6df09c14ab13382712bb30269f64087c",
+      "size": 9807,
       "classification": "test"
     },
     {
@@ -1204,6 +1869,13 @@
       "mode": "100644",
       "blob_sha": "b58bbcbb713966e1b37b0e1a158b7d3f2870ab54",
       "size": 2498,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_env_file.py",
+      "mode": "100644",
+      "blob_sha": "7e62fad607becb38458195333fc7e23d256dd55d",
+      "size": 1534,
       "classification": "test"
     },
     {
@@ -1223,15 +1895,15 @@
     {
       "path": "backend/tests/test_exports.py",
       "mode": "100644",
-      "blob_sha": "6ba1832b3de3640da18eb403376ca02c672c72cb",
-      "size": 1180,
+      "blob_sha": "8187ea794081a4d2e4bfdb66a02fa2389fc34a81",
+      "size": 3421,
       "classification": "test"
     },
     {
       "path": "backend/tests/test_flagpole_inventory.py",
       "mode": "100644",
-      "blob_sha": "b3df14adbfe87151a7acbd95f56bd129601ad03e",
-      "size": 6729,
+      "blob_sha": "25faae05aed3ad870dea02e58386106070281a90",
+      "size": 10158,
       "classification": "test"
     },
     {
@@ -1293,8 +1965,8 @@
     {
       "path": "backend/tests/test_gis_raster.py",
       "mode": "100644",
-      "blob_sha": "b6a661f01a3646b180d4efbc3754c9ba0855dd53",
-      "size": 16841,
+      "blob_sha": "44fd53e5c2a5b0912abc73c49888985036fe4699",
+      "size": 17727,
       "classification": "test"
     },
     {
@@ -1340,6 +2012,13 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/test_ingestion_safety.py",
+      "mode": "100644",
+      "blob_sha": "56695d3dbe3492fe84524c0e6af7a038902e6961",
+      "size": 14426,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/test_intelligence_plane.py",
       "mode": "100644",
       "blob_sha": "9aa8908bd61fd97455bf340256b558298d35a6ee",
@@ -1349,8 +2028,22 @@
     {
       "path": "backend/tests/test_launch_app.py",
       "mode": "100644",
-      "blob_sha": "8ded2912140805f871073a56c00179c40faa13e9",
-      "size": 22388,
+      "blob_sha": "9df7114795fb11a5eb1d28778089f2130b55c625",
+      "size": 32266,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_local_model.py",
+      "mode": "100644",
+      "blob_sha": "c35d83142d8459392d749a9dc28fd8525afe096b",
+      "size": 16285,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_local_tools.py",
+      "mode": "100644",
+      "blob_sha": "dbc8d74bf5aeb1a1d26c2ef7812db1cb86c4bb1a",
+      "size": 6164,
       "classification": "test"
     },
     {
@@ -1375,6 +2068,13 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/test_macos_packaging.py",
+      "mode": "100644",
+      "blob_sha": "06747f7d81637d81bc285c0fd0363636980a7a06",
+      "size": 5565,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/test_memory_policy.py",
       "mode": "100644",
       "blob_sha": "abb615611583eb9caf68a7dd822c0c74b97e130c",
@@ -1382,10 +2082,17 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/test_message_edits.py",
+      "mode": "100644",
+      "blob_sha": "6627fee42b8ceecfde70d7f4cd20dca7e2f3769b",
+      "size": 6842,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/test_mock_model.py",
       "mode": "100644",
-      "blob_sha": "afc4cb4556b4aaf2940101748a5d6d6e01dea830",
-      "size": 3792,
+      "blob_sha": "5e2b29574d04183498b03041916c7fb2a59ef150",
+      "size": 3819,
       "classification": "test"
     },
     {
@@ -1396,17 +2103,38 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/test_native_launch.py",
+      "mode": "100644",
+      "blob_sha": "a1afd433f335a004839d538eecd75125f65f25ed",
+      "size": 8069,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_ocr08_structure_live_cert.py",
+      "mode": "100644",
+      "blob_sha": "f1dd4133c65a3fb0dcfe1cc23b7a553397b0ed44",
+      "size": 242,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/test_ocr_analysis.py",
       "mode": "100644",
-      "blob_sha": "7c4c500385812e105c746cc6a6c497ed544c8a8c",
-      "size": 5772,
+      "blob_sha": "b9604c46d2326887382bf40be1fccc915a7d4ba3",
+      "size": 6686,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_ocr_corpus_eval.py",
+      "mode": "100644",
+      "blob_sha": "ff7f2b7fa7ace40ef9e43a4d38c314fe30034534",
+      "size": 3896,
       "classification": "test"
     },
     {
       "path": "backend/tests/test_ocr_corpus_evidence.py",
       "mode": "100644",
-      "blob_sha": "37d26599640cdb7c2890b65d47d6c2805baebb66",
-      "size": 3898,
+      "blob_sha": "907a8a1bcd1015d6585899ee1beb5990335ed51c",
+      "size": 6443,
       "classification": "test"
     },
     {
@@ -1426,8 +2154,15 @@
     {
       "path": "backend/tests/test_ocr_pdf.py",
       "mode": "100644",
-      "blob_sha": "e5d37ddece451f97a33c0e01245904fc45517fa4",
-      "size": 4774,
+      "blob_sha": "5216208ab827baf06a339c30e6d96c0e556c2fa9",
+      "size": 5885,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_ocr_structure.py",
+      "mode": "100644",
+      "blob_sha": "8ad8b5d0f23e6b80010056cabb6aa2124d0aa09f",
+      "size": 12509,
       "classification": "test"
     },
     {
@@ -1435,6 +2170,13 @@
       "mode": "100644",
       "blob_sha": "e559c01106d0c5c0a1ba165fa5fa07443b06a2c8",
       "size": 1107,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_one_click.py",
+      "mode": "100644",
+      "blob_sha": "4b2c2d445ae40749945950b4876c6c4591ab5322",
+      "size": 27409,
       "classification": "test"
     },
     {
@@ -1452,17 +2194,31 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/test_phone_access.py",
+      "mode": "100644",
+      "blob_sha": "98cc1a27d452258926af77df08ff2457456fe0bd",
+      "size": 21458,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/test_portable_install.py",
       "mode": "100644",
-      "blob_sha": "0a4b1a07730df451389cbbec3644cb7a000df64a",
-      "size": 2856,
+      "blob_sha": "6fb83e4563063a677a845a56dc6eec029a0a2cb4",
+      "size": 3005,
       "classification": "test"
     },
     {
       "path": "backend/tests/test_portable_runtime.py",
       "mode": "100644",
-      "blob_sha": "1655f01d9cb4261f95b240697cc3079a9f1198ec",
-      "size": 3200,
+      "blob_sha": "161603a193a1c296a2157bcd2ea7d5fb4b2f137c",
+      "size": 5698,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_portable_runtime_source.py",
+      "mode": "100644",
+      "blob_sha": "aa25ce8919b44f2589ff1c93001dfc320d81099d",
+      "size": 7903,
       "classification": "test"
     },
     {
@@ -1473,6 +2229,20 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/test_prompt_injection.py",
+      "mode": "100644",
+      "blob_sha": "45723a8928cc25d61a7b9b6809a68c768113b267",
+      "size": 7687,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_provider_attempt_identity.py",
+      "mode": "100644",
+      "blob_sha": "573cbea8b8d114333cea8c31fe3d88f4903ac2e7",
+      "size": 9223,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/test_provider_recovery.py",
       "mode": "100644",
       "blob_sha": "7d71c0fac127c1b0fa55e58318c9df3a1829e342",
@@ -1480,10 +2250,31 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/test_python_locks.py",
+      "mode": "100644",
+      "blob_sha": "a3b38680ba4bfb6437bd916518ef7e01d022e3a3",
+      "size": 4120,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/test_release_grade_certification.py",
       "mode": "100644",
-      "blob_sha": "1617233c1782f151fa61c5069f31df0d323a26e3",
-      "size": 1746,
+      "blob_sha": "dceb7e85325fb07b3ed21b36542a3352b3d22fd2",
+      "size": 11782,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_release_receipts.py",
+      "mode": "100644",
+      "blob_sha": "6366c77e5beba1d98efe73dc2a7ff6f5aa0d0c0b",
+      "size": 1638,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_release_scope.py",
+      "mode": "100644",
+      "blob_sha": "0ebeb5de178cdfa43aa49f123562958c92c93ef4",
+      "size": 20422,
       "classification": "test"
     },
     {
@@ -1515,10 +2306,24 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/test_retrieval_scale_benchmark.py",
+      "mode": "100644",
+      "blob_sha": "12c766465454cff2e81a71992cdbf1bd59b545da",
+      "size": 7150,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_rt09_real_world_corpus.py",
+      "mode": "100644",
+      "blob_sha": "299ee56d97329824e645bcdf531e82be018ff196",
+      "size": 1416,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/test_runtime_identity.py",
       "mode": "100644",
-      "blob_sha": "b22faa4cc8dcd38bb00bf8ea49f3dd32bc8a0e95",
-      "size": 2388,
+      "blob_sha": "6e6a110b00a9d494dafc9a272c2bee8679be4ee0",
+      "size": 4137,
       "classification": "test"
     },
     {
@@ -1533,6 +2338,13 @@
       "mode": "100644",
       "blob_sha": "7d55ad64abefa3f2f7257a7f1d17c84a7099a279",
       "size": 4350,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_security_gates.py",
+      "mode": "100644",
+      "blob_sha": "33138a3ea5b42da265d0d81dcb63eb2acdd20124",
+      "size": 5648,
       "classification": "test"
     },
     {
@@ -1552,8 +2364,29 @@
     {
       "path": "backend/tests/test_services.py",
       "mode": "100644",
-      "blob_sha": "7b3e98a9ac5ba05baa3dbab40a74c4fb5c6cc294",
-      "size": 9580,
+      "blob_sha": "4fff9a30814f075bc0d5b2a6d0ef48f9b628a4fb",
+      "size": 11141,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_shadow_baseline.py",
+      "mode": "100644",
+      "blob_sha": "671f1b24f575fb35c555790cd9d96018cbe61930",
+      "size": 3379,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_shadow_evidence.py",
+      "mode": "100644",
+      "blob_sha": "1a28300b635f27ceb22a41a65d0a6f24cb5944b6",
+      "size": 5513,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_shadow_qa.py",
+      "mode": "100644",
+      "blob_sha": "e5b69920924cec4239d0eb3f10d47ddbb2777db2",
+      "size": 2174,
       "classification": "test"
     },
     {
@@ -1571,10 +2404,31 @@
       "classification": "test"
     },
     {
+      "path": "backend/tests/test_tool_denominator.py",
+      "mode": "100644",
+      "blob_sha": "c2e493560fb4ca09820a39c8feef8f47e3ac90d3",
+      "size": 6843,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_tool_runtime_integrity.py",
+      "mode": "100644",
+      "blob_sha": "8fbd6f4463c3148628ca3f441307c0ee36826244",
+      "size": 11280,
+      "classification": "test"
+    },
+    {
       "path": "backend/tests/test_tools.py",
       "mode": "100644",
-      "blob_sha": "b2034009dde4ccfaa867be58abd07b730fd32ca0",
-      "size": 9488,
+      "blob_sha": "0b7fa8902eb282d0bdcf83bbb8e66a36f5812690",
+      "size": 11753,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_video_cli_parity.py",
+      "mode": "100644",
+      "blob_sha": "9414403f115f7ae15c0fe2bc5dcb975d9d1ba184",
+      "size": 3698,
       "classification": "test"
     },
     {
@@ -1587,8 +2441,8 @@
     {
       "path": "backend/tests/test_web_browsing.py",
       "mode": "100644",
-      "blob_sha": "d104c610970dd6af563f34adfd6c88d3ca81f594",
-      "size": 21211,
+      "blob_sha": "291c05e61d54e67b9a4833702864669eb0b7bdd6",
+      "size": 22442,
       "classification": "test"
     },
     {
@@ -1601,8 +2455,8 @@
     {
       "path": "backend/tests/test_web_render.py",
       "mode": "100644",
-      "blob_sha": "ea8d54a6fa1bb4ea1f00b194ef043682855cb125",
-      "size": 3522,
+      "blob_sha": "481dbfbba3249d8f547a3b2efeb72809ad89d09d",
+      "size": 4122,
       "classification": "test"
     },
     {
@@ -1624,6 +2478,27 @@
       "mode": "100644",
       "blob_sha": "a5d27d19c59630006213f3c34bd96cc98b223907",
       "size": 6808,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_windows_launcher.py",
+      "mode": "100644",
+      "blob_sha": "d3eba718aca3724b54520636231ba1d62ab12cdd",
+      "size": 4720,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_windows_native.py",
+      "mode": "100644",
+      "blob_sha": "560750057a55ee9718eccd555959a00fb15a3845",
+      "size": 7068,
+      "classification": "test"
+    },
+    {
+      "path": "backend/tests/test_work_runs.py",
+      "mode": "100644",
+      "blob_sha": "a5de468a76e8bbd272ad9fba40cdfa90d2f614dd",
+      "size": 26085,
       "classification": "test"
     },
     {
@@ -1678,8 +2553,8 @@
     {
       "path": "docs/APPLE_APP_STORE_SECURITY.md",
       "mode": "100644",
-      "blob_sha": "63d0d9b50ca5dcdcc299c6060122f955acd8faeb",
-      "size": 7307,
+      "blob_sha": "f686d4e17463ba8f199ff68cfcb2bfba3d7a17db",
+      "size": 10661,
       "classification": "documentation"
     },
     {
@@ -1690,17 +2565,24 @@
       "classification": "documentation"
     },
     {
+      "path": "docs/BLOCKERS_AND_UNBLOCK_PLAN_2026-09-28.md",
+      "mode": "100644",
+      "blob_sha": "68dba7a221155b34d35c78aee2a01bfdde1121fa",
+      "size": 8964,
+      "classification": "documentation"
+    },
+    {
       "path": "docs/CERTIFICATION.md",
       "mode": "100644",
-      "blob_sha": "a183d589fcd79f7ebf5bc2e0ff5b9dc23c0280ee",
-      "size": 8433,
+      "blob_sha": "e4aa799ed805f624f1c9756ea430740f9d62e5a6",
+      "size": 9791,
       "classification": "documentation"
     },
     {
       "path": "docs/CLI.md",
       "mode": "100644",
-      "blob_sha": "1dfbb237c6f4e2d2c78fe6a61b802ecbeb4661fe",
-      "size": 89721,
+      "blob_sha": "99dc1503a20b209a97c25778f2a2c00d3865e9f8",
+      "size": 96566,
       "classification": "documentation"
     },
     {
@@ -1781,17 +2663,24 @@
       "classification": "documentation"
     },
     {
+      "path": "docs/CONVERSATION_ORGANIZATION.md",
+      "mode": "100644",
+      "blob_sha": "4bfb95b1c7ea8f2bca9d1a021c5fd3be6a7f3fe0",
+      "size": 5807,
+      "classification": "documentation"
+    },
+    {
       "path": "docs/DESKTOP_LAUNCHER.md",
       "mode": "100644",
-      "blob_sha": "7546e5737a6f224db3565c347b0abd4482b46617",
-      "size": 2221,
+      "blob_sha": "d82fc6c39ece7c8404f70a690ec68cf59de73bfe",
+      "size": 4020,
       "classification": "documentation"
     },
     {
       "path": "docs/DEVELOPMENT_GOAL.md",
       "mode": "100644",
-      "blob_sha": "f49fcb8c8a51376a74ce0b88570045b703f94b9a",
-      "size": 14627,
+      "blob_sha": "ed75318c305d71911af6883569814aa136e8d157",
+      "size": 15068,
       "classification": "documentation"
     },
     {
@@ -1818,8 +2707,8 @@
     {
       "path": "docs/FIRST_RUN.md",
       "mode": "100644",
-      "blob_sha": "aede93239ad8e6f5ef00274f4a57fc503fee7fbf",
-      "size": 2877,
+      "blob_sha": "ef90cae3e35853b47635ac5105da20d77cb00f1c",
+      "size": 6283,
       "classification": "documentation"
     },
     {
@@ -1853,36 +2742,57 @@
     {
       "path": "docs/MUCARO_V1_DENOMINATOR_AUDIT.md",
       "mode": "100644",
-      "blob_sha": "5b2be8f8271862a02b6ae4a3f725242e467e582c",
-      "size": 8375,
+      "blob_sha": "1b01677d76fd8ab378f9867bac7d94dae1b5641c",
+      "size": 9483,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/ONE_CLICK_SETUP.md",
+      "mode": "100644",
+      "blob_sha": "2eaeafba75516f761e541ba9689bd3d0c248de45",
+      "size": 17322,
       "classification": "documentation"
     },
     {
       "path": "docs/PACKAGING_POLICY.md",
       "mode": "100644",
-      "blob_sha": "c350437063205777752a800a0a6240f560770b93",
-      "size": 7831,
+      "blob_sha": "5ab9ba779bb40e1d4b8978c8c9f8ad9a987f86de",
+      "size": 10036,
       "classification": "documentation"
     },
     {
       "path": "docs/PHASE2_QUEUE.md",
       "mode": "100644",
-      "blob_sha": "1401aeb23630a7dfa53399518af4b4daed930252",
-      "size": 9495,
+      "blob_sha": "ddb16573700e8604695e65bd2d4018ff27894c4f",
+      "size": 9639,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/PHONE_ACCESS.md",
+      "mode": "100644",
+      "blob_sha": "92c14aaa7e5d85892daad578f4466938c253a961",
+      "size": 7911,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/RELEASE_SCOPE_2026-09-29.md",
+      "mode": "100644",
+      "blob_sha": "ca19784e9bdd23aa8b7fe3fa049ca13c1589c074",
+      "size": 2610,
       "classification": "documentation"
     },
     {
       "path": "docs/RELEASE_STATUS.md",
       "mode": "100644",
-      "blob_sha": "e9466606446487f64d0f2320d1bca637d22c2b1e",
-      "size": 33590,
+      "blob_sha": "cc57d599358d871cc8d339cfb419f5f695d80ef0",
+      "size": 35159,
       "classification": "documentation"
     },
     {
       "path": "docs/RESPONSE_FLOW.md",
       "mode": "100644",
-      "blob_sha": "5818b63f3843785833c68a94b77279e808e1f177",
-      "size": 6935,
+      "blob_sha": "1c58df59e63290bb3989810b1a6768453c52de84",
+      "size": 7129,
       "classification": "documentation"
     },
     {
@@ -1893,6 +2803,13 @@
       "classification": "documentation"
     },
     {
+      "path": "docs/RUNTIME_INDEPENDENCE.md",
+      "mode": "100644",
+      "blob_sha": "017b226888f2df82b592fcc3bef2a9a0d6e8e130",
+      "size": 6312,
+      "classification": "documentation"
+    },
+    {
       "path": "docs/SCHEMA_LOCK.md",
       "mode": "100644",
       "blob_sha": "9118bda81a78bf951d5ac148760045033c38b616",
@@ -1900,10 +2817,80 @@
       "classification": "documentation"
     },
     {
+      "path": "docs/SHADOW_QA.md",
+      "mode": "100644",
+      "blob_sha": "7e7c2fa993cea77c8edd8ba33e63a65f94cc93ea",
+      "size": 8703,
+      "classification": "documentation"
+    },
+    {
       "path": "docs/SOURCE_LINEAGE.md",
       "mode": "100644",
       "blob_sha": "89c91111b0be5686a682031fc20d2b7d3aaef3bd",
       "size": 3176,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/UX_SETUP_IOS_AUDIT.md",
+      "mode": "100644",
+      "blob_sha": "b1b2aed2aac16398053193787e1f520e15951dd8",
+      "size": 22103,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/VIDEO_CLI_PARITY_V1.md",
+      "mode": "100644",
+      "blob_sha": "82ad385815fb77eae285f73631819709f00257aa",
+      "size": 3979,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/release/MACOS_APP.md",
+      "mode": "100644",
+      "blob_sha": "79918ca2a3684a93047c5e67ad8e5b7f98a2a6a7",
+      "size": 5309,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/release/MOBILE_INTERACTION_EXTRACTION_V1.md",
+      "mode": "100644",
+      "blob_sha": "57ff38041e377fbd6f8a929fe6cfc1b9c6edcc63",
+      "size": 11809,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/release/MUCARO_RELEASE_ENGINEERING_CONTRACT_V1.md",
+      "mode": "100644",
+      "blob_sha": "3278597aa11fcdbc423b894bb3119f93d03956ad",
+      "size": 45208,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/release/RELEASE_CERT_AUDIT_2026-09-29.md",
+      "mode": "100644",
+      "blob_sha": "5a82ca5bc7307adc4af43ea89450437333cfa1d3",
+      "size": 18850,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/release/RELEASE_ENGINEERING_STATE.md",
+      "mode": "100644",
+      "blob_sha": "894a29e56539150c7d12d7e266e57468484302dd",
+      "size": 6311,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/release/SECURITY_GATES.md",
+      "mode": "100644",
+      "blob_sha": "919f3b9db28f1a6e6fbfc45484599f0a5c2f9d51",
+      "size": 3926,
+      "classification": "documentation"
+    },
+    {
+      "path": "docs/release/UI_ACCESSIBILITY.md",
+      "mode": "100644",
+      "blob_sha": "d35a4a9b4b4eef67feb8846a2222f454017140e4",
+      "size": 3446,
       "classification": "documentation"
     },
     {
@@ -1916,14 +2903,14 @@
     {
       "path": "frontend/index.html",
       "mode": "100644",
-      "blob_sha": "845057f00c2bf1c17f85af9063575c36128c3f25",
-      "size": 295,
+      "blob_sha": "d81c473bc56188a568a7af6e8a95d0ded799fb1e",
+      "size": 945,
       "classification": "source"
     },
     {
       "path": "frontend/package-lock.json",
       "mode": "100644",
-      "blob_sha": "b569a738597692706d126630bc4991b2fdd0a5f0",
+      "blob_sha": "ed9559a59a3a670c55fe73cf639c99f7445a6d29",
       "size": 56751,
       "classification": "configuration"
     },
@@ -1935,39 +2922,228 @@
       "classification": "configuration"
     },
     {
+      "path": "frontend/public/favicon.png",
+      "mode": "100644",
+      "blob_sha": "0d5b6543cab65617898fe4bca5d25bb6d583ad81",
+      "size": 127083,
+      "classification": "other"
+    },
+    {
       "path": "frontend/src/App.jsx",
       "mode": "100644",
-      "blob_sha": "6ca7d6ac522009bd7144e389a85f1462d4d973f4",
-      "size": 19990,
+      "blob_sha": "f9fefacc1d1cbf0bd8e3b5dd7208f648018d4367",
+      "size": 12638,
       "classification": "source"
     },
     {
       "path": "frontend/src/api.js",
       "mode": "100644",
-      "blob_sha": "7d2c3cd4589463cbd8812fcbff394e2434b69c6d",
-      "size": 4616,
+      "blob_sha": "5e8062f860a40ac96f3c10696b521ce64bc71d2f",
+      "size": 13842,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/clipboard.js",
+      "mode": "100644",
+      "blob_sha": "ccc234307fcf03d7a79169093767f675877b303f",
+      "size": 2076,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/ChatView.jsx",
+      "mode": "100644",
+      "blob_sha": "5941ab837daf5d0e2cd549aa4685492bf60a5910",
+      "size": 21380,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/CleartextNotice.jsx",
+      "mode": "100644",
+      "blob_sha": "4443d908941f11f87b7b8b671d933bf2faf759d8",
+      "size": 878,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/Composer.jsx",
+      "mode": "100644",
+      "blob_sha": "87307535db109833f46496026ea8de081bd35874",
+      "size": 6704,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/ConfirmSheet.jsx",
+      "mode": "100644",
+      "blob_sha": "a72633fdc7c5f97b4e21bf321a422cd6ebc6ad74",
+      "size": 1338,
       "classification": "source"
     },
     {
       "path": "frontend/src/components/DirectoryIntake.jsx",
       "mode": "100644",
-      "blob_sha": "0913994e829eaccca09bce52d254e17b10aad8d2",
-      "size": 6402,
+      "blob_sha": "a3bd2187aff9c44c89a0df26925f3ced30df57c9",
+      "size": 7160,
       "classification": "source"
     },
     {
-      "path": "frontend/src/components/PlanningGate.jsx",
+      "path": "frontend/src/components/EvidencePanel.jsx",
       "mode": "100644",
-      "blob_sha": "7854896bb7d4d9267ab8704c24080467444c136b",
-      "size": 2111,
+      "blob_sha": "65d38163949dd5e5c873d7871f435e58d8de56dc",
+      "size": 2854,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/Icons.jsx",
+      "mode": "100644",
+      "blob_sha": "e12fe9a6cf1c9bdb4ff6a896b231246c455ee123",
+      "size": 1709,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/MessageActions.jsx",
+      "mode": "100644",
+      "blob_sha": "33edda13551e75b9e775c3afb3caf21d661d2a6b",
+      "size": 9706,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/RichText.jsx",
+      "mode": "100644",
+      "blob_sha": "866a6173ec65a08ebb733ca8cbaa6b72e7c68cfc",
+      "size": 1442,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/RunBlock.jsx",
+      "mode": "100644",
+      "blob_sha": "d261df0ec8f22959688b5ba19563a5ea9263a88d",
+      "size": 12490,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/Sheet.jsx",
+      "mode": "100644",
+      "blob_sha": "b6cb94bd2f4da3fb78710b5670a3e2be381a158a",
+      "size": 2991,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/TasksDrawer.jsx",
+      "mode": "100644",
+      "blob_sha": "ffd81099d3bbb526c88fbd81f23e3e1af2dcc5cf",
+      "size": 3380,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/TokenGate.jsx",
+      "mode": "100644",
+      "blob_sha": "dc7346620a61c6352414fb1d78da6d1ea6e49fdb",
+      "size": 3985,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/workspaces/MemoryWorkspace.jsx",
+      "mode": "100644",
+      "blob_sha": "9b5a60d7885d35739a1a21c5b7719b13e3221c4c",
+      "size": 3665,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/workspaces/ProvenanceWorkspace.jsx",
+      "mode": "100644",
+      "blob_sha": "9b1712444646745a31cefe14a2ed638dca5d9436",
+      "size": 2802,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+      "mode": "100644",
+      "blob_sha": "da7836647376cc83f16478223725e7697d4d3da6",
+      "size": 4953,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/components/workspaces/SourcesWorkspace.jsx",
+      "mode": "100644",
+      "blob_sha": "0fcc26622ee8231f1181931648334524d3735cb4",
+      "size": 5766,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/feed.js",
+      "mode": "100644",
+      "blob_sha": "65f6254e02a0e0259ed5d3630bdb0240592cc30a",
+      "size": 4486,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/files.js",
+      "mode": "100644",
+      "blob_sha": "91d5e1d3d0392251d52b8fffa0ca4090890b0da0",
+      "size": 4754,
+      "classification": "source"
+    },
+    {
+      "path": "frontend/src/main.jsx",
+      "mode": "100644",
+      "blob_sha": "78c0e05d2b00a8e971fca21460e5b6a5552bb2cb",
+      "size": 242,
       "classification": "source"
     },
     {
       "path": "frontend/src/styles.css",
       "mode": "100644",
-      "blob_sha": "5ec74a77e949acbc8cf1561717fb9cbcda3ced4a",
-      "size": 10092,
+      "blob_sha": "eacd8dfc50ac64926d0db6a7e52c168de1bafcb9",
+      "size": 20458,
       "classification": "source"
+    },
+    {
+      "path": "frontend/vite.config.js",
+      "mode": "100644",
+      "blob_sha": "850f4e1b8dc2abd738a8c6b3fab29e0f654c8ab0",
+      "size": 847,
+      "classification": "source"
+    },
+    {
+      "path": "packaging/icons/mucaro.ico",
+      "mode": "100644",
+      "blob_sha": "f5dd59fcebdde2a8354364328588c2c7981ef7a5",
+      "size": 188906,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/launchers/build-requirements.txt",
+      "mode": "100644",
+      "blob_sha": "59b5ca086f736e956ff60b84e5466b7066aa5c31",
+      "size": 435,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/launchers/windows/BUILD_SHA256",
+      "mode": "100644",
+      "blob_sha": "c5723dea08a879464fe7644e9fa151134e8b1234",
+      "size": 80,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/launchers/windows/mucaro_launcher.c",
+      "mode": "100644",
+      "blob_sha": "72ac81940e1327ff09a0a39e103ff41aebb4877b",
+      "size": 3580,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/launchers/windows/mucaro_launcher.manifest",
+      "mode": "100644",
+      "blob_sha": "4b40005e8787f9125e71e9a2878cf5905752b783",
+      "size": 743,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/launchers/windows/mucaro_launcher.rc",
+      "mode": "100644",
+      "blob_sha": "8a9490664714aed4448bf6204357019a15fbf100",
+      "size": 845,
+      "classification": "other"
     },
     {
       "path": "packaging/macos/MucaroAI-AppStore.entitlements",
@@ -1984,24 +3160,122 @@
       "classification": "other"
     },
     {
+      "path": "packaging/macos/desktop_entry.py",
+      "mode": "100644",
+      "blob_sha": "c4c14330850bce4c19f0e62c80e3eb42a0cd15ed",
+      "size": 771,
+      "classification": "source"
+    },
+    {
+      "path": "packaging/macos/mucaro.spec",
+      "mode": "100644",
+      "blob_sha": "0a4fe0166cf21c51ca3c29c8ee9b9ba737c03b9c",
+      "size": 3291,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/macos/requirements-macos-arm64.in",
+      "mode": "100644",
+      "blob_sha": "0c20b293238096a7e1594fb021f7d3c6e050347c",
+      "size": 640,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/macos/requirements-macos-arm64.lock",
+      "mode": "100644",
+      "blob_sha": "de3011609727c87d5924d714002d6490834654b0",
+      "size": 51745,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/one_click/build-requirements.in",
+      "mode": "100644",
+      "blob_sha": "5599aeb6775440e9cfbbdb21e74b3763d78a8adc",
+      "size": 204,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/one_click/requirements-aarch64-apple-darwin.lock",
+      "mode": "100644",
+      "blob_sha": "0a5fadae3009fb3538dda84530aed1a4e2e1b6bb",
+      "size": 94427,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/one_click/requirements-x86_64-apple-darwin.lock",
+      "mode": "100644",
+      "blob_sha": "0a5fadae3009fb3538dda84530aed1a4e2e1b6bb",
+      "size": 94427,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/one_click/requirements-x86_64-pc-windows-msvc.lock",
+      "mode": "100644",
+      "blob_sha": "e0755df6fb04557c5b4740359585621aaf086faf",
+      "size": 98787,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/one_click/requirements-x86_64-unknown-linux-gnu.lock",
+      "mode": "100644",
+      "blob_sha": "6f0d81d6ebfa6aa8232980de32e9f007511abbd0",
+      "size": 88780,
+      "classification": "other"
+    },
+    {
+      "path": "packaging/runtime/macos-x86_64.json",
+      "mode": "100644",
+      "blob_sha": "3cbd3f448034fc3ebc6e04b56239e992034644e7",
+      "size": 1443,
+      "classification": "data"
+    },
+    {
+      "path": "packaging/runtime/requirements-macos-x86_64.lock",
+      "mode": "100644",
+      "blob_sha": "0380fbb5a95f1e41049752a5df92c5b8006236d2",
+      "size": 41794,
+      "classification": "other"
+    },
+    {
       "path": "pyproject.toml",
       "mode": "100644",
-      "blob_sha": "2b2acecb5ea27fafb961c15bea0e189ea2dcb239",
-      "size": 1054,
+      "blob_sha": "507a425b7d6a9af23669b7fb0a5492ca9b2655a6",
+      "size": 1270,
       "classification": "configuration"
+    },
+    {
+      "path": "qa/rendered/package-lock.json",
+      "mode": "100644",
+      "blob_sha": "8d6baba9035cf3e98d43afb9b3a4b551b14181c0",
+      "size": 3104,
+      "classification": "configuration"
+    },
+    {
+      "path": "qa/rendered/package.json",
+      "mode": "100644",
+      "blob_sha": "01521ea58d126cdff107a340a3999750049581fc",
+      "size": 347,
+      "classification": "configuration"
+    },
+    {
+      "path": "qa/rendered/rendered_qa.mjs",
+      "mode": "100644",
+      "blob_sha": "626dd1d852dd1c72da9d4194e158698c4bdf6368",
+      "size": 92610,
+      "classification": "other"
     },
     {
       "path": "schemas/agent_checkpoint.schema.json",
       "mode": "100644",
-      "blob_sha": "cb9fe49810bb06c1a018012c948657f0ed83bf97",
-      "size": 2066,
+      "blob_sha": "f941c9c840be3f66a7f23eeb328c2659a939f4f7",
+      "size": 2437,
       "classification": "schema"
     },
     {
       "path": "schemas/answer_trace.schema.json",
       "mode": "100644",
-      "blob_sha": "0456df5346a8a4995ae686adbc60125d89500dad",
-      "size": 1281,
+      "blob_sha": "f5fb73bcf0847faffce1af31fd74c3fcfa841347",
+      "size": 1308,
       "classification": "schema"
     },
     {
@@ -2019,6 +3293,13 @@
       "classification": "schema"
     },
     {
+      "path": "schemas/citation_record.schema.json",
+      "mode": "100644",
+      "blob_sha": "3ae97474dc7fc6cad0b828e30192ef783cdb1ff3",
+      "size": 1475,
+      "classification": "schema"
+    },
+    {
       "path": "schemas/container_binding.schema.json",
       "mode": "100644",
       "blob_sha": "6062d2a7dd66603e2131385152b4f47f932b1d57",
@@ -2030,6 +3311,13 @@
       "mode": "100644",
       "blob_sha": "33fc03a78e0c951b87a8606228f623953d7b7c77",
       "size": 2009,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/directory_grant.schema.json",
+      "mode": "100644",
+      "blob_sha": "0143fd8f0fb1938e490c07cb999b38dddc5198de",
+      "size": 754,
       "classification": "schema"
     },
     {
@@ -2075,6 +3363,27 @@
       "classification": "schema"
     },
     {
+      "path": "schemas/memory_item.schema.json",
+      "mode": "100644",
+      "blob_sha": "b7d229e4fb52eb90d36a548fe42c6203b5b6c508",
+      "size": 997,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/memory_selection.schema.json",
+      "mode": "100644",
+      "blob_sha": "70d4077e6129240f015e392d40dbbd7ca6f4d9f7",
+      "size": 1135,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/model_route_decision.schema.json",
+      "mode": "100644",
+      "blob_sha": "8ae09ac686ab80af1715c75fd5eef043f722666d",
+      "size": 1322,
+      "classification": "schema"
+    },
+    {
       "path": "schemas/model_runtime.schema.json",
       "mode": "100644",
       "blob_sha": "657d6c6b0d27923454e8edcf260bfec3175010cf",
@@ -2086,6 +3395,69 @@
       "mode": "100644",
       "blob_sha": "e9514ec34ee3c3d059dc2156b5075f576cee253c",
       "size": 702,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/provenance_record.schema.json",
+      "mode": "100644",
+      "blob_sha": "8c8d440a9d475877957c5630571c149a947a01ce",
+      "size": 1877,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/release_acceptance_ledger.schema.json",
+      "mode": "100644",
+      "blob_sha": "b253089697df577fc765420cf1e1b1ae0f3c9992",
+      "size": 1882,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/release_blocker_ledger.schema.json",
+      "mode": "100644",
+      "blob_sha": "11abe9316ddcb147ee3500e5357eb98d143c14f7",
+      "size": 1523,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/release_contradiction_ledger.schema.json",
+      "mode": "100644",
+      "blob_sha": "f91908649ff758eb97f4de8f156b33f4658f3613",
+      "size": 1709,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/release_dag.schema.json",
+      "mode": "100644",
+      "blob_sha": "1d3ea9df626ad963b086c1d765112381adfa72f0",
+      "size": 1662,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/release_receipt.schema.json",
+      "mode": "100644",
+      "blob_sha": "88a97ac6ceb5c5bcd8aeffb7bc40a3b0408c25b2",
+      "size": 927,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/release_scope_delta_ledger.schema.json",
+      "mode": "100644",
+      "blob_sha": "e31d4a4c78fdaee35cbe010ebc9cb48da5ff9663",
+      "size": 1396,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/release_scope_manifest.schema.json",
+      "mode": "100644",
+      "blob_sha": "007f3b522bcb61edb39ff3a61808b577474d5a43",
+      "size": 3991,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/release_state_snapshot.schema.json",
+      "mode": "100644",
+      "blob_sha": "1396730452c7b400c1e3382db85021f2a9be4af3",
+      "size": 1574,
       "classification": "schema"
     },
     {
@@ -2133,8 +3505,29 @@
     {
       "path": "schemas/source_manifest.schema.json",
       "mode": "100644",
-      "blob_sha": "17d9adea4b443e54cc276fa5fca9aef419790292",
-      "size": 1325,
+      "blob_sha": "be9de308e6664cf589b9e79d5586a8909f104091",
+      "size": 1898,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/tool_audit_event.schema.json",
+      "mode": "100644",
+      "blob_sha": "2ed42f64d6d81cc76630273231686320fa41c0bf",
+      "size": 1164,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/tool_call.schema.json",
+      "mode": "100644",
+      "blob_sha": "430f374c6b6e34e7f3607398b88cea6955c90e60",
+      "size": 1877,
+      "classification": "schema"
+    },
+    {
+      "path": "schemas/video_cli_parity.schema.json",
+      "mode": "100644",
+      "blob_sha": "cf518459c7db30e1fc895839b0fbdf4b9afe22a6",
+      "size": 2139,
       "classification": "schema"
     },
     {
@@ -2145,18 +3538,39 @@
       "classification": "source"
     },
     {
+      "path": "scripts/bench_latency.py",
+      "mode": "100755",
+      "blob_sha": "cea692a9e3dff38ac05e70ab5b437fe9fe419efd",
+      "size": 6707,
+      "classification": "source"
+    },
+    {
       "path": "scripts/bootstrap_macos.sh",
       "mode": "100755",
-      "blob_sha": "2a033b7f366807dd7c68f9de4c2ee6270fda0733",
-      "size": 1366,
+      "blob_sha": "89c81a678f9fee92d82034bd1cbde498765e9d12",
+      "size": 3063,
       "classification": "source"
     },
     {
       "path": "scripts/bootstrap_windows.ps1",
       "mode": "100644",
-      "blob_sha": "8adc24ea4e7412ac742e135fb73e41f3a3fa171e",
-      "size": 1325,
+      "blob_sha": "a1292873871a12e7de8f2efde638e767bbc61ff5",
+      "size": 3369,
       "classification": "other"
+    },
+    {
+      "path": "scripts/build_launchers.py",
+      "mode": "100755",
+      "blob_sha": "ea12b5532eb328e45a840cd079ed22e1084fbbf5",
+      "size": 5649,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/build_macos_app.py",
+      "mode": "100755",
+      "blob_sha": "048ce2c4aefd17c34dfab99151691397feff918b",
+      "size": 16822,
+      "classification": "source"
     },
     {
       "path": "scripts/certify_answer_trace_quality.py",
@@ -2168,8 +3582,8 @@
     {
       "path": "scripts/certify_clean_machine_macos.py",
       "mode": "100644",
-      "blob_sha": "ffcf28c2f6122c2c541ba99cd9bb62581aab9e60",
-      "size": 1249,
+      "blob_sha": "a2da8ed00038acea6dc45350f5cf54bfb1811535",
+      "size": 1273,
       "classification": "source"
     },
     {
@@ -2222,6 +3636,20 @@
       "classification": "source"
     },
     {
+      "path": "scripts/certify_ocr08_structure_live.py",
+      "mode": "100644",
+      "blob_sha": "911855076e54662e018a77be0dce7638bd94784c",
+      "size": 12945,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_ocr_corpus.py",
+      "mode": "100755",
+      "blob_sha": "d88c9e523ff0f878e172bb64c7041e324a230f06",
+      "size": 2709,
+      "classification": "source"
+    },
+    {
       "path": "scripts/certify_ocr_live_runtime.py",
       "mode": "100644",
       "blob_sha": "34fefa455e34ea76f44a65993cc52abd6ae44b44",
@@ -2245,15 +3673,15 @@
     {
       "path": "scripts/certify_release.py",
       "mode": "100755",
-      "blob_sha": "9797d505d9a9457c2cb9423150eb8f605dd6d0a2",
-      "size": 12850,
+      "blob_sha": "ab172dd0500050faa3f077a0ecce65baf38a5676",
+      "size": 13896,
       "classification": "source"
     },
     {
       "path": "scripts/certify_release_grade.py",
-      "mode": "100644",
-      "blob_sha": "388e4d2d4fca64b8f71892e91eddf8967f90e5aa",
-      "size": 14925,
+      "mode": "100755",
+      "blob_sha": "fa8342d5d42768c3c3e4919fb5424de6bd9637d5",
+      "size": 21775,
       "classification": "source"
     },
     {
@@ -2264,10 +3692,31 @@
       "classification": "source"
     },
     {
+      "path": "scripts/certify_retrieval_real_world_live.py",
+      "mode": "100644",
+      "blob_sha": "09123d5c8f6182aaba688691f87a2c48da3c3402",
+      "size": 8378,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_retrieval_scale.py",
+      "mode": "100644",
+      "blob_sha": "efcd67732f64a062ea75d4b3d46b603b4305ce1c",
+      "size": 1611,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/certify_security_gates.py",
+      "mode": "100755",
+      "blob_sha": "1e596ae9aadcdfa93d3d3ce83bf22644f9581fd5",
+      "size": 11290,
+      "classification": "source"
+    },
+    {
       "path": "scripts/certify_source_artifact.py",
       "mode": "100755",
-      "blob_sha": "858c93c451457d2f23f0d0267d2a2b2c71e03e19",
-      "size": 7774,
+      "blob_sha": "4c3d577827a03b52d060a9b60375441d8a75127e",
+      "size": 8382,
       "classification": "source"
     },
     {
@@ -2294,8 +3743,8 @@
     {
       "path": "scripts/dev_start.py",
       "mode": "100755",
-      "blob_sha": "4f717de2339b7c24b3af30010ba003544bcbbed6",
-      "size": 3255,
+      "blob_sha": "f22f0458eac4adef5e4fd94b2b4ea96f072d7b68",
+      "size": 3481,
       "classification": "source"
     },
     {
@@ -2329,8 +3778,15 @@
     {
       "path": "scripts/launch_app.py",
       "mode": "100755",
-      "blob_sha": "d0b5a921a292bb538c6a9bc519e2cb996dab474a",
-      "size": 6767,
+      "blob_sha": "b6fd1c4c075a73bd16acb5c510d9352220a9da19",
+      "size": 24112,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/lock_python_deps.py",
+      "mode": "100755",
+      "blob_sha": "bfa5ac3c365cbe576d9f7b8d22c5d7be90abdf2d",
+      "size": 5277,
       "classification": "source"
     },
     {
@@ -2339,6 +3795,55 @@
       "blob_sha": "5c0c7cd073a8418be157f5f85b16226d79300b1a",
       "size": 317,
       "classification": "source"
+    },
+    {
+      "path": "scripts/native_start.ps1",
+      "mode": "100644",
+      "blob_sha": "c30b39d649fb70d4a660da5a9590d019669d636a",
+      "size": 3476,
+      "classification": "other"
+    },
+    {
+      "path": "scripts/native_start.sh",
+      "mode": "100755",
+      "blob_sha": "0d01dd6ea47ef7e2b1538ac6776e098b5e4d8a2b",
+      "size": 1469,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/native_window.py",
+      "mode": "100644",
+      "blob_sha": "21dbf403466e19d9729f11977c47927704c293bc",
+      "size": 12822,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/one_click.py",
+      "mode": "100644",
+      "blob_sha": "6cd0e703672a2ae1274defe2c1e2b0ba44eb44ac",
+      "size": 20187,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/one_click.sh",
+      "mode": "100755",
+      "blob_sha": "050921e4a84346de47b5c0f38df5a0d38f110cbd",
+      "size": 12155,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/one_click_pins.env",
+      "mode": "100644",
+      "blob_sha": "07191f146f9c7dddc1e109e5819fabd228400785",
+      "size": 1710,
+      "classification": "other"
+    },
+    {
+      "path": "scripts/one_click_windows.ps1",
+      "mode": "100644",
+      "blob_sha": "b9b6bbc155e8277379a6d1631692da51467c8d9d",
+      "size": 15368,
+      "classification": "other"
     },
     {
       "path": "scripts/package_desktop.py",
@@ -2350,22 +3855,50 @@
     {
       "path": "scripts/preflight.py",
       "mode": "100755",
-      "blob_sha": "621bf9403da62a57e1828b0da395f006018fa48c",
-      "size": 6424,
+      "blob_sha": "dc22872a8965fea19a2cbe7775815bd047d7495b",
+      "size": 7904,
       "classification": "source"
     },
     {
       "path": "scripts/release_check.py",
       "mode": "100755",
-      "blob_sha": "ebbf97a982a5054cda1916622725703fd10cb945",
-      "size": 2996,
+      "blob_sha": "05d1287292a5b59feefd6cf352bff10e9103270f",
+      "size": 3019,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/release_ledger_update.py",
+      "mode": "100755",
+      "blob_sha": "ff45de38517c665c77c3e7b5dada3341a30da286",
+      "size": 3217,
       "classification": "source"
     },
     {
       "path": "scripts/repair_npm_registry.sh",
       "mode": "100755",
-      "blob_sha": "f0c6fa29c4798ff2cf54d1accc3f2b19e6e8f8b6",
-      "size": 1079,
+      "blob_sha": "d989e01b6597ffe86a5f4093f542efedd29567f4",
+      "size": 1144,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/resolve_shadow_baseline.py",
+      "mode": "100644",
+      "blob_sha": "6f61a48c034432454fe408d7cb1c2eb279e90ab0",
+      "size": 6749,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/shadow_evidence.py",
+      "mode": "100644",
+      "blob_sha": "de2c08bc5b73d7bcf67b0f31fbc809aff8c0b326",
+      "size": 8299,
+      "classification": "source"
+    },
+    {
+      "path": "scripts/shadow_qa.py",
+      "mode": "100644",
+      "blob_sha": "5d857b20f0583535c454902c7f9fa9ba75fa289f",
+      "size": 11060,
       "classification": "source"
     },
     {
@@ -2374,7 +3907,14 @@
       "blob_sha": "3e71e9302697b42ff5530a3adb8feadead3586a0",
       "size": 958,
       "classification": "source"
+    },
+    {
+      "path": "scripts/verify_macos_app.py",
+      "mode": "100755",
+      "blob_sha": "6b8040946e49317e40185e499e680334daec5345",
+      "size": 18743,
+      "classification": "source"
     }
   ],
-  "inventory_sha256": "8d4de69eeee347f8f73a76e8ca463be9330805e29983337001d1843e30cf453b"
+  "inventory_sha256": "a534a15143ac27742a12ac44fd26e39801284883fb4e5d7c6526ac907ba9c073"
 }
