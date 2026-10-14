@@ -18,6 +18,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -28,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SHADOW_BASE_OVERRIDE: ${{ inputs.base_sha || '' }}
-      SHADOW_CHECKPOINT_SHA: ${{ inputs.checkpoint_sha || github.sha }}
+      SHADOW_CHECKPOINT_SHA: ${{ inputs.checkpoint_sha || github.event.pull_request.head.sha || github.sha }}
       SHADOW_EVIDENCE_MANIFEST: ${{ inputs.evidence_manifest || '' }}
     steps:
       - uses: actions/checkout@v7
@@ -86,7 +89,7 @@ jobs:
             test -n "$SHADOW_EVIDENCE_MANIFEST"
             args+=(--historical-replay --evidence-manifest "$SHADOW_EVIDENCE_MANIFEST")
           fi
-          python scripts/shadow_qa.py "${args[@]}"
+          python -m scripts.shadow_qa "${args[@]}"
       - name: Upload Shadow baseline receipt
         if: always()
         uses: actions/upload-artifact@v7
