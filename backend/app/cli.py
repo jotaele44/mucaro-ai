@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 
 from .config import Settings, settings
 from .capability_contracts import (
+    CapabilityOutputContractError,
     build_capability_contract_report,
     validate_gis_report_file,
     validate_ocr_report_file,
@@ -3020,7 +3021,7 @@ def run_gis_inspect(args: argparse.Namespace, cfg: Settings) -> int:
         path = cfg.project_root / path
     try:
         result = inspect_geojson(path, cfg=cfg)
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3041,7 +3042,7 @@ def run_gis_point_in_polygon(args: argparse.Namespace, cfg: Settings) -> int:
             cfg=cfg,
             require_matching_crs=not args.allow_crs_mismatch,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3057,7 +3058,7 @@ def run_gis_compare(args: argparse.Namespace, cfg: Settings) -> int:
         right_path = cfg.project_root / right_path
     try:
         result = compare_geojson_geometries(left_path, right_path, cfg=cfg, match_on=args.match_on)
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3079,7 +3080,7 @@ def run_gis_overlay(args: argparse.Namespace, cfg: Settings) -> int:
             operation=args.overlay_operation,
             match_on=args.match_on,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3092,7 +3093,7 @@ def run_gis_reproject(args: argparse.Namespace, cfg: Settings) -> int:
         path = cfg.project_root / path
     try:
         result = reproject_geojson(path, target_crs=args.target_crs, cfg=cfg, source_crs=args.source_crs)
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3114,7 +3115,7 @@ def run_gis_csv_points(args: argparse.Namespace, cfg: Settings) -> int:
             delimiter=args.delimiter,
             skip_invalid_rows=args.skip_invalid_rows,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3135,7 +3136,7 @@ def run_gis_filter_bbox(args: argparse.Namespace, cfg: Settings) -> int:
             cfg=cfg,
             mode=args.mode,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3155,7 +3156,7 @@ def run_gis_clip_bbox(args: argparse.Namespace, cfg: Settings) -> int:
             max_y=args.max_y,
             cfg=cfg,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3173,7 +3174,7 @@ def run_gis_measure(args: argparse.Namespace, cfg: Settings) -> int:
             coordinate_units=args.coordinate_units,
             measurement_mode=args.measurement_mode,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3188,7 +3189,7 @@ def _resolve_project_path(value: str, cfg: Settings) -> Path:
 def _run_gis_report(args: argparse.Namespace, operation: Any) -> int:
     try:
         result = operation()
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3361,7 +3362,7 @@ def run_ocr_analyze(args: argparse.Namespace, cfg: Settings) -> int:
             tesseract_path=args.tesseract_path,
             timeout_seconds=args.timeout_seconds,
         )
-    except OCRAnalysisError as exc:
+    except (OCRAnalysisError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)

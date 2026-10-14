@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .gis_processing import GISProcessingError, GIS_REPORT_SCHEMA_VERSION
+from .capability_contracts import require_gis_report_contract
 from .utils import stable_id, utc_now, write_json
 
 
@@ -40,5 +41,7 @@ def create_map_export_manifest(*, cfg: Any, output_path: Path, layers: list[dict
     created_at = utc_now(); output_sha = _sha256(output)
     report_id = stable_id("gisreport", "map_export", output_sha, output_crs, renderer, renderer_version, created_at)
     report = {"schema_version": GIS_REPORT_SCHEMA_VERSION, "report_id": report_id, "status": "GIS_MAP_EXPORT_MANIFEST_OK", "operation": "create_map_export_manifest", "created_at": created_at, "output": {"path": str(output), "sha256": output_sha, "bytes": output.stat().st_size, "crs": output_crs, "extent": [float(v) for v in extent]}, "renderer": {"name": renderer, "version": renderer_version}, "parameters": parameters or {}, "layers": frozen_layers, "invariants": {"layer_count": len(frozen_layers), "all_layer_hashes_present": all(bool(row["sha256"]) for row in frozen_layers), "output_hash_present": bool(output_sha), "renderer_identity_present": True}, "warnings": ["GIS_EXPORT_NO_LAYERS"] if not frozen_layers else [], "limitations": ["This receipt certifies the exported artifact and declared rendering inputs; it does not infer that the renderer used every source byte semantically.", "Visual correctness requires independent regression controls for material maps."], "falsification_criteria": ["reject if output SHA-256 changes", "reject if any bound layer SHA-256 changes", "reject provenance claims when renderer identity/version or output CRS is absent"]}
-    report_path = cfg.export_dir / "gis_reports" / f"{report_id}.json"; write_json(report_path, report)
+    report_path = cfg.export_dir / "gis_reports" / f"{report_id}.json"
+    require_gis_report_contract(report, report_path=str(report_path))
+    write_json(report_path, report)
     return {**report, "report_path": str(report_path), "report_sha256": _sha256(report_path)}

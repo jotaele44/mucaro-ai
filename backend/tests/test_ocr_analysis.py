@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from backend.app import ocr_analysis
+from backend.app.capability_contracts import CapabilityOutputContractError
 from backend.app.config import Settings
 from backend.app.ocr_analysis import OCRAnalysisError, analyze_image_ocr
 
@@ -141,3 +143,20 @@ def test_analyze_image_ocr_rejects_invalid_layout_mode(tmp_path: Path):
         analyze_image_ocr(image, cfg=cfg, layout_mode="columns", tesseract_path="/usr/bin/tesseract")
 
     assert exc.value.status == "ERROR_OCR_LAYOUT_INVALID"
+
+
+def test_ocr_report_contract_fails_before_persistence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    cfg = make_settings(tmp_path)
+    report = {"report_id": "ocr_report_contract_failure"}
+    report_path = cfg.export_dir / "ocr_reports" / f"{report['report_id']}.json"
+
+    def reject_report(report: dict[str, object], *, report_path: str | None = None) -> None:
+        raise CapabilityOutputContractError("ERROR_OCR_REPORT_CONTRACT", "test contract rejection", report=report)
+
+    monkeypatch.setattr(ocr_analysis, "require_ocr_report_contract", reject_report)
+
+    with pytest.raises(CapabilityOutputContractError) as exc:
+        ocr_analysis._write_report(cfg, report)
+
+    assert exc.value.status == "ERROR_OCR_REPORT_CONTRACT"
+    assert not report_path.exists()

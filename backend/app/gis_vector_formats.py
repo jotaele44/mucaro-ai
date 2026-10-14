@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .gis_processing import GISProcessingError, GIS_REPORT_SCHEMA_VERSION, _classify_geometry, _coordinate_dimension_summary
+from .capability_contracts import require_gis_report_contract
 from .utils import stable_id, utc_now, write_json
 
 SUPPORTED_VECTOR_FORMATS = {".geojson": "GEOJSON", ".json": "GEOJSON", ".gpkg": "GEOPACKAGE", ".shp": "SHAPEFILE"}
@@ -19,6 +20,7 @@ def _sha256(path: Path) -> str:
 
 def _report(cfg: Any, report: dict[str, Any]) -> dict[str, Any]:
     path = cfg.export_dir / "gis_reports" / f"{report['report_id']}.json"
+    require_gis_report_contract(report, report_path=str(path))
     write_json(path, report)
     return {**report, "report_path": str(path), "report_sha256": _sha256(path)}
 

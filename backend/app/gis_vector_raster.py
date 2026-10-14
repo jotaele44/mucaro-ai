@@ -11,6 +11,7 @@ from rasterio.features import geometry_mask
 from shapely.geometry import shape
 
 from .gis_processing import GISProcessingError, GIS_REPORT_SCHEMA_VERSION, _coordinate_dimension_summary
+from .capability_contracts import require_gis_report_contract
 from .utils import stable_id, utc_now, write_json
 
 
@@ -181,6 +182,7 @@ def _build_vector_raster_report(
         ],
     }
     report_path = cfg.export_dir / "gis_reports" / f"{report_id}.json"
+    require_gis_report_contract(report, report_path=str(report_path))
     write_json(report_path, report)
     return {**report, "report_path": str(report_path), "report_sha256": _sha256(report_path)}
 

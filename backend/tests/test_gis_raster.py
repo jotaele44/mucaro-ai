@@ -7,6 +7,8 @@ import pytest
 import rasterio
 from rasterio.transform import Affine, from_origin
 
+from backend.app import gis_raster
+from backend.app.capability_contracts import CapabilityOutputContractError
 from backend.app.config import Settings
 from backend.app.gis_processing import GISProcessingError
 from backend.app.gis_raster import (
@@ -106,6 +108,23 @@ def test_raster_operations_fail_closed_on_missing_or_malformed_inputs(tmp_path: 
     with pytest.raises(GISProcessingError) as exc:
         clip_raster_bbox(source, (0, 0, float("inf"), 1), cfg=cfg)
     assert exc.value.status == "ERROR_GIS_RASTER_BBOX"
+
+
+def test_gis_report_contract_fails_before_persistence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    cfg = make_settings(tmp_path)
+    report = {"report_id": "gis_report_contract_failure"}
+    report_path = cfg.export_dir / "gis_reports" / f"{report['report_id']}.json"
+
+    def reject_report(report: dict[str, object], *, report_path: str | None = None) -> None:
+        raise CapabilityOutputContractError("ERROR_GIS_REPORT_CONTRACT", "test contract rejection", report=report)
+
+    monkeypatch.setattr(gis_raster, "require_gis_report_contract", reject_report)
+
+    with pytest.raises(CapabilityOutputContractError) as exc:
+        gis_raster._write_report(cfg, report)
+
+    assert exc.value.status == "ERROR_GIS_REPORT_CONTRACT"
+    assert not report_path.exists()
 
 
 def test_resample_raster_preserves_governed_grid_metadata(tmp_path: Path) -> None:

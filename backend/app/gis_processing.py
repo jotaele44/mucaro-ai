@@ -15,6 +15,7 @@ from shapely.geometry import mapping as shapely_mapping
 from shapely.geometry import shape as shapely_shape
 
 from .config import Settings, settings
+from .capability_contracts import require_gis_report_contract
 from .utils import stable_id, utc_now, write_json
 
 GIS_REPORT_SCHEMA_VERSION = "mucaro_gis_report_v1"
@@ -304,6 +305,7 @@ def _inspect_features(source: GeoJSONSource) -> tuple[list[dict[str, Any]], dict
 
 def _write_report(cfg: Settings, report: dict[str, Any]) -> dict[str, Any]:
     path = _report_path(cfg, str(report["report_id"]))
+    require_gis_report_contract(report, report_path=str(path))
     write_json(path, report)
     report_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     return {**report, "report_path": str(path), "report_sha256": report_sha256}

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .config import Settings, settings
+from .capability_contracts import require_ocr_report_contract
 from .local_tools import resolve_tool_request
 from .multimodal import IMAGE_SUFFIXES, parse_multimodal_metadata
 from .utils import stable_id, utc_now, write_json
@@ -142,6 +143,7 @@ def _parse_tsv(tsv_text: str) -> list[dict[str, Any]]:
 
 def _write_report(cfg: Settings, report: dict[str, Any]) -> dict[str, Any]:
     path = _report_path(cfg, str(report["report_id"]))
+    require_ocr_report_contract(report, report_path=str(path))
     write_json(path, report)
     report_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     return {**report, "report_path": str(path), "report_sha256": report_sha256}

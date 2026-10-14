@@ -33,6 +33,16 @@ GOVERNED_CRS_GRID_SHA256 = "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b833
 GOVERNED_CRS_GRID_BYTES = 3644
 
 
+class CapabilityOutputContractError(RuntimeError):
+    """Raised when a producer is about to persist a contract-invalid report."""
+
+    def __init__(self, status: str, detail: str, *, report: dict[str, Any] | None = None) -> None:
+        super().__init__(detail)
+        self.status = status
+        self.detail = detail
+        self.report = report
+
+
 @dataclass(frozen=True)
 class CapabilityContract:
     capability_id: str
@@ -1683,6 +1693,28 @@ def validate_web_snapshot_file(path: Path) -> dict[str, Any]:
         failed_check = _contract_check("snapshot_file_readable", False, str(exc))
         return _contract_result("governed_web_browsing", [failed_check], report_path=str(path))
     return validate_web_snapshot_contract(snapshot if isinstance(snapshot, dict) else {}, report_path=str(path))
+
+
+def require_gis_report_contract(report: dict[str, Any], *, report_path: str | None = None) -> None:
+    result = validate_gis_report_contract(report, report_path=report_path)
+    if result.get("status") != CAPABILITY_OUTPUT_CONTRACT_OK:
+        failed = ", ".join(str(row.get("name")) for row in result.get("failed_checks", [])[:8]) or "unknown"
+        raise CapabilityOutputContractError(
+            "ERROR_GIS_REPORT_CONTRACT",
+            f"GIS report contract failed before persistence: {failed}",
+            report=report,
+        )
+
+
+def require_ocr_report_contract(report: dict[str, Any], *, report_path: str | None = None) -> None:
+    result = validate_ocr_report_contract(report, report_path=report_path)
+    if result.get("status") != CAPABILITY_OUTPUT_CONTRACT_OK:
+        failed = ", ".join(str(row.get("name")) for row in result.get("failed_checks", [])[:8]) or "unknown"
+        raise CapabilityOutputContractError(
+            "ERROR_OCR_REPORT_CONTRACT",
+            f"OCR report contract failed before persistence: {failed}",
+            report=report,
+        )
 
 
 def list_advanced_capability_contracts() -> list[dict[str, Any]]:
