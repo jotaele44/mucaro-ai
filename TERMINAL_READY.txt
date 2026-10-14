@@ -1,0 +1,10 @@
+MUCARO SECURITY SCAN — WORK-IN-PROGRESS
+Status: PROVISIONAL / NOT_CERTIFIED
+
+Installation (repository root): python -m pip install -e '.[dev]'
+Python tests: python -m pytest backend/tests -q
+Frontend: cd frontend && npm ci && npm run build
+Integrity: git rev-parse HEAD && git status --porcelain
+Target runtime: local-only; project authorization required; never auto-grant filesystem permissions.
+No findings is not a security certificate. A failed test or missing evidence fails closed.
+Native macOS and Windows require independent certification before release.

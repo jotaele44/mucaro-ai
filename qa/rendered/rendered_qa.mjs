@@ -480,6 +480,48 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "13-sources");
   axeRuns.push(await axe(page, viewport, "sources"));
 
+  // Security Scan: real local backend, no mocked successful scans.
+  const scanFixture = mkdtempSync(path.join(ROOT, "data", "qa-security-"));
+  try {
+    execFileSync("git", ["init", scanFixture]);
+    writeFileSync(path.join(scanFixture, "sample.js"), 'const value = eval("1");\n');
+    execFileSync("git", ["-C", scanFixture, "add", "sample.js"]);
+    execFileSync("git", ["-C", scanFixture, "-c", "user.name=Mucaro QA", "-c", "user.email=qa@example.invalid", "commit", "-m", "fixture"]);
+    await openNav();
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Security Scan", exact: true }).click();
+    await page.getByRole("heading", { name: "Security Scan" }).waitFor();
+    const scanButton = page.getByRole("button", { name: "Start scan" });
+    check("security scan starts disabled until validation", viewport, await scanButton.isDisabled());
+    await page.getByRole("textbox", { name: "Repository path on this computer" }).fill(path.join(scanFixture, "missing-directory"));
+    const beforeExpectedHttpError = consoleErrors.length;
+    const negativeResponse = page.waitForResponse((response) =>
+      response.url().endsWith("/security-scans/preflight") && response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "Validate target" }).click();
+    const deniedTarget = await negativeResponse;
+    await page.getByRole("alert").getByText(/ERROR_INPUT_PATH_NOT_FOUND/).waitFor();
+    await page.waitForTimeout(100);
+    const expectedConsole = consoleErrors.slice(beforeExpectedHttpError);
+    const expectedNegative = deniedTarget.status() === 409 && expectedConsole.length === 1 &&
+      /Failed to load resource:.*409/.test(expectedConsole[0]);
+    check("security scan negative target produces exact expected HTTP 409", viewport, expectedNegative);
+    // Remove only the single matched intentional negative-case resource message, never arbitrary errors.
+    if (expectedNegative) consoleErrors.splice(beforeExpectedHttpError, 1);
+    check("security scan rejects an absent repository and offers Retry", viewport, await scanButton.isDisabled() && await page.getByRole("button", { name: "Retry" }).isVisible());
+    await page.getByRole("textbox", { name: "Repository path on this computer" }).fill(scanFixture);
+    await page.getByRole("button", { name: "Validate target" }).click();
+    await page.getByText(/Validated 1 tracked files/).waitFor();
+    await scanButton.click();
+    await page.getByRole("region", { name: "Security scan result" }).getByText("DYNAMIC_EVAL").waitFor();
+    check("security scan validates a clean local repo and presents bounded candidates", viewport,
+      await page.getByText(/1 files examined/).isVisible());
+    drawerStates.push(await drawerClosed());
+    await shot(page, viewport, "13b-security-scan");
+    axeRuns.push(await axe(page, viewport, "security-scan"));
+  } finally {
+    rmSync(scanFixture, { recursive: true, force: true });
+  }
+
   await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Memory", exact: true }).click();
   await page.getByLabel("Remember").fill("Prefer tables for comparisons");
@@ -505,7 +547,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   axeRuns.push(await axe(page, viewport, "settings"));
 
   if (viewport === "iphone") {
-    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
+    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 5 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
     // iOS zooms into fields under 16px on focus; touch targets need 44px (Apple HIG).
     const touch = await page.evaluate(() => {
       const visible = (el) => {
