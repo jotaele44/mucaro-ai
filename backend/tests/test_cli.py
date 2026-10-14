@@ -313,6 +313,91 @@ def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Pa
     assert "FAIL no_text_status_has_warning" in output
 
 
+def test_cli_capabilities_validate_ocr_v1_evidence_closes_and_rejects_traversal(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    evidence_root = tmp_path / "ocr-evidence"
+    evidence_root.mkdir()
+    denominator = evidence_root / "denominator.json"
+    denominator.write_text(
+        json.dumps(
+            {
+                "schema_version": "MUCARO_OCR_V1_CORPUS/1.0",
+                "case_count": 1,
+                "cases": [{"id": "OCRV1-01", "class": "CLEAN_ENGLISH", "expected_state": "SUPPORTED"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    source = evidence_root / "source.png"
+    source.write_bytes(b"source-bytes")
+    receipt = evidence_root / "receipt.json"
+    receipt.write_text(json.dumps({"status": "fixture"}), encoding="utf-8")
+    evidence = evidence_root / "evidence.json"
+    evidence.write_text(
+        json.dumps(
+            {
+                "schema_version": "MUCARO_OCR_V1_EVIDENCE/1.0",
+                "denominator_sha256": hashlib.sha256(denominator.read_bytes()).hexdigest(),
+                "cases": [
+                    {
+                        "id": "OCRV1-01",
+                        "source_path": source.name,
+                        "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                        "receipt_path": receipt.name,
+                        "receipt_sha256": hashlib.sha256(receipt.read_bytes()).hexdigest(),
+                        "observed_state": "SUPPORTED",
+                        "adjudication": "PASS",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "capabilities",
+                "validate-ocr-v1-evidence",
+                str(denominator),
+                str(evidence),
+                "--evidence-root",
+                str(evidence_root),
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "OCR_V1_EVIDENCE_READY"
+    assert payload["certification_ready"] is True
+    assert payload["counts"]["validated_cases"] == 1
+
+    evidence_payload = json.loads(evidence.read_text(encoding="utf-8"))
+    evidence_payload["cases"][0]["source_path"] = "../source.png"
+    evidence.write_text(json.dumps(evidence_payload), encoding="utf-8")
+    assert (
+        main(
+            [
+                "capabilities",
+                "validate-ocr-v1-evidence",
+                str(denominator),
+                str(evidence),
+                "--evidence-root",
+                str(evidence_root),
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    error = json.loads(capsys.readouterr().err)
+    assert error["status"] == "ERROR_OCR_CORPUS_PATH_TRAVERSAL"
+
+
 def test_cli_ocr_analyze_reports_adapter_errors(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     image = tmp_path / "scan.png"

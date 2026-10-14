@@ -71,6 +71,7 @@ listing. Missing targets return the existing error payload and failure exit code
 | `mucaro capabilities validate-gis-report REPORT_PATH` | Validate a saved GIS receipt against the advanced capability output contract | 0 | 2 |
 | `mucaro capabilities validate-ocr-report REPORT_PATH` | Validate a saved OCR receipt against the state-of-the-art OCR output contract | 0 | 2 |
 | `mucaro capabilities validate-ocr-pdf-report REPORT_PATH` | Validate a saved PDF OCR receipt against the page-level OCR output contract | 0 | 2 |
+| `mucaro capabilities validate-ocr-v1-evidence DENOMINATOR_PATH EVIDENCE_PATH` | Validate a frozen OCR v1 evidence ledger, source/receipt hashes, and case-state closure | 0 | 2 |
 | `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry/topology receipt | 0 | 2 |
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
@@ -332,6 +333,17 @@ and OCR engine identity, page ordering, rendered-page and child-report hashes,
 page/span/no-text accounting, warning consistency, limitations, and
 falsification criteria. It does not infer semantic tables, forms, or
 handwriting from page OCR.
+
+Use `mucaro capabilities validate-ocr-v1-evidence DENOMINATOR_PATH
+EVIDENCE_PATH` to validate a frozen OCR v1 evidence ledger. The validator binds
+the evidence to the denominator SHA-256, requires exact case-count closure,
+rejects duplicate/unknown/missing cases, verifies source and receipt hashes,
+checks expected versus observed states, and requires explicit adjudication for
+provisional or unsupported cases. Relative source and receipt paths are
+restricted to the ledger directory by default (or `--evidence-root`), with
+lexical traversal and symlink indirection rejected. A ready ledger proves
+fixture and receipt identity only; it does not promote unsupported OCR classes
+or establish representative accuracy.
 
 ## Output Contracts
 
@@ -652,6 +664,16 @@ approved and audited.
 | `ERROR_OCR_PDF_PARSE` | PDF page structure could not be read |
 | `ERROR_OCR_PDF_NO_PAGES` | PDF contains no pages |
 | `ERROR_OCR_PDF_REPORT_CONTRACT` | aggregate PDF OCR report failed validation before persistence |
+| `ERROR_OCR_DENOMINATOR_CASES` | OCR v1 denominator is missing a case count or cases array |
+| `ERROR_OCR_DENOMINATOR_COUNT` | OCR v1 denominator case count does not equal the declared cases |
+| `ERROR_OCR_DENOMINATOR_CASE_ROW` | OCR v1 denominator contains a malformed case row or empty case ID |
+| `ERROR_OCR_DENOMINATOR_STATE` | OCR v1 denominator case is missing an expected state |
+| `ERROR_OCR_EVIDENCE_CASES` | OCR v1 evidence ledger is missing its cases array |
+| `ERROR_OCR_CORPUS_PATH` | OCR v1 evidence path is empty or absolute |
+| `ERROR_OCR_CORPUS_PATH_TRAVERSAL` | OCR v1 evidence path contains a parent-directory traversal component |
+| `ERROR_OCR_CORPUS_SYMLINK` | OCR v1 evidence path resolves through a symlink |
+| `ERROR_OCR_CORPUS_PATH_ESCAPE` | OCR v1 evidence path resolves outside the evidence root |
+| `ERROR_OCR_CORPUS_FILE_MISSING` | OCR v1 evidence source or receipt file does not exist |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |

@@ -87,6 +87,7 @@ from .gis_eval import (
 )
 from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .ocr_corpus_evidence import OcrCorpusEvidenceError, validate_ocr_v1_evidence
 from .ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
 from .ocr_structure import OCRStructureError, reconstruct_ocr_report
 from .ingestion import (
@@ -1114,6 +1115,20 @@ def build_parser() -> argparse.ArgumentParser:
     capability_validate_ocr_pdf.add_argument("report_path", type=Path, help="Path to a saved mucaro_pdf_ocr_report_v1 JSON receipt.")
     capability_validate_ocr_pdf.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     capability_validate_ocr_pdf.set_defaults(handler=run_capability_validate_pdf_ocr_report)
+
+    capability_validate_ocr_v1 = capabilities_subcommands.add_parser(
+        "validate-ocr-v1-evidence",
+        help="Validate a frozen OCR v1 evidence ledger against its denominator and source receipts.",
+    )
+    capability_validate_ocr_v1.add_argument("denominator_path", type=Path, help="Path to the frozen OCR denominator JSON file.")
+    capability_validate_ocr_v1.add_argument("evidence_path", type=Path, help="Path to the OCR evidence ledger JSON file.")
+    capability_validate_ocr_v1.add_argument(
+        "--evidence-root",
+        type=Path,
+        help="Root directory containing the ledger's relative source and receipt paths. Defaults to the ledger directory.",
+    )
+    capability_validate_ocr_v1.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_ocr_v1.set_defaults(handler=run_capability_validate_ocr_v1_evidence)
 
     capability_validate_retrieval = capabilities_subcommands.add_parser(
         "validate-retrieval-quality",
@@ -8445,6 +8460,25 @@ def run_capability_validate_pdf_ocr_report(args: argparse.Namespace, cfg: Settin
     report = validate_pdf_ocr_report_file(path)
     emit_payload(report, args.format)
     return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_ocr_v1_evidence(args: argparse.Namespace, cfg: Settings) -> int:
+    denominator = args.denominator_path
+    evidence = args.evidence_path
+    root = args.evidence_root
+    if not denominator.is_absolute():
+        denominator = cfg.project_root / denominator
+    if not evidence.is_absolute():
+        evidence = cfg.project_root / evidence
+    if root is not None and not root.is_absolute():
+        root = cfg.project_root / root
+    try:
+        report = validate_ocr_v1_evidence(denominator, evidence, evidence_root=root)
+    except OcrCorpusEvidenceError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "OCR_V1_EVIDENCE_READY" else 2
 
 
 def run_capability_validate_retrieval_quality(args: argparse.Namespace, cfg: Settings) -> int:
