@@ -1271,6 +1271,12 @@ html {
     min-height: 44px;
   }
 
+  /* Native selects can ignore the shared :is() minimum in some WebKit builds. */
+  :root .field select {
+    height: 44px;
+    min-height: 44px;
+  }
+
   /* An icon has no text to widen its button, so it needs the 44px width explicitly. */
   :root .message-actions .icon-action {
     min-width: 44px;
