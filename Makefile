@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: bootstrap start setup preflight test validate ingest ask cli serve launch-smoke desktop macos-app macos-app-verify security-gates release-grade release-status release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
+.PHONY: bootstrap start setup preflight test validate inventory-check ingest ask cli serve launch-smoke desktop macos-app macos-app-verify security-gates release-grade release-status release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
 
 bootstrap:
 	bash scripts/bootstrap_macos.sh
@@ -20,6 +20,9 @@ test:
 
 validate:
 	PYTHONPATH=.:backend $(PYTHON) scripts/validate_json.py
+
+inventory-check:
+	PYTHONPATH=.:backend $(PYTHON) scripts/mucaro.py flagpole inventory verify --format text
 
 ingest:
 	PYTHONPATH=.:backend $(PYTHON) scripts/ingest_folder.py data/input
