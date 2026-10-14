@@ -1456,6 +1456,32 @@ def test_cli_certify_retrieval_quality_writes_exact_head_receipt(tmp_path: Path,
     assert "min_source_formats=13" in text_output
 
 
+def test_cli_capabilities_validate_retrieval_quality_receipt(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["certify", "retrieval-quality", "--format", "json"], cfg=cfg) == 0
+    generated = json.loads(capsys.readouterr().out)
+    receipt_path = tmp_path / generated["receipt"]
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["head_sha"] = "a" * 40
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    assert main(["capabilities", "validate-retrieval-quality", generated["receipt"], "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["capability_id"] == "retrieval_quality_evaluation"
+    assert payload["counts"]["fail"] == 0
+
+
+def test_cli_capabilities_validate_web_snapshot_reports_missing_file(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["capabilities", "validate-web-snapshot", "missing-snapshot.json", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_FAILED"
+    assert payload["capability_id"] == "governed_web_browsing"
+    assert payload["failed_checks"][0]["name"] == "snapshot_file_readable"
+
+
 def test_cli_eval_answer_trace_reports_traceability_metrics(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
 

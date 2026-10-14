@@ -16,7 +16,13 @@ from typing import Any, Sequence
 from urllib.parse import urlparse
 
 from .config import Settings, settings
-from .capability_contracts import build_capability_contract_report, validate_gis_report_file, validate_ocr_report_file
+from .capability_contracts import (
+    build_capability_contract_report,
+    validate_gis_report_file,
+    validate_ocr_report_file,
+    validate_retrieval_quality_file,
+    validate_web_snapshot_file,
+)
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -1085,6 +1091,22 @@ def build_parser() -> argparse.ArgumentParser:
     capability_validate_ocr.add_argument("report_path", type=Path, help="Path to a saved OCR report JSON file.")
     capability_validate_ocr.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     capability_validate_ocr.set_defaults(handler=run_capability_validate_ocr_report)
+
+    capability_validate_retrieval = capabilities_subcommands.add_parser(
+        "validate-retrieval-quality",
+        help="Validate a retrieval-quality release receipt against its bounded evidence contract.",
+    )
+    capability_validate_retrieval.add_argument("report_path", type=Path, help="Path to a retrieval-quality release receipt JSON file.")
+    capability_validate_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_retrieval.set_defaults(handler=run_capability_validate_retrieval_quality)
+
+    capability_validate_web = capabilities_subcommands.add_parser(
+        "validate-web-snapshot",
+        help="Validate an immutable governed web snapshot and its citation policy.",
+    )
+    capability_validate_web.add_argument("snapshot_path", type=Path, help="Path to a saved web snapshot JSON file.")
+    capability_validate_web.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_web.set_defaults(handler=run_capability_validate_web_snapshot)
 
     memory = subcommands.add_parser("memory", help="Manage explicit local assistant memory.")
     memory_subcommands = memory.add_subparsers(dest="memory_command", required=True)
@@ -8366,6 +8388,24 @@ def run_capability_validate_ocr_report(args: argparse.Namespace, cfg: Settings) 
     if not path.is_absolute():
         path = cfg.project_root / path
     report = validate_ocr_report_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_retrieval_quality(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_retrieval_quality_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_web_snapshot(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.snapshot_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_web_snapshot_file(path)
     emit_payload(report, args.format)
     return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
 

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import base64
 
 from backend.app.capability_contracts import (
     CAPABILITY_CONTRACT_SCHEMA_VERSION,
@@ -9,6 +10,8 @@ from backend.app.capability_contracts import (
     validate_coding_certification_contract,
     validate_gis_report_contract,
     validate_ocr_report_contract,
+    validate_retrieval_quality_contract,
+    validate_web_snapshot_contract,
 )
 
 
@@ -683,3 +686,115 @@ def test_validate_coding_certification_contract_rejects_tampered_ready_report():
 
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
     assert "rows.0.evidence_hash_matches" in {check["name"] for check in result["failed_checks"]}
+
+
+def _valid_retrieval_receipt() -> dict:
+    counts = {
+        "chunks": 2,
+        "queries": 2,
+        "positive_queries": 1,
+        "no_context_queries": 1,
+        "expected_bindings": 1,
+        "multi_binding_queries": 0,
+        "source_ids": 2,
+        "source_formats": 1,
+        "strategies": 1,
+    }
+    nested_report = {
+        "status": "RETRIEVAL_EVAL_OK",
+        "fixture": "fixture.json",
+        "top_k": 5,
+        "fixture_validation": {"status": "RETRIEVAL_FIXTURE_OK"},
+        "counts": counts,
+        "strategies": [{"strategy": "hybrid", "cases": []}],
+    }
+    case = {
+        "name": "fixture_case",
+        "fixture": "fixture.json",
+        "thresholds": {"min_hybrid_recall": 0.8},
+        "status": "RETRIEVAL_EVAL_OK",
+        "counts": counts,
+        "report": nested_report,
+    }
+    return {
+        "schema_version": "mucaro_release_receipt_v1",
+        "receipt_type": "retrieval_quality",
+        "status": "RETRIEVAL_QUALITY_CERT_OK",
+        "head_sha": "a" * 40,
+        "created_utc": "2026-10-14T00:00:00Z",
+        "command": ["python3", "scripts/certify_retrieval_quality.py"],
+        "payload": {
+            "profile": "fixture-profile",
+            "top_k": 5,
+            "cases": [case],
+            "failed_cases": [],
+        },
+    }
+
+
+def test_retrieval_quality_contract_closes_fixture_accounting_and_rejects_tampering():
+    receipt = _valid_retrieval_receipt()
+
+    valid = validate_retrieval_quality_contract(receipt)
+    assert valid["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert valid["counts"]["fail"] == 0
+
+    receipt["payload"]["cases"][0]["counts"]["no_context_queries"] = 2
+    invalid = validate_retrieval_quality_contract(receipt)
+    assert invalid["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "cases.0.counts.query_accounting_closed" for check in invalid["failed_checks"])
+
+
+def _valid_web_snapshot() -> dict:
+    raw = b"Governed snapshot fixture."
+    encoded = base64.b64encode(raw).decode("ascii")
+    digest = hashlib.sha256(raw).hexdigest()
+    return {
+        "schema_version": "mucaro_web_snapshot_v1",
+        "snapshot_id": "websnap_contract_fixture",
+        "snapshot_kind": "web_page",
+        "requested_url": "https://example.com/fixture",
+        "fetch_url": "https://example.com/fixture",
+        "final_url": "https://example.com/fixture",
+        "redirect_chain": [],
+        "retrieval_started_utc": "2026-10-14T00:00:00Z",
+        "retrieval_utc": "2026-10-14T00:00:01Z",
+        "http_status": 200,
+        "content_type": "text/plain; charset=utf-8",
+        "cache_policy": {"cache_mode": "immutable_snapshot_only"},
+        "robots_policy": {"status": "ROBOTS_ALLOWED", "allowed": True},
+        "http_error_policy": {"is_http_error": False, "snapshot_allowed": False, "citation_allowed": False},
+        "content_sha256": digest,
+        "content_size_bytes": len(raw),
+        "content_base64": encoded,
+        "parser_name": "web_snapshot_preview_v1",
+        "parser_trace": {"content_kind": "text"},
+        "parser_warnings": [],
+        "charset": "utf-8",
+        "text_preview": raw.decode("utf-8"),
+        "policy": {"cache_mode": "immutable_snapshot_only"},
+    }
+
+
+def test_web_snapshot_contract_binds_provenance_bytes_and_citation_policy():
+    snapshot = _valid_web_snapshot()
+
+    valid = validate_web_snapshot_contract(snapshot)
+    assert valid["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert valid["counts"]["fail"] == 0
+
+    snapshot["content_base64"] = base64.b64encode(b"tampered").decode("ascii")
+    invalid = validate_web_snapshot_contract(snapshot)
+    assert invalid["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "content_hash_matches_bytes" for check in invalid["failed_checks"])
+
+
+def test_web_snapshot_contract_rejects_inconsistent_http_error_policy():
+    snapshot = _valid_web_snapshot()
+    snapshot["http_status"] = 404
+    snapshot["snapshot_kind"] = "http_error_page"
+    snapshot["http_error_policy"] = {"is_http_error": False, "snapshot_allowed": True, "citation_allowed": True}
+
+    invalid = validate_web_snapshot_contract(snapshot)
+    assert invalid["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "http_error_policy.status_consistent" for check in invalid["failed_checks"])

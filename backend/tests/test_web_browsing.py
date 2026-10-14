@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from backend.app.config import Settings
+from backend.app.capability_contracts import validate_web_snapshot_contract
 from backend.app.ingestion import get_chunks, get_sources, ingest_web_snapshot
 from backend.app.web_browsing import (
     WebBrowseSessionPolicy,
@@ -154,6 +155,9 @@ def test_fetch_web_snapshot_records_policy_and_bytes(tmp_path: Path):
     assert result["status"] == "WEB_FETCH_SNAPSHOT_OK"
     snapshot_path = Path(result["snapshot_path"])
     saved = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    contract = validate_web_snapshot_contract(saved, report_path=str(snapshot_path))
+    assert contract["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert contract["counts"]["fail"] == 0
     assert saved["schema_version"] == "mucaro_web_snapshot_v1"
     assert saved["requested_url"] == url
     assert saved["final_url"] == url

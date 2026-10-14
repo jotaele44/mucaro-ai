@@ -4,11 +4,15 @@ import hashlib
 import json
 import math
 import re
+import base64
+import binascii
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from .coding_certification import ALLOWED_EVIDENCE_STATES, CODING_CERTIFICATION_SCHEMA_VERSION
+from .release_receipts import RECEIPT_SCHEMA_VERSION, read_release_receipt_file
 
 CAPABILITY_CONTRACT_SCHEMA_VERSION = "mucaro_advanced_capability_contracts_v1"
 CAPABILITY_OUTPUT_CONTRACT_OK = "CAPABILITY_OUTPUT_CONTRACT_OK"
@@ -16,6 +20,10 @@ CAPABILITY_OUTPUT_CONTRACT_FAILED = "CAPABILITY_OUTPUT_CONTRACT_FAILED"
 GIS_REPORT_SCHEMA_VERSION = "mucaro_gis_report_v1"
 OCR_REPORT_SCHEMA_VERSION = "mucaro_ocr_report_v1"
 CODING_CERTIFICATION_REPORT_SCHEMA_VERSION = CODING_CERTIFICATION_SCHEMA_VERSION
+WEB_SNAPSHOT_SCHEMA_VERSION = "mucaro_web_snapshot_v1"
+RETRIEVAL_QUALITY_RECEIPT_TYPE = "retrieval_quality"
+RETRIEVAL_QUALITY_OK = "RETRIEVAL_QUALITY_CERT_OK"
+RETRIEVAL_QUALITY_FAILED = "RETRIEVAL_QUALITY_CERT_FAILED"
 CRS_ENGINE_ADAPTERS = {
     "pyproj_transformer_group_always_xy_v1",
     "pyproj_governed_local_grid_always_xy_v1",
@@ -1445,6 +1453,236 @@ def validate_coding_certification_file(path: Path) -> dict[str, Any]:
             "failed_checks": [failed_check],
         }
     return validate_coding_certification_contract(report if isinstance(report, dict) else {}, report_path=str(path))
+
+
+def _contract_result(
+    capability_id: str,
+    checks: list[dict[str, str]],
+    *,
+    report_path: str | None = None,
+    report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": CAPABILITY_OUTPUT_CONTRACT_OK if not failed else CAPABILITY_OUTPUT_CONTRACT_FAILED,
+        "schema_version": "mucaro_capability_output_contract_v1",
+        "capability_id": capability_id,
+        "report_path": report_path,
+        "report_status": report.get("status") if isinstance(report, dict) else None,
+        "checks": checks,
+        "counts": {
+            "pass": len(checks) - len(failed),
+            "fail": len(failed),
+            "total": len(checks),
+        },
+        "failed_checks": failed,
+    }
+
+
+def _valid_sha256(value: Any) -> bool:
+    return isinstance(value, str) and bool(re.fullmatch(r"[0-9a-fA-F]{64}", value))
+
+
+def _valid_git_sha(value: Any) -> bool:
+    return isinstance(value, str) and bool(re.fullmatch(r"[0-9a-fA-F]{40}", value))
+
+
+def _non_negative_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def validate_retrieval_quality_contract(receipt: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
+    """Validate a retrieval-quality release receipt without overclaiming corpus quality."""
+    if not isinstance(receipt, dict):
+        return _contract_result(
+            "retrieval_quality_evaluation",
+            [_contract_check("payload_object", False, "receipt must be a JSON object")],
+            report_path=report_path,
+        )
+    checks: list[dict[str, str]] = [
+        _contract_check("payload_object", isinstance(receipt, dict), "receipt must be a JSON object"),
+        _contract_check("schema_version", receipt.get("schema_version") == RECEIPT_SCHEMA_VERSION, f"schema_version must be {RECEIPT_SCHEMA_VERSION}"),
+        _contract_check("receipt_type", receipt.get("receipt_type") == RETRIEVAL_QUALITY_RECEIPT_TYPE, "receipt_type must be retrieval_quality"),
+        _contract_check("status", receipt.get("status") in {RETRIEVAL_QUALITY_OK, RETRIEVAL_QUALITY_FAILED}, "status must be a retrieval quality certification status"),
+        _contract_check("head_sha", _valid_git_sha(receipt.get("head_sha")), "head_sha must be a full 40-character commit SHA"),
+        _contract_check("created_utc", isinstance(receipt.get("created_utc"), str) and bool(receipt.get("created_utc")), "created_utc is required"),
+        _contract_check("command", isinstance(receipt.get("command"), list) and bool(receipt.get("command")) and all(isinstance(item, str) and item for item in receipt.get("command", [])), "command must be a non-empty string array"),
+        _contract_check("payload", isinstance(receipt.get("payload"), dict), "payload must be an object"),
+    ]
+    payload = receipt.get("payload") if isinstance(receipt.get("payload"), dict) else {}
+    cases = payload.get("cases")
+    failed_cases = payload.get("failed_cases")
+    checks.extend(
+        [
+            _contract_check("profile", isinstance(payload.get("profile"), str) and bool(payload.get("profile")), "payload profile is required"),
+            _contract_check("top_k", isinstance(payload.get("top_k"), int) and not isinstance(payload.get("top_k"), bool) and payload.get("top_k", 0) > 0, "top_k must be a positive integer"),
+            _contract_check("cases_array", isinstance(cases, list) and bool(cases), "payload cases must be a non-empty array"),
+            _contract_check("failed_cases_array", isinstance(failed_cases, list), "failed_cases must be an array"),
+        ]
+    )
+    case_names: list[str] = []
+    observed_failed: list[str] = []
+    if isinstance(cases, list):
+        for index, case in enumerate(cases):
+            prefix = f"cases.{index}"
+            if not isinstance(case, dict):
+                checks.append(_contract_check(f"{prefix}.object", False, "case must be an object"))
+                continue
+            name = case.get("name")
+            if isinstance(name, str) and name:
+                case_names.append(name)
+            checks.extend(
+                [
+                    _contract_check(f"{prefix}.name", isinstance(name, str) and bool(name), "case name is required"),
+                    _contract_check(f"{prefix}.fixture", isinstance(case.get("fixture"), str) and bool(case.get("fixture")), "fixture path is required"),
+                    _contract_check(f"{prefix}.thresholds", isinstance(case.get("thresholds"), dict) and bool(case.get("thresholds")), "thresholds must be a non-empty object"),
+                    _contract_check(f"{prefix}.counts", isinstance(case.get("counts"), dict), "counts must be an object"),
+                    _contract_check(f"{prefix}.report", isinstance(case.get("report"), dict), "nested evaluation report is required"),
+                    _contract_check(f"{prefix}.status", case.get("status") in {"RETRIEVAL_EVAL_OK", "RETRIEVAL_EVAL_FAILED"}, "case status must be explicit"),
+                ]
+            )
+            if case.get("status") != "RETRIEVAL_EVAL_OK" and isinstance(name, str):
+                observed_failed.append(name)
+            counts = case.get("counts") if isinstance(case.get("counts"), dict) else {}
+            count_keys = ("chunks", "queries", "positive_queries", "no_context_queries", "expected_bindings", "multi_binding_queries", "source_ids", "source_formats", "strategies")
+            for key in count_keys:
+                if key in counts:
+                    checks.append(_contract_check(f"{prefix}.counts.{key}", _non_negative_int(counts.get(key)), f"{key} must be a non-negative integer"))
+            if "queries" in counts and "positive_queries" in counts and "no_context_queries" in counts:
+                checks.append(_contract_check(f"{prefix}.counts.query_accounting_closed", counts.get("positive_queries", -1) + counts.get("no_context_queries", -1) == counts.get("queries", -2), "positive and no-context queries must close to total queries"))
+            nested = case.get("report") if isinstance(case.get("report"), dict) else {}
+            checks.extend(
+                [
+                    _contract_check(f"{prefix}.report.status_matches", nested.get("status") == case.get("status"), "nested report status must match case status"),
+                    _contract_check(f"{prefix}.report.fixture_validation", _dotted(nested, "fixture_validation.status") == "RETRIEVAL_FIXTURE_OK", "fixture validation must pass"),
+                    _contract_check(f"{prefix}.report.strategies", isinstance(nested.get("strategies"), list) and bool(nested.get("strategies")), "strategy evaluations are required"),
+                    _contract_check(f"{prefix}.report.counts_match", isinstance(nested.get("counts"), dict) and nested.get("counts") == counts, "nested report counts must match case counts"),
+                ]
+            )
+            if isinstance(nested.get("strategies"), list):
+                strategy_names: list[str] = []
+                for strategy_index, strategy in enumerate(nested["strategies"]):
+                    if not isinstance(strategy, dict):
+                        checks.append(_contract_check(f"{prefix}.report.strategies.{strategy_index}.object", False, "strategy must be an object"))
+                        continue
+                    strategy_name = strategy.get("strategy")
+                    if isinstance(strategy_name, str) and strategy_name:
+                        strategy_names.append(strategy_name)
+                    checks.extend(
+                        [
+                            _contract_check(f"{prefix}.report.strategies.{strategy_index}.name", isinstance(strategy_name, str) and bool(strategy_name), "strategy name is required"),
+                            _contract_check(f"{prefix}.report.strategies.{strategy_index}.cases", isinstance(strategy.get("cases"), list), "strategy cases must be an array"),
+                        ]
+                    )
+                checks.append(_contract_check(f"{prefix}.report.strategy_names_unique", len(strategy_names) == len(set(strategy_names)), "strategy names must be unique"))
+                if isinstance(counts.get("strategies"), int):
+                    checks.append(_contract_check(f"{prefix}.counts.strategy_count_matches", counts["strategies"] == len(nested["strategies"]), "strategy count must match strategy receipts"))
+    checks.extend(
+        [
+            _contract_check("case_names_unique", len(case_names) == len(set(case_names)), "case names must be unique"),
+            _contract_check("failed_case_names_unique", isinstance(failed_cases, list) and all(isinstance(item, dict) and isinstance(item.get("name"), str) for item in failed_cases) and len({item.get("name") for item in failed_cases if isinstance(item, dict)}) == len(failed_cases), "failed case names must be unique"),
+            _contract_check("failed_case_accounting_closed", isinstance(failed_cases, list) and sorted(item.get("name") for item in failed_cases if isinstance(item, dict)) == sorted(observed_failed), "failed_cases must exactly match failed case rows"),
+            _contract_check("receipt_status_matches_cases", receipt.get("status") == RETRIEVAL_QUALITY_OK if isinstance(cases, list) else False, "successful receipt status requires no failed cases"),
+        ]
+    )
+    if receipt.get("status") == RETRIEVAL_QUALITY_FAILED:
+        checks[-1] = _contract_check("receipt_status_matches_cases", bool(observed_failed) and isinstance(failed_cases, list) and len(failed_cases) == len(observed_failed), "failed receipt status requires failed case rows")
+    return _contract_result("retrieval_quality_evaluation", checks, report_path=report_path, report=receipt)
+
+
+def validate_retrieval_quality_file(path: Path) -> dict[str, Any]:
+    receipt, error = read_release_receipt_file(path)
+    if error is not None or receipt is None:
+        failed_check = _contract_check("receipt_file_readable", False, error or f"receipt not found: {path}")
+        return _contract_result("retrieval_quality_evaluation", [failed_check], report_path=str(path))
+    return validate_retrieval_quality_contract(receipt, report_path=str(path))
+
+
+def validate_web_snapshot_contract(snapshot: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
+    """Validate immutable web snapshot provenance and citation-policy boundaries."""
+    if not isinstance(snapshot, dict):
+        return _contract_result(
+            "governed_web_browsing",
+            [_contract_check("payload_object", False, "snapshot must be a JSON object")],
+            report_path=report_path,
+        )
+    checks: list[dict[str, str]] = [
+        _contract_check("payload_object", isinstance(snapshot, dict), "snapshot must be a JSON object"),
+        _contract_check("schema_version", snapshot.get("schema_version") == WEB_SNAPSHOT_SCHEMA_VERSION, f"schema_version must be {WEB_SNAPSHOT_SCHEMA_VERSION}"),
+        _contract_check("snapshot_id", isinstance(snapshot.get("snapshot_id"), str) and bool(snapshot.get("snapshot_id")), "snapshot_id is required"),
+        _contract_check("snapshot_kind", snapshot.get("snapshot_kind") in {"web_page", "http_error_page"}, "snapshot_kind must be explicit"),
+        _contract_check("retrieval_timestamps", all(isinstance(snapshot.get(key), str) and snapshot.get(key).endswith("Z") for key in ("retrieval_started_utc", "retrieval_utc")), "retrieval timestamps must be UTC strings ending in Z"),
+        _contract_check("http_status", isinstance(snapshot.get("http_status"), int) and 100 <= snapshot.get("http_status", 0) <= 599, "http_status must be an HTTP status code"),
+        _contract_check("content_type", isinstance(snapshot.get("content_type"), str) and bool(snapshot.get("content_type")), "content_type is required"),
+        _contract_check("content_sha256", _valid_sha256(snapshot.get("content_sha256")), "content_sha256 must be a SHA-256"),
+        _contract_check("content_size_bytes", _non_negative_int(snapshot.get("content_size_bytes")), "content_size_bytes must be non-negative"),
+        _contract_check("content_base64", isinstance(snapshot.get("content_base64"), str), "content_base64 is required"),
+        _contract_check("parser_name", isinstance(snapshot.get("parser_name"), str) and bool(snapshot.get("parser_name")), "parser_name is required"),
+        _contract_check("parser_trace", isinstance(snapshot.get("parser_trace"), dict), "parser_trace must be an object"),
+        _contract_check("parser_warnings", isinstance(snapshot.get("parser_warnings"), list) and all(isinstance(item, str) and item for item in snapshot.get("parser_warnings", [])), "parser_warnings must be a string array"),
+        _contract_check("redirect_chain", isinstance(snapshot.get("redirect_chain"), list), "redirect_chain must be an array"),
+        _contract_check("policy", isinstance(snapshot.get("policy"), dict), "policy must be an object"),
+        _contract_check("cache_policy", isinstance(snapshot.get("cache_policy"), dict), "cache_policy must be an object"),
+        _contract_check("robots_policy", isinstance(snapshot.get("robots_policy"), dict), "robots_policy must be an object"),
+        _contract_check("http_error_policy", isinstance(snapshot.get("http_error_policy"), dict), "http_error_policy must be an object"),
+    ]
+    for field in ("requested_url", "fetch_url", "final_url"):
+        parsed = urlparse(snapshot.get(field, "")) if isinstance(snapshot.get(field), str) else None
+        checks.append(_contract_check(f"{field}_httpscheme", parsed is not None and parsed.scheme in {"http", "https"} and bool(parsed.netloc), f"{field} must be an HTTP(S) URL"))
+    for index, redirect in enumerate(snapshot.get("redirect_chain", []) if isinstance(snapshot.get("redirect_chain"), list) else []):
+        checks.append(_contract_check(f"redirect_chain.{index}.object", isinstance(redirect, dict), "redirect entries must be objects"))
+    try:
+        raw = base64.b64decode(snapshot.get("content_base64", ""), validate=True)
+        decoded_ok = True
+    except (ValueError, binascii.Error, TypeError):
+        raw = b""
+        decoded_ok = False
+    checks.extend(
+        [
+            _contract_check("content_base64_decodes", decoded_ok, "content_base64 must be strict base64"),
+            _contract_check("content_hash_matches_bytes", decoded_ok and hashlib.sha256(raw).hexdigest() == snapshot.get("content_sha256"), "content_sha256 must match decoded bytes"),
+            _contract_check("content_size_matches_bytes", decoded_ok and len(raw) == snapshot.get("content_size_bytes"), "content_size_bytes must match decoded bytes"),
+        ]
+    )
+    http_error_policy = snapshot.get("http_error_policy") if isinstance(snapshot.get("http_error_policy"), dict) else {}
+    http_error = snapshot.get("http_status", 0) >= 400 if isinstance(snapshot.get("http_status"), int) else False
+    checks.extend(
+        [
+            _contract_check("http_error_policy.boolean", isinstance(http_error_policy.get("is_http_error"), bool), "is_http_error must be boolean"),
+            _contract_check("http_error_policy.status_consistent", http_error_policy.get("is_http_error") == http_error, "is_http_error must match HTTP status"),
+            _contract_check("http_error_policy.snapshot_allowed", isinstance(http_error_policy.get("snapshot_allowed"), bool), "snapshot_allowed must be boolean"),
+            _contract_check("http_error_policy.citation_allowed", isinstance(http_error_policy.get("citation_allowed"), bool), "citation_allowed must be boolean"),
+            _contract_check("citation_requires_snapshot_permission", http_error_policy.get("citation_allowed") is not True or http_error_policy.get("snapshot_allowed") is True, "citation cannot be allowed without snapshot permission"),
+        ]
+    )
+    cache_policy = snapshot.get("cache_policy") if isinstance(snapshot.get("cache_policy"), dict) else {}
+    policy = snapshot.get("policy") if isinstance(snapshot.get("policy"), dict) else {}
+    checks.extend(
+        [
+            _contract_check("cache_mode_snapshot_only", cache_policy.get("cache_mode") == "immutable_snapshot_only" or policy.get("cache_mode") == "immutable_snapshot_only", "cache mode must be immutable_snapshot_only"),
+            _contract_check("robots_allowed", isinstance(snapshot.get("robots_policy"), dict) and snapshot["robots_policy"].get("allowed") is True, "snapshot must record an allowed robots policy"),
+        ]
+    )
+    parser_trace = snapshot.get("parser_trace") if isinstance(snapshot.get("parser_trace"), dict) else {}
+    content_kind = parser_trace.get("content_kind")
+    text_preview = snapshot.get("text_preview")
+    checks.extend(
+        [
+            _contract_check("parser_content_kind", content_kind in {"html", "text", "json", "xml", "pdf", "non_text"}, "parser_trace.content_kind must be explicit"),
+            _contract_check("text_preview_string", isinstance(text_preview, str), "text_preview must be a string"),
+            _contract_check("non_text_preview_empty", content_kind != "non_text" or text_preview == "", "non-text snapshots cannot claim a text preview"),
+        ]
+    )
+    return _contract_result("governed_web_browsing", checks, report_path=report_path, report=snapshot)
+
+
+def validate_web_snapshot_file(path: Path) -> dict[str, Any]:
+    try:
+        snapshot = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError) as exc:
+        failed_check = _contract_check("snapshot_file_readable", False, str(exc))
+        return _contract_result("governed_web_browsing", [failed_check], report_path=str(path))
+    return validate_web_snapshot_contract(snapshot if isinstance(snapshot, dict) else {}, report_path=str(path))
 
 
 def list_advanced_capability_contracts() -> list[dict[str, Any]]:
