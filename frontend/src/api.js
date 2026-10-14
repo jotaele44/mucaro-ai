@@ -275,6 +275,8 @@ export const api = {
   toolCalls: () => request("/tools/requests"),
   resolveInteraction: (id, payload) => request(`/interactions/${id}/resolve`, json("POST", payload)),
 
+  securityScanPreflight: (payload) => request("/security-scans/preflight", json("POST", payload)),
+  securityScanRun: (payload) => request("/security-scans/run", json("POST", payload)),
   sources: () => request("/sources"),
   source: (id) => request(`/sources/${id}`),
   deleteSource: (id) => request(`/sources/${id}`, { method: "DELETE" }),
