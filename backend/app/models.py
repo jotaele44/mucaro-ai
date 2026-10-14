@@ -61,7 +61,7 @@ class SecurityScanPreflightRequest(BaseModel):
 class SecurityScanRunRequest(BaseModel):
     path: str = Field(min_length=1, max_length=4096)
     expected_head: str = Field(pattern=r"^[0-9a-f]{40}$")
-    max_files: int = Field(default=500, ge=1, le=1000)
+    max_files: int = Field(default=1000, ge=1, le=1000)
 
 
 class IngestPathRequest(BaseModel):
