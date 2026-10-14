@@ -55,4 +55,4 @@ jobs:
             data/exports/ocr_evals/*.json
             data/exports/release_receipts/ocr_representative_corpus-*.json
           if-no-files-found: error
-          archive: false
+          archive: true
