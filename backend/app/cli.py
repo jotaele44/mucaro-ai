@@ -87,6 +87,12 @@ from .gis_eval import (
 )
 from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .ocr_corpus_eval import (
+    DEFAULT_OCR_CORPUS_MANIFEST,
+    OCR_CORPUS_READY,
+    OcrCorpusEvaluationError,
+    build_ocr_corpus_evaluation,
+)
 from .ocr_corpus_evidence import OcrCorpusEvidenceError, validate_ocr_v1_evidence
 from .ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
 from .ocr_structure import OCRStructureError, reconstruct_ocr_report
@@ -474,6 +480,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     certify_answer_trace.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     certify_answer_trace.set_defaults(handler=run_certify_answer_trace_quality)
+
+    certify_ocr_corpus = certify_subcommands.add_parser(
+        "ocr-corpus",
+        help="Execute the frozen bounded OCR corpus and write an exact-head evidence receipt.",
+    )
+    certify_ocr_corpus.add_argument(
+        "--manifest",
+        type=Path,
+        default=DEFAULT_OCR_CORPUS_MANIFEST,
+        help="Frozen OCR corpus denominator manifest.",
+    )
+    certify_ocr_corpus.add_argument("--tesseract-path", help="Explicit path to the local tesseract executable.")
+    certify_ocr_corpus.add_argument("--renderer-path", help="Explicit path to the local pdftoppm executable.")
+    certify_ocr_corpus.add_argument(
+        "--strict-quality",
+        action="store_true",
+        help="Return nonzero unless the bounded corpus has no provisional quality residue.",
+    )
+    certify_ocr_corpus.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    certify_ocr_corpus.set_defaults(handler=run_certify_ocr_corpus)
 
     certify_gis = certify_subcommands.add_parser(
         "gis-quality",
@@ -8161,6 +8187,37 @@ def run_certify_answer_trace_quality(args: argparse.Namespace, cfg: Settings) ->
     )
     emit_payload(report, args.format)
     return 0 if report["status"] == ANSWER_TRACE_QUALITY_OK else 2
+
+
+def run_certify_ocr_corpus(args: argparse.Namespace, cfg: Settings) -> int:
+    manifest = args.manifest
+    if not manifest.is_absolute():
+        manifest = cfg.project_root / manifest
+    command = ["mucaro", "certify", "ocr-corpus"]
+    if args.manifest != DEFAULT_OCR_CORPUS_MANIFEST:
+        command.extend(["--manifest", str(args.manifest)])
+    if args.tesseract_path:
+        command.extend(["--tesseract-path", args.tesseract_path])
+    if args.renderer_path:
+        command.extend(["--renderer-path", args.renderer_path])
+    if args.strict_quality:
+        command.append("--strict-quality")
+    try:
+        report = build_ocr_corpus_evaluation(
+            cfg.project_root,
+            cfg=cfg,
+            manifest_path=manifest,
+            tesseract_path=args.tesseract_path,
+            renderer_path=args.renderer_path,
+            command=command,
+        )
+    except OcrCorpusEvaluationError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(report, args.format)
+    if report.get("status") != OCR_CORPUS_READY:
+        return 2
+    return 2 if args.strict_quality and report.get("accuracy_certified") is not True else 0
 
 
 def run_certify_operator_workflow(args: argparse.Namespace, cfg: Settings) -> int:

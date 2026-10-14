@@ -67,6 +67,7 @@ listing. Missing targets return the existing error payload and failure exit code
 | `mucaro certify answer-trace-quality` | Write an exact-head cited-answer traceability release receipt | 0 | 2 |
 | `mucaro certify gis-quality` | Write an exact-head GIS fixture-quality release receipt | 0 | 2 |
 | `mucaro certify operator-workflow` | Write an exact-head local operator-workflow release receipt | 0 | 2 |
+| `mucaro certify ocr-corpus` | Execute the frozen bounded OCR corpus and write an exact-head evidence receipt | 0 | 2; `--strict-quality` also fails on provisional quality residue |
 | `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
 | `mucaro capabilities validate-gis-report REPORT_PATH` | Validate a saved GIS receipt against the advanced capability output contract | 0 | 2 |
 | `mucaro capabilities validate-ocr-report REPORT_PATH` | Validate a saved OCR receipt against the state-of-the-art OCR output contract | 0 | 2 |
@@ -344,6 +345,17 @@ restricted to the ledger directory by default (or `--evidence-root`), with
 lexical traversal and symlink indirection rejected. A ready ledger proves
 fixture and receipt identity only; it does not promote unsupported OCR classes
 or establish representative accuracy.
+
+Use `mucaro certify ocr-corpus` to execute the committed six-case OCR
+calibration corpus. The command records source bytes, OCR receipt hashes,
+required-token recall, no-text state, warning state, page lineage, span
+accounting, accent-preservation residue, and an exact-head release receipt.
+The normal command succeeds when the evidence ledger is complete and reports
+`quality_state=PROVISIONAL` while unresolved quality residue remains. Use
+`--strict-quality` when a CI lane must fail until every provisional quality
+expectation is closed. This corpus is intentionally bounded and does not claim
+statistical real-world OCR accuracy, semantic table/form/handwriting support,
+or universal document-layout understanding.
 
 ## Output Contracts
 
@@ -674,6 +686,21 @@ approved and audited.
 | `ERROR_OCR_CORPUS_SYMLINK` | OCR v1 evidence path resolves through a symlink |
 | `ERROR_OCR_CORPUS_PATH_ESCAPE` | OCR v1 evidence path resolves outside the evidence root |
 | `ERROR_OCR_CORPUS_FILE_MISSING` | OCR v1 evidence source or receipt file does not exist |
+| `ERROR_OCR_CORPUS_MANIFEST_READ` | OCR representative corpus manifest could not be read as a JSON object |
+| `ERROR_OCR_CORPUS_MANIFEST_SCHEMA` | OCR representative corpus manifest has an unsupported schema version |
+| `ERROR_OCR_CORPUS_MANIFEST_COUNT` | OCR representative corpus case count does not equal its cases array |
+| `ERROR_OCR_CORPUS_MANIFEST_CASE` | OCR representative corpus has a malformed case row or empty case ID |
+| `ERROR_OCR_CORPUS_MANIFEST_DUPLICATE` | OCR representative corpus contains a duplicate case ID |
+| `ERROR_OCR_CORPUS_MANIFEST_SHA256` | OCR representative corpus source bytes do not match the frozen SHA-256 |
+| `ERROR_OCR_CORPUS_MANIFEST_INPUT_KIND` | OCR representative corpus case has an unsupported input kind |
+| `ERROR_OCR_CORPUS_MANIFEST_STATE` | OCR representative corpus case has an unsupported expected state |
+| `ERROR_OCR_CORPUS_MANIFEST_TOKENS` | OCR representative corpus case is missing required token expectations |
+| `ERROR_OCR_CORPUS_SOURCE_PATH` | OCR representative corpus source path is empty or absolute |
+| `ERROR_OCR_CORPUS_SOURCE_TRAVERSAL` | OCR representative corpus source path contains parent-directory traversal |
+| `ERROR_OCR_CORPUS_SOURCE_SYMLINK` | OCR representative corpus source path resolves through a symlink |
+| `ERROR_OCR_CORPUS_SOURCE_ESCAPE` | OCR representative corpus source path resolves outside the project root |
+| `ERROR_OCR_CORPUS_SOURCE_MISSING` | OCR representative corpus source file does not exist |
+| `ERROR_OCR_CORPUS_ARTIFACT_ESCAPE` | OCR representative corpus report path resolves outside the project root |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
