@@ -70,6 +70,7 @@ listing. Missing targets return the existing error payload and failure exit code
 | `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
 | `mucaro capabilities validate-gis-report REPORT_PATH` | Validate a saved GIS receipt against the advanced capability output contract | 0 | 2 |
 | `mucaro capabilities validate-ocr-report REPORT_PATH` | Validate a saved OCR receipt against the state-of-the-art OCR output contract | 0 | 2 |
+| `mucaro capabilities validate-ocr-pdf-report REPORT_PATH` | Validate a saved PDF OCR receipt against the page-level OCR output contract | 0 | 2 |
 | `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry/topology receipt | 0 | 2 |
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
@@ -96,6 +97,7 @@ listing. Missing targets return the existing error payload and failure exit code
 | `mucaro gis validate-corpus MANIFEST_PATH` | Validate frozen authoritative GIS corpus bytes, provenance, explicit asset types, vector identities/geometries, and raster grids/value accounting | 0 | 2 |
 | `mucaro gis map-export-manifest OUTPUT_PATH --layer PATH CRS ...` | Bind an existing map/export artifact to renderer identity, extent, CRS, and source-layer hashes | 0 | 2 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
+| `mucaro ocr pdf PDF_PATH` | Render PDF pages locally and write a page-lineage OCR receipt with explicit no-text residue | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources, persistent index status, and semantic-store status | 0 | 2 |
@@ -306,9 +308,13 @@ IMAGE_PATH` runs a local Tesseract engine against one image, preserves the
 source image SHA-256, engine path/version, language, layout mode, raw text,
 normalized text, canonical text, per-span confidence state, source-coordinate
 bounding boxes, warnings, and a JSON receipt under `data/exports/ocr_reports`.
-It is a narrow local image receipt candidate; PDF/page rendering, calibrated
-document layout, handwriting, tables/forms, and optional external OCR providers
-remain future governed-document-intelligence work.
+`mucaro ocr pdf PDF_PATH` renders each PDF page with local `pdftoppm`, runs the
+same local OCR adapter per page, preserves source/rendered/child-report hashes,
+page indices, renderer identity, page accounting, and no-text residue, and
+writes a governed aggregate receipt under the same directory. Both are bounded
+local receipt workflows; calibrated document layout, handwriting, semantic
+tables/forms, and optional external OCR providers remain future governed-
+document-intelligence work.
 
 Use `mucaro capabilities validate-ocr-report REPORT_PATH` to check a saved OCR
 receipt against the executable state-of-the-art OCR output contract. The
@@ -319,6 +325,13 @@ span/confidence accounting. It returns `CAPABILITY_OUTPUT_CONTRACT_FAILED` when
 a report omits source or engine proof, claims text without saved spans, misses a
 required no-text or low-confidence warning, or asserts span/confidence counts
 that do not match the saved spans.
+
+Use `mucaro capabilities validate-ocr-pdf-report REPORT_PATH` to validate the
+aggregate PDF receipt. The PDF validator checks source PDF identity, renderer
+and OCR engine identity, page ordering, rendered-page and child-report hashes,
+page/span/no-text accounting, warning consistency, limitations, and
+falsification criteria. It does not infer semantic tables, forms, or
+handwriting from page OCR.
 
 ## Output Contracts
 
@@ -628,6 +641,17 @@ approved and audited.
 | `ERROR_OCR_LAYOUT_INVALID` | OCR layout mode was not one of the supported adapter modes |
 | `ERROR_OCR_TIMEOUT` | OCR engine exceeded the configured timeout |
 | `ERROR_OCR_ENGINE_FAILED` | OCR engine exited with a non-zero status |
+| `ERROR_OCR_PDF_NOT_FOUND` | PDF OCR input path does not exist |
+| `ERROR_OCR_PDF_UNSUPPORTED_INPUT` | PDF OCR received a non-PDF input |
+| `ERROR_OCR_PDF_DPI` | PDF page rendering DPI is outside the supported 72-600 range |
+| `ERROR_OCR_PDF_RENDERER_UNAVAILABLE` | local `pdftoppm` executable was not found |
+| `ERROR_OCR_PDF_RENDER_FAILED` | PDF page renderer exited unsuccessfully |
+| `ERROR_OCR_PDF_RENDER_TIMEOUT` | PDF page renderer exceeded its timeout |
+| `ERROR_OCR_PDF_RENDER_EMPTY` | PDF renderer produced no page images |
+| `ERROR_OCR_PDF_PAGE_COUNT_MISMATCH` | rendered PDF page count differs from declared page count |
+| `ERROR_OCR_PDF_PARSE` | PDF page structure could not be read |
+| `ERROR_OCR_PDF_NO_PAGES` | PDF contains no pages |
+| `ERROR_OCR_PDF_REPORT_CONTRACT` | aggregate PDF OCR report failed validation before persistence |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |

@@ -330,6 +330,23 @@ def test_cli_ocr_analyze_reports_adapter_errors(tmp_path: Path, capsys, monkeypa
     assert "ERROR_OCR_ENGINE_UNAVAILABLE Local tesseract executable was not found." in captured.err
 
 
+def test_cli_ocr_pdf_reports_adapter_errors(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    def fake_analyze(path: Path, **kwargs):
+        del path, kwargs
+        raise cli.PDFOCRAnalysisError("ERROR_OCR_PDF_RENDERER_UNAVAILABLE", "Local pdftoppm executable was not found.")
+
+    monkeypatch.setattr(cli, "analyze_pdf_ocr", fake_analyze)
+
+    assert main(["ocr", "pdf", str(pdf), "--format", "text"], cfg=cfg) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "ERROR_OCR_PDF_RENDERER_UNAVAILABLE Local pdftoppm executable was not found." in captured.err
+
+
 def test_cli_sources_ingest_web_snapshot(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
     cfg.ensure_dirs()

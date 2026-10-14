@@ -21,6 +21,7 @@ from .capability_contracts import (
     build_capability_contract_report,
     validate_gis_report_file,
     validate_ocr_report_file,
+    validate_pdf_ocr_report_file,
     validate_retrieval_quality_file,
     validate_web_snapshot_file,
 )
@@ -86,6 +87,7 @@ from .gis_eval import (
 )
 from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
 from .ocr_structure import OCRStructureError, reconstruct_ocr_report
 from .ingestion import (
     IngestLimitError,
@@ -899,6 +901,18 @@ def build_parser() -> argparse.ArgumentParser:
     ocr_analyze.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     ocr_analyze.set_defaults(handler=run_ocr_analyze)
 
+    ocr_pdf = ocr_subcommands.add_parser("pdf", help="Render a local PDF and run page-level local OCR with lineage receipts.")
+    ocr_pdf.add_argument("pdf_path", help="Path to a local PDF file.")
+    ocr_pdf.add_argument("--language", default="eng", help="OCR language code passed to the local engine.")
+    ocr_pdf.add_argument("--layout", choices=["single_block", "auto"], default="auto", help="OCR layout mode for each rendered page.")
+    ocr_pdf.add_argument("--dpi", type=int, default=200, help="PDF page rendering DPI (72-600).")
+    ocr_pdf.add_argument("--renderer-path", help="Explicit path to the local pdftoppm executable.")
+    ocr_pdf.add_argument("--tesseract-path", help="Explicit path to the local tesseract executable.")
+    ocr_pdf.add_argument("--render-timeout-seconds", type=int, default=120, help="PDF renderer timeout.")
+    ocr_pdf.add_argument("--ocr-timeout-seconds", type=int, default=60, help="Per-page OCR timeout.")
+    ocr_pdf.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    ocr_pdf.set_defaults(handler=run_ocr_pdf)
+
     ocr_structure = ocr_subcommands.add_parser(
         "structure",
         help="Derive a bounded multi-column, table, or form structure receipt from a saved image OCR receipt.",
@@ -1092,6 +1106,14 @@ def build_parser() -> argparse.ArgumentParser:
     capability_validate_ocr.add_argument("report_path", type=Path, help="Path to a saved OCR report JSON file.")
     capability_validate_ocr.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     capability_validate_ocr.set_defaults(handler=run_capability_validate_ocr_report)
+
+    capability_validate_ocr_pdf = capabilities_subcommands.add_parser(
+        "validate-ocr-pdf-report",
+        help="Validate a saved PDF OCR receipt against the page-level OCR output contract.",
+    )
+    capability_validate_ocr_pdf.add_argument("report_path", type=Path, help="Path to a saved mucaro_pdf_ocr_report_v1 JSON receipt.")
+    capability_validate_ocr_pdf.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_ocr_pdf.set_defaults(handler=run_capability_validate_pdf_ocr_report)
 
     capability_validate_retrieval = capabilities_subcommands.add_parser(
         "validate-retrieval-quality",
@@ -3363,6 +3385,29 @@ def run_ocr_analyze(args: argparse.Namespace, cfg: Settings) -> int:
             timeout_seconds=args.timeout_seconds,
         )
     except (OCRAnalysisError, CapabilityOutputContractError) as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_ocr_pdf(args: argparse.Namespace, cfg: Settings) -> int:
+    path = Path(args.pdf_path)
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        result = analyze_pdf_ocr(
+            path,
+            cfg=cfg,
+            language=args.language,
+            layout_mode=args.layout,
+            dpi=args.dpi,
+            renderer_path=args.renderer_path,
+            tesseract_path=args.tesseract_path,
+            render_timeout_seconds=args.render_timeout_seconds,
+            ocr_timeout_seconds=args.ocr_timeout_seconds,
+        )
+    except (PDFOCRAnalysisError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -8389,6 +8434,15 @@ def run_capability_validate_ocr_report(args: argparse.Namespace, cfg: Settings) 
     if not path.is_absolute():
         path = cfg.project_root / path
     report = validate_ocr_report_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_pdf_ocr_report(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_pdf_ocr_report_file(path)
     emit_payload(report, args.format)
     return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
 

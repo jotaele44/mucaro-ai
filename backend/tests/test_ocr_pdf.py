@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from pypdf import PdfWriter
 
+from backend.app import ocr_pdf
+from backend.app.capability_contracts import CapabilityOutputContractError, validate_pdf_ocr_report_file
 from backend.app.config import Settings
 from backend.app.ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
 
@@ -89,6 +91,9 @@ def test_pdf_ocr_preserves_page_lineage_and_no_text_residue(tmp_path: Path) -> N
     assert all(page["rendered_sha256"] for page in report["pages"])
     assert all(page["ocr_report_sha256"] for page in report["pages"])
     assert "OCR_PDF_NO_TEXT_PAGES_PRESENT" in report["warnings"]
+    validation = validate_pdf_ocr_report_file(Path(report["report_path"]))
+    assert validation["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert validation["counts"]["fail"] == 0
 
 
 def test_pdf_ocr_fails_closed_on_rendered_page_count_mismatch(tmp_path: Path) -> None:
@@ -119,3 +124,20 @@ def test_pdf_ocr_rejects_non_pdf_and_invalid_dpi(tmp_path: Path) -> None:
     with pytest.raises(PDFOCRAnalysisError) as dpi:
         analyze_pdf_ocr(pdf, cfg=cfg, dpi=20, renderer_path="pdftoppm", tesseract_path="tesseract")
     assert dpi.value.status == "ERROR_OCR_PDF_DPI"
+
+
+def test_pdf_report_contract_fails_before_persistence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = make_settings(tmp_path)
+    report = {"report_id": "ocr_pdf_contract_failure"}
+    report_path = cfg.export_dir / "ocr_reports" / f"{report['report_id']}.json"
+
+    def reject_report(report: dict[str, object], *, report_path: str | None = None) -> None:
+        raise CapabilityOutputContractError("ERROR_OCR_PDF_REPORT_CONTRACT", "test contract rejection", report=report)
+
+    monkeypatch.setattr(ocr_pdf, "require_pdf_ocr_report_contract", reject_report)
+
+    with pytest.raises(CapabilityOutputContractError) as exc:
+        ocr_pdf._write_report(cfg, report)
+
+    assert exc.value.status == "ERROR_OCR_PDF_REPORT_CONTRACT"
+    assert not report_path.exists()
