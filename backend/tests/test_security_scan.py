@@ -91,3 +91,45 @@ def test_local_api_preflight_scan_and_stale_guard(tmp_path):
     stale = client.post("/security-scans/run", json={"path": str(root), "expected_head": "0" * 40})
     assert stale.status_code == 409
     assert stale.json()["detail"]["status"] == "ERROR_SCAN_STALE_HEAD"
+
+
+def test_permission_boundary_rejects_ungranted_external_repo(tmp_path):
+    from dataclasses import replace
+
+    root, cfg = repo_fixture(tmp_path)
+    restricted = replace(cfg, project_root=tmp_path / "unrelated-project")
+    with pytest.raises(SecurityScanError) as exc:
+        preflight_repository(str(root), cfg=restricted)
+    assert exc.value.status == "ERROR_DIRECTORY_PERMISSION_REQUIRED"
+
+
+def test_scan_does_not_mutate_worktree(tmp_path):
+    root, cfg = repo_fixture(tmp_path)
+    head = git(root, "rev-parse", "HEAD")
+    status_before = git(root, "status", "--porcelain")
+    report = scan_repository(str(root), head, cfg=cfg)
+    status_after = git(root, "status", "--porcelain")
+    assert report["head_sha"] == head
+    assert status_before == status_after == ""
+    assert git(root, "rev-parse", "HEAD") == head
+
+
+def test_remote_scan_request_rejected_even_with_valid_operator_token(tmp_path):
+    from dataclasses import replace
+
+    root, cfg = repo_fixture(tmp_path)
+    protected_cfg = replace(cfg, operator_token="local-fixture-secret")
+    client = TestClient(create_app(protected_cfg), client=("198.51.100.27", 50123))
+    response = client.post(
+        "/security-scans/preflight",
+        json={"path": str(root)},
+        headers={"X-Mucaro-Token": "local-fixture-secret"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"]["status"] == "ERROR_SCAN_LOCAL_ONLY"
+
+
+def test_no_implicit_write_access_or_arbitrary_path(tmp_path):
+    root, cfg = repo_fixture(tmp_path)
+    with pytest.raises(SecurityScanError):
+        scan_repository(str(root / "nonexistent"), "0" * 40, cfg=cfg)
