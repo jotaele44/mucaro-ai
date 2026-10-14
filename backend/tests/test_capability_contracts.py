@@ -2,6 +2,7 @@ import hashlib
 import json
 import base64
 
+from backend.app import retrieval_quality_certification as retrieval_quality
 from backend.app.capability_contracts import (
     CAPABILITY_CONTRACT_SCHEMA_VERSION,
     CAPABILITY_OUTPUT_CONTRACT_FAILED,
@@ -798,3 +799,33 @@ def test_web_snapshot_contract_rejects_inconsistent_http_error_policy():
     invalid = validate_web_snapshot_contract(snapshot)
     assert invalid["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
     assert any(check["name"] == "http_error_policy.status_consistent" for check in invalid["failed_checks"])
+
+
+def test_retrieval_quality_producer_fails_closed_on_exact_head_contract_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(retrieval_quality, "current_git_head", lambda _root: "a" * 40)
+    monkeypatch.setattr(
+        retrieval_quality,
+        "build_retrieval_eval_report",
+        lambda **_kwargs: {
+            "status": "RETRIEVAL_EVAL_OK",
+            "counts": {},
+            "category_threshold_failures": [],
+            "distractor_threshold_failures": [],
+            "source_format_threshold_failures": [],
+        },
+    )
+    monkeypatch.setattr(
+        retrieval_quality,
+        "validate_retrieval_quality_contract",
+        lambda _receipt: {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "failed_checks": [{"name": "fixture_contract_failure"}],
+        },
+    )
+
+    result = retrieval_quality.build_retrieval_quality_certification(tmp_path, write_receipt=True)
+
+    assert result["status"] == retrieval_quality.RETRIEVAL_QUALITY_FAILED
+    assert result["contract_status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert result["contract_failed_checks"] == ["fixture_contract_failure"]
+    assert result["receipt"] is None

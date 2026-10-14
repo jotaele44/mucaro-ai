@@ -1424,6 +1424,7 @@ def test_cli_certify_retrieval_quality_writes_exact_head_receipt(tmp_path: Path,
     assert main(["certify", "retrieval-quality", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "RETRIEVAL_QUALITY_CERT_OK"
+    assert payload["contract_status"] == "UNVERIFIED"
     assert payload["profile"] == "v0.1.23-local-release"
     assert payload["head_sha"] == "UNKNOWN_HEAD"
     assert payload["receipt"] == "data/exports/release_receipts/retrieval_quality-UNKNOWN_HEAD.json"

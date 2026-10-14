@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .capability_contracts import validate_retrieval_quality_contract
 from .release_receipts import write_release_receipt
 from .retrieval_eval import DEFAULT_FIXTURE, ROOT, build_retrieval_eval_report
 
@@ -147,6 +148,27 @@ def build_retrieval_quality_certification(
         "failed_cases": failed_cases,
         "receipt": None,
     }
+    receipt_command = command or [sys.executable, "scripts/certify_retrieval_quality.py"]
+    contract_candidate = {
+        "schema_version": "mucaro_release_receipt_v1",
+        "receipt_type": RETRIEVAL_QUALITY_RECEIPT_TYPE,
+        "status": status,
+        "head_sha": head_sha,
+        "created_utc": "PENDING",
+        "command": receipt_command,
+        "payload": {
+            "profile": profile,
+            "top_k": top_k,
+            "cases": case_reports,
+            "failed_cases": failed_cases,
+        },
+    }
+    contract = validate_retrieval_quality_contract(contract_candidate)
+    result["contract_status"] = "UNVERIFIED" if head_sha == "UNKNOWN_HEAD" else contract["status"]
+    if head_sha != "UNKNOWN_HEAD" and contract["status"] != "CAPABILITY_OUTPUT_CONTRACT_OK":
+        result["status"] = RETRIEVAL_QUALITY_FAILED
+        result["contract_failed_checks"] = [check["name"] for check in contract.get("failed_checks", [])]
+        return result
     if write_receipt:
         try:
             receipt = write_release_receipt(
@@ -154,13 +176,8 @@ def build_retrieval_quality_certification(
                 receipt_type=RETRIEVAL_QUALITY_RECEIPT_TYPE,
                 status=status,
                 head_sha=head_sha,
-                command=command or [sys.executable, "scripts/certify_retrieval_quality.py"],
-                payload={
-                    "profile": profile,
-                    "top_k": top_k,
-                    "cases": case_reports,
-                    "failed_cases": failed_cases,
-                },
+                command=receipt_command,
+                payload=contract_candidate["payload"],
             )
             result["receipt"] = str(receipt.relative_to(root) if receipt.is_relative_to(root) else receipt)
         except OSError as exc:
