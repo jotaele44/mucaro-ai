@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -10,7 +11,7 @@ from backend.app.config import Settings
 from backend.app.main import create_app
 from backend.app.security_scan import SecurityScanError, preflight_repository, scan_repository
 
-pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="Git required")
+pytestmark = pytest.mark.skipif(shutil.which("git") is None or os.name != "posix", reason="Git and POSIX no-follow handles required; Windows scan certification is OPEN")
 
 
 def git(root: Path, *args: str) -> str:
