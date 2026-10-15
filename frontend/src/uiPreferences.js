@@ -5,6 +5,9 @@ export const UI_DEFAULTS = Object.freeze({
   density: "comfortable",
   accent: "teal",
   motion: "system",
+  general: { startRoute: "chat" },
+  notifications: { runComplete: true, errors: true, approvals: true },
+  voice: { enabled: true, rate: 1 },
   personalization: {
     style: "balanced",
     warmth: 0.5,
@@ -36,6 +39,16 @@ export function normalizeUIPrefs(value) {
     density: ["compact", "comfortable", "roomy"].includes(raw.density) ? raw.density : UI_DEFAULTS.density,
     accent: ["teal", "blue", "violet"].includes(raw.accent) ? raw.accent : UI_DEFAULTS.accent,
     motion: ["system", "full", "reduced"].includes(raw.motion) ? raw.motion : UI_DEFAULTS.motion,
+    general: { startRoute: ["chat","sources","documents","memory","provenance","settings"].includes(raw.general?.startRoute) ? raw.general.startRoute : "chat" },
+    notifications: {
+      runComplete: raw.notifications?.runComplete !== false,
+      errors: raw.notifications?.errors !== false,
+      approvals: raw.notifications?.approvals !== false,
+    },
+    voice: {
+      enabled: raw.voice?.enabled !== false,
+      rate: Math.min(2, Math.max(0.5, Number(raw.voice?.rate) || 1)),
+    },
     personalization: {
       style: ["balanced", "concise", "detailed", "analytical"].includes(personalization.style) ? personalization.style : "balanced",
       warmth: clamp(personalization.warmth, 0.5),
