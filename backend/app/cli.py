@@ -5784,6 +5784,11 @@ def build_release_handoff_report(
     )
 
     expected_receipt_count = len(REQUIRED_DISTRIBUTION_RECEIPTS)
+    required_receipt_types = {receipt_type for receipt_type, _ in REQUIRED_DISTRIBUTION_RECEIPTS}
+    required_current_head_receipts = [
+        row for row in current_head_receipts if row.get("receipt_type") in required_receipt_types
+    ]
+    required_receipt_summary = summarize_release_receipts(required_current_head_receipts)
     checks = [
         *preflight_checks,
         *refresh_checks,
@@ -5791,11 +5796,14 @@ def build_release_handoff_report(
             "current_head_receipts",
             (
                 "PASS"
-                if receipt_summary.get("total") == expected_receipt_count
-                and receipt_summary.get("valid") == expected_receipt_count
+                if required_receipt_summary.get("total") == expected_receipt_count
+                and required_receipt_summary.get("valid") == expected_receipt_count
                 else "FAIL"
             ),
-            f"total={receipt_summary.get('total')} valid={receipt_summary.get('valid')} invalid={receipt_summary.get('invalid')}",
+            f"required_total={required_receipt_summary.get('total')} "
+            f"required_valid={required_receipt_summary.get('valid')} "
+            f"all_total={receipt_summary.get('total')} all_valid={receipt_summary.get('valid')} "
+            f"all_invalid={receipt_summary.get('invalid')}",
         ),
         _certification_gate(
             "distribution_manifest",

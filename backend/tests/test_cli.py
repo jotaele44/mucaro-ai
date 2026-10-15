@@ -4556,9 +4556,17 @@ def test_cli_release_handoff_saves_and_verifies_ordered_artifact_set(tmp_path: P
     support_path = tmp_path / "data" / "exports" / "support_bundles" / f"support-bundle-{head_sha[:12]}.json"
     next_actions_path = tmp_path / "data" / "exports" / "release_next_actions" / f"next-actions-{head_sha[:12]}.json"
     receipts = [
-        {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-        for index in range(8)
+        {"head_sha": head_sha, "receipt_type": receipt_type, "status": status, "valid": True}
+        for receipt_type, status in cli.REQUIRED_DISTRIBUTION_RECEIPTS
     ]
+    receipts.append(
+        {
+            "head_sha": head_sha,
+            "receipt_type": "ocr_representative_corpus",
+            "status": "OCR_REPRESENTATIVE_CORPUS_READY",
+            "valid": True,
+        }
+    )
 
     def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
         if args == ["git", "rev-parse", "HEAD"]:
@@ -4706,6 +4714,8 @@ def test_cli_release_handoff_saves_and_verifies_ordered_artifact_set(tmp_path: P
 
     assert payload["status"] == "RELEASE_HANDOFF_OPEN"
     assert payload["head_sha"] == head_sha
+    assert payload["current_head_receipts_summary"]["total"] == 9
+    assert payload["current_head_receipts_summary"]["valid"] == 9
     assert payload["counts"] == {"pass": 7, "open": 1, "fail": 0, "total": 8}
     assert payload["artifacts"]["distribution_manifest"]["path"] == str(distribution_path)
     assert payload["artifacts"]["governance_report"]["path"] == str(governance_path)
@@ -4772,8 +4782,8 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
         if receipt_calls["count"] == 1:
             return []
         return [
-            {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-            for index in range(8)
+            {"head_sha": head_sha, "receipt_type": receipt_type, "status": status, "valid": True}
+            for receipt_type, status in cli.REQUIRED_DISTRIBUTION_RECEIPTS
         ]
 
     def fake_distribution(root: Path, *, output_path: Path | None = None, save: bool = False):
@@ -4977,8 +4987,8 @@ def test_cli_release_handoff_refresh_step_selects_canonical_subset(tmp_path: Pat
         if receipt_calls["count"] == 1:
             return []
         return [
-            {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-            for index in range(8)
+            {"head_sha": head_sha, "receipt_type": receipt_type, "status": status, "valid": True}
+            for receipt_type, status in cli.REQUIRED_DISTRIBUTION_RECEIPTS
         ]
 
     monkeypatch.setattr(cli, "_command_output", fake_command_output)
