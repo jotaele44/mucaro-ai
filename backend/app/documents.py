@@ -108,8 +108,8 @@ def _validate_block(block: dict[str, Any], seen: set[str]) -> dict[str, Any]:
         src = out.get("src", "")
         if not isinstance(src, str) or not src:
             raise DocumentError("ERROR_DOCUMENT_INVALID_IMAGE", "Image src is required.")
-        if src.startswith(("http://", "https://", "//")):
-            raise DocumentError("ERROR_DOCUMENT_REMOTE_IMAGE", "Persistent document images must use local/content-addressed sources.")
+        if not re.fullmatch(r"/document-assets/[a-zA-Z0-9_-]{1,120}", src):
+            raise DocumentError("ERROR_DOCUMENT_IMAGE_SOURCE", "Persistent document images must use Mucaro content-addressed document assets.")
         caption = out.get("caption", "")
         if not isinstance(caption, str):
             raise DocumentError("ERROR_DOCUMENT_INVALID_IMAGE", "Image caption must be a string.")
