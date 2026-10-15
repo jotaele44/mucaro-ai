@@ -10,7 +10,7 @@ from typing import Any
 from .config import parse_bool, settings
 
 # Bump when tables change; init_db only ever moves the recorded version forward.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def get_connection(sqlite_path: Path | None = None) -> sqlite3.Connection:
@@ -96,6 +96,19 @@ _SCHEMA_SQL = """
                 FOREIGN KEY(document_id) REFERENCES documents(document_id)
             );
             CREATE INDEX IF NOT EXISTS document_comments_document ON document_comments(document_id, state, created_at);
+            CREATE TABLE IF NOT EXISTS document_assets (
+                asset_id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL,
+                sha256 TEXT NOT NULL,
+                media_type TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                content BLOB NOT NULL,
+                FOREIGN KEY(document_id) REFERENCES documents(document_id),
+                UNIQUE(document_id, sha256)
+            );
+            CREATE INDEX IF NOT EXISTS document_assets_document ON document_assets(document_id, created_at);
             CREATE TABLE IF NOT EXISTS work_runs (
                 run_id TEXT PRIMARY KEY,
                 conversation_id TEXT NOT NULL,
