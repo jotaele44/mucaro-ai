@@ -351,6 +351,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
                 announce={announce}
                 allowReadAloud={turn.role === "assistant"}
                 file={turn.role === "assistant" ? { title: question?.content || conversation?.title || "", citations: [], records: [] } : null}
+                onOpenDocument={turn.role === "assistant" && onOpenDocument ? (title, text) => onOpenDocument(title, text, "conversation:" + conversationId) : null}
               />
             </div>
           );
@@ -364,6 +365,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
             announce={announce}
             messageEdits={messageEdits}
             onEditMessage={saveMessageEdit}
+            onOpenDocument={onOpenDocument}
           />
         ))}
         {error && (
