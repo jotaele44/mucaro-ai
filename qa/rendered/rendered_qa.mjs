@@ -587,6 +587,8 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.getByRole("button", { name: "Bold", exact: true }).click();
   check("rich formatting keeps native selection semantics and creates a bold mark", viewport, (await richEditor.locator("strong").count()) === 1);
   await page.getByRole("button", { name: "✓", exact: true }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).waitFor();
+  await page.locator(".document-block strong").filter({ hasText: "Bold evidence" }).waitFor();
   check("saved rich mark renders without unsafe HTML injection", viewport, (await page.locator(".document-block strong").filter({ hasText: "Bold evidence" }).count()) === 1);
 
   await page.getByRole("button", { name: /Tab 1/ }).click();
