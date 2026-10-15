@@ -126,7 +126,7 @@ export function App(){
         </div>)}</div>
       </>}
     </main>
-    {tasksOpen&&<TasksDrawer onClose={()=>setTasksOpen(false)}/>}\n    {mobileSettingsOpen&&<Sheet title="Settings" side="bottom" size="large" onClose={()=>setMobileSettingsOpen(false)}><SettingsWorkspace embedded options={options} onOptionsChange={setOptions} uiPrefs={uiPrefs} onUIPrefsChange={(next)=>setUiPrefs(normalizeUIPrefs(next))} announce={announce}/></Sheet>}
+    {tasksOpen&&<TasksDrawer onClose={()=>setTasksOpen(false)}/>}\n    {mobileSettingsOpen&&<Sheet title="Settings" side="bottom" size="large" onClose={()=>setMobileSettingsOpen(false)}><SettingsWorkspace embedded idPrefix="mobile-" options={options} onOptionsChange={setOptions} uiPrefs={uiPrefs} onUIPrefsChange={(next)=>setUiPrefs(normalizeUIPrefs(next))} announce={announce}/></Sheet>}
     <div className="sr-only" role="status" aria-live="polite">{message}</div>
   </div>;
 }
