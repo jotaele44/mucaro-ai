@@ -25,8 +25,9 @@ const rows=[
 function Row({id,title,description,onClick,value}){return <button type="button" className="settings-row" onClick={()=>onClick(id)}><span className={"settings-row-icon settings-icon-"+id} aria-hidden="true"/><span className="settings-row-copy"><strong>{title}</strong><span>{description}</span></span>{value&&<span className="settings-row-value">{value}</span>}<span aria-hidden="true">›</span></button>;}
 function Toggle({label,checked,onChange}){return <label className="settings-toggle"><span>{label}</span><input type="checkbox" checked={checked} onChange={(e)=>onChange(e.target.checked)}/></label>;}
 
-export function SettingsWorkspace({options,onOptionsChange,uiPrefs,onUIPrefsChange,announce,embedded=false}){
-  const [page,setPage]=useState("home"),[models,setModels]=useState([]),[manifest,setManifest]=useState(null),[config,setConfig]=useState(null),[memory,setMemory]=useState(null),[documents,setDocuments]=useState([]),[sources,setSources]=useState([]);
+export function SettingsWorkspace({options,onOptionsChange,uiPrefs,onUIPrefsChange,announce,embedded=false,idPrefix=""}){
+  const settingsHeadingId=idPrefix+"settings-title";
+    const [page,setPage]=useState("home"),[models,setModels]=useState([]),[manifest,setManifest]=useState(null),[config,setConfig]=useState(null),[memory,setMemory]=useState(null),[documents,setDocuments]=useState([]),[sources,setSources]=useState([]);
   const [token,setToken]=useState(api.getOperatorToken()),[error,setError]=useState(null),[instructionsOpen,setInstructionsOpen]=useState(false),[instructions,setInstructions]=useState(uiPrefs?.personalization?.customInstructions||"");
   useEffect(()=>{Promise.all([api.models(),api.offlineManifest(),api.config(),api.memory(),api.documents(),api.sources()]).then(([m,o,c,mem,docs,src])=>{setModels(m.providers||[]);setManifest(o);setConfig(c);setMemory(mem);setDocuments(docs.documents||[]);setSources(src.sources||src||[]);}).catch(setError);},[]);
   useEffect(()=>setInstructions(uiPrefs?.personalization?.customInstructions||""),[uiPrefs?.personalization?.customInstructions]);
@@ -80,12 +81,12 @@ export function SettingsWorkspace({options,onOptionsChange,uiPrefs,onUIPrefsChan
   }
 
   const swiping=page!=="home"&&swipe.progress>0;
-  return <section className={"workspace settings-stack settings-page-"+page+(swiping?" settings-swiping":"")} aria-labelledby="settings-title" {...swipe.bind}>
+  return <section className={"workspace settings-stack settings-page-"+page+(swiping?" settings-swiping":"")} aria-labelledby={settingsHeadingId} {...swipe.bind}>
     {page!=="home"&&<div className="settings-backdrop-page" inert={true}
       style={{transform:"translate3d("+(-24+swipe.progress*24)+"%,0,0)",opacity:0.72+swipe.progress*0.28}}><HomeView inert/></div>}
     <div className="settings-foreground-page"
       style={page!=="home"?{transform:"translate3d("+(swipe.progress*100)+"%,0,0)",boxShadow:swipe.progress?"-12px 0 28px rgba(0,0,0,"+(0.16*(1-swipe.progress))+")":undefined}:undefined}>
-      {(!embedded||page!=="home")&&<header className="settings-stack-header">{page!=="home"&&<button type="button" className="icon-button" aria-label="Back to Settings" onClick={back}>‹</button>}<h1 id="settings-title">{title}</h1></header>}
+      {(!embedded||page!=="home")&&<header className="settings-stack-header">{page!=="home"&&<button type="button" className="icon-button" aria-label="Back to Settings" onClick={back}>‹</button>}<h1 id={settingsHeadingId}>{title}</h1></header>}
       {error&&<p className="error-card" role="alert">{error.status||"ERROR"}: {error.message}</p>}
       <Page/>
     </div>
