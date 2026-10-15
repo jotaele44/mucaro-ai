@@ -23,6 +23,8 @@ export function deriveRun(run, events) {
     state: run.state,
     version: run.version,
     createdAt: run.created_at,
+    options: run.options || {},
+    lineage: run.lineage || null,
     plan: null,
     route: null,
     calls: new Map(),

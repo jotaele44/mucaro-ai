@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 import threading
 from typing import Any
 
 from .config import Settings, settings
 from .context_state import build_context_state, build_model_context
-from .db import delete_payload, init_db, list_payloads, upsert_payload
+from .db import delete_payload, get_connection, init_db, list_payloads, upsert_payload
 from .utils import stable_id, utc_now
 
 DEFAULT_TITLE = "New chat"
@@ -16,6 +17,13 @@ MAX_CONTEXT_CHARS = 2400
 
 
 class ConversationMessageEditError(RuntimeError):
+    def __init__(self, status: str, detail: str):
+        super().__init__(detail)
+        self.status = status
+        self.detail = detail
+
+
+class ConversationBranchError(RuntimeError):
     def __init__(self, status: str, detail: str):
         super().__init__(detail)
         self.status = status
@@ -94,6 +102,92 @@ def delete_conversation(conversation_id: str, cfg: Settings = settings) -> dict[
     }
 
 
+def create_branch_conversation(
+    source_conversation_id: str,
+    source_run_id: str,
+    branch_key: str,
+    request_sha256: str,
+    context_turns: list[dict[str, Any]],
+    source_turn_id: str,
+    source_display_revision: int,
+    cfg: Settings = settings,
+) -> tuple[dict[str, Any], bool]:
+    """Atomically create or recover one deterministic semantic branch without mutating its source."""
+    if not branch_key:
+        raise ConversationBranchError("ERROR_BRANCH_KEY_REQUIRED", "Branch idempotency key is required.")
+    if not all(isinstance(turn, dict) for turn in context_turns):
+        raise ConversationBranchError("ERROR_BRANCH_CONTEXT_INVALID", "Branch context must contain only turn records.")
+
+    cfg.ensure_dirs()
+    init_db(cfg.sqlite_path)
+    branch_id = stable_id("conv_branch", source_conversation_id, source_run_id, branch_key, length=24)
+
+    with _CONVERSATION_LOCK, get_connection(cfg.sqlite_path) as conn:
+        conn.isolation_level = None
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            source_row = conn.execute(
+                "SELECT payload_json FROM conversations WHERE conversation_id = ?",
+                (source_conversation_id,),
+            ).fetchone()
+            if source_row is None:
+                raise ConversationBranchError("ERROR_CONVERSATION_NOT_FOUND", "Source conversation not found.")
+            source = json.loads(source_row["payload_json"])
+
+            existing_row = conn.execute(
+                "SELECT payload_json FROM conversations WHERE conversation_id = ?",
+                (branch_id,),
+            ).fetchone()
+            if existing_row is not None:
+                existing = json.loads(existing_row["payload_json"])
+                origin = existing.get("branch_origin")
+                if (
+                    not isinstance(origin, dict)
+                    or origin.get("request_sha256") != request_sha256
+                    or origin.get("source_conversation_id") != source_conversation_id
+                    or origin.get("source_run_id") != source_run_id
+                ):
+                    raise ConversationBranchError(
+                        "ERROR_BRANCH_IDEMPOTENCY_CONFLICT",
+                        "This branch identity is already bound to a different request.",
+                    )
+                conn.execute("COMMIT")
+                return existing, False
+
+            now = utc_now()
+            source_title = str(source.get("title") or DEFAULT_TITLE)
+            origin = {
+                "kind": "SEMANTIC_BRANCH",
+                "source_conversation_id": source_conversation_id,
+                "source_run_id": source_run_id,
+                "source_turn_id": source_turn_id,
+                "source_display_revision": int(source_display_revision),
+                "request_sha256": request_sha256,
+                "context_turn_ids": [turn.get("turn_id") for turn in context_turns if turn.get("turn_id")],
+                "created_at": now,
+                "original_preserved": True,
+            }
+            conversation = {
+                "conversation_id": branch_id,
+                "title": f"Branch · {source_title}"[:120],
+                "created_at": now,
+                "updated_at": now,
+                "turns": [],
+                "message_edits": {},
+                "branch_context_turns": [dict(turn) for turn in context_turns],
+                "branch_origin": origin,
+            }
+            conn.execute(
+                "INSERT INTO conversations (conversation_id, payload_json) VALUES (?, ?)",
+                (branch_id, json.dumps(conversation, ensure_ascii=False, sort_keys=True)),
+            )
+            conn.execute("COMMIT")
+            return conversation, True
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
+
+
 def edit_conversation_message(
     conversation_id: str,
     message_key: str,
@@ -150,9 +244,19 @@ def edit_conversation_message(
 
 
 def build_conversation_context(conversation: dict[str, Any]) -> list[dict[str, Any]]:
-    """Build bounded model context without mutating or deleting canonical turns."""
+    """Build bounded model context; semantic branches prepend their immutable canonical context snapshot."""
+    raw_branch_context = conversation.get("branch_context_turns", [])
+    if raw_branch_context is None:
+        raw_branch_context = []
+    if not isinstance(raw_branch_context, list) or not all(isinstance(turn, dict) for turn in raw_branch_context):
+        raise ValueError("ERROR_BRANCH_CONTEXT_INVALID")
+    current_turns = conversation.get("turns", [])
+    if not isinstance(current_turns, list) or not all(isinstance(turn, dict) for turn in current_turns):
+        raise ValueError("ERROR_CONVERSATION_TURNS_INVALID")
+    context_conversation = dict(conversation)
+    context_conversation["turns"] = [dict(turn) for turn in raw_branch_context] + [dict(turn) for turn in current_turns]
     state = build_context_state(
-        conversation,
+        context_conversation,
         recent_turn_limit=MAX_CONTEXT_TURNS,
         recent_char_limit=MAX_CONTEXT_CHARS,
     )

@@ -31,6 +31,7 @@ Guarantees (MOB F02-F04, F07-F09, F13-F16, F18; TGT-014, TGT-018):
 
 from __future__ import annotations
 
+import hashlib
 import json
 import threading
 import time
@@ -38,7 +39,13 @@ from collections.abc import Iterator
 from typing import Any
 
 from .config import Settings, settings
-from .conversations import append_turns, build_conversation_context, get_conversation
+from .conversations import (
+    ConversationBranchError,
+    append_turns,
+    build_conversation_context,
+    create_branch_conversation,
+    get_conversation,
+)
 from .db import ensure_db, get_connection
 from .error_categories import classify_error
 from .model_router import ModelProviderError
@@ -256,6 +263,7 @@ def summarize_run(run: dict[str, Any], cfg: Settings = settings) -> dict[str, An
         "tool_summary": summarize_tool_calls(calls),
         "event_count": int(count),
         "queue_seq": run["queue_seq"],
+        "lineage": run.get("lineage"),
     }
 
 
@@ -327,6 +335,7 @@ def submit_message(
     idempotency_key: str | None = None,
     interrupt: bool = False,
     dismiss_pending_question: bool = False,
+    lineage: dict[str, Any] | None = None,
     cfg: Settings = settings,
 ) -> dict[str, Any]:
     ensure_db(cfg.sqlite_path)
@@ -373,6 +382,8 @@ def submit_message(
             "round": 1,
             "cancel_requested": False,
         }
+        if lineage is not None:
+            body["lineage"] = dict(lineage)
         conn.execute(
             "INSERT INTO work_runs (run_id, conversation_id, queue_seq, state, idempotency_key, version, payload_json) VALUES (?, ?, ?, 'QUEUED', ?, 1, ?)",
             (run_id, conversation_id, queue_seq, idempotency_key, json.dumps(body, ensure_ascii=False, sort_keys=True)),
@@ -424,6 +435,102 @@ def _schedule(run_id: str, cfg: Settings) -> None:
         advance_run(run_id, cfg)
         return
     threading.Thread(target=advance_run, args=(run_id, cfg), name=f"run-{run_id}", daemon=True).start()
+
+
+def branch_run(
+    conversation_id: str,
+    source_run_id: str,
+    prompt: str,
+    *,
+    mode: str = "ask",
+    options: dict[str, Any] | None = None,
+    idempotency_key: str,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Create a new conversation/run from canonical context before one completed source prompt."""
+    text = (prompt or "").strip()
+    if not text:
+        raise RunError("ERROR_RUN_PROMPT_EMPTY", "Message text is required.")
+    if len(text) > MAX_PROMPT_CHARS:
+        raise RunError("ERROR_RUN_PROMPT_TOO_LONG", f"Message exceeds {MAX_PROMPT_CHARS} characters.")
+    if mode not in MODES:
+        raise RunError("ERROR_RUN_MODE_INVALID", f"Mode must be one of {sorted(MODES)}.")
+    if not idempotency_key or len(idempotency_key) < 8 or len(idempotency_key) > 128:
+        raise RunError("ERROR_BRANCH_KEY_INVALID", "Branch idempotency key must be 8 to 128 characters.")
+
+    source_run = get_run(source_run_id, cfg)
+    if source_run.get("conversation_id") != conversation_id:
+        raise RunError("ERROR_BRANCH_SOURCE_NOT_FOUND", "Source run was not found in this conversation.")
+    if source_run.get("state") != "COMPLETED":
+        raise RunError("ERROR_BRANCH_SOURCE_NOT_COMPLETED", f"Only completed runs can be branched; run is {source_run.get('state')}.")
+
+    source_conversation = get_conversation(conversation_id, cfg)
+    if source_conversation is None:
+        raise RunError("ERROR_CONVERSATION_NOT_FOUND", conversation_id)
+    turns = source_conversation.get("turns", [])
+    if not isinstance(turns, list):
+        raise RunError("ERROR_BRANCH_SOURCE_TURN_UNRESOLVED", "Source conversation turns are invalid.")
+    candidates = [
+        (index, turn)
+        for index, turn in enumerate(turns)
+        if isinstance(turn, dict) and turn.get("work_run_id") == source_run_id and turn.get("role") == "user"
+    ]
+    if len(candidates) != 1:
+        raise RunError(
+            "ERROR_BRANCH_SOURCE_TURN_UNRESOLVED",
+            f"Expected exactly one canonical user turn for source run; found {len(candidates)}.",
+        )
+    source_index, source_turn = candidates[0]
+    context_turns = [dict(turn) for turn in turns[:source_index] if isinstance(turn, dict)]
+
+    edits = source_conversation.get("message_edits") or {}
+    if not isinstance(edits, dict):
+        raise RunError("ERROR_MESSAGE_EDITS_INVALID", "Stored message edits are not a valid mapping.")
+    source_edit = edits.get(f"run:{source_run_id}:user")
+    if source_edit is not None and not isinstance(source_edit, dict):
+        raise RunError("ERROR_MESSAGE_EDITS_INVALID", "Stored source message edit is not valid.")
+    try:
+        display_revision = int(source_edit.get("revision", 0)) if source_edit is not None else 0
+    except (TypeError, ValueError) as exc:
+        raise RunError("ERROR_MESSAGE_EDITS_INVALID", "Stored source message edit revision is not valid.") from exc
+
+    canonical_options = dict(options or {})
+    request_body = {"prompt": text, "mode": mode, "options": canonical_options}
+    request_sha256 = hashlib.sha256(
+        json.dumps(request_body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    try:
+        branch_conversation, created = create_branch_conversation(
+            conversation_id,
+            source_run_id,
+            idempotency_key,
+            request_sha256,
+            context_turns,
+            str(source_turn.get("turn_id") or ""),
+            display_revision,
+            cfg,
+        )
+    except ConversationBranchError as exc:
+        raise RunError(exc.status, exc.detail) from exc
+
+    lineage = dict(branch_conversation.get("branch_origin") or {})
+    branch_run_key = stable_id("branchrun", branch_conversation["conversation_id"], idempotency_key, length=40)
+    submitted = submit_message(
+        branch_conversation["conversation_id"],
+        text,
+        mode=mode,
+        options=canonical_options,
+        idempotency_key=branch_run_key,
+        lineage=lineage,
+        cfg=cfg,
+    )
+    return {
+        "status": "RUN_BRANCH_CREATED" if created else "RUN_BRANCH_DUPLICATE_RETURNED",
+        "source_conversation_id": conversation_id,
+        "source_run_id": source_run_id,
+        "conversation": branch_conversation,
+        "run": submitted["run"],
+    }
 
 
 def edit_queued_run(run_id: str, prompt: str, *, expected_version: int, cfg: Settings = settings) -> dict[str, Any]:

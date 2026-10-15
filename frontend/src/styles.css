@@ -523,6 +523,43 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+
+.run-receipt {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+
+.run-receipt > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12.5px;
+  list-style-position: outside;
+}
+
+.run-receipt-body {
+  display: grid;
+  gap: 10px;
+  padding: 10px 0 2px;
+}
+
+.run-receipt-section {
+  font-size: 13px;
+}
+
+.run-receipt-section > strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.run-receipt-section ol {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+
+.branch-lineage {
+  margin: 0;
+}
+
 .plan-details summary,
 details summary {
   cursor: pointer;
@@ -821,6 +858,25 @@ details summary {
   margin: 0;
 }
 
+
+.branch-retry-form {
+  display: grid;
+  gap: 12px;
+}
+
+.branch-retry-form textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 9px 10px;
+  font: inherit;
+  line-height: 1.45;
+}
+
 /* ---------- composer ---------- */
 
 .composer {
@@ -1029,6 +1085,27 @@ details summary {
   margin: 4px 0 0;
 }
 
+
+.workspace-empty-state {
+  margin: 0;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.workspace-empty-state h2 {
+  font-size: 17px;
+}
+
+.empty-state-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  margin: 10px auto 0;
+  text-decoration: none;
+}
+
 .workspace-actions {
   display: flex;
   gap: 8px;
@@ -1119,6 +1196,98 @@ details summary {
   font-size: 14px;
 }
 
+
+.directory-intake .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.directory-intake .panel-header h2,
+.directory-intake h3 {
+  margin: 0;
+}
+
+.directory-intake .hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.path-form {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr);
+  gap: 10px;
+}
+
+.path-form label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.path-form input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.permission-control {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  padding: 10px 12px;
+}
+
+.permission-confirm {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.permission-confirm p {
+  margin: 4px 0 10px;
+}
+
+.grant-list {
+  display: grid;
+  gap: 6px;
+}
+
+.grant-select {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 9px 10px;
+  cursor: pointer;
+}
+
+.grant-select[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.grant-select > span:first-child {
+  min-width: 0;
+  display: grid;
+}
+
+.grant-select strong,
+.grant-select small {
+  overflow-wrap: anywhere;
+}
+
 /* ---------- access token gate (phone access) ---------- */
 
 .gate .gate-input {
@@ -1203,6 +1372,11 @@ details summary {
 
   .user-bubble {
     max-width: 92%;
+  }
+
+
+  .path-form {
+    grid-template-columns: 1fr;
   }
 }
 

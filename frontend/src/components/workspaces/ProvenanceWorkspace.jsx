@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../api.js";
 
 // Provenance (TGT-032): tool-action ledger with audit-chain verification, progressive disclosure.
-export function ProvenanceWorkspace() {
+export function ProvenanceWorkspace({ onNavigateToChat }) {
   const [summary, setSummary] = useState(null);
   const [calls, setCalls] = useState([]);
   const [error, setError] = useState(null);
@@ -56,7 +56,13 @@ export function ProvenanceWorkspace() {
           </li>
         ))}
       </ul>
-      {!calls.length && !error && <p className="empty-state muted">No actions recorded yet.</p>}
+      {!calls.length && !error && (
+        <div className="empty-state workspace-empty-state">
+          <h2>No tool actions recorded</h2>
+          <p className="muted">This ledger appears when a chat requests a tool action and records the request, decision, and outcome. Ordinary answers do not fabricate provenance rows.</p>
+          <button type="button" className="secondary-button" onClick={onNavigateToChat}>Go to Chat</button>
+        </div>
+      )}
     </section>
   );
 }
