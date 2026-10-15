@@ -5,7 +5,7 @@ from pathlib import Path, PurePath
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
@@ -27,11 +27,14 @@ from .documents import (
     DocumentError,
     create_comment,
     create_document,
+    get_asset,
     get_document,
+    list_assets,
     list_comments,
     list_documents,
     list_revisions,
     set_comment_state,
+    store_asset,
     update_document,
 )
 from .exports import EXPORT_FILES, export_file_path
@@ -840,6 +843,45 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             result = update_document(document_id, req.document, req.expected_revision, actor="api", cfg=cfg)
             result["comments"] = list_comments(document_id, cfg=cfg)
             return result
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.post("/documents/{document_id}/assets")
+    async def upload_document_asset(document_id: str, upload: UploadFile = File(...), _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            content = await upload.read(5_000_001)
+            if len(content) > 5_000_000:
+                raise DocumentError("ERROR_DOCUMENT_ASSET_TOO_LARGE", "Document asset exceeds 5000000 bytes.")
+            return store_asset(
+                document_id,
+                filename=upload.filename or "image",
+                media_type=upload.content_type or "application/octet-stream",
+                content=content,
+                cfg=cfg,
+            )
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.get("/documents/{document_id}/assets")
+    def document_assets(document_id: str) -> dict:
+        try:
+            return {"status": "DOCUMENT_ASSETS_OK", "assets": list_assets(document_id, cfg=cfg)}
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.get("/document-assets/{asset_id}")
+    def document_asset(asset_id: str) -> Response:
+        try:
+            asset = get_asset(asset_id, cfg=cfg)
+            return Response(
+                content=asset["content"],
+                media_type=asset["media_type"],
+                headers={
+                    "Cache-Control": "private, max-age=31536000, immutable",
+                    "ETag": f'"{asset["sha256"]}"',
+                    "Content-Disposition": f'inline; filename="{asset["filename"].replace(chr(34), "")}"',
+                },
+            )
         except DocumentError as exc:
             raise document_error(exc) from exc
 
