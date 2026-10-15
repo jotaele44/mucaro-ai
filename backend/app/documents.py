@@ -311,10 +311,8 @@ def update_document(
                     )
             conn.execute("COMMIT")
         except BaseException:
-            try:
+            if conn.in_transaction:
                 conn.execute("ROLLBACK")
-            except Exception:
-                pass
             raise
     return get_document(document_id, cfg=cfg)
 
