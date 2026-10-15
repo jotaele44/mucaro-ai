@@ -36,25 +36,32 @@ export function tabKey(view, resourceId = null) {
   if (view === "documents") return "document:" + (resourceId || "library");
   return "workspace:" + view;
 }
-export function makeTab(view, resourceId = null) {
+export function makeTab(view, resourceId = null, returnKey = null) {
   if (!ROUTE_IDS.has(view)) return null;
   if (!["chat", "documents"].includes(view)) resourceId = null;
   if (resourceId != null && (typeof resourceId !== "string" || resourceId.length > 180 || !/^[a-zA-Z0-9_-]+$/.test(resourceId))) return null;
-  return { key: tabKey(view, resourceId), view, resourceId, mountId: mountId() };
+  return { key: tabKey(view, resourceId), view, resourceId, mountId: mountId(), returnKey: typeof returnKey === "string" ? returnKey : null };
 }
 export function restoreTabs(raw, legacyConversationId = null) {
   if (!Array.isArray(raw)) return [makeTab("chat", legacyConversationId) || makeTab("chat")];
   const seen = new Set(), mounts = new Set(), valid = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
-    const tab = makeTab(item.view, ["chat", "documents"].includes(item.view) ? item.resourceId ?? item.conversationId ?? null : null);
+    const tab = makeTab(
+      item.view,
+      ["chat", "documents"].includes(item.view) ? item.resourceId ?? item.conversationId ?? null : null,
+      typeof item.returnKey === "string" ? item.returnKey : null,
+    );
     if (!tab || item.key !== tab.key || seen.has(tab.key)) continue;
     if (typeof item.mountId === "string" && /^pane-[a-zA-Z0-9-]{1,100}$/.test(item.mountId) && !mounts.has(item.mountId)) tab.mountId = item.mountId;
     while (mounts.has(tab.mountId)) tab.mountId = mountId();
     seen.add(tab.key); mounts.add(tab.mountId); valid.push(tab);
     if (valid.length === MAX_OPEN_TABS) break;
   }
-  return valid.length ? valid : [makeTab("chat")];
+  if (!valid.length) return [makeTab("chat")];
+  const keys = new Set(valid.map((tab) => tab.key));
+  for (const tab of valid) if (!keys.has(tab.returnKey) || tab.returnKey === tab.key) tab.returnKey = null;
+  return valid;
 }
 export function addTab(tabs, requested) {
   if (!requested) return { tabs, key: null, rejected: true };
@@ -78,8 +85,11 @@ export function removeTab(tabs, key, activeKey) {
   if (index === -1) return { tabs, key: activeKey };
   let next = tabs.filter((tab) => tab.key !== key);
   if (!next.length) next = [makeTab("chat")];
+  const removed = tabs[index];
   const selected = activeKey === key
-    ? next[Math.min(index, next.length - 1)].key
+    ? (removed.returnKey && next.some((tab) => tab.key === removed.returnKey)
+      ? removed.returnKey
+      : next[Math.min(index, next.length - 1)].key)
     : (next.some((tab) => tab.key === activeKey) ? activeKey : next[0].key);
   return { tabs: next, key: selected };
 }
