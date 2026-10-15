@@ -83,7 +83,7 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
   );
 }
 
-export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions }) {
+export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, onOpenDocument, announce, modes, defaultOptions }) {
   const [conversation, setConversation] = useState(null);
   const [runs, setRuns] = useState(new Map());
   const [summaries, setSummaries] = useState([]);
