@@ -470,6 +470,12 @@ async function scenario(browser, base, viewport, contextOptions) {
   const drawerStates = [];
   await openNav();
   if (viewport === "iphone") {
+    await page.waitForFunction(() => {
+      const node=document.querySelector(".navigation-shell");
+      if(!node)return false;
+      const box=node.getBoundingClientRect();
+      return Math.abs(box.left) < 2;
+    });
     const drawerGeometry = await page.locator(".navigation-shell").evaluate((node) => {
       const box = node.getBoundingClientRect();
       return { left: Math.round(box.left), right: Math.round(box.right), width: Math.round(box.width), viewport: window.innerWidth };
@@ -491,7 +497,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Memory", exact: true }).click();
   await page.getByLabel("Remember").fill("Prefer tables for comparisons");
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await page.getByText("Prefer tables for comparisons").waitFor();
+  await page.locator(".memory-list").getByText("Prefer tables for comparisons", { exact: true }).waitFor();
   check("memory add is visible with provenance", viewport, (await page.getByText(/preference · from api/).count()) >= 1);
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "14-memory");
