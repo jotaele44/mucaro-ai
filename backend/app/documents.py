@@ -352,6 +352,10 @@ def create_comment(
         raise DocumentError("ERROR_DOCUMENT_COMMENT_RANGE", "Both start and end offsets are required for a range comment.")
     if start_offset is not None and (start_offset < 0 or end_offset < start_offset):
         raise DocumentError("ERROR_DOCUMENT_COMMENT_RANGE", "Invalid comment range.")
+    if start_offset is not None:
+        anchor_text = block.get("text")
+        if not isinstance(anchor_text, str) or end_offset > len(anchor_text):
+            raise DocumentError("ERROR_DOCUMENT_COMMENT_RANGE", "Comment range is outside the anchored text block.")
     comment_id = _new_id("cmt")
     now = _now()
     payload = {
@@ -418,8 +422,17 @@ def store_asset(
         raise DocumentError("ERROR_DOCUMENT_ASSET_EMPTY", "Document asset is empty.")
     if len(content) > MAX_ASSET_BYTES:
         raise DocumentError("ERROR_DOCUMENT_ASSET_TOO_LARGE", f"Document asset exceeds {MAX_ASSET_BYTES} bytes.")
+    signatures = {
+        "image/png": lambda value: value.startswith(b"\\x89PNG\\r\\n\\x1a\\n"),
+        "image/jpeg": lambda value: value.startswith(b"\\xff\\xd8\\xff"),
+        "image/gif": lambda value: value.startswith((b"GIF87a", b"GIF89a")),
+        "image/webp": lambda value: len(value) >= 12 and value[:4] == b"RIFF" and value[8:12] == b"WEBP",
+    }
+    if not signatures[media_type](content):
+        raise DocumentError("ERROR_DOCUMENT_ASSET_SIGNATURE", "Document asset bytes do not match the declared image type.")
     digest = sha256(content).hexdigest()
-    safe_name = str(filename or "image").replace("\\", "/").split("/")[-1][:240] or "image"
+    raw_name = str(filename or "image").replace("\\", "/").split("/")[-1][:240] or "image"
+    safe_name = re.sub(r'[\\x00-\\x1f\\x7f"]+', "_", raw_name) or "image"
     now = _now()
     with get_connection(cfg.sqlite_path) as conn:
         existing = conn.execute(
