@@ -219,9 +219,37 @@ async function scenario(browser, base, viewport, contextOptions) {
       (await assistantMessage.getByRole("button", { name: "Edit message" }).count()) === 1,
   );
 
+  // The actions are icons: no visible words, a name for assistive technology and a tooltip, full touch size on a phone.
+  const actionButtons = await completedRun.locator(".message-actions button").evaluateAll((buttons) =>
+    buttons.map((button) => {
+      const box = button.getBoundingClientRect();
+      return {
+        label: button.getAttribute("aria-label") || "",
+        title: button.getAttribute("title") || "",
+        text: button.textContent.trim(),
+        icon: Boolean(button.querySelector("svg.icon")),
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+      };
+    }),
+  );
+  const minSide = viewport === "iphone" ? 44 : 24;
+  check(
+    "message actions are icons with a name and a tooltip",
+    viewport,
+    actionButtons.length >= 4 &&
+      actionButtons.every((button) => button.icon && !button.text && button.label && button.title && button.width >= minSide && button.height >= minSide),
+    actionButtons.map((button) => `${button.label}(${button.title}) ${button.width}x${button.height}${button.text ? ` text="${button.text}"` : ""}`).join(", "),
+  );
+
   await assistantMessage.getByRole("button", { name: "Copy message text" }).click();
   await page.waitForFunction(() => document.querySelector('[role="status"]')?.textContent?.includes("Copied to clipboard."));
   check("copy action reports success", viewport, true);
+  check(
+    "Copy shows a check mark after copying",
+    viewport,
+    (await assistantMessage.getByRole("button", { name: "Copy message text" }).locator("svg.icon-check").count()) === 1,
+  );
 
   // Save and Share: the answer as shown, plus the records Mucaro saved with it, become files.
   const saveButton = assistantMessage.getByRole("button", { name: "Save answer as a file" });

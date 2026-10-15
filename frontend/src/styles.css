@@ -807,6 +807,21 @@ details summary {
   font-size: 12px;
 }
 
+.message-actions .icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 2px 6px;
+}
+
+.icon {
+  display: block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
 .message-editor {
   display: grid;
   gap: 8px;
@@ -1420,5 +1435,10 @@ html {
 
   :root :is(button, select, input:not([type="file"]):not([type="checkbox"]):not([type="radio"])) {
     min-height: 44px;
+  }
+
+  /* An icon has no text to widen its button, so it needs the 44px width explicitly. */
+  :root .message-actions .icon-action {
+    min-width: 44px;
   }
 }
