@@ -37,8 +37,14 @@ export function deriveRun(run, events) {
     final: null,
     interrupted: null,
     notes: [],
+    progress: [],
+    usage: null,
     lastSeq: 0,
   };
+  // Claude's text arrives in numbered segments; a segment followed by a tool call is narration ("Let me check…")
+  // and shows as a progress line instead of as part of the answer.
+  const pieces = [];
+  const narrated = new Set();
   for (const event of events) {
     view.lastSeq = Math.max(view.lastSeq, event.seq);
     const data = event.data || {};
@@ -74,7 +80,14 @@ export function deriveRun(run, events) {
         view.notes.push(data.text);
         break;
       case "text_delta":
-        view.answer += data.text || "";
+        pieces.push({ segment: data.segment, text: data.text || "" });
+        break;
+      case "progress":
+        view.progress.push({ text: data.text, kind: data.kind, at: event.created_at });
+        if (data.kind === "narration") narrated.add(data.segment);
+        break;
+      case "usage":
+        view.usage = data;
         break;
       case "citation":
         view.citations.push(data);
@@ -98,6 +111,11 @@ export function deriveRun(run, events) {
         break;
     }
   }
+  view.answer = pieces
+    .filter((piece) => piece.segment === undefined || !narrated.has(piece.segment))
+    .map((piece) => piece.text)
+    .join("");
+  view.agent = view.route?.status === "CLAUDE_AGENT_READY" || view.progress.length > 0;
   const decided = new Set(
     [...view.calls.values()].filter((call) => call.status && call.status !== "PENDING_APPROVAL").map((call) => call.tool_call_id),
   );
@@ -137,4 +155,16 @@ export function toolSummaryLabel(calls) {
 
 export function transcriptText(turns) {
   return turns.map((turn) => `${turn.role === "user" ? "You" : "Mucaro"}: ${turn.content}`).join("\n\n");
+}
+
+/** "Worked 14 s · 3 searches · 2 sources" for a finished Claude turn. */
+export function workSummary(view) {
+  const seconds = view.usage?.duration_ms != null ? Math.round(view.usage.duration_ms / 1000) : null;
+  const searches = (view.usage?.web_search_requests || 0) + view.progress.filter((row) => row.kind === "tool" && /^Searching your/.test(row.text)).length;
+  const reads = view.progress.filter((row) => row.kind === "tool" && /^(Reading|Opening|Listing)/.test(row.text)).length;
+  const parts = [seconds != null ? `Worked ${seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`}` : "Worked"];
+  if (searches) parts.push(`${searches} search${searches === 1 ? "" : "es"}`);
+  if (reads) parts.push(`${reads} read${reads === 1 ? "" : "s"}`);
+  if (view.citations.length) parts.push(`${view.citations.length} source${view.citations.length === 1 ? "" : "s"}`);
+  return parts.join(" · ");
 }
