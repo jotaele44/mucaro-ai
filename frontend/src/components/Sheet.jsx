@@ -47,7 +47,7 @@ export function Sheet({ title, onClose, children, side = "right", labelledBy, si
   function pointerDown(event) {
     if (!canDrag || event.isPrimary === false) return;
     drag.current = { id:event.pointerId, y:event.clientY, lastY:event.clientY, lastT:event.timeStamp, vy:0 };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* synthetic/test pointers may not be capturable */ }
   }
   function pointerMove(event) {
     const g=drag.current;
