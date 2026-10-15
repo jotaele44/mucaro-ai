@@ -21,7 +21,18 @@ from backend.app.documents import (
 
 
 def cfg(tmp_path: Path) -> Settings:
-    return Settings(project_root=tmp_path, data_dir=tmp_path / "data", sqlite_path=tmp_path / "data" / "mucaro.sqlite")
+    data = tmp_path / "data"
+    return Settings(
+        project_root=tmp_path,
+        data_dir=data,
+        input_dir=data / "input",
+        processed_dir=data / "processed",
+        export_dir=data / "exports",
+        index_dir=data / "indexes",
+        sqlite_path=data / "processed" / "mucaro.sqlite",
+        default_model_provider="mock",
+        default_model_name="mock",
+    )
 
 
 def test_schema_upgrade_and_document_round_trip(tmp_path):
