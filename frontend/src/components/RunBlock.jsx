@@ -24,6 +24,15 @@ const ACTION_TITLE = {
   "files.list_directory": "List this folder?",
 };
 
+// A short single line streamed while Claude works is usually what it is about to do ("I'll check the docs"), which
+// becomes a progress line once a tool starts. Showing it as the status line keeps it from flashing up as an answer.
+const PROVISIONAL_CHARS = 200;
+
+function provisionalText(view) {
+  const text = view.answer || "";
+  return view.state === "RUNNING" && text && !text.includes("\n") && text.length <= PROVISIONAL_CHARS ? text.trim() : "";
+}
+
 function secondsSince(iso, now) {
   const at = Date.parse(iso || "");
   return Number.isNaN(at) ? 0 : Math.max(0, Math.round((now - at) / 1000));
@@ -63,8 +72,10 @@ function ProgressLine({ view }) {
   const waited = secondsSince(last.at, now);
   let text = last.text;
   if (view.state === "AWAITING_APPROVAL") text = "Waiting for your approval";
+  else if (running && provisionalText(view)) text = provisionalText(view);
   else if (view.answer && running) text = "Writing the answer";
   else if (running && last.kind === "status" && waited >= 5) text = "Still thinking";
+  text = text.replace(/(…|\.\.\.)$/, "");
   return (
     <p className="progress-line" role="status" aria-live="polite">
       {running && <span className="spinner" aria-hidden="true" />}
@@ -327,7 +338,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
           </p>
         )}
 
-        {view.answer && (
+        {view.answer && !(view.agent && provisionalText(view)) && (
           <div className="bubble assistant-bubble">
             <EditableMessage
               text={String(assistantEdit?.content ?? view.answer ?? "")}
@@ -337,6 +348,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
               announce={announce}
               allowReadAloud
               file={answerFile}
+              streaming={!TERMINAL_STATES.has(view.state)}
               onCite={(number) => {
                 const match = view.citations.find((row) => row.citation_order === number);
                 if (match) onOpenCitation(match);

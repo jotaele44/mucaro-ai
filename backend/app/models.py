@@ -95,6 +95,9 @@ class InteractionDismissRequest(BaseModel):
 
 
 class RunOptions(BaseModel):
+    # "auto": Claude answers when it is connected and allowed, otherwise the cited-answer pipeline does.
+    # "cited": always the cited-answer pipeline over the chosen model_provider. "agent": Claude, or fail if it is off.
+    engine: Literal["auto", "agent", "cited"] = "auto"
     top_k: int = Field(default=5, ge=1, le=20)
     retrieval_strategy: Literal["hybrid", "lexical", "vector", "bm25", "persistent", "semantic"] = "hybrid"
     model_provider: str | None = None
