@@ -547,8 +547,8 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.locator("#main").getByRole("button", { name: "New document", exact: true }).click();
   await page.locator(".document-spinner").waitFor();
   check("document shell renders before delayed document content", viewport, true);
-  await page.unroute("**/documents/doc_*");
   await page.getByLabel("Document title").waitFor();
+  await page.unroute("**/documents/doc_*");
   check("new document opens in first-class workspace", viewport, (await page.getByLabel("Document title").inputValue()) === "Untitled document");
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await page.getByRole("button", { name: "+ checklist", exact: true }).click();
@@ -560,6 +560,8 @@ async function scenario(browser, base, viewport, contextOptions) {
   check("checklist toggles and persists completion styling", viewport, (await checklist.locator(".checked").count()) === 1);
   await page.getByRole("button", { name: "Revision history" }).click();
   const revisions = page.getByRole("dialog", { name: "Revision history" });
+  await revisions.waitFor();
+  await revisions.locator(".revision-row").first().waitFor();
   check("document provenance exposes immutable revision hashes", viewport, (await revisions.locator(".revision-row").count()) >= 2 && (await revisions.locator("code").count()) >= 2);
   await page.keyboard.press("Escape");
 
