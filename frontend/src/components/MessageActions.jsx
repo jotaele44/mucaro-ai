@@ -69,7 +69,7 @@ function SaveSheet({ text, file, announce, onClose }) {
 // One canonical per-message action surface. Copy/edit never mutate the canonical transcript.
 // `file` ({ title, citations, records }) adds Save and Share for an answer.
 // The actions are icons; each button's aria-label is its name and its title the hover tooltip.
-export function MessageActions({ text, announce, onEdit, allowReadAloud = false, file = null }) {
+export function MessageActions({ text, announce, onEdit, allowReadAloud = false, file = null, onOpenDocument = null }) {
   const [speaking, setSpeaking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
