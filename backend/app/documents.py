@@ -423,8 +423,8 @@ def store_asset(
     if len(content) > MAX_ASSET_BYTES:
         raise DocumentError("ERROR_DOCUMENT_ASSET_TOO_LARGE", f"Document asset exceeds {MAX_ASSET_BYTES} bytes.")
     signatures = {
-        "image/png": lambda value: value.startswith(b"\\x89PNG\\r\\n\\x1a\\n"),
-        "image/jpeg": lambda value: value.startswith(b"\\xff\\xd8\\xff"),
+        "image/png": lambda value: value.startswith(b"\x89PNG\r\n\x1a\n"),
+        "image/jpeg": lambda value: value.startswith(b"\xff\xd8\xff"),
         "image/gif": lambda value: value.startswith((b"GIF87a", b"GIF89a")),
         "image/webp": lambda value: len(value) >= 12 and value[:4] == b"RIFF" and value[8:12] == b"WEBP",
     }
@@ -432,7 +432,7 @@ def store_asset(
         raise DocumentError("ERROR_DOCUMENT_ASSET_SIGNATURE", "Document asset bytes do not match the declared image type.")
     digest = sha256(content).hexdigest()
     raw_name = str(filename or "image").replace("\\", "/").split("/")[-1][:240] or "image"
-    safe_name = re.sub(r'[\\x00-\\x1f\\x7f"]+', "_", raw_name) or "image"
+    safe_name = re.sub(r'[\x00-\x1f\x7f"]+', "_", raw_name) or "image"
     now = _now()
     with get_connection(cfg.sqlite_path) as conn:
         existing = conn.execute(
