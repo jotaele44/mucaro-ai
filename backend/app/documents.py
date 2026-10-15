@@ -62,6 +62,18 @@ def _validate_block(block: dict[str, Any], seen: set[str]) -> dict[str, Any]:
         if not isinstance(text, str):
             raise DocumentError("ERROR_DOCUMENT_INVALID_BLOCK", f"{kind} text must be a string.")
         out["text"] = text
+        marks = out.get("marks", [])
+        if not isinstance(marks, list):
+            raise DocumentError("ERROR_DOCUMENT_INVALID_MARKS", "Inline marks must be an array.")
+        normalized_marks = []
+        for mark in marks:
+            if not isinstance(mark, dict) or mark.get("type") not in {"bold", "italic", "underline", "strike"}:
+                raise DocumentError("ERROR_DOCUMENT_INVALID_MARKS", "Unsupported inline mark.")
+            start, end = mark.get("start"), mark.get("end")
+            if not isinstance(start, int) or not isinstance(end, int) or start < 0 or end <= start or end > len(text):
+                raise DocumentError("ERROR_DOCUMENT_INVALID_MARK_RANGE", "Inline mark range is outside the block text.")
+            normalized_marks.append({"type": mark["type"], "start": start, "end": end})
+        out["marks"] = sorted(normalized_marks, key=lambda row: (row["start"], row["end"], row["type"]))
         if kind == "heading":
             level = int(out.get("level", 2))
             if level not in {1, 2, 3}:
@@ -270,6 +282,31 @@ def update_document(
                 "INSERT INTO document_revisions (document_id, revision, parent_revision, created_at, actor, content_sha256, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (document_id, next_revision, current, now, actor, digest, encoded.decode("utf-8")),
             )
+            # Comments never silently migrate after edits. Missing anchors or now-invalid
+            # character ranges become ORPHANED and retain their original binding evidence.
+            blocks = {
+                block["block_id"]: block
+                for tab in normalized["tabs"]
+                for block in tab["blocks"]
+            }
+            comment_rows = conn.execute(
+                "SELECT comment_id, payload_json FROM document_comments WHERE document_id = ? AND state = 'ACTIVE'",
+                (document_id,),
+            ).fetchall()
+            for comment_row in comment_rows:
+                comment = json.loads(comment_row["payload_json"])
+                anchor = blocks.get(comment.get("block_id"))
+                orphaned = anchor is None
+                if not orphaned and comment.get("start_offset") is not None:
+                    anchor_text = str(anchor.get("text", ""))
+                    orphaned = int(comment.get("end_offset") or 0) > len(anchor_text)
+                if orphaned:
+                    comment["state"] = "ORPHANED"
+                    comment["updated_at"] = now
+                    conn.execute(
+                        "UPDATE document_comments SET state = 'ORPHANED', updated_at = ?, payload_json = ? WHERE comment_id = ?",
+                        (now, json.dumps(comment, ensure_ascii=False, sort_keys=True), comment_row["comment_id"]),
+                    )
             conn.execute("COMMIT")
         except BaseException:
             try:
