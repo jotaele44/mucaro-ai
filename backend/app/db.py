@@ -10,7 +10,7 @@ from typing import Any
 from .config import parse_bool, settings
 
 # Bump when tables change; init_db only ever moves the recorded version forward.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def get_connection(sqlite_path: Path | None = None) -> sqlite3.Connection:
@@ -62,6 +62,40 @@ _SCHEMA_SQL = """
                 interaction_id TEXT PRIMARY KEY,
                 payload_json TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS documents (
+                document_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                current_revision INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                payload_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS document_revisions (
+                document_id TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                parent_revision INTEGER,
+                created_at TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                content_sha256 TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                PRIMARY KEY (document_id, revision),
+                FOREIGN KEY(document_id) REFERENCES documents(document_id)
+            );
+            CREATE INDEX IF NOT EXISTS document_revisions_document ON document_revisions(document_id, revision);
+            CREATE TABLE IF NOT EXISTS document_comments (
+                comment_id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL,
+                tab_id TEXT NOT NULL,
+                block_id TEXT NOT NULL,
+                start_offset INTEGER,
+                end_offset INTEGER,
+                state TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                FOREIGN KEY(document_id) REFERENCES documents(document_id)
+            );
+            CREATE INDEX IF NOT EXISTS document_comments_document ON document_comments(document_id, state, created_at);
             CREATE TABLE IF NOT EXISTS work_runs (
                 run_id TEXT PRIMARY KEY,
                 conversation_id TEXT NOT NULL,
