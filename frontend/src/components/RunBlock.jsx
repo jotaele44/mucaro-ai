@@ -185,7 +185,7 @@ function Citations({ citations, onOpenCitation }) {
   );
 }
 
-export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdits = {}, onEditMessage }) {
+export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdits = {}, onEditMessage, onOpenDocument }) {
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolLabel = toolSummaryLabel(view.calls);
   const planSteps = view.plan?.steps || [];
@@ -271,6 +271,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
               announce={announce}
               allowReadAloud
               file={answerFile}
+              onOpenDocument={onOpenDocument ? (title, text) => onOpenDocument(title, text, view.runId) : null}
             />
           </div>
         )}

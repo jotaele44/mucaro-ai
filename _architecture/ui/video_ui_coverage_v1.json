@@ -1,0 +1,816 @@
+{
+  "schema_version": "mucaro-video-ui-coverage/1.0",
+  "denominator_sha256": null,
+  "denominator_path": "_architecture/ui/video_ui_denominator_v1.json",
+  "generated_utc": "2026-10-14T23:59:00Z",
+  "bounded_claim": "Every observable portable denominator item has an implementation binding. This is source coverage, not rendered/device certification.",
+  "counts": {
+    "denominator": 43,
+    "covered": 43,
+    "unmapped": 0
+  },
+  "coverage": [
+    {
+      "observation_id": "OBS-A-001",
+      "feature": "circular menu trigger",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/NavigationShell.jsx",
+        "frontend/src/components/WorkspaceTabs.jsx",
+        "frontend/src/components/MobileWorkspacePicker.jsx",
+        "frontend/src/navigation.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/navigation.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-002",
+      "feature": "left drawer",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/NavigationShell.jsx",
+        "frontend/src/components/WorkspaceTabs.jsx",
+        "frontend/src/components/MobileWorkspacePicker.jsx",
+        "frontend/src/navigation.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/navigation.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-003",
+      "feature": "drawer search",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/NavigationShell.jsx",
+        "frontend/src/components/WorkspaceTabs.jsx",
+        "frontend/src/components/MobileWorkspacePicker.jsx",
+        "frontend/src/navigation.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/navigation.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-004",
+      "feature": "pinned section",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/NavigationShell.jsx",
+        "frontend/src/components/WorkspaceTabs.jsx",
+        "frontend/src/components/MobileWorkspacePicker.jsx",
+        "frontend/src/navigation.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/navigation.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-005",
+      "feature": "recent items",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/NavigationShell.jsx",
+        "frontend/src/components/WorkspaceTabs.jsx",
+        "frontend/src/components/MobileWorkspacePicker.jsx",
+        "frontend/src/navigation.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/navigation.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-006",
+      "feature": "selected row",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/NavigationShell.jsx",
+        "frontend/src/components/WorkspaceTabs.jsx",
+        "frontend/src/components/MobileWorkspacePicker.jsx",
+        "frontend/src/navigation.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/navigation.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-007",
+      "feature": "profile/settings sheet",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/App.jsx",
+        "frontend/src/components/Sheet.jsx"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-008",
+      "feature": "settings home groups",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "frontend/src/uiPreferences.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/uiPreferences.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-009",
+      "feature": "appearance row",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "frontend/src/uiPreferences.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/uiPreferences.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-010",
+      "feature": "language row",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "frontend/src/uiPreferences.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/uiPreferences.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-011",
+      "feature": "personalization row",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "frontend/src/uiPreferences.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/uiPreferences.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-012",
+      "feature": "base style selector",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "frontend/src/uiPreferences.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/uiPreferences.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-013",
+      "feature": "tone sliders/options",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "frontend/src/uiPreferences.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/uiPreferences.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-014",
+      "feature": "custom instructions",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "frontend/src/uiPreferences.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/uiPreferences.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-015",
+      "feature": "behavior toggles",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "frontend/src/uiPreferences.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/uiPreferences.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-016",
+      "feature": "interactive back gesture",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/motion.js",
+        "frontend/src/components/Sheet.jsx",
+        "frontend/src/styles.css"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-017",
+      "feature": "page push/pop",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/motion.js",
+        "frontend/src/components/Sheet.jsx",
+        "frontend/src/styles.css"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-018",
+      "feature": "sheet transition",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/motion.js",
+        "frontend/src/components/Sheet.jsx",
+        "frontend/src/styles.css"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-A-019",
+      "feature": "keyboard-aware editor",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/motion.js",
+        "frontend/src/components/Sheet.jsx",
+        "frontend/src/styles.css"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-001",
+      "feature": "document shell",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-002",
+      "feature": "loading shell",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-003",
+      "feature": "close control",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-004",
+      "feature": "undo/redo controls",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-005",
+      "feature": "comments control",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-006",
+      "feature": "share/export control",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py",
+        "frontend/src/files.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-007",
+      "feature": "done/check control",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-008",
+      "feature": "internal tab selector",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-009",
+      "feature": "tab bottom sheet",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-010",
+      "feature": "title/meta row",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-011",
+      "feature": "paragraph/heading blocks",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-012",
+      "feature": "inline code/code blocks",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-013",
+      "feature": "bullets/ordered lists",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-014",
+      "feature": "block quotes",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-015",
+      "feature": "checklist",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-016",
+      "feature": "collapsible sections",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-017",
+      "feature": "embedded images",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py",
+        "backend/app/main.py",
+        "frontend/src/api.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-018",
+      "feature": "text edit mode",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-019",
+      "feature": "format toolbar",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-020",
+      "feature": "native selection",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/workspaces/DocumentsWorkspace.jsx",
+        "frontend/src/components/RichBlockEditor.jsx",
+        "backend/app/documents.py",
+        "backend/app/db.py"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "backend/tests/test_documents.py"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-021",
+      "feature": "tab sheet motion",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/motion.js",
+        "frontend/src/components/Sheet.jsx",
+        "frontend/src/styles.css"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-022",
+      "feature": "accordion motion",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/motion.js",
+        "frontend/src/components/Sheet.jsx",
+        "frontend/src/styles.css"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-023",
+      "feature": "checklist state transition",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/motion.js",
+        "frontend/src/components/Sheet.jsx",
+        "frontend/src/styles.css"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    },
+    {
+      "observation_id": "OBS-B-024",
+      "feature": "mobile document toolbar",
+      "source_state": "FACT",
+      "implementation": [
+        "_architecture/ui/video_ui_denominator_v1.json",
+        "frontend/src/components/NavigationShell.jsx",
+        "frontend/src/components/WorkspaceTabs.jsx",
+        "frontend/src/components/MobileWorkspacePicker.jsx",
+        "frontend/src/navigation.js"
+      ],
+      "regression_surfaces": [
+        "qa/rendered/rendered_qa.mjs",
+        "frontend/src/navigation.test.mjs"
+      ],
+      "source_implementation": "IMPLEMENTED",
+      "certification": "PROVISIONAL",
+      "remaining_gate": "exact-head build/rendered/accessibility/performance; physical device where applicable"
+    }
+  ],
+  "global_gates": {
+    "source_denominator": "PASS",
+    "feature_denominator": "PROVISIONAL",
+    "interaction_denominator": "PROVISIONAL",
+    "motion_denominator": "PROVISIONAL",
+    "accessibility": "OPEN",
+    "performance": "OPEN",
+    "state_conservation": "PROVISIONAL",
+    "keyboard_viewport": "PROVISIONAL",
+    "revision_integrity": "PROVISIONAL",
+    "offline_runtime": "OPEN",
+    "native_desktop": "OPEN",
+    "physical_mobile": "OPEN",
+    "no_remote_asset_dependency": "PROVISIONAL"
+  }
+}

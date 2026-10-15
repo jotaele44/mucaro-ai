@@ -25,6 +25,13 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --registry=https://registry.npmjs.org/
         working-directory: frontend
+      - name: Run frontend navigation and UI unit regressions
+        run: npm run test:unit
+        working-directory: frontend
+      - name: Certify frozen video UI source coverage
+        run: |
+          python scripts/certify_video_ui_coverage.py
+          pytest -q backend/tests/test_video_ui_coverage.py backend/tests/test_documents.py
       - name: Certify release gates
         run: python scripts/certify_release.py
       - name: Certify security gates (SBOM, audits, secrets, static triage, network exposure)

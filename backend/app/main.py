@@ -5,7 +5,7 @@ from pathlib import Path, PurePath
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
@@ -23,6 +23,20 @@ from .conversations import (
 )
 from .db import init_db, list_payloads, upsert_payload
 from .execution_gate import analyze_task, approve_execution
+from .documents import (
+    DocumentError,
+    create_comment,
+    create_document,
+    get_asset,
+    get_document,
+    list_assets,
+    list_comments,
+    list_documents,
+    list_revisions,
+    set_comment_state,
+    store_asset,
+    update_document,
+)
 from .exports import EXPORT_FILES, export_file_path
 from .ingestion import (
     FOLDER_SUPPORTED_SUFFIXES,
@@ -42,6 +56,10 @@ from .models import (
     ConversationCreateRequest,
     ConversationUpdateRequest,
     DirectoryPermissionRequest,
+    DocumentCommentCreateRequest,
+    DocumentCommentStateRequest,
+    DocumentCreateRequest,
+    DocumentUpdateRequest,
     IngestPathRequest,
     InteractionCreateRequest,
     InteractionDismissRequest,
@@ -794,6 +812,118 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/tools/audit")
     def tool_audit() -> dict:
         return list_tool_audit_events(cfg)
+
+    def document_error(exc: DocumentError) -> HTTPException:
+        status_code = 404 if exc.status in {"ERROR_DOCUMENT_NOT_FOUND", "ERROR_DOCUMENT_COMMENT_NOT_FOUND"} else 409 if exc.status == "ERROR_DOCUMENT_REVISION_CONFLICT" else 400
+        return api_error(exc.status, exc.detail, status_code=status_code)
+
+    @app.get("/documents")
+    def documents() -> dict:
+        return {"status": "DOCUMENTS_OK", "documents": list_documents(cfg=cfg)}
+
+    @app.post("/documents")
+    def create_doc(req: DocumentCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return create_document(req.title, origin_type=req.origin_type, origin_ref=req.origin_ref, initial_text=req.initial_text, cfg=cfg)
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.get("/documents/{document_id}")
+    def document(document_id: str) -> dict:
+        try:
+            result = get_document(document_id, cfg=cfg)
+            result["comments"] = list_comments(document_id, cfg=cfg)
+            return result
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.put("/documents/{document_id}")
+    def save_document(document_id: str, req: DocumentUpdateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            result = update_document(document_id, req.document, req.expected_revision, actor="api", cfg=cfg)
+            result["comments"] = list_comments(document_id, cfg=cfg)
+            return result
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.post("/documents/{document_id}/assets")
+    async def upload_document_asset(document_id: str, upload: UploadFile = File(...), _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            content = await upload.read(5_000_001)
+            if len(content) > 5_000_000:
+                raise DocumentError("ERROR_DOCUMENT_ASSET_TOO_LARGE", "Document asset exceeds 5000000 bytes.")
+            return store_asset(
+                document_id,
+                filename=upload.filename or "image",
+                media_type=upload.content_type or "application/octet-stream",
+                content=content,
+                cfg=cfg,
+            )
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.get("/documents/{document_id}/assets")
+    def document_assets(document_id: str) -> dict:
+        try:
+            return {"status": "DOCUMENT_ASSETS_OK", "assets": list_assets(document_id, cfg=cfg)}
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.get("/document-assets/{asset_id}")
+    def document_asset(asset_id: str) -> Response:
+        try:
+            asset = get_asset(asset_id, cfg=cfg)
+            return Response(
+                content=asset["content"],
+                media_type=asset["media_type"],
+                headers={
+                    "Cache-Control": "private, max-age=31536000, immutable",
+                    "ETag": f'"{asset["sha256"]}"',
+                    "X-Content-Type-Options": "nosniff",
+                    "Content-Security-Policy": "default-src 'none'; sandbox",
+                    "Content-Disposition": f'inline; filename="{asset["filename"].replace(chr(34), "")}"',
+                },
+            )
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.get("/documents/{document_id}/revisions")
+    def document_revisions(document_id: str) -> dict:
+        try:
+            get_document(document_id, cfg=cfg)
+            return {"status": "DOCUMENT_REVISIONS_OK", "revisions": list_revisions(document_id, cfg=cfg)}
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.get("/documents/{document_id}/comments")
+    def document_comments(document_id: str) -> dict:
+        try:
+            get_document(document_id, cfg=cfg)
+            return {"status": "DOCUMENT_COMMENTS_OK", "comments": list_comments(document_id, cfg=cfg)}
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.post("/documents/{document_id}/comments")
+    def add_document_comment(document_id: str, req: DocumentCommentCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return create_comment(
+                document_id,
+                tab_id=req.tab_id,
+                block_id=req.block_id,
+                text=req.text,
+                start_offset=req.start_offset,
+                end_offset=req.end_offset,
+                cfg=cfg,
+            )
+        except DocumentError as exc:
+            raise document_error(exc) from exc
+
+    @app.patch("/documents/comments/{comment_id}")
+    def update_document_comment(comment_id: str, req: DocumentCommentStateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return set_comment_state(comment_id, req.state, cfg=cfg)
+        except DocumentError as exc:
+            raise document_error(exc) from exc
 
     @app.get("/workspaces")
     def workspaces() -> dict:
