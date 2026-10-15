@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api, authIssueOf, onAuthIssue } from "./api.js";
 import { ChatView } from "./components/ChatView.jsx";
 import { NavigationShell } from "./components/NavigationShell.jsx";
+import { MobileWorkspacePicker } from "./components/MobileWorkspacePicker.jsx";
 import { WorkspaceTabs } from "./components/WorkspaceTabs.jsx";
 import { TasksDrawer } from "./components/TasksDrawer.jsx";
 import { TokenGate } from "./components/TokenGate.jsx";
@@ -104,7 +105,10 @@ export function App(){
     <button type="button" className="context-edge-handle" aria-label={contextOpen?"Collapse contextual sidebar":"Expand contextual sidebar"} aria-expanded={contextOpen} onClick={()=>setContextOpen((x)=>!x)}>☰</button>
     <div className="nav-scrim" onClick={()=>setNavOpen(false)} aria-hidden="true"/>
     <main id="main" className="main" tabIndex={-1} inert={mobileOverlay&&navOpen}>
-      <div className="mobile-bar"><button type="button" className="icon-button" aria-controls="navigation-shell" aria-expanded={navOpen} aria-label="Open navigation" onClick={()=>setNavOpen(true)}>☰</button><span className="brand-inline">{uiText(uiPrefs.language,view)}</span></div>
+      <div className="mobile-bar"><button type="button" className="icon-button" aria-controls="navigation-shell" aria-expanded={navOpen} aria-label="Open navigation" onClick={()=>setNavOpen(true)}>☰</button>
+        <MobileWorkspacePicker tabs={tabs} activeKey={activeTabKey} conversations={conversations} documents={documents} locale={uiPrefs.language}
+          onSelect={selectKey} onCloseTab={closeTab} onNewChat={()=>openConversation(null)} onNewDocument={newDocument}/>
+      </div>
       {(health.state==="error"||health.offline)&&<div className="error-card banner" role="alert"><strong>Mucaro's local service is not reachable.</strong> {health.offline?"Reconnecting…":"Your data stays on this computer."}<button type="button" className="secondary-button" onClick={retry}>Retry</button></div>}
       {health.state==="checking"&&<p className="muted center pad">Starting…</p>}
       {health.state==="locked"&&<TokenGate reason={health.reason} busy={gateBusy} onSubmit={submitToken} onRetry={retry}/>}
