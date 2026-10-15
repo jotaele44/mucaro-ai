@@ -79,9 +79,12 @@ export function SettingsWorkspace({options,onOptionsChange,uiPrefs,onUIPrefsChan
     return <div className="settings-page-body"><div className="settings-card"><p><strong>Mucaro AI</strong></p><p className="muted">Local-first research workspace.</p><p>Frontend build version 0.1.23</p></div></div>;
   }
 
-  return <section className={"workspace settings-stack settings-page-"+page} aria-labelledby="settings-title" {...swipe.bind} style={{"--back-progress":swipe.progress}}>
-    {page!=="home"&&<div className="settings-backdrop-page"><HomeView inert/></div>}
-    <div className="settings-foreground-page">
+  const swiping=page!=="home"&&swipe.progress>0;
+  return <section className={"workspace settings-stack settings-page-"+page+(swiping?" settings-swiping":"")} aria-labelledby="settings-title" {...swipe.bind}>
+    {page!=="home"&&<div className="settings-backdrop-page" inert={true}
+      style={{transform:"translate3d("+(-24+swipe.progress*24)+"%,0,0)",opacity:0.72+swipe.progress*0.28}}><HomeView inert/></div>}
+    <div className="settings-foreground-page"
+      style={page!=="home"?{transform:"translate3d("+(swipe.progress*100)+"%,0,0)",boxShadow:swipe.progress?"-12px 0 28px rgba(0,0,0,"+(0.16*(1-swipe.progress))+")":undefined}:undefined}>
       <header className="settings-stack-header">{page!=="home"&&<button type="button" className="icon-button" aria-label="Back to Settings" onClick={back}>‹</button>}<h1 id="settings-title">{title}</h1></header>
       {error&&<p className="error-card" role="alert">{error.status||"ERROR"}: {error.message}</p>}
       <Page/>
