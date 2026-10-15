@@ -85,7 +85,13 @@ export function App(){
 
   const active=tabs.find((t)=>t.key===activeTabKey)||tabs[0],view=active.view,resourceId=active.resourceId;
   function commitNav(next,key){tabsRef.current=next;selectedRef.current=key;setTabs(next);setActiveTabKey(key);}
-  function openTab(tab){const out=addTab(tabsRef.current,tab);if(out.rejected){announce("Too many tabs are open. Close one first.");return;}commitNav(out.tabs,out.key);setNavOpen(false);}
+  function openTab(tab){
+    const exists=tabsRef.current.some((item)=>item.key===tab?.key);
+    const requested=!exists&&tab?{...tab,returnKey:tab.returnKey||selectedRef.current}:tab;
+    const out=addTab(tabsRef.current,requested);
+    if(out.rejected){announce("Too many tabs are open. Close one first.");return;}
+    commitNav(out.tabs,out.key);setNavOpen(false);
+  }
   function selectKey(key){if(!tabsRef.current.some((t)=>t.key===key))return;selectedRef.current=key;setActiveTabKey(key);setNavOpen(false);}
   function openSettings(){if(mobileOverlay){setMobileSettingsOpen(true);return;}selectRoute("settings");}
   function selectRoute(route){if(route==="chat"){const last=tabsRef.current.slice().reverse().find((t)=>t.view==="chat");openTab(last||makeTab("chat"));}else if(route==="documents"){const last=tabsRef.current.slice().reverse().find((t)=>t.view==="documents");openTab(last||makeTab("documents"));}else openTab(makeTab(route));}
@@ -119,7 +125,7 @@ export function App(){
         <div className="workspace-panels">{tabs.map((tab)=><div key={tab.mountId} id={"panel-"+tab.mountId} className="workspace-pane" role="region" aria-labelledby={"tab-"+tab.mountId} hidden={tab.key!==activeTabKey}>
           {tab.view==="chat"&&<ChatView reconnect={reconnect} conversationId={tab.resourceId} onConversationCreated={(id)=>adopt(tab.key,"chat",id)} onConversationsChanged={loadConversations} onOpenTasks={()=>setTasksOpen(true)} announce={announce} modes={modes} defaultOptions={options} onOpenDocument={async(title,text,originRef)=>{const doc=await api.createDocument({title:title||"Mucaro answer",origin_type:"answer",origin_ref:originRef||null,initial_text:text||""});await loadDocuments();openDocument(doc.document_id);}}/>}
           {tab.view==="sources"&&<SourcesWorkspace announce={announce}/>}
-          {tab.view==="documents"&&<DocumentsWorkspace documentId={tab.resourceId} onDocumentCreated={(id)=>adopt(tab.key,"documents",id)} onDocumentsChanged={loadDocuments} onCloseDocument={()=>adopt(tab.key,"documents",null)} announce={announce}/>}
+          {tab.view==="documents"&&<DocumentsWorkspace documentId={tab.resourceId} onDocumentCreated={(id)=>openDocument(id)} onDocumentsChanged={loadDocuments} onCloseDocument={()=>closeTab(tab.key)} announce={announce}/>}
           {tab.view==="memory"&&<MemoryWorkspace announce={announce}/>}
           {tab.view==="provenance"&&<ProvenanceWorkspace/>}
           {tab.view==="settings"&&<SettingsWorkspace options={options} onOptionsChange={setOptions} uiPrefs={uiPrefs} onUIPrefsChange={(next)=>setUiPrefs(normalizeUIPrefs(next))} announce={announce}/>}
