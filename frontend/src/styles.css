@@ -1497,3 +1497,47 @@ html {
   .settings-row { min-height:66px; }
   .custom-instructions-editor textarea { min-height:50vh; }
 }
+
+
+/* Stack underlay for the recorded iOS-style interactive back gesture. */
+.settings-stack { position:relative; overflow:hidden; padding:0 !important; }
+.settings-foreground-page {
+  position:relative; z-index:2; min-height:100%; background:var(--bg);
+  transition:transform var(--motion-page) var(--ease-out-expo), box-shadow var(--motion-page) linear;
+  will-change:transform;
+}
+.settings-backdrop-page {
+  position:absolute; inset:0; z-index:1; overflow:auto; background:var(--bg); pointer-events:none;
+  will-change:transform,opacity;
+}
+.settings-swiping .settings-foreground-page,
+.settings-swiping .settings-backdrop-page { transition:none; }
+
+/* Narrow screens replace the desktop tab strip with a sheet-backed selector. */
+.mobile-workspace-picker-button {
+  display:none; flex:1; min-width:0; min-height:40px; align-items:center; justify-content:center; gap:6px;
+  border:0; background:transparent; font-weight:650; cursor:pointer;
+}
+.mobile-workspace-picker-button span:first-child { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.mobile-workspace-list { display:grid; gap:5px; }
+.mobile-workspace-row {
+  display:grid; grid-template-columns:minmax(0,1fr) 44px; align-items:center;
+  border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--surface);
+}
+.mobile-workspace-select {
+  min-width:0; min-height:54px; display:grid; gap:1px; align-content:center; padding:7px 12px; border:0;
+  background:transparent; text-align:left; cursor:pointer;
+}
+.mobile-workspace-select[aria-current="true"] { background:var(--accent-soft); }
+.mobile-workspace-select strong { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.mobile-workspace-kind { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+.mobile-workspace-close { width:44px; height:44px; border:0; background:transparent; font-size:20px; cursor:pointer; }
+.mobile-workspace-close:active { background:var(--surface-2); }
+.mobile-workspace-new { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+
+@media (max-width:760px), (max-height:550px) and (pointer:coarse) {
+  .mobile-workspace-picker-button { display:flex; }
+  .mobile-bar { justify-content:space-between; }
+  .mobile-bar>.icon-button { flex:0 0 44px; }
+  .settings-foreground-page { min-height:100%; }
+}
