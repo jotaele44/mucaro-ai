@@ -469,7 +469,14 @@ async function scenario(browser, base, viewport, contextOptions) {
   };
   const drawerStates = [];
   await openNav();
-  if (viewport === "iphone") await shot(page, viewport, "12-nav-open");
+  if (viewport === "iphone") {
+    const drawerGeometry = await page.locator(".navigation-shell").evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      return { left: Math.round(box.left), right: Math.round(box.right), width: Math.round(box.width), viewport: window.innerWidth };
+    });
+    check("mobile navigation leaves a visible content peek", viewport, drawerGeometry.left === 0 && drawerGeometry.right < drawerGeometry.viewport && drawerGeometry.right > drawerGeometry.viewport * 0.85, JSON.stringify(drawerGeometry));
+    await shot(page, viewport, "12-nav-open");
+  }
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources", exact: true }).click();
   await page.getByRole("heading", { name: "Sources" }).waitFor();
   await page.locator(".source-row").nth(1).waitFor();
@@ -499,7 +506,11 @@ async function scenario(browser, base, viewport, contextOptions) {
   await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
   const settingsScope = viewport === "iphone" ? page.getByRole("dialog", { name: "Settings" }) : page.locator("#main");
-  if (viewport === "iphone") await settingsScope.waitFor();
+  if (viewport === "iphone") {
+    await settingsScope.waitFor();
+    check("mobile Settings sheet stacks over the still-open navigation drawer", viewport,
+      await page.evaluate(() => document.querySelector(".app-shell")?.classList.contains("nav-open") && Boolean(document.querySelector('.sheet-backdrop-bottom'))));
+  }
   await settingsScope.getByRole("button", { name: /Personalization/ }).click();
   await settingsScope.getByRole("heading", { name: "Personalization" }).waitFor();
   check("settings personalization exposes four bounded style controls", viewport, (await settingsScope.locator('input[type="range"]').count()) === 4);
@@ -589,6 +600,9 @@ async function scenario(browser, base, viewport, contextOptions) {
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "17-documents");
   axeRuns.push(await axe(page, viewport, "documents"));
+  await page.getByRole("button", { name: "Close document", exact: true }).click();
+  await page.getByRole("heading", { name: "Documents", exact: true }).waitFor();
+  check("closing a document returns to its originating Documents library", viewport, true);
 
   if (viewport === "iphone") {
     check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
