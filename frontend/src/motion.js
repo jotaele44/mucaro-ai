@@ -62,7 +62,7 @@ export function useEdgeSwipeBack({ enabled = true, onCommit, edgePx = 28, thresh
   const onPointerDown = (event) => {
     if (!enabled || event.pointerType === "mouse" || event.clientX > edgePx || event.isPrimary === false) return;
     gesture.current = { id: event.pointerId, startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastT: event.timeStamp, vx: 0, active: true };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* synthetic/test pointers may not be capturable */ }
   };
   const onPointerMove = (event) => {
     const g = gesture.current;
