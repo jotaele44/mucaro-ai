@@ -192,3 +192,39 @@ def test_document_assets_are_content_hashed_deduplicated_and_bounded(tmp_path):
     with pytest.raises(DocumentError) as exc:
         store_asset(created["document_id"], filename="remote.svg", media_type="image/svg+xml", content=b"<svg/>", cfg=settings)
     assert exc.value.status == "ERROR_DOCUMENT_ASSET_TYPE"
+
+
+def test_comment_range_must_fit_text_anchor(tmp_path):
+    settings = cfg(tmp_path)
+    settings.ensure_dirs()
+    init_db(settings.sqlite_path)
+    created = create_document("Range", initial_text="abc", cfg=settings)
+    tab = created["document"]["tabs"][0]
+    block = tab["blocks"][0]
+    with pytest.raises(DocumentError) as exc:
+        create_comment(
+            created["document_id"],
+            tab_id=tab["tab_id"],
+            block_id=block["block_id"],
+            text="outside",
+            start_offset=1,
+            end_offset=9,
+            cfg=settings,
+        )
+    assert exc.value.status == "ERROR_DOCUMENT_COMMENT_RANGE"
+
+
+def test_document_asset_signature_must_match_declared_media_type(tmp_path):
+    settings = cfg(tmp_path)
+    settings.ensure_dirs()
+    init_db(settings.sqlite_path)
+    created = create_document("Asset signature", cfg=settings)
+    with pytest.raises(DocumentError) as exc:
+        store_asset(
+            created["document_id"],
+            filename="fake.png",
+            media_type="image/png",
+            content=b"not-a-png",
+            cfg=settings,
+        )
+    assert exc.value.status == "ERROR_DOCUMENT_ASSET_SIGNATURE"
