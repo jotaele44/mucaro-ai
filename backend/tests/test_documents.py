@@ -74,7 +74,7 @@ def test_duplicate_ids_remote_images_and_missing_section_children_rejected(tmp_p
     bad_image["tabs"][0]["blocks"] = [{"block_id": "img1", "type": "image", "src": "https://remote.example/image.png", "caption": ""}]
     with pytest.raises(DocumentError) as exc:
         update_document(created["document_id"], bad_image, 1, cfg=settings)
-    assert exc.value.status == "ERROR_DOCUMENT_REMOTE_IMAGE"
+    assert exc.value.status == "ERROR_DOCUMENT_IMAGE_SOURCE"
 
     missing = get_document(created["document_id"], cfg=settings)["document"]
     missing["tabs"][0]["blocks"] = [{"block_id": "sec1", "type": "section", "title": "Section", "children": ["does_not_exist"]}]
