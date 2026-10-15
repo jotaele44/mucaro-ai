@@ -25,6 +25,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --registry=https://registry.npmjs.org/
         working-directory: frontend
+      - name: Run frontend navigation and UI unit regressions
+        run: npm run test:unit
+        working-directory: frontend
       - name: Certify release gates
         run: python scripts/certify_release.py
       - name: Certify security gates (SBOM, audits, secrets, static triage, network exposure)
