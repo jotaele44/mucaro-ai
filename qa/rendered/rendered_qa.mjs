@@ -464,7 +464,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   const drawerClosed = async () => {
     if (viewport !== "iphone") return true;
     return page
-      .waitForFunction(() => document.querySelector(".sidebar").getBoundingClientRect().right <= 0, null, { timeout: 5000 })
+      .waitForFunction(() => document.querySelector(".navigation-shell").getBoundingClientRect().right <= 0, null, { timeout: 5000 })
       .then(() => true, () => false);
   };
   const drawerStates = [];
@@ -498,11 +498,97 @@ async function scenario(browser, base, viewport, contextOptions) {
 
   await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByText("What works offline").waitFor();
-  check("settings shows model choice and offline capabilities", viewport, (await page.getByRole("radio", { name: /openai_compatible_local/ }).count()) === 1);
-  drawerStates.push(await drawerClosed());
+  const settingsScope = viewport === "iphone" ? page.getByRole("dialog", { name: "Settings" }) : page.locator("#main");
+  if (viewport === "iphone") await settingsScope.waitFor();
+  await settingsScope.getByRole("button", { name: /Personalization/ }).click();
+  await settingsScope.getByRole("heading", { name: "Personalization" }).waitFor();
+  check("settings personalization exposes four bounded style controls", viewport, (await settingsScope.locator('input[type="range"]').count()) === 4);
+  await settingsScope.getByRole("button", { name: /Custom instructions/ }).click();
+  const instructions = page.getByRole("dialog", { name: "Custom instructions" });
+  await instructions.getByLabel("Custom instructions").fill("Use explicit provenance states.");
+  await instructions.getByRole("button", { name: "Save", exact: true }).click();
+  await settingsScope.getByRole("button", { name: "Back to Settings" }).click();
+  await settingsScope.getByRole("button", { name: /Appearance/ }).click();
+  await settingsScope.getByRole("button", { name: "Dark", exact: true }).click();
+  check("explicit dark appearance state is applied", viewport, await page.evaluate(() => document.documentElement.dataset.mucaroTheme === "dark"));
+  await settingsScope.getByRole("button", { name: "System", exact: true }).click();
+  await settingsScope.getByRole("button", { name: "Back to Settings" }).click();
+  await settingsScope.getByRole("button", { name: /Models & retrieval/ }).click();
+  check("settings preserves model selection controls", viewport, (await settingsScope.getByRole("radio", { name: /openai_compatible_local/ }).count()) === 1);
+  await settingsScope.getByRole("button", { name: "Back to Settings" }).click();
+  await settingsScope.getByRole("button", { name: /Diagnostics/ }).click();
+  await settingsScope.getByText("Offline local").waitFor();
+  check("settings diagnostics exposes offline capability counts", viewport, (await settingsScope.getByText("Needs network").count()) === 1);
   await shot(page, viewport, "16-settings");
   axeRuns.push(await axe(page, viewport, "settings"));
+  if (viewport === "iphone") {
+    await page.keyboard.press("Escape");
+    await settingsScope.waitFor({ state: "detached" });
+  }
+
+  if (viewport !== "iphone") await openNav();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Documents", exact: true }).click();
+  await page.getByRole("heading", { name: "Documents" }).waitFor();
+  await page.route("**/documents/doc_*", async (route) => {
+    if (route.request().method() === "GET") await new Promise((resolve) => setTimeout(resolve, 350));
+    await route.continue();
+  });
+  await page.locator("#main").getByRole("button", { name: "New document", exact: true }).click();
+  await page.locator(".document-spinner").waitFor();
+  check("document shell renders before delayed document content", viewport, true);
+  await page.unroute("**/documents/doc_*");
+  await page.getByLabel("Document title").waitFor();
+  check("new document opens in first-class workspace", viewport, (await page.getByLabel("Document title").inputValue()) === "Untitled document");
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: "+ checklist", exact: true }).click();
+  await page.getByLabel("Checklist item text").fill("Verify source identity");
+  await page.getByRole("button", { name: "✓", exact: true }).click();
+  const checklist = page.locator(".checklist-block");
+  await checklist.getByText("Verify source identity").waitFor();
+  await checklist.getByRole("checkbox").check();
+  check("checklist toggles and persists completion styling", viewport, (await checklist.locator(".checked").count()) === 1);
+  await page.getByRole("button", { name: "Revision history" }).click();
+  const revisions = page.getByRole("dialog", { name: "Revision history" });
+  check("document provenance exposes immutable revision hashes", viewport, (await revisions.locator(".revision-row").count()) >= 2 && (await revisions.locator("code").count()) >= 2);
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: /Comments/ }).click();
+  const comments = page.getByRole("dialog", { name: "Comments" });
+  await comments.getByLabel("Add comment to selected block").fill("Validate this evidence.");
+  await comments.getByRole("button", { name: "Add comment" }).click();
+  await comments.getByText("Validate this evidence.").waitFor();
+  check("anchored document comment is persisted", viewport, true);
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: "+ paragraph", exact: true }).click();
+  const richEditor = page.getByRole("textbox", { name: "Edit document block" });
+  await richEditor.fill("Bold evidence");
+  await richEditor.press("ControlOrMeta+A");
+  await page.getByRole("button", { name: "Bold", exact: true }).click();
+  check("rich formatting keeps native selection semantics and creates a bold mark", viewport, (await richEditor.locator("strong").count()) === 1);
+  await page.getByRole("button", { name: "✓", exact: true }).click();
+  check("saved rich mark renders without unsafe HTML injection", viewport, (await page.locator(".document-block strong").filter({ hasText: "Bold evidence" }).count()) === 1);
+
+  await page.getByRole("button", { name: /Tab 1/ }).click();
+  const tabsSheet = page.getByRole("dialog", { name: "Document tabs" });
+  await tabsSheet.getByRole("button", { name: "＋ New tab" }).click();
+  await page.getByRole("button", { name: /Tab 2/ }).waitFor();
+  check("document tab sheet creates and selects an internal tab", viewport, true);
+  await page.getByRole("button", { name: "+ paragraph", exact: true }).click();
+  await page.getByRole("textbox", { name: "Edit document block" }).fill("Second tab");
+  await page.getByRole("button", { name: "✓", exact: true }).click();
+
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  const imageInput = page.locator('input[type="file"][accept*="image/png"]');
+  await imageInput.setInputFiles({ name: "qa.png", mimeType: "image/png", buffer: Buffer.from([137,80,78,71,13,10,26,10,1,2,3,4]) });
+  await page.locator(".document-block-image img").waitFor();
+  const imageSrc = await page.locator(".document-block-image img").getAttribute("src");
+  check("document media is rebound to local content-addressed storage", viewport, /^\/document-assets\/asset_/.test(imageSrc || ""), imageSrc || "no src");
+  await page.getByRole("button", { name: "✓", exact: true }).click();
+  drawerStates.push(await drawerClosed());
+  await shot(page, viewport, "17-documents");
+  axeRuns.push(await axe(page, viewport, "documents"));
 
   if (viewport === "iphone") {
     check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
