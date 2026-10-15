@@ -25,7 +25,7 @@ function Row({selected,onClick,title,meta,pinned=false}) {
 export function NavigationShell({
   view, conversations, documents, activeResourceId, filter, setFilter,
   pinnedConversationIds=[], onTogglePin, onSelectRoute, onOpenConversation, onOpenDocument,
-  onNewDocument, onTasks, contextOpen, locale="en", inactive=false,
+  onNewDocument, onTasks, onSettings, contextOpen, locale="en", inactive=false,
 }) {
   const route=ROUTES.find((row)=>row.id===view)||ROUTES[0];
   const q=filter.trim().toLowerCase();
@@ -41,11 +41,12 @@ export function NavigationShell({
           <img className="brand-owl" src={MUCARO_BRAND_ICON} alt="" width="40" height="40" draggable="false"/>
         </button>
         <ul className="rail-pages">
-          {ROUTES.map((item)=><li key={item.id}><button type="button" className="rail-button"
+          {ROUTES.filter((item)=>item.id!=="settings").map((item)=><li key={item.id}><button type="button" className="rail-button"
             aria-current={view===item.id?"page":undefined} aria-label={uiText(locale,item.id)} title={uiText(locale,item.id)}
             onClick={()=>onSelectRoute(item.id)}><Icon type={item.icon}/></button></li>)}
         </ul>
         <div className="rail-spacer"/>
+        <button type="button" className="rail-button" aria-current={view==="settings"?"page":undefined} aria-label={uiText(locale,"settings")} title={uiText(locale,"settings")} onClick={onSettings}><Icon type="settings"/></button>
         <button type="button" className="rail-button" aria-label={uiText(locale,"tasks")} title={uiText(locale,"tasks")} onClick={onTasks}><Icon type="tasks"/></button>
       </nav>
       <aside className={"context-sidebar "+(contextOpen?"":"context-sidebar-collapsed")} aria-label={uiText(locale,route.id)+" navigation"}>
