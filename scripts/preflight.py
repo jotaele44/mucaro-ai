@@ -37,7 +37,7 @@ REQUIRED_FILES = [
     "scripts/release_check.py",
     "schemas/execution_gate.schema.json",
 ]
-PY_IMPORTS = ["fastapi", "pydantic", "jsonschema", "pytest", "pypdf"]
+PY_IMPORTS = ["fastapi", "pydantic", "jsonschema", "pypdf"]
 # .env files copied from older .env.example versions may still pin these retired model ids.
 RETIRED_MODEL_IDS = {"claude-3-5-sonnet-latest"}
 CURRENT_DEFAULT_MODEL = "claude-sonnet-5"

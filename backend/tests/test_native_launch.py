@@ -173,8 +173,10 @@ def test_macos_setup_requests_and_checks_native_dependencies(monkeypatch):
 
     monkeypatch.setattr(sys, "platform", "darwin")
     module = runpy.run_path(str(ROOT / "scripts/one_click.py"), run_name="native_dependencies_test")
-    assert "desktop" in module["PYTHON_EXTRAS"].split(",")
+    assert module["PYTHON_EXTRAS"] == "desktop"
+    assert "dev" not in module["PYTHON_EXTRAS"]
     assert {"webview", "AppKit", "Foundation", "WebKit"} <= set(module["KEY_MODULES"])
+    assert {"httpx", "pytest", "ruff", "pip_audit"}.isdisjoint(set(module["KEY_MODULES"]))
 
 
 @pytest.mark.parametrize("body,expected", [

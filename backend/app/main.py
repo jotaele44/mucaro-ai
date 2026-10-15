@@ -263,6 +263,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             "model_provider": cfg.default_model_provider,
             "model_name": cfg.default_model_name,
             "max_upload_bytes": cfg.max_upload_bytes,
+            "offline_mode": cfg.offline_mode,
             "cors_origins": list(cfg.cors_origins),
             "auth": auth_status(cfg),
             "security": build_security_report(cfg),
@@ -549,7 +550,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.get("/offline-manifest")
     def offline_manifest(offline: bool = False) -> dict:
-        return build_offline_manifest(system_offline=offline)
+        return build_offline_manifest(system_offline=offline or cfg.offline_mode)
 
     @app.get("/work-runs/modes")
     def work_run_modes() -> dict:

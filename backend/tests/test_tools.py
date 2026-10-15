@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -77,6 +78,35 @@ def test_tool_runtime_denies_unknown_tools_and_audits_rejection(tmp_path: Path):
     events = list_tool_audit_events(cfg)["events"]
     assert events[0]["event"] == "TOOL_REQUEST_REJECTED"
     assert events[0]["status"] == "ERROR_TOOL_NOT_ALLOWED"
+
+
+def test_global_offline_mode_blocks_remote_tools_before_handler_and_allows_local_tools(monkeypatch, tmp_path: Path):
+    cfg = replace(make_settings(tmp_path), offline_mode=True)
+    called = False
+
+    def forbidden_fetch(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("remote handler must not run in offline mode")
+
+    monkeypatch.setattr("backend.app.tools.fetch_web_snapshot", forbidden_fetch)
+    requested = request_tool_call("web.fetch", {"url": "https://example.com"}, cfg=cfg, requested_by="test")
+    call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(call_id, cfg=cfg, executed_by="test")
+    assert exc.value.status == "ERROR_OFFLINE_NETWORK_DISABLED"
+    assert called is False
+    call = next(row for row in list_tool_calls(cfg)["tool_calls"] if row["tool_call_id"] == call_id)
+    assert call["status"] == "FAILED"
+    assert call["result"]["status"] == "ERROR_OFFLINE_NETWORK_DISABLED"
+
+    local = request_tool_call("source_library.status", cfg=cfg, requested_by="test")
+    local_id = local["tool_call"]["tool_call_id"]
+    approve_tool_call(local_id, cfg=cfg, approved_by="test")
+    executed = run_tool_call(local_id, cfg=cfg, executed_by="test")
+    assert executed["status"] == "TOOL_CALL_EXECUTED"
+    assert executed["result"]["status"] == "SOURCE_LIBRARY_STATUS_OK"
 
 
 def test_tool_runtime_executes_governed_web_fetch(monkeypatch, tmp_path: Path):

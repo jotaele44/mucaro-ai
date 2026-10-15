@@ -656,7 +656,8 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
             task_type="cited_qa",
             preferred_provider=options.get("model_provider"),
             allow_live=bool(options.get("allow_live")),
-            require_offline=bool(options.get("require_offline")),
+            require_offline=bool(options.get("require_offline")) or cfg.offline_mode,
+            system_offline=cfg.offline_mode,
         )
         route_event = {
             "status": route["status"],

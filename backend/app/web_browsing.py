@@ -594,6 +594,8 @@ def fetch_web_snapshot(
     policy: WebFetchPolicy | None = None,
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
+    if cfg.offline_mode:
+        raise WebBrowsingError("ERROR_OFFLINE_NETWORK_DISABLED", "Web fetching is disabled while MUCARO_AI_OFFLINE is enabled.")
     policy = policy or WebFetchPolicy()
     checked = validate_web_fetch_url(url, allow_private_hosts=policy.allow_private_hosts)
     requested_at = utc_now()
@@ -799,6 +801,8 @@ def fetch_web_browse_session(
     session_policy: WebBrowseSessionPolicy | None = None,
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
+    if cfg.offline_mode:
+        raise WebBrowsingError("ERROR_OFFLINE_NETWORK_DISABLED", "Web browsing sessions are disabled while MUCARO_AI_OFFLINE is enabled.")
     fetch_policy = fetch_policy or WebFetchPolicy()
     session_policy = session_policy or WebBrowseSessionPolicy()
     started_at = utc_now()

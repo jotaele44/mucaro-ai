@@ -80,7 +80,7 @@ def test_lock_pins_exactly_the_project_versions_for_its_extras(target):
 def test_lock_extras_match_what_the_setup_installs(monkeypatch, target):
     monkeypatch.setattr(sys, "platform", PLATFORM_OF_TARGET[target])
     module = runpy.run_path(str(ROOT / "scripts/one_click.py"), run_name="lock_extras_test")
-    assert tuple(module["PYTHON_EXTRAS"].split(",")) == lock_python_deps.TARGETS[target]
+    assert tuple(filter(None, module["PYTHON_EXTRAS"].split(","))) == lock_python_deps.TARGETS[target]
 
 
 def test_setup_only_asks_for_locks_that_exist():

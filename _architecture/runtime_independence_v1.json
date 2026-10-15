@@ -17,7 +17,9 @@
       "optional update/download operations explicitly initiated by the operator"
     ],
     "packaged_host_path_fallback_allowed": false,
-    "source_developer_host_path_fallback_allowed": true
+    "source_developer_host_path_fallback_allowed": true,
+    "global_offline_switch": "MUCARO_AI_OFFLINE=1",
+    "global_offline_behavior": "FAIL_CLOSED_EXTERNAL_NETWORK_CAPABILITIES_ALLOW_LOOPBACK_LOCAL_SERVICE_AND_LOCAL_MODEL"
   },
   "dependency_classes": [
     {
@@ -64,7 +66,7 @@
     },
     {
       "id": "remote_model_api",
-      "current_state": "OPTIONAL_AND_EXPLICIT",
+      "current_state": "OPTIONAL_EXPLICIT_STDLIB_HTTPS_NO_PROVIDER_SDK",
       "target": "KEEP_BEHIND_NETWORK_PERMISSION_GATE",
       "runtime_external_work_allowed": true
     },
@@ -100,6 +102,8 @@
     "This contract does not claim every capability is already bundled.",
     "This contract does not claim feature parity across desktop and mobile.",
     "This contract does not classify explicitly authorized API or fetch traffic as an independence defect.",
-    "Bundled-only resolution does not mean Git, OCR engines, or a container engine are already present in every release artifact."
+    "Bundled-only resolution does not mean Git, OCR engines, or a container engine are already present in every release artifact.",
+    "The built-in Anthropic HTTPS adapter removes a provider SDK dependency but remote model calls still require network access and operator-provided credentials.",
+    "MUCARO_AI_OFFLINE is an application-level capability gate, not an operating-system firewall; maintainer build/release acquisition tools are outside the installed-runtime denominator."
   ]
 }

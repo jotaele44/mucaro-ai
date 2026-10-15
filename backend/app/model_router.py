@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import ipaddress
 import json
@@ -57,8 +56,8 @@ MODEL_PROVIDER_SPECS: dict[str, ModelProviderSpec] = {
         live=True,
         requires_live_mode=True,
         api_key_env="ANTHROPIC_API_KEY",
-        optional_dependency="anthropic",
-        description="Live Anthropic Messages API adapter, disabled unless live mode and credentials are explicit.",
+        optional_dependency=None,
+        description="Live Anthropic Messages API adapter over standard-library HTTPS/SSE, disabled unless live mode and credentials are explicit.",
         locality="remote",
         modalities=("text",),
         context_tokens=200_000,
@@ -84,6 +83,8 @@ MODEL_PROVIDER_SPECS: dict[str, ModelProviderSpec] = {
 
 LOCAL_PROVIDER = "openai_compatible_local"
 DEFAULT_LOCAL_MODEL_URL = "http://127.0.0.1:11434/v1"
+ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_API_VERSION = "2023-06-01"
 _PROBE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _PROBE_TTL_SECONDS = 5.0
 
@@ -101,9 +102,6 @@ _EFFORT_MODEL_PREFIXES = (
     "claude-opus-4-8",
     "claude-sonnet-4-6",
 )
-# One client per API key, so connections are reused across questions instead of reopened.
-_ANTHROPIC_CLIENT: dict[str, Any] = {}
-
 
 def normalize_model_provider(model_provider: str | None) -> str:
     provider = (model_provider or "mock").strip().lower()
@@ -175,15 +173,23 @@ def _probe_local_server(base_url: str, model: str) -> dict[str, Any]:
     return result
 
 
+def _offline_enabled() -> bool:
+    return (os.getenv("MUCARO_AI_OFFLINE") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _provider_status(spec: ModelProviderSpec) -> dict[str, Any]:
     live_mode_enabled = os.getenv("MUCARO_AI_LIVE_MODE") == "1"
+    system_offline = _offline_enabled()
     api_key_configured = bool(os.getenv(spec.api_key_env)) if spec.api_key_env else None
     dependency_available = (
         importlib.util.find_spec(spec.optional_dependency) is not None if spec.optional_dependency else None
     )
     warnings: list[str] = []
     status = "MODEL_PROVIDER_READY"
-    if spec.requires_live_mode and not live_mode_enabled:
+    if spec.locality == "remote" and system_offline:
+        status = "MODEL_PROVIDER_DISABLED"
+        warnings.append("SYSTEM_OFFLINE")
+    elif spec.requires_live_mode and not live_mode_enabled:
         status = "MODEL_PROVIDER_DISABLED"
         warnings.append("LIVE_MODE_DISABLED")
     elif spec.api_key_env and not api_key_configured:
@@ -226,6 +232,7 @@ def _provider_status(spec: ModelProviderSpec) -> dict[str, Any]:
         "optional_dependency": spec.optional_dependency,
         "description": spec.description,
         "live_mode_enabled": live_mode_enabled,
+        "system_offline": system_offline,
         "api_key_configured": api_key_configured,
         "dependency_available": dependency_available,
         "status": status,
@@ -245,6 +252,16 @@ def generate_answer(
     on_text_delta: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     spec = get_model_provider_spec(model_provider)
+    if spec.locality == "remote" and _offline_enabled():
+        return _fallback_or_error(
+            query,
+            retrieved_chunks,
+            allow_mock_fallback=allow_mock_fallback,
+            status="ERROR_OFFLINE_NETWORK_DISABLED",
+            detail="Remote model calls are disabled while MUCARO_AI_OFFLINE is enabled.",
+            conversation_context=conversation_context or [],
+            memory_context=memory_context or [],
+        )
     if spec.name == LOCAL_PROVIDER:
         return _local_answer(
             query,
@@ -391,35 +408,27 @@ def anthropic_effort(model: str) -> str | None:
     return effort if model.startswith(_EFFORT_MODEL_PREFIXES) else None
 
 
-def _anthropic_client(sdk: Any) -> Any:
-    key_id = hashlib.sha256((os.getenv("ANTHROPIC_API_KEY") or "").encode("utf-8")).hexdigest()
-    client = _ANTHROPIC_CLIENT.get(key_id)
-    if client is None:
-        _ANTHROPIC_CLIENT.clear()
-        client = _ANTHROPIC_CLIENT[key_id] = sdk.Anthropic()
-    return client
-
-
-def _anthropic_error(sdk: Any, exc: Exception) -> ModelProviderError:
-    detail = str(getattr(exc, "message", None) or exc)
-    # Most specific first: RateLimitError is an APIStatusError, APITimeoutError an APIConnectionError.
-    if isinstance(exc, sdk.RateLimitError):
+def _anthropic_http_error(exc: urllib.error.HTTPError) -> ModelProviderError:
+    detail = f"Anthropic Messages API returned HTTP {exc.code}."
+    if exc.code == 429:
         return ModelProviderError("ERROR_MODEL_PROVIDER_RATE_LIMIT", detail)
-    if isinstance(exc, sdk.APITimeoutError):
+    if exc.code in {408, 504}:
         return ModelProviderError("ERROR_MODEL_PROVIDER_TIMEOUT", detail)
-    if isinstance(exc, sdk.APIConnectionError):
+    if exc.code >= 500:
         return ModelProviderError("ERROR_MODEL_PROVIDER_UNAVAILABLE", detail)
-    if isinstance(exc, sdk.APIStatusError):
-        status_code = int(getattr(exc, "status_code", 0) or 0)
-        # An error that arrives mid-stream comes with the stream's HTTP 200, so read the API error type too.
-        body = getattr(exc, "body", None)
-        error_type = (body.get("error") or {}).get("type") if isinstance(body, dict) else None
-        if error_type == "rate_limit_error":
-            return ModelProviderError("ERROR_MODEL_PROVIDER_RATE_LIMIT", detail)
-        if status_code >= 500 or error_type in {"overloaded_error", "api_error"}:
-            return ModelProviderError("ERROR_MODEL_PROVIDER_UNAVAILABLE", f"HTTP {status_code}: {detail}")
-        return ModelProviderError("ERROR_MODEL_PROVIDER_REQUEST_REJECTED", f"HTTP {status_code}: {detail}")
-    return ModelProviderError("ERROR_MODEL_PROVIDER_RESPONSE_INVALID", detail)
+    return ModelProviderError("ERROR_MODEL_PROVIDER_REQUEST_REJECTED", detail)
+
+
+def _anthropic_stream_error(payload: dict[str, Any]) -> ModelProviderError:
+    error = payload.get("error") if isinstance(payload, dict) else None
+    error = error if isinstance(error, dict) else {}
+    kind = str(error.get("type") or "")
+    detail = str(error.get("message") or kind or "Anthropic stream returned an error.")
+    if kind == "rate_limit_error":
+        return ModelProviderError("ERROR_MODEL_PROVIDER_RATE_LIMIT", detail)
+    if kind in {"overloaded_error", "api_error"}:
+        return ModelProviderError("ERROR_MODEL_PROVIDER_UNAVAILABLE", detail)
+    return ModelProviderError("ERROR_MODEL_PROVIDER_REQUEST_REJECTED", detail)
 
 
 def _anthropic_answer(
@@ -432,40 +441,97 @@ def _anthropic_answer(
     memory_context: list[dict[str, Any]],
     on_text_delta: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
-    try:
-        import anthropic as sdk  # type: ignore
-    except Exception:
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
         return _fallback_or_error(
             query,
             retrieved_chunks,
             allow_mock_fallback=allow_mock_fallback,
-            status="ERROR_MODEL_SDK_MISSING",
-            detail='Install the optional dependency group with: python -m pip install -e ".[anthropic]"',
+            status="ERROR_MODEL_API_KEY_MISSING",
+            detail="Set ANTHROPIC_API_KEY before using model_provider=anthropic.",
             conversation_context=conversation_context,
             memory_context=memory_context,
         )
     model = model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model)
     effort = anthropic_effort(model)
     system, user = build_grounded_prompt(query, retrieved_chunks, conversation_context, memory_context)
-    request: dict[str, Any] = {
+    payload: dict[str, Any] = {
         "model": model,
         "max_tokens": ANTHROPIC_MAX_OUTPUT_TOKENS,
         "system": system,
         "messages": [{"role": "user", "content": user}],
+        "stream": True,
     }
     if effort:
-        # The pinned SDK predates the typed output_config parameter; the API reads it from the body.
-        request["extra_body"] = {"output_config": {"effort": effort}}
+        payload["output_config"] = {"effort": effort}
+    request = urllib.request.Request(
+        ANTHROPIC_MESSAGES_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+            "X-API-Key": api_key,
+            "anthropic-version": ANTHROPIC_API_VERSION,
+        },
+        method="POST",
+    )
+    text_parts: list[str] = []
+    stop_reason: str | None = None
+    saw_message_stop = False
     try:
-        with _anthropic_client(sdk).messages.stream(**request) as stream:
-            if on_text_delta is not None:
-                for text in stream.text_stream:
-                    if text:
-                        on_text_delta(text)
-            final = stream.get_final_message()
-    except sdk.APIError as exc:
-        raise _anthropic_error(sdk, exc) from exc
-    text = "\n".join(block.text for block in final.content if getattr(block, "type", None) == "text")
+        with urllib.request.urlopen(request, timeout=120) as response:
+            event_name = ""
+            data_lines: list[str] = []
+            for raw_line in response:
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
+                if line:
+                    if line.startswith("event:"):
+                        event_name = line[6:].strip()
+                    elif line.startswith("data:"):
+                        data_lines.append(line[5:].strip())
+                    continue
+                if not data_lines:
+                    event_name = ""
+                    continue
+                try:
+                    event = json.loads("\n".join(data_lines))
+                except ValueError as exc:
+                    raise ModelProviderError(
+                        "ERROR_MODEL_PROVIDER_RESPONSE_INVALID",
+                        "Anthropic SSE stream returned invalid JSON.",
+                    ) from exc
+                if event_name == "error" or event.get("type") == "error":
+                    raise _anthropic_stream_error(event)
+                if event.get("type") == "content_block_delta":
+                    delta = event.get("delta") if isinstance(event.get("delta"), dict) else {}
+                    if delta.get("type") == "text_delta":
+                        piece = str(delta.get("text") or "")
+                        if piece:
+                            text_parts.append(piece)
+                            if on_text_delta is not None:
+                                on_text_delta(piece)
+                elif event.get("type") == "message_delta":
+                    delta = event.get("delta") if isinstance(event.get("delta"), dict) else {}
+                    if delta.get("stop_reason") is not None:
+                        stop_reason = str(delta["stop_reason"])
+                elif event.get("type") == "message_stop":
+                    saw_message_stop = True
+                event_name = ""
+                data_lines = []
+    except urllib.error.HTTPError as exc:
+        raise _anthropic_http_error(exc) from exc
+    except ModelProviderError:
+        raise
+    except TimeoutError as exc:
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_TIMEOUT", str(exc)) from exc
+    except (urllib.error.URLError, OSError) as exc:
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_UNAVAILABLE", str(exc)) from exc
+
+    if not saw_message_stop:
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_RESPONSE_INVALID", "Anthropic SSE stream ended without message_stop.")
+    text = "".join(text_parts).strip()
+    if not text:
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_RESPONSE_INVALID", "Anthropic SSE stream returned no text content.")
     cited = [c["chunk_id"] for c in retrieved_chunks if c["chunk_id"] in text]
     return {
         "model_provider": "anthropic",
@@ -473,10 +539,9 @@ def _anthropic_answer(
         "answer": text,
         "cited_chunk_ids": cited,
         "streamed": on_text_delta is not None,
-        "stop_reason": getattr(final, "stop_reason", None),
+        "stop_reason": stop_reason,
         "effort": effort,
     }
-
 
 def build_grounded_prompt(
     query: str,

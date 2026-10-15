@@ -9,6 +9,15 @@ def test_parse_positive_int_uses_default_for_invalid_values():
     assert parse_positive_int("1024", DEFAULT_MAX_UPLOAD_BYTES) == 1024
 
 
+def test_settings_loads_global_offline_mode(monkeypatch, tmp_path):
+    monkeypatch.setenv("MUCARO_AI_ROOT", str(tmp_path))
+    monkeypatch.setenv("MUCARO_AI_OFFLINE", "1")
+    assert Settings.load().offline_mode is True
+
+    monkeypatch.setenv("MUCARO_AI_OFFLINE", "0")
+    assert Settings.load().offline_mode is False
+
+
 def test_settings_loads_explicit_distribution_channel(monkeypatch, tmp_path):
     monkeypatch.setenv("MUCARO_AI_ROOT", str(tmp_path))
     monkeypatch.setenv("MUCARO_AI_DATA_DIR", str(tmp_path.parent / "application-support"))

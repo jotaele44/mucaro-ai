@@ -40,8 +40,10 @@ NATIVE_WINDOW_MODULES = {
     "darwin": ("webview", "AppKit", "Foundation", "WebKit"),
     "win32": ("webview", "clr"),  # clr: pythonnet, which pywebview's WebView2 backend loads
 }
-PYTHON_EXTRAS = "dev,anthropic,desktop" if sys.platform in NATIVE_WINDOW_PLATFORMS else "dev,anthropic"
-# Import names that prove the dependency install is usable (runtime, geospatial, live mode, preflight).
+# End-user setup installs only runtime dependencies: no dev tools (pytest, ruff, pip-audit, httpx)
+# and no provider SDK; the desktop extra is added only where the native window runs.
+PYTHON_EXTRAS = "desktop" if sys.platform in NATIVE_WINDOW_PLATFORMS else ""
+# Import names that prove the end-user runtime install is usable.
 KEY_MODULES = (
     "fastapi",
     "starlette",
@@ -54,9 +56,6 @@ KEY_MODULES = (
     "pyproj",
     "rasterio",
     "geographiclib",
-    "anthropic",
-    "httpx",
-    "pytest",
 ) + NATIVE_WINDOW_MODULES.get(sys.platform, ())
 NPM_REGISTRY = "https://registry.npmjs.org/"
 LOG_KEEP = 10

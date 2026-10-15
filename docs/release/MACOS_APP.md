@@ -35,8 +35,9 @@ the folder yourself if you want your data gone.
     you run an OpenAI-compatible local server such as Ollama, llama.cpp or
     LM Studio;
   - tesseract / Poppler (for OCR);
-  - Playwright/Chromium (for rendered web pages);
-  - the Anthropic SDK.
+  - Playwright/Chromium (for rendered web pages).
+
+  Remote Anthropic calls use the built-in HTTPS adapter when the operator explicitly enables live mode and supplies an API key; no Anthropic SDK is required.
 
   Settings → "What works offline" lists exactly what is available in the
   running app.

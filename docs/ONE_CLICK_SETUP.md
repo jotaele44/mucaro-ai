@@ -38,6 +38,10 @@ exit code 11 and a dialog linking the WebView2 download. `scripts/build_launcher
 `Mucaro AI.exe` and its icon (from the macOS app's owl) byte for byte with pinned tools;
 `packaging/launchers/windows/BUILD_SHA256` records the expected hash and CI checks it.
 
+End-user setup does not install the `dev` dependency group (pytest, ruff, pip-audit, httpx) or a
+provider SDK: the hash-pinned locks contain only runtime dependencies, plus the desktop extra on
+macOS and Windows.
+
 ```
 Mucaro AI.command (macOS/Linux)          Mucaro AI.cmd (Windows)
         | exec                                   | powershell -ExecutionPolicy Bypass

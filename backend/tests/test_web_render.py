@@ -1,4 +1,5 @@
 import socket
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -36,6 +37,26 @@ def make_settings(root: Path) -> Settings:
     )
     cfg.ensure_dirs()
     return cfg
+
+
+def test_global_offline_mode_blocks_render_before_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    offline_cfg = replace(make_settings(tmp_path), offline_mode=True)
+    called = False
+
+    def forbidden_render(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("render engine must not run in offline mode")
+
+    monkeypatch.setattr(render, "_render_with_playwright", forbidden_render)
+    with pytest.raises(WebRenderError) as exc:
+        render_web_page(
+            "https://example.com",
+            cfg=offline_cfg,
+            allow_rendered_browser=True,
+        )
+    assert exc.value.status == "ERROR_OFFLINE_NETWORK_DISABLED"
+    assert called is False
 
 
 def test_render_requires_explicit_live_permission(tmp_path: Path) -> None:

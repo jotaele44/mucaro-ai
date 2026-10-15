@@ -103,6 +103,8 @@ def search_web_brave(
     max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
+    if cfg.offline_mode:
+        raise WebSearchError("ERROR_OFFLINE_NETWORK_DISABLED", "Web search is disabled while MUCARO_AI_OFFLINE is enabled.")
     normalized_query = _validate_query(query)
     _validate_count_offset(count, offset)
     if not allow_live_search:

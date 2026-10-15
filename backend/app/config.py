@@ -72,6 +72,7 @@ class Settings:
     allow_public_bind: bool = False
     distribution_channel: str = DEFAULT_DISTRIBUTION_CHANNEL
     max_ingest_bytes: int = DEFAULT_MAX_INGEST_BYTES
+    offline_mode: bool = False
 
     @classmethod
     def load(cls) -> "Settings":
@@ -108,6 +109,7 @@ class Settings:
             deployment_profile=os.getenv("MUCARO_AI_DEPLOYMENT_PROFILE", "local").strip().lower() or "local",
             allow_public_bind=parse_bool(os.getenv("MUCARO_AI_ALLOW_PUBLIC_BIND"), False),
             distribution_channel=distribution_channel,
+            offline_mode=parse_bool(os.getenv("MUCARO_AI_OFFLINE"), False),
         )
 
     def ensure_dirs(self) -> None:
