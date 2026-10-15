@@ -85,7 +85,7 @@ export const RichBlockEditor=forwardRef(function RichBlockEditor({block,onChange
     read:()=>root.current?parse(root.current):{text:"",marks:[]},
   }),[block,onChange]);
   return <div ref={root} className={"rich-block-editor "+className} contentEditable suppressContentEditableWarning
-    role="textbox" aria-multiline="true"
+    role="textbox" aria-label="Edit document block" aria-multiline="true"
     onInput={emit}
     onPaste={(event)=>{event.preventDefault();command("insertText",event.clipboardData.getData("text/plain"));}}
     onKeyDown={(event)=>{if(event.key==="Enter"){event.preventDefault();command("insertLineBreak");}}}
