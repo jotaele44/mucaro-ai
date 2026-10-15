@@ -83,11 +83,11 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
   );
 }
 
-export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions }) {
+export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions, claude = null, onOpenSettings }) {
   const [conversation, setConversation] = useState(null);
   const [runs, setRuns] = useState(new Map());
   const [summaries, setSummaries] = useState([]);
-  const [mode, setMode] = useState("ask");
+  const [mode, setMode] = useState("agent");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [citation, setCitation] = useState(null);
@@ -334,7 +334,25 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         {empty && (
           <div className="empty-state">
             <h2>What should Mucaro work on?</h2>
-            <p className="muted">Ask about your sources, or use a command such as <code>/status</code> or <code>/fetch https://…</code>. Actions always ask before they run unless you choose Auto for local read-only tools.</p>
+            {claude?.ready ? (
+              <p className="muted">
+                Ask anything. Claude searches the web, runs code and reads your documents as needed, and shows each step as it works.
+                Changes to your files or memory always ask first.
+              </p>
+            ) : (
+              <p className="muted">Ask about your sources, or use a command such as <code>/status</code> or <code>/fetch https://…</code>.</p>
+            )}
+          </div>
+        )}
+        {claude && !claude.ready && (
+          <div className="card connect-card" role="note">
+            <p className="card-kicker">Offline answers only</p>
+            <p>{claude.detail} Without Claude, answers only quote your documents.</p>
+            {onOpenSettings && (
+              <button type="button" className="primary-button" onClick={onOpenSettings}>
+                Connect Claude
+              </button>
+            )}
           </div>
         )}
         {legacyTurns.map((turn, index) => {
