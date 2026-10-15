@@ -296,6 +296,12 @@ export const api = {
   saveDocument: (id, document, expectedRevision) =>
     request(`/documents/${encodeURIComponent(id)}`, json("PUT", { document, expected_revision: expectedRevision })),
   documentRevisions: (id) => request(`/documents/${encodeURIComponent(id)}/revisions`),
+  documentAssets: (id) => request(`/documents/${encodeURIComponent(id)}/assets`),
+  uploadDocumentAsset: (id, file) => {
+    const form = new FormData();
+    form.append("upload", file);
+    return request(`/documents/${encodeURIComponent(id)}/assets`, { method: "POST", body: form, timeoutMs: UPLOAD_TIMEOUT_MS });
+  },
   documentComments: (id) => request(`/documents/${encodeURIComponent(id)}/comments`),
   addDocumentComment: (id, payload) => request(`/documents/${encodeURIComponent(id)}/comments`, json("POST", payload)),
   updateDocumentComment: (commentId, state) => request(`/documents/comments/${encodeURIComponent(commentId)}`, json("PATCH", { state })),
