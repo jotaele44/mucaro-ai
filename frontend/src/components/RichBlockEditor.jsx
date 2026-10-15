@@ -65,7 +65,15 @@ export const RichBlockEditor=forwardRef(function RichBlockEditor({block,onChange
     lastEmitted.current=sig(next);onChange(next);
   }
   function command(name,value=null){
-    root.current?.focus();
+    const node=root.current;
+    if(!node)return;
+    const selection=window.getSelection();
+    const selectionInside=Boolean(
+      selection?.rangeCount &&
+      node.contains(selection.anchorNode) &&
+      node.contains(selection.focusNode)
+    );
+    if(!selectionInside) node.focus();
     document.execCommand(name,false,value);
     emit();
   }
