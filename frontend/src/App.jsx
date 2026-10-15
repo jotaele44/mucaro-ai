@@ -5,6 +5,7 @@ import { NavigationShell } from "./components/NavigationShell.jsx";
 import { MobileWorkspacePicker } from "./components/MobileWorkspacePicker.jsx";
 import { WorkspaceTabs } from "./components/WorkspaceTabs.jsx";
 import { TasksDrawer } from "./components/TasksDrawer.jsx";
+import { Sheet } from "./components/Sheet.jsx";
 import { TokenGate } from "./components/TokenGate.jsx";
 import { DocumentsWorkspace } from "./components/workspaces/DocumentsWorkspace.jsx";
 import { MemoryWorkspace } from "./components/workspaces/MemoryWorkspace.jsx";
@@ -30,7 +31,7 @@ export function App(){
   const [contextOpen,setContextOpen]=useState(()=>stored("mucaro.nav.contextOpen.v2",true)!==false);
   const [conversations,setConversations]=useState([]),[documents,setDocuments]=useState([]),[filter,setFilter]=useState("");
   const [pinned,setPinned]=useState(()=>stored("mucaro.nav.pinnedConversations.v1",[]));
-  const [navOpen,setNavOpen]=useState(false),[mobileOverlay,setMobileOverlay]=useState(()=>matchMedia(MOBILE_NAV_QUERY).matches),[tasksOpen,setTasksOpen]=useState(false);
+  const [navOpen,setNavOpen]=useState(false),[mobileOverlay,setMobileOverlay]=useState(()=>matchMedia(MOBILE_NAV_QUERY).matches),[tasksOpen,setTasksOpen]=useState(false),[mobileSettingsOpen,setMobileSettingsOpen]=useState(false);
   const [modes,setModes]=useState(null),[options,setOptions]=useState(()=>({...DEFAULT_OPTIONS,...stored("mucaro.options",{})})),[message,setMessage]=useState("");
   const [health,setHealth]=useState({state:"checking"}),[gateBusy,setGateBusy]=useState(false),[reconnect,setReconnect]=useState(0);
   const healthRef=useRef(health),polling=useRef(false),offline=useRef(false),tabsRef=useRef(tabs),selectedRef=useRef(activeTabKey);
@@ -86,6 +87,7 @@ export function App(){
   function commitNav(next,key){tabsRef.current=next;selectedRef.current=key;setTabs(next);setActiveTabKey(key);}
   function openTab(tab){const out=addTab(tabsRef.current,tab);if(out.rejected){announce("Too many tabs are open. Close one first.");return;}commitNav(out.tabs,out.key);setNavOpen(false);}
   function selectKey(key){if(!tabsRef.current.some((t)=>t.key===key))return;selectedRef.current=key;setActiveTabKey(key);setNavOpen(false);}
+  function openSettings(){if(mobileOverlay){setMobileSettingsOpen(true);return;}selectRoute("settings");}
   function selectRoute(route){if(route==="chat"){const last=tabsRef.current.slice().reverse().find((t)=>t.view==="chat");openTab(last||makeTab("chat"));}else if(route==="documents"){const last=tabsRef.current.slice().reverse().find((t)=>t.view==="documents");openTab(last||makeTab("documents"));}else openTab(makeTab(route));}
   function openConversation(id){openTab(makeTab("chat",id));}
   function openDocument(id){openTab(makeTab("documents",id));}
@@ -101,10 +103,10 @@ export function App(){
     <a className="skip-link" href="#main">Skip to content</a>
     <NavigationShell view={view} conversations={conversations} documents={documents} activeResourceId={resourceId} filter={filter} setFilter={setFilter}
       pinnedConversationIds={pinned} onTogglePin={togglePin} onSelectRoute={selectRoute} onOpenConversation={openConversation} onOpenDocument={openDocument}
-      onNewDocument={newDocument} onTasks={()=>{setTasksOpen(true);setNavOpen(false);}} contextOpen={contextOpen} locale={uiPrefs.language} inactive={mobileOverlay&&!navOpen}/>
+      onNewDocument={newDocument} onTasks={()=>{setTasksOpen(true);setNavOpen(false);}} onSettings={openSettings} contextOpen={contextOpen} locale={uiPrefs.language} inactive={(mobileOverlay&&!navOpen)||mobileSettingsOpen}/>
     <button type="button" className="context-edge-handle" aria-label={contextOpen?"Collapse contextual sidebar":"Expand contextual sidebar"} aria-expanded={contextOpen} onClick={()=>setContextOpen((x)=>!x)}>☰</button>
     <div className="nav-scrim" onClick={()=>setNavOpen(false)} aria-hidden="true"/>
-    <main id="main" className="main" tabIndex={-1} inert={mobileOverlay&&navOpen}>
+    <main id="main" className="main" tabIndex={-1} inert={(mobileOverlay&&navOpen)||mobileSettingsOpen}>
       <div className="mobile-bar"><button type="button" className="icon-button" aria-controls="navigation-shell" aria-expanded={navOpen} aria-label="Open navigation" onClick={()=>setNavOpen(true)}>☰</button>
         <MobileWorkspacePicker tabs={tabs} activeKey={activeTabKey} conversations={conversations} documents={documents} locale={uiPrefs.language}
           onSelect={selectKey} onCloseTab={closeTab} onNewChat={()=>openConversation(null)} onNewDocument={newDocument}/>
@@ -124,7 +126,7 @@ export function App(){
         </div>)}</div>
       </>}
     </main>
-    {tasksOpen&&<TasksDrawer onClose={()=>setTasksOpen(false)}/>}
+    {tasksOpen&&<TasksDrawer onClose={()=>setTasksOpen(false)}/>}\n    {mobileSettingsOpen&&<Sheet title="Settings" side="bottom" size="large" onClose={()=>setMobileSettingsOpen(false)}><SettingsWorkspace embedded options={options} onOptionsChange={setOptions} uiPrefs={uiPrefs} onUIPrefsChange={(next)=>setUiPrefs(normalizeUIPrefs(next))} announce={announce}/></Sheet>}
     <div className="sr-only" role="status" aria-live="polite">{message}</div>
   </div>;
 }
