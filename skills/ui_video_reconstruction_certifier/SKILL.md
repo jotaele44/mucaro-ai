@@ -24,7 +24,7 @@ Use this skill after a UI recording is supplied and the goal is feature/motion r
 ```bash
 python scripts/certify_video_ui_coverage.py
 python scripts/certify_video_ui_coverage.py --video-a /path/to/video-a.mp4 --video-b /path/to/video-b.mp4 --output /fresh/path/ui-video-coverage-receipt.json
-pytest -q scripts/test_certify_video_ui_coverage.py
+pytest -q backend/tests/test_video_ui_coverage.py
 ```
 
 ## Certification semantics
