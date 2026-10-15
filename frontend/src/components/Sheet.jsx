@@ -69,7 +69,7 @@ export function Sheet({ title, onClose, children, side = "right", labelledBy, si
   const headingId = labelledBy || `sheet-${title.replace(/\W+/g, "-").toLowerCase()}`;
   const mobileBottom = side !== "center";
   return (
-    <div className="sheet-backdrop" style={{ "--vvh": `${viewport.height}px`, "--sheet-duration": `${MOTION.sheetOpen}ms` }}
+    <div className={`sheet-backdrop sheet-backdrop-${side}`} style={{ "--vvh": `${viewport.height}px`, "--sheet-duration": `${MOTION.sheetOpen}ms` }}
       onPointerDown={(event) => event.target === event.currentTarget && closeRef.current()}>
       <section ref={panel}
         className={`sheet sheet-${side} sheet-size-${size} ${dragY ? "sheet-dragging" : ""}`}
