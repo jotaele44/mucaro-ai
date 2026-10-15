@@ -110,3 +110,41 @@ def test_noop_save_does_not_synthesize_revision(tmp_path):
     again = update_document(created["document_id"], created["document"], 1, cfg=settings)
     assert again["revision"] == 1
     assert [row["revision"] for row in list_revisions(created["document_id"], cfg=settings)] == [1]
+
+
+def test_inline_marks_validate_and_comment_anchor_orphans_after_edit(tmp_path):
+    settings = cfg(tmp_path)
+    settings.ensure_dirs()
+    init_db(settings.sqlite_path)
+    created = create_document("Rich", initial_text="abcdef", cfg=settings)
+    tab = created["document"]["tabs"][0]
+    block = tab["blocks"][0]
+    comment = create_comment(
+        created["document_id"],
+        tab_id=tab["tab_id"],
+        block_id=block["block_id"],
+        text="range",
+        start_offset=1,
+        end_offset=6,
+        cfg=settings,
+    )
+    doc = created["document"]
+    doc["tabs"][0]["blocks"][0]["text"] = "abc"
+    doc["tabs"][0]["blocks"][0]["marks"] = [{"type": "bold", "start": 0, "end": 3}]
+    saved = update_document(created["document_id"], doc, 1, cfg=settings)
+    assert saved["document"]["tabs"][0]["blocks"][0]["marks"] == [{"type": "bold", "start": 0, "end": 3}]
+    comments = list_comments(created["document_id"], cfg=settings)
+    assert comments[0]["comment_id"] == comment["comment_id"]
+    assert comments[0]["state"] == "ORPHANED"
+
+
+def test_invalid_inline_mark_range_fails_closed(tmp_path):
+    settings = cfg(tmp_path)
+    settings.ensure_dirs()
+    init_db(settings.sqlite_path)
+    created = create_document("Marks", initial_text="abc", cfg=settings)
+    doc = created["document"]
+    doc["tabs"][0]["blocks"][0]["marks"] = [{"type": "bold", "start": 0, "end": 99}]
+    with pytest.raises(DocumentError) as exc:
+        update_document(created["document_id"], doc, 1, cfg=settings)
+    assert exc.value.status == "ERROR_DOCUMENT_INVALID_MARK_RANGE"
