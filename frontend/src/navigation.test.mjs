@@ -50,3 +50,20 @@ test("closing active chooses deterministic neighbor and last close restores new 
   const last=removeTab([a],a.key,a.key);
   assert.equal(last.key,"chat:new"); assert.equal(last.tabs.length,1);
 });
+
+test("closing an active tab returns to its recorded origin when still open",()=>{
+  const chat=makeTab("chat","c1"), library=makeTab("documents"), sources=makeTab("sources");
+  const doc=makeTab("documents","doc_1",library.key);
+  const out=removeTab([chat,library,sources,doc],doc.key,doc.key);
+  assert.equal(out.key,library.key);
+  assert.deepEqual(out.tabs.map((t)=>t.key),[chat.key,library.key,sources.key]);
+});
+test("restored return targets fail closed when missing or self-referential",()=>{
+  const raw=[
+    {view:"chat",resourceId:"c1",key:"chat:c1",mountId:"pane-a",returnKey:"workspace:sources"},
+    {view:"documents",resourceId:"doc_1",key:"document:doc_1",mountId:"pane-b",returnKey:"document:doc_1"},
+  ];
+  const restored=restoreTabs(raw);
+  assert.equal(restored[0].returnKey,null);
+  assert.equal(restored[1].returnKey,null);
+});
