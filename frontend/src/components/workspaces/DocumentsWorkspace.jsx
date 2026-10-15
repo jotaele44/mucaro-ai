@@ -75,21 +75,21 @@ export function DocumentsWorkspace({documentId,onDocumentCreated,onDocumentsChan
   const [loading,setLoading]=useState(true),[error,setError]=useState(null),[activeTab,setActiveTab]=useState(null),[editing,setEditing]=useState(false);
   const [selectedBlock,setSelectedBlock]=useState(null),[collapsed,setCollapsed]=useState(()=>new Set()),[tabSheet,setTabSheet]=useState(false),[commentSheet,setCommentSheet]=useState(false),[revisionSheet,setRevisionSheet]=useState(false),[revisions,setRevisions]=useState([]);
   const [commentText,setCommentText]=useState(""),[undo,setUndo]=useState([]),[redo,setRedo]=useState([]);
-  const editorNode=useRef(null);
+  const editorNode=useRef(null),draftRef=useRef(null);
 
   async function loadList(){const p=await api.documents();setList(p.documents||[]);onDocumentsChanged?.(p.documents||[]);}
-  async function loadDoc(value){if(!value){setRecord(null);setDraft(null);return;}const p=await api.document(value);setRecord(p);setDraft(clone(p.document));setComments(p.comments||[]);setActiveTab((cur)=>p.document.tabs.some((t)=>t.tab_id===cur)?cur:p.document.tabs[0]?.tab_id||null);setUndo([]);setRedo([]);}
+  async function loadDoc(value){if(!value){setRecord(null);setDraft(null);draftRef.current=null;return;}const p=await api.document(value);const loaded=clone(p.document);setRecord(p);setDraft(loaded);draftRef.current=loaded;setComments(p.comments||[]);setActiveTab((cur)=>p.document.tabs.some((t)=>t.tab_id===cur)?cur:p.document.tabs[0]?.tab_id||null);setUndo([]);setRedo([]);}
   useEffect(()=>{setLoading(true);setError(null);Promise.all([loadList(),loadDoc(documentId)]).catch(setError).finally(()=>setLoading(false));},[documentId]);
 
   const tab=useMemo(()=>draft?.tabs.find((r)=>r.tab_id===activeTab)||draft?.tabs[0]||null,[draft,activeTab]);
   const selected=useMemo(()=>tab?.blocks.find((r)=>r.block_id===selectedBlock)||null,[tab,selectedBlock]);
 
-  function mutate(fn){setDraft((cur)=>{if(!cur)return cur;const next=clone(cur);fn(next);setUndo((rows)=>[...rows.slice(-49),clone(cur)]);setRedo([]);return next;});}
+  function mutate(fn){setDraft((cur)=>{if(!cur)return cur;const next=clone(cur);fn(next);draftRef.current=next;setUndo((rows)=>[...rows.slice(-49),clone(cur)]);setRedo([]);return next;});}
   function replaceBlock(block){mutate((next)=>{const t=next.tabs.find((r)=>r.tab_id===activeTab),i=t.blocks.findIndex((r)=>r.block_id===block.block_id);if(i>=0)t.blocks[i]=block;});}
-  function undoOne(){if(!undo.length||!draft)return;const prev=undo[undo.length-1];setUndo(undo.slice(0,-1));setRedo((r)=>[...r,clone(draft)]);setDraft(clone(prev));}
-  function redoOne(){if(!redo.length||!draft)return;const next=redo[redo.length-1];setRedo(redo.slice(0,-1));setUndo((r)=>[...r,clone(draft)]);setDraft(clone(next));}
-  async function saveDoc(next=draft){if(!record||!next)return null;const saved=await api.saveDocument(record.document_id,next,record.revision);setRecord(saved);setDraft(clone(saved.document));setComments(saved.comments||comments);setUndo([]);setRedo([]);onDocumentsChanged?.();announce?.("Document saved.");return saved;}
-  async function toggleChecklist(blockId,itemId){const next=clone(draft),t=next.tabs.find((r)=>r.tab_id===activeTab),b=t.blocks.find((r)=>r.block_id===blockId),item=b.items.find((x)=>x.item_id===itemId);item.checked=!item.checked;setUndo((r)=>[...r.slice(-49),clone(draft)]);setRedo([]);setDraft(next);if(!editing)await saveDoc(next);}
+  function undoOne(){if(!undo.length||!draft)return;const prev=clone(undo[undo.length-1]);setUndo(undo.slice(0,-1));setRedo((r)=>[...r,clone(draft)]);draftRef.current=prev;setDraft(prev);}
+  function redoOne(){if(!redo.length||!draft)return;const next=clone(redo[redo.length-1]);setRedo(redo.slice(0,-1));setUndo((r)=>[...r,clone(draft)]);draftRef.current=next;setDraft(next);}
+  async function saveDoc(next=null){const candidate=next||draftRef.current||draft;if(!record||!candidate)return null;const saved=await api.saveDocument(record.document_id,candidate,record.revision);const loaded=clone(saved.document);setRecord(saved);setDraft(loaded);draftRef.current=loaded;setComments(saved.comments||comments);setUndo([]);setRedo([]);onDocumentsChanged?.();announce?.("Document saved.");return saved;}
+  async function toggleChecklist(blockId,itemId){const next=clone(draftRef.current||draft),t=next.tabs.find((r)=>r.tab_id===activeTab),b=t.blocks.find((r)=>r.block_id===blockId),item=b.items.find((x)=>x.item_id===itemId);item.checked=!item.checked;setUndo((r)=>[...r.slice(-49),clone(draftRef.current||draft)]);setRedo([]);draftRef.current=next;setDraft(next);if(!editing)await saveDoc(next);}
   function addBlock(type){
     const b={block_id:uid("blk"),type};
     if(["paragraph","title","heading","code","quote"].includes(type)){b.text="";b.marks=[];}
