@@ -77,3 +77,28 @@ def classify_error(status: str | None) -> str:
         if needle in code:
             return category
     return "INTERNAL_FAILURE"
+
+_HTTP_STATUS_CATEGORIES: dict[int, str] = {
+    400: "INPUT_INVALID",
+    401: "PERMISSION_DENIED",
+    403: "PERMISSION_DENIED",
+    404: "SOURCE_UNAVAILABLE",
+    405: "INPUT_INVALID",
+    408: "REMOTE_SERVICE_UNAVAILABLE",
+    409: "INPUT_INVALID",
+    413: "INPUT_INVALID",
+    415: "UNSUPPORTED_FORMAT",
+    422: "INPUT_INVALID",
+    429: "REMOTE_SERVICE_UNAVAILABLE",
+    502: "REMOTE_SERVICE_UNAVAILABLE",
+    503: "REMOTE_SERVICE_UNAVAILABLE",
+    504: "REMOTE_SERVICE_UNAVAILABLE",
+}
+
+
+def classify_http_error(status: str | None, status_code: int) -> str:
+    """Classify one API failure without replacing its precise status identity."""
+    category = classify_error(status)
+    if category != "INTERNAL_FAILURE":
+        return category
+    return _HTTP_STATUS_CATEGORIES.get(status_code, "INTERNAL_FAILURE")

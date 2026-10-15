@@ -40,6 +40,7 @@ def test_data_bearing_routes_reject_missing_token_when_configured(tmp_path, meth
     response = getattr(client, method)(path, json=body) if body is not None else getattr(client, method)(path)
     assert response.status_code == 401
     assert response.json()["detail"]["status"] == "ERROR_OPERATOR_AUTH_REQUIRED"
+    assert response.json()["detail"]["category"] == "PERMISSION_DENIED"
 
 
 @pytest.mark.parametrize("method,path,body", PROTECTED_READS)

@@ -4,9 +4,11 @@ import re
 from pathlib import Path, PurePath
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
@@ -22,6 +24,7 @@ from .conversations import (
     rename_conversation,
 )
 from .db import init_db, list_payloads, upsert_payload
+from .error_categories import ERROR_CATEGORIES, classify_http_error
 from .execution_gate import analyze_task, approve_execution
 from .exports import EXPORT_FILES, export_file_path
 from .ingestion import (
@@ -122,9 +125,33 @@ GENERATED_NAME_PATTERN = re.compile(r"^(src_|run_|chunk_)", re.IGNORECASE)
 
 
 def api_error(status: str, detail: str, *, status_code: int = 400, **extra: object) -> HTTPException:
-    payload = {"status": status, "detail": detail}
+    payload = {
+        "status": status,
+        "category": classify_http_error(status, status_code),
+        "detail": detail,
+    }
     payload.update(extra)
+    if payload.get("category") not in ERROR_CATEGORIES:
+        payload["category"] = classify_http_error(status, status_code)
     return HTTPException(status_code=status_code, detail=payload)
+
+
+def _categorized_http_payload(status_code: int, detail: object) -> dict[str, object]:
+    if isinstance(detail, dict):
+        payload = dict(detail)
+        status = str(payload.get("status") or f"ERROR_HTTP_{status_code}")
+        message = payload.get("detail")
+        category = payload.get("category")
+        payload["status"] = status
+        payload["category"] = category if category in ERROR_CATEGORIES else classify_http_error(status, status_code)
+        payload["detail"] = str(message) if message is not None else status
+        return payload
+    status = f"ERROR_HTTP_{status_code}"
+    return {
+        "status": status,
+        "category": classify_http_error(status, status_code),
+        "detail": str(detail) if detail else status,
+    }
 
 
 def sanitize_upload_filename(filename: str | None) -> str:
@@ -209,6 +236,50 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         return require_operator_auth(cfg, authorization=authorization, x_mucaro_token=x_mucaro_token)
 
     app = FastAPI(title="Mucaro AI", version="0.1.23", dependencies=[Depends(require_auth_unless_public)])
+
+    @app.exception_handler(StarletteHTTPException)
+    async def categorized_http_exception(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": _categorized_http_payload(exc.status_code, exc.detail)},
+            headers=exc.headers,
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def categorized_request_validation(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        errors = [
+            {
+                "loc": list(row.get("loc") or []),
+                "msg": str(row.get("msg") or ""),
+                "type": str(row.get("type") or ""),
+            }
+            for row in exc.errors()
+        ]
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": {
+                    "status": "ERROR_REQUEST_VALIDATION",
+                    "category": "INPUT_INVALID",
+                    "detail": "Request validation failed.",
+                    "errors": errors,
+                }
+            },
+        )
+
+    @app.exception_handler(Exception)
+    async def categorized_internal_exception(_request: Request, _exc: Exception) -> JSONResponse:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": {
+                    "status": "ERROR_INTERNAL_REQUEST_FAILURE",
+                    "category": "INTERNAL_FAILURE",
+                    "detail": "Internal request failure.",
+                }
+            },
+        )
+
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,

@@ -106,6 +106,7 @@ def test_api_optional_operator_auth_protects_mutations(tmp_path: Path):
     rejected = client.post("/plan", json={"user_request": "Add CLI capability"})
     assert rejected.status_code == 401
     assert rejected.json()["detail"]["status"] == "ERROR_OPERATOR_AUTH_REQUIRED"
+    assert rejected.json()["detail"]["category"] == "PERMISSION_DENIED"
 
     allowed = client.post(
         "/plan",
@@ -122,6 +123,52 @@ def test_api_optional_operator_auth_protects_mutations(tmp_path: Path):
     )
     assert bearer_allowed.status_code == 200
     assert bearer_allowed.json()["title"] == "Authorized chat"
+
+
+def test_api_validation_failure_has_actionable_category(tmp_path: Path):
+    client = make_client(tmp_path)
+
+    response = client.post("/plan", json={})
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["status"] == "ERROR_REQUEST_VALIDATION"
+    assert detail["category"] == "INPUT_INVALID"
+    assert detail["detail"] == "Request validation failed."
+    assert detail["errors"]
+    assert all(set(row) == {"loc", "msg", "type"} for row in detail["errors"])
+
+
+def test_api_framework_404_has_source_unavailable_category(tmp_path: Path):
+    client = make_client(tmp_path)
+
+    response = client.get("/route-that-does-not-exist")
+
+    assert response.status_code == 404
+    detail = response.json()["detail"]
+    assert detail["status"] == "ERROR_HTTP_404"
+    assert detail["category"] == "SOURCE_UNAVAILABLE"
+
+
+def test_api_uncaught_failure_is_generic_and_categorized(tmp_path: Path):
+    app = create_app(make_settings(tmp_path))
+
+    @app.get("/_test/internal-failure")
+    def internal_failure():
+        raise RuntimeError("sensitive detail must not cross the API boundary")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.get("/_test/internal-failure")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": {
+            "status": "ERROR_INTERNAL_REQUEST_FAILURE",
+            "category": "INTERNAL_FAILURE",
+            "detail": "Internal request failure.",
+        }
+    }
+    assert "sensitive detail" not in response.text
 
 
 def test_api_security_status_reports_profile(tmp_path: Path):
@@ -154,6 +201,7 @@ def test_api_tool_runtime_requires_approval_and_audits_execution(tmp_path: Path)
     blocked = client.post(f"/tools/requests/{tool_call_id}/run")
     assert blocked.status_code == 400
     assert blocked.json()["detail"]["status"] == "ERROR_TOOL_APPROVAL_REQUIRED"
+    assert blocked.json()["detail"]["category"] == "BLOCKED_ACTION"
 
     approved = client.post(f"/tools/requests/{tool_call_id}/approve", json={"reason": "operator approved"})
     assert approved.status_code == 200
@@ -181,6 +229,7 @@ def test_api_tool_runtime_rejects_unknown_tools(tmp_path: Path):
 
     assert rejected.status_code == 400
     assert rejected.json()["detail"]["status"] == "ERROR_TOOL_NOT_ALLOWED"
+    assert rejected.json()["detail"]["category"] == "BLOCKED_ACTION"
     audit = client.get("/tools/audit")
     assert audit.json()["events"][0]["event"] == "TOOL_REQUEST_REJECTED"
 
@@ -262,6 +311,7 @@ def test_api_ingest_rejects_unsupported_extension(tmp_path: Path):
 
     assert response.status_code == 400
     assert response.json()["detail"]["status"] == "ERROR_UNSUPPORTED_FILE_TYPE"
+    assert response.json()["detail"]["category"] == "UNSUPPORTED_FORMAT"
 
 
 def test_api_ingest_accepts_png_metadata_upload(tmp_path: Path):

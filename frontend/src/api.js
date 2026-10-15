@@ -121,8 +121,10 @@ async function errorFrom(res) {
   } else {
     message = String(detail);
   }
-  const category =
+  const fallbackCategory =
     res.status === 401 || res.status === 403 ? "PERMISSION_DENIED" : res.status === 404 ? "SOURCE_UNAVAILABLE" : res.status >= 500 ? "INTERNAL_FAILURE" : undefined;
+  // A category the service states (TGT-034) wins over the HTTP-status fallback.
+  const category = detail && typeof detail === "object" && !Array.isArray(detail) && detail.category ? detail.category : fallbackCategory;
   const error = new ApiError(status, message, category, payload, res.status);
   const issue = authIssueOf(error);
   if (issue) for (const listener of authListeners) listener(issue);
