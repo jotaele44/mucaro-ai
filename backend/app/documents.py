@@ -19,6 +19,8 @@ ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,120}$")
 MAX_TABS = 32
 MAX_BLOCKS_PER_TAB = 5000
 MAX_DOCUMENT_BYTES = 5_000_000
+MAX_ASSET_BYTES = 5_000_000
+ALLOWED_ASSET_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 
 
 class DocumentError(RuntimeError):
@@ -399,3 +401,63 @@ def set_comment_state(comment_id: str, state: str, *, cfg: Settings = settings) 
             (state, now, json.dumps(payload, ensure_ascii=False, sort_keys=True), comment_id),
         )
     return payload
+
+
+def store_asset(
+    document_id: str,
+    *,
+    filename: str,
+    media_type: str,
+    content: bytes,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    get_document(document_id, cfg=cfg)
+    if media_type not in ALLOWED_ASSET_TYPES:
+        raise DocumentError("ERROR_DOCUMENT_ASSET_TYPE", f"Unsupported document asset type {media_type!r}.")
+    if not content:
+        raise DocumentError("ERROR_DOCUMENT_ASSET_EMPTY", "Document asset is empty.")
+    if len(content) > MAX_ASSET_BYTES:
+        raise DocumentError("ERROR_DOCUMENT_ASSET_TOO_LARGE", f"Document asset exceeds {MAX_ASSET_BYTES} bytes.")
+    digest = sha256(content).hexdigest()
+    safe_name = str(filename or "image").replace("\\", "/").split("/")[-1][:240] or "image"
+    now = _now()
+    with get_connection(cfg.sqlite_path) as conn:
+        existing = conn.execute(
+            "SELECT asset_id, filename, media_type, size_bytes, sha256, created_at FROM document_assets WHERE document_id = ? AND sha256 = ?",
+            (document_id, digest),
+        ).fetchone()
+        if existing:
+            row = dict(existing)
+            return {**row, "document_id": document_id, "url": f"/document-assets/{row['asset_id']}"}
+        asset_id = _new_id("asset")
+        conn.execute(
+            "INSERT INTO document_assets (asset_id, document_id, sha256, media_type, filename, size_bytes, created_at, content) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (asset_id, document_id, digest, media_type, safe_name, len(content), now, content),
+        )
+    return {
+        "asset_id": asset_id, "document_id": document_id, "sha256": digest,
+        "media_type": media_type, "filename": safe_name, "size_bytes": len(content),
+        "created_at": now, "url": f"/document-assets/{asset_id}",
+    }
+
+
+def get_asset(asset_id: str, *, cfg: Settings = settings) -> dict[str, Any]:
+    _checked_id(asset_id, "asset_id")
+    with get_connection(cfg.sqlite_path) as conn:
+        row = conn.execute(
+            "SELECT asset_id, document_id, sha256, media_type, filename, size_bytes, created_at, content FROM document_assets WHERE asset_id = ?",
+            (asset_id,),
+        ).fetchone()
+    if not row:
+        raise DocumentError("ERROR_DOCUMENT_ASSET_NOT_FOUND", "Document asset not found.")
+    return dict(row)
+
+
+def list_assets(document_id: str, *, cfg: Settings = settings) -> list[dict[str, Any]]:
+    get_document(document_id, cfg=cfg)
+    with get_connection(cfg.sqlite_path) as conn:
+        rows = conn.execute(
+            "SELECT asset_id, document_id, sha256, media_type, filename, size_bytes, created_at FROM document_assets WHERE document_id = ? ORDER BY created_at ASC, asset_id ASC",
+            (document_id,),
+        ).fetchall()
+    return [{**dict(row), "url": f"/document-assets/{row['asset_id']}"} for row in rows]
