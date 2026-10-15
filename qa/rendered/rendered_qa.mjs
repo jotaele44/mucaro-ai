@@ -505,7 +505,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   check("settings personalization exposes four bounded style controls", viewport, (await settingsScope.locator('input[type="range"]').count()) === 4);
   await settingsScope.getByRole("button", { name: /Custom instructions/ }).click();
   const instructions = page.getByRole("dialog", { name: "Custom instructions" });
-  await instructions.getByLabel("Custom instructions").fill("Use explicit provenance states.");
+  await instructions.getByRole("textbox", { name: "Custom instructions", exact: true }).fill("Use explicit provenance states.");
   await instructions.getByRole("button", { name: "Save", exact: true }).click();
   await settingsScope.getByRole("button", { name: "Back to Settings" }).click();
   await settingsScope.getByRole("button", { name: /Appearance/ }).click();
