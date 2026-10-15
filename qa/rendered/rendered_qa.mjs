@@ -483,7 +483,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Memory", exact: true }).click();
   await page.getByLabel("Remember").fill("Prefer tables for comparisons");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.getByText("Prefer tables for comparisons").waitFor();
   check("memory add is visible with provenance", viewport, (await page.getByText(/preference · from api/).count()) >= 1);
   drawerStates.push(await drawerClosed());
