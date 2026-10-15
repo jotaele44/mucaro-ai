@@ -52,6 +52,35 @@ function parse(root){
   return {text:text.replace(/\r/g,""),marks:mergeMarks(marks)};
 }
 
+function selectionOffsets(root){
+  const selection=window.getSelection();
+  if(!selection?.rangeCount)return null;
+  const range=selection.getRangeAt(0);
+  if(!root.contains(range.startContainer)||!root.contains(range.endContainer))return null;
+  const prefix=document.createRange();
+  prefix.selectNodeContents(root);
+  prefix.setEnd(range.startContainer,range.startOffset);
+  const start=prefix.toString().length;
+  const whole=document.createRange();
+  whole.selectNodeContents(root);
+  whole.setEnd(range.endContainer,range.endOffset);
+  const end=whole.toString().length;
+  return {start:Math.min(start,end),end:Math.max(start,end)};
+}
+
+function toggledMarks(marks,type,start,end){
+  const rows=marks||[];
+  const covered=rows.some((mark)=>mark.type===type&&mark.start<=start&&mark.end>=end);
+  if(!covered)return mergeMarks([...rows,{type,start,end}]);
+  const next=[];
+  for(const mark of rows){
+    if(mark.type!==type||mark.end<=start||mark.start>=end){next.push({...mark});continue;}
+    if(mark.start<start)next.push({...mark,end:start});
+    if(mark.end>end)next.push({...mark,start:end});
+  }
+  return mergeMarks(next);
+}
+
 export const RichBlockEditor=forwardRef(function RichBlockEditor({block,onChange,className=""},ref){
   const root=useRef(null),lastEmitted=useRef("");
   useEffect(()=>{
@@ -77,12 +106,22 @@ export const RichBlockEditor=forwardRef(function RichBlockEditor({block,onChange
     document.execCommand(name,false,value);
     emit();
   }
+  function toggle(type){
+    const node=root.current;
+    if(!node)return;
+    const offsets=selectionOffsets(node);
+    if(!offsets||offsets.end<=offsets.start)return;
+    const next={...block,marks:toggledMarks(block.marks||[],type,offsets.start,offsets.end)};
+    lastEmitted.current=sig(next);
+    populate(node,next);
+    onChange(next);
+  }
   useImperativeHandle(ref,()=>({
     focus:()=>root.current?.focus(),
-    bold:()=>command("bold"),
-    italic:()=>command("italic"),
-    underline:()=>command("underline"),
-    strike:()=>command("strikeThrough"),
+    bold:()=>toggle("bold"),
+    italic:()=>toggle("italic"),
+    underline:()=>toggle("underline"),
+    strike:()=>toggle("strike"),
     insertText:(value)=>command("insertText",value),
     indent:()=>command("insertText","  "),
     outdent:()=>{
