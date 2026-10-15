@@ -271,6 +271,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
               announce={announce}
               allowReadAloud
               file={answerFile}
+              onOpenDocument={onOpenDocument ? (title, text) => onOpenDocument(title, text, view.runId) : null}
             />
           </div>
         )}
