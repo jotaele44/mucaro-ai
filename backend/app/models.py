@@ -121,3 +121,27 @@ class MessageEditRequest(BaseModel):
 class RunEditRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=20000)
     expected_version: int = Field(ge=1)
+
+
+class DocumentCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=240)
+    origin_type: str = Field(default="manual", min_length=1, max_length=80)
+    origin_ref: str | None = Field(default=None, max_length=240)
+    initial_text: str = Field(default="", max_length=20000)
+
+
+class DocumentUpdateRequest(BaseModel):
+    expected_revision: int = Field(ge=1)
+    document: dict
+
+
+class DocumentCommentCreateRequest(BaseModel):
+    tab_id: str = Field(min_length=1, max_length=120)
+    block_id: str = Field(min_length=1, max_length=120)
+    text: str = Field(min_length=1, max_length=4000)
+    start_offset: int | None = Field(default=None, ge=0)
+    end_offset: int | None = Field(default=None, ge=0)
+
+
+class DocumentCommentStateRequest(BaseModel):
+    state: Literal["ACTIVE", "RESOLVED", "ORPHANED"]
