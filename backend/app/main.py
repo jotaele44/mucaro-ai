@@ -879,6 +879,8 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 headers={
                     "Cache-Control": "private, max-age=31536000, immutable",
                     "ETag": f'"{asset["sha256"]}"',
+                    "X-Content-Type-Options": "nosniff",
+                    "Content-Security-Policy": "default-src 'none'; sandbox",
                     "Content-Disposition": f'inline; filename="{asset["filename"].replace(chr(34), "")}"',
                 },
             )
