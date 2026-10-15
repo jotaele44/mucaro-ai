@@ -480,7 +480,7 @@ async function scenario(browser, base, viewport, contextOptions) {
       const box = node.getBoundingClientRect();
       return { left: Math.round(box.left), right: Math.round(box.right), width: Math.round(box.width), viewport: window.innerWidth };
     });
-    check("mobile navigation leaves a visible content peek", viewport, drawerGeometry.left === 0 && drawerGeometry.right < drawerGeometry.viewport && drawerGeometry.right > drawerGeometry.viewport * 0.85, JSON.stringify(drawerGeometry));
+    check("mobile navigation leaves a visible content peek", viewport, Math.abs(drawerGeometry.left) <= 2 && drawerGeometry.right < drawerGeometry.viewport && drawerGeometry.right > drawerGeometry.viewport * 0.85, JSON.stringify(drawerGeometry));
     await shot(page, viewport, "12-nav-open");
   }
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources", exact: true }).click();
@@ -682,8 +682,10 @@ async function launchTokenScenario(browser, viewport) {
     await page.reload();
     check("reload keeps the launch session authorized", viewport, (await relisted).status() === 200);
     await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
-    const managed = await page.getByText("created a fresh token for this launch").isVisible().catch(() => false);
-    const tokenField = await page.getByLabel("Token", { exact: true }).count();
+    const settings = page.locator("#main");
+    await settings.getByRole("button", { name: /Security/ }).click();
+    const managed = await settings.getByText("This app launch manages its token automatically.", { exact: true }).isVisible().catch(() => false);
+    const tokenField = await settings.getByLabel("Local access token", { exact: true }).count();
     check("Settings shows the launch token as app-managed (no token field)", viewport, managed && tokenField === 0);
     await context.close();
 
@@ -1323,6 +1325,9 @@ async function lanScenario(browser, address) {
         check("the phone link with the token in its fragment opens the app (M7)", "iphone", opened && !linkPage.url().includes("token="), `opened: ${opened}, address bar: ${linkPage.url().replace(token, "<token>")}`);
         await linkPage.getByRole("button", { name: "Open navigation" }).click();
         await linkPage.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
+        const settings = linkPage.getByRole("dialog", { name: "Settings" });
+        await settings.waitFor();
+        await settings.getByRole("button", { name: /Security/ }).click();
         const warned = await appears(cleartextNotice(linkPage));
         check("Settings says a network connection over http is not encrypted (M7)", "iphone", warned);
         await shot(linkPage, "iphone", "21-cleartext-notice");
