@@ -42,12 +42,17 @@ export function SettingsWorkspace({options,onOptionsChange,uiPrefs,onUIPrefsChan
   }:null,[manifest]);
 
   function slider(label,key){return <label className="settings-slider"><span>{label}<output>{Math.round(uiPrefs.personalization[key]*100)}</output></span><input type="range" min="0" max="1" step="0.05" value={uiPrefs.personalization[key]} onChange={(e)=>patchPersonal({[key]:Number(e.target.value)})}/></label>;}
-  function Page(){
-    if(page==="home") return <div className="settings-groups">
-      <section className="settings-group">{rows.slice(0,5).map((r)=><Row key={r[0]} id={r[0]} title={r[1]} description={r[2]} onClick={setPage} value={r[0]==="appearance"?uiPrefs.theme:r[0]==="general"?uiPrefs.language.toUpperCase():null}/>)}</section>
-      <section className="settings-group">{rows.slice(5,10).map((r)=><Row key={r[0]} id={r[0]} title={r[1]} description={r[2]} onClick={setPage}/>)}</section>
-      <section className="settings-group">{rows.slice(10).map((r)=><Row key={r[0]} id={r[0]} title={r[1]} description={r[2]} onClick={setPage}/>)}</section>
+  function HomeView({ inert = false } = {}) {
+    const handler = inert ? () => {} : setPage;
+    return <div className="settings-groups" aria-hidden={inert || undefined}>
+      <section className="settings-group">{rows.slice(0,5).map((r)=><Row key={r[0]} id={r[0]} title={r[1]} description={r[2]} onClick={handler} value={r[0]==="appearance"?uiPrefs.theme:r[0]==="general"?uiPrefs.language.toUpperCase():null}/>)}</section>
+      <section className="settings-group">{rows.slice(5,10).map((r)=><Row key={r[0]} id={r[0]} title={r[1]} description={r[2]} onClick={handler}/>)}</section>
+      <section className="settings-group">{rows.slice(10).map((r)=><Row key={r[0]} id={r[0]} title={r[1]} description={r[2]} onClick={handler}/>)}</section>
     </div>;
+  }
+
+  function Page(){
+    if(page==="home") return <HomeView/>;
     if(page==="appearance") return <div className="settings-page-body">
       <fieldset className="settings-card"><legend>Theme</legend><div className="segmented">{["auto","light","dark"].map((x)=><button key={x} type="button" aria-pressed={uiPrefs.theme===x} onClick={()=>patch({theme:x})}>{x==="auto"?"System":x[0].toUpperCase()+x.slice(1)}</button>)}</div></fieldset>
       <fieldset className="settings-card"><legend>Density</legend><div className="segmented">{["compact","comfortable","roomy"].map((x)=><button key={x} type="button" aria-pressed={uiPrefs.density===x} onClick={()=>patch({density:x})}>{x}</button>)}</div></fieldset>
@@ -75,9 +80,12 @@ export function SettingsWorkspace({options,onOptionsChange,uiPrefs,onUIPrefsChan
   }
 
   return <section className={"workspace settings-stack settings-page-"+page} aria-labelledby="settings-title" {...swipe.bind} style={{"--back-progress":swipe.progress}}>
-    <header className="settings-stack-header">{page!=="home"&&<button type="button" className="icon-button" aria-label="Back to Settings" onClick={back}>‹</button>}<h1 id="settings-title">{title}</h1></header>
-    {error&&<p className="error-card" role="alert">{error.status||"ERROR"}: {error.message}</p>}
-    <Page/>
+    {page!=="home"&&<div className="settings-backdrop-page"><HomeView inert/></div>}
+    <div className="settings-foreground-page">
+      <header className="settings-stack-header">{page!=="home"&&<button type="button" className="icon-button" aria-label="Back to Settings" onClick={back}>‹</button>}<h1 id="settings-title">{title}</h1></header>
+      {error&&<p className="error-card" role="alert">{error.status||"ERROR"}: {error.message}</p>}
+      <Page/>
+    </div>
     {instructionsOpen&&<Sheet title="Custom instructions" side="bottom" size="large" onClose={()=>{setInstructions(uiPrefs.personalization.customInstructions);setInstructionsOpen(false);}}><label className="custom-instructions-editor"><span className="sr-only">Custom instructions</span><textarea data-autofocus value={instructions} maxLength={12000} onChange={(e)=>setInstructions(e.target.value)}/><span className="character-count">{instructions.length.toLocaleString()} / 12,000</span></label><div className="button-row"><button type="button" className="secondary-button" onClick={()=>setInstructionsOpen(false)}>Cancel</button><button type="button" className="primary-button" onClick={()=>{patchPersonal({customInstructions:instructions});setInstructionsOpen(false);announce?.("Custom instructions saved.");}}>Save</button></div></Sheet>}
   </section>;
 }
