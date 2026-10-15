@@ -1541,3 +1541,24 @@ html {
   .mobile-bar>.icon-button { flex:0 0 44px; }
   .settings-foreground-page { min-height:100%; }
 }
+
+
+.sheet-backdrop-bottom { justify-content:center; align-items:flex-end; }
+.sheet-bottom {
+  width:min(720px,100%); height:auto; max-height:min(82vh,var(--vvh,82vh));
+  border-radius:18px 18px 0 0;
+}
+.sheet-backdrop-bottom .sheet-grabber-zone { display:flex; }
+.rich-block-editor {
+  min-height:92px; width:100%; padding:10px 12px; border:1px solid var(--accent);
+  border-radius:10px; background:var(--surface); white-space:pre-wrap; overflow-wrap:anywhere;
+  outline:none; caret-color:var(--accent);
+}
+.rich-block-editor:focus { box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent); }
+.revision-list { display:grid; gap:8px; }
+.revision-row {
+  display:flex; justify-content:space-between; gap:12px; align-items:center;
+  padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2);
+}
+.revision-row>div { display:grid; }
+.revision-row code { color:var(--muted); font-size:11px; }
