@@ -535,3 +535,14 @@ def test_secrets_never_appear_in_events_or_history(cfg, api, chat, tmp_path):
     blob = json.dumps(list_run_events(run["run_id"], cfg=cfg)) + json.dumps(load_history(chat, cfg)) + json.dumps(get_run(run["run_id"], cfg))
     assert FAKE_KEY not in blob
     assert not any(FAKE_KEY in path.read_text(encoding="utf-8", errors="ignore") for path in Path(cfg.data_dir).rglob("*") if path.is_file() and path.suffix != ".sqlite3")
+
+
+def test_engine_option_selects_the_pipeline(cfg, api, chat):
+    cited = submit_message(chat, "hello", mode="agent", options={"engine": "cited"}, cfg=cfg)["run"]
+    assert api.requests == [] and "engine" not in get_run(cited["run_id"], cfg)
+
+    save_app_settings({"live_consent": False}, cfg)
+    forced = submit_message(chat, "hello", mode="agent", options={"engine": "agent"}, cfg=cfg)["run"]
+    failed = get_run(forced["run_id"], cfg)
+    assert failed["state"] == "FAILED" and failed["error"]["status"] == "ERROR_CLAUDE_CONSENT_REQUIRED"
+    assert api.requests == []

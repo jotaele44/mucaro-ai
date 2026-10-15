@@ -160,7 +160,7 @@ export function transcriptText(turns) {
 /** "Worked 14 s · 3 searches · 2 sources" for a finished Claude turn. */
 export function workSummary(view) {
   const seconds = view.usage?.duration_ms != null ? Math.round(view.usage.duration_ms / 1000) : null;
-  const searches = (view.usage?.web_search_requests || 0) + view.progress.filter((row) => row.kind === "tool" && /^Searching your/.test(row.text)).length;
+  const searches = view.progress.filter((row) => row.kind === "tool" && /^Searching /.test(row.text)).length;
   const reads = view.progress.filter((row) => row.kind === "tool" && /^(Reading|Opening|Listing)/.test(row.text)).length;
   const parts = [seconds != null ? `Worked ${seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`}` : "Worked"];
   if (searches) parts.push(`${searches} search${searches === 1 ? "" : "es"}`);

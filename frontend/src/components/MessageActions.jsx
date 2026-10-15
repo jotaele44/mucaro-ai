@@ -157,6 +157,7 @@ export function EditableMessage({
   allowReadAloud = false,
   file = null,
   onCite = null,
+  streaming = false,
   children,
 }) {
   // Answers mark citations as ⟦n⟧; copies, read-aloud and edits use the plain [n] form.
@@ -239,6 +240,7 @@ export function EditableMessage({
         <>
           <RichText text={text} onCite={onCite} />
           {children}
+          {!streaming && (
           <div className="message-footer">
             {edited && (
               <span
@@ -260,6 +262,7 @@ export function EditableMessage({
               file={file}
             />
           </div>
+          )}
         </>
       )}
     </div>

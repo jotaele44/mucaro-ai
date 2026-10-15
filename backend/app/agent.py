@@ -968,9 +968,10 @@ def advance_turn(run: dict[str, Any], cfg: Settings, hooks: TurnHooks) -> TurnOu
             return TurnOutcome("awaiting_approval", awaiting_call_ids=[item["tool_call_id"] for item in state["awaiting"]])
         _finish_tool_round(state)
         hooks.save(state)
+    status = claude_status(cfg)
+    if not status["ready"]:
+        return TurnOutcome("failed", status=f"ERROR_{status['status']}", detail=status["detail"])
     key, _source = get_api_key(cfg)
-    if not key:
-        return TurnOutcome("failed", status="ERROR_CLAUDE_KEY_MISSING", detail="Add your Anthropic API key in Settings.")
     client = _client(key)
     tools_config = _tools_config(conversation_id, cfg)
     tools = request_tools(state["model"], tools_config, str(run.get("mode") or AGENT_MODE))

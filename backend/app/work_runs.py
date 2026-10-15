@@ -698,8 +698,11 @@ class _AgentRoute(Exception):
 def _agent_engine(run: dict[str, Any], question: str, cfg: Settings) -> bool:
     """Claude answers when it is connected and allowed; offline, local-model and plan runs keep the cited-answer path."""
     options = run.get("options", {})
-    if run["mode"] == "plan" or not question:
+    engine = options.get("engine") or "auto"
+    if run["mode"] == "plan" or not question or engine == "cited":
         return False
+    if engine == "agent":
+        return True  # if Claude is not ready, the turn fails and says why instead of answering offline
     if options.get("require_offline") or options.get("model_provider") == "openai_compatible_local":
         return False
     return agent.agent_ready(cfg)
