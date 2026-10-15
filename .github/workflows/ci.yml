@@ -28,6 +28,10 @@ jobs:
       - name: Run frontend navigation and UI unit regressions
         run: npm run test:unit
         working-directory: frontend
+      - name: Certify frozen video UI source coverage
+        run: |
+          python scripts/certify_video_ui_coverage.py
+          pytest -q scripts/test_certify_video_ui_coverage.py backend/tests/test_documents.py
       - name: Certify release gates
         run: python scripts/certify_release.py
       - name: Certify security gates (SBOM, audits, secrets, static triage, network exposure)
