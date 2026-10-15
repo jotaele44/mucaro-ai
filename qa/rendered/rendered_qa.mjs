@@ -581,7 +581,7 @@ async function scenario(browser, base, viewport, contextOptions) {
 
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   const imageInput = page.locator('input[type="file"][accept*="image/png"]');
-  await imageInput.setInputFiles({ name: "qa.png", mimeType: "image/png", buffer: Buffer.from([137,80,78,71,13,10,26,10,1,2,3,4]) });
+  await imageInput.setInputFiles({ name: "qa.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") });
   await page.locator(".document-block-image img").waitFor();
   const imageSrc = await page.locator(".document-block-image img").getAttribute("src");
   check("document media is rebound to local content-addressed storage", viewport, /^\/document-assets\/asset_/.test(imageSrc || ""), imageSrc || "no src");
