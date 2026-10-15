@@ -38,16 +38,23 @@ therefore requires a matching grant when the path is outside the project root.
 
 ## Browser Flow
 
-The local frontend exposes the same contract in the Directory Access panel:
+The local frontend exposes the same contract in the Directory Access panel with
+one canonical intake action:
 
-1. Enter a local file or directory path.
-2. Check access.
-3. Confirm the prompted granted root.
-4. Grant access or grant and ingest.
-5. Revoke the grant when it is no longer needed.
+1. Enter the folder path and optional reason.
+2. Choose **Check access & ingest**.
+3. If an existing grant covers the resolved path, ingestion proceeds through the
+   normal server-side permission check.
+4. If a grant is required, verify the resolved granted root and choose
+   **Grant access & ingest**. Cancel leaves the grant unchanged and does not ingest.
+5. Manage an active grant only from **Granted directories**, where **Revoke** is
+   the single grant-management action.
 
-Browser directory access still goes through the backend `/ingest-path` route, so
-the UI cannot bypass the server-side permission gate.
+The UI intentionally does not expose separate Check, Ingest, Grant, and
+Grant-and-Ingest controls for the same workflow. Browser directory access still
+goes through the backend `/permissions/directories/*` and `/ingest-path`
+routes, so consolidating the UI does not bypass or weaken the server-side
+permission gate.
 
 ## Local State
 

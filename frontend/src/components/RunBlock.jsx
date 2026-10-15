@@ -193,6 +193,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
   const assistantMessageKey = `run:${view.runId}:assistant`;
   const userEdit = messageEdits[userMessageKey];
   const assistantEdit = messageEdits[assistantMessageKey];
+  const compactCompleted = view.state === "COMPLETED" && Boolean(view.answer) && !view.error && !view.interrupted;
   // Save and Share appear once the answer is complete, never on text that is still streaming.
   const answerFile =
     view.answer && TERMINAL_STATES.has(view.state)
@@ -214,33 +215,75 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
       </div>
 
       <div className="assistant-block">
-        <div className="run-status">
-          <span className={`status-chip status-${view.state.toLowerCase()}`}>{STATE_LABEL[view.state] || view.state}</span>
-          {view.state === "RUNNING" && <span className="spinner" aria-hidden="true" />}
-          {(planSteps.length > 0 || view.route) && (
-            <details className="plan-details">
-              <summary>Plan · {planSteps.length} step{planSteps.length === 1 ? "" : "s"}</summary>
-              <ol>
-                {planSteps.map((step, index) => (
-                  <li key={index}>
-                    {step.step}
-                    {step.tool && step.requires_approval && <span className="muted small"> — needs approval</span>}
-                  </li>
-                ))}
-              </ol>
-              {view.route && (
-                <p className="muted small">
-                  Model: {view.route.selected_provider || "none"} ({view.route.selection_reason || view.route.status})
-                </p>
+        {compactCompleted ? (
+          <details className="run-receipt">
+            <summary>
+              <span className="status-chip status-completed">{STATE_LABEL[view.state] || view.state}</span>
+              <span>Run details</span>
+              {(planSteps.length > 0 || toolLabel) && (
+                <span className="muted small">
+                  {planSteps.length > 0 ? `${planSteps.length} plan step${planSteps.length === 1 ? "" : "s"}` : ""}
+                  {planSteps.length > 0 && toolLabel ? " · " : ""}
+                  {toolLabel || ""}
+                </span>
               )}
-            </details>
-          )}
-        </div>
+            </summary>
+            {(planSteps.length > 0 || view.route || toolLabel) && (
+              <div className="run-receipt-body">
+                {planSteps.length > 0 && (
+                  <ol>
+                    {planSteps.map((step, index) => (
+                      <li key={index}>
+                        {step.step}
+                        {step.tool && step.requires_approval && <span className="muted small"> — needs approval</span>}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {view.route && (
+                  <p className="muted small">
+                    Model: {view.route.selected_provider || "none"} ({view.route.selection_reason || view.route.status})
+                  </p>
+                )}
+                {toolLabel && (
+                  <button type="button" className="tool-summary" onClick={() => setToolsOpen(true)} aria-haspopup="dialog">
+                    {toolLabel}
+                  </button>
+                )}
+              </div>
+            )}
+          </details>
+        ) : (
+          <>
+            <div className="run-status">
+              <span className={`status-chip status-${view.state.toLowerCase()}`}>{STATE_LABEL[view.state] || view.state}</span>
+              {view.state === "RUNNING" && <span className="spinner" aria-hidden="true" />}
+              {(planSteps.length > 0 || view.route) && (
+                <details className="plan-details">
+                  <summary>Plan · {planSteps.length} step{planSteps.length === 1 ? "" : "s"}</summary>
+                  <ol>
+                    {planSteps.map((step, index) => (
+                      <li key={index}>
+                        {step.step}
+                        {step.tool && step.requires_approval && <span className="muted small"> — needs approval</span>}
+                      </li>
+                    ))}
+                  </ol>
+                  {view.route && (
+                    <p className="muted small">
+                      Model: {view.route.selected_provider || "none"} ({view.route.selection_reason || view.route.status})
+                    </p>
+                  )}
+                </details>
+              )}
+            </div>
 
-        {toolLabel && (
-          <button type="button" className="tool-summary" onClick={() => setToolsOpen(true)} aria-haspopup="dialog">
-            {toolLabel}
-          </button>
+            {toolLabel && (
+              <button type="button" className="tool-summary" onClick={() => setToolsOpen(true)} aria-haspopup="dialog">
+                {toolLabel}
+              </button>
+            )}
+          </>
         )}
 
         {view.pendingApprovals.map((request) => (
