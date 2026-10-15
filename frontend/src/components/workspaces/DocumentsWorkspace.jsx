@@ -2,32 +2,40 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api.js";
 import { saveFile, shareFile, shareMessage } from "../../files.js";
 import { Sheet } from "../Sheet.jsx";
+import { RichBlockEditor } from "../RichBlockEditor.jsx";
 
 const uid=(p)=>p+"_"+(globalThis.crypto?.randomUUID?.()||Math.random().toString(16).slice(2));
 const clone=(v)=>JSON.parse(JSON.stringify(v));
 
-function Inline({text}){
-  const value=String(text||"");
-  const rules=[[/\*\*([^*]+)\*\*/,"strong"],[/__([^_]+)__/, "u"],[/~~([^~]+)~~/,"s"],[/\*([^*]+)\*/,"em"]];
-  for(const [re,tag] of rules){
-    const m=re.exec(value);
-    if(m){const Tag=tag;return <><Inline text={value.slice(0,m.index)}/><Tag>{m[1]}</Tag><Inline text={value.slice(m.index+m[0].length)}/></>;}
+function MarkedText({text,marks=[]}){
+  const value=String(text||""),bounds=new Set([0,value.length]);
+  for(const mark of marks){bounds.add(Math.max(0,Math.min(value.length,mark.start)));bounds.add(Math.max(0,Math.min(value.length,mark.end)));}
+  const points=[...bounds].sort((a,b)=>a-b),parts=[];
+  for(let i=0;i<points.length-1;i++){
+    const start=points[i],end=points[i+1];if(end<=start)continue;
+    let node=value.slice(start,end);
+    const active=marks.filter((m)=>m.start<=start&&m.end>=end).map((m)=>m.type);
+    if(active.includes("strike"))node=<s>{node}</s>;
+    if(active.includes("underline"))node=<u>{node}</u>;
+    if(active.includes("italic"))node=<em>{node}</em>;
+    if(active.includes("bold"))node=<strong>{node}</strong>;
+    parts.push(<React.Fragment key={start+"-"+end}>{node}</React.Fragment>);
   }
-  return <>{value}</>;
+  return <>{parts}</>;
 }
 
 function ViewBlock({block,selected,onSelect,onChecklist,collapsed,onToggle}){
   const cls="document-block document-block-"+block.type+(selected?" selected":"");
   if(block.type==="divider") return <hr className={cls}/>;
   if(block.type==="image") return <figure className={cls} onClick={onSelect}><img src={block.src} alt={block.caption||""}/>{block.caption&&<figcaption>{block.caption}</figcaption>}</figure>;
-  if(block.type==="heading"){const Tag="h"+(block.level||2);return <Tag className={cls} onClick={onSelect}><Inline text={block.text}/></Tag>;}
-  if(block.type==="title") return <h1 className={cls} onClick={onSelect}><Inline text={block.text}/></h1>;
+  if(block.type==="heading"){const Tag="h"+(block.level||2);return <Tag className={cls} onClick={onSelect}><MarkedText text={block.text} marks={block.marks||[]}/></Tag>;}
+  if(block.type==="title") return <h1 className={cls} onClick={onSelect}><MarkedText text={block.text} marks={block.marks||[]}/></h1>;
   if(block.type==="code") return <pre className={cls} onClick={onSelect}><code>{block.text}</code></pre>;
-  if(block.type==="quote") return <blockquote className={cls} onClick={onSelect}><Inline text={block.text}/></blockquote>;
-  if(block.type==="bullets"||block.type==="ordered"){const Tag=block.type==="ordered"?"ol":"ul";return <Tag className={cls} onClick={onSelect}>{(block.items||[]).map((x,i)=><li key={i}><Inline text={x}/></li>)}</Tag>;}
-  if(block.type==="checklist") return <ul className={cls+" checklist-block"}>{(block.items||[]).map((item)=><li key={item.item_id}><label><input type="checkbox" checked={item.checked} onChange={()=>onChecklist(item.item_id)}/><span className={item.checked?"checked":""}><Inline text={item.text}/></span></label></li>)}</ul>;
+  if(block.type==="quote") return <blockquote className={cls} onClick={onSelect}><MarkedText text={block.text} marks={block.marks||[]}/></blockquote>;
+  if(block.type==="bullets"||block.type==="ordered"){const Tag=block.type==="ordered"?"ol":"ul";return <Tag className={cls} onClick={onSelect}>{(block.items||[]).map((x,i)=><li key={i}><MarkedText text={x}/></li>)}</Tag>;}
+  if(block.type==="checklist") return <ul className={cls+" checklist-block"}>{(block.items||[]).map((item)=><li key={item.item_id}><label><input type="checkbox" checked={item.checked} onChange={()=>onChecklist(item.item_id)}/><span className={item.checked?"checked":""}><MarkedText text={item.text}/></span></label></li>)}</ul>;
   if(block.type==="section") return <section className={cls}><button type="button" className="section-toggle" aria-expanded={!collapsed} onClick={onToggle}><span>{block.title}</span><span aria-hidden="true">{collapsed?"›":"⌄"}</span></button></section>;
-  return <p className={cls} onClick={onSelect}><Inline text={block.text}/></p>;
+  return <p className={cls} onClick={onSelect}><MarkedText text={block.text} marks={block.marks||[]}/></p>;
 }
 
 function markdown(doc){
@@ -52,11 +60,14 @@ function markdown(doc){
 }
 
 function Editor({block,onChange,onNode}){
-  const ref=useRef(null);
-  useEffect(()=>onNode?.(ref.current),[onNode]);
-  if(["bullets","ordered"].includes(block.type)) return <textarea ref={ref} className="document-text-editor" value={(block.items||[]).join("\n")} onChange={(e)=>onChange({...block,items:e.target.value.split("\n")})}/>;
+  const plainRef=useRef(null);
+  useEffect(()=>{if(plainRef.current)onNode?.(plainRef.current);},[onNode,block.block_id]);
+  if(["paragraph","title","heading","quote"].includes(block.type)){
+    return <RichBlockEditor ref={onNode} block={block} onChange={onChange} className="document-rich-editor"/>;
+  }
+  if(["bullets","ordered"].includes(block.type)) return <textarea ref={plainRef} className="document-text-editor" value={(block.items||[]).join("\n")} onChange={(e)=>onChange({...block,items:e.target.value.split("\n")})}/>;
   if(block.type==="checklist") return <div className="checklist-editor">{(block.items||[]).map((item,i)=><div key={item.item_id} className="checklist-editor-row"><input type="checkbox" checked={item.checked} onChange={(e)=>{const items=clone(block.items);items[i].checked=e.target.checked;onChange({...block,items});}}/><input value={item.text} onChange={(e)=>{const items=clone(block.items);items[i].text=e.target.value;onChange({...block,items});}}/></div>)}</div>;
-  return <textarea id={"document-block-editor-"+block.block_id} ref={ref} className="document-text-editor" value={block.text||""} onChange={(e)=>onChange({...block,text:e.target.value})} rows={Math.min(16,Math.max(3,String(block.text||"").split("\n").length+1))}/>;
+  return <textarea ref={plainRef} id={"document-block-editor-"+block.block_id} className="document-text-editor" value={block.text||""} onChange={(e)=>onChange({...block,text:e.target.value})} rows={Math.min(16,Math.max(3,String(block.text||"").split("\n").length+1))}/>;
 }
 
 export function DocumentsWorkspace({documentId,onDocumentCreated,onDocumentsChanged,onCloseDocument,announce}){
@@ -80,7 +91,23 @@ export function DocumentsWorkspace({documentId,onDocumentCreated,onDocumentsChan
   async function saveDoc(next=draft){if(!record||!next)return null;const saved=await api.saveDocument(record.document_id,next,record.revision);setRecord(saved);setDraft(clone(saved.document));setComments(saved.comments||comments);setUndo([]);setRedo([]);onDocumentsChanged?.();announce?.("Document saved.");return saved;}
   async function toggleChecklist(blockId,itemId){const next=clone(draft),t=next.tabs.find((r)=>r.tab_id===activeTab),b=t.blocks.find((r)=>r.block_id===blockId),item=b.items.find((x)=>x.item_id===itemId);item.checked=!item.checked;setUndo((r)=>[...r.slice(-49),clone(draft)]);setRedo([]);setDraft(next);if(!editing)await saveDoc(next);}
   function addBlock(type){const b={block_id:uid("blk"),type};if(["paragraph","title","heading","code","quote"].includes(type))b.text="";if(type==="heading")b.level=2;if(["bullets","ordered"].includes(type))b.items=[""];if(type==="checklist")b.items=[{item_id:uid("item"),text:"",checked:false}];mutate((next)=>next.tabs.find((r)=>r.tab_id===activeTab).blocks.push(b));setSelectedBlock(b.block_id);setEditing(true);}
-  function format(kind){const node=editorNode.current;if(!node||!selected||!["title","paragraph","heading","code","quote"].includes(selected.type))return;const start=node.selectionStart||0,end=node.selectionEnd||start,text=String(selected.text||""),part=text.slice(start,end),wrap={bold:["**","**"],italic:["*","*"],underline:["__","__"],strike:["~~","~~"]};let next=text,caret=start;if(wrap[kind]){const [a,b]=wrap[kind];next=text.slice(0,start)+a+part+b+text.slice(end);caret=end+a.length+b.length;}else if(kind==="quote"){next=text.slice(0,start)+"> "+part+text.slice(end);caret=end+2;}else if(kind==="indent"){next=text.slice(0,start)+"  "+part+text.slice(end);caret=end+2;}else if(kind==="outdent"){const p=part.replace(/^ {1,2}/,"");next=text.slice(0,start)+p+text.slice(end);caret=start+p.length;}else if(kind==="emoji"){next=text.slice(0,start)+"🙂"+text.slice(end);caret=start+2;}replaceBlock({...selected,text:next});requestAnimationFrame(()=>{node.focus();node.setSelectionRange(caret,caret);});}
+  function format(kind){
+    const editor=editorNode.current;
+    if(!selected)return;
+    if(kind==="quote"){replaceBlock({...selected,type:"quote"});return;}
+    if(editor&&typeof editor[kind]==="function"){editor[kind]();return;}
+    if(kind==="emoji"&&editor?.insertText){editor.insertText("🙂");return;}
+    if(kind==="indent"&&editor?.indent){editor.indent();return;}
+    if(kind==="outdent"&&editor?.outdent){editor.outdent();return;}
+    if(editor instanceof HTMLTextAreaElement){
+      const start=editor.selectionStart||0,end=editor.selectionEnd||start,text=editor.value;
+      const inserted=kind==="emoji"?"🙂":kind==="indent"?"  ":"";
+      if(inserted){
+        editor.setRangeText(inserted,start,end,"end");
+        editor.dispatchEvent(new Event("input",{bubbles:true}));
+      }
+    }
+  }
   async function addComment(){if(!record||!tab||!selectedBlock||!commentText.trim())return;const c=await api.addDocumentComment(record.document_id,{tab_id:tab.tab_id,block_id:selectedBlock,text:commentText.trim()});setComments((r)=>[...r,c]);setCommentText("");announce?.("Comment added.");}
   async function resolveComment(commentId){const c=await api.updateDocumentComment(commentId,"RESOLVED");setComments((r)=>r.map((x)=>x.comment_id===commentId?c:x));}
 
@@ -92,9 +119,9 @@ export function DocumentsWorkspace({documentId,onDocumentCreated,onDocumentsChan
   return <section className={"workspace document-workspace "+(editing?"document-editing":"")} aria-labelledby="document-title">
     <header className="document-toolbar"><div><button type="button" className="icon-button" aria-label="Close document" onClick={onCloseDocument}>✕</button><button type="button" className="icon-button" aria-label="Undo" disabled={!undo.length} onClick={undoOne}>↶</button><button type="button" className="icon-button" aria-label="Redo" disabled={!redo.length} onClick={redoOne}>↷</button></div><div><button type="button" className="icon-button" aria-label={"Comments "+activeComments.length} onClick={()=>setCommentSheet(true)}>◌</button><button type="button" className="icon-button" aria-label="Share document" onClick={async()=>{const text=markdown(draft),name=(draft.title||"mucaro-document").replace(/[^a-z0-9]+/gi,"-").toLowerCase()+".md",result=await shareFile(new Blob([text],{type:"text/markdown;charset=utf-8"}),name,{title:draft.title});announce?.(shareMessage(result,name));}}>↥</button><button type="button" className="icon-button" aria-label="Save document file" onClick={()=>saveFile(new Blob([markdown(draft)],{type:"text/markdown;charset=utf-8"}),(draft.title||"document")+".md")}>⇩</button>{editing?<button type="button" className="done-button" onClick={async()=>{await saveDoc();setEditing(false);}}>✓</button>:<button type="button" className="secondary-button" onClick={()=>setEditing(true)}>Edit</button>}</div></header>
     <div className="document-tabbar"><button type="button" className="document-tab-selector" onClick={()=>setTabSheet(true)}>{tab?.title||"Tab"} ⌄</button></div>
-    <div className="document-scroll"><div className="document-meta"><span>{new Date(record.updated_at).toLocaleDateString()}</span><span>Revision {record.revision}</span><span>{draft.metadata?.origin_type||"manual"}</span></div><input id="document-title" className="document-title-input" value={draft.title} readOnly={!editing} onChange={(e)=>mutate((n)=>{n.title=e.target.value;})}/><div className="document-blocks">{(tab?.blocks||[]).map((row)=>editing&&selectedBlock===row.block_id?<div key={row.block_id} className="document-block-editor-wrap"><Editor block={row} onChange={replaceBlock} onNode={(node)=>{editorNode.current=node;}}/></div>:<ViewBlock key={row.block_id} block={row} selected={selectedBlock===row.block_id} collapsed={collapsed.has(row.block_id)} onSelect={()=>{setSelectedBlock(row.block_id);if(editing)requestAnimationFrame(()=>document.getElementById("document-block-editor-"+row.block_id)?.focus());}} onToggle={()=>setCollapsed((cur)=>{const n=new Set(cur);n.has(row.block_id)?n.delete(row.block_id):n.add(row.block_id);return n;})} onChecklist={(item)=>toggleChecklist(row.block_id,item)}/>)}</div>
+    <div className="document-scroll"><div className="document-meta"><span>{new Date(record.updated_at).toLocaleDateString()}</span><span>Revision {record.revision}</span><span>{draft.metadata?.origin_type||"manual"}</span></div><input id="document-title" className="document-title-input" value={draft.title} readOnly={!editing} onChange={(e)=>mutate((n)=>{n.title=e.target.value;})}/><div className="document-blocks">{(tab?.blocks||[]).map((row)=>editing&&selectedBlock===row.block_id?<div key={row.block_id} className="document-block-editor-wrap"><Editor block={row} onChange={replaceBlock} onNode={(node)=>{editorNode.current=node;}}/></div>:<ViewBlock key={row.block_id} block={row} selected={selectedBlock===row.block_id} collapsed={collapsed.has(row.block_id)} onSelect={()=>{setSelectedBlock(row.block_id);if(editing)requestAnimationFrame(()=>editorNode.current?.focus?.());}} onToggle={()=>setCollapsed((cur)=>{const n=new Set(cur);n.has(row.block_id)?n.delete(row.block_id):n.add(row.block_id);return n;})} onChecklist={(item)=>toggleChecklist(row.block_id,item)}/>)}</div>
       {editing&&<div className="document-add-row">{["paragraph","heading","bullets","ordered","checklist","quote","code","divider"].map((kind)=><button key={kind} type="button" className="ghost-button" onClick={()=>addBlock(kind)}>+ {kind}</button>)}<label className="ghost-button">+ image<input type="file" accept="image/*" hidden onChange={(e)=>{const file=e.target.files?.[0];if(!file)return;if(file.size>2000000){announce?.("Image is too large.");return;}const r=new FileReader();r.onload=()=>mutate((n)=>n.tabs.find((x)=>x.tab_id===activeTab).blocks.push({block_id:uid("blk"),type:"image",src:String(r.result),caption:file.name}));r.readAsDataURL(file);}}/></label></div>}</div>
-    {editing&&<div className="document-formatbar" role="toolbar" aria-label="Formatting"><button onClick={()=>setCommentSheet(true)}>◌</button><button onClick={()=>format("emoji")}>☺</button><button onClick={()=>format("outdent")}>⇤</button><button onClick={()=>format("indent")}>⇥</button><select aria-label="Block style" value={selected?.type||"paragraph"} onChange={(e)=>selected&&replaceBlock({...selected,type:e.target.value,...(e.target.value==="heading"?{level:2}:{})})}><option value="paragraph">Aa</option><option value="heading">H2</option><option value="quote">Quote</option><option value="code">Code</option></select><button onClick={()=>format("bold")}><strong>B</strong></button><button onClick={()=>format("italic")}><em>I</em></button><button onClick={()=>format("underline")}><u>U</u></button><button onClick={()=>format("strike")}><s>S</s></button><button onClick={()=>format("quote")}>❝</button><button onClick={()=>editorNode.current?.blur()}>⌨︎</button></div>}
+    {editing&&<div className="document-formatbar" role="toolbar" aria-label="Formatting"><button onClick={()=>setCommentSheet(true)}>◌</button><button onClick={()=>format("emoji")}>☺</button><button onClick={()=>format("outdent")}>⇤</button><button onClick={()=>format("indent")}>⇥</button><select aria-label="Block style" value={["paragraph","heading","quote","code"].includes(selected?.type)?selected.type:"paragraph"} onChange={(e)=>selected&&replaceBlock({...selected,type:e.target.value,...(e.target.value==="heading"?{level:2}:{})})}><option value="paragraph">Aa</option><option value="heading">H2</option><option value="quote">Quote</option><option value="code">Code</option></select><button onClick={()=>format("bold")}><strong>B</strong></button><button onClick={()=>format("italic")}><em>I</em></button><button onClick={()=>format("underline")}><u>U</u></button><button onClick={()=>format("strike")}><s>S</s></button><button onClick={()=>format("quote")}>❝</button><button onClick={()=>{const node=editorNode.current;if(node?.blur)node.blur();else document.activeElement?.blur?.();}}>⌨︎</button></div>}
     {tabSheet&&<Sheet title="Document tabs" side="bottom" size="compact" onClose={()=>setTabSheet(false)}><div className="document-tab-sheet">{draft.tabs.map((row)=><button key={row.tab_id} type="button" className="sheet-row" aria-current={row.tab_id===activeTab?"true":undefined} onClick={()=>{setActiveTab(row.tab_id);setTabSheet(false);}}>{row.title}</button>)}<button type="button" className="sheet-row" onClick={()=>{const t=uid("tab");mutate((n)=>n.tabs.push({tab_id:t,title:"Tab "+(n.tabs.length+1),position:n.tabs.length,blocks:[]}));setActiveTab(t);setTabSheet(false);setEditing(true);}}>＋ New tab</button></div></Sheet>}
     {commentSheet&&<Sheet title="Comments" side="bottom" size="medium" onClose={()=>setCommentSheet(false)}><div className="comment-list">{comments.map((row)=><article key={row.comment_id} className={"comment "+row.state.toLowerCase()}><p>{row.text}</p><span className="muted small">{row.state}</span>{row.state==="ACTIVE"&&<button type="button" className="ghost-button" onClick={()=>resolveComment(row.comment_id)}>Resolve</button>}</article>)}</div>{selectedBlock?<form onSubmit={(e)=>{e.preventDefault();addComment();}} className="comment-form"><label className="field"><span>Add comment to selected block</span><textarea value={commentText} onChange={(e)=>setCommentText(e.target.value)}/></label><button type="submit" className="primary-button" disabled={!commentText.trim()}>Add comment</button></form>:<p className="muted">Select a block to anchor a comment.</p>}</Sheet>}
   </section>;
