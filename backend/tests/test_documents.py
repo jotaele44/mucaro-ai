@@ -14,6 +14,9 @@ from backend.app.documents import (
     list_revisions,
     set_comment_state,
     update_document,
+    store_asset,
+    get_asset,
+    list_assets,
 )
 
 
@@ -25,7 +28,7 @@ def test_schema_upgrade_and_document_round_trip(tmp_path):
     settings = cfg(tmp_path)
     settings.ensure_dirs()
     init_db(settings.sqlite_path)
-    assert schema_version(settings.sqlite_path) == 3
+    assert schema_version(settings.sqlite_path) == 4
 
     created = create_document("Research plan", initial_text="First paragraph", cfg=settings)
     assert created["revision"] == 1
@@ -148,3 +151,33 @@ def test_invalid_inline_mark_range_fails_closed(tmp_path):
     with pytest.raises(DocumentError) as exc:
         update_document(created["document_id"], doc, 1, cfg=settings)
     assert exc.value.status == "ERROR_DOCUMENT_INVALID_MARK_RANGE"
+
+
+def test_document_assets_are_content_hashed_deduplicated_and_bounded(tmp_path):
+    settings = cfg(tmp_path)
+    settings.ensure_dirs()
+    init_db(settings.sqlite_path)
+    created = create_document("Assets", cfg=settings)
+    first = store_asset(
+        created["document_id"],
+        filename="figure.png",
+        media_type="image/png",
+        content=b"\x89PNG\r\n\x1a\nfixture",
+        cfg=settings,
+    )
+    second = store_asset(
+        created["document_id"],
+        filename="renamed.png",
+        media_type="image/png",
+        content=b"\x89PNG\r\n\x1a\nfixture",
+        cfg=settings,
+    )
+    assert first["asset_id"] == second["asset_id"]
+    assert first["sha256"] == second["sha256"]
+    assert first["url"].startswith("/document-assets/")
+    assert get_asset(first["asset_id"], cfg=settings)["content"].endswith(b"fixture")
+    assert len(list_assets(created["document_id"], cfg=settings)) == 1
+
+    with pytest.raises(DocumentError) as exc:
+        store_asset(created["document_id"], filename="remote.svg", media_type="image/svg+xml", content=b"<svg/>", cfg=settings)
+    assert exc.value.status == "ERROR_DOCUMENT_ASSET_TYPE"
