@@ -539,6 +539,39 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "16-settings");
   axeRuns.push(await axe(page, viewport, "settings"));
   if (viewport === "iphone") {
+    const stack = settingsScope.locator(".settings-stack");
+    await stack.dispatchEvent("pointerdown", { pointerType: "touch", pointerId: 41, isPrimary: true, clientX: 2, clientY: 260 });
+    await stack.dispatchEvent("pointermove", { pointerType: "touch", pointerId: 41, isPrimary: true, clientX: 260, clientY: 262 });
+    await page.waitForFunction(() => {
+      const node=document.querySelector('[role="dialog"][aria-labelledby^="sheet-settings"] .settings-foreground-page');
+      return Boolean(node && node.style.transform && !node.style.transform.includes("(0%"));
+    });
+    const swipeTransform = await settingsScope.locator(".settings-foreground-page").evaluate((node) => node.style.transform);
+    check("settings edge swipe tracks the touch pointer interactively", viewport, /translate3d\([1-9]/.test(swipeTransform), swipeTransform);
+    await stack.dispatchEvent("pointerup", { pointerType: "touch", pointerId: 41, isPrimary: true, clientX: 260, clientY: 262 });
+    await settingsScope.getByRole("button", { name: /Personalization/ }).waitFor();
+    check("settings edge swipe commits back to the previous settings page", viewport, true);
+
+    await settingsScope.getByRole("button", { name: /Appearance/ }).click();
+    await settingsScope.getByRole("button", { name: "reduced", exact: true }).click();
+    await page.waitForFunction(() => document.documentElement.dataset.mucaroMotion === "reduced");
+    const reducedDuration = await settingsScope.locator(".settings-foreground-page").evaluate((node) => getComputedStyle(node).transitionDuration);
+    check("reduced-motion preference collapses transition durations", viewport, reducedDuration.includes("0.000001") || reducedDuration.includes("1e-06") || reducedDuration === "0s", reducedDuration);
+    await settingsScope.getByRole("button", { name: "system", exact: true }).click();
+    await settingsScope.getByRole("button", { name: "Back to Settings" }).click();
+
+    await settingsScope.getByRole("button", { name: /Personalization/ }).click();
+    await settingsScope.getByRole("button", { name: /Custom instructions/ }).click();
+    const dragSheet = page.getByRole("dialog", { name: "Custom instructions" });
+    await dragSheet.waitFor();
+    const grabber = dragSheet.locator(".sheet-grabber-zone");
+    await grabber.dispatchEvent("pointerdown", { pointerType: "touch", pointerId: 42, isPrimary: true, clientX: 190, clientY: 40 });
+    await grabber.dispatchEvent("pointermove", { pointerType: "touch", pointerId: 42, isPrimary: true, clientX: 190, clientY: 420 });
+    await grabber.dispatchEvent("pointerup", { pointerType: "touch", pointerId: 42, isPrimary: true, clientX: 190, clientY: 420 });
+    await dragSheet.waitFor({ state: "detached" });
+    check("bottom sheet drag gesture dismisses past the threshold", viewport, true);
+    await settingsScope.getByRole("button", { name: "Back to Settings" }).click();
+
     await page.keyboard.press("Escape");
     await settingsScope.waitFor({ state: "detached" });
   }
