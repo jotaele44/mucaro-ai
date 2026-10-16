@@ -86,3 +86,10 @@ for the same exact Mucaro source SHA, with positive and negative execution evide
 
 Until then the correct aggregate state is `VIDEO_CLI_PARITY_OPEN` or `VIDEO_CLI_PARITY_INVALID`, never an inferred percentage-based PASS.
 \n### Governed generalized file edit\n\n`coding.file_edit` adds bounded one-file `CREATE`, `REPLACE`, and `DELETE` semantics. Every call remains approval-gated and binds exact repository HEAD, repository-relative path, expected preimage state/hash, and proposed content SHA-256 where applicable. Dirty targets, symlink traversal, `.git` mutation, content drift, unexpected dirty-path expansion, and failed postconditions fail closed; postcondition failures trigger rollback. This closes VCP-004 at the source-implementation layer only; runtime certification remains separate.\n
+## Current source implementation status
+
+At PR #228 head, the source matrix is `27 IMPLEMENTED / 0 PARTIAL / 0 ABSENT / 0 UNVERIFIED`. This is source closure only. Runtime certification remains governed by the closure rule above.
+
+### Model-driven Autopilot planning and replanning
+
+Autopilot can generate a canonical task DAG from a natural-language objective only after an exact governed repository HEAD has been observed. Generated plans remain pending explicit authorization. Replans require a paused, blocked, or failed parent checkpoint, a structured trigger, and a finite remaining `max_replans` budget. Successor checkpoints preserve the parent source SHA, cumulative usage counters, wall-time start, loop history, and hashed plan/replan receipts.
