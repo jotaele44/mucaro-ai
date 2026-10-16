@@ -129,7 +129,10 @@
         "Last executed hosted boundary 2026-09-29T16:22:37Z: CI 24 steps, WebKit 13, Chromium 13, macOS 15",
         "First confirmed universal zero-step boundary 2026-09-29T16:31:25Z: CI/macOS/WebKit/Chromium all 0 steps",
         "CI, macOS app and Rendered UI workflow blobs are identical across the 8m48s transition window",
-        "Current main 6c5e2868fa35a984d715e80554bb93ea37373370: CI run 36740205293 job 109972306901 and Shadow QA run 36740205210 job 109972306723 both 0 steps"
+        "Current main 6c5e2868fa35a984d715e80554bb93ea37373370: CI run 36740205293 job 109972306901 and Shadow QA run 36740205210 job 109972306723 both 0 steps",
+        "_architecture/release/evidence/actions_runner_admission_resolved_20261013.json",
+        "PR #114 CI run 38344568273 job 115122849026: SUCCESS with real executed steps",
+        "PR #117 CI run 38344565848 job 115122841366: SUCCESS with real executed steps"
       ],
       "what_would_unblock": "Restore GitHub-hosted runner admission, then execute PR #138 v1.2 unchanged on its exact head. The first valid run must execute steps and emit benchmark evidence; a zero-step retry is not unblocking evidence.",
       "dependent_nodes": [
@@ -141,8 +144,8 @@
         "Verify account Actions usage/billing/policy in GitHub UI when operator access is available; do not infer the cause from zero-step jobs alone.",
         "Preserve PR #150 and PR #151 exact source heads without state promotion until hosted execution resumes."
       ],
-      "status": "ACTIVE",
-      "resolution": null
+      "status": "RESOLVED",
+      "resolution": "Runner admission resumed by 2026-10-13T04:03:14Z. PR #114 exact head c3787835e1e50ee18bad48e7fe62514ef239cbf1 and PR #117 exact head 7b1cd0767f2b15d81410716c360c935c7a5f4994 executed successful CI, rendered Chromium/WebKit, macOS app, and OCR live-runtime jobs with nonzero steps. See _architecture/release/evidence/actions_runner_admission_resolved_20261013.json. This resolves runner admission only; RT-10/MATRIX-007 remains PROVISIONAL until its frozen benchmark executes."
     }
   ]
 }
