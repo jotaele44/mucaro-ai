@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-10-16T18:24:00Z",
+  "updated_utc": "2026-10-16T18:28:27Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -231,7 +231,7 @@
       "dependencies": [
         "N07"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "risk": "MEDIUM",
       "user_value": "HIGH",
       "downstream_unlock_value": "MEDIUM",
@@ -240,7 +240,7 @@
         "frozen retrieval benchmark with thresholds"
       ],
       "blocker": null,
-      "notes": "Runner admission is restored and BLK-ACTIONS-001 is RESOLVED. RT-10/MATRIX-007 still requires execution of the frozen production-scale retrieval benchmark before N09 can advance beyond PROVISIONAL."
+      "notes": "PASS: RT-09 real-world retrieval provenance plus RT-10 v1.2 10,000-chunk/80-query source-tree-equivalent execution close retrieval quality, citation integrity, scale/performance, negative-query and ambiguous-binding gates. RT-10 run 36643492834 job 117130186355 returned RT10_SCALE_CERT_PASS with zero threshold failures."
     },
     {
       "node_id": "N10",
