@@ -6,6 +6,7 @@ it must already be active, no-capability, and IN_PROCESS. No unattended side-eff
 from __future__ import annotations
 from typing import Any
 from time import time
+import math
 from .capability_policy import CapabilityPolicy, evaluate_capabilities
 from .agent_claim_authority import ClaimIssuer, policy_digest as authority_policy_digest
 from .scoped_agent_claim import ScopedClaimIssuer, ScopedClaimVerifier
@@ -63,11 +64,17 @@ class GovernedSkillBridge:
 
     def execute_readonly(self, *, job_id: str, run_id: str,
                          skill_id: str, arguments: dict[str,Any],
-                         worker_id: str, lease_seconds: int = 30) -> dict[str,Any]:
+                         worker_id: str, lease_seconds: int = 30,
+                         resource_units: float | None = None) -> dict[str,Any]:
         if not isinstance(arguments,dict):
             raise DispatchGateError("INVALID_ARGUMENTS")
         skill=self._authorize(skill_id)
         if isinstance(self.claim_issuer,ScopedClaimIssuer):
+            if (resource_units is None or isinstance(resource_units,bool)
+                    or not isinstance(resource_units,(int,float))
+                    or not math.isfinite(resource_units) or resource_units<=0
+                    or resource_units>self.claim_issuer.scope.max_resource_units):
+                raise DispatchGateError("RESOURCE_SCOPE_EXCEEDED")
             if (self.claim_issuer.scope.skill_id!=skill_id or
                 not self.claim_issuer.scope.matches_runtime(self.cfg.project_root)):
                 raise DispatchGateError("SOURCE_OR_WORKSPACE_DRIFT")
