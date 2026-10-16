@@ -1789,7 +1789,7 @@ def test_cli_package_macos_app_builds_and_verifies_bundle(tmp_path: Path, capsys
     )
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "MACOS_APP_BUNDLE_READY"
-    assert payload["app_path"] == str(output_dir / "Mucaro AI.app")
+    assert payload["app_path"] == str(output_dir / "Mucaro AI Setup.app")
 
     assert main(["package", "macos-app", "--verify", payload["app_path"], "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out

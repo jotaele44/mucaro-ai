@@ -398,9 +398,9 @@ approved and audited.
 | `HOSTED_INCIDENT_PACKET_NOT_REQUIRED` | hosted governance is already ready, so an incident packet was not required |
 | `HOSTED_INCIDENT_PACKET_VERIFIED` | saved hosted-governance incident packet passed schema, hash, payload, copy-line, command, and optional current-head checks |
 | `HOSTED_INCIDENT_PACKET_VERIFY_FAILED` | saved hosted-governance incident packet is missing, malformed, hash-mismatched, stale for current `HEAD`, or otherwise invalid |
-| `MACOS_APP_BUNDLE_READY` | Local source-bound `Mucaro AI.app` bundle was built and verified |
+| `MACOS_APP_BUNDLE_READY` | Local source-bound `Mucaro AI Setup.app` bundle was built and verified |
 | `MACOS_APP_BUNDLE_FAILED` | Local macOS Application bundle could not be built from the current source/runtime inputs |
-| `MACOS_APP_BUNDLE_VERIFIED` | Existing local `Mucaro AI.app` bundle passed structure, executable, receipt, and launcher-target checks |
+| `MACOS_APP_BUNDLE_VERIFIED` | Existing local `Mucaro AI Setup.app` bundle passed structure, executable, receipt, and launcher-target checks |
 | `MACOS_APP_BUNDLE_VERIFY_FAILED` | Existing local macOS Application bundle is missing or does not pass required structure/launcher checks |
 | `RELEASE_NEXT_ACTIONS_OPEN` | one or more release or hosted-governance actions remain open; output includes prioritized operator commands and verification commands |
 | `RELEASE_NEXT_ACTIONS_READY` | no release next actions remain open |
@@ -1047,11 +1047,10 @@ Add `--require-current-head` when the manifest must bind to the current checkout
 before a release or distribution decision.
 
 Use `mucaro package macos-app --format text` to build a local double-clickable
-`Mucaro AI.app` bundle under `data/exports/desktop_apps`. The bundle is a
-source-bound wrapper: it launches this checked-out repository with the Python
-executable recorded at build time, then runs `scripts/launch_app.py`, which
-starts the local backend and opens the browser UI. Use `mucaro package
-macos-app --verify data/exports/desktop_apps/Mucaro\ AI.app --format text` to
+`Mucaro AI Setup.app` bundle under `data/exports/desktop_apps`. The bundle is a
+source-bound wrapper: it launches this checked-out repository through the silent
+setup path, which provisions its private runtime and opens the native window.
+Use `mucaro package macos-app --verify data/exports/desktop_apps/Mucaro\ AI\ Setup.app --format text` to
 verify the bundle structure, executable bit, Info.plist binding, receipt, and
 launcher target. This is not yet a portable signed installer with embedded
 runtime, reinstall, upgrade, and rollback guarantees, and it is explicitly not

@@ -5,7 +5,7 @@ Outputs (all committed):
 - ``Mucaro AI.exe``                            Windows launcher (C, packaging/launchers/windows/)
 - ``packaging/icons/mucaro.ico``               Windows icon (embedded in the .exe and used for the
                                                window), made from the macOS app's owl
-                                               (``Mucaro AI.app/Contents/Resources/MucaroAI.png``)
+                                               (``Mucaro AI Setup.app/Contents/Resources/MucaroAI.png``)
 - ``packaging/launchers/windows/BUILD_SHA256`` expected hash of the .exe
 
 Tools are pinned and hash-checked (packaging/launchers/build-requirements.txt: zig for cross-compiling,
@@ -31,7 +31,7 @@ REQUIREMENTS = ROOT / "packaging" / "launchers" / "build-requirements.txt"
 WINDOWS_SRC = ROOT / "packaging" / "launchers" / "windows"
 EXE = ROOT / "Mucaro AI.exe"
 ICO = ROOT / "packaging" / "icons" / "mucaro.ico"
-ICON_SOURCE = ROOT / "Mucaro AI.app" / "Contents" / "Resources" / "MucaroAI.png"
+ICON_SOURCE = ROOT / "Mucaro AI Setup.app" / "Contents" / "Resources" / "MucaroAI.png"
 EXE_HASH_FILE = WINDOWS_SRC / "BUILD_SHA256"
 ICO_SIZES = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
 ZIG_FLAGS = [

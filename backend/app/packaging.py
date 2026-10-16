@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import plistlib
 import shlex
 import subprocess
 import tomllib
@@ -53,7 +54,9 @@ OPTIONAL_GENERATED_OUTPUTS = [
 DISTRIBUTION_MANIFEST_SCHEMA_VERSION = "mucaro_distribution_manifest_v1"
 DISTRIBUTION_MANIFEST_DIR = Path("data") / "exports" / "distribution_manifests"
 MACOS_APP_BUNDLE_SCHEMA_VERSION = "mucaro_macos_app_bundle_v1"
-MACOS_APP_BUNDLE_NAME = "Mucaro AI.app"
+MACOS_APP_BUNDLE_NAME = "Mucaro AI Setup.app"
+MACOS_APP_DISPLAY_NAME = "Mucaro AI Setup"
+MACOS_APP_BUNDLE_ID = "ai.mucaro.source-launcher"
 MACOS_APP_BUNDLE_DIR = Path("data") / "exports" / "desktop_apps"
 REQUIRED_DISTRIBUTION_RECEIPTS = [
     ("local_release", "CERTIFY_RELEASE_OK"),
@@ -263,13 +266,13 @@ exec /bin/bash scripts/native_start.sh "${{REPO_ROOT}}" "$@"
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>Mucaro AI</string>
+  <string>{MACOS_APP_DISPLAY_NAME}</string>
   <key>CFBundleDisplayName</key>
-  <string>Mucaro AI</string>
+  <string>{MACOS_APP_DISPLAY_NAME}</string>
   <key>CFBundleExecutable</key>
   <string>mucaro-ai</string>
   <key>CFBundleIdentifier</key>
-  <string>ai.mucaro.source-launcher</string>
+  <string>{MACOS_APP_BUNDLE_ID}</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -338,6 +341,11 @@ def verify_macos_app_bundle(app_path: Path, *, root: Path = ROOT) -> dict[str, A
     checks: list[dict[str, str]] = [
         _check("app_bundle_exists", "PASS" if app_path.exists() and app_path.is_dir() else "FAIL", str(app_path)),
         _check("bundle_extension", "PASS" if app_path.name.endswith(".app") else "FAIL", app_path.name),
+        _check(
+            "source_bundle_filename",
+            "PASS" if app_path.name == MACOS_APP_BUNDLE_NAME else "FAIL",
+            f"expected={MACOS_APP_BUNDLE_NAME} observed={app_path.name}",
+        ),
         _check("contents_dir", "PASS" if contents.exists() and contents.is_dir() else "FAIL", str(contents)),
         _check("info_plist", "PASS" if plist_path.exists() else "FAIL", str(plist_path)),
         _check("launcher_executable", "PASS" if executable_path.exists() and os.access(executable_path, os.X_OK) else "FAIL", str(executable_path)),
@@ -350,13 +358,70 @@ def verify_macos_app_bundle(app_path: Path, *, root: Path = ROOT) -> dict[str, A
             receipt = _load_json(receipt_path)
             checks.append(_check("receipt_schema", "PASS" if receipt.get("schema_version") == MACOS_APP_BUNDLE_SCHEMA_VERSION else "FAIL", str(receipt.get("schema_version"))))
             checks.append(_check("receipt_entrypoint", "PASS" if receipt.get("entrypoint") == "scripts/native_start.sh" else "FAIL", str(receipt.get("entrypoint"))))
+            checks.append(
+                _check(
+                    "receipt_source_bundle_name",
+                    "PASS" if receipt.get("bundle_name") == MACOS_APP_BUNDLE_NAME else "FAIL",
+                    f"expected={MACOS_APP_BUNDLE_NAME} observed={receipt.get('bundle_name')}",
+                )
+            )
+            checks.append(
+                _check(
+                    "receipt_source_scope",
+                    "PASS" if receipt.get("scope") == "source_bound_local_macos_app_wrapper" else "FAIL",
+                    str(receipt.get("scope")),
+                )
+            )
+            checks.append(
+                _check(
+                    "receipt_app_path",
+                    "PASS" if receipt.get("app_path") == str(app_path) else "FAIL",
+                    f"expected={app_path} observed={receipt.get('app_path')}",
+                )
+            )
         except (OSError, json.JSONDecodeError, ValueError) as exc:
             checks.append(_check("receipt_parse", "FAIL", str(exc)))
 
     if plist_path.exists():
-        plist_text = plist_path.read_text(encoding="utf-8", errors="replace")
-        checks.append(_check("plist_executable_binding", "PASS" if "<string>mucaro-ai</string>" in plist_text else "FAIL", "CFBundleExecutable=mucaro-ai"))
-        checks.append(_check("plist_package_type", "PASS" if "<string>APPL</string>" in plist_text else "FAIL", "CFBundlePackageType=APPL"))
+        try:
+            plist = plistlib.loads(plist_path.read_bytes())
+        except (OSError, plistlib.InvalidFileException, ValueError) as exc:
+            checks.append(_check("plist_parse", "FAIL", str(exc)))
+            plist = {}
+        checks.append(
+            _check(
+                "plist_executable_binding",
+                "PASS" if plist.get("CFBundleExecutable") == "mucaro-ai" else "FAIL",
+                f"expected=mucaro-ai observed={plist.get('CFBundleExecutable')}",
+            )
+        )
+        checks.append(
+            _check(
+                "plist_package_type",
+                "PASS" if plist.get("CFBundlePackageType") == "APPL" else "FAIL",
+                f"expected=APPL observed={plist.get('CFBundlePackageType')}",
+            )
+        )
+        checks.append(
+            _check(
+                "plist_source_name",
+                "PASS"
+                if plist.get("CFBundleName") == MACOS_APP_DISPLAY_NAME
+                and plist.get("CFBundleDisplayName") == MACOS_APP_DISPLAY_NAME
+                else "FAIL",
+                (
+                    f"expected={MACOS_APP_DISPLAY_NAME} "
+                    f"name={plist.get('CFBundleName')} display={plist.get('CFBundleDisplayName')}"
+                ),
+            )
+        )
+        checks.append(
+            _check(
+                "plist_source_bundle_id",
+                "PASS" if plist.get("CFBundleIdentifier") == MACOS_APP_BUNDLE_ID else "FAIL",
+                f"expected={MACOS_APP_BUNDLE_ID} observed={plist.get('CFBundleIdentifier')}",
+            )
+        )
 
     if executable_path.exists():
         launcher_text = executable_path.read_text(encoding="utf-8", errors="replace")

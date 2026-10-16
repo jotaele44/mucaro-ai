@@ -12,7 +12,7 @@ Phone access is off unless you ask for it. A normal launch listens on this compu
 
 | How you start Mucaro | What to do |
 |---|---|
-| `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows) | Add `MUCARO_AI_PHONE_ACCESS=1` to `.env`, then open the app. A dialog offers to copy the link (a **Copy link** button on macOS, a Yes or No question on Windows). |
+| `Mucaro AI Setup.app` (macOS) or `Mucaro AI.exe` (Windows) | Add `MUCARO_AI_PHONE_ACCESS=1` to `.env`, then open the app. A dialog offers to copy the link (a **Copy link** button on macOS, a Yes or No question on Windows). |
 | `Mucaro AI.command`, `Mucaro AI.cmd` | Add `MUCARO_AI_PHONE_ACCESS=1` to `.env`, or pass `--phone` from a terminal. The window prints the link. |
 | A terminal | `python scripts/launch_app.py --phone` |
 

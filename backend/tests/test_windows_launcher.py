@@ -35,7 +35,7 @@ def _pe_header(data: bytes) -> tuple[int, int]:
 
 def test_top_folder_has_the_windows_launcher_next_to_the_mac_app():
     assert EXE.is_file()
-    assert (REPO / "Mucaro AI.app").is_dir()
+    assert (REPO / "Mucaro AI Setup.app").is_dir()
     assert (REPO / "Mucaro AI.cmd").is_file()
     assert not [path.name for path in REPO.iterdir() if path.name.startswith("Start Mucaro AI")]
     assert build_launchers.EXE == EXE
