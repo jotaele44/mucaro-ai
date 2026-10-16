@@ -81,6 +81,126 @@ def test_cli_help_lists_serve(capsys):
     assert "serve" in output
 
 
+def test_cli_inspects_portable_runtime_archive_without_materializing(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    archive = tmp_path / "runtime.tar.gz"
+    archive.write_bytes(b"fixture")
+    expected = {
+        "archive_bytes": 7,
+        "archive_root": "python",
+        "archive_sha256": "a" * 64,
+        "logical_members_sha256": "b" * 64,
+        "member_count": 2,
+        "payload_multiset_sha256": "c" * 64,
+        "regular_file_count": 1,
+        "symlink_count": 1,
+        "total_regular_bytes": 17,
+    }
+
+    monkeypatch.setattr(cli, "inspect_runtime_archive", lambda path: expected if path == archive else {})
+    monkeypatch.setattr(
+        cli,
+        "materialize_portable_runtime",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not materialize")),
+    )
+
+    assert main(["package", "portable-runtime", "--inspect-archive", str(archive), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {"status": "PORTABLE_RUNTIME_ARCHIVE_INSPECTED", **expected}
+
+
+def test_cli_archive_inspection_passes_explicit_safety_bounds(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    archive = tmp_path / "runtime.tar.gz"
+    observed = {}
+
+    def fake_inspect(path: Path, **kwargs):
+        observed["path"] = path
+        observed["kwargs"] = kwargs
+        return {
+            "archive_bytes": 1,
+            "archive_root": "python",
+            "archive_sha256": "a" * 64,
+            "logical_members_sha256": "b" * 64,
+            "member_count": 1,
+            "payload_multiset_sha256": "c" * 64,
+            "regular_file_count": 1,
+            "symlink_count": 0,
+            "total_regular_bytes": 1,
+        }
+
+    monkeypatch.setattr(cli, "inspect_runtime_archive", fake_inspect)
+
+    assert (
+        main(
+            [
+                "package",
+                "portable-runtime",
+                "--inspect-archive",
+                str(archive),
+                "--max-members",
+                "2500",
+                "--max-regular-bytes",
+                "80000000",
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    assert observed == {
+        "path": archive,
+        "kwargs": {"max_members": 2500, "max_regular_bytes": 80000000},
+    }
+
+
+def test_cli_archive_inspection_bounds_require_inspection_mode(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    monkeypatch.setattr(
+        cli,
+        "materialize_portable_runtime",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must fail before materialization")),
+    )
+
+    assert main(["package", "portable-runtime", "--max-members", "2500", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["status"] == "ERROR_PORTABLE_RUNTIME_MODE_CONFLICT"
+    assert "--inspect-archive" in payload["detail"]
+
+
+def test_cli_archive_inspection_rejects_conflicting_modes(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    archive = tmp_path / "runtime.tar.gz"
+    verify = tmp_path / "runtime"
+
+    monkeypatch.setattr(
+        cli,
+        "inspect_runtime_archive",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("conflict must fail before inspection")),
+    )
+
+    assert (
+        main(
+            [
+                "package",
+                "portable-runtime",
+                "--inspect-archive",
+                str(archive),
+                "--verify",
+                str(verify),
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["status"] == "ERROR_PORTABLE_RUNTIME_MODE_CONFLICT"
+    assert "--verify" in payload["detail"]
+
+
 def test_cli_materializes_portable_runtime_with_governed_defaults(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     expected_output = tmp_path / "data" / "exports" / "portable_runtimes" / "macos-x86_64"
@@ -98,6 +218,66 @@ def test_cli_materializes_portable_runtime_with_governed_defaults(tmp_path: Path
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "PORTABLE_RUNTIME_VERIFIED"
     assert payload["runtime_dir"] == str(expected_output)
+
+
+def test_cli_materializes_portable_runtime_with_explicit_manifest_output(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    manifest = tmp_path / "packaging" / "runtime" / "macos-arm64.json"
+    expected_output = tmp_path / "data" / "exports" / "portable_runtimes" / "macos-arm64"
+
+    def fake_materialize(root: Path, manifest_path: Path, output: Path, *, archive_path: Path | None = None):
+        assert root == tmp_path
+        assert manifest_path == manifest
+        assert output == expected_output
+        assert archive_path is None
+        return {"status": "PORTABLE_RUNTIME_VERIFIED", "runtime_dir": str(output), "failed_checks": []}
+
+    monkeypatch.setattr(cli, "materialize_portable_runtime", fake_materialize)
+
+    assert (
+        main(
+            ["package", "portable-runtime", "--manifest", str(manifest), "--format", "json"],
+            cfg=cfg,
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "PORTABLE_RUNTIME_VERIFIED"
+    assert payload["runtime_dir"] == str(expected_output)
+
+
+def test_cli_portable_runtime_explicit_output_overrides_manifest_name(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    manifest = tmp_path / "packaging" / "runtime" / "macos-arm64.json"
+    explicit_output = tmp_path / "custom" / "runtime"
+
+    def fake_materialize(root: Path, manifest_path: Path, output: Path, *, archive_path: Path | None = None):
+        assert root == tmp_path
+        assert manifest_path == manifest
+        assert output == explicit_output
+        assert archive_path is None
+        return {"status": "PORTABLE_RUNTIME_VERIFIED", "runtime_dir": str(output), "failed_checks": []}
+
+    monkeypatch.setattr(cli, "materialize_portable_runtime", fake_materialize)
+
+    assert (
+        main(
+            [
+                "package",
+                "portable-runtime",
+                "--manifest",
+                str(manifest),
+                "--output-dir",
+                str(explicit_output),
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["runtime_dir"] == str(explicit_output)
 
 
 def test_cli_refuses_portable_app_when_runtime_verification_fails(tmp_path: Path, capsys, monkeypatch):
