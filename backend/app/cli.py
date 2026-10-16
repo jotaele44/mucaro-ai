@@ -79,6 +79,7 @@ from .gis_eval import (
 from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
 from .ocr_structure import OCRStructureError, reconstruct_ocr_report
+from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
 from .ingestion import (
     IngestLimitError,
     delete_source,
@@ -5341,6 +5342,20 @@ def _release_handoff_certification_command(
     timeout = timeout_seconds if timeout_seconds > 0 else None
     started_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     started = time.monotonic()
+    denial = _subprocess_permission_denial(cfg, command, subject=f"cli.release_handoff.{step_id}")
+    if denial:
+        return {
+            "step_id": step_id,
+            "status": "FAIL",
+            "returncode": None,
+            "command": " ".join(command),
+            "detail": denial,
+            "output_tail": [],
+            "timed_out": False,
+            "started_utc": started_utc,
+            "ended_utc": started_utc,
+            "elapsed_seconds": 0.0,
+        }
     try:
         proc = subprocess.run(
             command,
@@ -6587,7 +6602,24 @@ def _git_output(cfg: Settings, args: list[str]) -> tuple[bool, str]:
     return _command_output(cfg, ["git", *args])
 
 
+def _subprocess_permission_denial(cfg: Settings, args: Sequence[str], *, subject: str) -> str | None:
+    """Return a denial detail before spawning args; gh additionally requires public network permission."""
+    capabilities = ["subprocess.execute", *(["network.public_http"] if args and args[0] == "gh" else [])]
+    for capability in capabilities:
+        try:
+            require_permission(
+                PermissionRequest(capability=capability, subject=subject, target=args[0] if args else None, origin="operator"),
+                cfg=cfg,
+            )
+        except PermissionEngineError as exc:
+            return f"{exc.status}: {exc.detail}"
+    return None
+
+
 def _command_output(cfg: Settings, args: list[str]) -> tuple[bool, str]:
+    denial = _subprocess_permission_denial(cfg, args, subject="cli.command_output")
+    if denial:
+        return False, denial
     try:
         proc = subprocess.run(
             args,

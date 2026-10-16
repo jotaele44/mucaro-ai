@@ -11,8 +11,14 @@ from .exports import export_answer_trace
 from .ingestion import get_chunks
 from .injection_guard import scan_chunks, scan_text
 from .memory_policy import MemorySelectionError, select_memory_context
+from .model_failover import FailoverPolicy, run_with_failover
 from .model_router import ModelProviderError, generate_answer
 from .model_routing_policy import ModelRoutingError, plan_model_route
+from .provider_recovery import (
+    ProviderRecoveryError,
+    execute_with_provider_checkpoint,
+    pause_provider_checkpoint,
+)
 from .retrieval import retrieve
 from .utils import stable_id, utc_now
 
@@ -35,6 +41,9 @@ def answer_question(
     cfg: Settings = settings,
     persist: bool = True,
     on_text_delta: Callable[[str], None] | None = None,
+    checkpoint_id: str | None = None,
+    provider_operation_key: str | None = None,
+    failover_policy: FailoverPolicy | None = None,
 ) -> dict[str, Any]:
     normalized_query = query.strip()
     if not normalized_query:
@@ -74,6 +83,7 @@ def answer_question(
             allow_live=allow_live,
             require_offline=require_offline,
             require_citations=True,
+            allow_offline_failover=allow_mock_fallback,
         )
     except ModelRoutingError as exc:
         if not allow_mock_fallback:
@@ -113,6 +123,10 @@ def answer_question(
                 "model_route": model_route,
             }
 
+    failover_order = model_route.get("failover_order") or [
+        {"provider": model_route["selected_provider"], "model": model_route["selected_model"]}
+    ]
+    streaming_suppressed = on_text_delta is not None and len(failover_order) > 1
     model_started = time.perf_counter()
     first_token_ms: list[float] = []
 
@@ -121,25 +135,97 @@ def answer_question(
             first_token_ms.append(_elapsed_ms(model_started))
         on_text_delta(text)  # type: ignore[misc]
 
-    try:
-        model = generate_answer(
-            normalized_query,
-            retrieved,
-            model_provider=model_route["selected_provider"],
-            model_name=model_route["selected_model"],
-            allow_mock_fallback=False,
-            conversation_context=conversation_context or [],
-            memory_context=selected_memory_context,
-            on_text_delta=timed_text_delta if on_text_delta is not None else None,
-        )
-    except ModelProviderError as exc:
-        return {
-            "status": exc.status,
+    stream_callback = None if streaming_suppressed or on_text_delta is None else timed_text_delta
+    operation_key = provider_operation_key or stable_id(
+        "model-op",
+        normalized_query,
+        model_route["route_sha256"],
+        *[str(chunk["chunk_id"]) for chunk in retrieved],
+        length=24,
+    )
+
+    def _invoke(provider: str, model_id: str | None) -> dict[str, Any]:
+        def operation() -> dict[str, Any]:
+            return generate_answer(
+                normalized_query,
+                retrieved,
+                model_provider=provider,
+                model_name=model_id,
+                allow_mock_fallback=False,
+                conversation_context=conversation_context or [],
+                memory_context=selected_memory_context,
+                on_text_delta=stream_callback,
+                cfg=cfg,
+            )
+
+        if checkpoint_id is None:
+            return operation()
+        try:
+            execution = execute_with_provider_checkpoint(
+                checkpoint_id,
+                provider=provider,
+                model=model_id,
+                operation=operation,
+                operation_key=operation_key,
+                pause_on_interruption=False,
+                cfg=cfg,
+            )
+        except ProviderRecoveryError as exc:
+            raise ModelProviderError(exc.status, exc.detail) from exc
+        if execution["status"] == "PROVIDER_EXECUTION_INTERRUPTED":
+            raise ModelProviderError(
+                str(execution["provider_error"]),
+                str(execution.get("detail") or execution["provider_error"]),
+            )
+        if execution["status"] in {"PROVIDER_EXECUTION_OK", "PROVIDER_EXECUTION_ALREADY_ACCEPTED"}:
+            result = execution.get("result")
+            if not isinstance(result, dict):
+                raise ModelProviderError("ERROR_PROVIDER_RESULT_INVALID", "accepted provider result is not an object")
+            return result
+        raise ModelProviderError("ERROR_PROVIDER_EXECUTION_STATE", str(execution["status"]))
+
+    def invoke(provider: str, model_id: str | None) -> dict[str, Any]:
+        try:
+            return _invoke(provider, model_id)
+        except ModelProviderError as exc:
+            # Text already reached the listener: a retry or another provider would repeat it.
+            exc.partial_output = bool(first_token_ms)
+            raise
+
+    failover = run_with_failover(
+        failover_order,
+        invoke,
+        policy=failover_policy,
+    )
+    if failover["status"] != "FAILOVER_OK":
+        failure = {
+            "status": failover.get("error_status") or "ERROR_MODEL_ROUTE_BLOCKED",
             "query": normalized_query,
             "retrieved_chunks": retrieved,
-            "detail": exc.detail,
+            "detail": failover.get("detail", ""),
             "model_route": model_route,
+            "model_attempts": failover["attempts"],
         }
+        if failover.get("interruption") and checkpoint_id:
+            last = failover["attempts"][-1]
+            try:
+                paused = pause_provider_checkpoint(
+                    checkpoint_id,
+                    provider=last["provider"],
+                    model=last["model"],
+                    provider_error=str(failover["error_status"]),
+                    cfg=cfg,
+                )
+            except ProviderRecoveryError as exc:
+                return {**failure, "checkpoint_error": exc.status}
+            return {
+                **failure,
+                "status": "PAUSED_PROVIDER",
+                "provider_error": failover["error_status"],
+                "checkpoint": paused,
+            }
+        return failure
+    model = failover["result"]
     model_ms = _elapsed_ms(model_started)
     # Advisory only: instruction-like text in sources or output is surfaced, never acted on (TGT-022).
     source_signals = scan_chunks(retrieved)
@@ -170,6 +256,9 @@ def answer_question(
         "model_route_sha256": model_route["route_sha256"],
         "model_route_selection_reason": model_route.get("selection_reason"),
         "model_route_fallback_reason": model_route.get("fallback_reason"),
+        "model_attempts": failover["attempts"],
+        "model_failed_over": bool(failover.get("failed_over")),
+        "model_failover_streaming_suppressed": streaming_suppressed,
         "retrieval_strategy": retrieved[0].get("retrieval_strategy", "unknown") if retrieved else "none",
         "retrieved_chunk_ids": retrieved_ids,
         "cited_chunk_ids": cited_ids,
