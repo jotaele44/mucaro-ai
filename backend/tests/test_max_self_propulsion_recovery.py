@@ -101,7 +101,7 @@ class RecoveryTests(unittest.TestCase):
         self.q.submit("first","g","EXECUTE",inp,self.policy)
         t=self.q.claim("first","worker",10,
             authorization=self.grant("first","g","worker",inp))
-        self.q.finish("first","worker",t["fence"],{"status":"PASS"},101)
+        self.q.finish("first","worker",t["fence"],{"status":"PASS"})
         self.q.db.execute("UPDATE receipts SET result_digest=? WHERE job_id=?",
                           (digest("altered"),"first"))
         with self.assertRaises(WorkerGateError):
