@@ -125,5 +125,24 @@ class LeasedAgentQueue:
                               "FROM jobs WHERE job_id=?", (job_id,)).fetchone()
         return dict(zip(("state","fence","attempts","output_digest","cancelled"),row)) if row else None
 
+    def verified_completion(self, job_id: str) -> dict[str, Any] | None:
+        """Read a successful persisted queue completion with its bound identities.
+
+        Does not infer source authority or prove external-side-effect uniqueness.
+        """
+        row=self.db.execute(
+            "SELECT run_id,phase,input_digest,policy_digest,state,output_digest,fence "
+            "FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+        if not row or row[4] != "SUCCEEDED" or not row[5]:
+            return None
+        receipt=self.db.execute(
+            "SELECT result_digest FROM receipts WHERE job_id=? AND fence=?",
+            (job_id,row[6])).fetchone()
+        if not receipt or receipt[0]!=row[5]:
+            raise WorkerGateError("QUEUE_RECEIPT_CONTRADICTION")
+        return {"job_id":job_id,"run_id":row[0],"phase":row[1],
+                "input_digest":row[2],"policy_digest":row[3],
+                "output_digest":row[5],"fence":row[6]}
+
     def close(self):
         self.db.close()
