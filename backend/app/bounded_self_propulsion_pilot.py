@@ -8,6 +8,7 @@ from typing import Any
 from .governed_learning_loop import digest
 from .goal_reactor import GoalReactor, GoalReactorError
 from .governed_skill_bridge import GovernedSkillBridge
+from .scoped_agent_claim import ScopedClaimIssuer
 
 def execute_next_approved_task(*, reactor: GoalReactor, bridge: GovernedSkillBridge,
         goal_id: str, task_arguments: dict[str,dict[str,Any]],
@@ -46,9 +47,10 @@ def execute_next_approved_task(*, reactor: GoalReactor, bridge: GovernedSkillBri
                 "recovered_from_completed_worker":True,
                 "verified_output_digest":completed["output_digest"],
                 "next":reactor.select(goal_id)}
+    opts={"resource_units":candidate["cost"]} if isinstance(getattr(bridge,"claim_issuer",None),ScopedClaimIssuer) else {}
     result=bridge.execute_readonly(job_id=task_id,run_id=task_run_id,
         skill_id=candidate["skill_id"],arguments=arguments,
-        worker_id=worker_id)
+        worker_id=worker_id,**opts)
     if result["status"]!="PASS":
         return {"status":result["status"],"reason":result.get("reason"),
                 "task_id":task_id}
