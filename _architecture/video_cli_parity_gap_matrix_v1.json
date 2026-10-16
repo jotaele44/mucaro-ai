@@ -22,8 +22,8 @@
     "SUPERSEDED"
   ],
   "counts": {
-    "IMPLEMENTED": 26,
-    "PARTIAL": 1,
+    "IMPLEMENTED": 27,
+    "PARTIAL": 0,
     "ABSENT": 0,
     "UNVERIFIED": 0,
     "TOTAL": 27
@@ -147,19 +147,21 @@
     },
     {
       "id": "VCP-010",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "certification_state": "OPEN",
       "evidence": [
         "backend/app/autopilot.py",
+        "backend/app/autopilot_planner.py",
         "schemas/autopilot_state.schema.json",
         "backend/app/agent_task_dag.py",
         "backend/app/agent_checkpoints.py",
         "backend/app/permission_leases.py",
         "backend/app/terminal_ui.py",
         "backend/tests/test_autopilot.py",
+        "backend/tests/test_autopilot_planner.py",
         "backend/tests/test_terminal_ui.py"
       ],
-      "gap": "Checkpoint/DAG continuation, governed tools, explicit authority, permission leases, budgets, loop/no-progress detection, deterministic stopping and bounded terminal authorize/run controls are source-backed; model-driven plan generation/replanning and executed long-horizon certification remain open."
+      "gap": "Model-driven task-DAG generation and trigger-bound bounded replanning are source-backed with exact source-SHA binding, allowlisted tool validation, canonical DAG validation, immutable plan/replan receipts, cumulative budget lineage, and explicit post-plan authorization; executed long-horizon runtime certification remains open."
     },
     {
       "id": "VCP-011",
