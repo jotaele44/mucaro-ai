@@ -3,11 +3,11 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
-import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from .runtime_identity import current_git_head
 from .tools import TOOL_REGISTRY, ToolDefinition
 
 SCHEMA = "mucaro-flagpole-tool-denominator/1.0"
@@ -177,16 +177,8 @@ def runtime_evidence(repo: Path, tool_names: list[str]) -> dict[str, list[str]]:
 
 
 def _source_sha(repo: Path) -> str | None:
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(repo), "rev-parse", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return None
-    return result.stdout.strip() or None
+    # Read .git metadata directly (runtime_identity); no host Git process.
+    return current_git_head(repo)
 
 
 def build_tool_denominator(

@@ -74,6 +74,7 @@ def answer_question(
             allow_live=allow_live,
             require_offline=require_offline,
             require_citations=True,
+            cfg=cfg,
         )
     except ModelRoutingError as exc:
         if not allow_mock_fallback:
@@ -90,10 +91,36 @@ def answer_question(
             allow_live=False,
             require_offline=True,
             require_citations=True,
+            cfg=cfg,
         )
         model_route["fallback_reason"] = exc.status
 
     if model_route["status"] != "MODEL_ROUTE_READY":
+        preferred_candidate = next(
+            (
+                row
+                for row in model_route.get("candidates", [])
+                if row.get("provider") == preferred_provider
+            ),
+            None,
+        )
+        permission_warning = next(
+            (
+                str(warning)
+                for warning in (preferred_candidate or {}).get("warnings", [])
+                if str(warning).startswith("MODEL_INVOKE_PERMISSION:")
+            ),
+            None,
+        )
+        if permission_warning is not None:
+            permission_status = permission_warning.split(":", 1)[1]
+            return {
+                "status": permission_status,
+                "query": normalized_query,
+                "retrieved_chunks": retrieved,
+                "detail": "model.invoke permission denied before provider readiness transport",
+                "model_route": model_route,
+            }
         if allow_mock_fallback and model_route.get("selected_provider") != "mock":
             model_route = plan_model_route(
                 task_type="cited_qa",
@@ -102,6 +129,7 @@ def answer_question(
                 allow_live=False,
                 require_offline=True,
                 require_citations=True,
+                cfg=cfg,
             )
             model_route["fallback_reason"] = "PRIMARY_ROUTE_BLOCKED"
         else:
@@ -131,6 +159,7 @@ def answer_question(
             conversation_context=conversation_context or [],
             memory_context=selected_memory_context,
             on_text_delta=timed_text_delta if on_text_delta is not None else None,
+            cfg=cfg,
         )
     except ModelProviderError as exc:
         return {
