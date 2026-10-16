@@ -1,0 +1,66 @@
+{
+  "schema_version": "mucaro-matrix017-performance-execution-evidence/1.0",
+  "observed_utc": "2026-10-16T21:58:32Z",
+  "repository": "jotaele44/mucaro-ai",
+  "source_head": "7674ffcf66131a37c6d1574a0aa6cc916e1fd7e8",
+  "workflow": {
+    "name": "MATRIX-017 Performance Certification",
+    "run_id": 38972805642,
+    "job_id": 117214997470,
+    "conclusion": "success"
+  },
+  "artifact": {
+    "id": 12077473702,
+    "name": "matrix017-performance-7674ffcf66131a37c6d1574a0aa6cc916e1fd7e8",
+    "size_bytes": 1114,
+    "digest": "sha256:588ca60d6b28f0d8d6962d67bfe9ac5f853d3154ce0afc70665e29995b0e3a5d"
+  },
+  "receipt": {
+    "benchmark_id": "mucaro-matrix017-workrun-v1",
+    "benchmark_sha256": "5436e2137abc3e1b7c7ca842bb928cb0e42d33336c7dda59b70945e2f6452784",
+    "head_sha": "7674ffcf66131a37c6d1574a0aa6cc916e1fd7e8",
+    "status": "MATRIX017_PERFORMANCE_CERT_PASS",
+    "threshold_failures": [],
+    "observed_profile": {
+      "machine": "arm64",
+      "os": "Darwin",
+      "python_version": "3.11.9"
+    },
+    "measurements": {
+      "provider": "mock",
+      "runs": 20,
+      "completed": 20,
+      "errors": [],
+      "first_word_ms": {
+        "p50": 23.5,
+        "p95": 37.5
+      },
+      "total_ms": {
+        "p50": 29.2,
+        "p95": 44.6
+      },
+      "stage_median_ms": {
+        "model_first_token_ms": 0.2,
+        "model_ms": 0.2,
+        "retrieval_ms": 0.2
+      },
+      "status": "BENCH_OK"
+    },
+    "thresholds": {
+      "max_error_count": 0,
+      "max_p95_first_word_ms": 5000,
+      "max_p95_total_ms": 10000,
+      "min_completed_rate": 1
+    },
+    "receipt_sha256": "6587d7a4d061b29c43959c9cf530efaf350c9b967e4935b94b5ed5bf4c8468a5"
+  },
+  "binding": [
+    "MATRIX-017 performance benchmark exact-head execution",
+    "TGT-020 bounded local performance evidence together with RT-10 retrieval-scale performance evidence"
+  ],
+  "limitations": [
+    "Deterministic local mock-provider regression evidence only; no remote-model latency claim.",
+    "Valid for the exact source SHA and observed hosted Apple Silicon profile.",
+    "A later source head requires a fresh execution before exact-head release certification."
+  ]
+}
