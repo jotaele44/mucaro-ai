@@ -66,6 +66,7 @@ jobs:
       - name: Resolve Python 3.13 arm64 macOS wheel-only dependency lock
         env:
           OUT: ${{ runner.temp }}/arm64-runtime-source
+          MACOSX_DEPLOYMENT_TARGET: "14.0"
         run: |
           set -euo pipefail
           uv pip compile pyproject.toml             --python-version 3.13             --python-platform aarch64-apple-darwin             --generate-hashes             --only-binary :all:             --output-file "$OUT/requirements-macos-arm64.lock"
