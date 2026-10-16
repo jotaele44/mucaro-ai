@@ -32,6 +32,19 @@ def execute_next_approved_task(*, reactor: GoalReactor, bridge: GovernedSkillBri
     goal=reactor.summary(goal_id)
     if goal["goal"][1]!=bridge.policy_digest:
         return {"status":"BLOCKED","reason":"GOAL_POLICY_MISMATCH","task_id":task_id}
+    completed=bridge.queue.verified_completion(task_id)
+    if completed is not None:
+        if (completed["run_id"]!=goal_id or completed["phase"]!="EXECUTE" or
+            completed["input_digest"]!=binding or
+            completed["policy_digest"]!=bridge.policy_digest):
+            return {"status":"BLOCKED","reason":"COMPLETION_IDENTITY_CONFLICT","task_id":task_id}
+        reactor.record_result(task_id=task_id,state="PASS",
+            result_digest=completed["output_digest"],
+            policy_digest=bridge.policy_digest,cost_observed=candidate["cost"])
+        return {"status":"PASS","task_id":task_id,
+                "recovered_from_completed_worker":True,
+                "verified_output_digest":completed["output_digest"],
+                "next":reactor.select(goal_id)}
     result=bridge.execute_readonly(job_id=task_id,run_id=goal_id,
         skill_id=candidate["skill_id"],arguments=arguments,
         worker_id=worker_id)
@@ -46,3 +59,27 @@ def execute_next_approved_task(*, reactor: GoalReactor, bridge: GovernedSkillBri
     return {"status":"PASS","task_id":task_id,
             "verified_output_digest":result["output_digest"],
             "next":reactor.select(goal_id)}
+
+def drive_approved_goal(*, reactor: GoalReactor, bridge: GovernedSkillBridge,
+        goal_id: str, task_arguments: dict[str,dict[str,Any]],
+        worker_id: str, max_actions: int = 8) -> dict[str,Any]:
+    """Run only a finite, previously approved DAG; never create new goals."""
+    if isinstance(max_actions,bool) or not isinstance(max_actions,int) or not 1<=max_actions<=32:
+        return {"status":"BLOCKED","reason":"INVALID_ACTION_BUDGET"}
+    receipts=[]
+    for _ in range(max_actions):
+        outcome=execute_next_approved_task(reactor=reactor,bridge=bridge,
+             goal_id=goal_id,task_arguments=task_arguments,worker_id=worker_id)
+        if outcome.get("status")!="PASS":
+            return {"status":outcome.get("status"),"reason":outcome.get("reason"),
+                    "receipts":receipts}
+        if "task_id" not in outcome:
+            return {"status":"PASS","receipts":receipts,
+                    "goal_receipt":reactor.summary(goal_id)}
+        receipts.append({"task_id":outcome["task_id"],
+                         "verified_output_digest":outcome["verified_output_digest"],
+                         "recovered":outcome.get("recovered_from_completed_worker",False)})
+        if outcome.get("next",{}).get("status")=="PASS":
+            return {"status":"PASS","receipts":receipts,
+                    "goal_receipt":reactor.summary(goal_id)}
+    return {"status":"OPEN","reason":"MAX_ACTIONS_REACHED","receipts":receipts}
