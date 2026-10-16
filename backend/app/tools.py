@@ -9,6 +9,7 @@ from .coding_container import CodingContainerError, build_coding_container_plan,
 from .coding_lifecycle import CodingLifecycleError, build_pull_request_request, commit_approved_changes, create_work_branch_transaction
 from .coding_checks import CodingCheck, CodingCheckError, execute_coding_check_suite
 from .coding_mutation import CodingMutationError, apply_patch_transaction
+from .coding_file_edit import CodingFileEditError, edit_repository_file_transaction
 from .coding_patch import validate_patch_proposal
 from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
@@ -202,6 +203,43 @@ def _coding_patch_apply(arguments: dict[str, Any], cfg: Settings) -> dict[str, A
             cfg=cfg,
         )
     except CodingMutationError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _coding_file_edit(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    path = arguments.get("path")
+    operation = arguments.get("operation")
+    expected_head_sha = arguments.get("expected_head_sha")
+    expected_preimage_state = arguments.get("expected_preimage_state")
+    expected_preimage_sha256 = arguments.get("expected_preimage_sha256")
+    content = arguments.get("content")
+    expected_content_sha256 = arguments.get("expected_content_sha256")
+
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.file_edit requires a non-empty repo_root argument.")
+    if not isinstance(path, str) or not path.strip():
+        raise ToolRuntimeError("ERROR_CODING_FILE_EDIT_PATH_REQUIRED", "coding.file_edit requires a repository-relative path.")
+    if operation not in {"CREATE", "REPLACE", "DELETE"}:
+        raise ToolRuntimeError("ERROR_CODING_FILE_EDIT_OPERATION_INVALID", "coding.file_edit operation must be CREATE, REPLACE, or DELETE.")
+    if not isinstance(expected_head_sha, str) or not expected_head_sha:
+        raise ToolRuntimeError("ERROR_CODING_FILE_EDIT_HEAD_REQUIRED", "coding.file_edit requires expected_head_sha.")
+    if expected_preimage_state not in {"EXISTS", "MISSING"}:
+        raise ToolRuntimeError("ERROR_CODING_FILE_EDIT_PREIMAGE_INVALID", "coding.file_edit requires expected_preimage_state EXISTS or MISSING.")
+
+    try:
+        return edit_repository_file_transaction(
+            repo_root,
+            path,
+            operation=operation,
+            expected_head_sha=expected_head_sha,
+            expected_preimage_state=expected_preimage_state,
+            expected_preimage_sha256=expected_preimage_sha256,
+            content=content,
+            expected_content_sha256=expected_content_sha256,
+            cfg=cfg,
+        )
+    except CodingFileEditError as exc:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
@@ -688,6 +726,14 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         handler=_coding_patch_apply,
         autopilot_success_statuses=("CODING_MUTATION_APPLIED",),
+    ),
+    "coding.file_edit": ToolDefinition(
+        name="coding.file_edit",
+        description="Create, replace, or delete exactly one approved repository-relative UTF-8 text file after exact HEAD, preimage, content-hash, path-boundary, symlink, dirty-target, and postimage checks.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_coding_file_edit,
+        autopilot_success_statuses=("CODING_FILE_EDIT_APPLIED",),
     ),
     "coding.exec": ToolDefinition(
         name="coding.exec",
