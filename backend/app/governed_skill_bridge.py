@@ -1,7 +1,7 @@
 """Strict policy-to-worker-to-skill binding for a credential-free V4 pilot.
 
-Only already-mounted, already-active, no-capability IN_PROCESS skills are
-eligible. No unattended side-effecting, remote, training or promotion actions.
+Only the explicitly reviewed built-in Mucaro health probe is eligible, and
+it must already be active, no-capability, and IN_PROCESS. No unattended side-effecting, remote, training or promotion actions.
 """
 from __future__ import annotations
 from typing import Any
@@ -11,6 +11,11 @@ from .config import Settings
 from .governed_learning_loop import digest
 from .leased_agent_queue import LeasedAgentQueue
 from .skill_runtime import SKILL_REGISTRY, list_skill_mounts, execute_skill
+
+# Bounded pilot ONLY. Zero declared capabilities do not prove a handler is pure:
+# the built-in health handler creates local directories as part of setup.
+# All other skill identities remain outside this pilot's execution authority.
+PILOT_SKILL_ALLOWLIST = frozenset({"mucaro/intelligence-plane-health"})
 
 class DispatchGateError(RuntimeError):
     pass
@@ -25,6 +30,8 @@ class GovernedSkillBridge:
         })
 
     def _authorize(self, skill_id: str):
+        if skill_id not in PILOT_SKILL_ALLOWLIST:
+            raise DispatchGateError("PILOT_SKILL_NOT_ALLOWLISTED")
         skill = SKILL_REGISTRY.get(skill_id)
         if not skill:
             raise DispatchGateError("UNKNOWN_SKILL")
