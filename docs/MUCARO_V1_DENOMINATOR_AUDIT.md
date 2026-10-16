@@ -178,7 +178,7 @@ Audit head: `acd03906a797821560d780f929c7f447c2f0565f`.
 
 Resulting overlay arithmetic:
 
-- current raw completion: `76.0%`
+- current raw completion: `76.5%`
 - current weighted completion: `77.6%`
 - applied events: `25`
 - OCR: `60.0%` — `PASS=4 / PROVISIONAL=4 / OPEN=2`
