@@ -20,10 +20,10 @@
     "path": "submit_message -> stream_run_events -> text_delta -> end"
   },
   "thresholds": {
-    "min_completed_rate": 1.0,
+    "min_completed_rate": 1,
     "max_error_count": 0,
-    "max_p95_first_word_ms": 5000.0,
-    "max_p95_total_ms": 10000.0
+    "max_p95_first_word_ms": 5000,
+    "max_p95_total_ms": 10000
   },
   "measurement": {
     "clock": "time.perf_counter",
@@ -36,5 +36,11 @@
     "The benchmark exercises the same work-run and event-stream path used by the app.",
     "Results are valid only for the exact source SHA, runner/runtime manifestation and workload recorded in the receipt.",
     "Threshold changes after first execution require a versioned benchmark revision and justification."
+  ],
+  "threshold_basis": [
+    "These are broad fail-closed release-regression ceilings, not a user-facing latency promise.",
+    "The existing RT-10 retrieval benchmark already uses a 5000 ms p95 ceiling for a materially heavier 10000-chunk retrieval proxy.",
+    "The 10000 ms end-to-end ceiling allows non-retrieval work-run/event-stream overhead while still detecting order-of-magnitude regressions.",
+    "Thresholds were frozen before the first MATRIX-017 execution; any post-execution threshold change requires a new benchmark revision."
   ]
 }
