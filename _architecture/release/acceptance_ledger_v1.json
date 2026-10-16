@@ -1324,7 +1324,12 @@
       "requirement_text": "Performance",
       "scope_state": "IN_SCOPE",
       "implementation_state": "IMPLEMENTED",
-      "implementation_refs": [],
+      "implementation_refs": [
+        "scripts/bench_latency.py",
+        "backend/app/performance_benchmark.py",
+        "scripts/certify_performance.py",
+        ".github/workflows/performance-cert.yml"
+      ],
       "dependencies": [],
       "positive_gate": ".github/workflows/performance-cert.yml",
       "negative_gate": "backend/tests/test_performance_benchmark.py::test_matrix017_threshold_falsification_is_detected",
@@ -2098,7 +2103,13 @@
       "requirement_text": "Performance benchmark",
       "scope_state": "IN_SCOPE",
       "implementation_state": "IMPLEMENTED",
-      "implementation_refs": [],
+      "implementation_refs": [
+        "_architecture/performance_benchmark_v1.json",
+        "backend/app/performance_benchmark.py",
+        "backend/tests/test_performance_benchmark.py",
+        "scripts/certify_performance.py",
+        ".github/workflows/performance-cert.yml"
+      ],
       "dependencies": [],
       "positive_gate": ".github/workflows/performance-cert.yml",
       "negative_gate": "backend/tests/test_performance_benchmark.py::test_matrix017_threshold_falsification_is_detected",
