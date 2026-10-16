@@ -56,7 +56,7 @@ class RecoveryTests(unittest.TestCase):
     def test_crash_after_worker_completion_recovers_without_rerun(self):
         self.add("first")
         inp=digest({"skill_id":self.skill,"skill_digest":self.version,"arguments":{}})
-        self.q.submit("first","g","EXECUTE",inp,self.policy)
+        self.q.submit("first",digest(["goal-task","g","first"]),"EXECUTE",inp,self.policy)
         token=self.q.claim("first","worker-1",100,10,permitted=True)
         output={"status":"PASS","result":"already-completed"}
         self.assertTrue(self.q.finish("first","worker-1",token["fence"],output,101))
