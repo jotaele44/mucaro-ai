@@ -10,6 +10,8 @@ from .db import ensure_db, upsert_payload
 from .exports import export_answer_trace
 from .ingestion import get_chunks
 from .injection_guard import scan_chunks, scan_text
+from .learning import LearningError, capture_run_if_enabled, prompt_context
+from .memory import active_memory_context
 from .memory_policy import MemorySelectionError, select_memory_context
 from .model_router import ModelProviderError, generate_answer
 from .model_routing_policy import ModelRoutingError, plan_model_route
@@ -55,13 +57,14 @@ def answer_question(
         return retrieval
     retrieved = retrieval["retrieved_chunks"]
     try:
-        memory_selection = select_memory_context(cfg, items=memory_context)
-    except MemorySelectionError as exc:
+        base_memory = memory_context if memory_context is not None else active_memory_context(cfg)
+        memory_selection = select_memory_context(cfg, items=[*base_memory, *prompt_context(cfg)])
+    except (MemorySelectionError, LearningError) as exc:
         return {
-            "status": exc.status,
+            "status": getattr(exc, "status", "ERROR_LEARNING_INTEGRITY"),
             "query": normalized_query,
             "retrieved_chunks": retrieved,
-            "detail": exc.detail,
+            "detail": getattr(exc, "detail", str(exc)),
         }
     selected_memory_context = memory_selection["selected"]
 
@@ -197,6 +200,15 @@ def answer_question(
     answer_trace = validate_citations(answer_trace)
     answer_trace["export_paths"] = export_answer_trace(answer_trace, cfg)
     if persist:
+        upsert_payload("runs", "run_id", answer_trace, cfg.sqlite_path)
+        try:
+            captured = capture_run_if_enabled(cfg, answer_trace["run_id"])
+            answer_trace["learning_capture"] = {
+                "status": captured.get("state", captured.get("status")),
+                "candidate_id": captured.get("candidate_id"),
+            }
+        except LearningError as exc:
+            answer_trace["learning_capture"] = {"status": "ERROR_LEARNING_CAPTURE", "detail": str(exc)}
         upsert_payload("runs", "run_id", answer_trace, cfg.sqlite_path)
     return answer_trace
 

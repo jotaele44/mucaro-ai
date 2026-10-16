@@ -1,0 +1,70 @@
+{
+  "schema": "mucaro-learning-closeout/1",
+  "tested_local_head": "f0c18f390f8b457389575b1bac878ad0fc9d84eb",
+  "published_source_head": "fb28614600f0b966e849543a2397be6059bab4b9",
+  "source_tree": "df008a94d3992533a6e21975563e8da99901ea2c",
+  "local_release": "PASS",
+  "local_gates": {
+    "passed": 21,
+    "failed": 0
+  },
+  "python_tests": {
+    "passed": 1296,
+    "failed": 0,
+    "skipped": 0
+  },
+  "effectiveness_scope": "synthetic_exact_context_only",
+  "service_network_observation": "BLOCKED",
+  "files": [
+    {
+      "path": "docs/GOVERNED_LEARNING_CLOSEOUT.md",
+      "bytes": 4823,
+      "sha256": "92a0f1141197c1acd3b9ab8edc38a51f1f2b0c9ed403e14ec4d3cedd41b096b3"
+    },
+    {
+      "path": "docs/evidence/governed-learning-closeout-2026-10-16/effectiveness.json",
+      "bytes": 26788,
+      "sha256": "b96403f00b59f4cc92e5287809fb28ae922ef9fd8bbe2a15d9c6bb8683027ca3"
+    },
+    {
+      "path": "docs/evidence/governed-learning-closeout-2026-10-16/local-release-receipt.json",
+      "bytes": 4640,
+      "sha256": "837cf0bbde90491e09a323193423ca80f59434e820c9a921ceae0ec1664618ed"
+    },
+    {
+      "path": "docs/evidence/governed-learning-closeout-2026-10-16/local-release.log",
+      "bytes": 2955,
+      "sha256": "2c993e994e0718e145d03a13ce1adba641de3da8df14d6fdb24bff745ccc2dff"
+    },
+    {
+      "path": "docs/evidence/governed-learning-closeout-2026-10-16/npm-audit-frontend.json",
+      "bytes": 362,
+      "sha256": "c31170531ee0b68347f260ec731381546be3c38714ed84176a8bfd9c000401a4"
+    },
+    {
+      "path": "docs/evidence/governed-learning-closeout-2026-10-16/pip-audit-macos-lock.json",
+      "bytes": 3971,
+      "sha256": "99ccadeb59d4ecfa85a94de0f9b1383c18aa8b566a680f95aa6b4a654ddc7480"
+    },
+    {
+      "path": "docs/evidence/governed-learning-closeout-2026-10-16/prior-security-runner-crash.log",
+      "bytes": 1319,
+      "sha256": "78cf41e39fb8438b7bd90dec2dbd4f59785efbec50a3186bab29495831d861c8"
+    },
+    {
+      "path": "docs/evidence/governed-learning-closeout-2026-10-16/prior-skip-inventory.log",
+      "bytes": 350,
+      "sha256": "7967303c8fe5febb1c349df4769024a1f911372057c984af0774072914ff5bb4"
+    },
+    {
+      "path": "docs/evidence/governed-learning-closeout-2026-10-16/security-adjudication.json",
+      "bytes": 2593,
+      "sha256": "f47123c1422f75da192075dbdc72a3958e15811c6efe46da7f63eea540bd7db9"
+    },
+    {
+      "path": "docs/evidence/governed-learning-closeout-2026-10-16/tooling-provenance.json",
+      "bytes": 501,
+      "sha256": "3ab97fef37c3286ee4dc4ed155f8e8f769399c4ca2bb2a2dd6290e9cb888e843"
+    }
+  ]
+}
