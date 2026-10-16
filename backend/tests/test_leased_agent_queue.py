@@ -31,12 +31,18 @@ def test_claim_complete_and_restart(tmp_path):
     token=q.claim("j","w",10,authorization=grant(q))
     assert token["fence"] == 1
     assert q.finish("j","w",1,{"status":"PASS","value":2})
+    verifier=q.claim_verifier
+    issuer=q.test_issuer
+    policy_hash=q.test_policy
     q.close()
-    q=LeasedAgentQueue(tmp_path/"queue.sqlite",claim_verifier=q.claim_verifier,
-                       clock=lambda: 120)
+    q=LeasedAgentQueue(tmp_path/"queue.sqlite",claim_verifier=verifier,
+                       clock=lambda:120)
     assert q.state("j")["state"] == "SUCCEEDED"
-    q.test_now[0]=105
-    assert q.claim("j","w2",10,authorization=grant(q,"w2")) is None
+    token2=issuer.issue(job_id="j",run_id="r",phase="EXECUTE",
+        input_digest=digest("input"),policy_hash=policy_hash,owner="w2",
+        skill_id="mucaro/intelligence-plane-health",
+        skill_digest="sha256:"+"a"*64,issued_at=120,expires_at=180)
+    assert q.claim("j","w2",10,authorization=token2) is None
     q.close()
 
 def test_stale_fence_rejected_after_lease_expiry(tmp_path):
@@ -51,7 +57,8 @@ def test_stale_fence_rejected_after_lease_expiry(tmp_path):
 
 def test_live_lease_excludes_duplicate_claim(tmp_path):
     q=init(tmp_path)
-    q.claim("j","w1",100,10,permitted=True)
+    q.claim("j","w1",10,authorization=grant(q,"w1"))
+    q.test_now[0]=105
     assert q.claim("j","w2",10,authorization=grant(q,"w2")) is None
     q.close()
 
@@ -64,7 +71,7 @@ def test_permission_denial_never_claims(tmp_path):
 
 def test_cancel_fences_active_worker(tmp_path):
     q=init(tmp_path)
-    t=q.claim("j","w",100,10,permitted=True)
+    t=q.claim("j","w",10,authorization=grant(q))
     q.cancel("j")
     assert not q.finish("j","w",t["fence"],{"status":"PASS"})
     assert q.state("j")["state"] == "CANCELLED"
@@ -72,8 +79,9 @@ def test_cancel_fences_active_worker(tmp_path):
 
 def test_attempt_limit_fails_closed(tmp_path):
     q=init(tmp_path)
-    q.claim("j","w1",100,10,permitted=True)
-    q.claim("j","w2",111,10,permitted=True)
+    q.claim("j","w1",10,authorization=grant(q,"w1"))
+    q.test_now[0]=111
+    q.claim("j","w2",10,authorization=grant(q,"w2"))
     q.test_now[0]=122
     assert q.claim("j","w3",10,authorization=grant(q,"w3")) is None
     assert q.state("j")["state"] == "FAILED"
@@ -90,7 +98,7 @@ def test_identity_conflict_and_duplicate_phase(tmp_path):
 
 def test_bad_results_rejected(tmp_path):
     q=init(tmp_path)
-    q.claim("j","w",100,10,permitted=True)
+    q.claim("j","w",10,authorization=grant(q))
     with pytest.raises(WorkerGateError):
         q.finish("j","w",1,{"status":"OPEN"})
     q.close()
@@ -105,8 +113,9 @@ def test_forbid_promotion_and_invalid_input(tmp_path):
 
 def test_idempotency_key_stable_across_expiry(tmp_path):
     q=init(tmp_path)
-    first=q.claim("j","w",100,10,permitted=True)
-    second=q.claim("j","w2",111,10,permitted=True)
+    first=q.claim("j","w",10,authorization=grant(q))
+    q.test_now[0]=111
+    second=q.claim("j","w2",10,authorization=grant(q,"w2"))
     assert first["idempotency_key"] == second["idempotency_key"]
     q.close()
 
