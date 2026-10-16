@@ -198,6 +198,22 @@ def test_certify_release_includes_package_artifact_gate(monkeypatch, capsys):
         ],
         certify_release.ROOT,
     ) in calls
+    assert (
+        "python_runtime_arm64_lock_audit",
+        [
+            sys.executable,
+            "-m",
+            "pip_audit",
+            "-r",
+            "packaging/runtime/requirements-macos-arm64.lock",
+            "--no-deps",
+            "--disable-pip",
+            "--strict",
+            "--progress-spinner",
+            "off",
+        ],
+        certify_release.ROOT,
+    ) in calls
 
 
 def test_certify_release_npm_audit_uses_working_node_fallback(monkeypatch):
