@@ -8,6 +8,9 @@ in ``.mucaro-runtime/state.json`` and is skipped when nothing it depends on chan
 double-clicks go straight to launch and an interrupted setup resumes where it stopped.
 
 Only the standard library is used before the Python dependencies are installed.
+
+With ``--desktop`` (Mucaro AI Setup.app on macOS) the steps run behind the app's own window instead; see
+``scripts/one_click_desktop.py``.
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ import shutil
 import subprocess
 import sys
 import sysconfig
+import threading
 import time
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
@@ -73,6 +77,25 @@ class SetupError(Exception):
         super().__init__(f"{code} {detail}")
         self.code = code
         self.detail = detail
+
+
+# Set when the Mucaro AI Setup.app window is closed during setup: the running command is stopped, no new
+# command starts, and nothing is retried.
+CANCELLED = threading.Event()
+_ACTIVE: set[subprocess.Popen[bytes]] = set()
+_ACTIVE_LOCK = threading.Lock()
+
+
+_NATIVE_WINDOW_MODULE_NAMES = frozenset(name for names in NATIVE_WINDOW_MODULES.values() for name in names)
+
+
+def python_extras(platform_name: str = sys.platform) -> str:
+    return "dev,anthropic,desktop" if platform_name in NATIVE_WINDOW_PLATFORMS else "dev,anthropic"
+
+
+def key_modules(platform_name: str = sys.platform) -> tuple[str, ...]:
+    base = tuple(name for name in KEY_MODULES if name not in _NATIVE_WINDOW_MODULE_NAMES)
+    return base + NATIVE_WINDOW_MODULES.get(platform_name, ())
 
 
 def lock_target(system: str | None = None, machine: str | None = None, interpreter_platform: str | None = None) -> str | None:
@@ -229,6 +252,9 @@ class SetupLog:
 
 
 def run_logged(cmd: list[str], *, log: SetupLog, cwd: Path | None = None, env: Mapping[str, str] | None = None) -> int:
+    if CANCELLED.is_set():
+        log.line("SETUP_CANCELLED not starting " + " ".join(str(part) for part in cmd))
+        return 130
     log.line("RUN " + " ".join(str(part) for part in cmd))
     try:
         proc = subprocess.Popen(
@@ -242,13 +268,41 @@ def run_logged(cmd: list[str], *, log: SetupLog, cwd: Path | None = None, env: M
     except OSError as exc:
         log.line(f"ERROR_COMMAND_START {exc}")
         return 127
-    if proc.stdout is None:
-        log.line("ERROR_COMMAND_START stdout pipe unavailable")
+    with _ACTIVE_LOCK:
+        _ACTIVE.add(proc)
+    try:
+        if CANCELLED.is_set():
+            # Cancelled while this command was starting: terminate_active() did not see it.
+            _stop_process(proc)
+        if proc.stdout is None:
+            log.line("ERROR_COMMAND_START stdout pipe unavailable")
+            proc.kill()
+            return 127
+        for chunk in iter(proc.stdout.readline, b""):
+            log.raw(chunk.decode("utf-8", errors="replace"))
+        return proc.wait()
+    finally:
+        with _ACTIVE_LOCK:
+            _ACTIVE.discard(proc)
+
+
+def _stop_process(proc: subprocess.Popen[bytes], timeout: float = 5.0) -> None:
+    if proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
         proc.kill()
-        return 127
-    for chunk in iter(proc.stdout.readline, b""):
-        log.raw(chunk.decode("utf-8", errors="replace"))
-    return proc.wait()
+
+
+def terminate_active(timeout: float = 5.0) -> None:
+    """Stop setup at once (the Mucaro AI Setup.app window was closed): end the running command, start nothing new."""
+    CANCELLED.set()
+    with _ACTIVE_LOCK:
+        running = list(_ACTIVE)
+    for proc in running:
+        _stop_process(proc, timeout)
 
 
 def run_with_retries(
@@ -267,6 +321,8 @@ def run_with_retries(
         returncode = run_logged(cmd, log=log, cwd=cwd, env=env)
         if returncode == 0:
             return
+        if CANCELLED.is_set():
+            raise SetupError("SETUP_CANCELLED", "the Mucaro AI window was closed during setup")
         if attempt < attempts:
             log.line(f"WARN_RETRY step={label} attempt={attempt} returncode={returncode} wait={delay:.0f}s")
             sleep(delay)
@@ -275,10 +331,18 @@ def run_with_retries(
 
 
 class OneClickSetup:
-    def __init__(self, log: SetupLog, runtime: Path, pins: dict[str, str]) -> None:
+    def __init__(
+        self,
+        log: SetupLog,
+        runtime: Path,
+        pins: dict[str, str],
+        on_step: Callable[[int, str], None] | None = None,
+    ) -> None:
         self.log = log
         self.runtime = runtime
         self.pins = pins
+        # Mucaro AI Setup.app shows each step in its window (scripts/one_click_desktop.py).
+        self.on_step = on_step
         self.state_path = runtime / "state.json"
         self.state = load_state(self.state_path)
         self.frontend = ROOT / "frontend"
@@ -289,7 +353,11 @@ class OneClickSetup:
         self.ran: list[str] = []
 
     def _step(self, number: int, title: str) -> None:
+        if CANCELLED.is_set():
+            raise SetupError("SETUP_CANCELLED", "the Mucaro AI window was closed during setup")
         self.log.line(f"==> [{number}/{TOTAL_STEPS}] {title}")
+        if self.on_step is not None:
+            self.on_step(number, title)
 
     def _record(self, key: str, value: Any) -> None:
         self.state[key] = value
@@ -325,7 +393,7 @@ class OneClickSetup:
             ],
             [ROOT / "pyproject.toml", lock],
         )
-        missing = missing_modules()
+        missing = missing_modules(key_modules())
         if self.state.get("python_deps") == fp and not missing:
             self.log.line("PY_DEPS_CACHED")
             return
@@ -348,7 +416,7 @@ class OneClickSetup:
             attempts=3,
             cwd=ROOT,
         )
-        missing = missing_modules()
+        missing = missing_modules(key_modules())
         if missing:
             raise SetupError("ERROR_PY_IMPORT_MISSING", ",".join(missing))
         self._record("python_deps", fp)
@@ -470,12 +538,23 @@ def main(argv: list[str] | None = None) -> int:
         description="Double-click setup, stage 1. Unrecognized options are passed to scripts/launch_app.py.",
     )
     parser.add_argument("--setup-only", action="store_true", help="Prepare everything, then exit without starting the app.")
+    parser.add_argument(
+        "--desktop",
+        action="store_true",
+        help="Mucaro AI Setup.app (macOS): show setup progress and then the app in its own window, with no terminal or browser.",
+    )
     args, launch_args = parser.parse_known_args(argv)
 
     runtime = runtime_dir()
     log_env = os.environ.get("MUCARO_SETUP_LOG")
     log_path = Path(log_env) if log_env else runtime / "logs" / f"setup-{time.strftime('%Y%m%d-%H%M%S')}.log"
     log = SetupLog(log_path)
+    if args.desktop:
+        if sys.platform == "darwin":
+            from scripts import one_click_desktop
+
+            return one_click_desktop.run(log, log_path=log_path, runtime=runtime, pins=read_pins())
+        log.line("DESKTOP_MODE_UNAVAILABLE Mucaro AI Setup.app needs macOS; continuing with the browser launcher")
     started = time.monotonic()
     try:
         log.line(f"ONE_CLICK_STAGE1_START python={platform.python_version()} root={ROOT}")

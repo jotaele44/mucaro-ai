@@ -1,0 +1,59 @@
+#!/bin/bash
+# Mucaro AI Setup.app (macOS): Finder runs this source-checkout bootstrap app.
+#
+# It finds the mucaro-ai folder around the app and hands over to the double-click setup
+# (scripts/one_click.sh --desktop). The first run prepares everything inside the folder, then
+# Mucaro AI opens in its own window with its own Dock icon; later runs open it in seconds. No
+# Terminal window, browser, or preinstalled Python, Node or git is used.
+#
+# Same rules as scripts/one_click.sh: bash 3.2 only, and never python/git/node/npm from PATH
+# (on a Mac without the developer tools those open an "install developer tools" dialog).
+# Arguments are not passed on: older macOS versions add a -psn_* argument to every app.
+set -uo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)" || exit 1
+BUNDLE="$(cd "${HERE}/../.." && pwd -P)" || exit 1
+ROOT="$(cd "${BUNDLE}/.." && pwd -P)" || exit 1
+
+# Finder discards what this script prints, so problems are shown in a dialog instead
+# (MUCARO_APP_DIALOGS=0 turns dialogs off for automation).
+alert() {
+  [ "${MUCARO_APP_DIALOGS:-1}" != 0 ] && [ -x /usr/bin/osascript ] || return 0
+  /usr/bin/osascript - "$1" "${BUNDLE}/Contents/Resources/AppIcon.icns" >/dev/null 2>&1 <<'OSA' || true
+on run argv
+  set message to item 1 of argv
+  try
+    display dialog message buttons {"OK"} default button 1 with title "Mucaro AI" with icon ((POSIX file (item 2 of argv)) as alias)
+  on error
+    display dialog message buttons {"OK"} default button 1 with title "Mucaro AI" with icon caution
+  end try
+end run
+OSA
+}
+
+# Gatekeeper "App Translocation": when a quarantined app is opened where a downloaded ZIP was
+# unpacked, macOS runs a read-only copy of the bundle alone from a random path, so the folder
+# around it is out of reach. Name the real cause instead of failing later with a vaguer error.
+case "${BUNDLE}" in
+  */AppTranslocation/*)
+    alert "macOS opened Mucaro AI from a temporary read-only copy, so it cannot reach the rest of the mucaro-ai folder. This happens once for a folder that came from a downloaded ZIP file.
+
+To fix it:
+1. Move the mucaro-ai folder out of Downloads (your home folder is a good place).
+2. Double-click Fix-Gatekeeper.command in that folder.
+3. Open Mucaro AI Setup.app again."
+    exit 1
+    ;;
+esac
+
+if [ ! -f "${ROOT}/scripts/one_click.sh" ]; then
+  alert "Mucaro AI Setup.app has to stay inside its mucaro-ai folder, next to the scripts folder.
+
+It is now in: ${ROOT}
+
+Move it back into the mucaro-ai folder and open it from there. To start Mucaro AI from the Dock, drag the app onto the Dock instead of moving it."
+  exit 1
+fi
+
+export MUCARO_APP_BUNDLE="${BUNDLE}"
+exec /bin/bash "${ROOT}/scripts/one_click.sh" --desktop

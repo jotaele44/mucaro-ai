@@ -24,9 +24,21 @@ Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, Wi
 from a terminal). See `docs/ONE_CLICK_SETUP.md` for what the setup
 does, its error codes, and how to remove it.
 
-Settings go in `.env` (created from `.env.example` on first run). The launcher reads it at
-startup; variables already exported in your shell take precedence. If the UI shows **Backend not
-reachable**, double-click the launcher again and press **Retry**.
+`Mucaro AI Setup.app` (macOS, the owl icon) runs the same setup but shows each step in its own
+window during the first open, then turns that window into Mucaro AI with its own Dock icon.
+Keep it inside this folder; to start it from the Dock, drag it onto the Dock.
+
+A folder downloaded as a ZIP file is quarantined by macOS, which blocks the app the first time
+("cannot be opened because Apple cannot check it for malicious software"). Double-click
+`Fix-Gatekeeper.command` once, or get the folder with `git clone` or GitHub Desktop, which is
+never quarantined.
+
+Supported: macOS 14+ on Apple silicon, macOS 13+ on Intel, Windows 10/11 x64, and Linux x86_64.
+See `docs/ONE_CLICK_SETUP.md` for what the setup does, its error codes, and how to remove it.
+
+Settings go in `.env` (created from `.env.example` on first run). The app and the launchers read
+it at startup; variables already exported in your shell take precedence. If the UI shows
+**Backend not reachable**, open the app (or the launcher) again and press **Retry**.
 
 See `docs/FIRST_RUN.md` for step-by-step startup and error recovery, and
 `docs/UX_SETUP_IOS_AUDIT.md` for the usability, setup, and mobile Safari audit.
@@ -315,7 +327,8 @@ Use `mucaro package macos-app --format text` to build a local source-bound
 launches this checkout through silent setup and opens the native window. It provisions private
 runtimes on first use. This is not yet a portable
 signed installer with embedded runtime, reinstall, upgrade, and rollback
-guarantees.
+guarantees. For source-checkout use, open the `Mucaro AI Setup.app` at the top of this folder
+instead: it needs no build step and opens in its own window.
 
 The portable lane starts by materializing the governed x86_64 macOS runtime,
 then embedding that verified input into an exact-head app bundle:

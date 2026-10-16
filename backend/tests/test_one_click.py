@@ -6,6 +6,9 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
+import time
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -19,6 +22,10 @@ COMMAND_FILE = REPO / "Mucaro AI.command"
 CMD_FILE = REPO / "Mucaro AI.cmd"
 STAGE0_SH = REPO / "scripts" / "one_click.sh"
 STAGE0_PS1 = REPO / "scripts" / "one_click_windows.ps1"
+# Mucaro AI Setup.app runs this launcher; Fix-Gatekeeper.command clears a ZIP download's quarantine.
+APP_LAUNCHER = REPO / "Mucaro AI Setup.app" / "Contents" / "MacOS" / "Mucaro AI"
+GATEKEEPER_FIX = REPO / "Fix-Gatekeeper.command"
+MAC_SHELL_SCRIPTS = (STAGE0_SH, COMMAND_FILE, APP_LAUNCHER, GATEKEEPER_FIX)
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 # A command word at a command position: line start, after ; & | ( $( ! or a keyword that starts a command.
 PATH_TOOL_AT_COMMAND_POSITION = re.compile(
@@ -75,12 +82,14 @@ def test_command_file_delegates_to_stage0():
 
 
 def test_command_file_is_executable_in_git():
-    # Finder only runs a .command file with the executable bit; git records it as mode 100755.
-    # Extracted source archives (certify_source_artifact.py) do not restore modes, so check git only.
+    # Finder only runs a .command file, or an app's launcher, with the executable bit; git records
+    # it as mode 100755. Extracted source archives (certify_source_artifact.py) do not restore
+    # modes, so check git only.
     if shutil.which("git") is None:
         pytest.skip("git not installed")
+    paths = [path.relative_to(REPO).as_posix() for path in MAC_SHELL_SCRIPTS]
     proc = subprocess.run(
-        ["git", "ls-files", "-s", "--", COMMAND_FILE.name, "scripts/one_click.sh"],
+        ["git", "ls-files", "-s", "--", *paths],
         cwd=REPO,
         text=True,
         capture_output=True,
@@ -89,16 +98,16 @@ def test_command_file_is_executable_in_git():
     if proc.returncode != 0 or not proc.stdout.strip():
         pytest.skip("not a git checkout")
     lines = proc.stdout.splitlines()
-    assert len(lines) == 2
+    assert len(lines) == len(paths)
     for line in lines:
         assert line.startswith("100755 "), line
-    assert COMMAND_FILE.stat().st_mode & 0o111
-    assert STAGE0_SH.stat().st_mode & 0o111
+    for path in MAC_SHELL_SCRIPTS:
+        assert path.stat().st_mode & 0o111, path
 
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash not installed")
 def test_stage0_shell_scripts_parse():
-    for path in (STAGE0_SH, COMMAND_FILE):
+    for path in MAC_SHELL_SCRIPTS:
         proc = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True, check=False)
         assert proc.returncode == 0, proc.stderr
 
@@ -115,7 +124,7 @@ def test_path_tool_pattern_flags_command_positions_only():
 def test_stage0_shell_never_runs_python_git_node_or_npm_from_path():
     # On macOS without the Command Line Tools, /usr/bin/python3 and /usr/bin/git are stubs that
     # open an install dialog, which would break the no-input promise.
-    for script in (STAGE0_SH, COMMAND_FILE):
+    for script in MAC_SHELL_SCRIPTS:
         for line in _code_lines(script, "#"):
             assert not PATH_TOOL_AT_COMMAND_POSITION.search(line), f"{script.name}: {line}"
 
@@ -123,7 +132,7 @@ def test_stage0_shell_never_runs_python_git_node_or_npm_from_path():
 def test_stage0_shell_avoids_bash4_only_syntax():
     # macOS ships bash 3.2.
     forbidden = [r"declare\s+-A", r"\bmapfile\b", r"\breadarray\b", r"\$\{[^}]*,,", r"\$\{[^}]*\^\^", r"&>>", r"\bcoproc\b", r";;&", r"\|&"]
-    for script in (STAGE0_SH, COMMAND_FILE):
+    for script in MAC_SHELL_SCRIPTS:
         text = "\n".join(_code_lines(script, "#"))
         for pattern in forbidden:
             assert not re.search(pattern, text), f"{script.name}: {pattern}"
@@ -532,6 +541,108 @@ def test_main_setup_only_does_not_launch(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "ONE_CLICK_SETUP_OK steps=python_deps" in out
     assert "ONE_CLICK_SETUP_ONLY_OK" in out
+
+
+# --- Mucaro AI Setup.app (desktop mode) hooks -----------------------------------------------------------
+
+
+def test_window_library_is_part_of_the_install_on_macos_and_windows():
+    # main's Mucaro AI.app (macOS) and Mucaro AI.exe (Windows) both open a pywebview window.
+    for platform_name in ("darwin", "win32"):
+        assert one_click.python_extras(platform_name) == "dev,anthropic,desktop"
+        assert "webview" in one_click.key_modules(platform_name)
+    assert one_click.python_extras("linux") == "dev,anthropic"
+    assert "webview" not in one_click.key_modules("linux")
+    assert one_click.key_modules(sys.platform) == one_click.KEY_MODULES
+    extras = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))["project"]["optional-dependencies"]
+    assert set(one_click.python_extras("darwin").split(",")) <= set(extras)
+
+
+def test_setup_reports_each_step_to_the_app_window(project):
+    _root, runtime, _tools = project
+    steps = []
+    pins = one_click.read_pins(REPO / "scripts" / "one_click_pins.env")
+
+    one_click.OneClickSetup(one_click.SetupLog(None), runtime, pins, on_step=lambda number, title: steps.append(number)).run()
+
+    assert steps == [1, 2, 3, 4, 5]
+
+
+@pytest.fixture
+def cancelled():
+    one_click.CANCELLED.set()
+    yield
+    one_click.CANCELLED.clear()
+
+
+def test_cancelled_setup_starts_nothing_and_retries_nothing(cancelled):
+    log = one_click.SetupLog(None)
+    waits = []
+
+    assert one_click.run_logged([sys.executable, "-c", "print('never')"], log=log) == 130
+    with pytest.raises(one_click.SetupError) as exc:
+        one_click.run_with_retries("npm_ci", [sys.executable, "-c", "pass"], log=log, attempts=3, sleep=waits.append)
+    assert exc.value.code == "SETUP_CANCELLED"
+    assert waits == []
+    with pytest.raises(one_click.SetupError) as exc:
+        one_click.OneClickSetup(log, Path("/nowhere"), {"UV_VERSION": "0", "NODE_VERSION": "0"})._step(1, "Python packages")
+    assert exc.value.code == "SETUP_CANCELLED"
+
+
+def test_terminate_active_stops_the_running_command():
+    log = one_click.SetupLog(None)
+    result = {}
+    worker = threading.Thread(
+        target=lambda: result.update(code=one_click.run_logged([sys.executable, "-c", "import time; time.sleep(60)"], log=log))
+    )
+    worker.start()
+    try:
+        deadline = time.monotonic() + 20
+        while not one_click._ACTIVE and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert one_click._ACTIVE
+        started = time.monotonic()
+        one_click.terminate_active(timeout=5)
+        worker.join(15)
+        assert not worker.is_alive()
+        assert result["code"] != 0
+        assert time.monotonic() - started < 15
+        assert not one_click._ACTIVE
+    finally:
+        one_click.CANCELLED.clear()
+
+
+def test_main_desktop_mode_hands_over_to_the_app_window_on_macos(tmp_path, monkeypatch):
+    import scripts.one_click_desktop as one_click_desktop
+
+    monkeypatch.setattr(one_click.sys, "platform", "darwin")
+    monkeypatch.setenv("MUCARO_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("MUCARO_SETUP_LOG", str(tmp_path / "logs" / "setup-1.log"))
+    monkeypatch.setattr(one_click.OneClickSetup, "run", lambda self: pytest.fail("the app window runs the setup"))
+    monkeypatch.setattr(one_click.launch_app, "main", lambda argv=None: pytest.fail("no browser launcher in the app"))
+    calls = []
+    monkeypatch.setattr(one_click_desktop, "run", lambda log, **kwargs: calls.append(kwargs) or 0)
+
+    assert one_click.main(["--desktop"]) == 0
+
+    assert calls[0]["log_path"] == tmp_path / "logs" / "setup-1.log"
+    assert calls[0]["runtime"] == tmp_path
+    assert calls[0]["pins"]["UV_VERSION"] == one_click.read_pins()["UV_VERSION"]
+
+
+def test_main_desktop_mode_uses_the_browser_launcher_off_macos(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(one_click.sys, "platform", "linux")
+    monkeypatch.setenv("MUCARO_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.delenv("MUCARO_SETUP_LOG", raising=False)
+    monkeypatch.delenv("MUCARO_SETUP_LOCK", raising=False)
+    monkeypatch.setattr(one_click.OneClickSetup, "run", lambda self: [])
+    launched = []
+    monkeypatch.setattr(one_click.launch_app, "main", lambda argv=None: launched.append(argv) or 0)
+
+    assert one_click.main(["--desktop", "--smoke-test", "--no-browser"]) == 0
+
+    assert "DESKTOP_MODE_UNAVAILABLE" in capsys.readouterr().out
+    assert launched == [one_click.LAUNCH_ARGS + ["--smoke-test", "--no-browser"]]
 
 
 # --- preflight and launcher changes -------------------------------------------------------------

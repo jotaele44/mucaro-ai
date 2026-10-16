@@ -2,8 +2,9 @@
 
 > **Source setup, not a release artifact.** Double-click the tracked `Mucaro AI.app` beside
 > `pyproject.toml` on macOS. It runs setup quietly and opens a native window without Terminal or
-> a browser. Release-grade certification requires two packaged lanes,
-> and neither is this launcher:
+> a browser. `Mucaro AI Setup.app` does the same but shows each setup step in its own window first.
+> Release-grade certification requires two packaged lanes,
+> and none of these launchers is one:
 >
 > - the native app, `Mucaro AI.app` with its own window: see [release/MACOS_APP.md](release/MACOS_APP.md);
 > - the portable embedded-runtime app: see [PACKAGING_POLICY.md](PACKAGING_POLICY.md#portable-runtime-and-application).
@@ -19,6 +20,9 @@ Desktop Launcher Mode lets Mucaro AI run with one command.
 `Mucaro AI.command` (macOS) and `Mucaro AI.cmd` (Windows) set up everything on first use and then
 run `scripts/launch_app.py --auto-port --exit-if-running`. `Mucaro AI.app` and `Mucaro AI.exe` run
 the same setup silently and add `--native` (own window, no browser). See `docs/ONE_CLICK_SETUP.md`.
+`Mucaro AI Setup.app` (macOS) runs the same setup inside its own window, showing each step,
+then turns that window into the app with the local service running inside it
+(`scripts/one_click_desktop.py`).
 
 Launcher options used by the double-click files:
 
@@ -32,6 +36,9 @@ Closing the terminal window (SIGHUP) or SIGTERM stops the backend the same way `
 It starts the private local backend on `127.0.0.1:8000`, serves the built React UI through FastAPI, opens the browser, and stops cleanly with `Ctrl+C`.
 
 ## Double-Click App
+
+For source-checkout use, open the `Mucaro AI Setup.app` committed in the repository root; it needs no build.
+The generated wrapper below is kept for the packaging checks (`MACOS_APP_BUNDLE_VERIFIED`).
 
 Build a local source-bound macOS Application bundle:
 

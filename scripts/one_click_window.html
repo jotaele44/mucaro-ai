@@ -1,0 +1,232 @@
+<!doctype html>
+<!--
+  First screen of Mucaro AI Setup.app (scripts/one_click_desktop.py loads it into the app window).
+  It shows setup progress until the app itself is loaded in the same window, or an error with
+  Try again / Show log / Quit. Self-contained on purpose: no network, no external files.
+  Python drives it through window.mucaroProgress({step}) and window.mucaroError({code, hint, detail, log}).
+  No Content-Security-Policy here: pywebview's evaluate_js runs through eval.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Mucaro AI</title>
+<style>
+  :root {
+    --bg: #f5f7f6;
+    --fg: #16211c;
+    --muted: #5a6a62;
+    --accent: #1f5f4a;
+    --accent-text: #ffffff;
+    --line: #d6dfda;
+    --bad: #a33a2c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101714;
+      --fg: #e7eeea;
+      --muted: #9aaca3;
+      --accent: #5cbf99;
+      --accent-text: #0c1a14;
+      --line: #2a3631;
+      --bad: #f0a092;
+    }
+  }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+  main { width: min(460px, calc(100% - 48px)); text-align: center; }
+  .logo { display: block; width: 96px; height: 96px; margin: 0 auto 18px; }
+  h1 { margin: 0 0 6px; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+  #status { margin: 0 0 22px; color: var(--muted); }
+  ol { display: inline-block; margin: 0; padding: 0; list-style: none; text-align: left; }
+  li { position: relative; padding: 4px 0 4px 30px; color: var(--muted); }
+  li::before {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    margin-top: -4px;
+    border-radius: 50%;
+    background: var(--line);
+  }
+  li[data-state="done"] { color: var(--fg); }
+  li[data-state="done"]::before {
+    content: "\2713";
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    background: none;
+    color: var(--accent);
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+  }
+  li[data-state="active"] { color: var(--fg); font-weight: 600; }
+  li[data-state="active"]::before {
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    margin-top: -8px;
+    background: none;
+    border: 2px solid var(--line);
+    border-top-color: var(--accent);
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #note { margin: 20px 0 0; font-size: 13px; color: var(--muted); }
+  #error { margin-top: 4px; }
+  #error-code { margin: 0 0 8px; color: var(--bad); font: 600 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #error-hint { margin: 0 0 10px; }
+  #error-detail, #error-log {
+    margin: 0 0 8px;
+    font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 18px; }
+  button {
+    min-height: 36px;
+    padding: 0 18px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+  }
+  button.primary { border-color: var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    li[data-state="active"]::before { animation: none; border-color: var(--accent); }
+  }
+</style>
+</head>
+<body>
+<main>
+  <svg class="logo" viewBox="102.4 102.4 819.2 819.2" role="img" aria-label="Mucaro AI">
+    <defs>
+      <linearGradient id="owl-body" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#2f8a6a"/>
+        <stop offset="1" stop-color="#1f5f4a"/>
+      </linearGradient>
+    </defs>
+    <rect x="102.4" y="102.4" width="819.2" height="819.2" rx="189.44" fill="url(#owl-body)"/>
+    <circle cx="378.88" cy="481.28" r="117.76" fill="#fafaf5"/>
+    <circle cx="378.88" cy="481.28" r="71.68" fill="#f2b13a"/>
+    <circle cx="378.88" cy="481.28" r="40.96" fill="#141f1a"/>
+    <circle cx="645.12" cy="481.28" r="117.76" fill="#fafaf5"/>
+    <circle cx="645.12" cy="481.28" r="71.68" fill="#f2b13a"/>
+    <circle cx="645.12" cy="481.28" r="40.96" fill="#141f1a"/>
+    <polygon points="471.04,593.92 552.96,593.92 512,696.32" fill="#f2b13a"/>
+  </svg>
+  <h1>Mucaro AI</h1>
+  <p id="status" role="status" aria-live="polite">Starting Mucaro AI…</p>
+  <ol id="steps" hidden></ol>
+  <p id="note" hidden>The first time takes a few minutes and needs an internet connection. Mucaro AI opens here by itself when it is ready.</p>
+  <section id="error" hidden>
+    <p id="error-code"></p>
+    <p id="error-hint"></p>
+    <p id="error-detail"></p>
+    <p id="error-log"></p>
+    <div class="actions">
+      <button type="button" class="primary" id="retry">Try again</button>
+      <button type="button" id="show-log">Show log</button>
+      <button type="button" id="quit">Quit</button>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  // Step 0 (private runtimes) is done before this window can open; 6 is loading the app itself.
+  var LABELS = [
+    "Private Python and Node.js",
+    "Python packages",
+    "Interface packages",
+    "Interface build",
+    "Settings and readiness check",
+    "Sample documents",
+    "Opening Mucaro AI"
+  ];
+  var LAST = LABELS.length - 1;
+  var status = document.getElementById("status");
+  var steps = document.getElementById("steps");
+  var note = document.getElementById("note");
+  var error = document.getElementById("error");
+  var current = 1;
+  var failed = false;
+
+  LABELS.forEach(function (label) {
+    var item = document.createElement("li");
+    item.textContent = label;
+    steps.appendChild(item);
+  });
+
+  function render() {
+    Array.prototype.forEach.call(steps.children, function (item, index) {
+      item.setAttribute("data-state", index < current ? "done" : index === current ? "active" : "todo");
+    });
+  }
+  render();
+
+  // A later run is ready in a second or two: show the step list and the first-run note only when
+  // setup is actually taking a while.
+  setTimeout(function () { if (!failed && current < LAST) { steps.hidden = false; } }, 1500);
+  setTimeout(function () { if (!failed && current < LAST) { note.hidden = false; } }, 4000);
+
+  window.mucaroProgress = function (state) {
+    if (failed) { return; }
+    var step = Number(state && state.step);
+    current = Math.max(0, Math.min(LAST, isFinite(step) ? step : 0));
+    status.textContent = current >= LAST ? "Opening Mucaro AI…" : "Getting Mucaro AI ready…";
+    if (current >= LAST) { note.hidden = true; }
+    render();
+  };
+
+  window.mucaroError = function (info) {
+    info = info || {};
+    failed = true;
+    steps.hidden = true;
+    note.hidden = true;
+    status.textContent = "Mucaro AI could not finish starting.";
+    document.getElementById("error-code").textContent = info.code || "";
+    document.getElementById("error-hint").textContent = info.hint || "";
+    document.getElementById("error-detail").textContent = info.detail || "";
+    document.getElementById("error-log").textContent = info.log ? "Log: " + info.log : "";
+    error.hidden = false;
+    document.getElementById("retry").focus();
+  };
+
+  // Exposed by scripts/one_click_desktop.py; they only act while this error screen is showing.
+  function call(name) {
+    var api = window.pywebview && window.pywebview.api;
+    if (api && typeof api[name] === "function") { api[name](); }
+  }
+  document.getElementById("retry").addEventListener("click", function () {
+    error.hidden = true;
+    status.textContent = "Trying again…";
+    call("mucaro_retry");
+  });
+  document.getElementById("show-log").addEventListener("click", function () { call("mucaro_show_log"); });
+  document.getElementById("quit").addEventListener("click", function () { call("mucaro_quit"); });
+})();
+</script>
+</body>
+</html>

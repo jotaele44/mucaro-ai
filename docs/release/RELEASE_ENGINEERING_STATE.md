@@ -103,8 +103,9 @@ These are all reversible. They are recorded as ASSUMPTION rather than FACT.
     receipt that includes `post_launch_bundle_immutable`.
 
   `scripts/certify_release_grade.py` blocks certification when either lane's
-  gates are missing. The one-click files (`Mucaro AI.command` and
-  `Mucaro AI.cmd`) are the supported source setup, not a release lane. This
+  gates are missing. The one-click files (`Mucaro AI Setup.app` in the repository
+  root, `Mucaro AI.command` and `Mucaro AI.cmd`) are the supported source setup,
+  not a release lane. This
   decision amends the RC-006 adjudication and makes TGT-029 PROVISIONAL until
   the portable lane has upgrade and rollback evidence.
 - **Release class.** The release class is direct distribution with a
