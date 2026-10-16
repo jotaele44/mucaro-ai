@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-10-02T15:01:08Z",
+  "updated_utc": "2026-10-16T18:24:00Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -231,7 +231,7 @@
       "dependencies": [
         "N07"
       ],
-      "state": "BLOCKED",
+      "state": "PROVISIONAL",
       "risk": "MEDIUM",
       "user_value": "HIGH",
       "downstream_unlock_value": "MEDIUM",
@@ -239,8 +239,8 @@
       "evidence_required": [
         "frozen retrieval benchmark with thresholds"
       ],
-      "blocker": "BLK-ACTIONS-001",
-      "notes": "RT-10/MATRIX-007 exact-head execution is blocked by repository-wide GitHub-hosted runner admission failure: jobs are created but execute zero steps. Source/threshold redesign is not authorized by this blocker."
+      "blocker": null,
+      "notes": "Runner admission is restored and BLK-ACTIONS-001 is RESOLVED. RT-10/MATRIX-007 still requires execution of the frozen production-scale retrieval benchmark before N09 can advance beyond PROVISIONAL."
     },
     {
       "node_id": "N10",
