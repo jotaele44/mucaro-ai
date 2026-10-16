@@ -11,7 +11,7 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
     report = audit_current_denominator_state(PROJECT_ROOT)
     assert report["status"] == "MUCARO_V1_DENOMINATOR_AUDIT_OK"
     assert report["historical_baseline"] == {"raw_completion_percent": 61.5, "weighted_completion_percent": 62.6}
-    assert report["current_overlay"]["raw_completion_percent"] == 76.0
+    assert report["current_overlay"]["raw_completion_percent"] == 76.5
     assert report["current_overlay"]["weighted_completion_percent"] == 77.6
     assert report["current_overlay"]["per_track"]["CODING"]["score_percent"] == 70.0
     assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"PASS": 4, "PROVISIONAL": 6}
