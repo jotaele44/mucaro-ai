@@ -85,3 +85,4 @@ The implementation vector is deliberately backend-first:
 for the same exact Mucaro source SHA, with positive and negative execution evidence and zero unresolved residue inside this declared scope.
 
 Until then the correct aggregate state is `VIDEO_CLI_PARITY_OPEN` or `VIDEO_CLI_PARITY_INVALID`, never an inferred percentage-based PASS.
+\n### Governed generalized file edit\n\n`coding.file_edit` adds bounded one-file `CREATE`, `REPLACE`, and `DELETE` semantics. Every call remains approval-gated and binds exact repository HEAD, repository-relative path, expected preimage state/hash, and proposed content SHA-256 where applicable. Dirty targets, symlink traversal, `.git` mutation, content drift, unexpected dirty-path expansion, and failed postconditions fail closed; postcondition failures trigger rollback. This closes VCP-004 at the source-implementation layer only; runtime certification remains separate.\n
