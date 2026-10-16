@@ -96,16 +96,19 @@ class ScopedClaimIssuer(ClaimIssuer):
 
 class ScopedClaimVerifier(ClaimVerifier):
     """Fail closed when the signed context differs from configured trust."""
-    def __init__(self, issuer_id, secret, policy, reviewed_skills, scope: ExecutionScope):
+    def __init__(self, issuer_id, secret, policy, reviewed_skills, scope: ExecutionScope,
+                 project_root: Path):
         super().__init__(issuer_id,secret,policy,reviewed_skills)
         if not isinstance(scope,ExecutionScope) or (
                 self.reviewed_skills.get(scope.skill_id) is None):
             raise ClaimAuthorityError("REVIEWED_SCOPE_REQUIRED")
         object.__setattr__(self,"scope",scope)
+        object.__setattr__(self,"project_root",Path(project_root))
 
     def verify(self, grant, *, job_id, run_id, phase, input_digest, policy_hash,
                owner, now, lease_seconds):
-        if (not isinstance(grant,dict) or len(grant)!=15 or
+        if (not self.scope.matches_runtime(self.project_root) or
+            not isinstance(grant,dict) or len(grant)!=15 or
             not isinstance(grant.get("signature"),str) or
             not isinstance(grant.get("scope"),dict)):
             return False
