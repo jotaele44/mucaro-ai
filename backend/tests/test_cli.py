@@ -1856,6 +1856,8 @@ mucaro = "backend.app.cli:main"
         "packaging/macos/PrivacyInfo.xcprivacy",
         "packaging/runtime/macos-x86_64.json",
         "packaging/runtime/requirements-macos-x86_64.lock",
+        "packaging/runtime/macos-arm64.json",
+        "packaging/runtime/requirements-macos-arm64.lock",
     ]:
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
