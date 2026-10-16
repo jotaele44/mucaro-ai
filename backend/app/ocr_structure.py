@@ -106,6 +106,57 @@ def _group_lines(spans: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(lines, key=lambda row: (row["page_index"], row["bbox"]["y"], row["bbox"]["x"], row["key"]))
 
 
+def _split_multicolumn_engine_lines(
+    lines: list[dict[str, Any]],
+    *,
+    horizontal_gap_height_factor: float = 4.0,
+) -> list[dict[str, Any]]:
+    """Split one OCR engine line only when it contains a column-scale horizontal gap.
+
+    Tesseract may assign left- and right-column words to one line when their baselines
+    align. Multi-column reconstruction cannot treat the engine hierarchy as a semantic
+    column boundary, so this creates geometry-only line segments while preserving every
+    original span identity.
+    """
+    segmented: list[dict[str, Any]] = []
+    for line in lines:
+        spans = sorted(
+            line["spans"],
+            key=lambda row: (row["bbox"]["x"], row["word_num"], row["span_index"]),
+        )
+        if len(spans) <= 1:
+            segmented.append(line)
+            continue
+        median_height = statistics.median(row["bbox"]["height"] for row in spans)
+        gap_threshold = max(24.0, median_height * horizontal_gap_height_factor)
+        groups: list[list[dict[str, Any]]] = [[spans[0]]]
+        for previous, current in zip(spans, spans[1:]):
+            previous_right = previous["bbox"]["x"] + previous["bbox"]["width"]
+            gap = current["bbox"]["x"] - previous_right
+            if gap > gap_threshold:
+                groups.append([current])
+            else:
+                groups[-1].append(current)
+        if len(groups) == 1:
+            segmented.append(line)
+            continue
+        for segment_index, group in enumerate(groups):
+            segmented.append(
+                {
+                    "key": (*line["key"], segment_index),
+                    "page_index": line["page_index"],
+                    "bbox": _union_bbox(group),
+                    "raw_text": " ".join(row["raw_text"] for row in group),
+                    "span_indices": [row["span_index"] for row in group],
+                    "spans": group,
+                }
+            )
+    return sorted(
+        segmented,
+        key=lambda row: (row["page_index"], row["bbox"]["y"], row["bbox"]["x"], row["key"]),
+    )
+
+
 def _one_page(spans: list[dict[str, Any]]) -> bool:
     return len({row["page_index"] for row in spans}) == 1
 
@@ -145,7 +196,8 @@ def reconstruct_multicolumn(
     rows = _validated_spans(spans)
     if not _one_page(rows):
         return _unresolved("MULTI_COLUMN", rows, ["MULTI_PAGE_SCOPE_NOT_SUPPORTED"])
-    lines = _group_lines(rows)
+    engine_lines = _group_lines(rows)
+    lines = _split_multicolumn_engine_lines(engine_lines)
     if len(lines) < min_columns * min_lines_per_column:
         return _unresolved("MULTI_COLUMN", rows, ["INSUFFICIENT_LINE_DENOMINATOR"])
 
@@ -238,6 +290,7 @@ def reconstruct_multicolumn(
         },
         "limitations": [
             "This bounded reconstruction assumes column lines have materially overlapping horizontal intervals within each column.",
+            "OCR engine lines may be split only at a geometry-derived horizontal gap greater than four median text heights; this is inference, not source identity.",
             "Spanning headings, nested columns, rotated text and multi-page column continuity remain unresolved.",
         ],
     }
