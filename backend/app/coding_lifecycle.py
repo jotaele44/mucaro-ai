@@ -9,6 +9,7 @@ from typing import Any
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
 from .local_tools import resolve_local_tool
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 
 CODING_LIFECYCLE_SCHEMA_VERSION = "mucaro-coding-lifecycle/1.0"
 PROTECTED_BRANCHES = {"main", "master"}
@@ -109,6 +110,18 @@ def create_work_branch_transaction(
         before = inspect_repository(context.repo_root, cfg=cfg)
     except CodingWorkspaceError as exc:
         raise CodingLifecycleError(exc.status, exc.detail) from exc
+    try:
+        require(
+            PermissionRequest(
+                capability="git.mutate",
+                subject="coding_lifecycle.create_work_branch",
+                target=str(context.repo_root),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise CodingLifecycleError(exc.status, exc.detail) from exc
     branch_name = _validate_branch_name(context.repo_root, branch_name)
     if before["head_sha"] != expected_head_sha:
         raise CodingLifecycleError("ERROR_CODING_BRANCH_HEAD_DRIFT", f"expected {expected_head_sha}, observed {before['head_sha']}")
@@ -177,6 +190,18 @@ def commit_approved_changes(
         context = resolve_repository(repo_root, cfg)
         before = inspect_repository(context.repo_root, cfg=cfg)
     except CodingWorkspaceError as exc:
+        raise CodingLifecycleError(exc.status, exc.detail) from exc
+    try:
+        require(
+            PermissionRequest(
+                capability="git.mutate",
+                subject="coding_lifecycle.commit_approved_changes",
+                target=str(context.repo_root),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
         raise CodingLifecycleError(exc.status, exc.detail) from exc
     expected_branch = _validate_branch_name(context.repo_root, expected_branch)
     approved = _validate_paths(approved_paths)
@@ -280,6 +305,18 @@ def build_pull_request_request(
         context = resolve_repository(repo_root, cfg)
         state = inspect_repository(context.repo_root, cfg=cfg)
     except CodingWorkspaceError as exc:
+        raise CodingLifecycleError(exc.status, exc.detail) from exc
+    try:
+        require(
+            PermissionRequest(
+                capability="git.read",
+                subject="coding_lifecycle.build_pull_request_request",
+                target=str(context.repo_root),
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
         raise CodingLifecycleError(exc.status, exc.detail) from exc
     head_branch = _validate_branch_name(context.repo_root, head_branch)
     base_branch = _validate_branch_name(context.repo_root, base_branch, allow_protected=True)

@@ -308,7 +308,7 @@ def test_offline_manifest_reports_a_missing_remote_sdk(monkeypatch):
         {"name": "mock", "description": "local", "locality": "local", "status": "MODEL_PROVIDER_READY",
          "optional_dependency": None, "dependency_available": None},
     ]
-    monkeypatch.setattr(offline, "list_model_providers", lambda: providers)
+    monkeypatch.setattr(offline, "list_model_providers", lambda *_args, **_kwargs: providers)
     manifest = build_offline_manifest()
     rows = {row["capability"]: row for row in manifest["capabilities"]}
     assert rows["model:anthropic"]["state_now"] == "LOCAL_DEPENDENCY_MISSING"
