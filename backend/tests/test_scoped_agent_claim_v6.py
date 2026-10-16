@@ -80,6 +80,22 @@ class ScopedClaimTests(unittest.TestCase):
         (self.git/"HEAD").write_text("b"*40,encoding="utf-8")
         self.assertFalse(self.verify(token))
 
+    def test_queue_denies_stale_source_after_issue(self):
+        from backend.app.leased_agent_queue import WorkerGateError
+        queue=LeasedAgentQueue(self.root/"revocation-queue.db",
+                               claim_verifier=self.verifier,clock=lambda:105)
+        try:
+            work=self.args()
+            queue.submit("job-1","run-1","EXECUTE",work["input_digest"],
+                         work["policy_hash"])
+            grant=self.issuer.issue(**work)
+            (self.git/"HEAD").write_text("b"*40,encoding="utf-8")
+            with self.assertRaises(WorkerGateError):
+                queue.claim("job-1","worker-1",10,authorization=grant)
+            self.assertEqual(queue.state("job-1")["state"],"READY")
+        finally:
+            queue.close()
+
     def test_wrong_workspace_rejected(self):
         other=Path(self.tmp.name)/"elsewhere"
         other.mkdir()
