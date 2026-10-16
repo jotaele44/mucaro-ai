@@ -1,0 +1,128 @@
+name: ARM64 Portable Runtime Source Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/arm64-runtime-source-cert.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  certify-arm64-runtime-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ASSET_NAME: cpython-3.13.15+20260901-aarch64-apple-darwin-install_only.tar.gz
+      ASSET_URL: https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.13.15%2B20260901-aarch64-apple-darwin-install_only.tar.gz
+      EXPECTED_BYTES: "25293188"
+      EXPECTED_SHA256: b9054a9d3d54f4cb5573d44907fddb29874b08909bde73f29f2868cf872223ee
+      UV_VERSION: "0.10.0"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install Mucaro and pinned uv resolver
+        run: |
+          python -m pip install -e .
+          python -m pip install "uv==${UV_VERSION}"
+
+      - name: Acquire and bind exact upstream arm64 archive
+        env:
+          OUT: ${{ runner.temp }}/arm64-runtime-source
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT"
+          curl --fail --location --retry 3 --retry-all-errors             "$ASSET_URL"             --output "$OUT/$ASSET_NAME"
+          python - "$OUT/$ASSET_NAME" <<'PY'
+          import hashlib
+          import os
+          import pathlib
+          import sys
+
+          path = pathlib.Path(sys.argv[1])
+          observed_bytes = path.stat().st_size
+          observed_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+          expected_bytes = int(os.environ["EXPECTED_BYTES"])
+          expected_sha256 = os.environ["EXPECTED_SHA256"]
+          print(f"ARM64_ARCHIVE_BYTES={observed_bytes}")
+          print(f"ARM64_ARCHIVE_SHA256={observed_sha256}")
+          if observed_bytes != expected_bytes:
+              raise SystemExit(f"archive byte mismatch: expected={expected_bytes} observed={observed_bytes}")
+          if observed_sha256 != expected_sha256:
+              raise SystemExit(f"archive sha256 mismatch: expected={expected_sha256} observed={observed_sha256}")
+          PY
+
+      - name: Inspect archive geometry and logical identity
+        env:
+          OUT: ${{ runner.temp }}/arm64-runtime-source
+        run: |
+          set -euo pipefail
+          python scripts/mucaro.py package portable-runtime             --inspect-archive "$OUT/$ASSET_NAME"             --max-members 2500             --max-regular-bytes 80000000             --format json             | tee "$OUT/archive-inspection.json"
+
+      - name: Resolve Python 3.13 arm64 macOS wheel-only dependency lock
+        env:
+          OUT: ${{ runner.temp }}/arm64-runtime-source
+        run: |
+          set -euo pipefail
+          uv pip compile pyproject.toml             --python-version 3.13             --python-platform aarch64-apple-darwin             --generate-hashes             --only-binary :all:             --output-file "$OUT/requirements-macos-arm64.lock"
+          test -s "$OUT/requirements-macos-arm64.lock"
+          sha256sum "$OUT/requirements-macos-arm64.lock"
+          cat "$OUT/requirements-macos-arm64.lock"
+
+      - name: Write source certification receipt
+        env:
+          OUT: ${{ runner.temp }}/arm64-runtime-source
+        run: |
+          set -euo pipefail
+          python - "$OUT" <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import sys
+
+          out = pathlib.Path(sys.argv[1])
+          inspection = json.loads((out / "archive-inspection.json").read_text())
+          lock = out / "requirements-macos-arm64.lock"
+          receipt = {
+              "schema_version": "mucaro-arm64-runtime-source-cert/1.0",
+              "status": "ARM64_RUNTIME_SOURCE_EVIDENCE_READY",
+              "source": {
+                  "release": "20260901",
+                  "asset_name": os.environ["ASSET_NAME"],
+                  "bytes": int(os.environ["EXPECTED_BYTES"]),
+                  "sha256": os.environ["EXPECTED_SHA256"],
+              },
+              "archive_inspection": inspection,
+              "dependency_lock": {
+                  "resolver": f"uv=={os.environ['UV_VERSION']}",
+                  "python_version": "3.13",
+                  "python_platform": "aarch64-apple-darwin",
+                  "wheel_only": True,
+                  "generate_hashes": True,
+                  "sha256": hashlib.sha256(lock.read_bytes()).hexdigest(),
+                  "bytes": lock.stat().st_size,
+              },
+              "limitations": [
+                  "This receipt does not materialize or execute the runtime.",
+                  "Apple-Silicon runtime probe and packaged lifecycle remain separate gates.",
+                  "Signing, notarization, clean-host and physical-device evidence remain separate.",
+              ],
+          }
+          path = out / "arm64-runtime-source-receipt.json"
+          path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          print(path.read_text())
+          PY
+
+      - name: Upload exact-head arm64 source evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: arm64-runtime-source-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/arm64-runtime-source
+          if-no-files-found: error
+          archive: true
