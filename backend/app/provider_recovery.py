@@ -16,6 +16,7 @@ PROVIDER_INTERRUPTION_STATUSES = {
     "ERROR_MODEL_PROVIDER_UNAVAILABLE",
     "ERROR_MODEL_PROVIDER_RATE_LIMIT",
     "ERROR_MODEL_PROVIDER_TIMEOUT",
+    "ERROR_LOCAL_MODEL_UNAVAILABLE",
 }
 # The provider may or may not have acted on the request: retrying is allowed, calling it ACCEPTED is not.
 ATTEMPT_INTERRUPTED_UNKNOWN = "INTERRUPTED_UNKNOWN"
@@ -27,6 +28,27 @@ class ProviderRecoveryError(RuntimeError):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+
+
+def pause_provider_checkpoint(
+    checkpoint_id: str,
+    *,
+    provider: str,
+    model: str | None,
+    provider_error: str,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    try:
+        return transition_checkpoint(
+            checkpoint_id,
+            state="PAUSED_PROVIDER",
+            pause_reason=f"{provider}:{provider_error}",
+            provider=provider,
+            model=model,
+            cfg=cfg,
+        )
+    except CheckpointError as exc:
+        raise ProviderRecoveryError(exc.status, exc.detail) from exc
 
 
 def provider_attempt_id(checkpoint: dict[str, Any], operation_key: str) -> str:
@@ -99,12 +121,11 @@ def execute_with_provider_checkpoint(
             _record(checkpoint_id, attempt_id, {**record, "state": outcome, "provider_error": exc.status, "finished_at": utc_now()}, cfg)
         if not interrupted:
             raise
-        paused = transition_checkpoint(
+        paused = pause_provider_checkpoint(
             checkpoint_id,
-            state="PAUSED_PROVIDER",
-            pause_reason=f"{provider}:{exc.status}",
             provider=provider,
             model=model,
+            provider_error=exc.status,
             cfg=cfg,
         )
         paused_result: dict[str, Any] = {"status": "PAUSED_PROVIDER", "provider_error": exc.status, "checkpoint": paused}
