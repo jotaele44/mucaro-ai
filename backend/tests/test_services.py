@@ -4,7 +4,10 @@ import csv
 import json
 from pathlib import Path
 
+from backend.app.agent_checkpoints import create_checkpoint, get_checkpoint
 from backend.app.config import Settings
+from backend.app.model_failover import FailoverPolicy
+from backend.app.model_router import ModelProviderError
 from backend.app.ingestion import ingest_web_snapshot
 from backend.app.services import answer_question
 from backend.app.utils import write_json
@@ -243,6 +246,273 @@ def test_answer_question_explicit_mock_fallback_is_policy_driven(tmp_path: Path,
     assert len(result["model_route_sha256"]) == 64
 
 
+def _failover_route(*providers: str) -> dict:
+    return {
+        "status": "MODEL_ROUTE_READY",
+        "selected_provider": providers[0],
+        "selected_model": f"{providers[0]}-model",
+        "selection_reason": "TEST_ROUTE",
+        "route_sha256": "a" * 64,
+        "failover_order": [
+            {"provider": provider, "model": f"{provider}-model"}
+            for provider in providers
+        ],
+    }
+
+
+def test_answer_question_records_single_provider_attempt(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    monkeypatch.setattr("backend.app.services.plan_model_route", lambda **kwargs: _failover_route("mock"))
+
+    result = answer_question("What does source lineage require?", cfg=cfg, persist=False)
+
+    assert result["model_failed_over"] is False
+    assert [attempt["status"] for attempt in result["model_attempts"]] == ["OK"]
+
+
+def test_answer_question_runtime_outage_fails_over_when_explicitly_allowed(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    monkeypatch.setattr(
+        "backend.app.services.plan_model_route",
+        lambda **kwargs: _failover_route("anthropic", "mock"),
+    )
+    calls: list[str] = []
+
+    def scripted(*args, model_provider=None, **kwargs):
+        calls.append(model_provider)
+        if model_provider == "anthropic":
+            raise ModelProviderError("ERROR_MODEL_PROVIDER_UNAVAILABLE", "outage")
+        return {
+            "model_provider": "mock",
+            "model_name": "mock-model",
+            "answer": "Source lineage requires chunk_a.",
+            "cited_chunk_ids": ["chunk_a"],
+        }
+
+    monkeypatch.setattr("backend.app.services.generate_answer", scripted)
+
+    result = answer_question(
+        "What does source lineage require?",
+        allow_mock_fallback=True,
+        cfg=cfg,
+        persist=False,
+        failover_policy=FailoverPolicy(max_attempts_per_provider=1, backoff_seconds=()),
+    )
+
+    assert calls == ["anthropic", "mock"]
+    assert result["model_provider"] == "mock"
+    assert result["model_failed_over"] is True
+    assert [attempt["status"] for attempt in result["model_attempts"]] == [
+        "ERROR_MODEL_PROVIDER_UNAVAILABLE",
+        "OK",
+    ]
+
+
+def test_checkpoint_failover_reuses_one_operation_identity_then_accepts(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    monkeypatch.setattr(
+        "backend.app.services.plan_model_route",
+        lambda **kwargs: _failover_route("anthropic", "mock"),
+    )
+
+    def scripted(*args, model_provider=None, **kwargs):
+        if model_provider == "anthropic":
+            raise ModelProviderError("ERROR_MODEL_PROVIDER_UNAVAILABLE", "outage")
+        return {
+            "model_provider": "mock",
+            "model_name": "mock-model",
+            "answer": "Source lineage requires chunk_a.",
+            "cited_chunk_ids": ["chunk_a"],
+        }
+
+    monkeypatch.setattr("backend.app.services.generate_answer", scripted)
+    checkpoint = create_checkpoint(
+        session_id="session-v04",
+        run_id="run-v04",
+        objective="Answer safely",
+        source_sha="c" * 40,
+        state="EXECUTING",
+        cfg=cfg,
+    )
+
+    result = answer_question(
+        "What does source lineage require?",
+        allow_mock_fallback=True,
+        cfg=cfg,
+        persist=False,
+        checkpoint_id=checkpoint["checkpoint_id"],
+        provider_operation_key="answer:stable",
+        failover_policy=FailoverPolicy(max_attempts_per_provider=1, backoff_seconds=()),
+    )
+
+    assert result["model_failed_over"] is True
+    stored = get_checkpoint(checkpoint["checkpoint_id"], cfg)
+    attempts = stored["metadata"]["provider_attempts"]
+    assert len(attempts) == 1
+    record = next(iter(attempts.values()))
+    assert record["state"] == "ACCEPTED"
+    assert record["attempts"] == 2
+    assert record["provider"] == "mock"
+
+
+def test_exhausted_provider_interruptions_pause_checkpoint_only_after_chain(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    monkeypatch.setattr(
+        "backend.app.services.plan_model_route",
+        lambda **kwargs: _failover_route("anthropic", "openai_compatible_local"),
+    )
+
+    def unavailable(*args, model_provider=None, **kwargs):
+        status = (
+            "ERROR_LOCAL_MODEL_UNAVAILABLE"
+            if model_provider == "openai_compatible_local"
+            else "ERROR_MODEL_PROVIDER_UNAVAILABLE"
+        )
+        raise ModelProviderError(status, f"{model_provider} outage")
+
+    monkeypatch.setattr("backend.app.services.generate_answer", unavailable)
+    checkpoint = create_checkpoint(
+        session_id="session-exhausted",
+        run_id="run-exhausted",
+        objective="Answer safely",
+        source_sha="d" * 40,
+        state="EXECUTING",
+        cfg=cfg,
+    )
+
+    result = answer_question(
+        "What does source lineage require?",
+        cfg=cfg,
+        persist=False,
+        checkpoint_id=checkpoint["checkpoint_id"],
+        provider_operation_key="answer:exhausted",
+        failover_policy=FailoverPolicy(max_attempts_per_provider=1, backoff_seconds=()),
+    )
+
+    assert result["status"] == "PAUSED_PROVIDER"
+    assert [row["provider"] for row in result["model_attempts"]] == [
+        "anthropic",
+        "openai_compatible_local",
+    ]
+    stored = get_checkpoint(checkpoint["checkpoint_id"], cfg)
+    assert stored["state"] == "PAUSED_PROVIDER"
+    assert stored["provider"] == "openai_compatible_local"
+    attempt = next(iter(stored["metadata"]["provider_attempts"].values()))
+    assert attempt["state"] == "INTERRUPTED_UNKNOWN"
+    assert attempt["attempts"] == 2
+
+
+def test_hard_failure_never_fails_over_or_pauses_checkpoint(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    monkeypatch.setattr(
+        "backend.app.services.plan_model_route",
+        lambda **kwargs: _failover_route("anthropic", "mock"),
+    )
+
+    def bad_request(*args, **kwargs):
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_CALL_FAILED", "bad request")
+
+    monkeypatch.setattr("backend.app.services.generate_answer", bad_request)
+    checkpoint = create_checkpoint(
+        session_id="session-hard",
+        run_id="run-hard",
+        objective="Answer",
+        source_sha="e" * 40,
+        state="EXECUTING",
+        cfg=cfg,
+    )
+
+    result = answer_question(
+        "What does source lineage require?",
+        cfg=cfg,
+        persist=False,
+        checkpoint_id=checkpoint["checkpoint_id"],
+        provider_operation_key="answer:hard",
+        failover_policy=FailoverPolicy(max_attempts_per_provider=1, backoff_seconds=()),
+    )
+
+    assert result["status"] == "ERROR_MODEL_PROVIDER_CALL_FAILED"
+    assert len(result["model_attempts"]) == 1
+    assert get_checkpoint(checkpoint["checkpoint_id"], cfg)["state"] == "EXECUTING"
+
+
+def test_multi_provider_failover_suppresses_partial_live_streaming(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    monkeypatch.setattr(
+        "backend.app.services.plan_model_route",
+        lambda **kwargs: _failover_route("openai_compatible_local", "mock"),
+    )
+    seen_callbacks: list[object] = []
+
+    def scripted(*args, model_provider=None, on_text_delta=None, **kwargs):
+        seen_callbacks.append(on_text_delta)
+        if model_provider == "openai_compatible_local":
+            raise ModelProviderError("ERROR_LOCAL_MODEL_UNAVAILABLE", "local server down")
+        return {
+            "model_provider": "mock",
+            "model_name": "mock-model",
+            "answer": "Source lineage requires chunk_a.",
+            "cited_chunk_ids": ["chunk_a"],
+        }
+
+    monkeypatch.setattr("backend.app.services.generate_answer", scripted)
+    deltas: list[str] = []
+
+    result = answer_question(
+        "What does source lineage require?",
+        allow_mock_fallback=True,
+        cfg=cfg,
+        persist=False,
+        on_text_delta=deltas.append,
+        failover_policy=FailoverPolicy(max_attempts_per_provider=1, backoff_seconds=()),
+    )
+
+    assert seen_callbacks == [None, None]
+    assert deltas == []
+    assert result["model_failover_streaming_suppressed"] is True
+    assert result["model_failed_over"] is True
+
+
+def test_single_provider_path_preserves_live_stream_callback(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    monkeypatch.setattr(
+        "backend.app.services.plan_model_route",
+        lambda **kwargs: _failover_route("openai_compatible_local"),
+    )
+
+    def local_success(*args, on_text_delta=None, **kwargs):
+        assert on_text_delta is not None
+        on_text_delta("delta")
+        return {
+            "model_provider": "openai_compatible_local",
+            "model_name": "local-model",
+            "answer": "Source lineage requires chunk_a.",
+            "cited_chunk_ids": ["chunk_a"],
+            "streamed": True,
+        }
+
+    monkeypatch.setattr("backend.app.services.generate_answer", local_success)
+    deltas: list[str] = []
+
+    result = answer_question(
+        "What does source lineage require?",
+        cfg=cfg,
+        persist=False,
+        on_text_delta=deltas.append,
+    )
+
+    assert deltas == ["delta"]
+    assert result["model_failover_streaming_suppressed"] is False
+    assert result["answer_streamed"] is True
+
+
 def test_answer_trace_records_stage_timings(tmp_path: Path):
     cfg = make_settings(tmp_path)
     seed_chunks(cfg)
@@ -256,3 +526,30 @@ def test_answer_trace_records_stage_timings(tmp_path: Path):
     assert timings["model_first_token_ms"] == timings["model_ms"]
     assert result["answer_streamed"] is False
 
+
+def test_single_provider_retry_never_repeats_streamed_text(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    seed_chunks(cfg)
+    monkeypatch.setattr("backend.app.services.plan_model_route", lambda **kwargs: _failover_route("anthropic"))
+    calls: list[int] = []
+
+    def drops_mid_stream(*args, on_text_delta=None, **kwargs):
+        calls.append(1)
+        on_text_delta("Partial answer ")
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_TIMEOUT", "stream timed out")
+
+    monkeypatch.setattr("backend.app.services.generate_answer", drops_mid_stream)
+    deltas: list[str] = []
+
+    result = answer_question(
+        "What does source lineage require?",
+        cfg=cfg,
+        persist=False,
+        on_text_delta=deltas.append,
+        failover_policy=FailoverPolicy(max_attempts_per_provider=2, backoff_seconds=()),
+    )
+
+    assert calls == [1]
+    assert deltas == ["Partial answer "]
+    assert result["status"] == "ERROR_MODEL_PROVIDER_TIMEOUT"
+    assert [attempt["status"] for attempt in result["model_attempts"]] == ["ERROR_MODEL_PROVIDER_TIMEOUT"]
