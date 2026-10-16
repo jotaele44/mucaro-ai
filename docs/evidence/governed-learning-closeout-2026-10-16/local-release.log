@@ -1,0 +1,41 @@
+RUN git ls-files
+RUN git status --short
+RUN /workspace/scratch/44be610f3be9/venv/bin/python -m pytest backend/tests -q
+RUN /workspace/scratch/44be610f3be9/venv/bin/python scripts/certify_answer_trace_quality.py
+RUN /workspace/scratch/44be610f3be9/venv/bin/python scripts/certify_operator_workflow.py
+RUN /workspace/scratch/44be610f3be9/venv/bin/python scripts/evaluate_retrieval.py
+RUN /workspace/scratch/44be610f3be9/venv/bin/python scripts/certify_retrieval_quality.py
+RUN /workspace/scratch/44be610f3be9/venv/bin/python scripts/certify_gis_quality.py
+RUN /workspace/scratch/44be610f3be9/venv/bin/python scripts/evaluate_retrieval.py --fixture backend/tests/fixtures/retrieval_eval_large.json
+RUN /workspace/scratch/44be610f3be9/venv/bin/python scripts/validate_json.py
+RUN /workspace/scratch/44be610f3be9/venv/bin/python scripts/mucaro.py flagpole inventory verify --require-clean --format text
+RUN /workspace/scratch/44be610f3be9/venv/bin/python scripts/package_desktop.py --self-test
+RUN /workspace/scratch/44be610f3be9/venv/bin/python scripts/mucaro.py package build --format json
+RUN /workspace/scratch/44be610f3be9/venv/bin/python scripts/mucaro.py package verify /workspace/scratch/44be610f3be9/mucaro-ai/data/exports/packages/mucaro-ai-0.1.23-f0c18f390f8b-artifact-manifest.json --require-current-head --format json
+RUN /workspace/scratch/44be610f3be9/venv/bin/python -m pip_audit -r backend/requirements.txt --progress-spinner off
+RUN /workspace/scratch/44be610f3be9/venv/bin/python -m pip_audit -r packaging/runtime/requirements-macos-x86_64.lock --no-deps --disable-pip --strict --progress-spinner off
+RUN npm audit --audit-level=moderate
+RUN npm run build
+PASS worktree_clean clean
+PASS prior_name_residue none
+PASS secret_pattern_scan none
+PASS large_file_scan <= 1000000 bytes except bounded allowlist
+PASS generated_artifact_scan none
+PASS python_tests 1296 passed, 448 warnings in 83.13s (0:01:23)
+PASS answer_trace_quality ANSWER_TRACE_QUALITY_CERT_OK
+PASS operator_workflow PASS tool_approval_execution_audit events=TOOL_CALL_REQUESTED,TOOL_CALL_APPROVED,TOOL_CALL_STARTED,TOOL_CALL_EXECUTED
+PASS retrieval_eval RETRIEVAL_EVAL_OK
+PASS retrieval_quality RETRIEVAL_QUALITY_CERT_OK
+PASS gis_quality PASS raster_d8_flow raster_d8_missing_complete_neighborhood_fails_closed observed=ERROR_GIS_D8_NO_COMPLETE_NEIGHBORHOOD expected=ERROR_GIS_D8_NO_COMPLETE_NEIGHBORHOOD
+PASS retrieval_eval_large RETRIEVAL_EVAL_OK
+PASS json_validation JSON_OK checked=38
+PASS flagpole_inventory FLAGPOLE_INVENTORY_OK
+PASS desktop_package_self_test DESKTOP_PACKAGE_READY
+PASS package_artifact manifest_member_count=563
+PASS package_artifact_verify manifest_member_count=563
+PASS python_audit No known vulnerabilities found
+PASS python_runtime_lock_audit No known vulnerabilities found
+PASS npm_audit found 0 vulnerabilities
+PASS frontend_build ✓ built in 1.30s
+RELEASE_RECEIPT data/exports/release_receipts/local_release-f0c18f390f8b.json
+CERTIFY_RELEASE_OK
