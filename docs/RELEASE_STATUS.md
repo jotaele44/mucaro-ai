@@ -14,11 +14,11 @@ Requirement denominator: 139 (arithmetic closes: yes).
 
 | State | Requirements |
 | --- | ---: |
-| PASS | 55 |
+| PASS | 58 |
 | FAIL | 0 |
-| OPEN | 49 |
+| OPEN | 47 |
 | BLOCKED | 7 |
-| PROVISIONAL | 27 |
+| PROVISIONAL | 26 |
 | NOT_APPLICABLE | 1 |
 
 | Terminal-rule condition | Holds |
@@ -38,8 +38,8 @@ Residue:
 - fail (0): none
 - blocked (6): `KERNEL-003`, `MATRIX-018`, `TGT-001`, `TGT-009`, `TGT-026`, `TGT-028`
 - externally blocked (1): `TGT-027`
-- provisional (27): 27 requirements (see `mucaro release scope status`)
-- open (49): 49 requirements (see `mucaro release scope status`)
+- provisional (26): 26 requirements (see `mucaro release scope status`)
+- open (47): 47 requirements (see `mucaro release scope status`)
 - active blockers: `BLK-LLM-001`, `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-SPEC-001`, `BLK-WEB-001`
 - unresolved material contradictions: none
 - open specification bindings: Mucaro AI Release-Grade Workbench Specification
