@@ -8,8 +8,8 @@ from typing import Any
 
 from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
-from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .local_tools import resolve_local_tool
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 
 CODING_LIFECYCLE_SCHEMA_VERSION = "mucaro-coding-lifecycle/1.0"
 PROTECTED_BRANCHES = {"main", "master"}
