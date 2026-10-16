@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -140,6 +141,36 @@ def test_local_model_404_maps_to_not_installed(local_server):
     with pytest.raises(ModelProviderError) as exc:
         generate_answer("q", CHUNK, model_provider="openai_compatible_local", model_name="other:1b")
     assert exc.value.status == "ERROR_LOCAL_MODEL_NOT_INSTALLED"
+
+
+@pytest.mark.parametrize(
+    ("http_code", "expected_status"),
+    [
+        (429, "ERROR_MODEL_PROVIDER_RATE_LIMIT"),
+        (408, "ERROR_MODEL_PROVIDER_TIMEOUT"),
+        (504, "ERROR_MODEL_PROVIDER_TIMEOUT"),
+        (500, "ERROR_LOCAL_MODEL_UNAVAILABLE"),
+        (400, "ERROR_LOCAL_MODEL_HTTP_ERROR"),
+    ],
+)
+def test_local_http_failures_map_to_failover_relevant_statuses(monkeypatch, http_code, expected_status):
+    class FailingOpener:
+        def open(self, *args, **kwargs):
+            raise urllib.error.HTTPError(
+                "http://127.0.0.1:11434/v1/chat/completions",
+                http_code,
+                "boom",
+                {},
+                None,
+            )
+
+    monkeypatch.setenv("MUCARO_AI_LOCAL_MODEL_URL", "http://127.0.0.1:11434/v1")
+    monkeypatch.setattr(model_router, "_local_opener", lambda: FailingOpener())
+
+    with pytest.raises(ModelProviderError) as exc:
+        generate_answer("q", CHUNK, model_provider="openai_compatible_local")
+
+    assert exc.value.status == expected_status
 
 
 def test_answer_pipeline_with_local_model_produces_a_valid_trace(local_server, cfg):
@@ -308,7 +339,7 @@ def test_offline_manifest_reports_a_missing_remote_sdk(monkeypatch):
         {"name": "mock", "description": "local", "locality": "local", "status": "MODEL_PROVIDER_READY",
          "optional_dependency": None, "dependency_available": None},
     ]
-    monkeypatch.setattr(offline, "list_model_providers", lambda: providers)
+    monkeypatch.setattr(offline, "list_model_providers", lambda *_args, **_kwargs: providers)
     manifest = build_offline_manifest()
     rows = {row["capability"]: row for row in manifest["capabilities"]}
     assert rows["model:anthropic"]["state_now"] == "LOCAL_DEPENDENCY_MISSING"

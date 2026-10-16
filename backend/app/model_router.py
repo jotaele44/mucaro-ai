@@ -13,7 +13,9 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
+from .config import Settings, settings
 from .injection_guard import neutralize_fence
+from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
 
 
 class ModelProviderError(RuntimeError):
@@ -105,6 +107,25 @@ _EFFORT_MODEL_PREFIXES = (
 _ANTHROPIC_CLIENT: dict[str, Any] = {}
 
 
+def classify_provider_exception(exc: BaseException) -> ModelProviderError:
+    """Map optional SDK/transport failures into stable, non-secret-bearing statuses."""
+    if isinstance(exc, ModelProviderError):
+        return exc
+    name = type(exc).__name__
+    code = getattr(exc, "status_code", None)
+    code = code if isinstance(code, int) else None
+    detail = name if code is None else f"{name} HTTP {code}"
+    if name == "RateLimitError" or code == 429:
+        return ModelProviderError("ERROR_MODEL_PROVIDER_RATE_LIMIT", detail)
+    if isinstance(exc, TimeoutError) or name in {"APITimeoutError", "Timeout", "ReadTimeout", "ConnectTimeout"}:
+        return ModelProviderError("ERROR_MODEL_PROVIDER_TIMEOUT", detail)
+    if name in {"APIConnectionError", "InternalServerError", "ServiceUnavailableError", "OverloadedError"} or (
+        code is not None and code >= 500
+    ):
+        return ModelProviderError("ERROR_MODEL_PROVIDER_UNAVAILABLE", detail)
+    return ModelProviderError("ERROR_MODEL_PROVIDER_CALL_FAILED", detail)
+
+
 def normalize_model_provider(model_provider: str | None) -> str:
     provider = (model_provider or "mock").strip().lower()
     if not provider:
@@ -120,16 +141,16 @@ def get_model_provider_spec(model_provider: str | None) -> ModelProviderSpec:
         raise ModelProviderError("ERROR_UNSUPPORTED_MODEL_PROVIDER", provider) from exc
 
 
-def list_model_providers() -> list[dict[str, Any]]:
-    return [_provider_status(spec) for spec in MODEL_PROVIDER_SPECS.values()]
+def list_model_providers(cfg: Settings = settings) -> list[dict[str, Any]]:
+    return [_provider_status(spec, cfg) for spec in MODEL_PROVIDER_SPECS.values()]
 
 
 def model_provider_names() -> tuple[str, ...]:
     return tuple(MODEL_PROVIDER_SPECS)
 
 
-def model_provider_status(model_provider: str | None = None) -> dict[str, Any]:
-    return _provider_status(get_model_provider_spec(model_provider))
+def model_provider_status(model_provider: str | None = None, cfg: Settings = settings) -> dict[str, Any]:
+    return _provider_status(get_model_provider_spec(model_provider), cfg)
 
 
 def local_model_settings() -> dict[str, Any]:
@@ -175,7 +196,7 @@ def _probe_local_server(base_url: str, model: str) -> dict[str, Any]:
     return result
 
 
-def _provider_status(spec: ModelProviderSpec) -> dict[str, Any]:
+def _provider_status(spec: ModelProviderSpec, cfg: Settings) -> dict[str, Any]:
     live_mode_enabled = os.getenv("MUCARO_AI_LIVE_MODE") == "1"
     api_key_configured = bool(os.getenv(spec.api_key_env)) if spec.api_key_env else None
     dependency_available = (
@@ -204,14 +225,29 @@ def _provider_status(spec: ModelProviderSpec) -> dict[str, Any]:
             status = "MODEL_PROVIDER_NOT_READY"
             warnings.append("LOCAL_MODEL_URL_NOT_LOOPBACK")
         else:
-            probe = _probe_local_server(local_cfg["base_url"], local_cfg["model"])
-            local.update({"reachable": probe["reachable"], "installed_models": probe["models"][:50]})
-            if not probe["reachable"]:
+            try:
+                require_permission(
+                    PermissionRequest(
+                        capability="model.invoke",
+                        subject="model_router.provider_status:openai_compatible_local",
+                        target=spec.name,
+                        origin="operator",
+                    ),
+                    cfg=cfg,
+                )
+            except PermissionEngineError as exc:
                 status = "MODEL_PROVIDER_NOT_READY"
-                warnings.append("LOCAL_MODEL_SERVER_UNREACHABLE")
-            elif not probe["model_installed"]:
-                status = "MODEL_PROVIDER_NOT_READY"
-                warnings.append(f"LOCAL_MODEL_NOT_INSTALLED:{local_cfg['model']}")
+                warnings.append(f"MODEL_INVOKE_PERMISSION:{exc.status}")
+                local.update({"reachable": None, "installed_models": []})
+            else:
+                probe = _probe_local_server(local_cfg["base_url"], local_cfg["model"])
+                local.update({"reachable": probe["reachable"], "installed_models": probe["models"][:50]})
+                if not probe["reachable"]:
+                    status = "MODEL_PROVIDER_NOT_READY"
+                    warnings.append("LOCAL_MODEL_SERVER_UNREACHABLE")
+                elif not probe["model_installed"]:
+                    status = "MODEL_PROVIDER_NOT_READY"
+                    warnings.append(f"LOCAL_MODEL_NOT_INSTALLED:{local_cfg['model']}")
     return {
         "locality": spec.locality,
         "modalities": list(spec.modalities),
@@ -243,9 +279,11 @@ def generate_answer(
     conversation_context: list[dict[str, Any]] | None = None,
     memory_context: list[dict[str, Any]] | None = None,
     on_text_delta: Callable[[str], None] | None = None,
+    cfg: Settings = settings,
 ) -> dict[str, Any]:
     spec = get_model_provider_spec(model_provider)
     if spec.name == LOCAL_PROVIDER:
+        _require_model_invoke(spec, cfg)
         return _local_answer(
             query,
             retrieved_chunks,
@@ -282,6 +320,7 @@ def generate_answer(
             conversation_context=conversation_context or [],
             memory_context=memory_context or [],
         )
+    _require_model_invoke(spec, cfg)
     return _anthropic_answer(
         query,
         retrieved_chunks,
@@ -291,6 +330,21 @@ def generate_answer(
         memory_context=memory_context or [],
         on_text_delta=on_text_delta,
     )
+
+
+def _require_model_invoke(spec: ModelProviderSpec, cfg: Settings) -> None:
+    try:
+        require_permission(
+            PermissionRequest(
+                capability="model.invoke",
+                subject=f"model_router.generate_answer:{spec.name}",
+                target=spec.name,
+                origin="operator",
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise ModelProviderError(exc.status, exc.detail) from exc
 
 
 def _fallback_or_error(
@@ -465,7 +519,12 @@ def _anthropic_answer(
             final = stream.get_final_message()
     except sdk.APIError as exc:
         raise _anthropic_error(sdk, exc) from exc
+    except Exception as exc:
+        # Anything else the SDK or its transport raises still maps to a stable status for failover.
+        raise classify_provider_exception(exc) from exc
     text = "\n".join(block.text for block in final.content if getattr(block, "type", None) == "text")
+    if not text.strip():
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_MALFORMED_RESPONSE", "provider returned no text content")
     cited = [c["chunk_id"] for c in retrieved_chunks if c["chunk_id"] in text]
     return {
         "model_provider": "anthropic",
@@ -555,7 +614,16 @@ def _local_answer(
                 payload = json.loads(response.read(4_000_000).decode("utf-8", errors="replace"))
                 parts.append(str(((payload.get("choices") or [{}])[0].get("message") or {}).get("content") or ""))
     except urllib.error.HTTPError as exc:
-        status = "ERROR_LOCAL_MODEL_NOT_INSTALLED" if exc.code == 404 else "ERROR_LOCAL_MODEL_HTTP_ERROR"
+        if exc.code == 404:
+            status = "ERROR_LOCAL_MODEL_NOT_INSTALLED"
+        elif exc.code == 429:
+            status = "ERROR_MODEL_PROVIDER_RATE_LIMIT"
+        elif exc.code in {408, 504}:
+            status = "ERROR_MODEL_PROVIDER_TIMEOUT"
+        elif exc.code >= 500:
+            status = "ERROR_LOCAL_MODEL_UNAVAILABLE"
+        else:
+            status = "ERROR_LOCAL_MODEL_HTTP_ERROR"
         raise ModelProviderError(status, f"Local model server returned HTTP {exc.code} for model {model}.") from exc
     except (urllib.error.URLError, OSError) as exc:
         raise ModelProviderError("ERROR_LOCAL_MODEL_UNAVAILABLE", f"Local model server unreachable at {base_url}: {exc}") from exc
