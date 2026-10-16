@@ -8,8 +8,8 @@ from typing import Any
 from .coding_patch import validate_patch_proposal
 from .coding_workspace import inspect_repository, resolve_repository
 from .config import Settings, settings
-from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .local_tools import resolve_local_tool
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .permissions import is_within_path
 
 CODING_MUTATION_SCHEMA_VERSION = "mucaro-coding-mutation/1.0"
