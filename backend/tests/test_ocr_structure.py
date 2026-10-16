@@ -70,6 +70,59 @@ def test_multicolumn_geometry_closes_span_accounting() -> None:
     assert all(result["invariants"].values())
 
 
+def test_multicolumn_splits_engine_line_when_columns_share_one_tesseract_line() -> None:
+    spans = [
+        span(0, "LEFTALPHA", x=120, y=140, width=310, height=41, block=1, line=1, word=1),
+        span(1, "RIGHTALPHA", x=1050, y=150, width=340, height=41, block=1, line=1, word=2),
+        span(2, "LEFTBETA", x=120, y=300, width=280, height=41, block=1, line=2, word=1),
+        span(3, "RIGHTBETA", x=1050, y=310, width=310, height=41, block=1, line=2, word=2),
+        span(4, "LEFTGAMMA", x=120, y=460, width=330, height=41, block=1, line=3, word=1),
+        span(5, "RIGHTGAMMA", x=1050, y=470, width=360, height=41, block=1, line=3, word=2),
+    ]
+
+    result = reconstruct_multicolumn(spans)
+
+    assert result["status"] == "OCR_MULTI_COLUMN_OK"
+    assert result["column_count"] == 2
+    assert result["columns"][0]["raw_lines"] == ["LEFTALPHA", "LEFTBETA", "LEFTGAMMA"]
+    assert result["columns"][1]["raw_lines"] == ["RIGHTALPHA", "RIGHTBETA", "RIGHTGAMMA"]
+    assert result["reading_order_span_indices"] == [0, 2, 4, 1, 3, 5]
+    assert result["invariants"]["all_input_spans_classified"] is True
+    assert result["invariants"]["span_assignment_unique"] is True
+
+
+def test_multicolumn_does_not_split_normal_multiword_line() -> None:
+    spans = [
+        span(0, "Left", x=50, y=50, width=80, block=1, line=1, word=1),
+        span(1, "one", x=150, y=50, width=70, block=1, line=1, word=2),
+        span(2, "Left", x=50, y=120, width=80, block=1, line=2, word=1),
+        span(3, "two", x=150, y=120, width=70, block=1, line=2, word=2),
+        span(4, "Right", x=500, y=55, width=90, block=2, line=1, word=1),
+        span(5, "one", x=610, y=55, width=70, block=2, line=1, word=2),
+        span(6, "Right", x=500, y=125, width=90, block=2, line=2, word=1),
+        span(7, "two", x=610, y=125, width=70, block=2, line=2, word=2),
+    ]
+
+    result = reconstruct_multicolumn(spans)
+
+    assert result["status"] == "OCR_MULTI_COLUMN_OK"
+    assert result["columns"][0]["raw_lines"] == ["Left one", "Left two"]
+    assert result["columns"][1]["raw_lines"] == ["Right one", "Right two"]
+
+
+def test_single_wide_gapped_row_still_cannot_synthesize_multicolumn() -> None:
+    spans = [
+        span(0, "LEFT", x=50, y=50, width=100, block=1, line=1, word=1),
+        span(1, "RIGHT", x=700, y=50, width=120, block=1, line=1, word=2),
+    ]
+
+    result = reconstruct_multicolumn(spans)
+
+    assert result["status"] == "OCR_STRUCTURE_UNRESOLVED"
+    assert "INSUFFICIENT_LINE_DENOMINATOR" in result["residue"]
+    assert result["invariants"]["semantic_structure_claimed"] is False
+
+
 def test_single_column_does_not_synthesize_multicolumn() -> None:
     spans = [
         span(0, "One", x=50, y=50, width=180, block=1, line=1),
