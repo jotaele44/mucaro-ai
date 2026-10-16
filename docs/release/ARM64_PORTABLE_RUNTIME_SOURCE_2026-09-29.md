@@ -1,6 +1,6 @@
 # Native arm64 portable-runtime source candidate — 2026-09-29
 
-**State:** CANDIDATE_NOT_IDENTITY  
+**State:** SOURCE_AND_LOCK_IDENTITY_VERIFIED  
 **Retrieval UTC:** 2026-09-29T22:04:11Z  
 **Release target:** native Apple Silicon / arm64 portable embedded-runtime lane  
 **Binding decision:** `docs/RELEASE_SCOPE_2026-09-29.md` requires a native arm64 embedded runtime. Intel/x86_64 evidence is compatibility evidence only.
@@ -97,53 +97,44 @@ explicit `--output-dir` remains authoritative and runtime identity continues
 to be established by frozen source bytes, manifest target fields, dependency
 lock, runtime probe, and tree receipt.
 
+## Executed source/lock closure — 2026-10-16
+
+Exact-head hosted certification independently retrieved the frozen `20260901`
+arm64 asset and reproduced the source/lock evidence twice.
+
+- archive bytes: `25293188`
+- archive SHA-256: `b9054a9d3d54f4cb5573d44907fddb29874b08909bde73f29f2868cf872223ee`
+- archive root: `python`
+- members: `1654`
+- regular files: `1646`
+- symlinks: `8`
+- total regular bytes: `65443266`
+- logical-members SHA-256: `74f3a0af3f4b7d02ed1dec4713ffa2a65c9fac11c7bab3bf95a23235af4ec859`
+- payload-multiset SHA-256: `fa7a654dc80b75c13ed842026b97035e7e52eadc4aeea7a262bfdcc91e6978c0`
+- dependency lock: `packaging/runtime/requirements-macos-arm64.lock`
+- lock bytes: `44071`
+- lock SHA-256: `cf7cea35480de5f416b4cf960ec0892954b97c7111e1665a40daa49b4f4fa457`
+- resolver: `uv==0.10.0`, Python 3.13, `aarch64-apple-darwin`,
+  wheel-only, hashes, `MACOSX_DEPLOYMENT_TARGET=14.0`
+
+The initial resolver attempt at uv's default Darwin 13.0 floor correctly
+rejected `pyproj==3.7.2`. The rerun used the already-declared Mucaro minimum
+macOS 14.0 and changed no project dependency version.
+
+`packaging/runtime/macos-arm64.json` now binds the independently observed
+geometry/hashes and dedicated arm64 lock.
+
 ## What remains OPEN
 
-1. **Independent archive-byte retrieval.** Re-download the upstream asset on a
-   permitted execution surface and require observed byte count and SHA-256 to
-   equal the frozen metadata above. The connected GitHub metadata surface can
-   enumerate the asset but does not expose binary release-asset download; the
-   available public-web transport returned an unusable signed release-asset
-   redirect, so no candidate bytes were obtained in this session.
-2. **Archive logical geometry.** Compute and freeze:
-   - member count;
-   - regular-file count;
-   - symlink count;
-   - total uncompressed regular bytes;
-   - archive root;
-   - regular-file modes inside the logical-member identity;
-   - path-sensitive logical-member SHA-256;
-   - path-insensitive payload-multiset SHA-256;
-   - safe symlink-target closure.
-   Do not copy the x86_64 archive-policy counts or treat the standalone
-   inspection safety ceilings as observed arm64 geometry.
-3. **Dedicated portable dependency lock.** An off-branch generation attempt on
-   2026-09-29 with uv 0.10.0 could not reach PyPI because the execution
-   environment had no DNS; no lock file was produced and no dependency
-   incompatibility was observed. Generate
-   `packaging/runtime/requirements-macos-arm64.lock` from the current
-   `pyproject.toml` for **Python 3.13 + aarch64-apple-darwin + wheel-only +
-   hashes**. The existing `packaging/macos/requirements-macos-arm64.lock` is
-   NONCOMPARABLE for this purpose because it was resolved for Python 3.11 and
-   includes native-app build dependencies such as PyInstaller and pywebview.
-4. **Manifest promotion.** Only after items 1–3 close, create
-   `packaging/runtime/macos-arm64.json` using independently observed archive
-   geometry and the dedicated portable lock.
-5. **Materialization.** Execute the normal portable-runtime materializer on an
-   Apple-Silicon runner and require:
-   - exact source bytes/hash;
-   - exact archive geometry;
-   - locked-distribution installation;
-   - required imports;
-   - `platform=darwin`;
-   - `machine=arm64`;
-   - `python_version=3.13.15`;
-   - no host user-site leakage;
-   - frozen runtime tree hash and provenance receipt.
-6. **Packaged lifecycle.** Build the portable app from that verified runtime and
+1. **Apple-Silicon materialization.** Execute the normal portable-runtime
+   materializer on an Apple-Silicon macOS 14+ runner and require exact source
+   bytes/hash, archive identity, locked-distribution installation, required
+   imports, `platform=darwin`, `machine=arm64`, Python 3.13.15, no host
+   user-site leakage, and a frozen runtime-tree/provenance receipt.
+2. **Packaged lifecycle.** Build the portable app from that verified runtime and
    execute install, launch, representative workflow, post-launch bundle
    immutability, distinct-version rollback and reinstall on Apple Silicon.
-7. **Separate gates.** Clean-host execution, physical-input evidence,
+3. **Separate gates.** Clean-host execution, physical-input evidence,
    Developer ID signing and notarization remain independent.
 
 ## Falsification rules
@@ -163,7 +154,8 @@ The candidate must fail closed if any of the following occurs:
 
 ## Certification boundary
 
-This record closes **source discovery and authoritative asset metadata binding
-only**. It does not certify BYTE identity, archive logical identity, dependency
-closure, runtime materialization, Apple-Silicon execution, clean-host
-execution, signing, notarization, or the release lane.
+This record now closes source discovery, independent BYTE identity, archive
+logical identity, and the dedicated arm64 dependency-lock/manifest boundary.
+It does not certify runtime materialization, Apple-Silicon runtime execution,
+the packaged lifecycle, clean-host execution, physical input, signing,
+notarization, or the release lane.
