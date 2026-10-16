@@ -66,7 +66,7 @@ class LeasedAgentQueue:
             if not row:
                 raise WorkerGateError("JOB_NOT_FOUND")
             state, until, fence, attempts, limit, cancelled, run, phase, inp, policy = row
-            if cancelled or state in ("SUCCEEDED","FAILED","CANCELLED"):
+            if cancelled or state in ("SUCCEEDED","FAILED","CANCELLED","BLOCKED"):
                 self.db.execute("COMMIT")
                 return None
             if not permitted:
