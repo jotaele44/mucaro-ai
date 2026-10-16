@@ -832,20 +832,23 @@
       "requirement_id": "INV-020",
       "requirement_text": "Citation integrity",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/citations.py",
         "backend/app/answer_trace_eval.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+      "negative_gate": "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+        "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N09",
-      "notes": "Structural citation checks exist; claim-level faithfulness absent."
+      "notes": "PASS: RT-10 v1.2 executed 80 frozen queries / 72 expected bindings with citation_correctness=1.0, citation_completeness=1.0, faithfulness=1.0 and unsupported_source_claim_rate=0.0. Structural citation falsification remains covered by existing citation/answer-trace tests. This proves citation integrity for the declared local hybrid retrieval + deterministic mock citation path; remote-model quality remains separately gated."
     },
     {
       "requirement_id": "INV-021",
@@ -1127,20 +1130,23 @@
       "requirement_id": "TGT-011",
       "requirement_text": "Retrieval-augmented generation",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/retrieval.py",
         "backend/app/retrieval_eval.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+      "negative_gate": "backend/tests/test_retrieval_scale_benchmark.py::test_rt10_negative_control_detects_false_no_context",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+        "backend/tests/test_retrieval_scale_benchmark.py::test_rt10_negative_control_detects_false_no_context"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N09",
-      "notes": "Faithfulness/unsupported-claim metrics absent."
+      "notes": "PASS: RT-09 supplies real-world authoritative-source retrieval provenance; RT-10 v1.2 supplies the frozen production-scale local-workstation proxy. Run 36643492834 / job 117130186355 certified 10,000 chunks and 80 queries with expected_source_hit_rate=1.0, expected_binding_recall=1.0, ambiguous_full_hit_rate=1.0, negative_query_accuracy=1.0, faithfulness=1.0, unsupported_source_claim_rate=0.0, p95=375.912 ms, throughput=3.233 qps, peak RSS=72.637 MiB, and zero threshold failures. Remote-model quality remains an independent live-provider gate."
     },
     {
       "requirement_id": "TGT-012",
@@ -1860,7 +1866,7 @@
       "requirement_id": "MATRIX-007",
       "requirement_text": "Retrieval benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/retrieval_eval.py",
         "_architecture/retrieval_real_world_corpus_v1.json",
@@ -1868,18 +1874,20 @@
         ".github/workflows/rt09-real-world-cert.yml"
       ],
       "dependencies": [],
-      "positive_gate": ".github/workflows/rt09-real-world-cert.yml",
-      "negative_gate": null,
+      "positive_gate": "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+      "negative_gate": "backend/tests/test_retrieval_scale_benchmark.py::test_rt10_threshold_falsification_is_detected",
       "benchmark": null,
       "evidence_refs": [
         "_architecture/retrieval_real_world_corpus_v1.json",
         "scripts/certify_retrieval_real_world_live.py",
-        "_architecture/mucaro_v1_denominator_events.json"
+        "_architecture/mucaro_v1_denominator_events.json",
+        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+        "backend/tests/test_retrieval_scale_benchmark.py::test_rt10_threshold_falsification_is_detected"
       ],
-      "state": "PROVISIONAL",
-      "blocker_id": "BLK-ACTIONS-001",
+      "state": "PASS",
+      "blocker_id": null,
       "dag_node": "N09",
-      "notes": "PR #127 merged a frozen 24-document IETF/W3C/NIST real-world corpus lane. Run 36382763249 passed with 24/24 source-bound queries hitting expected sources in top-5, 3 parser formats, 8,277,197 source bytes and 4,933 chunks; artifact 10952734875 digest sha256:1eb4198e783fbaa84ae60610c7048d6e889c077aaf59aa70c7db29cebd4badac. MATRIX-007 remains PROVISIONAL because its crosswalk also includes RT-10 production-scale stress/scalability, which is not closed by this corpus. PR #138 v1.2 is frozen at 81b7a2d1128f4c20331b2ef46ce7ac9b4f7eced7. Exact-head RT-10, normal CI, and macOS jobs terminate with zero executed steps; unrelated repository workflows reproduce the same condition. MATRIX-007 remains PROVISIONAL and N09 is BLOCKED on BLK-ACTIONS-001 until runner admission executes the frozen lane."
+      "notes": "PASS: RT-09 real-world corpus evidence remains bound (24/24 source-bound queries hit expected sources in top-5; 8,277,197 source bytes; 4,933 chunks). RT-10 v1.2 was executed on 2026-10-16 via run 36643492834 / job 117130186355 and returned RT10_SCALE_CERT_PASS with zero threshold failures on 10,000 chunks and 80 queries. The workflow tested GitHub merge commit b51b30f120b1914235353dbebb289a4729bc1258 rather than literal PR commit 81b7a2d1128f4c20331b2ef46ce7ac9b4f7eced7, but both commits have identical tree 006c2d2e2e7e29a6f904bb7de4599734d3f1d326 and zero file differences; evidence is classified SOURCE_TREE_EQUIVALENT_EXECUTION, not literal commit identity."
     },
     {
       "requirement_id": "MATRIX-008",
