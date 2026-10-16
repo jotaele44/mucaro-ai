@@ -1323,17 +1323,26 @@
       "requirement_id": "TGT-020",
       "requirement_text": "Performance",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "scripts/bench_latency.py",
+        "backend/app/performance_benchmark.py",
+        "scripts/certify_performance.py",
+        ".github/workflows/performance-cert.yml"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "positive_gate": ".github/workflows/performance-cert.yml",
+      "negative_gate": "backend/tests/test_performance_benchmark.py::test_matrix017_threshold_falsification_is_detected",
+      "benchmark": "_architecture/performance_benchmark_v1.json",
+      "evidence_refs": [
+        "_architecture/release/evidence/matrix017_performance_execution_20261016.json",
+        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+        "_architecture/performance_benchmark_v1.json"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N21",
-      "notes": "No frozen performance thresholds."
+      "notes": "PASS within declared release claims: RT-10 freezes retrieval-scale performance at 10,000 chunks, and MATRIX-017 run 38972805642 freezes the real work-run/event-stream path on hosted macOS arm64 with 20/20 completed, zero errors, p95 first-word 37.5 ms and p95 total 44.6 ms against pre-execution ceilings of 5,000/10,000 ms. This is bounded local/mock evidence; remote-model latency is not claimed."
     },
     {
       "requirement_id": "TGT-021",
@@ -2093,17 +2102,27 @@
       "requirement_id": "MATRIX-017",
       "requirement_text": "Performance benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "ABSENT",
-      "implementation_refs": [],
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "_architecture/performance_benchmark_v1.json",
+        "backend/app/performance_benchmark.py",
+        "backend/tests/test_performance_benchmark.py",
+        "scripts/certify_performance.py",
+        ".github/workflows/performance-cert.yml"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "positive_gate": ".github/workflows/performance-cert.yml",
+      "negative_gate": "backend/tests/test_performance_benchmark.py::test_matrix017_threshold_falsification_is_detected",
+      "benchmark": "_architecture/performance_benchmark_v1.json",
+      "evidence_refs": [
+        "_architecture/performance_benchmark_v1.json",
+        "_architecture/release/evidence/matrix017_performance_execution_20261016.json",
+        ".github/workflows/performance-cert.yml"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N21",
-      "notes": ""
+      "notes": "PASS: frozen benchmark mucaro-matrix017-workrun-v1 executed on exact head 7674ffcf66131a37c6d1574a0aa6cc916e1fd7e8 via run 38972805642 on Darwin/arm64/Python 3.11.9. 20/20 work runs completed with zero errors; p95 first-word 37.5 ms <= 5,000 ms and p95 total 44.6 ms <= 10,000 ms; threshold_failures=[]; receipt sha256 6587d7a4d061b29c43959c9cf530efaf350c9b967e4935b94b5ed5bf4c8468a5."
     },
     {
       "requirement_id": "MATRIX-018",

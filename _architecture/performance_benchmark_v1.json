@@ -1,0 +1,46 @@
+{
+  "schema_version": "MUCARO_MATRIX017_PERFORMANCE/1.0",
+  "benchmark_id": "mucaro-matrix017-workrun-v1",
+  "purpose": "Bounded release-regression benchmark for the real conversation work-run and event-stream path on the supported hosted Apple Silicon profile.",
+  "profile": {
+    "runner": "macos-14",
+    "required_os": "Darwin",
+    "required_machine": "arm64",
+    "python_version": "3.11",
+    "provider": "mock"
+  },
+  "workload": {
+    "runs": 20,
+    "questions": [
+      "How does source lineage work?",
+      "What is Mucaro AI?",
+      "How are answers cited?"
+    ],
+    "corpus": "data/input",
+    "path": "submit_message -> stream_run_events -> text_delta -> end"
+  },
+  "thresholds": {
+    "min_completed_rate": 1,
+    "max_error_count": 0,
+    "max_p95_first_word_ms": 5000,
+    "max_p95_total_ms": 10000
+  },
+  "measurement": {
+    "clock": "time.perf_counter",
+    "p95_method": "nearest-rank",
+    "data_directory": "throwaway temporary directory",
+    "warmup_runs": 0
+  },
+  "claim_boundary": [
+    "This is a release-regression ceiling for the deterministic local mock provider, not a universal latency or remote-model claim.",
+    "The benchmark exercises the same work-run and event-stream path used by the app.",
+    "Results are valid only for the exact source SHA, runner/runtime manifestation and workload recorded in the receipt.",
+    "Threshold changes after first execution require a versioned benchmark revision and justification."
+  ],
+  "threshold_basis": [
+    "These are broad fail-closed release-regression ceilings, not a user-facing latency promise.",
+    "The existing RT-10 retrieval benchmark already uses a 5000 ms p95 ceiling for a materially heavier 10000-chunk retrieval proxy.",
+    "The 10000 ms end-to-end ceiling allows non-retrieval work-run/event-stream overhead while still detecting order-of-magnitude regressions.",
+    "Thresholds were frozen before the first MATRIX-017 execution; any post-execution threshold change requires a new benchmark revision."
+  ]
+}

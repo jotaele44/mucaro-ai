@@ -542,7 +542,7 @@
         "frozen thresholds + recovery benchmark"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "MATRIX-017 PASS: frozen Apple-Silicon work-run performance benchmark run 38972805642 completed 20/20 with zero errors, p95 first-word 37.5 ms and p95 total 44.6 ms under pre-execution ceilings; RT-10 independently covers retrieval-scale performance. TGT-020 and MATRIX-017 are PASS. TGT-019 and MATRIX-016 recovery/offline-transition evidence remain open."
     },
     {
       "node_id": "N22",
