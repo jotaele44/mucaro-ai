@@ -76,7 +76,8 @@ def test_command_file_delegates_to_stage0():
 
 def test_command_file_is_executable_in_git():
     # Finder only runs a .command file with the executable bit; git records it as mode 100755.
-    # Extracted source archives (certify_source_artifact.py) do not restore modes, so check git only.
+    # Git mode remains the source-of-truth for Finder checkout behavior; artifact extraction
+    # separately restores recorded POSIX modes before running launcher checks.
     if shutil.which("git") is None:
         pytest.skip("git not installed")
     proc = subprocess.run(

@@ -8,7 +8,10 @@ from io import BytesIO
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import pytest
+
 from backend.app.config import Settings
+from backend.app.capability_contracts import validate_web_snapshot_contract
 from backend.app.ingestion import get_chunks, get_sources, ingest_web_snapshot
 from backend.app.web_browsing import (
     WebBrowseSessionPolicy,
@@ -152,8 +155,12 @@ def test_fetch_web_snapshot_records_policy_and_bytes(tmp_path: Path):
         server.shutdown()
 
     assert result["status"] == "WEB_FETCH_SNAPSHOT_OK"
+    assert result["snapshot_contract_status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
     snapshot_path = Path(result["snapshot_path"])
     saved = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    contract = validate_web_snapshot_contract(saved, report_path=str(snapshot_path))
+    assert contract["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert contract["counts"]["fail"] == 0
     assert saved["schema_version"] == "mucaro_web_snapshot_v1"
     assert saved["requested_url"] == url
     assert saved["final_url"] == url
@@ -194,6 +201,30 @@ def test_fetch_web_snapshot_records_policy_and_bytes(tmp_path: Path):
     assert ledger["entry_count"] == 1
     assert ledger["entries"][0]["snapshot_id"] == saved["snapshot_id"]
     assert ledger["entries"][0]["snapshot_sha256"] == result["snapshot_sha256"]
+
+
+def test_fetch_web_snapshot_rejects_failed_contract_before_persisting(tmp_path: Path, monkeypatch):
+    cfg = make_settings(tmp_path)
+    server, url = _serve_fixture()
+    monkeypatch.setattr(
+        "backend.app.web_browsing.validate_web_snapshot_contract",
+        lambda _snapshot: {
+            "status": "CAPABILITY_OUTPUT_CONTRACT_FAILED",
+            "failed_checks": [{"name": "fixture_contract_failure"}],
+        },
+    )
+    try:
+        with pytest.raises(WebBrowsingError) as error:
+            fetch_web_snapshot(
+                url,
+                cfg=cfg,
+                policy=WebFetchPolicy(timeout_seconds=5, max_bytes=1000, allow_private_hosts=True),
+            )
+    finally:
+        server.shutdown()
+
+    assert error.value.status == "ERROR_WEB_SNAPSHOT_CONTRACT"
+    assert not list((cfg.export_dir / "web_snapshots").glob("*.json"))
 
 
 def test_ingest_web_snapshot_makes_snapshot_citeable(tmp_path: Path):

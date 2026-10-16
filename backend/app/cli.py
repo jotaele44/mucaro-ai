@@ -16,7 +16,15 @@ from typing import Any, Sequence
 from urllib.parse import urlparse
 
 from .config import Settings, settings
-from .capability_contracts import build_capability_contract_report, validate_gis_report_file, validate_ocr_report_file
+from .capability_contracts import (
+    CapabilityOutputContractError,
+    build_capability_contract_report,
+    validate_gis_report_file,
+    validate_ocr_report_file,
+    validate_pdf_ocr_report_file,
+    validate_retrieval_quality_file,
+    validate_web_snapshot_file,
+)
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -35,6 +43,7 @@ from .conversations import (
     get_conversation,
     list_conversations,
     rename_conversation,
+    update_conversation,
 )
 from .db import list_payloads
 from .execution_gate import analyze_task
@@ -78,6 +87,14 @@ from .gis_eval import (
 )
 from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .ocr_corpus_eval import (
+    DEFAULT_OCR_CORPUS_MANIFEST,
+    OCR_CORPUS_READY,
+    OcrCorpusEvaluationError,
+    build_ocr_corpus_evaluation,
+)
+from .ocr_corpus_evidence import OcrCorpusEvidenceError, validate_ocr_v1_evidence
+from .ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
 from .ocr_structure import OCRStructureError, reconstruct_ocr_report
 from .ingestion import (
     IngestLimitError,
@@ -463,6 +480,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     certify_answer_trace.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     certify_answer_trace.set_defaults(handler=run_certify_answer_trace_quality)
+
+    certify_ocr_corpus = certify_subcommands.add_parser(
+        "ocr-corpus",
+        help="Execute the frozen bounded OCR corpus and write an exact-head evidence receipt.",
+    )
+    certify_ocr_corpus.add_argument(
+        "--manifest",
+        type=Path,
+        default=DEFAULT_OCR_CORPUS_MANIFEST,
+        help="Frozen OCR corpus denominator manifest.",
+    )
+    certify_ocr_corpus.add_argument("--tesseract-path", help="Explicit path to the local tesseract executable.")
+    certify_ocr_corpus.add_argument("--renderer-path", help="Explicit path to the local pdftoppm executable.")
+    certify_ocr_corpus.add_argument(
+        "--strict-quality",
+        action="store_true",
+        help="Return nonzero unless the bounded corpus has no provisional quality residue.",
+    )
+    certify_ocr_corpus.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    certify_ocr_corpus.set_defaults(handler=run_certify_ocr_corpus)
 
     certify_gis = certify_subcommands.add_parser(
         "gis-quality",
@@ -891,6 +928,18 @@ def build_parser() -> argparse.ArgumentParser:
     ocr_analyze.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     ocr_analyze.set_defaults(handler=run_ocr_analyze)
 
+    ocr_pdf = ocr_subcommands.add_parser("pdf", help="Render a local PDF and run page-level local OCR with lineage receipts.")
+    ocr_pdf.add_argument("pdf_path", help="Path to a local PDF file.")
+    ocr_pdf.add_argument("--language", default="eng", help="OCR language code passed to the local engine.")
+    ocr_pdf.add_argument("--layout", choices=["single_block", "auto"], default="auto", help="OCR layout mode for each rendered page.")
+    ocr_pdf.add_argument("--dpi", type=int, default=200, help="PDF page rendering DPI (72-600).")
+    ocr_pdf.add_argument("--renderer-path", help="Explicit path to the local pdftoppm executable.")
+    ocr_pdf.add_argument("--tesseract-path", help="Explicit path to the local tesseract executable.")
+    ocr_pdf.add_argument("--render-timeout-seconds", type=int, default=120, help="PDF renderer timeout.")
+    ocr_pdf.add_argument("--ocr-timeout-seconds", type=int, default=60, help="Per-page OCR timeout.")
+    ocr_pdf.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    ocr_pdf.set_defaults(handler=run_ocr_pdf)
+
     ocr_structure = ocr_subcommands.add_parser(
         "structure",
         help="Derive a bounded multi-column, table, or form structure receipt from a saved image OCR receipt.",
@@ -946,6 +995,15 @@ def build_parser() -> argparse.ArgumentParser:
     conversations_rename.add_argument("title", nargs="+", help="New conversation title.")
     conversations_rename.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     conversations_rename.set_defaults(handler=run_conversations_rename)
+
+    for command, field, value in (
+        ("pin", "pinned", True), ("unpin", "pinned", False),
+        ("archive", "archived", True), ("restore", "archived", False),
+    ):
+        action = conversations_subcommands.add_parser(command, help=f"{command.capitalize()} a saved conversation.")
+        action.add_argument("conversation_id", help="Conversation identifier.")
+        action.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+        action.set_defaults(handler=run_conversations_organize, organization_field=field, organization_value=value)
 
     conversations_delete = conversations_subcommands.add_parser("delete", help="Delete one saved conversation.")
     conversations_delete.add_argument("conversation_id", help="Conversation identifier.")
@@ -1075,6 +1133,44 @@ def build_parser() -> argparse.ArgumentParser:
     capability_validate_ocr.add_argument("report_path", type=Path, help="Path to a saved OCR report JSON file.")
     capability_validate_ocr.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     capability_validate_ocr.set_defaults(handler=run_capability_validate_ocr_report)
+
+    capability_validate_ocr_pdf = capabilities_subcommands.add_parser(
+        "validate-ocr-pdf-report",
+        help="Validate a saved PDF OCR receipt against the page-level OCR output contract.",
+    )
+    capability_validate_ocr_pdf.add_argument("report_path", type=Path, help="Path to a saved mucaro_pdf_ocr_report_v1 JSON receipt.")
+    capability_validate_ocr_pdf.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_ocr_pdf.set_defaults(handler=run_capability_validate_pdf_ocr_report)
+
+    capability_validate_ocr_v1 = capabilities_subcommands.add_parser(
+        "validate-ocr-v1-evidence",
+        help="Validate a frozen OCR v1 evidence ledger against its denominator and source receipts.",
+    )
+    capability_validate_ocr_v1.add_argument("denominator_path", type=Path, help="Path to the frozen OCR denominator JSON file.")
+    capability_validate_ocr_v1.add_argument("evidence_path", type=Path, help="Path to the OCR evidence ledger JSON file.")
+    capability_validate_ocr_v1.add_argument(
+        "--evidence-root",
+        type=Path,
+        help="Root directory containing the ledger's relative source and receipt paths. Defaults to the ledger directory.",
+    )
+    capability_validate_ocr_v1.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_ocr_v1.set_defaults(handler=run_capability_validate_ocr_v1_evidence)
+
+    capability_validate_retrieval = capabilities_subcommands.add_parser(
+        "validate-retrieval-quality",
+        help="Validate a retrieval-quality release receipt against its bounded evidence contract.",
+    )
+    capability_validate_retrieval.add_argument("report_path", type=Path, help="Path to a retrieval-quality release receipt JSON file.")
+    capability_validate_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_retrieval.set_defaults(handler=run_capability_validate_retrieval_quality)
+
+    capability_validate_web = capabilities_subcommands.add_parser(
+        "validate-web-snapshot",
+        help="Validate an immutable governed web snapshot and its citation policy.",
+    )
+    capability_validate_web.add_argument("snapshot_path", type=Path, help="Path to a saved web snapshot JSON file.")
+    capability_validate_web.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_web.set_defaults(handler=run_capability_validate_web_snapshot)
 
     memory = subcommands.add_parser("memory", help="Manage explicit local assistant memory.")
     memory_subcommands = memory.add_subparsers(dest="memory_command", required=True)
@@ -2808,12 +2904,15 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         for conversation in payload.get("conversations", []):
             print(
                 f"{conversation.get('conversation_id')} {conversation.get('title')} "
-                f"turns={conversation.get('turn_count', 0)} status={conversation.get('last_status')}"
+                f"turns={conversation.get('turn_count', 0)} status={conversation.get('last_status')} "
+                f"pinned={conversation.get('pinned', False)} archived={conversation.get('archived', False)} "
+                f"revision={conversation.get('revision', 0)}"
             )
     elif "conversation_id" in payload and "turns" in payload:
         print(f"conversation_id={payload.get('conversation_id')}")
         print(f"title={payload.get('title')}")
         print(f"turns={len(payload.get('turns', []))}")
+        print(f"pinned={payload.get('pinned', False)} archived={payload.get('archived', False)} revision={payload.get('revision', 0)}")
         for turn in payload.get("turns", []):
             print(f"{turn.get('role')} {turn.get('status')} {turn.get('run_id') or ''}".rstrip())
     elif "runs" in payload:
@@ -2985,7 +3084,7 @@ def run_gis_inspect(args: argparse.Namespace, cfg: Settings) -> int:
         path = cfg.project_root / path
     try:
         result = inspect_geojson(path, cfg=cfg)
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3006,7 +3105,7 @@ def run_gis_point_in_polygon(args: argparse.Namespace, cfg: Settings) -> int:
             cfg=cfg,
             require_matching_crs=not args.allow_crs_mismatch,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3022,7 +3121,7 @@ def run_gis_compare(args: argparse.Namespace, cfg: Settings) -> int:
         right_path = cfg.project_root / right_path
     try:
         result = compare_geojson_geometries(left_path, right_path, cfg=cfg, match_on=args.match_on)
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3044,7 +3143,7 @@ def run_gis_overlay(args: argparse.Namespace, cfg: Settings) -> int:
             operation=args.overlay_operation,
             match_on=args.match_on,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3057,7 +3156,7 @@ def run_gis_reproject(args: argparse.Namespace, cfg: Settings) -> int:
         path = cfg.project_root / path
     try:
         result = reproject_geojson(path, target_crs=args.target_crs, cfg=cfg, source_crs=args.source_crs)
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3079,7 +3178,7 @@ def run_gis_csv_points(args: argparse.Namespace, cfg: Settings) -> int:
             delimiter=args.delimiter,
             skip_invalid_rows=args.skip_invalid_rows,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3100,7 +3199,7 @@ def run_gis_filter_bbox(args: argparse.Namespace, cfg: Settings) -> int:
             cfg=cfg,
             mode=args.mode,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3120,7 +3219,7 @@ def run_gis_clip_bbox(args: argparse.Namespace, cfg: Settings) -> int:
             max_y=args.max_y,
             cfg=cfg,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3138,7 +3237,7 @@ def run_gis_measure(args: argparse.Namespace, cfg: Settings) -> int:
             coordinate_units=args.coordinate_units,
             measurement_mode=args.measurement_mode,
         )
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3153,7 +3252,7 @@ def _resolve_project_path(value: str, cfg: Settings) -> Path:
 def _run_gis_report(args: argparse.Namespace, operation: Any) -> int:
     try:
         result = operation()
-    except GISProcessingError as exc:
+    except (GISProcessingError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3326,7 +3425,30 @@ def run_ocr_analyze(args: argparse.Namespace, cfg: Settings) -> int:
             tesseract_path=args.tesseract_path,
             timeout_seconds=args.timeout_seconds,
         )
-    except OCRAnalysisError as exc:
+    except (OCRAnalysisError, CapabilityOutputContractError) as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if not str(result.get("status", "")).startswith("ERROR_") else 2
+
+
+def run_ocr_pdf(args: argparse.Namespace, cfg: Settings) -> int:
+    path = Path(args.pdf_path)
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        result = analyze_pdf_ocr(
+            path,
+            cfg=cfg,
+            language=args.language,
+            layout_mode=args.layout,
+            dpi=args.dpi,
+            renderer_path=args.renderer_path,
+            tesseract_path=args.tesseract_path,
+            render_timeout_seconds=args.render_timeout_seconds,
+            ocr_timeout_seconds=args.ocr_timeout_seconds,
+        )
+    except (PDFOCRAnalysisError, CapabilityOutputContractError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -4176,10 +4298,16 @@ def build_release_dashboard_report(
     head_sha = git_payload.get("head_sha") if isinstance(git_payload.get("head_sha"), str) else None
     branch = git_payload.get("branch") if isinstance(git_payload.get("branch"), str) else None
     receipts = list_release_receipts(cfg.project_root)
-    current_head_receipts = [row for row in receipts if row.get("head_sha") == head_sha]
-    receipt_summary = summarize_release_receipts(current_head_receipts)
+    all_current_head_receipts = [row for row in receipts if row.get("head_sha") == head_sha]
     receipt_payloads = release_state.get("receipts", {})
     expected_receipt_types = sorted(receipt_payloads) if isinstance(receipt_payloads, dict) else []
+    current_head_receipts = [
+        row for row in all_current_head_receipts if row.get("receipt_type") in expected_receipt_types
+    ]
+    additional_current_head_receipts = [
+        row for row in all_current_head_receipts if row.get("receipt_type") not in expected_receipt_types
+    ]
+    receipt_summary = summarize_release_receipts(current_head_receipts)
     missing_receipts = [
         receipt_type
         for receipt_type in expected_receipt_types
@@ -4332,6 +4460,7 @@ def build_release_dashboard_report(
         ),
         "current_head_receipts_summary": receipt_summary,
         "current_head_receipts": current_head_receipts,
+        "additional_current_head_receipts": additional_current_head_receipts,
         "checks": checks,
         "blockers": sorted(set(blockers)),
         "release_states": release_state.get("states", []),
@@ -5655,6 +5784,11 @@ def build_release_handoff_report(
     )
 
     expected_receipt_count = len(REQUIRED_DISTRIBUTION_RECEIPTS)
+    required_receipt_types = {receipt_type for receipt_type, _ in REQUIRED_DISTRIBUTION_RECEIPTS}
+    required_current_head_receipts = [
+        row for row in current_head_receipts if row.get("receipt_type") in required_receipt_types
+    ]
+    required_receipt_summary = summarize_release_receipts(required_current_head_receipts)
     checks = [
         *preflight_checks,
         *refresh_checks,
@@ -5662,11 +5796,14 @@ def build_release_handoff_report(
             "current_head_receipts",
             (
                 "PASS"
-                if receipt_summary.get("total") == expected_receipt_count
-                and receipt_summary.get("valid") == expected_receipt_count
+                if required_receipt_summary.get("total") == expected_receipt_count
+                and required_receipt_summary.get("valid") == expected_receipt_count
                 else "FAIL"
             ),
-            f"total={receipt_summary.get('total')} valid={receipt_summary.get('valid')} invalid={receipt_summary.get('invalid')}",
+            f"required_total={required_receipt_summary.get('total')} "
+            f"required_valid={required_receipt_summary.get('valid')} "
+            f"all_total={receipt_summary.get('total')} all_valid={receipt_summary.get('valid')} "
+            f"all_invalid={receipt_summary.get('invalid')}",
         ),
         _certification_gate(
             "distribution_manifest",
@@ -8060,6 +8197,37 @@ def run_certify_answer_trace_quality(args: argparse.Namespace, cfg: Settings) ->
     return 0 if report["status"] == ANSWER_TRACE_QUALITY_OK else 2
 
 
+def run_certify_ocr_corpus(args: argparse.Namespace, cfg: Settings) -> int:
+    manifest = args.manifest
+    if not manifest.is_absolute():
+        manifest = cfg.project_root / manifest
+    command = ["mucaro", "certify", "ocr-corpus"]
+    if args.manifest != DEFAULT_OCR_CORPUS_MANIFEST:
+        command.extend(["--manifest", str(args.manifest)])
+    if args.tesseract_path:
+        command.extend(["--tesseract-path", args.tesseract_path])
+    if args.renderer_path:
+        command.extend(["--renderer-path", args.renderer_path])
+    if args.strict_quality:
+        command.append("--strict-quality")
+    try:
+        report = build_ocr_corpus_evaluation(
+            cfg.project_root,
+            cfg=cfg,
+            manifest_path=manifest,
+            tesseract_path=args.tesseract_path,
+            renderer_path=args.renderer_path,
+            command=command,
+        )
+    except OcrCorpusEvaluationError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(report, args.format)
+    if report.get("status") != OCR_CORPUS_READY:
+        return 2
+    return 2 if args.strict_quality and report.get("accuracy_certified") is not True else 0
+
+
 def run_certify_operator_workflow(args: argparse.Namespace, cfg: Settings) -> int:
     command = ["mucaro", "certify", "operator-workflow"]
     if args.profile != OPERATOR_WORKFLOW_PROFILE:
@@ -8128,6 +8296,16 @@ def run_conversations_delete(args: argparse.Namespace, cfg: Settings) -> int:
     result = delete_conversation(args.conversation_id, cfg)
     emit_payload(result, args.format)
     return 0 if result.get("status") == "CONVERSATION_DELETE_OK" else 2
+
+
+def run_conversations_organize(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = update_conversation(args.conversation_id, {args.organization_field: args.organization_value}, cfg)
+    except KeyError:
+        emit_payload({"status": "ERROR_CONVERSATION_NOT_FOUND", "conversation_id": args.conversation_id}, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
 
 
 def run_conversations_ask(args: argparse.Namespace, cfg: Settings) -> int:
@@ -8336,6 +8514,52 @@ def run_capability_validate_ocr_report(args: argparse.Namespace, cfg: Settings) 
     if not path.is_absolute():
         path = cfg.project_root / path
     report = validate_ocr_report_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_pdf_ocr_report(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_pdf_ocr_report_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_ocr_v1_evidence(args: argparse.Namespace, cfg: Settings) -> int:
+    denominator = args.denominator_path
+    evidence = args.evidence_path
+    root = args.evidence_root
+    if not denominator.is_absolute():
+        denominator = cfg.project_root / denominator
+    if not evidence.is_absolute():
+        evidence = cfg.project_root / evidence
+    if root is not None and not root.is_absolute():
+        root = cfg.project_root / root
+    try:
+        report = validate_ocr_v1_evidence(denominator, evidence, evidence_root=root)
+    except OcrCorpusEvidenceError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "OCR_V1_EVIDENCE_READY" else 2
+
+
+def run_capability_validate_retrieval_quality(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_retrieval_quality_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_web_snapshot(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.snapshot_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_web_snapshot_file(path)
     emit_payload(report, args.format)
     return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
 

@@ -219,12 +219,37 @@ textarea {
   flex: 1;
 }
 
+.conversation-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.conversation-tabs button {
+  flex: 1;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.conversation-tabs button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+.conversation-error p {
+  margin: 0;
+  font-size: 13px;
+}
+
 .conversation-list {
   overflow-y: auto;
   flex: 1;
 }
 
 .conversation-title {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -420,6 +445,19 @@ button:disabled {
 
 .menu button:hover {
   background: var(--surface-2);
+}
+
+.menu-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu .error-text,
+.menu [role="status"] {
+  max-width: 260px;
+  margin: 8px 10px;
+  overflow-wrap: anywhere;
 }
 
 .feed {
@@ -1230,6 +1268,12 @@ html {
   }
 
   :root :is(button, select, input:not([type="file"]):not([type="checkbox"]):not([type="radio"])) {
+    min-height: 44px;
+  }
+
+  /* Native selects can ignore the shared :is() minimum in some WebKit builds. */
+  :root .field select {
+    height: 44px;
     min-height: 44px;
   }
 

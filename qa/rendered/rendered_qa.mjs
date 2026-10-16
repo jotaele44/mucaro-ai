@@ -18,7 +18,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
 const args = process.argv.slice(2);
 const argValue = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
-const scenarioFilter = argValue("--scenarios", "").split(",").filter(Boolean); // resilience,streams,gate,lan,clipboard,share
+const scenarioFilter = argValue("--scenarios", "").split(",").filter(Boolean); // resilience,streams,gate,lan,clipboard,share,organization
 const onlyNew = args.includes("--only-new") || scenarioFilter.length > 0;
 const wantScenario = (name) => scenarioFilter.length === 0 || scenarioFilter.includes(name);
 const browserName = argValue("--browser", "chromium");
@@ -435,11 +435,11 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.getByRole("heading", { name: `QA ${viewport} conversation` }).waitFor();
   check("rename from the conversation menu (F17)", viewport, true);
 
-  // Delete asks for confirmation and says there is no archive (F17).
+  // Deletion remains permanent; archiving is the reversible alternative (F17).
   await page.getByRole("button", { name: "Conversation menu" }).click();
   await page.getByRole("menuitem", { name: "Delete…" }).click();
   const confirm = page.getByRole("dialog", { name: "Delete conversation?" });
-  check("delete confirms and states there is no archive (F17)", viewport, (await confirm.getByText(/There is no archive or undo/).count()) === 1);
+  check("delete confirms permanent loss and offers archive instead (F17)", viewport, (await confirm.getByText(/Archive it instead.*Permanent deletion has no undo/).count()) === 1);
   await confirm.getByRole("button", { name: "Keep it" }).click();
   await confirm.waitFor({ state: "detached" });
 
@@ -602,6 +602,7 @@ async function guarded(label, viewport, body) {
   try {
     await body();
   } catch (err) {
+    console.error(err.stack || String(err));
     check(`${label}: scenario ran to completion`, viewport, false, String(err.message || err).split("\n")[0]);
   }
 }
@@ -1423,6 +1424,141 @@ if (!existsSync(path.join(ROOT, "frontend", "dist", "index.html"))) {
   console.error("frontend/dist missing: run `npm run build` in frontend/ first");
   process.exit(2);
 }
+async function organizationScenario(browser, base) {
+  for (const [viewport, profile] of [["desktop", desktopProfile()], ["iphone", iphoneProfile()]]) {
+    await guarded("durable conversation organization", viewport, async () => {
+      const context = await browser.newContext({ ...profile, baseURL: base });
+      const page = await context.newPage();
+      const name = `Organization ${viewport}`;
+      const created = await (await fetch(`${base}/conversations`, jsonPost({ title: name }))).json();
+      const cid = created.conversation_id;
+      const row = async () => (await fetch(`${base}/conversations/${cid}`)).json();
+      const nav = page.getByRole("navigation", { name: "Primary" });
+      const openNav = async () => {
+        if (viewport === "iphone") await page.getByRole("button", { name: "Open navigation" }).click();
+      };
+      try {
+        await page.goto("/");
+        await page.locator("#composer-input").waitFor();
+        await openNav();
+        await nav.getByRole("button", { name: `${name} 0 turns`, exact: true }).click();
+        await page.getByRole("heading", { name, exact: true }).waitFor();
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByRole("menuitem", { name: "Pin", exact: true }).click();
+        await page.getByText("Local workspace · Pinned · answers cite your sources", { exact: true }).waitFor();
+        check("pin is acknowledged by durable backend state", viewport, (await row()).pinned === true);
+        await page.reload();
+        await page.getByRole("heading", { name, exact: true }).waitFor();
+        check("pin survives reload", viewport, await page.getByText("Local workspace · Pinned · answers cite your sources", { exact: true }).isVisible());
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByRole("menuitem", { name: "Archive", exact: true }).click();
+        await page.getByText("Archived conversation · Pinned · answers cite your sources", { exact: true }).waitFor();
+        check("archive preserves the conversation", viewport, (await row()).archived === true);
+        await openNav();
+        check("archived chat is excluded from active list", viewport, await nav.getByRole("button", { name: `${name} Pinned · 0 turns`, exact: true }).count() === 0);
+        await nav.getByRole("button", { name: "Archived", exact: true }).click();
+        await nav.getByRole("button", { name: `${name} Pinned · 0 turns`, exact: true }).click();
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByRole("menuitem", { name: "Restore conversation", exact: true }).click();
+        await page.getByText("Local workspace · Pinned · answers cite your sources", { exact: true }).waitFor();
+        check("restore retains pin and stable identity", viewport, !(await row()).archived && (await row()).pinned);
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByRole("menuitem", { name: "Unpin", exact: true }).waitFor();
+        await page.waitForFunction(() => !document.querySelector('[role="menuitem"]')?.disabled);
+        const before = await row();
+        await fetch(`${base}/conversations/${cid}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: `${name} changed elsewhere`, expected_revision: before.revision }),
+        });
+        await page.getByRole("menuitem", { name: "Unpin", exact: true }).click();
+        await page.getByText("Conversation changed. Reload it before saving.", { exact: true }).waitFor();
+        await page.getByRole("heading", { name: `${name} changed elsewhere`, exact: true }).waitFor();
+        check("stale browser action fails without overwriting", viewport, (await row()).pinned && (await row()).title === `${name} changed elsewhere`);
+        await page.getByRole("menuitem", { name: "Unpin", exact: true }).click();
+        await page.getByText("Local workspace · answers cite your sources", { exact: true }).waitFor();
+        check("conflict recovery applies only the retried action", viewport, !(await row()).pinned);
+        await page.route(`**/conversations/${cid}`, async (route) => {
+          if (route.request().method() === "PATCH") await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: { status: "ERROR_UPDATE_REFUSED", detail: "Update refused by the service." } }) });
+          else await route.continue();
+        });
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByRole("menuitem", { name: "Pin", exact: true }).click();
+        await page.getByText("Update refused by the service.", { exact: true }).waitFor();
+        check("refused organization shows an error without false success", viewport, !(await row()).pinned);
+        await page.unroute(`**/conversations/${cid}`);
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.route(`**/conversations/${cid}`, async (route) => {
+          if (route.request().method() === "GET") await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: { status: "ERROR_READ_REFUSED", detail: "Conversation refresh refused." } }) });
+          else await route.continue();
+        });
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByText("Conversation refresh refused.", { exact: true }).waitFor();
+        check("failed menu refresh blocks stale mutations", viewport, await page.getByRole("menuitem", { name: "Pin", exact: true }).isDisabled() && !(await row()).pinned);
+        await page.unroute(`**/conversations/${cid}`);
+        await page.getByRole("button", { name: "Retry conversation", exact: true }).click();
+        await page.getByRole("menuitem", { name: "Pin", exact: true }).click();
+        await page.getByText("Local workspace · Pinned · answers cite your sources", { exact: true }).waitFor();
+        await page.route("**/conversations", async (route) => {
+          if (route.request().method() === "GET") await route.fulfill({ status: 503, body: "List unavailable" });
+          else await route.continue();
+        });
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByRole("menuitem", { name: "Unpin", exact: true }).click();
+        await openNav();
+        await nav.getByRole("button", { name: "Chats", exact: true }).click();
+        await nav.getByText("Could not refresh chats. The list may be out of date.", { exact: true }).waitFor();
+        check("failed list refresh preserves last-good chat list", viewport, await nav.getByRole("button", { name: `${name} changed elsewhere Pinned · 0 turns`, exact: true }).isVisible());
+        await page.unroute("**/conversations");
+        await nav.getByRole("button", { name: "Retry chats", exact: true }).click();
+        await nav.getByRole("button", { name: `${name} changed elsewhere 0 turns`, exact: true }).waitFor();
+        check("chat list retry recovers acknowledged state", viewport, await nav.getByRole("alert").count() === 0);
+        if (viewport === "iphone") await nav.getByRole("button", { name: `${name} changed elsewhere 0 turns`, exact: true }).click();
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.waitForFunction(() => !document.querySelector('[role="menuitem"]')?.disabled);
+        await page.keyboard.press("End");
+        check("conversation menu supports keyboard navigation", viewport, await page.getByRole("menuitem", { name: "Delete…" }).evaluate(el => el === document.activeElement));
+        await page.keyboard.press("Escape");
+        check("Escape restores focus to the menu trigger", viewport, await page.getByRole("button", { name: "Conversation menu" }).evaluate(el => el === document.activeElement));
+        const stale = await row();
+        let releaseOld;
+        let markRead;
+        const delayedRead = new Promise(resolve => { releaseOld = resolve; });
+        const readStarted = new Promise(resolve => { markRead = resolve; });
+        let reads = 0;
+        await page.route(`**/conversations/${cid}`, async (route) => {
+          if (route.request().method() === "GET" && reads++ === 0) {
+            markRead();
+            await delayedRead;
+            await route.fulfill({ status: 200, contentType: "application/json", headers: { "x-qa-stale-read": "1" }, body: JSON.stringify(stale) });
+          } else await route.continue();
+        });
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await readStarted;
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await fetch(`${base}/conversations/${cid}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: `${name} newest`, expected_revision: stale.revision }) });
+        await page.getByRole("button", { name: "Conversation menu" }).click();
+        await page.getByRole("heading", { name: `${name} newest`, exact: true }).waitFor();
+        const oldResponse = page.waitForResponse(response => response.headers()["x-qa-stale-read"] === "1");
+        releaseOld();
+        await (await oldResponse).finished();
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        check("delayed older read cannot replace a newer conversation revision", viewport, await page.getByRole("heading", { name: `${name} newest`, exact: true }).isVisible());
+        await page.unroute(`**/conversations/${cid}`);
+        await page.keyboard.press("Escape");
+        await shot(page, viewport, "conversation-organization");
+        const violations = await axe(page, viewport, "organization");
+        axeResults.push(violations);
+        check("organization has no horizontal overflow", viewport, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+      } catch (err) {
+        await shot(page, viewport, "conversation-organization-failure");
+        throw err;
+      } finally {
+        await context.close();
+      }
+    });
+  }
+}
+
 const backend = await startBackend(dataDir, port);
 let status = "RENDERED_QA_FAIL";
 const axeResults = [];
@@ -1450,6 +1586,7 @@ try {
   }
   if (wantScenario("clipboard")) await clipboardScenario(browser, base);
   if (wantScenario("share")) await shareScenario(browser, base);
+  if (wantScenario("organization")) await organizationScenario(browser, base);
   if (!onlyNew) {
     await offlineScenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } }, async () => {
       backend.kill("SIGTERM");

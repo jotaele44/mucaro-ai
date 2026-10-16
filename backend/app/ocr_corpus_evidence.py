@@ -39,12 +39,18 @@ def _load_json(path: Path, status: str) -> tuple[dict[str, Any], bytes]:
 def _resolve_under(root: Path, relative: Any, *, label: str) -> Path:
     if not isinstance(relative, str) or not relative or Path(relative).is_absolute():
         raise OcrCorpusEvidenceError("ERROR_OCR_CORPUS_PATH", label)
-    target = (root / relative).resolve()
+    relative_path = Path(relative)
+    if ".." in relative_path.parts:
+        raise OcrCorpusEvidenceError("ERROR_OCR_CORPUS_PATH_TRAVERSAL", label)
+    candidate = root / relative_path
+    if candidate.is_symlink():
+        raise OcrCorpusEvidenceError("ERROR_OCR_CORPUS_SYMLINK", label)
+    target = candidate.resolve()
     try:
         target.relative_to(root)
     except ValueError as exc:
         raise OcrCorpusEvidenceError("ERROR_OCR_CORPUS_PATH_ESCAPE", label) from exc
-    if target.is_symlink() or not target.is_file():
+    if not target.is_file():
         raise OcrCorpusEvidenceError("ERROR_OCR_CORPUS_FILE_MISSING", label)
     return target
 
@@ -65,14 +71,25 @@ def validate_ocr_v1_evidence(
         raise OcrCorpusEvidenceError("ERROR_OCR_EVIDENCE_SCHEMA", str(evidence.get("schema_version")))
 
     denominator_sha = hashlib.sha256(denominator_bytes).hexdigest()
+    expected_cases = denominator.get("cases")
+    denominator_case_count = denominator.get("case_count")
+    if not isinstance(expected_cases, list) or not isinstance(denominator_case_count, int):
+        raise OcrCorpusEvidenceError("ERROR_OCR_DENOMINATOR_CASES", "case_count and cases are required")
+    if denominator_case_count != len(expected_cases):
+        raise OcrCorpusEvidenceError("ERROR_OCR_DENOMINATOR_COUNT", "case_count does not match cases")
+    for index, row in enumerate(expected_cases):
+        if not isinstance(row, dict) or not isinstance(row.get("id"), str) or not row.get("id"):
+            raise OcrCorpusEvidenceError("ERROR_OCR_DENOMINATOR_CASE_ROW", f"cases[{index}]")
+        if not isinstance(row.get("expected_state"), str) or not row.get("expected_state"):
+            raise OcrCorpusEvidenceError("ERROR_OCR_DENOMINATOR_STATE", str(row.get("id")))
+
     failures: list[str] = []
     if evidence.get("denominator_sha256") != denominator_sha:
         failures.append("DENOMINATOR_SHA256_MISMATCH")
 
-    expected_cases = denominator.get("cases")
     evidence_cases = evidence.get("cases")
-    if not isinstance(expected_cases, list) or not isinstance(evidence_cases, list):
-        raise OcrCorpusEvidenceError("ERROR_OCR_CORPUS_CASES", "cases must be arrays")
+    if not isinstance(evidence_cases, list):
+        raise OcrCorpusEvidenceError("ERROR_OCR_EVIDENCE_CASES", "cases must be an array")
 
     expected_by_id = {str(row.get("id")): row for row in expected_cases if isinstance(row, dict)}
     if len(expected_by_id) != len(expected_cases):

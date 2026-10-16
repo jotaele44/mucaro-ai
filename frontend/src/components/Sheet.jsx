@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useLayoutEffect, useRef } from "react";
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
@@ -13,11 +13,11 @@ export function Sheet({ title, onClose, children, side = "right", labelledBy }) 
   const opener = useRef(typeof document !== "undefined" ? document.activeElement : null);
   const closeRef = useRef(onClose);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     closeRef.current = onClose;
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = panel.current;
     // Initial focus: a field marked data-autofocus, otherwise the dialog itself so a screen reader announces its
     // name. Not the close button, which is first in document order.

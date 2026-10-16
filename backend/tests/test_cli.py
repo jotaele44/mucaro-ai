@@ -313,6 +313,91 @@ def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Pa
     assert "FAIL no_text_status_has_warning" in output
 
 
+def test_cli_capabilities_validate_ocr_v1_evidence_closes_and_rejects_traversal(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    evidence_root = tmp_path / "ocr-evidence"
+    evidence_root.mkdir()
+    denominator = evidence_root / "denominator.json"
+    denominator.write_text(
+        json.dumps(
+            {
+                "schema_version": "MUCARO_OCR_V1_CORPUS/1.0",
+                "case_count": 1,
+                "cases": [{"id": "OCRV1-01", "class": "CLEAN_ENGLISH", "expected_state": "SUPPORTED"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    source = evidence_root / "source.png"
+    source.write_bytes(b"source-bytes")
+    receipt = evidence_root / "receipt.json"
+    receipt.write_text(json.dumps({"status": "fixture"}), encoding="utf-8")
+    evidence = evidence_root / "evidence.json"
+    evidence.write_text(
+        json.dumps(
+            {
+                "schema_version": "MUCARO_OCR_V1_EVIDENCE/1.0",
+                "denominator_sha256": hashlib.sha256(denominator.read_bytes()).hexdigest(),
+                "cases": [
+                    {
+                        "id": "OCRV1-01",
+                        "source_path": source.name,
+                        "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                        "receipt_path": receipt.name,
+                        "receipt_sha256": hashlib.sha256(receipt.read_bytes()).hexdigest(),
+                        "observed_state": "SUPPORTED",
+                        "adjudication": "PASS",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "capabilities",
+                "validate-ocr-v1-evidence",
+                str(denominator),
+                str(evidence),
+                "--evidence-root",
+                str(evidence_root),
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "OCR_V1_EVIDENCE_READY"
+    assert payload["certification_ready"] is True
+    assert payload["counts"]["validated_cases"] == 1
+
+    evidence_payload = json.loads(evidence.read_text(encoding="utf-8"))
+    evidence_payload["cases"][0]["source_path"] = "../source.png"
+    evidence.write_text(json.dumps(evidence_payload), encoding="utf-8")
+    assert (
+        main(
+            [
+                "capabilities",
+                "validate-ocr-v1-evidence",
+                str(denominator),
+                str(evidence),
+                "--evidence-root",
+                str(evidence_root),
+                "--format",
+                "json",
+            ],
+            cfg=cfg,
+        )
+        == 2
+    )
+    error = json.loads(capsys.readouterr().err)
+    assert error["status"] == "ERROR_OCR_CORPUS_PATH_TRAVERSAL"
+
+
 def test_cli_ocr_analyze_reports_adapter_errors(tmp_path: Path, capsys, monkeypatch):
     cfg = make_settings(tmp_path)
     image = tmp_path / "scan.png"
@@ -328,6 +413,23 @@ def test_cli_ocr_analyze_reports_adapter_errors(tmp_path: Path, capsys, monkeypa
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "ERROR_OCR_ENGINE_UNAVAILABLE Local tesseract executable was not found." in captured.err
+
+
+def test_cli_ocr_pdf_reports_adapter_errors(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    def fake_analyze(path: Path, **kwargs):
+        del path, kwargs
+        raise cli.PDFOCRAnalysisError("ERROR_OCR_PDF_RENDERER_UNAVAILABLE", "Local pdftoppm executable was not found.")
+
+    monkeypatch.setattr(cli, "analyze_pdf_ocr", fake_analyze)
+
+    assert main(["ocr", "pdf", str(pdf), "--format", "text"], cfg=cfg) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "ERROR_OCR_PDF_RENDERER_UNAVAILABLE Local pdftoppm executable was not found." in captured.err
 
 
 def test_cli_sources_ingest_web_snapshot(tmp_path: Path, capsys):
@@ -910,6 +1012,10 @@ def test_cli_product_audit_reports_open_goal_gaps(tmp_path: Path, capsys):
     assert by_id["governed_web_browsing"]["status"] == "OPEN"
     assert by_id["coding_programming_expertise"]["status"] == "OPEN"
     assert by_id["transparency_objectivity_governance"]["status"] == "OPEN"
+    assert "retrieval-quality" in by_id["transparency_objectivity_governance"]["evidence"]
+    assert "governed web-snapshot" in by_id["transparency_objectivity_governance"]["evidence"]
+    assert "coding certification outputs" in by_id["transparency_objectivity_governance"]["evidence"]
+    assert "live coding runtime output" in by_id["transparency_objectivity_governance"]["gap"]
     assert by_id["multimodal_interface"]["status"] == "PASS"
     assert by_id["personalization_memory"]["status"] == "PASS"
     assert by_id["production_security"]["status"] == "PASS"
@@ -1420,6 +1526,7 @@ def test_cli_certify_retrieval_quality_writes_exact_head_receipt(tmp_path: Path,
     assert main(["certify", "retrieval-quality", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "RETRIEVAL_QUALITY_CERT_OK"
+    assert payload["contract_status"] == "UNVERIFIED"
     assert payload["profile"] == "v0.1.23-local-release"
     assert payload["head_sha"] == "UNKNOWN_HEAD"
     assert payload["receipt"] == "data/exports/release_receipts/retrieval_quality-UNKNOWN_HEAD.json"
@@ -1452,6 +1559,32 @@ def test_cli_certify_retrieval_quality_writes_exact_head_receipt(tmp_path: Path,
     assert "min_category_binding_recall=1.0" in text_output
     assert "min_distractor_free_rate=1.0" in text_output
     assert "min_source_formats=13" in text_output
+
+
+def test_cli_capabilities_validate_retrieval_quality_receipt(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["certify", "retrieval-quality", "--format", "json"], cfg=cfg) == 0
+    generated = json.loads(capsys.readouterr().out)
+    receipt_path = tmp_path / generated["receipt"]
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["head_sha"] = "a" * 40
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    assert main(["capabilities", "validate-retrieval-quality", generated["receipt"], "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["capability_id"] == "retrieval_quality_evaluation"
+    assert payload["counts"]["fail"] == 0
+
+
+def test_cli_capabilities_validate_web_snapshot_reports_missing_file(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+
+    assert main(["capabilities", "validate-web-snapshot", "missing-snapshot.json", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_FAILED"
+    assert payload["capability_id"] == "governed_web_browsing"
+    assert payload["failed_checks"][0]["name"] == "snapshot_file_readable"
 
 
 def test_cli_eval_answer_trace_reports_traceability_metrics(tmp_path: Path, capsys):
@@ -2732,6 +2865,14 @@ def test_cli_release_dashboard_summarizes_current_handoff_artifacts(tmp_path: Pa
     ).stdout.strip()
     subprocess.run(["git", "tag", "v0.1.23-dashboard"], cwd=tmp_path, check=True)
     write_distribution_manifest_fixture_receipts(tmp_path, head_sha)
+    write_release_receipt(
+        tmp_path,
+        receipt_type="security_gates",
+        status="SECURITY_GATES_PASS",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_security_gates.py"],
+        payload={"checks": []},
+    )
     assert main(["package", "distribution-manifest", "--save", "--format", "json"], cfg=cfg) == 0
     capsys.readouterr()
     write_dashboard_governance_report_fixture(tmp_path, head_sha)
@@ -2764,6 +2905,7 @@ def test_cli_release_dashboard_summarizes_current_handoff_artifacts(tmp_path: Pa
     assert payload["governance_report_status"] == "GOVERNANCE_REPORT_VERIFIED"
     assert payload["remote_branch_status"] == "PASS"
     assert payload["current_head_receipts_summary"]["total"] == 8
+    assert [row["receipt_type"] for row in payload["additional_current_head_receipts"]] == ["security_gates"]
     assert checks["current_head_receipts"]["status"] == "PASS"
     assert checks["distribution_manifest"]["status"] == "PASS"
     assert checks["governance_report"]["status"] == "PASS"
@@ -4414,9 +4556,17 @@ def test_cli_release_handoff_saves_and_verifies_ordered_artifact_set(tmp_path: P
     support_path = tmp_path / "data" / "exports" / "support_bundles" / f"support-bundle-{head_sha[:12]}.json"
     next_actions_path = tmp_path / "data" / "exports" / "release_next_actions" / f"next-actions-{head_sha[:12]}.json"
     receipts = [
-        {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-        for index in range(8)
+        {"head_sha": head_sha, "receipt_type": receipt_type, "status": status, "valid": True}
+        for receipt_type, status in cli.REQUIRED_DISTRIBUTION_RECEIPTS
     ]
+    receipts.append(
+        {
+            "head_sha": head_sha,
+            "receipt_type": "ocr_representative_corpus",
+            "status": "OCR_REPRESENTATIVE_CORPUS_READY",
+            "valid": True,
+        }
+    )
 
     def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
         if args == ["git", "rev-parse", "HEAD"]:
@@ -4564,6 +4714,8 @@ def test_cli_release_handoff_saves_and_verifies_ordered_artifact_set(tmp_path: P
 
     assert payload["status"] == "RELEASE_HANDOFF_OPEN"
     assert payload["head_sha"] == head_sha
+    assert payload["current_head_receipts_summary"]["total"] == 9
+    assert payload["current_head_receipts_summary"]["valid"] == 9
     assert payload["counts"] == {"pass": 7, "open": 1, "fail": 0, "total": 8}
     assert payload["artifacts"]["distribution_manifest"]["path"] == str(distribution_path)
     assert payload["artifacts"]["governance_report"]["path"] == str(governance_path)
@@ -4630,8 +4782,8 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
         if receipt_calls["count"] == 1:
             return []
         return [
-            {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-            for index in range(8)
+            {"head_sha": head_sha, "receipt_type": receipt_type, "status": status, "valid": True}
+            for receipt_type, status in cli.REQUIRED_DISTRIBUTION_RECEIPTS
         ]
 
     def fake_distribution(root: Path, *, output_path: Path | None = None, save: bool = False):
@@ -4835,8 +4987,8 @@ def test_cli_release_handoff_refresh_step_selects_canonical_subset(tmp_path: Pat
         if receipt_calls["count"] == 1:
             return []
         return [
-            {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-            for index in range(8)
+            {"head_sha": head_sha, "receipt_type": receipt_type, "status": status, "valid": True}
+            for receipt_type, status in cli.REQUIRED_DISTRIBUTION_RECEIPTS
         ]
 
     monkeypatch.setattr(cli, "_command_output", fake_command_output)

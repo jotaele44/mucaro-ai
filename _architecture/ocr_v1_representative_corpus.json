@@ -1,0 +1,113 @@
+{
+  "schema_version": "MUCARO_OCR_V1_CORPUS/1.0",
+  "corpus_id": "mucaro-ocr-v1-representative-bounded",
+  "purpose": "Frozen source-byte and expected-observation denominator for bounded OCR quality evaluation. This is evidence for calibration and regression, not a claim of universal OCR accuracy.",
+  "case_count": 6,
+  "source_root": ".",
+  "quality_policy": {
+    "confidence_scale": "0-100",
+    "minimum_required_token_recall": 1.0,
+    "accent_preservation_is_reported_separately": true,
+    "semantic_layout_is_not_inferred_from_word_spans": true,
+    "accuracy_state": "PROVISIONAL_UNTIL_REPRESENTATIVE_LABELED_CORPUS"
+  },
+  "cases": [
+    {
+      "id": "OCRREP-01",
+      "class": "CLEAN_ENGLISH",
+      "input_kind": "image",
+      "source_path": "backend/tests/fixtures/ocr_v1_representative/clean-english.png",
+      "source_sha256": "21946cbf52ebfd09d63ba74e16668c4cd7af73d7a755156fc655f0d17b7099bd",
+      "language": "eng",
+      "layout_mode": "single_block",
+      "expected_state": "SUPPORTED",
+      "required_tokens": ["Mucaro", "evidence", "2026", "Source", "lineage", "exact"],
+      "expected_normalized_text": "Mucaro evidence 2026\nSource lineage remains exact",
+      "required_warnings": [],
+      "adjudication": "PASS"
+    },
+    {
+      "id": "OCRREP-02",
+      "class": "CLEAN_SPANISH_ACCENTS",
+      "input_kind": "image",
+      "source_path": "backend/tests/fixtures/ocr_v1_representative/clean-spanish.png",
+      "source_sha256": "41051f8b6ea4fed7bff61135ab19119e24e35c2390ba742da21af93653ed4456",
+      "language": "spa",
+      "layout_mode": "single_block",
+      "expected_state": "PROVISIONAL",
+      "required_tokens": ["Puerto", "Rico"],
+      "accent_tokens": ["información", "Geografía", "océano", "análisis"],
+      "required_warnings": [],
+      "adjudication": "PROVISIONAL"
+    },
+    {
+      "id": "OCRREP-03",
+      "class": "NO_TEXT",
+      "input_kind": "image",
+      "source_path": "backend/tests/fixtures/ocr_v1_representative/no-text.png",
+      "source_sha256": "7cd02536d40d506da4f3aa327f18f22c2f8f49147cdb2fb1056e270e7fa413bb",
+      "language": "eng",
+      "layout_mode": "single_block",
+      "expected_state": "NO_TEXT",
+      "required_tokens": [],
+      "required_warnings": ["OCR_NO_TEXT_DETECTED"],
+      "adjudication": "PASS"
+    },
+    {
+      "id": "OCRREP-04",
+      "class": "LOW_CONTRAST_SCAN",
+      "input_kind": "image",
+      "source_path": "backend/tests/fixtures/ocr_v1_representative/low-contrast.png",
+      "source_sha256": "4dcbf0ffc687d6b74c5369c29b66990ac7b6d1e50815e66a012069dfbc22e662",
+      "language": "eng",
+      "layout_mode": "single_block",
+      "expected_state": "PROVISIONAL",
+      "required_tokens": ["Review", "required", "Low", "contrast", "source"],
+      "required_warnings": [],
+      "adjudication": "PROVISIONAL"
+    },
+    {
+      "id": "OCRREP-05",
+      "class": "MULTI_COLUMN_PRINTED",
+      "input_kind": "image",
+      "source_path": "backend/tests/fixtures/ocr_v1_representative/multi-column.png",
+      "source_sha256": "8fc6dbf099ada7f8267defe770e1bf6c676e52b551934570c3d575aff5d761cc",
+      "language": "eng",
+      "layout_mode": "auto",
+      "expected_state": "PROVISIONAL",
+      "required_tokens": ["LEFT", "COLUMN", "ALPHA", "RIGHT", "BETA", "GAMMA"],
+      "required_warnings": [],
+      "adjudication": "PROVISIONAL"
+    },
+    {
+      "id": "OCRREP-06",
+      "class": "PDF_PAGE_LINEAGE",
+      "input_kind": "pdf",
+      "source_path": "backend/tests/fixtures/ocr_v1_representative/clean-english.pdf",
+      "source_sha256": "262fc2cbe96bd0183ebf57b3d2846c4b5cf2287529a0afc249d10712d8335cf5",
+      "language": "eng",
+      "layout_mode": "auto",
+      "dpi": 200,
+      "expected_state": "SUPPORTED",
+      "required_tokens": ["Mucaro", "evidence", "2026", "Source", "lineage", "exact"],
+      "required_warnings": [],
+      "expected_page_count": 1,
+      "adjudication": "PASS"
+    }
+  ],
+  "invariants": [
+    "case_count equals cases length",
+    "case IDs are unique",
+    "source paths are relative and source SHA-256 values match frozen bytes",
+    "accent expectations remain separate from unaccented token recall",
+    "PROVISIONAL cases never promote to universal accuracy claims",
+    "NO_TEXT is distinct from OCR engine failure",
+    "PDF source identity remains distinct from rendered page identity"
+  ],
+  "limitations": [
+    "The six fixtures are a bounded calibration and regression corpus, not a statistically representative real-world dataset.",
+    "Semantic tables, forms, handwriting, mixed handwriting, and difficult document layouts remain outside this denominator.",
+    "Confidence thresholds classify engine output and do not prove character-level correctness without labeled corpus adjudication.",
+    "The PDF case evaluates page rendering and lineage in addition to OCR text; it does not certify arbitrary PDF structure."
+  ]
+}

@@ -16,6 +16,7 @@ from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urldefrag, urlparse
 
+from .capability_contracts import validate_web_snapshot_contract
 from .config import Settings, settings
 from .utils import read_json, stable_id, utc_now, write_json
 
@@ -677,6 +678,10 @@ def fetch_web_snapshot(
             "cache_mode": policy.cache_mode,
         },
     }
+    snapshot_contract = validate_web_snapshot_contract(snapshot)
+    if snapshot_contract["status"] != "CAPABILITY_OUTPUT_CONTRACT_OK":
+        failed_names = ",".join(check["name"] for check in snapshot_contract.get("failed_checks", []))
+        raise WebBrowsingError("ERROR_WEB_SNAPSHOT_CONTRACT", f"snapshot contract failed: {failed_names}")
     path = cfg.export_dir / WEB_SNAPSHOT_DIR / f"{snapshot_id}.json"
     write_json(path, snapshot)
     snapshot_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -686,6 +691,7 @@ def fetch_web_snapshot(
         "snapshot": snapshot,
         "snapshot_path": str(path),
         "snapshot_sha256": snapshot_sha256,
+        "snapshot_contract_status": snapshot_contract["status"],
         "ledger_path": ledger["path"],
         "ledger_entry_count": ledger["entry_count"],
     }

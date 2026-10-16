@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .gis_processing import GIS_REPORT_SCHEMA_VERSION, GISProcessingError
+from .capability_contracts import require_gis_report_contract
 from .utils import stable_id, utc_now, write_json
 
 try:
@@ -59,6 +60,7 @@ def _resolve_source(path: Path) -> Path:
 
 def _write_report(cfg: Any, report: dict[str, Any]) -> dict[str, Any]:
     path = cfg.export_dir / "gis_reports" / f"{report['report_id']}.json"
+    require_gis_report_contract(report, report_path=str(path))
     write_json(path, report)
     return {**report, "report_path": str(path), "report_sha256": _sha256(path)}
 

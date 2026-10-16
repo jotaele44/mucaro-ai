@@ -140,6 +140,18 @@ def answer_question(
             "detail": exc.detail,
             "model_route": model_route,
         }
+    selected_provider = model_route["selected_provider"]
+    observed_provider = model.get("model_provider")
+    if observed_provider != selected_provider:
+        return {
+            "status": "ERROR_MODEL_PROVIDER_IDENTITY_MISMATCH",
+            "query": normalized_query,
+            "retrieved_chunks": retrieved,
+            "detail": "The model response provider did not match the provider selected by the routing policy.",
+            "expected_provider": selected_provider,
+            "observed_provider": observed_provider,
+            "model_route": model_route,
+        }
     model_ms = _elapsed_ms(model_started)
     # Advisory only: instruction-like text in sources or output is surfaced, never acted on (TGT-022).
     source_signals = scan_chunks(retrieved)

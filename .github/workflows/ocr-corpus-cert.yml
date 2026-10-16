@@ -1,0 +1,58 @@
+name: OCR Representative Corpus Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "_architecture/ocr_v1_representative_corpus.json"
+      - "backend/app/ocr_analysis.py"
+      - "backend/app/ocr_corpus_eval.py"
+      - "backend/app/ocr_corpus_evidence.py"
+      - "backend/app/ocr_pdf.py"
+      - "backend/app/cli.py"
+      - "backend/tests/fixtures/ocr_v1_representative/**"
+      - "backend/tests/test_ocr_corpus_eval.py"
+      - "backend/tests/test_ocr_corpus_evidence.py"
+      - "scripts/certify_ocr_corpus.py"
+      - ".github/workflows/ocr-corpus-cert.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "_architecture/ocr_v1_representative_corpus.json"
+      - "backend/app/ocr_analysis.py"
+      - "backend/app/ocr_corpus_eval.py"
+      - "backend/app/ocr_corpus_evidence.py"
+      - "backend/app/ocr_pdf.py"
+      - "backend/tests/fixtures/ocr_v1_representative/**"
+      - "scripts/certify_ocr_corpus.py"
+      - ".github/workflows/ocr-corpus-cert.yml"
+
+jobs:
+  certify-ocr-corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install local OCR engines
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa poppler-utils
+      - name: Install Mucaro
+        run: python -m pip install -e ".[dev]"
+      - name: Run OCR corpus regressions
+        run: python -m pytest backend/tests/test_ocr_corpus_eval.py backend/tests/test_ocr_corpus_evidence.py -q
+      - name: Execute bounded OCR corpus certification
+        run: python scripts/certify_ocr_corpus.py --format json
+      - name: Upload OCR corpus evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: ocr-representative-corpus-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            data/exports/ocr_evals/*.json
+            data/exports/release_receipts/ocr_representative_corpus-*.json
+          if-no-files-found: error
+          archive: true

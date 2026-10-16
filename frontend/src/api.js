@@ -255,6 +255,7 @@ export const api = {
   createConversation: (title) => request("/conversations", json("POST", { title })),
   conversation: (id) => request(`/conversations/${id}`),
   renameConversation: (id, title) => request(`/conversations/${id}`, json("PATCH", { title })),
+  updateConversation: (id, changes, expectedRevision) => request(`/conversations/${id}`, json("PATCH", { ...changes, expected_revision: expectedRevision })),
   deleteConversation: (id) => request(`/conversations/${id}`, { method: "DELETE" }),
   conversationRuns: (id) => request(`/conversations/${id}/runs?limit=100`),
 

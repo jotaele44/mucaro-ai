@@ -91,6 +91,14 @@ def extract_source_archive(manifest: dict[str, Any], temp_root: Path) -> Path:
         if roots != {expected_root}:
             raise ValueError(f"unexpected archive root: {','.join(sorted(roots)) or 'none'} expected={expected_root}")
         archive.extractall(temp_root)
+        # Python's ZipFile extraction does not consistently restore POSIX mode bits.
+        # Executable source launchers must remain executable after certification extraction.
+        for info in infos:
+            mode = (info.external_attr >> 16) & 0o777
+            if not mode:
+                continue
+            extracted = temp_root / Path(*PurePosixPath(info.filename).parts)
+            extracted.chmod(mode)
     source_dir = temp_root / expected_root
     if not source_dir.is_dir():
         raise FileNotFoundError(f"extracted source root missing: {source_dir}")

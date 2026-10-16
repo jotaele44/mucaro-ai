@@ -1,5 +1,28 @@
 # Mucaro AI Certification
 
+## Current Candidate
+
+Date: 2026-10-08
+
+The current development candidate is bounded separately from the historical
+certification ledger below:
+
+- Branch: `codex/conversation-organization-current-20261008`
+- Pull request: `#212` (draft)
+- Candidate head: `bfc9601885ffbd24939095c523e7d31aa80c5a6d`
+- Preserved baseline: `v0.1.4-local-persistent-index` at
+  `a1bd219b25bc239f88f30c53902ffd5b4c1bd9a8`
+- Scope: durable conversation organization, revision-safe frontend recovery,
+  transcript isolation, CLI/API parity, and reproducible `httpx2` test tooling.
+- Local release: `CERTIFY_RELEASE_OK`
+- Local security: `SECURITY_GATES_PASS` (11/11 gates)
+- Fresh clone: `FRESH_CLONE_CERT_OK` from the exact candidate SHA
+- Rendered UI: `RENDERED_QA_PASS` (178/178 checks, desktop and iPhone)
+- Hosted CI: `OPEN` while the PR checks are queued; no hosted pass is claimed
+
+The candidate is reviewable and locally validated, but it is not a new
+certified tag and has not been merged to `main`.
+
 ## Baseline Anchor
 
 Date: 2026-08-20
@@ -75,10 +98,11 @@ Candidate target:
   branch protection, and governed tag binding are proven for the current HEAD.
 - Required external receipt: hosted CI and fresh-clone certification must pass on the final pushed commit before tagging. Current release candidates must also build `PACKAGE_ARTIFACT_READY` from the same clean source state before a governed tag.
 
-## Scope
+## Historical Scope
 
-This certification covers the committed `mucaro-ai` source tree intended for the
-`v0.1.2-local-certified` successor tag.
+This section records the historical certification scope associated with the
+`v0.1.2-local-certified` successor tag. It is retained for provenance and does
+not claim that the current candidate head is covered by those older receipts.
 
 Included:
 
@@ -145,7 +169,13 @@ Excluded by design:
 - Reference repo cloning still depends on local internet/DNS access and remains
   outside the committed source certification.
 
-## Status
+## Historical Status
 
 CERTIFIED through `v0.1.4-local-persistent-index` after local release, hosted CI,
 retrieval eval, and fresh-clone gates passed on the final tag target.
+
+## Current Status
+
+The current candidate is `OPEN` pending hosted CI and subsequent review or merge
+decisions. Local exact-head evidence is complete within the bounded candidate
+scope above; no new tag or `CERTIFIED` claim is made here.

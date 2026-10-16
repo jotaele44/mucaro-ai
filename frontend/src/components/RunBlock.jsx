@@ -174,7 +174,11 @@ function Citations({ citations, onOpenCitation }) {
           key={`${citation.chunk_id}-${citation.citation_order}`}
           type="button"
           className="citation-chip"
-          onClick={() => onOpenCitation(citation)}
+          onPointerDown={(event) => event.currentTarget.focus()}
+          onClick={(event) => {
+            event.currentTarget.focus();
+            onOpenCitation(citation);
+          }}
           aria-label={`Open citation ${citation.citation_order}: ${citation.source_url || citation.source_id}`}
         >
           [{citation.citation_order}] {citation.source_url ? hostOf(citation.source_url) : citation.source_id.slice(0, 14)}

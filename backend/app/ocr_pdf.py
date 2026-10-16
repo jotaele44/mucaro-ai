@@ -9,6 +9,7 @@ from typing import Any, Callable
 from pypdf import PdfReader
 
 from .config import Settings, settings
+from .capability_contracts import require_pdf_ocr_report_contract
 from .local_tools import resolve_tool_request
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
 from .utils import stable_id, utc_now, write_json
@@ -75,6 +76,14 @@ def _render_pages(
     if not pages:
         raise PDFOCRAnalysisError("ERROR_OCR_PDF_RENDER_EMPTY", "PDF renderer produced no page images.")
     return pages
+
+
+def _write_report(cfg: Settings, report: dict[str, Any]) -> dict[str, Any]:
+    path = cfg.export_dir / PDF_OCR_REPORT_DIR / f"{report['report_id']}.json"
+    require_pdf_ocr_report_contract(report, report_path=str(path))
+    write_json(path, report)
+    report_sha256 = _sha256_file(path)
+    return {**report, "report_path": str(path), "report_sha256": report_sha256}
 
 
 def analyze_pdf_ocr(
@@ -231,7 +240,4 @@ def analyze_pdf_ocr(
             "treat no-text pages as explicit residue rather than silently dropping them",
         ],
     }
-    report_path = cfg.export_dir / PDF_OCR_REPORT_DIR / f"{report_id}.json"
-    write_json(report_path, report)
-    report_sha256 = _sha256_file(report_path)
-    return {**report, "report_path": str(report_path), "report_sha256": report_sha256}
+    return _write_report(cfg, report)

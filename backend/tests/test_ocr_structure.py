@@ -70,6 +70,27 @@ def test_multicolumn_geometry_closes_span_accounting() -> None:
     assert all(result["invariants"].values())
 
 
+def test_multicolumn_handles_tesseract_shared_line_keys_across_columns() -> None:
+    spans = [
+        span(0, "LEFTALPHA", x=120, y=140, width=290, height=38, block=1, line=1, word=1),
+        span(1, "RIGHTALPHA", x=1050, y=150, width=325, height=40, block=1, line=1, word=2),
+        span(2, "LEFTBETA", x=120, y=300, width=255, height=38, block=2, line=1, word=1),
+        span(3, "RIGHTBETA", x=1050, y=310, width=290, height=40, block=2, line=1, word=2),
+        span(4, "LEFTGAMMA", x=120, y=460, width=320, height=40, block=3, line=1, word=1),
+        span(5, "RIGHTGAMMA", x=1050, y=470, width=355, height=40, block=3, line=1, word=2),
+    ]
+    result = reconstruct_multicolumn(spans)
+    assert result["status"] == "OCR_MULTI_COLUMN_OK"
+    assert result["column_count"] == 2
+    assert [column["raw_lines"] for column in result["columns"]] == [
+        ["LEFTALPHA", "LEFTBETA", "LEFTGAMMA"],
+        ["RIGHTALPHA", "RIGHTBETA", "RIGHTGAMMA"],
+    ]
+    assert result["reading_order_span_indices"] == [0, 2, 4, 1, 3, 5]
+    assert result["invariants"]["all_input_spans_classified"] is True
+    assert result["invariants"]["span_assignment_unique"] is True
+
+
 def test_single_column_does_not_synthesize_multicolumn() -> None:
     spans = [
         span(0, "One", x=50, y=50, width=180, block=1, line=1),
