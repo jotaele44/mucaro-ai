@@ -1470,7 +1470,9 @@
       "implementation_refs": [
         "scripts/build_macos_app.py",
         "packaging/macos/mucaro.spec",
-        "packaging/macos/requirements-macos-arm64.lock"
+        "packaging/macos/requirements-macos-arm64.lock",
+        "packaging/runtime/macos-arm64.json",
+        "packaging/runtime/requirements-macos-arm64.lock"
       ],
       "dependencies": [],
       "positive_gate": "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
@@ -1479,12 +1481,13 @@
       "evidence_refs": [
         "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
         "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
-        "backend/tests/test_macos_packaging.py::test_lock_is_fully_hash_pinned_and_covers_every_input"
+        "backend/tests/test_macos_packaging.py::test_lock_is_fully_hash_pinned_and_covers_every_input",
+        "_architecture/release/evidence/arm64_runtime_source_20261016.json"
       ],
       "state": "BLOCKED",
       "blocker_id": "BLK-SIGN-001",
       "dag_node": "N20",
-      "notes": "Both release lanes are required (A7). Native app lane: all eight TGT-026 verifications pass on macOS: bundle validity, launch, resources, runtime dependencies, and no dev server, terminal or source tree; clean reinstall is covered by the E2E reinstall step. The artifact is ad-hoc signed, so it is not yet distributable under the declared Developer ID release class; Gatekeeper rejects it (BLK-SIGN-001). Portable embedded-runtime lane: assembly and verification exist (backend/app/portable_runtime.py); its release-grade gates (portable_embedded_runtime, portable_install_reinstall_smoke) have no exact-head evidence yet."
+      "notes": "Both release lanes are required (A7). Native app lane: all eight TGT-026 verifications pass on macOS; the artifact remains ad-hoc signed, so it is not yet distributable under the declared Developer ID release class (BLK-SIGN-001). Portable lane source boundary: independently retrieved CPython 3.13.15 arm64 bytes, observed archive geometry/logical identity, a dedicated Python 3.13 aarch64 wheel-only hash lock, and packaging/runtime/macos-arm64.json are now frozen by arm64_runtime_source_20261016.json. Portable runtime materialization and portable_install_reinstall_smoke still require exact-head Apple-Silicon execution; source/lock evidence alone does not close those runtime gates."
     },
     {
       "requirement_id": "TGT-027",
@@ -1545,12 +1548,13 @@
         "backend/tests/test_db_upgrade.py",
         "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
         "docs/release/MACOS_APP.md",
-        "backend/tests/test_clean_machine_macos.py::test_distinct_version_flow_emits_all_required_evidence"
+        "backend/tests/test_clean_machine_macos.py::test_distinct_version_flow_emits_all_required_evidence",
+        "_architecture/release/evidence/arm64_runtime_source_20261016.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N20",
-      "notes": "Both release lanes are required (user decision 2026-09-26, assumption A7). Native app lane: bundle replacement keeps data; schema upgrades are atomic and forward-only; a too-new database fails safely with ERROR_DATABASE_SCHEMA_TOO_NEW. Tested: upgrade, interrupted upgrade (rolled back), compatibility refusal, and app reinstall keeping data (macOS E2E). Portable embedded-runtime lane: the distinct-version upgrade/rollback check and the clean-machine flow are implemented and unit-tested, but no receipt from two distinct packaged portable versions exists yet, so this row is PROVISIONAL rather than PASS."
+      "notes": "Both release lanes are required (A7). Native app upgrade/reinstall and database migration behavior are evidenced. The portable arm64 source/lock/manifest boundary is now independently frozen by arm64_runtime_source_20261016.json, removing the former source-input blocker. The distinct-version portable upgrade/rollback and clean-machine packaged lifecycle still have no native Apple-Silicon receipt from two distinct portable versions, so this row remains PROVISIONAL."
     },
     {
       "requirement_id": "TGT-030",
@@ -2117,12 +2121,13 @@
       "evidence_refs": [
         "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
         "_architecture/release/evidence/macos_app_0a806c1e8c98/window.png",
-        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json"
+        "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
+        "_architecture/release/evidence/arm64_runtime_source_20261016.json"
       ],
       "state": "BLOCKED",
       "blocker_id": "BLK-PHYS-001",
       "dag_node": "N20",
-      "notes": "Both release lanes are required (A7). Native app lane: build -> verify bundle -> install -> open (LaunchServices) -> verify GUI (window list, screenshot, GUI-connected signal) -> ingest/ask/cite/export -> quit (Apple Event) -> relaunch -> verify state: all pass on a hosted runner. Portable lane benchmark: not yet run end to end. A literal double-click is BLK-PHYS-001."
+      "notes": "Both release lanes are required (A7). Native app build/install/LaunchServices/GUI/workflow/relaunch evidence is retained. The native arm64 portable source, archive identity and dependency lock are now governed by arm64_runtime_source_20261016.json and packaging/runtime/macos-arm64.json. The portable app benchmark has not yet been executed end to end on that materialized runtime. A literal double-click remains independently blocked by BLK-PHYS-001."
     },
     {
       "requirement_id": "MATRIX-019",
@@ -2143,12 +2148,13 @@
         "backend/tests/test_release_grade_certification.py::test_both_release_lanes_are_required",
         "backend/tests/test_release_grade_certification.py::test_clean_machine_receipt_must_prove_the_bundle_stayed_immutable",
         "_architecture/release/evidence/release_grade_0a806c1e8c98/release_grade_receipt.json",
-        "_architecture/release/evidence/release_grade_0a806c1e8c98/provenance.json"
+        "_architecture/release/evidence/release_grade_0a806c1e8c98/provenance.json",
+        "_architecture/release/evidence/arm64_runtime_source_20261016.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N24",
-      "notes": "The sequence is wired and requires both release lanes (A7). First end-to-end run at 0a806c1 (evidence: release_grade_0a806c1e8c98) with the exact-head native-app build and E2E receipts and the hosted-CI receipt (merge e3cfb5f, tree-equivalent to the head): clean worktree, local release, fresh clone, Python distribution, operator workflow, retrieval and GIS benchmarks, security gates, the packaged app's security profile, source-artifact installability, native-app build and E2E, hosted CI and the final manifest all PASS. Verdict PROVISIONAL, blocked by the four portable-lane gates (no portable inputs produced yet), signed_notarized_installer (BLK-SIGN-001) and release_scope."
+      "notes": "The release-grade sequence still requires both release lanes (A7). Native/common gates retain their prior evidence. The arm64 portable source/lock/manifest input boundary is now frozen and reproducible, but Apple-Silicon runtime materialization, portable install/reinstall, distinct-version rollback, and clean-host packaged lifecycle receipts remain OPEN; signing/notarization and release-scope residue remain independent. Therefore this row remains PROVISIONAL."
     },
     {
       "requirement_id": "MATRIX-020",

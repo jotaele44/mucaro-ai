@@ -331,6 +331,21 @@ def main() -> int:
                     "off",
                 ],
             ),
+            gate_command(
+                "python_runtime_arm64_lock_audit",
+                [
+                    sys.executable,
+                    "-m",
+                    "pip_audit",
+                    "-r",
+                    "packaging/runtime/requirements-macos-arm64.lock",
+                    "--no-deps",
+                    "--disable-pip",
+                    "--strict",
+                    "--progress-spinner",
+                    "off",
+                ],
+            ),
             gate_npm_audit(),
             gate_frontend_build(),
         ]

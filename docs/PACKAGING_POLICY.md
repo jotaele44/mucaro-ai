@@ -99,19 +99,30 @@ local distribution handoff boundary.
 ## Portable Runtime And Application
 
 The portable lane separates runtime provenance from application assembly. The
-governed x86_64 macOS source manifest and wheel-only dependency lock are:
+governed macOS source manifests and wheel-only dependency locks are:
 
-- `packaging/runtime/macos-x86_64.json`
-- `packaging/runtime/requirements-macos-x86_64.lock`
+- native release target:
+  - `packaging/runtime/macos-arm64.json`
+  - `packaging/runtime/requirements-macos-arm64.lock`
+- compatibility-only Intel lane:
+  - `packaging/runtime/macos-x86_64.json`
+  - `packaging/runtime/requirements-macos-x86_64.lock`
 
-Materialize and verify the runtime before building an application:
+The arm64 manifest is source-bound from independently retrieved `20260901`
+CPython 3.13.15 bytes and observed archive geometry. It does not by itself
+certify materialization or the packaged lifecycle.
+
+Materialize and verify the native runtime before building an application:
 
 ```bash
-PYTHONPATH=.:backend python3 scripts/mucaro.py package portable-runtime --format text
 PYTHONPATH=.:backend python3 scripts/mucaro.py package portable-runtime \
-  --verify data/exports/portable_runtimes/macos-x86_64 --format text
+  --manifest packaging/runtime/macos-arm64.json --format text
+PYTHONPATH=.:backend python3 scripts/mucaro.py package portable-runtime \
+  --manifest packaging/runtime/macos-arm64.json \
+  --verify data/exports/portable_runtimes/macos-arm64 --format text
 PYTHONPATH=.:backend python3 scripts/mucaro.py package portable-macos-app \
-  --runtime-dir data/exports/portable_runtimes/macos-x86_64 --format text
+  --runtime-manifest packaging/runtime/macos-arm64.json \
+  --runtime-dir data/exports/portable_runtimes/macos-arm64 --format text
 ```
 
 The materializer accepts only the exact HTTPS archive, byte count, SHA-256,
