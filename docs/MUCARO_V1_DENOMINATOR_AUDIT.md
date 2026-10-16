@@ -161,3 +161,26 @@ Resulting legacy overlay arithmetic:
 - RETRIEVAL: `90.0%` — `PASS=8 / PROVISIONAL=2`
 
 This is not retrieval-domain or release certification.
+
+
+## OCR-08 bounded printed structure PASS
+
+Audit head: `acd03906a797821560d780f929c7f447c2f0565f`.
+
+- `OCR-08 OPEN → PASS`: PR #231 merged the live bounded printed-structure repair.
+- Dedicated OCR08 Structure Certification run `38947779399` / job `117131185194` completed successfully.
+- Artifact `12066897303` digest `sha256:9108cc22694489bbb71c93b39801d9be5cbb1cfddfc3c99b8323e8adfa61a48b`.
+- Frozen benchmark SHA-256: `0d6f6f253948592f60d4a0e2fca1d5a1edf73916a3d989f11f2619356ea1d52e`.
+- Real Tesseract 5.3.4 / PSM 3 produced and reconstructed the bounded multi-column, rectangular-table and colon-labeled-form positives.
+- All six benchmark states matched: 3/3 positive structures and 3/3 negative fail-closed cases.
+- `positive_case_pass_rate=1.0`, `negative_fail_closed_rate=1.0`, `span_accounting_rate=1.0`, zero threshold failures.
+- Full CI `38947779262`, Rendered UI QA `38947779408` (Chromium + WebKit), and macOS app `38947779298` also passed on candidate head `7ca63011ef460ff98b317e964b2ff6f11c40e9e9`.
+
+Resulting overlay arithmetic:
+
+- current raw completion: `76.0%`
+- current weighted completion: `77.6%`
+- applied events: `25`
+- OCR: `60.0%` — `PASS=4 / PROVISIONAL=4 / OPEN=2`
+
+The promoted structures remain explicitly `INFERENCE / CANDIDATE_NOT_IDENTITY`. OCR-09 handwriting/difficult-scan coverage and OCR-10 representative-corpus certification remain OPEN; this event does not promote those rows or broad release requirement TGT-005.
