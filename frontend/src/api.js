@@ -290,6 +290,13 @@ export const api = {
   revokeDirectoryPermission: (payload) => request("/permissions/directories/revoke", json("POST", payload)),
   ingestPath: (payload) => request("/ingest-path", json("POST", payload)),
 
+  learning: () => request("/learning"),
+  learningCapture: (payload) => request("/learning/capture", json("POST", payload)),
+  learningRecognize: (payload) => request("/learning/recognize", json("POST", payload)),
+  learningScan: (id, payload) => request(`/learning/scan-run/${encodeURIComponent(id)}`, json("POST", payload)),
+  learningAction: (id, action, payload) => request(`/learning/${encodeURIComponent(id)}/${action}`, json("POST", payload)),
+  learningFeedback: (payload) => request("/learning/feedback", json("POST", payload)),
+  learningRecommend: (context) => request(`/learning/recommend?context=${encodeURIComponent(context)}`),
   memory: () => request("/memory"),
   remember: (content, kind) => request("/memory", json("POST", { content, kind })),
   updateMemory: (id, enabled) => request(`/memory/${id}`, json("PATCH", { enabled })),

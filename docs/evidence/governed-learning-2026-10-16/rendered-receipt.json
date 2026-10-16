@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "scope": "learning fixture UI; chromium desktop/mobile widths",
+  "checks": [
+    {
+      "width": 1440,
+      "lifecycle": "PASS",
+      "reward_interface": "PASS",
+      "rollback": "PASS",
+      "overflow": false,
+      "serious_a11y": 0,
+      "page_errors": []
+    },
+    {
+      "width": 393,
+      "lifecycle": "PASS",
+      "reward_interface": "PASS",
+      "rollback": "PASS",
+      "overflow": false,
+      "serious_a11y": 0,
+      "page_errors": []
+    },
+    {
+      "width": 430,
+      "lifecycle": "PASS",
+      "reward_interface": "PASS",
+      "rollback": "PASS",
+      "overflow": false,
+      "serious_a11y": 0,
+      "page_errors": []
+    }
+  ]
+}

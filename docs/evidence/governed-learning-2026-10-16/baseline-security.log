@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_listening_addresses_see_a_real_all_interfaces_bind ____________
+
+    @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="reads /proc")
+    def test_listening_addresses_see_a_real_all_interfaces_bind() -> None:
+        loopback = socket.socket()
+        public = socket.socket()
+        try:
+            loopback.bind(("127.0.0.1", 0))
+            loopback.listen()
+            public.bind(("0.0.0.0", 0))
+            public.listen()
+            addresses = sg.listening_addresses(os.getpid())
+>           assert f"127.0.0.1:{loopback.getsockname()[1]}" in addresses
+E           AssertionError: assert '127.0.0.1:44427' in []
+
+backend/tests/test_security_gates.py:112: AssertionError
+=========================== short test summary info ============================
+FAILED backend/tests/test_security_gates.py::test_listening_addresses_see_a_real_all_interfaces_bind
+1 failed in 0.05s

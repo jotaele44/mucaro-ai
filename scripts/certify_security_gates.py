@@ -144,7 +144,14 @@ def network_exposure_gate() -> dict[str, Any]:
                 except (OSError, json.JSONDecodeError):
                     security = {}
                 time.sleep(0.1)
-            addresses = listening_addresses(proc.pid)
+            try:
+                addresses = listening_addresses(proc.pid)
+            except OSError as exc:
+                return gate("network_exposure", False, {
+                    "observation_status": "BLOCKED", "requested_pid": proc.pid,
+                    "reason": "Cannot independently inspect the service process in this environment",
+                    "error_type": type(exc).__name__,
+                })
             modes = {
                 "data_dir": oct(stat.S_IMODE(data_dir.stat().st_mode)),
                 "instance_json": oct(stat.S_IMODE(instance_path.stat().st_mode)),
