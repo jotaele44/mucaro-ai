@@ -8,6 +8,7 @@ from typing import Any
 from time import time
 from .capability_policy import CapabilityPolicy, evaluate_capabilities
 from .agent_claim_authority import ClaimIssuer, policy_digest as authority_policy_digest
+from .scoped_agent_claim import ScopedClaimIssuer, ScopedClaimVerifier
 from .config import Settings
 from .governed_learning_loop import digest
 from .leased_agent_queue import LeasedAgentQueue
@@ -30,6 +31,12 @@ class GovernedSkillBridge:
             queue.claim_verifier.policy != policy or
             queue.claim_verifier.issuer_id != claim_issuer.issuer_id):
             raise DispatchGateError("CLAIM_AUTHORITY_NOT_BOUND")
+        if isinstance(claim_issuer,ScopedClaimIssuer):
+            verifier=queue.claim_verifier
+            if (not isinstance(verifier,ScopedClaimVerifier)
+                or verifier.scope != claim_issuer.scope
+                or not claim_issuer.scope.matches_runtime(cfg.project_root)):
+                raise DispatchGateError("SCOPED_RUNTIME_IDENTITY_DENIED")
         self.policy_digest = authority_policy_digest(policy)
 
     def _authorize(self, skill_id: str):
@@ -60,6 +67,10 @@ class GovernedSkillBridge:
         if not isinstance(arguments,dict):
             raise DispatchGateError("INVALID_ARGUMENTS")
         skill=self._authorize(skill_id)
+        if isinstance(self.claim_issuer,ScopedClaimIssuer):
+            if (self.claim_issuer.scope.skill_id!=skill_id or
+                not self.claim_issuer.scope.matches_runtime(self.cfg.project_root)):
+                raise DispatchGateError("SOURCE_OR_WORKSPACE_DRIFT")
         inp=digest({"skill_id":skill_id,"skill_digest":skill.digest,"arguments":arguments})
         self.queue.submit(job_id,run_id,"EXECUTE",inp,self.policy_digest,max_attempts=2)
         issued_at=int(time())
