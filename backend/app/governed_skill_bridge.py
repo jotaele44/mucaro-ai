@@ -26,7 +26,9 @@ class GovernedSkillBridge:
                  policy: CapabilityPolicy, claim_issuer: ClaimIssuer):
         self.queue, self.cfg, self.policy = queue, cfg, policy
         self.claim_issuer = claim_issuer
-        if claim_issuer.policy != policy or queue.claim_verifier is None:
+        if (claim_issuer.policy != policy or queue.claim_verifier is None or
+            queue.claim_verifier.policy != policy or
+            queue.claim_verifier.issuer_id != claim_issuer.issuer_id):
             raise DispatchGateError("CLAIM_AUTHORITY_NOT_BOUND")
         self.policy_digest = authority_policy_digest(policy)
 
