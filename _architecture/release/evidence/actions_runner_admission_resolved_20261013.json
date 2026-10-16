@@ -1,0 +1,78 @@
+{
+  "schema_version": "mucaro-actions-runner-admission-resolution/1.0",
+  "repository": "jotaele44/mucaro-ai",
+  "blocker_id": "BLK-ACTIONS-001",
+  "resolution_state": "RESOLVED",
+  "resolution_basis": "GitHub-hosted runner admission resumed and executed real workflow steps on multiple exact pull-request heads.",
+  "resolution_observed_by_utc": "2026-10-13T04:03:14Z",
+  "successful_executions": [
+    {
+      "pull_request": 114,
+      "head_sha": "c3787835e1e50ee18bad48e7fe62514ef239cbf1",
+      "workflow": "CI",
+      "run_id": 38344568273,
+      "job_id": 115122849026,
+      "job_name": "validate",
+      "conclusion": "success",
+      "executed_step_count": 23
+    },
+    {
+      "pull_request": 114,
+      "head_sha": "c3787835e1e50ee18bad48e7fe62514ef239cbf1",
+      "workflow": "Rendered UI QA",
+      "run_id": 38344568297,
+      "job_ids": [115122849279, 115122849395],
+      "job_names": ["rendered-qa (webkit)", "rendered-qa (chromium)"],
+      "conclusion": "success"
+    },
+    {
+      "pull_request": 114,
+      "head_sha": "c3787835e1e50ee18bad48e7fe62514ef239cbf1",
+      "workflow": "macOS app",
+      "run_id": 38344568275,
+      "job_id": 115122849043,
+      "job_name": "build-and-verify",
+      "conclusion": "success"
+    },
+    {
+      "pull_request": 117,
+      "head_sha": "7b1cd0767f2b15d81410716c360c935c7a5f4994",
+      "workflow": "CI",
+      "run_id": 38344565848,
+      "job_id": 115122841366,
+      "job_name": "validate",
+      "conclusion": "success",
+      "executed_step_count": 23
+    },
+    {
+      "pull_request": 117,
+      "head_sha": "7b1cd0767f2b15d81410716c360c935c7a5f4994",
+      "workflow": "Rendered UI QA",
+      "run_id": 38344565870,
+      "job_ids": [115122841574, 115122841987],
+      "job_names": ["rendered-qa (webkit)", "rendered-qa (chromium)"],
+      "conclusion": "success"
+    },
+    {
+      "pull_request": 117,
+      "head_sha": "7b1cd0767f2b15d81410716c360c935c7a5f4994",
+      "workflow": "macOS app",
+      "run_id": 38344565935,
+      "job_id": 115122841860,
+      "job_name": "build-and-verify",
+      "conclusion": "success"
+    }
+  ],
+  "falsification": {
+    "prior_universal_zero_step_condition": "FALSIFIED",
+    "reason": "Later jobs on the same repository executed nonzero workflow steps to completion."
+  },
+  "scope": {
+    "resolved": "runner admission only",
+    "not_resolved": [
+      "RT-10/MATRIX-007 production-scale benchmark execution",
+      "OCR08 structure certification",
+      "release scope terminal closure"
+    ]
+  }
+}
