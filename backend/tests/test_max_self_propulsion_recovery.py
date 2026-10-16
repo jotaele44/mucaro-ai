@@ -6,6 +6,8 @@ from types import SimpleNamespace
 
 from backend.app.governed_learning_loop import digest
 from backend.app.leased_agent_queue import LeasedAgentQueue, WorkerGateError
+from backend.app.capability_policy import CapabilityPolicy
+from backend.app.agent_claim_authority import ClaimIssuer, ClaimVerifier, policy_digest
 from backend.app.goal_reactor import GoalReactor
 from backend.app.bounded_self_propulsion_pilot import (
     drive_approved_goal, execute_next_approved_task,
@@ -16,17 +18,30 @@ class RecoveryTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         folder=Path(self.temp.name)
-        self.q=LeasedAgentQueue(folder/"queue.sqlite")
         self.g=GoalReactor(folder/"goal.sqlite")
-        self.addCleanup(self.q.close)
         self.addCleanup(self.g.close)
         self.skill="mucaro/intelligence-plane-health"
         self.version="sha256:"+"f"*64
-        self.policy=digest({"policy":"test"})
+        policy=CapabilityPolicy.build(policy_id="recovery-test",allowed={"runtime.in_process"})
+        self.policy=policy_digest(policy)
+        self.now=[100]
+        key=b"recovery-isolated-fixture-key-at-least-thirty-two-bytes"
+        reviewed={self.skill:self.version}
+        self.issuer=ClaimIssuer("recovery-fixture",key,policy,reviewed)
+        self.q=LeasedAgentQueue(folder/"queue.sqlite",
+            claim_verifier=ClaimVerifier("recovery-fixture",key,reviewed),
+            clock=lambda:self.now[0])
+        self.addCleanup(self.q.close)
         self.g.add_goal(goal_id="g",description="approved limited fixture",
                         authority_digest=self.policy,limit_cost=3)
         self.calls=0
         self.args={}
+
+    def grant(self, job_id, run_id, worker_id, input_digest):
+        return self.issuer.issue(job_id=job_id,run_id=run_id,phase="EXECUTE",
+            input_digest=input_digest,policy_hash=self.policy,owner=worker_id,
+            skill_id=self.skill,skill_digest=self.version,
+            issued_at=self.now[0],expires_at=self.now[0]+60)
 
     def add(self, task_id, dependencies=()):
         self.g.add_task(task_id=task_id,goal_id="g",phase="EXECUTE",
@@ -45,10 +60,11 @@ class RecoveryTests(unittest.TestCase):
             assert execute, "worker should not be invoked during recovery"
             inp=digest({"skill_id":skill_id,"skill_digest":self.version,"arguments":arguments})
             self.q.submit(job_id,run_id,"EXECUTE",inp,self.policy)
-            claim=self.q.claim(job_id,worker_id,100,10,permitted=True)
+            claim=self.q.claim(job_id,worker_id,10,
+                authorization=self.grant(job_id,run_id,worker_id,inp))
             assert claim is not None
             output={"status":"PASS","result":self.calls}
-            assert self.q.finish(job_id,worker_id,claim["fence"],output,101)
+            assert self.q.finish(job_id,worker_id,claim["fence"],output)
             return {"status":"PASS","output_digest":digest(output)}
         bridge.execute_readonly=run
         return bridge
@@ -57,9 +73,10 @@ class RecoveryTests(unittest.TestCase):
         self.add("first")
         inp=digest({"skill_id":self.skill,"skill_digest":self.version,"arguments":{}})
         self.q.submit("first",digest(["goal-task","g","first"]),"EXECUTE",inp,self.policy)
-        token=self.q.claim("first","worker-1",100,10,permitted=True)
+        token=self.q.claim("first","worker-1",10,
+            authorization=self.grant("first",digest(["goal-task","g","first"]),"worker-1",inp))
         output={"status":"PASS","result":"already-completed"}
-        self.assertTrue(self.q.finish("first","worker-1",token["fence"],output,101))
+        self.assertTrue(self.q.finish("first","worker-1",token["fence"],output))
         result=execute_next_approved_task(reactor=self.g,bridge=self.bridge(execute=False),
             goal_id="g",task_arguments=self.args,worker_id="worker-2")
         self.assertTrue(result["recovered_from_completed_worker"])
@@ -70,8 +87,9 @@ class RecoveryTests(unittest.TestCase):
     def test_completed_receipt_mismatch_blocks_recovery(self):
         self.add("first")
         self.q.submit("first","different-run","EXECUTE",digest("other"),self.policy)
-        t=self.q.claim("first","worker",100,10,permitted=True)
-        self.q.finish("first","worker",t["fence"],{"status":"PASS"},101)
+        t=self.q.claim("first","worker",10,
+            authorization=self.grant("first","different-run","worker",digest("other")))
+        self.q.finish("first","worker",t["fence"],{"status":"PASS"})
         r=execute_next_approved_task(reactor=self.g,bridge=self.bridge(execute=False),
             goal_id="g",task_arguments=self.args,worker_id="worker")
         self.assertEqual(r["reason"],"COMPLETION_IDENTITY_CONFLICT")
