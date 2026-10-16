@@ -5,6 +5,10 @@ on:
   pull_request:
     paths:
       - "_architecture/performance_benchmark_v1.json"
+      - "_architecture/release/acceptance_ledger_v1.json"
+      - "_architecture/release/release_dag_v1.json"
+      - "_architecture/release/evidence/matrix017_performance_execution_*.json"
+      - "docs/RELEASE_STATUS.md"
       - "backend/app/performance_benchmark.py"
       - "backend/tests/test_performance_benchmark.py"
       - "scripts/bench_latency.py"
@@ -14,6 +18,10 @@ on:
     branches: [main]
     paths:
       - "_architecture/performance_benchmark_v1.json"
+      - "_architecture/release/acceptance_ledger_v1.json"
+      - "_architecture/release/release_dag_v1.json"
+      - "_architecture/release/evidence/matrix017_performance_execution_*.json"
+      - "docs/RELEASE_STATUS.md"
       - "backend/app/performance_benchmark.py"
       - "backend/tests/test_performance_benchmark.py"
       - "scripts/bench_latency.py"
