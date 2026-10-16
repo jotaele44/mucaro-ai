@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "f70ebd8e815bd4f4044b67455c8a33c7ef05789b",
+  "audit_head": "acd03906a797821560d780f929c7f447c2f0565f",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -340,6 +340,27 @@
         "certification report sha256=0249b023d286c9e6332fbd98e633b49797cd98e631c0efcad34c123f0fb3fe6e"
       ],
       "reason": "The frozen real-world corpus gate authorizes at most RT-09 OPEN→PROVISIONAL. A 24-document authoritative IETF/W3C/NIST corpus was acquired, hash-frozen, parsed across TXT/HTML/PDF, evaluated against 24 exact source-bound queries with 100% top-5 hit rate, and bound to exact manifest/source/query denominators. RT-10 production-scale stress remains independently unresolved, so PASS is not authorized."
+    },
+    {
+      "event_id": "evt-ocr08-bounded-structure-pass",
+      "requirement_id": "OCR-08",
+      "from_state": "OPEN",
+      "to_state": "PASS",
+      "evidence_type": "MERGED_LIVE_BOUNDED_PRINTED_STRUCTURE_CERTIFICATION_WITH_NEGATIVE_GATES",
+      "evidence": [
+        "PR#231",
+        "main@acd03906a797821560d780f929c7f447c2f0565f",
+        "candidate head@7ca63011ef460ff98b317e964b2ff6f11c40e9e9",
+        "GitHub Actions OCR08 Structure Certification run 38947779399 job 117131185194 conclusion=success",
+        "GitHub Actions CI run 38947779262 conclusion=success",
+        "GitHub Actions Rendered UI QA run 38947779408 Chromium/WebKit conclusion=success",
+        "GitHub Actions macOS app run 38947779298 conclusion=success",
+        "artifact#12066897303 digest=sha256:9108cc22694489bbb71c93b39801d9be5cbb1cfddfc3c99b8323e8adfa61a48b",
+        "benchmark sha256=0d6f6f253948592f60d4a0e2fca1d5a1edf73916a3d989f11f2619356ea1d52e",
+        "123 OCR structure regressions passed; 6/6 benchmark states matched; positive_case_pass_rate=1.0; negative_fail_closed_rate=1.0; span_accounting_rate=1.0; threshold_failures=[]",
+        "real Tesseract 5.3.4 PSM3 multi-column/table/form execution; negative single-column/ambiguous-table/duplicate-form cases remained unresolved"
+      ],
+      "reason": "OCR-08 is specifically bounded multi-column, table and form reconstruction. PR #231 repaired the live Tesseract shared-line multi-column defect without weakening thresholds, then passed the dedicated six-case live certification, full CI, Chromium/WebKit and macOS gates. The positive structures remain explicitly INFERENCE/CANDIDATE_NOT_IDENTITY and all negative cases fail closed. OCR-09 handwriting/difficult-scan coverage and OCR-10 representative corpus remain independently OPEN; this event does not promote them or broad TGT-005."
     }
   ]
 }
