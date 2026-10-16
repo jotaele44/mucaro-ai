@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import hmac
 import json
+from types import MappingProxyType
 from typing import Any, Mapping
 from .capability_policy import CapabilityPolicy, evaluate_capabilities
 from .governed_learning_loop import digest
@@ -43,6 +44,8 @@ class ClaimIssuer:
         _secret(self.secret)
         if not self.issuer_id or not self.reviewed_skills:
             raise ClaimAuthorityError("ISSUER_SCOPE_REQUIRED")
+        object.__setattr__(self,"reviewed_skills",
+                           MappingProxyType(dict(self.reviewed_skills)))
 
     def issue(self, *, job_id: str, run_id: str, phase: str,
               input_digest: str, policy_hash: str, owner: str,
@@ -73,12 +76,15 @@ class ClaimIssuer:
 class ClaimVerifier:
     issuer_id: str
     secret: bytes
+    policy: CapabilityPolicy
     reviewed_skills: Mapping[str,str]
 
     def __post_init__(self):
         _secret(self.secret)
         if not self.issuer_id or not self.reviewed_skills:
             raise ClaimAuthorityError("VERIFIER_SCOPE_REQUIRED")
+        object.__setattr__(self,"reviewed_skills",
+                           MappingProxyType(dict(self.reviewed_skills)))
 
     def verify(self, grant: object, *, job_id: str, run_id: str,
                phase: str, input_digest: str, policy_hash: str,
@@ -95,7 +101,8 @@ class ClaimVerifier:
             payload={k:v for k,v in grant.items() if k!="signature"}
             if not hmac.compare_digest(signature,_sign(self.secret,payload)):
                 return False
-            if (payload["schema"]!=SCHEMA or payload["issuer_id"]!=self.issuer_id
+            if (policy_hash!=policy_digest(self.policy)
+                or payload["schema"]!=SCHEMA or payload["issuer_id"]!=self.issuer_id
                 or payload["job_id"]!=job_id or payload["run_id"]!=run_id
                 or payload["phase"]!=phase or payload["input_digest"]!=input_digest
                 or payload["policy_digest"]!=policy_hash or payload["owner"]!=owner
