@@ -5,6 +5,7 @@ eligible. No unattended side-effecting, remote, training or promotion actions.
 """
 from __future__ import annotations
 from typing import Any
+from time import time
 from .capability_policy import CapabilityPolicy, evaluate_capabilities
 from .config import Settings
 from .governed_learning_loop import digest
@@ -45,13 +46,13 @@ class GovernedSkillBridge:
 
     def execute_readonly(self, *, job_id: str, run_id: str,
                          skill_id: str, arguments: dict[str,Any],
-                         worker_id: str, now: int, lease_seconds: int = 30) -> dict[str,Any]:
+                         worker_id: str, lease_seconds: int = 30) -> dict[str,Any]:
         if not isinstance(arguments,dict):
             raise DispatchGateError("INVALID_ARGUMENTS")
         skill=self._authorize(skill_id)
         inp=digest({"skill_id":skill_id,"skill_digest":skill.digest,"arguments":arguments})
         self.queue.submit(job_id,run_id,"EXECUTE",inp,self.policy_digest,max_attempts=2)
-        claim=self.queue.claim(job_id,worker_id,now,lease_seconds,permitted=True)
+        claim=self.queue.claim(job_id,worker_id,int(time()),lease_seconds,permitted=True)
         if claim is None:
             return {"status":"BLOCKED","reason":"NO_AUTHORIZED_CLAIM"}
         if claim["input_digest"]!=inp or claim["policy_digest"]!=self.policy_digest:
@@ -75,7 +76,7 @@ class GovernedSkillBridge:
                 "skill_digest":skill.digest,
                 "runtime_identity_digest":digest(evidence.get("runtime_identity")),
                 "result_digest":digest(executed.get("result"))}
-        completed=self.queue.finish(job_id,worker_id,claim["fence"],output,now)
+        completed=self.queue.finish(job_id,worker_id,claim["fence"],output,int(time()))
         if not completed:
             return {"status":"BLOCKED","reason":"STALE_FENCE_OR_LEASE"}
         return {"status":"PASS","job_id":job_id,"claim_fence":claim["fence"],
