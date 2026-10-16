@@ -1,0 +1,55 @@
+name: MATRIX-017 Performance Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "_architecture/performance_benchmark_v1.json"
+      - "backend/app/performance_benchmark.py"
+      - "backend/tests/test_performance_benchmark.py"
+      - "scripts/bench_latency.py"
+      - "scripts/certify_performance.py"
+      - ".github/workflows/performance-cert.yml"
+  push:
+    branches: [main]
+    paths:
+      - "_architecture/performance_benchmark_v1.json"
+      - "backend/app/performance_benchmark.py"
+      - "backend/tests/test_performance_benchmark.py"
+      - "scripts/bench_latency.py"
+      - "scripts/certify_performance.py"
+      - ".github/workflows/performance-cert.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  certify-performance:
+    runs-on: macos-14
+    timeout-minutes: 20
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install Mucaro
+        run: python -m pip install -e ".[dev]"
+      - name: Validate MATRIX-017 benchmark and falsification gates
+        run: python -m pytest backend/tests/test_performance_benchmark.py -q
+      - name: Execute frozen work-run benchmark
+        env:
+          PERF_OUT: ${{ runner.temp }}/matrix017/matrix017-performance.json
+        run: python scripts/certify_performance.py --output "$PERF_OUT"
+      - name: Upload exact-head performance evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: matrix017-performance-${{ env.HEAD_SHA }}
+          path: ${{ runner.temp }}/matrix017
+          if-no-files-found: warn
+          archive: true
