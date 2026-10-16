@@ -246,5 +246,19 @@ class BridgeTests(unittest.TestCase):
         self.assertIsNone(self.q.state("job"))
 
 
+    def test_arbitrary_zero_capability_skill_is_not_eligible(self):
+        from backend.app import governed_skill_bridge as mod
+        skill_id="unreviewed/declared-zero-capabilities"
+        unreviewed=SimpleNamespace(skill_id=skill_id,runtime="IN_PROCESS",
+                                   capabilities=(),digest="sha256:"+"b"*64)
+        with patch.dict(mod.SKILL_REGISTRY,{skill_id:unreviewed}):
+            b=mod.GovernedSkillBridge(queue=self.q,cfg=SimpleNamespace(),
+                                      policy=self.policy)
+            with self.assertRaises(mod.DispatchGateError):
+                b.execute_readonly(job_id="job",run_id="goal",skill_id=skill_id,
+                                   arguments={},worker_id="worker")
+        self.assertIsNone(self.q.state("job"))
+
+
 if __name__=="__main__":
     unittest.main()
