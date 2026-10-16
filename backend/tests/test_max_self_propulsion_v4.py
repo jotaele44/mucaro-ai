@@ -177,7 +177,7 @@ class BridgeTests(unittest.TestCase):
         reviewed={self.skill_id:self.skill.digest}
         self.issuer=ClaimIssuer("isolated-test",key,self.policy,reviewed)
         self.q=LeasedAgentQueue(self.path/"queue.sqlite",
-            claim_verifier=ClaimVerifier("isolated-test",key,reviewed))
+            claim_verifier=ClaimVerifier("isolated-test",key,self.policy,reviewed))
         self.addCleanup(self.q.close)
 
     def _execute(self, skill=None, arguments=None, goal=True):
