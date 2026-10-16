@@ -32,9 +32,10 @@ def execute_next_approved_task(*, reactor: GoalReactor, bridge: GovernedSkillBri
     goal=reactor.summary(goal_id)
     if goal["goal"][1]!=bridge.policy_digest:
         return {"status":"BLOCKED","reason":"GOAL_POLICY_MISMATCH","task_id":task_id}
+    task_run_id=digest(["goal-task",goal_id,task_id])
     completed=bridge.queue.verified_completion(task_id)
     if completed is not None:
-        if (completed["run_id"]!=goal_id or completed["phase"]!="EXECUTE" or
+        if (completed["run_id"]!=task_run_id or completed["phase"]!="EXECUTE" or
             completed["input_digest"]!=binding or
             completed["policy_digest"]!=bridge.policy_digest):
             return {"status":"BLOCKED","reason":"COMPLETION_IDENTITY_CONFLICT","task_id":task_id}
@@ -45,7 +46,7 @@ def execute_next_approved_task(*, reactor: GoalReactor, bridge: GovernedSkillBri
                 "recovered_from_completed_worker":True,
                 "verified_output_digest":completed["output_digest"],
                 "next":reactor.select(goal_id)}
-    result=bridge.execute_readonly(job_id=task_id,run_id=goal_id,
+    result=bridge.execute_readonly(job_id=task_id,run_id=task_run_id,
         skill_id=candidate["skill_id"],arguments=arguments,
         worker_id=worker_id)
     if result["status"]!="PASS":
