@@ -9,7 +9,7 @@ def init(tmp_path):
     key=b"queue-isolated-fixture-key-at-least-thirty-two-bytes"
     policy=CapabilityPolicy.build(policy_id="queue-fixture",allowed={"runtime.in_process"})
     reviewed={"mucaro/intelligence-plane-health":"sha256:"+"a"*64}
-    verifier=ClaimVerifier("queue-fixture",key,reviewed)
+    verifier=ClaimVerifier("queue-fixture",key,policy,reviewed)
     q=LeasedAgentQueue(tmp_path/"queue.sqlite",claim_verifier=verifier,
                        clock=lambda: q.test_now[0])
     q.test_now=[100]
