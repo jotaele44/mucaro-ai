@@ -31,7 +31,7 @@
       "class": "CLEAN_SPANISH_ACCENTS",
       "input_kind": "image",
       "source_path": "backend/tests/fixtures/ocr_v1_representative/clean-spanish.png",
-      "source_sha256": "bc7f02a817688a56235450854a961a625ecc39905a172fc21901bfb268d43c5a",
+      "source_sha256": "41051f8b6ea4fed7bff61135ab19119e24e35c2390ba742da21af93653ed4456",
       "language": "spa",
       "layout_mode": "single_block",
       "expected_state": "PROVISIONAL",
