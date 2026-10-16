@@ -546,11 +546,11 @@ def create_app(cfg: Settings = settings) -> FastAPI:
 
     @app.get("/models")
     def models() -> dict:
-        return {"status": "MODEL_PROVIDERS_OK", "providers": list_model_providers()}
+        return {"status": "MODEL_PROVIDERS_OK", "providers": list_model_providers(cfg)}
 
     @app.get("/offline-manifest")
     def offline_manifest(offline: bool = False) -> dict:
-        return build_offline_manifest(system_offline=offline)
+        return build_offline_manifest(system_offline=offline, cfg=cfg)
 
     @app.get("/work-runs/modes")
     def work_run_modes() -> dict:
