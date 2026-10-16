@@ -11,7 +11,7 @@ from .governed_skill_bridge import GovernedSkillBridge
 
 def execute_next_approved_task(*, reactor: GoalReactor, bridge: GovernedSkillBridge,
         goal_id: str, task_arguments: dict[str,dict[str,Any]],
-        worker_id: str, now: int) -> dict[str,Any]:
+        worker_id: str) -> dict[str,Any]:
     selected=reactor.select(goal_id)
     if selected["status"]!="READY":
         return selected
@@ -34,7 +34,7 @@ def execute_next_approved_task(*, reactor: GoalReactor, bridge: GovernedSkillBri
         return {"status":"BLOCKED","reason":"GOAL_POLICY_MISMATCH","task_id":task_id}
     result=bridge.execute_readonly(job_id=task_id,run_id=goal_id,
         skill_id=candidate["skill_id"],arguments=arguments,
-        worker_id=worker_id,now=now)
+        worker_id=worker_id)
     if result["status"]!="PASS":
         return {"status":result["status"],"reason":result.get("reason"),
                 "task_id":task_id}
