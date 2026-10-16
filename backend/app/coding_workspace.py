@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings, settings
-from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .local_tools import resolve_local_tool
+from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .permissions import DirectoryPermissionError, ensure_directory_permission, is_within_path
 
 DEFAULT_FILE_MAX_BYTES = 256 * 1024
