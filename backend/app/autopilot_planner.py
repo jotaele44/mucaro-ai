@@ -348,6 +348,9 @@ def replan_autopilot(
     successor_state = deepcopy((successor.get("metadata") or {}).get("autopilot"))
     successor_state["counters"] = deepcopy(counters)
     successor_state["counters"]["replans"] = next_replan
+    successor_state["started_at"] = state.get("started_at")
+    successor_state["fingerprint_history"] = deepcopy(state.get("fingerprint_history") or [])
+    successor_state["no_progress_streak"] = int(state.get("no_progress_streak") or 0)
     successor = set_checkpoint_metadata_namespace(
         successor["checkpoint_id"],
         namespace="autopilot",
