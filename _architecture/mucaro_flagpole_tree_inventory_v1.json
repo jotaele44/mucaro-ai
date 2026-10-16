@@ -1,7 +1,7 @@
 {
   "schema": "mucaro-flagpole-exact-tree-inventory/1.0",
-  "source_sha": "5f2fd9d9d1568fd4deafce4d209e76f75dc4acf8",
-  "tree_sha": "d10bfb8a35192e050266d5297a61bde74ba7da66",
+  "source_sha": "b3df0c5ac12aa8ab3d872aeb3063aa821979ddb8",
+  "tree_sha": "dd45efce89fe841319f0366c0c3dd61ac2575201",
   "scope": "complete tracked Git blob tree at exact HEAD",
   "exclusions": [],
   "file_count": 557,
@@ -292,7 +292,7 @@
     {
       "path": "_architecture/mucaro_flagpole_tree_inventory_v1.json",
       "mode": "100644",
-      "blob_sha": "da42e912e1444d9dca4eb827c17e3e8d3ad31255",
+      "blob_sha": "8a9ffacb6d4e3c468b6d2eabfe0232b3271fb0a4",
       "size": 115519,
       "classification": "data"
     },
@@ -334,7 +334,7 @@
     {
       "path": "_architecture/ocr_v1_representative_corpus.json",
       "mode": "100644",
-      "blob_sha": "1a061929beed3e13db09a7d6c1061942cb3a9044",
+      "blob_sha": "50fe683007786c0b23aacc5bcccabb5b02f899f2",
       "size": 4894,
       "classification": "data"
     },
@@ -1552,8 +1552,8 @@
     {
       "path": "backend/tests/fixtures/ocr_v1_representative/clean-spanish.png",
       "mode": "100644",
-      "blob_sha": "13ef0b6c0991142a6d5006020fcc4e7b12d672c2",
-      "size": 13719,
+      "blob_sha": "1e382ec78e376019675e7cd3cf33be7f0f0f4621",
+      "size": 14490,
       "classification": "test"
     },
     {
@@ -3916,5 +3916,5 @@
       "classification": "source"
     }
   ],
-  "inventory_sha256": "a4e2f30e1999d29e90ce6024e97d284ecca58f328eaed951ef8ac5364bbd2051"
+  "inventory_sha256": "dc6c3f505b8511596d02602b51be7a99402e881663df31270599d86e63e784e6"
 }
