@@ -839,10 +839,11 @@
       ],
       "dependencies": [],
       "positive_gate": "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
-      "negative_gate": null,
+      "negative_gate": "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json"
+        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+        "backend/tests/test_contracts.py::test_export_refuses_a_trace_with_a_fabricated_citation"
       ],
       "state": "PASS",
       "blocker_id": null,
@@ -1136,10 +1137,11 @@
       ],
       "dependencies": [],
       "positive_gate": "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
-      "negative_gate": null,
+      "negative_gate": "backend/tests/test_retrieval_scale_benchmark.py::test_rt10_negative_control_detects_false_no_context",
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json"
+        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+        "backend/tests/test_retrieval_scale_benchmark.py::test_rt10_negative_control_detects_false_no_context"
       ],
       "state": "PASS",
       "blocker_id": null,
@@ -1873,13 +1875,14 @@
       ],
       "dependencies": [],
       "positive_gate": "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
-      "negative_gate": null,
+      "negative_gate": "backend/tests/test_retrieval_scale_benchmark.py::test_rt10_threshold_falsification_is_detected",
       "benchmark": null,
       "evidence_refs": [
         "_architecture/retrieval_real_world_corpus_v1.json",
         "scripts/certify_retrieval_real_world_live.py",
         "_architecture/mucaro_v1_denominator_events.json",
-        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json"
+        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+        "backend/tests/test_retrieval_scale_benchmark.py::test_rt10_threshold_falsification_is_detected"
       ],
       "state": "PASS",
       "blocker_id": null,
