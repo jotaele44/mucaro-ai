@@ -43,6 +43,8 @@ REQUIRED_PACKAGE_INPUTS = [
     "packaging/macos/PrivacyInfo.xcprivacy",
     "packaging/runtime/macos-x86_64.json",
     "packaging/runtime/requirements-macos-x86_64.lock",
+    "packaging/runtime/macos-arm64.json",
+    "packaging/runtime/requirements-macos-arm64.lock",
     "frontend/package.json",
     "frontend/package-lock.json",
 ]
@@ -180,6 +182,8 @@ def build_desktop_package_manifest(root: Path = ROOT) -> dict[str, Any]:
         "pyproject.toml",
         "packaging/runtime/macos-x86_64.json",
         "packaging/runtime/requirements-macos-x86_64.lock",
+        "packaging/runtime/macos-arm64.json",
+        "packaging/runtime/requirements-macos-arm64.lock",
     ]
     missing = [path for path in required if not (root / path).exists()]
     metadata_error = None
