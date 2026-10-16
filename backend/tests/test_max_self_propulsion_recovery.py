@@ -29,7 +29,7 @@ class RecoveryTests(unittest.TestCase):
         reviewed={self.skill:self.version}
         self.issuer=ClaimIssuer("recovery-fixture",key,policy,reviewed)
         self.q=LeasedAgentQueue(folder/"queue.sqlite",
-            claim_verifier=ClaimVerifier("recovery-fixture",key,reviewed),
+            claim_verifier=ClaimVerifier("recovery-fixture",key,policy,reviewed),
             clock=lambda:self.now[0])
         self.addCleanup(self.q.close)
         self.g.add_goal(goal_id="g",description="approved limited fixture",
