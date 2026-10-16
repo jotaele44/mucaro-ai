@@ -15,6 +15,7 @@ from backend.app.goal_reactor import GoalReactor, GoalReactorError
 from backend.app.independent_evaluation_gate import assess_holdout, EvaluationGateError
 from backend.app.leased_agent_queue import LeasedAgentQueue
 from backend.app.capability_policy import CapabilityPolicy
+from backend.app.agent_claim_authority import ClaimIssuer, ClaimVerifier
 
 
 class ReactorTests(unittest.TestCase):
@@ -167,13 +168,17 @@ class BridgeTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.path=Path(self.temp.name)
-        self.q=LeasedAgentQueue(self.path/"queue.sqlite")
-        self.addCleanup(self.q.close)
         self.policy=CapabilityPolicy.build(policy_id="fixture-readonly",
                             allowed={"runtime.in_process"})
         self.skill_id="mucaro/intelligence-plane-health"
         self.skill=SimpleNamespace(skill_id=self.skill_id, runtime="IN_PROCESS",
                                    capabilities=(),digest="sha256:"+"a"*64)
+        key=b"v4-isolated-fixture-claim-key-at-least-32-bytes"
+        reviewed={self.skill_id:self.skill.digest}
+        self.issuer=ClaimIssuer("isolated-test",key,self.policy,reviewed)
+        self.q=LeasedAgentQueue(self.path/"queue.sqlite",
+            claim_verifier=ClaimVerifier("isolated-test",key,reviewed))
+        self.addCleanup(self.q.close)
 
     def _execute(self, skill=None, arguments=None, goal=True):
         from backend.app import governed_skill_bridge as bridge_mod
@@ -190,7 +195,7 @@ class BridgeTests(unittest.TestCase):
           with patch.object(bridge_mod,"list_skill_mounts",return_value={"mounts":[active]}):
            with patch.object(bridge_mod,"execute_skill",return_value=executed) as run:
             b=bridge_mod.GovernedSkillBridge(queue=self.q,cfg=SimpleNamespace(),
-                                              policy=self.policy)
+                                              policy=self.policy,claim_issuer=self.issuer)
             if not goal:
                 result=b.execute_readonly(job_id="job",run_id="goal",
                     skill_id=self.skill_id,arguments=arguments or {},
@@ -229,7 +234,7 @@ class BridgeTests(unittest.TestCase):
                                capabilities=(),digest=self.skill.digest)
         with patch.dict(mod.SKILL_REGISTRY,{self.skill_id:remote}):
             bridge=mod.GovernedSkillBridge(queue=self.q,cfg=SimpleNamespace(),
-                                            policy=self.policy)
+                                            policy=self.policy,claim_issuer=self.issuer)
             with self.assertRaises(mod.DispatchGateError):
                 bridge.execute_readonly(job_id="job",run_id="goal",skill_id=self.skill_id,
                         arguments={},worker_id="worker")
@@ -237,8 +242,11 @@ class BridgeTests(unittest.TestCase):
 
     def test_unauthorized_policy_never_dispatches(self):
         from backend.app import governed_skill_bridge as mod
+        denied=CapabilityPolicy.build(policy_id="deny",allowed=())
+        denied_issuer=ClaimIssuer("isolated-test",self.issuer.secret,
+                                 denied,self.issuer.reviewed_skills)
         b=mod.GovernedSkillBridge(queue=self.q,cfg=SimpleNamespace(),
-            policy=CapabilityPolicy.build(policy_id="deny",allowed=()))
+            policy=denied,claim_issuer=denied_issuer)
         with patch.dict(mod.SKILL_REGISTRY,{self.skill_id:self.skill}):
             with self.assertRaises(mod.DispatchGateError):
                 b.execute_readonly(job_id="job",run_id="goal",
@@ -253,7 +261,7 @@ class BridgeTests(unittest.TestCase):
                                    capabilities=(),digest="sha256:"+"b"*64)
         with patch.dict(mod.SKILL_REGISTRY,{skill_id:unreviewed}):
             b=mod.GovernedSkillBridge(queue=self.q,cfg=SimpleNamespace(),
-                                      policy=self.policy)
+                                      policy=self.policy,claim_issuer=self.issuer)
             with self.assertRaises(mod.DispatchGateError):
                 b.execute_readonly(job_id="job",run_id="goal",skill_id=skill_id,
                                    arguments={},worker_id="worker")
