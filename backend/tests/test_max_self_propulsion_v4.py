@@ -245,12 +245,9 @@ class BridgeTests(unittest.TestCase):
         denied=CapabilityPolicy.build(policy_id="deny",allowed=())
         denied_issuer=ClaimIssuer("isolated-test",self.issuer.secret,
                                  denied,self.issuer.reviewed_skills)
-        b=mod.GovernedSkillBridge(queue=self.q,cfg=SimpleNamespace(),
-            policy=denied,claim_issuer=denied_issuer)
-        with patch.dict(mod.SKILL_REGISTRY,{self.skill_id:self.skill}):
-            with self.assertRaises(mod.DispatchGateError):
-                b.execute_readonly(job_id="job",run_id="goal",
-                    skill_id=self.skill_id,arguments={},worker_id="worker")
+        with self.assertRaises(mod.DispatchGateError):
+            mod.GovernedSkillBridge(queue=self.q,cfg=SimpleNamespace(),
+                policy=denied,claim_issuer=denied_issuer)
         self.assertIsNone(self.q.state("job"))
 
 
