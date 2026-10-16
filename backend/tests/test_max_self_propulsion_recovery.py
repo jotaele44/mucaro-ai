@@ -99,7 +99,8 @@ class RecoveryTests(unittest.TestCase):
         self.add("first")
         inp=digest({"skill_id":self.skill,"skill_digest":self.version,"arguments":{}})
         self.q.submit("first","g","EXECUTE",inp,self.policy)
-        t=self.q.claim("first","worker",100,10,permitted=True)
+        t=self.q.claim("first","worker",10,
+            authorization=self.grant("first","g","worker",inp))
         self.q.finish("first","worker",t["fence"],{"status":"PASS"},101)
         self.q.db.execute("UPDATE receipts SET result_digest=? WHERE job_id=?",
                           (digest("altered"),"first"))
