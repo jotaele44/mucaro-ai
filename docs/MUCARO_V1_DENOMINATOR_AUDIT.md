@@ -165,7 +165,9 @@ This is not retrieval-domain or release certification.
 
 ## OCR-10 bounded representative corpus overlay
 
-Audit head: `d1018d571da1224f1bdd1e34734acf250892a27e`.
+Audit publication head: `f0991f960eb4195d4c4ceaa4a1df68b6b0c0e8a8`.
+
+OCR execution head: `d1018d571da1224f1bdd1e34734acf250892a27e`.
 
 - `OCR-10 OPEN -> PROVISIONAL`: append-only event `evt-ocr10-bounded-corpus-provisional` records the committed corpus execution.
 - The six-case manifest is source-byte bound with SHA-256 `2def4509bfa8b85ca2f2fd684551230dd65211e398f8aa88c7a5b6969cc1cb97`.

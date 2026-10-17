@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "d1018d571da1224f1bdd1e34734acf250892a27e",
+  "audit_head": "f0991f960eb4195d4c4ceaa4a1df68b6b0c0e8a8",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
