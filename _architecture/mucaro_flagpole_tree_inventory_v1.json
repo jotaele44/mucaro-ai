@@ -1,7 +1,7 @@
 {
   "schema": "mucaro-flagpole-exact-tree-inventory/1.0",
-  "source_sha": "b3df0c5ac12aa8ab3d872aeb3063aa821979ddb8",
-  "tree_sha": "dd45efce89fe841319f0366c0c3dd61ac2575201",
+  "source_sha": "b88a19ae1f5000a93d6356cc5803acd93555c76b",
+  "tree_sha": "9337aab9945687b686230158d90984d7814d02b2",
   "scope": "complete tracked Git blob tree at exact HEAD",
   "exclusions": [],
   "file_count": 557,
@@ -292,7 +292,7 @@
     {
       "path": "_architecture/mucaro_flagpole_tree_inventory_v1.json",
       "mode": "100644",
-      "blob_sha": "8a9ffacb6d4e3c468b6d2eabfe0232b3271fb0a4",
+      "blob_sha": "860bbffca9d483776be3f1d141470722135871cf",
       "size": 115519,
       "classification": "data"
     },
@@ -313,8 +313,8 @@
     {
       "path": "_architecture/mucaro_v1_denominator_events.json",
       "mode": "100644",
-      "blob_sha": "0bf44803d1bfc296003c01a69b38a61d5462c27e",
-      "size": 19160,
+      "blob_sha": "3332e9fcfa3f7bf48da3a676c492930b75cb8913",
+      "size": 20614,
       "classification": "data"
     },
     {
@@ -2742,8 +2742,8 @@
     {
       "path": "docs/MUCARO_V1_DENOMINATOR_AUDIT.md",
       "mode": "100644",
-      "blob_sha": "1b01677d76fd8ab378f9867bac7d94dae1b5641c",
-      "size": 9483,
+      "blob_sha": "3df4e9e3c56a76d086d5d602c64ed6f409a6049e",
+      "size": 11069,
       "classification": "documentation"
     },
     {
@@ -3916,5 +3916,5 @@
       "classification": "source"
     }
   ],
-  "inventory_sha256": "dc6c3f505b8511596d02602b51be7a99402e881663df31270599d86e63e784e6"
+  "inventory_sha256": "5ccd350535d349c4834d2c1476c754c50ee74dbe1d790c9b166f68aae67aad75"
 }
