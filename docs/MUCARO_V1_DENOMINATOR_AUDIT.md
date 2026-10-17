@@ -161,3 +161,25 @@ Resulting legacy overlay arithmetic:
 - RETRIEVAL: `90.0%` — `PASS=8 / PROVISIONAL=2`
 
 This is not retrieval-domain or release certification.
+
+
+## OCR-10 bounded representative corpus overlay
+
+Audit head: `d1018d571da1224f1bdd1e34734acf250892a27e`.
+
+- `OCR-10 OPEN -> PROVISIONAL`: append-only event `evt-ocr10-bounded-corpus-provisional` records the committed corpus execution.
+- The six-case manifest is source-byte bound with SHA-256 `2def4509bfa8b85ca2f2fd684551230dd65211e398f8aa88c7a5b6969cc1cb97`.
+- Exact-head receipt `ocr_representative_corpus-d1018d571da1.json` reports `OCR_REPRESENTATIVE_CORPUS_READY`, six executed cases, token-recall mean `1.0`, bounded-observation pass rate `1.0`, source identity `1.0`, span accounting `1.0`, and accent preservation for all six reported cases.
+- The evaluation report SHA-256 is `22c5f73332074175c13d2e56baf3150b1e7bdcdd00482dc222942e1af3636fb3`; the release receipt SHA-256 is `7d012ab71b79b33dd6860a3563b7d458706e89b658fa064b5860ad15a52a0ee5`.
+- Hosted OCR Representative Corpus Certification run `38845291683` completed successfully for the same head.
+- `quality_state=PROVISIONAL` and `accuracy_certified=false` remain correct because the corpus is bounded calibration/regression evidence, not a statistically representative real-world accuracy study. OCR-08 semantic table/form reconstruction and OCR-09 handwriting/difficult-scan coverage remain open.
+
+Resulting denominator arithmetic:
+
+- current raw completion: `76.0%`
+- current weighted completion: `77.2%`
+- applied events: `25`
+- OCR: `55.0%` — `PASS=3 / PROVISIONAL=5 / OPEN=2`
+- total states: `PASS=60 / PROVISIONAL=32 / OPEN=8`
+
+This remains an evidence-state overlay, not OCR-domain or release certification.

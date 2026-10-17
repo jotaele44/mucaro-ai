@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "f70ebd8e815bd4f4044b67455c8a33c7ef05789b",
+  "audit_head": "d1018d571da1224f1bdd1e34734acf250892a27e",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -340,6 +340,22 @@
         "certification report sha256=0249b023d286c9e6332fbd98e633b49797cd98e631c0efcad34c123f0fb3fe6e"
       ],
       "reason": "The frozen real-world corpus gate authorizes at most RT-09 OPEN→PROVISIONAL. A 24-document authoritative IETF/W3C/NIST corpus was acquired, hash-frozen, parsed across TXT/HTML/PDF, evaluated against 24 exact source-bound queries with 100% top-5 hit rate, and bound to exact manifest/source/query denominators. RT-10 production-scale stress remains independently unresolved, so PASS is not authorized."
+    },
+    {
+      "event_id": "evt-ocr10-bounded-corpus-provisional",
+      "requirement_id": "OCR-10",
+      "from_state": "OPEN",
+      "to_state": "PROVISIONAL",
+      "evidence_type": "EXACT_HEAD_SOURCE_BOUND_OCR_CORPUS_WITH_EXECUTED_EVIDENCE_LEDGER",
+      "evidence": [
+        "branch@d1018d571da1224f1bdd1e34734acf250892a27e",
+        "manifest=_architecture/ocr_v1_representative_corpus.json sha256=2def4509bfa8b85ca2f2fd684551230dd65211e398f8aa88c7a5b6969cc1cb97",
+        "report=data/exports/ocr_evals/ocrcorpus_b79bbe0a37e926ea.json sha256=22c5f73332074175c13d2e56baf3150b1e7bdcdd00482dc222942e1af3636fb3",
+        "receipt=data/exports/release_receipts/ocr_representative_corpus-d1018d571da1.json sha256=7d012ab71b79b33dd6860a3563b7d458706e89b658fa064b5860ad15a52a0ee5",
+        "OCR_REPRESENTATIVE_CORPUS_READY cases=6 token_recall_mean=1.0 bounded_observation_pass_rate=1.0 accent_preservation_case_count=6",
+        "hosted OCR Representative Corpus Certification run 38845291683 conclusion=success"
+      ],
+      "reason": "The committed six-case corpus executes all cases with exact source SHA binding, evidence-ledger closure, token recall mean 1.0, closed span/source accounting, and corrected accent preservation. The corpus remains bounded calibration/regression evidence rather than representative real-world accuracy, so OCR-10 is promoted only to PROVISIONAL and OCR-08/09 semantic layout and handwriting claims remain open."
     }
   ]
 }
