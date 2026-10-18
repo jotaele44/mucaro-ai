@@ -352,7 +352,7 @@ class _SSEParser:
             return None
         name, _, value = line.partition(":")
         if name == "data":
-            self.data.append(value[1:] if value.startswith(" ") else value)
+            self.data.append(value.removeprefix(" "))
         return None
 
 
@@ -737,7 +737,7 @@ def _stream_message(
         if stopped:
             raise AgentAborted() from exc
         raise _api_error(exc) from exc
-    except Exception as exc:  # noqa: BLE001 - a closed stream surfaces as a transport error
+    except Exception as exc:  # a closed stream surfaces as a transport error; re-raised below
         with _ACTIVE_LOCK:
             stopped = run_id in _ABORTED
         if stopped or should_stop():
@@ -909,7 +909,7 @@ def _trace(state: dict[str, Any], run: dict[str, Any], answer: str) -> dict[str,
     finished = utc_now()
     started = state.get("started_at") or finished
     try:
-        duration_ms = int((datetime.fromisoformat(finished.replace("Z", "+00:00")) - datetime.fromisoformat(started.replace("Z", "+00:00"))).total_seconds() * 1000)
+        duration_ms = int((datetime.fromisoformat(finished) - datetime.fromisoformat(started)).total_seconds() * 1000)
     except ValueError:
         duration_ms = 0
     return {

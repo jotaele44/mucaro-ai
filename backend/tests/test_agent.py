@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import pytest
 
@@ -20,7 +20,15 @@ from backend.app.conversations import create_conversation, delete_conversation, 
 from backend.app.memory import list_memory_items
 from backend.app.permissions import grant_directory
 from backend.app.tools import approve_tool_call, deny_tool_call, list_tool_calls
-from backend.app.work_runs import get_run, list_run_events, reconcile_runs_on_startup, resume_waiting_run, run_envelope, stop_run, submit_message
+from backend.app.work_runs import (
+    get_run,
+    list_run_events,
+    reconcile_runs_on_startup,
+    resume_waiting_run,
+    run_envelope,
+    stop_run,
+    submit_message,
+)
 from backend.tests.test_api import make_settings
 
 FAKE_KEY = "sk-ant-api03-" + "x" * 40
@@ -94,7 +102,7 @@ class FakeResponse:
         self.on_line = on_line
         self.closed = False
 
-    def __enter__(self) -> FakeResponse:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc: object) -> bool:

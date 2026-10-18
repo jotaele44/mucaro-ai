@@ -20,8 +20,8 @@ from backend.app.app_settings import (
     validate_api_key,
 )
 from backend.app.main import create_app
-from backend.app.tools import approve_tool_call, request_tool_call, run_tool_call
 from backend.app.permissions import grant_directory
+from backend.app.tools import approve_tool_call, request_tool_call, run_tool_call
 from backend.tests.test_api import make_settings
 
 KEY = "sk-ant-api03-" + "k" * 60
