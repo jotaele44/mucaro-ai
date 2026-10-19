@@ -29,17 +29,22 @@ REQUIRED_SDIST_MEMBERS = [
     "backend/app/gis_grids/manifest.json",
     "backend/app/gis_grids/NOTICE.md",
     "backend/app/gis_grids/us_noaa_pvhpgn.tif",
+    "backend/app/gis_grids/us_noaa_FL.tif",
 ]
 GOVERNED_GRID_ASSETS = {
     "backend/app/gis_grids/manifest.json": {
-        "sha256": "869e31ea30f1be6477c04899a384ddcac0beb6ded811d8dcad8d62050f140c2f",
+        "sha256": "3d49d0bb364be9f41879ef3e74aa6766131ccb13ea6aef8bc11631f35d0fa1bc",
     },
     "backend/app/gis_grids/NOTICE.md": {
-        "sha256": "94736fff04e4646cc08897ec8a9960d41f267ae24359d61c870baea84ccdd1fc",
+        "sha256": "e184aaa7002d3607c95d1a60e86a14432308910256b166b0e52dfabd8ac26663",
     },
     "backend/app/gis_grids/us_noaa_pvhpgn.tif": {
         "sha256": "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d",
         "size_bytes": 3644,
+    },
+    "backend/app/gis_grids/us_noaa_FL.tif": {
+        "sha256": "73b385448f09e6c1122a87b5b3137a5b5775585af9445889e0a3a8c4c5951f54",
+        "size_bytes": 8374,
     },
 }
 
@@ -95,10 +100,13 @@ def certify_installed_wheel(
         "manifest_path=grid_root/'manifest.json'; "
         "notice_path=grid_root/'NOTICE.md'; "
         "grid_path=grid_root/'us_noaa_pvhpgn.tif'; "
-        "assert hashlib.sha256(manifest_path.read_bytes()).hexdigest() == '869e31ea30f1be6477c04899a384ddcac0beb6ded811d8dcad8d62050f140c2f'; "
-        "assert hashlib.sha256(notice_path.read_bytes()).hexdigest() == '94736fff04e4646cc08897ec8a9960d41f267ae24359d61c870baea84ccdd1fc'; "
+        "florida_grid_path=grid_root/'us_noaa_FL.tif'; "
+        "assert hashlib.sha256(manifest_path.read_bytes()).hexdigest() == '3d49d0bb364be9f41879ef3e74aa6766131ccb13ea6aef8bc11631f35d0fa1bc'; "
+        "assert hashlib.sha256(notice_path.read_bytes()).hexdigest() == 'e184aaa7002d3607c95d1a60e86a14432308910256b166b0e52dfabd8ac26663'; "
         "assert grid_path.stat().st_size == 3644; "
         "assert hashlib.sha256(grid_path.read_bytes()).hexdigest() == 'a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d'; "
+        "assert florida_grid_path.stat().st_size == 8374; "
+        "assert hashlib.sha256(florida_grid_path.read_bytes()).hexdigest() == '73b385448f09e6c1122a87b5b3137a5b5775585af9445889e0a3a8c4c5951f54'; "
         f"assert importlib.metadata.version({expected['name']!r}) == {expected['version']!r}; "
         "print(f'ISOLATED_WHEEL_IMPORT_OK module={module_path} prefix={prefix}')"
     )

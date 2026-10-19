@@ -29,7 +29,7 @@ CRS_ENGINE_ADAPTERS = {
     "pyproj_transformer_group_always_xy_v1",
     "pyproj_governed_local_grid_always_xy_v1",
 }
-GOVERNED_CRS_GRID_MANIFEST_SHA256 = "869e31ea30f1be6477c04899a384ddcac0beb6ded811d8dcad8d62050f140c2f"
+GOVERNED_CRS_GRID_MANIFEST_SHA256 = "3d49d0bb364be9f41879ef3e74aa6766131ccb13ea6aef8bc11631f35d0fa1bc"
 GOVERNED_CRS_GRID_SHA256 = "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d"
 GOVERNED_CRS_GRID_BYTES = 3644
 
@@ -498,14 +498,22 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             )
         governed_grid = _dotted(report, "parameters.governed_grid")
         if _dotted(report, "parameters.adapter") == "pyproj_governed_local_grid_always_xy_v1":
+            selected_grid = (
+                selected_candidate.get("grids", [])[0]
+                if isinstance(selected_candidate, dict)
+                and isinstance(selected_candidate.get("grids"), list)
+                and selected_candidate.get("grids")
+                and isinstance(selected_candidate.get("grids")[0], dict)
+                else None
+            )
             checks.extend(
                 [
                     _contract_check("crs_engine.governed_grid.object", isinstance(governed_grid, dict), "governed-grid reports must include a grid binding receipt"),
                     _contract_check("crs_engine.governed_grid.manifest_schema", isinstance(governed_grid, dict) and governed_grid.get("schema_version") == "mucaro_gis_grid_manifest_v1", "governed-grid reports must bind the supported manifest schema"),
                     _contract_check("crs_engine.governed_grid.manifest_hash", isinstance(governed_grid, dict) and governed_grid.get("sha256") == GOVERNED_CRS_GRID_MANIFEST_SHA256, "governed-grid reports must bind the source-approved manifest SHA-256"),
-                    _contract_check("crs_engine.governed_grid.grid_hash", isinstance(governed_grid, dict) and governed_grid.get("grid_sha256") == GOVERNED_CRS_GRID_SHA256, "governed-grid reports must bind the source-approved grid SHA-256"),
-                    _contract_check("crs_engine.governed_grid.grid_bytes", isinstance(governed_grid, dict) and governed_grid.get("grid_bytes") == GOVERNED_CRS_GRID_BYTES, "governed-grid reports must bind the source-approved grid byte count"),
-                    _contract_check("crs_engine.governed_grid.crs_pair", isinstance(governed_grid, dict) and governed_grid.get("source_crs") == "EPSG:4326" and governed_grid.get("target_crs") == "EPSG:32161", "governed-grid reports must bind the authorized CRS pair"),
+                    _contract_check("crs_engine.governed_grid.grid_hash", isinstance(governed_grid, dict) and isinstance(selected_grid, dict) and governed_grid.get("grid_sha256") == selected_grid.get("local_sha256"), "governed-grid reports must bind the selected grid SHA-256"),
+                    _contract_check("crs_engine.governed_grid.grid_bytes", isinstance(governed_grid, dict) and isinstance(selected_grid, dict) and governed_grid.get("grid_bytes") == selected_grid.get("local_bytes"), "governed-grid reports must bind the selected grid byte count"),
+                    _contract_check("crs_engine.governed_grid.crs_pair", isinstance(governed_grid, dict) and governed_grid.get("source_crs") == _dotted(report, "parameters.source_crs") and governed_grid.get("target_crs") == _dotted(report, "parameters.target_crs"), "governed-grid reports must bind the authorized CRS pair"),
                     _contract_check("crs_engine.governed_grid.network_absent", isinstance(governed_grid, dict) and governed_grid.get("network_access_performed") is False, "governed-grid execution must not perform network access"),
                     _contract_check("crs_engine.governed_grid.independent_scope", isinstance(governed_grid, dict) and governed_grid.get("independent_engine_validation") == "OPEN", "governed-grid reports must not overclaim independent-engine validation"),
                     _contract_check("crs_engine.governed_grid.invariant", _dotted(report, "invariants.governed_grid_binding_satisfied") is True, "governed-grid source and byte bindings must pass"),

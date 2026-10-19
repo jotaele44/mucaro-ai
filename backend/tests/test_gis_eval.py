@@ -12,10 +12,10 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 64,
-        "passed": 64,
+        "cases": 65,
+        "passed": 65,
         "failed": 0,
-        "positive_cases": 38,
+        "positive_cases": 39,
         "negative_cases": 26,
         "operations": 25,
         "operation_names": [
@@ -114,6 +114,7 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["reproject_invalid_latitude_fails_closed"]["observed_status"] == "ERROR_GIS_REPROJECT_INVALID_COORDINATES"
     assert by_id["reproject_crs_wgs84_to_utm20n"]["observed_status"] == "GIS_CRS_REPROJECT_OK"
     assert by_id["reproject_crs_puerto_rico_governed_grid"]["observed_status"] == "GIS_CRS_REPROJECT_OK"
+    assert by_id["reproject_crs_florida_governed_grid"]["observed_status"] == "GIS_CRS_REPROJECT_OK"
     assert by_id["reproject_crs_puerto_rico_outside_grid_fails_closed"]["case_type"] == "negative"
     assert by_id["reproject_crs_puerto_rico_outside_grid_fails_closed"]["observed_status"] == "ERROR_GIS_CRS_TRANSFORM"
     assert by_id["reproject_crs_m_coordinates_fail_closed"]["observed_status"] == "ERROR_GIS_CRS_M_UNSUPPORTED"
