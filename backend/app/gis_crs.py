@@ -28,7 +28,7 @@ CRS_ADAPTER = "pyproj_transformer_group_always_xy_v1"
 CRS_GOVERNED_GRID_ADAPTER = "pyproj_governed_local_grid_always_xy_v1"
 CRS_NETWORK_POLICY = "offline_only"
 GOVERNED_GRID_MANIFEST_SCHEMA_VERSION = "mucaro_gis_grid_manifest_v1"
-GOVERNED_GRID_MANIFEST_SHA256 = "869e31ea30f1be6477c04899a384ddcac0beb6ded811d8dcad8d62050f140c2f"
+GOVERNED_GRID_MANIFEST_SHA256 = "3d49d0bb364be9f41879ef3e74aa6766131ccb13ea6aef8bc11631f35d0fa1bc"
 GOVERNED_GRID_ROOT = Path(__file__).resolve().parent / "gis_grids"
 GOVERNED_GRID_ID = "us_noaa_pvhpgn"
 GOVERNED_GRID_FILENAME = "us_noaa_pvhpgn.tif"
@@ -60,9 +60,6 @@ def _load_governed_grid_transform(
     *,
     grid_root: Path | None = None,
 ) -> dict[str, Any] | None:
-    if source_obj.to_epsg() != 4326 or target_obj.to_epsg() != 32161:
-        return None
-
     root = (grid_root or GOVERNED_GRID_ROOT).expanduser().resolve()
     manifest_path = root / "manifest.json"
     if manifest_path.is_symlink() or not manifest_path.is_file():
@@ -93,39 +90,57 @@ def _load_governed_grid_transform(
             "ERROR_GIS_CRS_GRID_MANIFEST_INVALID",
             "The governed local datum-grid manifest schema or network policy is invalid.",
         )
-    matching_rows = [
-        row
-        for row in manifest["grids"]
-        if isinstance(row, dict) and row.get("grid_id") == GOVERNED_GRID_ID
-    ]
+
+    matching_rows: list[dict[str, Any]] = []
+    for row in manifest["grids"]:
+        if not isinstance(row, dict) or not isinstance(row.get("allowed_operation"), dict):
+            continue
+        operation = row["allowed_operation"]
+        try:
+            operation_source = CRS.from_user_input(operation.get("source_crs")).to_epsg()
+            operation_target = CRS.from_user_input(operation.get("target_crs")).to_epsg()
+        except (ProjError, TypeError, ValueError):
+            raise _governed_grid_error(
+                "ERROR_GIS_CRS_GRID_OPERATION_MISMATCH",
+                "The governed local datum-grid operation contains an invalid CRS.",
+            )
+        if operation_source == source_obj.to_epsg() and operation_target == target_obj.to_epsg():
+            matching_rows.append(row)
+    if not matching_rows:
+        return None
     if len(matching_rows) != 1:
         raise _governed_grid_error(
             "ERROR_GIS_CRS_GRID_MANIFEST_INVALID",
-            "The governed local datum-grid manifest must contain exactly one bound grid row.",
+            "The governed local datum-grid manifest must contain exactly one operation for the requested CRS pair.",
         )
+
     grid = matching_rows[0]
-    allowed_operation = grid.get("allowed_operation")
+    allowed_operation = grid["allowed_operation"]
     expected_fields = {
-        "filename": GOVERNED_GRID_FILENAME,
-        "bytes": GOVERNED_GRID_BYTES,
-        "sha256": GOVERNED_GRID_SHA256,
         "source_crs": "EPSG:4269",
         "target_crs": "EPSG:4152",
     }
-    if any(grid.get(key) != value for key, value in expected_fields.items()) or not isinstance(allowed_operation, dict):
+    if (
+        any(grid.get(key) != value for key, value in expected_fields.items())
+        or not isinstance(grid.get("grid_id"), str)
+        or not isinstance(grid.get("filename"), str)
+        or not isinstance(grid.get("bytes"), int)
+        or not isinstance(grid.get("sha256"), str)
+    ):
         raise _governed_grid_error(
             "ERROR_GIS_CRS_GRID_MANIFEST_INVALID",
             "The governed local datum-grid manifest does not match its source-bound grid policy.",
         )
     if (
-        allowed_operation.get("source_crs") != GOVERNED_GRID_SOURCE_CRS
-        or allowed_operation.get("target_crs") != GOVERNED_GRID_TARGET_CRS
-        or allowed_operation.get("operation_name") != GOVERNED_GRID_OPERATION_NAME
-        or allowed_operation.get("accuracy_metres") != GOVERNED_GRID_ACCURACY_METRES
+        not isinstance(allowed_operation.get("source_crs"), str)
+        or not isinstance(allowed_operation.get("target_crs"), str)
+        or not isinstance(allowed_operation.get("operation_name"), str)
+        or not isinstance(allowed_operation.get("pipeline_template"), str)
+        or not isinstance(allowed_operation.get("accuracy_metres"), int | float)
     ):
         raise _governed_grid_error(
             "ERROR_GIS_CRS_GRID_OPERATION_MISMATCH",
-            "The governed local datum-grid is not authorized for the requested CRS operation.",
+            "The governed local datum-grid operation is incomplete.",
         )
 
     filename = str(grid["filename"])
@@ -154,28 +169,29 @@ def _load_governed_grid_transform(
             "The governed local datum-grid file is absent or is not a regular file.",
         )
     local_bytes = grid_path.stat().st_size
-    if local_bytes != GOVERNED_GRID_BYTES:
+    if local_bytes != grid["bytes"]:
         raise _governed_grid_error(
             "ERROR_GIS_CRS_GRID_SIZE_MISMATCH",
             "The governed local datum-grid byte count does not match the source-bound manifest.",
         )
     local_sha256 = sha256_file(grid_path)
-    if local_sha256 != GOVERNED_GRID_SHA256:
+    if local_sha256 != grid["sha256"]:
         raise _governed_grid_error(
             "ERROR_GIS_CRS_GRID_HASH_MISMATCH",
             "The governed local datum-grid SHA-256 does not match the source-bound manifest.",
         )
 
-    canonical_pipeline = GOVERNED_GRID_PIPELINE_TEMPLATE.format(grid=GOVERNED_GRID_FILENAME)
-    execution_pipeline = GOVERNED_GRID_PIPELINE_TEMPLATE.format(grid=json.dumps(grid_path.as_posix()))
+    pipeline_template = str(allowed_operation["pipeline_template"])
+    canonical_pipeline = pipeline_template.format(grid=filename)
+    execution_pipeline = pipeline_template.format(grid=json.dumps(grid_path.as_posix()))
     transformer = Transformer.from_pipeline(execution_pipeline)
     source = grid.get("source") if isinstance(grid.get("source"), dict) else {}
     license_row = grid.get("license") if isinstance(grid.get("license"), dict) else {}
     grid_receipt = {
-        "grid_id": GOVERNED_GRID_ID,
-        "short_name": GOVERNED_GRID_FILENAME,
+        "grid_id": grid["grid_id"],
+        "short_name": filename,
         "full_name": str(grid_path),
-        "package_name": "mucaro-ai-governed-grid",
+        "package_name": f"mucaro-ai-governed-grid-{grid['grid_id']}",
         "url": source.get("proj_cdn_url"),
         "direct_download": True,
         "open_license": license_row.get("classification") == "PUBLIC_DOMAIN",
@@ -197,9 +213,9 @@ def _load_governed_grid_transform(
     }
     candidate = {
         "index": 0,
-        "description": GOVERNED_GRID_OPERATION_NAME,
+        "description": str(allowed_operation["operation_name"]),
         "definition_sha256": hashlib.sha256(canonical_pipeline.encode("utf-8")).hexdigest(),
-        "accuracy": GOVERNED_GRID_ACCURACY_METRES,
+        "accuracy": float(allowed_operation["accuracy_metres"]),
         "grids": [grid_receipt],
         "grid_metadata_complete": True,
         "requires_network_download": False,
@@ -218,18 +234,21 @@ def _load_governed_grid_transform(
             "path": str(manifest_path),
             "sha256": manifest_sha256,
             "retrieval_utc": manifest.get("retrieval_utc"),
-            "grid_id": GOVERNED_GRID_ID,
+            "grid_id": grid["grid_id"],
             "grid_sha256": local_sha256,
             "grid_bytes": local_bytes,
-            "source_crs": GOVERNED_GRID_SOURCE_CRS,
-            "target_crs": GOVERNED_GRID_TARGET_CRS,
+            "source_crs": allowed_operation["source_crs"],
+            "target_crs": allowed_operation["target_crs"],
             "operation_authority": allowed_operation.get("operation_authority"),
-            "accuracy_metres": GOVERNED_GRID_ACCURACY_METRES,
+            "accuracy_metres": float(allowed_operation["accuracy_metres"]),
             "area_of_use": allowed_operation.get("area_of_use"),
             "bounds": allowed_operation.get("bounds"),
             "network_access_performed": False,
             "independent_engine_validation": "OPEN",
         },
+        "grid_id": grid["grid_id"],
+        "operation_name": allowed_operation["operation_name"],
+        "accuracy_metres": float(allowed_operation["accuracy_metres"]),
     }
 
 
@@ -335,8 +354,8 @@ def reproject_geojson_crs(
             pipeline = governed["canonical_pipeline"]
             execution_pipeline_sha256 = governed["execution_pipeline_sha256"]
             governed_grid_receipt: dict[str, Any] | None = governed["manifest"]
-            transformer_description = GOVERNED_GRID_OPERATION_NAME
-            transformer_accuracy = GOVERNED_GRID_ACCURACY_METRES
+            transformer_description = governed["operation_name"]
+            transformer_accuracy = governed["accuracy_metres"]
         else:
             with python_warnings.catch_warnings(record=True) as caught_warnings:
                 python_warnings.simplefilter("always")
@@ -507,8 +526,10 @@ def reproject_geojson_crs(
             "grid_inventory_complete": all(row["grid_metadata_complete"] for row in candidate_receipts),
             "governed_grid_binding_satisfied": governed_grid_receipt is None
             or (
-                governed_grid_receipt["grid_sha256"] == GOVERNED_GRID_SHA256
-                and governed_grid_receipt["grid_bytes"] == GOVERNED_GRID_BYTES
+                governed_grid_receipt["grid_sha256"]
+                == candidate_receipts[selected_candidate_index]["grids"][0]["local_sha256"]
+                and governed_grid_receipt["grid_bytes"]
+                == candidate_receipts[selected_candidate_index]["grids"][0]["local_bytes"]
                 and governed_grid_receipt["network_access_performed"] is False
             ),
         },
@@ -520,7 +541,7 @@ def reproject_geojson_crs(
             "remote grid downloads are not permitted; a governed local grid is used only for an exact source-bound CRS pair, otherwise a lower-accuracy offline candidate may be selected",
             "local grid files are bound by path, byte count, and SHA-256 when selected",
             "candidate availability and transformer accuracy remain environment-dependent and are exposed in the receipt",
-            "the governed Puerto Rico datum-grid control is implementation and provenance evidence, not independent-engine certification",
+            "governed regional datum-grid controls are implementation and provenance evidence, not independent-engine certification",
         ],
         "falsification_criteria": [
             "reject if feature_row_conservation is false",
