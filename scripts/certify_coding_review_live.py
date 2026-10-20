@@ -11,6 +11,8 @@ from typing import Any
 from backend.app.coding_review import CodingReviewError, build_code_review_receipt
 from backend.app.config import Settings
 
+ROOT = Path(__file__).resolve().parents[1]
+
 STATUS_OK = "CODING_REVIEW_LIVE_CERT_OK"
 STATUS_FAILED = "CODING_REVIEW_LIVE_CERT_FAILED"
 
