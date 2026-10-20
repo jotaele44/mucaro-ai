@@ -7,7 +7,7 @@ import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard
 from urllib.parse import urlparse
 
 CAPABILITY_CONTRACT_SCHEMA_VERSION = "mucaro_advanced_capability_contracts_v1"
@@ -97,7 +97,11 @@ def _dotted(payload: Any, dotted_path: str) -> Any:
     return current
 
 
-def _is_number(value: Any) -> bool:
+def _is_int(value: Any) -> TypeGuard[int]:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_number(value: Any) -> TypeGuard[int | float]:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
@@ -486,14 +490,8 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             )
         governed_grid = _dotted(report, "parameters.governed_grid")
         if _dotted(report, "parameters.adapter") == "pyproj_governed_local_grid_always_xy_v1":
-            selected_grid = (
-                selected_candidate.get("grids", [])[0]
-                if isinstance(selected_candidate, dict)
-                and isinstance(selected_candidate.get("grids"), list)
-                and selected_candidate.get("grids")
-                and isinstance(selected_candidate.get("grids")[0], dict)
-                else None
-            )
+            selected_grids = selected_candidate.get("grids") if isinstance(selected_candidate, dict) else None
+            selected_grid = selected_grids[0] if isinstance(selected_grids, list) and selected_grids and isinstance(selected_grids[0], dict) else None
             checks.extend(
                 [
                     _contract_check("crs_engine.governed_grid.object", isinstance(governed_grid, dict), "governed-grid reports must include a grid binding receipt"),
@@ -730,10 +728,10 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             flat = accounting.get("flat_cell_count")
             checks.extend(
                 [
-                    _contract_check("terrain.source_accounting", isinstance(total, int) and accounting.get("source_valid_cell_count", -1) + accounting.get("source_nodata_cell_count", -1) == total, "terrain source valid and NODATA counts must close"),
-                    _contract_check("terrain.neighborhood_accounting", all(isinstance(value, int) for value in (total, neighborhood_valid, neighborhood_excluded)) and neighborhood_valid + neighborhood_excluded == total, "terrain neighborhood valid and excluded counts must close"),
-                    _contract_check("terrain.slope_accounting", isinstance(total, int) and isinstance(neighborhood_valid, int) and output_bands[0].get("valid_cell_count") == neighborhood_valid and output_bands[0].get("valid_cell_count", -1) + output_bands[0].get("nodata_cell_count", -1) == total, "slope accounting must close to complete neighborhoods"),
-                    _contract_check("terrain.aspect_accounting", all(isinstance(value, int) for value in (total, neighborhood_valid, flat)) and output_bands[1].get("valid_cell_count", -1) + flat == neighborhood_valid and output_bands[1].get("valid_cell_count", -1) + output_bands[1].get("nodata_cell_count", -1) == total, "aspect accounting must separate flat cells from complete neighborhoods"),
+                    _contract_check("terrain.source_accounting", _is_int(total) and _is_int(accounting.get("source_valid_cell_count")) and _is_int(accounting.get("source_nodata_cell_count")) and accounting["source_valid_cell_count"] + accounting["source_nodata_cell_count"] == total, "terrain source valid and NODATA counts must close"),
+                    _contract_check("terrain.neighborhood_accounting", _is_int(total) and _is_int(neighborhood_valid) and _is_int(neighborhood_excluded) and neighborhood_valid + neighborhood_excluded == total, "terrain neighborhood valid and excluded counts must close"),
+                    _contract_check("terrain.slope_accounting", _is_int(total) and _is_int(neighborhood_valid) and _is_int(output_bands[0].get("valid_cell_count")) and _is_int(output_bands[0].get("nodata_cell_count")) and output_bands[0]["valid_cell_count"] == neighborhood_valid and output_bands[0]["valid_cell_count"] + output_bands[0]["nodata_cell_count"] == total, "slope accounting must close to complete neighborhoods"),
+                    _contract_check("terrain.aspect_accounting", _is_int(total) and _is_int(neighborhood_valid) and _is_int(flat) and _is_int(output_bands[1].get("valid_cell_count")) and _is_int(output_bands[1].get("nodata_cell_count")) and output_bands[1]["valid_cell_count"] + flat == neighborhood_valid and output_bands[1]["valid_cell_count"] + output_bands[1]["nodata_cell_count"] == total, "aspect accounting must separate flat cells from complete neighborhoods"),
                 ]
             )
     elif operation == "derive_raster_hillshade":
@@ -792,9 +790,9 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             maximum = output_band.get("maximum")
             checks.extend(
                 [
-                    _contract_check("hillshade.cell_accounting", all(isinstance(value, int) for value in (total, valid, nodata)) and valid + nodata == total, "hillshade valid and NODATA counts must close"),
-                    _contract_check("hillshade.illumination_accounting", all(isinstance(value, int) for value in (valid, shadow, illuminated)) and shadow + illuminated == valid, "hillshade shadow and illuminated counts must close"),
-                    _contract_check("hillshade.fully_lit_accounting", all(isinstance(value, int) for value in (valid, fully_lit)) and 0 <= fully_lit <= valid, "hillshade fully-lit count must be bounded by valid cells"),
+                    _contract_check("hillshade.cell_accounting", _is_int(total) and _is_int(valid) and _is_int(nodata) and valid + nodata == total, "hillshade valid and NODATA counts must close"),
+                    _contract_check("hillshade.illumination_accounting", _is_int(valid) and _is_int(shadow) and _is_int(illuminated) and shadow + illuminated == valid, "hillshade shadow and illuminated counts must close"),
+                    _contract_check("hillshade.fully_lit_accounting", _is_int(valid) and _is_int(fully_lit) and 0 <= fully_lit <= valid, "hillshade fully-lit count must be bounded by valid cells"),
                     _contract_check("hillshade.band_accounting", output_band.get("valid_cell_count") == valid and output_band.get("nodata_cell_count") == nodata, "hillshade band accounting must match report accounting"),
                     _contract_check("hillshade.range", isinstance(minimum, (int, float)) and isinstance(maximum, (int, float)) and 0.0 <= minimum <= maximum <= 255.0, "hillshade output values must remain within 0..255"),
                 ]
@@ -853,18 +851,20 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             fill_volume = accounting.get("fill_volume_cubic_metres")
             cell_area = _dotted(report, "parameters.cell_area_square_metres")
             conditioned_band, fill_depth_band = output_bands
+            fill_minimum = fill_depth_band.get("minimum")
+            fill_maximum = fill_depth_band.get("maximum")
             checks.extend(
                 [
-                    _contract_check("depression_fill.source_accounting", all(isinstance(value, int) and not isinstance(value, bool) for value in (total, valid, nodata)) and valid + nodata == total, "depression-fill source valid and NODATA counts must close"),
-                    _contract_check("depression_fill.seed_accounting", all(isinstance(value, int) and not isinstance(value, bool) for value in (valid, seeds, interior)) and seeds > 0 and seeds + interior == valid, "depression-fill outlet and interior counts must close"),
-                    _contract_check("depression_fill.processed_accounting", all(isinstance(value, int) and not isinstance(value, bool) for value in (valid, processed)) and processed == valid, "depression-fill must process every valid cell"),
-                    _contract_check("depression_fill.change_accounting", all(isinstance(value, int) and not isinstance(value, bool) for value in (valid, raised, unchanged)) and raised + unchanged == valid, "depression-fill raised and unchanged counts must close"),
-                    _contract_check("depression_fill.component_accounting", all(isinstance(value, int) and not isinstance(value, bool) for value in (raised, components)) and (components == 0 if raised == 0 else 0 < components <= raised), "depression components must be bounded by raised cells"),
+                    _contract_check("depression_fill.source_accounting", _is_int(total) and _is_int(valid) and _is_int(nodata) and valid + nodata == total, "depression-fill source valid and NODATA counts must close"),
+                    _contract_check("depression_fill.seed_accounting", _is_int(valid) and _is_int(seeds) and _is_int(interior) and seeds > 0 and seeds + interior == valid, "depression-fill outlet and interior counts must close"),
+                    _contract_check("depression_fill.processed_accounting", _is_int(valid) and _is_int(processed) and processed == valid, "depression-fill must process every valid cell"),
+                    _contract_check("depression_fill.change_accounting", _is_int(valid) and _is_int(raised) and _is_int(unchanged) and raised + unchanged == valid, "depression-fill raised and unchanged counts must close"),
+                    _contract_check("depression_fill.component_accounting", _is_int(raised) and _is_int(components) and (components == 0 if raised == 0 else 0 < components <= raised), "depression components must be bounded by raised cells"),
                     _contract_check("depression_fill.maximum_within_limit", _is_number(observed_maximum) and _is_number(maximum_fill_depth) and 0.0 <= float(observed_maximum) <= float(maximum_fill_depth) + 1e-12, "observed fill depth must remain within the explicit maximum"),
                     _contract_check("depression_fill.volume_accounting", _is_number(fill_volume) and _is_number(total_fill_depth) and _is_number(cell_area) and math.isclose(float(fill_volume), float(total_fill_depth) * float(cell_area), rel_tol=0.0, abs_tol=max(1e-9, abs(float(fill_volume)) * 1e-12)), "fill volume must equal total depth times affine cell area"),
                     _contract_check("depression_fill.band_accounting", all(band.get("valid_cell_count") == valid and band.get("nodata_cell_count") == nodata for band in output_bands), "every depression-fill band must preserve source valid and NODATA accounting"),
                     _contract_check("depression_fill.band_names", [band.get("name") for band in output_bands] == expected_band_names, "depression-fill band receipt names must match output descriptions"),
-                    _contract_check("depression_fill.depth_range", _is_number(fill_depth_band.get("minimum")) and _is_number(fill_depth_band.get("maximum")) and float(fill_depth_band.get("minimum")) >= 0.0 and math.isclose(float(fill_depth_band.get("maximum")), float(observed_maximum), rel_tol=0.0, abs_tol=1e-12), "fill-depth band must be non-negative and match maximum accounting"),
+                    _contract_check("depression_fill.depth_range", _is_number(fill_minimum) and _is_number(fill_maximum) and _is_number(observed_maximum) and float(fill_minimum) >= 0.0 and math.isclose(float(fill_maximum), float(observed_maximum), rel_tol=0.0, abs_tol=1e-12), "fill-depth band must be non-negative and match maximum accounting"),
                     _contract_check("depression_fill.conditioned_range", _is_number(conditioned_band.get("minimum")) and _is_number(conditioned_band.get("maximum")) and float(conditioned_band.get("minimum")) <= float(conditioned_band.get("maximum")), "conditioned elevation range must be ordered"),
                 ]
             )
@@ -972,13 +972,14 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 else -1
             )
             direction_total = sum(direction_counts.values()) if direction_counts_valid else -1
+            terminal_accounting_valid = _is_int(terminal) and _is_int(valid) and _is_int(unique) and terminal == terminal_state_total == valid - unique
             checks.extend(
                 [
-                    _contract_check("d8.source_accounting", all(isinstance(value, int) for value in (total, valid, nodata)) and valid + nodata == total, "D8 source valid and NODATA counts must close"),
-                    _contract_check("d8.neighborhood_accounting", all(isinstance(value, int) for value in (valid, complete)) and 0 < complete <= valid, "D8 complete neighborhoods must be a non-empty subset of valid cells"),
+                    _contract_check("d8.source_accounting", _is_int(total) and _is_int(valid) and _is_int(nodata) and valid + nodata == total, "D8 source valid and NODATA counts must close"),
+                    _contract_check("d8.neighborhood_accounting", _is_int(valid) and _is_int(complete) and 0 < complete <= valid, "D8 complete neighborhoods must be a non-empty subset of valid cells"),
                     _contract_check("d8.state_accounting", state_counts_valid and isinstance(valid, int) and state_total == valid, "D8 states must classify every valid cell exactly once"),
                     _contract_check("d8.flow_edge_accounting", state_counts_valid and all(isinstance(value, int) for value in (unique, flow_edges)) and unique == flow_edges == state_counts.get("FLOW_UNIQUE"), "D8 flow edges must equal unique-flow states"),
-                    _contract_check("d8.terminal_accounting", state_counts_valid and all(isinstance(value, int) for value in (terminal, valid, unique)) and terminal == terminal_state_total == valid - unique, "D8 terminal states must close to valid cells without flow edges"),
+                    _contract_check("d8.terminal_accounting", terminal_accounting_valid, "D8 terminal states must close to valid cells without flow edges"),
                     _contract_check("d8.direction_accounting", state_counts_valid and direction_counts_valid and all(isinstance(value, int) for value in (nonzero, unique)) and direction_total == unique and nonzero == unique + state_counts.get("TIE_UNRESOLVED", -1), "D8 direction counts and nonzero direction cells must close"),
                     _contract_check("d8.band_accounting", all(band.get("valid_cell_count") == valid and band.get("nodata_cell_count") == nodata for band in output_bands), "Every D8 band must preserve source valid and NODATA accounting"),
                     _contract_check("d8.band_names", [band.get("name") for band in output_bands] == expected_band_names, "D8 band receipt names must match output descriptions"),
@@ -1459,11 +1460,11 @@ def validate_web_snapshot_contract(report: dict[str, Any], *, report_path: str |
         _contract_check("final_url", _valid_http_url(report.get("final_url")), "final_url must be an http(s) URL without credentials"),
         _contract_check("retrieval_started_utc", isinstance(report.get("retrieval_started_utc"), str) and bool(report.get("retrieval_started_utc")), "retrieval_started_utc is required"),
         _contract_check("retrieval_utc", isinstance(report.get("retrieval_utc"), str) and bool(report.get("retrieval_utc")), "retrieval_utc is required"),
-        _contract_check("http_status", isinstance(report.get("http_status"), int) and 100 <= report.get("http_status") <= 599, "http_status must be 100..599"),
+        _contract_check("http_status", _is_int(report.get("http_status")) and 100 <= report["http_status"] <= 599, "http_status must be 100..599"),
         _contract_check("content_type", isinstance(report.get("content_type"), str) and bool(report.get("content_type")), "content_type is required"),
         _contract_check("content_sha256", _valid_sha256(report.get("content_sha256")), "content_sha256 must be a lowercase SHA-256"),
-        _contract_check("content_size_bytes", isinstance(report.get("content_size_bytes"), int) and report.get("content_size_bytes") >= 0, "content_size_bytes must be non-negative"),
-        _contract_check("content_base64", isinstance(report.get("content_base64"), str) and bool(report.get("content_base64")), "content_base64 is required for byte identity"),
+        _contract_check("content_size_bytes", _is_int(report.get("content_size_bytes")) and report["content_size_bytes"] >= 0, "content_size_bytes must be non-negative"),
+        _contract_check("content_base64", isinstance(report.get("content_base64"), str) and (bool(report.get("content_base64")) or report.get("content_size_bytes") == 0), "content_base64 is required for byte identity"),
         _contract_check("redirect_chain", isinstance(report.get("redirect_chain"), list), "redirect_chain must be an array"),
         _contract_check("fragment_removed", isinstance(report.get("fragment_removed"), bool), "fragment_removed must be boolean"),
         _contract_check("parser_name", isinstance(report.get("parser_name"), str) and bool(report.get("parser_name")), "parser_name is required"),

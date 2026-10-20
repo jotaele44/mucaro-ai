@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -22,6 +23,31 @@ def git_output(*args: str) -> str:
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip())
     return proc.stdout.strip()
+
+
+def emit_failure_summary(suite: dict[str, Any]) -> None:
+    failures = []
+    for row in suite.get("checks", []):
+        if not isinstance(row, dict) or row.get("state") == "PASS":
+            continue
+        receipt = row.get("execution_receipt")
+        failures.append(
+            {
+                "check_id": row.get("check_id"),
+                "state": row.get("state"),
+                "error_status": row.get("error_status"),
+                "error_detail": row.get("error_detail"),
+                "exit_code": receipt.get("exit_code") if isinstance(receipt, dict) else None,
+                "stdout": receipt.get("stdout", {}).get("text", "")[-4000:]
+                if isinstance(receipt, dict) and isinstance(receipt.get("stdout"), dict)
+                else "",
+                "stderr": receipt.get("stderr", {}).get("text", "")[-4000:]
+                if isinstance(receipt, dict) and isinstance(receipt.get("stderr"), dict)
+                else "",
+            }
+        )
+    if failures:
+        print(json.dumps({"coding_profile_failures": failures}, sort_keys=True), file=sys.stderr)
 
 
 def main() -> int:
@@ -95,6 +121,7 @@ def main() -> int:
         args.output.parent.mkdir(parents=True,exist_ok=True)
         args.output.write_text(json.dumps(payload,indent=2,sort_keys=True)+"\n",encoding="utf-8")
     print(payload["status"])
+    emit_failure_summary(suite)
     print(json.dumps(payload,sort_keys=True))
     return 0 if payload["status"]==STATUS_OK else 2
 

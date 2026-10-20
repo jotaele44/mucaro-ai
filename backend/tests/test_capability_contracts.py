@@ -518,6 +518,43 @@ def test_validate_web_snapshot_contract_closes_byte_and_evidence_accounting():
     assert any(check["name"] == "content_bytes_match_hash" for check in tampered["failed_checks"])
 
 
+def test_validate_web_snapshot_contract_accepts_zero_byte_body():
+    report = {
+        "schema_version": "mucaro_web_snapshot_v1",
+        "snapshot_id": "websnap_empty",
+        "snapshot_kind": "web_page",
+        "requested_url": "https://example.test/empty",
+        "fetch_url": "https://example.test/empty",
+        "final_url": "https://example.test/empty",
+        "redirect_chain": [],
+        "fragment_removed": False,
+        "retrieval_started_utc": "2026-10-20T00:00:00Z",
+        "retrieval_utc": "2026-10-20T00:00:01Z",
+        "http_status": 204,
+        "content_type": "text/plain",
+        "content_sha256": hashlib.sha256(b"").hexdigest(),
+        "content_size_bytes": 0,
+        "content_base64": "",
+        "parser_name": "web_snapshot_preview_v1",
+        "parser_trace": {"content_kind": "text", "trace_warnings": []},
+        "parser_warnings": [],
+        "charset": "utf-8",
+        "text_preview": "",
+        "cache_policy": {
+            "cache_mode": "immutable_snapshot_only",
+            "reuse_allowed": False,
+            "revalidation_required_before_reuse": True,
+            "warnings": [],
+        },
+        "robots_policy": {"status": "ROBOTS_ALLOWED", "allowed": True},
+        "http_error_policy": {"is_http_error": False, "snapshot_allowed": False, "citation_allowed": False},
+        "evidence_contract": _evidence_fixture(),
+    }
+    result = validate_web_snapshot_contract(report)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert result["counts"]["fail"] == 0
+
+
 def test_validate_web_session_contract_rejects_unaccounted_selection():
     report = {
         "schema_version": "mucaro_web_browse_session_v1",
