@@ -731,6 +731,7 @@ def build_parser() -> argparse.ArgumentParser:
     gis_vector_raster.add_argument("vector_path", help="Path to a GeoJSON FeatureCollection.")
     gis_vector_raster.add_argument("raster_path", help="Path to a local raster source.")
     gis_vector_raster.add_argument("--band", type=int, default=1, help="One-based raster band index.")
+    gis_vector_raster.add_argument("--inclusion-rule", choices=["cell_center", "fractional_coverage"], default="cell_center", help="Cell-center or projected planar fractional coverage inclusion.")
     gis_vector_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_vector_raster.set_defaults(handler=run_gis_vector_raster)
 
@@ -741,6 +742,7 @@ def build_parser() -> argparse.ArgumentParser:
     gis_zonal_stats.add_argument("vector_path", help="Path to a GeoJSON FeatureCollection.")
     gis_zonal_stats.add_argument("raster_path", help="Path to a local raster source.")
     gis_zonal_stats.add_argument("--band", type=int, default=1, help="One-based raster band index.")
+    gis_zonal_stats.add_argument("--inclusion-rule", choices=["cell_center", "fractional_coverage"], default="cell_center", help="Cell-center or projected planar fractional coverage inclusion.")
     gis_zonal_stats.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_zonal_stats.set_defaults(handler=run_gis_zonal_stats)
 
@@ -2520,6 +2522,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "ellipsoid",
                 "band",
                 "cell_inclusion_rule",
+                "coverage_measurement",
+                "coverage_area_units",
+                "weighted_statistics",
                 "implicit_reprojection",
                 "requested_bbox",
                 "effective_bbox",
@@ -2656,6 +2661,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "source_and_output_hash_present",
                 "feature_accounting_closed",
                 "cell_accounting_closed",
+                "coverage_accounting_closed",
                 "crs_exactly_matched",
                 "nodata_separate_from_zero",
                 "no_implicit_reprojection",
@@ -3236,7 +3242,7 @@ def run_gis_vector_raster(args: argparse.Namespace, cfg: Settings) -> int:
     raster_path = _resolve_project_path(args.raster_path, cfg)
     return _run_gis_report(
         args,
-        lambda: analyze_vector_raster_intersection(vector_path, raster_path, cfg=cfg, band=args.band),
+        lambda: analyze_vector_raster_intersection(vector_path, raster_path, cfg=cfg, band=args.band, inclusion_rule=args.inclusion_rule),
     )
 
 
@@ -3245,7 +3251,7 @@ def run_gis_zonal_stats(args: argparse.Namespace, cfg: Settings) -> int:
     raster_path = _resolve_project_path(args.raster_path, cfg)
     return _run_gis_report(
         args,
-        lambda: compute_zonal_statistics(vector_path, raster_path, cfg=cfg, band=args.band),
+        lambda: compute_zonal_statistics(vector_path, raster_path, cfg=cfg, band=args.band, inclusion_rule=args.inclusion_rule),
     )
 
 

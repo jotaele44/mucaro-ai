@@ -624,7 +624,7 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
         checks.extend(
             [
                 _contract_check("vector_raster.parameters.band", isinstance(_dotted(report, "parameters.band"), int) and _dotted(report, "parameters.band") >= 1, "vector-raster band must be one-based"),
-                _contract_check("vector_raster.parameters.rule", _dotted(report, "parameters.cell_inclusion_rule") == "cell_center", "cell inclusion rule must be explicit"),
+                _contract_check("vector_raster.parameters.rule", _dotted(report, "parameters.cell_inclusion_rule") in {"cell_center", "fractional_coverage"}, "cell inclusion rule must be explicit and supported"),
                 _contract_check("vector_raster.crs_match", _dotted(report, "vector_source.crs") == _dotted(report, "raster_source.crs"), "vector and raster CRS must match exactly"),
                 _contract_check("vector_raster.features", isinstance(features, list), "per-feature vector-raster receipts are required"),
                 _contract_check("vector_raster.state_counts", isinstance(state_counts, dict), "vector-raster state counts are required"),
@@ -649,6 +649,16 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 )
             )
             if operation == "compute_zonal_statistics":
+                fractional = _dotted(report, "parameters.cell_inclusion_rule") == "fractional_coverage"
+                if fractional:
+                    checks.extend(
+                        [
+                            _contract_check("vector_raster.fractional.coverage_measurement", _dotted(report, "parameters.coverage_measurement") == "planar_intersection_area", "fractional coverage must bind planar intersection area"),
+                            _contract_check("vector_raster.fractional.weighted_statistics", _dotted(report, "parameters.weighted_statistics") is True, "fractional coverage must bind weighted statistics"),
+                            _contract_check("vector_raster.fractional.invariant", _dotted(report, "invariants.coverage_accounting_closed") is True, "fractional coverage accounting must close"),
+                            _contract_check("vector_raster.fractional.rows", all(isinstance(feature, dict) and feature.get("coverage_accounting_closed") is True and _is_number(feature.get("covered_area")) and _is_number(feature.get("valid_coverage_area")) and _is_number(feature.get("nodata_coverage_area")) for feature in features), "fractional rows must expose closed planar coverage areas"),
+                        ]
+                    )
                 for index, feature in enumerate(features):
                     if isinstance(feature, dict) and feature.get("state") == "INTERSECTS_VALID":
                         checks.extend(
@@ -1493,7 +1503,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "topology policy and overlay operations extend beyond explicit planar make_valid and the current Polygon/MultiPolygon boundary",
                 "additional regional datum-grid transformations, vertical CRS, time-dependent operations, broader axis-order cases, and independent-engine datum validation are certified",
                 "ellipsoidal hole-orientation and large-geometry edge cases close beyond the bounded antimeridian and polar control corpus",
-                "broader vector/raster formats, fractional zonal coverage, additional resampling kernels, remote sensing, hydrology beyond bounded priority-flood conditioning and D8, bathymetry, and temporal GIS are receipt-backed",
+                "broader vector/raster formats, additional resampling kernels, remote sensing, hydrology beyond bounded priority-flood conditioning and D8, bathymetry, and temporal GIS are receipt-backed",
                 "rendered-map visual correctness and larger, more diverse real vector/raster corpora are independently certified",
             ),
         ),
