@@ -1,0 +1,164 @@
+MUCARO AI — TERMINAL READY
+==========================
+Scope: current source checkout, including the two-video portable UI reconstruction,
+hierarchical Settings/Personalization, versioned Documents, provenance bindings,
+motion/responsive navigation, and regression/certification gates.
+
+This file is operational guidance, not a certification receipt. Always bind claims to
+the exact checked-out commit and generated receipts.
+
+0) EXACT-HEAD IDENTITY
+----------------------
+macOS / Linux:
+  git rev-parse HEAD
+  git status --porcelain
+  git diff --check
+  shasum -a 256 _architecture/ui/video_ui_denominator_v1.json
+  shasum -a 256 _architecture/ui/video_ui_coverage_v1.json
+
+Windows PowerShell:
+  git rev-parse HEAD
+  git status --porcelain
+  git diff --check
+  Get-FileHash _architecture/ui/video_ui_denominator_v1.json -Algorithm SHA256
+  Get-FileHash _architecture/ui/video_ui_coverage_v1.json -Algorithm SHA256
+
+Gate: do not certify a dirty checkout. A different SHA is a different exact-head target.
+
+1) INSTALL / UPDATE DEPENDENCIES
+--------------------------------
+macOS / Linux:
+  python3.12 -m venv .venv
+  source .venv/bin/activate
+  python -m pip install --upgrade pip
+  python -m pip install -e ".[dev]"
+  (cd frontend && npm ci)
+
+Windows PowerShell:
+  py -3.12 -m venv .venv
+  .\.venv\Scripts\Activate.ps1
+  python -m pip install --upgrade pip
+  python -m pip install -e ".[dev]"
+  Push-Location frontend
+  npm ci
+  Pop-Location
+
+If a lock/install step fails, stop. Do not replace npm ci with npm install and do not
+silently relax Python requirements.
+
+2) FAST POSITIVE / NEGATIVE REGRESSION GATES
+---------------------------------------------
+macOS / Linux / Windows (with the venv active):
+  python scripts/certify_video_ui_coverage.py
+  pytest -q backend/tests/test_video_ui_coverage.py backend/tests/test_documents.py
+  (cd frontend && npm run test:unit)
+
+Expected:
+  - video UI source-coverage certifier: state PASS
+  - document/video coverage tests: zero failures
+  - frontend unit suite: zero failures
+
+The video certifier may report source_video_hash_checks as OPEN_NOT_SUPPLIED when the
+original recording bytes are not present in the checkout. That is not a source-byte PASS.
+
+3) OPTIONAL SOURCE-VIDEO BYTE REBINDING
+---------------------------------------
+If the two original recordings are available locally, run:
+
+  python scripts/certify_video_ui_coverage.py \
+    --video-a "/absolute/path/to/ScreenRecording_10-14-2026 19-52-25_1.mp4" \
+    --video-b "/absolute/path/to/ScreenRecording_10-14-2026 18-39-46_1(1).mp4" \
+    --output "/absolute/fresh/path/ui-video-coverage-receipt.json"
+
+The output path must not already exist. A hash mismatch is FAIL, never a near-match.
+
+4) BUILD
+--------
+macOS / Linux:
+  (cd frontend && npm run build)
+
+Windows PowerShell:
+  Push-Location frontend
+  npm run build
+  Pop-Location
+
+5) FULL RELEASE / SECURITY CERTIFICATION
+----------------------------------------
+  python scripts/certify_release.py
+  python scripts/certify_security_gates.py
+
+Both commands must exit 0. Review the exact-head receipts under:
+  data/exports/release_receipts/
+and security evidence under:
+  data/exports/security/
+
+6) RENDERED UI QA — CHROMIUM + WEBKIT
+-------------------------------------
+One-time browser setup:
+  cd qa/rendered
+  npm ci
+  npx playwright install --with-deps chromium webkit
+
+Run Chromium:
+  node rendered_qa.mjs --browser chromium --python "$(command -v python)" --out /tmp/mucaro-rendered-chromium
+
+Run WebKit:
+  node rendered_qa.mjs --browser webkit --python "$(command -v python)" --out /tmp/mucaro-rendered-webkit
+
+Windows PowerShell equivalent from qa/rendered:
+  node rendered_qa.mjs --browser chromium --python (Get-Command python).Source --out "$env:TEMP\mucaro-rendered-chromium"
+  node rendered_qa.mjs --browser webkit --python (Get-Command python).Source --out "$env:TEMP\mucaro-rendered-webkit"
+
+Required result: RENDERED_QA_PASS in both engines, with zero failed checks.
+Retain receipt.json plus screenshots as exact-head evidence.
+
+7) START THE APP
+----------------
+Developer launch:
+  python scripts/launch_app.py
+
+Backend only:
+  python scripts/dev_start.py --backend-only
+
+Frontend hot-reload only after npm ci:
+  python scripts/dev_start.py --frontend-only
+
+8) PHYSICAL DEVICE GATE
+-----------------------
+Rendered iPhone emulation is not physical-device certification.
+
+Before claiming physical-mobile parity, run the current exact head on the supported
+physical iPhone/iOS target and verify at minimum:
+  - drawer opens/closes and leaves intended content peek;
+  - Settings sheet stacks correctly over drawer;
+  - edge-swipe back gesture and reduced-motion behavior;
+  - native keyboard does not hide editors or actions;
+  - document tab sheet, checklists, comments, formatting, media and share/save;
+  - rotation / safe areas / touch targets / no horizontal overflow;
+  - service reconnect and phone-access security notices.
+
+Until that is completed and recorded, PHYSICAL_MOBILE remains OPEN.
+
+9) FAILURE HANDLING
+-------------------
+On any failure:
+  - preserve the failing exact-head SHA and receipt/log;
+  - classify the narrowest failing gate;
+  - fix only the demonstrated cause;
+  - rerun the failed gate and all upstream invariants it could affect;
+  - do not overwrite prior receipts;
+  - do not label source coverage, rendered QA, native packaging, or physical-device
+    validation as PASS merely because another gate passed.
+
+10) MERGE GATE
+--------------
+Merge only when:
+  - branch is reconciled with current main;
+  - exact-head CI PASS;
+  - security/release certification PASS;
+  - rendered Chromium PASS;
+  - rendered WebKit PASS;
+  - required native package workflows PASS;
+  - physical-device validation PASS if the bounded release claim includes it;
+  - _architecture/ui/video_ui_coverage_v1.json has zero unmapped observations;
+  - no unresolved residue remains inside the declared claim.

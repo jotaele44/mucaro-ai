@@ -71,3 +71,13 @@ export const ShareIcon = () => (
     <path d="M7 11H6a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1h-1" />
   </Icon>
 );
+
+
+export const DocumentIcon = () => (
+  <Icon name="document">
+    <path d="M6 3h8l4 4v14H6z" />
+    <path d="M14 3v5h5" />
+    <path d="M9 12h6" />
+    <path d="M9 16h6" />
+  </Icon>
+);

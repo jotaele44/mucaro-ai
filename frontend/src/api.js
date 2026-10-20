@@ -290,6 +290,22 @@ export const api = {
   revokeDirectoryPermission: (payload) => request("/permissions/directories/revoke", json("POST", payload)),
   ingestPath: (payload) => request("/ingest-path", json("POST", payload)),
 
+  documents: () => request("/documents"),
+  createDocument: (payload) => request("/documents", json("POST", payload)),
+  document: (id) => request(`/documents/${encodeURIComponent(id)}`),
+  saveDocument: (id, document, expectedRevision) =>
+    request(`/documents/${encodeURIComponent(id)}`, json("PUT", { document, expected_revision: expectedRevision })),
+  documentRevisions: (id) => request(`/documents/${encodeURIComponent(id)}/revisions`),
+  documentAssets: (id) => request(`/documents/${encodeURIComponent(id)}/assets`),
+  uploadDocumentAsset: (id, file) => {
+    const form = new FormData();
+    form.append("upload", file);
+    return request(`/documents/${encodeURIComponent(id)}/assets`, { method: "POST", body: form, timeoutMs: UPLOAD_TIMEOUT_MS });
+  },
+  documentComments: (id) => request(`/documents/${encodeURIComponent(id)}/comments`),
+  addDocumentComment: (id, payload) => request(`/documents/${encodeURIComponent(id)}/comments`, json("POST", payload)),
+  updateDocumentComment: (commentId, state) => request(`/documents/comments/${encodeURIComponent(commentId)}`, json("PATCH", { state })),
+
   memory: () => request("/memory"),
   remember: (content, kind) => request("/memory", json("POST", { content, kind })),
   updateMemory: (id, enabled) => request(`/memory/${id}`, json("PATCH", { enabled })),

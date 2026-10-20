@@ -1,0 +1,442 @@
+{
+  "schema_version": "mucaro-video-ui-denominator/1.0",
+  "generated_utc": "2026-10-14T23:56:00Z",
+  "claim_scope": "100% of observable, non-provider-specific UI elements/interactions/settings/motion visible in the two frozen recordings; hidden/unseen semantics remain UNKNOWN.",
+  "exclusions": [
+    "ChatGPT/Claude branding, logos, provider/model names, subscription/upgrade/restore-purchase commerce, proprietary hosted-service-only controls.",
+    "Native iOS software keyboard implementation itself (Mucaro adapts to it rather than recreating it)."
+  ],
+  "recordings": [
+    {
+      "id": "A",
+      "filename": "ScreenRecording_10-14-2026 19-52-25_1.mp4",
+      "sha256": "237fd9708e09769b5cf3532263148f155f4641efb10b63b0084f845a7faa9575",
+      "duration_s": 22.840023,
+      "width": 512,
+      "height": 1060,
+      "video_frames": 685,
+      "avg_fps": 29.991213231265135
+    },
+    {
+      "id": "B",
+      "filename": "ScreenRecording_10-14-2026 18-39-46_1(1).mp4",
+      "sha256": "85fce9df4285d3a0dc1cba98c6c087998dd1b1c732e259d11cabe983c346b726",
+      "duration_s": 53.368345,
+      "width": 512,
+      "height": 1044,
+      "video_frames": 1601,
+      "avg_fps": 29.99905655684095
+    }
+  ],
+  "denominator": {
+    "video_frames": 2286,
+    "duration_s": 76.208368
+  },
+  "observations": [
+    {
+      "id": "OBS-A-001",
+      "source": "A",
+      "category": "navigation",
+      "feature": "circular menu trigger",
+      "interaction": "tap opens left drawer",
+      "mapping": "mobile navigation trigger",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-002",
+      "source": "A",
+      "category": "navigation",
+      "feature": "left drawer",
+      "interaction": "slides in while right-edge content remains visible",
+      "mapping": "rail+context mobile drawer with scrim and content peek",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-003",
+      "source": "A",
+      "category": "navigation",
+      "feature": "drawer search",
+      "interaction": "search field in drawer header",
+      "mapping": "context-aware search",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-004",
+      "source": "A",
+      "category": "navigation",
+      "feature": "pinned section",
+      "interaction": "fixed pinned items before recents",
+      "mapping": "persisted pinned workspaces/conversations/documents",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-005",
+      "source": "A",
+      "category": "navigation",
+      "feature": "recent items",
+      "interaction": "scrolling recent-list rows with ellipsis",
+      "mapping": "recent workspace history",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-006",
+      "source": "A",
+      "category": "navigation",
+      "feature": "selected row",
+      "interaction": "highlight active destination",
+      "mapping": "canonical active selection",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-007",
+      "source": "A",
+      "category": "presentation",
+      "feature": "profile/settings sheet",
+      "interaction": "sheet rises over still-visible drawer",
+      "mapping": "SheetHost stacked presentation preserving previous state",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-008",
+      "source": "A",
+      "category": "settings",
+      "feature": "settings home groups",
+      "interaction": "grouped cards/rows with leading icon, label, current value, chevron",
+      "mapping": "SettingsRegistry + SettingsStack",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-009",
+      "source": "A",
+      "category": "settings",
+      "feature": "appearance row",
+      "interaction": "opens theme configuration",
+      "mapping": "System/Light/Dark plus density/accent",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-010",
+      "source": "A",
+      "category": "settings",
+      "feature": "language row",
+      "interaction": "current language value + navigation",
+      "mapping": "bounded locale setting",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-011",
+      "source": "A",
+      "category": "settings",
+      "feature": "personalization row",
+      "interaction": "opens nested settings page",
+      "mapping": "response-style/personalization settings",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-012",
+      "source": "A",
+      "category": "personalization",
+      "feature": "base style selector",
+      "interaction": "tap selectable style option",
+      "mapping": "response-style preference",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-013",
+      "source": "A",
+      "category": "personalization",
+      "feature": "tone sliders/options",
+      "interaction": "warmth/conciseness/enthusiasm/emoji-style controls",
+      "mapping": "bounded response preferences",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-014",
+      "source": "A",
+      "category": "personalization",
+      "feature": "custom instructions",
+      "interaction": "opens large editable sheet with save/dismiss",
+      "mapping": "persistent custom-instructions editor",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-015",
+      "source": "A",
+      "category": "personalization",
+      "feature": "behavior toggles",
+      "interaction": "binary toggles for response/suggestion behavior",
+      "mapping": "quick-response + suggested-follow-up preferences",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-016",
+      "source": "A",
+      "category": "motion",
+      "feature": "interactive back gesture",
+      "interaction": "horizontal edge-swipe reveals previous page with parallax",
+      "mapping": "gesture-owned stack pop",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-017",
+      "source": "A",
+      "category": "motion",
+      "feature": "page push/pop",
+      "interaction": "screen-to-screen horizontal transition with fixed chrome",
+      "mapping": "SettingsStack/PageStack motion",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-018",
+      "source": "A",
+      "category": "motion",
+      "feature": "sheet transition",
+      "interaction": "bottom/upward sheet entry and downward dismissal",
+      "mapping": "SheetHost snap/dismiss motion",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-A-019",
+      "source": "A",
+      "category": "keyboard",
+      "feature": "keyboard-aware editor",
+      "interaction": "sheet/editor remains usable above native keyboard",
+      "mapping": "visualViewport keyboard adapter",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-001",
+      "source": "B",
+      "category": "documents",
+      "feature": "document shell",
+      "interaction": "full-screen document opens inside app chrome",
+      "mapping": "first-class Documents workspace",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-002",
+      "source": "B",
+      "category": "documents",
+      "feature": "loading shell",
+      "interaction": "toolbar visible before content; central spinner; content appears without shell replacement",
+      "mapping": "progressive document loading",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-003",
+      "source": "B",
+      "category": "documents",
+      "feature": "close control",
+      "interaction": "close/back returns to originating context",
+      "mapping": "document close with state restoration",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-004",
+      "source": "B",
+      "category": "documents",
+      "feature": "undo/redo controls",
+      "interaction": "toolbar history actions with disabled/enabled state",
+      "mapping": "per-document-tab history",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-005",
+      "source": "B",
+      "category": "documents",
+      "feature": "comments control",
+      "interaction": "toolbar comment affordance",
+      "mapping": "block/range comments",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-006",
+      "source": "B",
+      "category": "documents",
+      "feature": "share/export control",
+      "interaction": "toolbar action",
+      "mapping": "native share + export formats",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-007",
+      "source": "B",
+      "category": "documents",
+      "feature": "done/check control",
+      "interaction": "editing mode commit/exit",
+      "mapping": "commit active document draft revision",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-008",
+      "source": "B",
+      "category": "documents",
+      "feature": "internal tab selector",
+      "interaction": "current tab label with dropdown arrow",
+      "mapping": "document-internal tabs distinct from workspace tabs",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-009",
+      "source": "B",
+      "category": "documents",
+      "feature": "tab bottom sheet",
+      "interaction": "drag sheet with selected tab row + New tab",
+      "mapping": "mobile document-tab manager",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-010",
+      "source": "B",
+      "category": "documents",
+      "feature": "title/meta row",
+      "interaction": "large title plus compact metadata chips",
+      "mapping": "document title + provenance metadata",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-011",
+      "source": "B",
+      "category": "documents",
+      "feature": "paragraph/heading blocks",
+      "interaction": "scrollable structured content",
+      "mapping": "stable-ID document blocks",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-012",
+      "source": "B",
+      "category": "documents",
+      "feature": "inline code/code blocks",
+      "interaction": "styled technical text",
+      "mapping": "code block types",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-013",
+      "source": "B",
+      "category": "documents",
+      "feature": "bullets/ordered lists",
+      "interaction": "structured list rendering/editing",
+      "mapping": "list block types",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-014",
+      "source": "B",
+      "category": "documents",
+      "feature": "block quotes",
+      "interaction": "quoted block styling",
+      "mapping": "quote block type",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-015",
+      "source": "B",
+      "category": "documents",
+      "feature": "checklist",
+      "interaction": "tap checkbox toggles completion and strikethrough",
+      "mapping": "transactional checklist block mutation + undo",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-016",
+      "source": "B",
+      "category": "documents",
+      "feature": "collapsible sections",
+      "interaction": "caret toggles section content",
+      "mapping": "view-state accordion",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-017",
+      "source": "B",
+      "category": "documents",
+      "feature": "embedded images",
+      "interaction": "image blocks within document",
+      "mapping": "content-addressed local media blocks",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-018",
+      "source": "B",
+      "category": "editor",
+      "feature": "text edit mode",
+      "interaction": "tap text enters direct document editing with caret/selection",
+      "mapping": "block editor mode",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-019",
+      "source": "B",
+      "category": "editor",
+      "feature": "format toolbar",
+      "interaction": "comment/emoji/indent/outdent/block-style/bold/italic/underline/strike/quote/keyboard controls",
+      "mapping": "contextual formatting toolbar",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-020",
+      "source": "B",
+      "category": "editor",
+      "feature": "native selection",
+      "interaction": "cursor/selection handles and keyboard",
+      "mapping": "native selection semantics inside editor",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-021",
+      "source": "B",
+      "category": "motion",
+      "feature": "tab sheet motion",
+      "interaction": "sheet enters from bottom with grabber and dismiss gesture",
+      "mapping": "SheetHost medium snap",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-022",
+      "source": "B",
+      "category": "motion",
+      "feature": "accordion motion",
+      "interaction": "section expands/collapses smoothly",
+      "mapping": "height/clip transition with reduced-motion fallback",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-023",
+      "source": "B",
+      "category": "motion",
+      "feature": "checklist state transition",
+      "interaction": "checkbox/style changes immediately without page reset",
+      "mapping": "local optimistic state + persisted revision",
+      "state": "FACT"
+    },
+    {
+      "id": "OBS-B-024",
+      "source": "B",
+      "category": "responsive",
+      "feature": "mobile document toolbar",
+      "interaction": "dense controls remain reachable at narrow width",
+      "mapping": "safe-area toolbar with overflow policy",
+      "state": "FACT"
+    }
+  ],
+  "unknowns": [
+    "Hidden comment-thread internals beyond the visible comment control.",
+    "Hidden provider account/billing semantics.",
+    "Exact source-app motion spring constants; Mucaro uses measured-looking bounded equivalents.",
+    "Any behavior not visible in either frozen recording."
+  ],
+  "certification_states": [
+    "PASS",
+    "FAIL",
+    "OPEN",
+    "BLOCKED",
+    "PROVISIONAL",
+    "AUDIT_ONLY",
+    "NONCANONICAL",
+    "CANDIDATE_NOT_IDENTITY",
+    "UNRESOLVED",
+    "SUPERSEDED"
+  ]
+}
