@@ -117,6 +117,6 @@ export function LearningWorkspace({ announce }) {
     <details><summary>Audit receipts ({data?.receipts?.length || 0})</summary>
       <pre className="learning-json" tabIndex={0} aria-label="Learning evidence JSON">{JSON.stringify(data?.receipts || [], null, 2)}</pre></details>
     <AgentConsumerPanel candidates={rows} announce={announce} />
-    <p className="muted small">Review and verification are operator attestations. Procedure artifacts require an explicit agent binding and separate run approval. Model-weight training is not connected.</p>
+    <p className="muted small">Review and verification are operator attestations. Skill artifacts are reusable procedures; they do not install executable code or start worker agents without explicit agent binding and separate run approval. Model-weight training is not connected.</p>
   </section>;
 }
