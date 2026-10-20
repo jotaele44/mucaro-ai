@@ -14,12 +14,12 @@ from pathlib import Path
 TEXT_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".json", ".toml", ".sh", ".ps1", ".cmd", ".yml", ".yaml"}
 SKIP_DIRS = {".git", "node_modules", ".venv", "dist", "build", "__pycache__", ".mucaro-runtime", ".pytest_cache"}
 PATTERNS = {
-    "external_url": re.compile(r"https?://[^\\s\\\"'<>\\x60]+"),
-    "subprocess": re.compile(r"\\b(subprocess\\.|Popen\\(|os\\.system\\(|execFile\\(|spawn\\()"),
-    "package_acquisition": re.compile(r"\\b(pip install|npm install|npm ci|curl |wget |brew install|Invoke-WebRequest)\\b", re.I),
-    "model_provider": re.compile(r"\\b(anthropic|openai|ollama|llama\\.cpp|lmstudio|model_provider)\\b", re.I),
-    "network_client": re.compile(r"\\b(urllib\\.request|requests\\.|httpx\\.|fetch\\(|WebSocket\\(|socket\\.)"),
-    "host_binary": re.compile(r"\\b(git|docker|podman|tesseract|pdftoppm|chromium|node|python3?)\\b", re.I),
+    "external_url": re.compile(r"https?://[^\s\\"'<>\x60]+"),
+    "subprocess": re.compile(r"\b(subprocess\.|Popen\(|os\.system\(|execFile\(|spawn\()"),
+    "package_acquisition": re.compile(r"\b(pip install|npm install|npm ci|curl |wget |brew install|Invoke-WebRequest)\b", re.I),
+    "model_provider": re.compile(r"\b(anthropic|openai|ollama|llama\.cpp|lmstudio|model_provider)\b", re.I),
+    "network_client": re.compile(r"\b(urllib\.request|requests\.|httpx\.|fetch\(|WebSocket\(|socket\.)"),
+    "host_binary": re.compile(r"\b(git|docker|podman|tesseract|pdftoppm|chromium|node|python3?)\b", re.I),
 }
 MANIFEST_PATHS = {"pyproject.toml", "frontend/package.json", "frontend/package-lock.json", "README.md"}
 
