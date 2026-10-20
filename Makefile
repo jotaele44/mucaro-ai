@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: bootstrap start setup preflight test validate inventory-check ingest ask cli serve launch-smoke desktop macos-app macos-app-verify security-gates release-grade release-status release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
+.PHONY: bootstrap start setup preflight test validate inventory-check ingest ask cli serve launch-smoke desktop macos-app macos-app-verify security-gates release-grade release-status mucaro-100 mucaro-100-certify release certify fresh-clone-cert backend frontend dev-backend dev-frontend dev refs clean
 
 bootstrap:
 	bash scripts/bootstrap_macos.sh
@@ -62,6 +62,12 @@ release-grade:
 # Regenerate the computed block in docs/RELEASE_STATUS.md from the release ledgers.
 release-status:
 	PYTHONPATH=.:backend $(PYTHON) scripts/mucaro.py release scope status --write-doc --format text
+
+mucaro-100:
+	PYTHONPATH=.:backend $(PYTHON) scripts/certify_mucaro_100.py --format text
+
+mucaro-100-certify:
+	PYTHONPATH=.:backend $(PYTHON) scripts/certify_mucaro_100.py --strict --format text
 
 release:
 	PYTHONPATH=.:backend $(PYTHON) scripts/release_check.py
