@@ -69,6 +69,16 @@ def compile_lock(uv: Path, pins: dict[str, str], target: str, output: Path) -> N
     extras = [f"--extra={extra}" for extra in TARGETS[target]]
     env = {key: value for key, value in os.environ.items() if not key.startswith("UV_")}
     env["UV_NO_CONFIG"] = "1"
+    security_args: list[str] = []
+    certifi_version = pins.get("PY_SECURITY_CERTIFI_VERSION")
+    certifi_cutoff = pins.get("PY_EXCLUDE_NEWER_CERTIFI")
+    if certifi_version and certifi_cutoff:
+        security_args = [
+            "--exclude-newer-package",
+            f"certifi={certifi_cutoff}",
+            "--upgrade-package",
+            f"certifi=={certifi_version}",
+        ]
     subprocess.run(
         [
             str(uv),
@@ -84,11 +94,7 @@ def compile_lock(uv: Path, pins: dict[str, str], target: str, output: Path) -> N
             "--generate-hashes",
             "--exclude-newer",
             pins["PY_EXCLUDE_NEWER"],
-            "--exclude-newer-package",
-            "pypdf=" + pins["PY_SECURITY_EXCLUDE_NEWER"],
-            "--exclude-newer-package",
-            "certifi=" + pins["PY_SECURITY_EXCLUDE_NEWER"],
-            "--upgrade-package=certifi==2026.10.19",
+            *security_args,
             "--custom-compile-command",
             COMPILE_COMMAND,
             "--quiet",
