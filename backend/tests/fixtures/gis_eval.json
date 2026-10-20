@@ -3,7 +3,7 @@
   "minimums": {
     "case_count": 67,
     "operation_count": 25,
-    "negative_case_count": 26
+    "negative_case_count": 27
   },
   "cases": [
     {
