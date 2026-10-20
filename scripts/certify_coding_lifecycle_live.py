@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import stat
 import subprocess
 import tempfile
 from pathlib import Path
@@ -195,9 +194,8 @@ def run_certification(source_root: Path = ROOT) -> dict[str, Any]:
             rollback_repo, branch_name="feature/rollback", expected_head_sha=rollback_head, cfg=cfg
         )
         (rollback_repo / "tracked.txt").write_text("beta\n", encoding="utf-8")
-        hook = rollback_repo / ".git" / "hooks" / "commit-msg"
-        hook.write_text("#!/bin/sh\nexit 19\n", encoding="utf-8")
-        hook.chmod(hook.stat().st_mode | stat.S_IXUSR)
+        _git(rollback_repo, "config", "commit.gpgsign", "true")
+        _git(rollback_repo, "config", "gpg.program", "/definitely/missing-mucaro-gpg")
         negative["failed_commit_rollback"] = _expect_status(
             lambda: commit_approved_changes(
                 rollback_repo,
