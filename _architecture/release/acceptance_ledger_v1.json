@@ -107,19 +107,27 @@
       "requirement_id": "KERNEL-003",
       "requirement_text": "Binding specification discovery",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
+        "docs/release/MUCARO_RELEASE_ENGINEERING_CONTRACT_V1.md",
+        "docs/release/MUCARO_WORKBENCH_SPEC_BINDING_V1.md",
         "_architecture/release/release_scope_manifest_v1.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_spec_hash_mismatch_is_detected",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "BLOCKED",
-      "blocker_id": "BLK-SPEC-001",
+      "evidence_refs": [
+        "docs/release/MUCARO_RELEASE_ENGINEERING_CONTRACT_V1.md",
+        "docs/release/MUCARO_WORKBENCH_SPEC_BINDING_V1.md",
+        "_architecture/release/release_scope_manifest_v1.json",
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_spec_hash_mismatch_is_detected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
       "dag_node": "N26",
-      "notes": "Contract and mobile brief are bound by hash; the separate Workbench Specification is missing (SPECIFICATION_BINDING=OPEN)."
+      "notes": "Canonical specification identity is resolved by the 2026-10-20 binding decision: MUCARO_RELEASE_ENGINEERING_CONTRACT_V1 is the Release-Grade Workbench Specification for the existing denominator. Hash binding and negative hash-drift regression remain authoritative."
     },
     {
       "requirement_id": "KERNEL-004",
