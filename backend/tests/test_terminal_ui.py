@@ -156,7 +156,14 @@ def test_terminal_autopilot_mode_generates_plan_without_auto_authorizing(
     monkeypatch.setattr(
         controller,
         "snapshot",
-        lambda: {**original_snapshot(), "repository_status": {"head_sha": "a" * 40}},
+        lambda: {
+            **original_snapshot(),
+            "repository_status": {
+                "tool_call_id": "tool_repo_status",
+                "executed_at": "2026-10-20T15:00:00Z",
+                "result": {"head_sha": "a" * 40, "branch": "feature/test"},
+            },
+        },
     )
     captured: dict[str, object] = {}
 
