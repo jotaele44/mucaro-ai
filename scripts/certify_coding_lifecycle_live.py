@@ -316,6 +316,21 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(payload["status"])
+    if payload["status"] != STATUS_OK:
+        print("failed_invariants=" + json.dumps(
+            sorted(key for key, value in payload["invariants"].items() if not value)
+        ))
+        print("failed_negative_cases=" + json.dumps(
+            {
+                key: {
+                    "expected": value["expected"],
+                    "observed": value["observed"],
+                }
+                for key, value in payload["negative_cases"].items()
+                if not value["passed"]
+            },
+            sort_keys=True,
+        ))
     print(f"receipt_sha256={payload['receipt_sha256']}")
     return 0 if payload["status"] == STATUS_OK else 2
 
