@@ -1,0 +1,45 @@
+MÚCARO-AI — TERMINAL READY
+Scope: standalone-independence audit branch (documentation only)
+Base: e88038cd6f79ec43f1bce519e3a4ed16ad0e6997
+Release certification: NOT_APPLICABLE — no distributable or executable changed by this tranche.
+Run from repository root. Never claim an offline release from these commands.
+
+macOS / Linux (individual commands):
+git status --short
+git rev-parse HEAD
+python3 scripts/preflight.py --strict-imports
+python3 scripts/release_check.py
+python3 -m pytest backend/tests -q
+
+Windows PowerShell (individual commands):
+git status --short
+git rev-parse HEAD
+py -3.12 scripts/preflight.py --strict-imports
+py -3.12 scripts/release_check.py
+py -3.12 -m pytest backend/tests -q
+
+Independent source/artifact checks:
+git ls-tree -r --name-only HEAD
+git show HEAD:docs/STANDALONE_INDEPENDENCE_EXECUTION.md
+git hash-object docs/STANDALONE_INDEPENDENCE_EXECUTION.md
+git status --porcelain
+
+Expected checks:
+- Baseline remains in Git ancestry; compare with: git merge-base HEAD main
+- No change to release claims until all IND acceptance gates PASS.
+- A command's exit code by itself is NOT release certification.
+- Source tree hash and generated binary hashes are separate evidence classes.
+- Clean-machine, network-disabled, no-developer-tools installation remains OPEN.
+
+Failure handling:
+- Missing developer dependencies: record BLOCKED (do not report test PASS).
+- Missing optional local model: core must start; local generation must report unavailable.
+- Network-off remote API: fail closed and record the denial, never imply successful inference.
+- Unexpected outbound network calls: FAIL isolation gate.
+- Failed schema migrations or missing data: STOP, restore a verified backup, preserve logs.
+- Do not force-update canonical main or discard local changes.
+- For a-Shell on iOS, use each command as a separate single line, never multiline shell blocks.
+
+Smoke-test scope:
+Developer checkout tests are useful evidence only; they cannot certify a prepared release package.
+Check docs/STANDALONE_INDEPENDENCE_EXECUTION.md for the full gate matrix.
