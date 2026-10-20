@@ -1,7 +1,7 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 64,
+    "case_count": 67,
     "operation_count": 25,
     "negative_case_count": 26
   },
@@ -2170,6 +2170,77 @@
       },
       "expect_error": true,
       "expected_status": "ERROR_GIS_VECTOR_RASTER_BAND",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "zonal_stats_fractional_projected_coverage_closes_area_and_weights",
+      "operation": "zonal_stats",
+      "parameters": {"band": 1, "inclusion_rule": "fractional_coverage"},
+      "inputs": {
+        "vector": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:3857"}},
+          "features": [
+            {"type": "Feature", "id": "fractional-zone", "geometry": {"type": "Polygon", "coordinates": [[[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 1.5], [0.5, 0.5]]]}, "properties": {}}
+          ]
+        },
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:3857",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expected_status": "GIS_ZONAL_STATS_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "feature_accounting_closed": true,
+        "cell_accounting_closed": true,
+        "coverage_accounting_closed": true,
+        "crs_exactly_matched": true,
+        "nodata_separate_from_zero": true,
+        "no_implicit_reprojection": true
+      },
+      "expected_fields": {
+        "parameters.cell_inclusion_rule": "fractional_coverage",
+        "parameters.coverage_measurement": "planar_intersection_area",
+        "parameters.weighted_statistics": true,
+        "features.0.feature_id": "fractional-zone",
+        "features.0.covered_cell_count": 4,
+        "features.0.valid_cell_count": 3,
+        "features.0.nodata_cell_count": 1,
+        "features.0.covered_area": 1.0,
+        "features.0.valid_coverage_area": 0.75,
+        "features.0.nodata_coverage_area": 0.25,
+        "features.0.coverage_fraction_sum": 1.0,
+        "features.0.coverage_accounting_closed": true,
+        "features.0.sum": 1.25,
+        "features.0.median": 2.0
+      }
+    },
+    {
+      "case_id": "zonal_stats_fractional_geographic_crs_fails_closed",
+      "operation": "zonal_stats",
+      "parameters": {"band": 1, "inclusion_rule": "fractional_coverage"},
+      "inputs": {
+        "vector": {
+          "type": "FeatureCollection",
+          "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
+          "features": []
+        },
+        "raster": {
+          "format": "raster",
+          "dtype": "int16",
+          "crs": "EPSG:4326",
+          "nodata": -9999,
+          "origin": [0, 2, 1, 1],
+          "bands": [[[0, 2], [3, -9999]]]
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_VECTOR_RASTER_FRACTIONAL_CRS",
       "expected_warnings": []
     },
     {

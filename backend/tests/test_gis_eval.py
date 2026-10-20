@@ -12,11 +12,11 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 64,
-        "passed": 64,
+        "cases": 67,
+        "passed": 67,
         "failed": 0,
-        "positive_cases": 38,
-        "negative_cases": 26,
+        "positive_cases": 40,
+        "negative_cases": 27,
         "operations": 25,
         "operation_names": [
             "bbox_filter",
@@ -130,6 +130,8 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["vector_raster_crs_mismatch_fails_closed"]["observed_status"] == "ERROR_GIS_VECTOR_RASTER_CRS_MISMATCH"
     assert by_id["zonal_stats_close_numeric_nodata_and_zero_accounting"]["observed_status"] == "GIS_ZONAL_STATS_OK"
     assert by_id["zonal_stats_invalid_band_fails_closed"]["observed_status"] == "ERROR_GIS_VECTOR_RASTER_BAND"
+    assert by_id["zonal_stats_fractional_projected_coverage_closes_area_and_weights"]["observed_status"] == "GIS_ZONAL_STATS_OK"
+    assert by_id["zonal_stats_fractional_geographic_crs_fails_closed"]["observed_status"] == "ERROR_GIS_VECTOR_RASTER_FRACTIONAL_CRS"
     assert by_id["raster_resample_preserves_grid_contract"]["observed_status"] == "GIS_RASTER_RESAMPLE_OK"
     assert by_id["raster_resample_invalid_dimensions_fail_closed"]["observed_status"] == "ERROR_GIS_RASTER_RESAMPLE_DIMENSIONS"
     assert by_id["real_corpus_bytes_schema_ids_and_geometry_validate"]["observed_status"] == "GIS_CORPUS_VALIDATION_OK"
