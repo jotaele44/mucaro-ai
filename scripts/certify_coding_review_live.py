@@ -53,6 +53,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Execute live coding-review evidence certification.")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    source_head_before = _run_git(ROOT, "rev-parse", "HEAD")
+    source_status_before = _run_git(ROOT, "status", "--porcelain=v1", "-z")
 
     with tempfile.TemporaryDirectory(prefix="mucaro-review-cert-") as tmp:
         root = Path(tmp)
@@ -136,7 +138,11 @@ def main() -> int:
         except CodingReviewError as exc:
             negative["invalid_line_range"] = exc.status
 
+        source_head_after = _run_git(ROOT, "rev-parse", "HEAD")
+        source_status_after = _run_git(ROOT, "status", "--porcelain=v1", "-z")
         invariants = {
+            "source_head_conserved": source_head_before == source_head_after,
+            "source_dirty_state_conserved": source_status_before == source_status_after,
             "status_terminal": report["status"] == "CODING_REVIEW_FINDINGS",
             "finding_count_closed": report["finding_count"] == 1,
             "changed_source_bound": report["invariants"]["changed_sources_bound"] is True,
@@ -154,6 +160,7 @@ def main() -> int:
             "schema_version": "mucaro-coding-review-live-cert/1.0",
             "status": STATUS_OK if all(invariants.values()) else STATUS_FAILED,
             "scope": "CODE-08_REVIEW_EVIDENCE_FILE_LINE_BINDING",
+            "source_head_sha": source_head_before,
             "repo_head_sha": base_head,
             "report": report,
             "negative_cases": negative,
