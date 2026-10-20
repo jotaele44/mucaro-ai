@@ -1,10 +1,18 @@
+import base64
+import hashlib
+
 from backend.app.capability_contracts import (
     CAPABILITY_CONTRACT_SCHEMA_VERSION,
     CAPABILITY_OUTPUT_CONTRACT_FAILED,
     CAPABILITY_OUTPUT_CONTRACT_OK,
+    build_evidence_contract,
     build_capability_contract_report,
+    validate_answer_trace_contract,
+    validate_coding_review_contract,
     validate_gis_report_contract,
     validate_ocr_report_contract,
+    validate_web_browse_session_contract,
+    validate_web_snapshot_contract,
 )
 
 
@@ -449,6 +457,141 @@ def test_validate_gis_report_contract_rejects_weak_measurement_receipts():
     assert "measure.total_length_numeric" in failed_names
     assert "limitations_non_empty" in failed_names
     assert "falsification_criteria_non_empty" in failed_names
+
+
+def _evidence_fixture(**overrides):
+    payload = build_evidence_contract(
+        claim_type="FACT",
+        evidence_type="DIRECT_TEST_FIXTURE",
+        source_identity_type="URL_PLUS_CONTENT_SHA256",
+        confidence="BOUNDED_BYTE_CAPTURE",
+        uncertainty_state="BOUNDED",
+        contradiction_state="NOT_ADJUDICATED",
+        verification_method="replay fixture and compare hashes",
+        limitations=["fixture is bounded"],
+        falsification_criteria=["tamper with the fixture"],
+    )
+    payload.update(overrides)
+    return payload
+
+
+def test_validate_web_snapshot_contract_closes_byte_and_evidence_accounting():
+    content = b"<html><body>fixture</body></html>"
+    report = {
+        "schema_version": "mucaro_web_snapshot_v1",
+        "snapshot_id": "websnap_contract",
+        "snapshot_kind": "web_page",
+        "requested_url": "https://example.test/source",
+        "fetch_url": "https://example.test/source",
+        "final_url": "https://example.test/source",
+        "redirect_chain": [],
+        "fragment_removed": False,
+        "retrieval_started_utc": "2026-10-20T00:00:00Z",
+        "retrieval_utc": "2026-10-20T00:00:01Z",
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "content_sha256": hashlib.sha256(content).hexdigest(),
+        "content_size_bytes": len(content),
+        "content_base64": base64.b64encode(content).decode("ascii"),
+        "parser_name": "web_snapshot_preview_v1",
+        "parser_trace": {"content_kind": "html", "trace_warnings": []},
+        "parser_warnings": [],
+        "charset": "utf-8",
+        "text_preview": "fixture",
+        "cache_policy": {
+            "cache_mode": "immutable_snapshot_only",
+            "reuse_allowed": False,
+            "revalidation_required_before_reuse": True,
+            "warnings": [],
+        },
+        "robots_policy": {"status": "ROBOTS_ALLOWED", "allowed": True},
+        "http_error_policy": {"is_http_error": False, "snapshot_allowed": False, "citation_allowed": False},
+        "evidence_contract": _evidence_fixture(),
+    }
+    result = validate_web_snapshot_contract(report)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert result["counts"]["fail"] == 0
+
+    report["content_base64"] = base64.b64encode(b"tampered").decode("ascii")
+    tampered = validate_web_snapshot_contract(report)
+    assert tampered["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "content_bytes_match_hash" for check in tampered["failed_checks"])
+
+
+def test_validate_web_session_contract_rejects_unaccounted_selection():
+    report = {
+        "schema_version": "mucaro_web_browse_session_v1",
+        "session_id": "websession_contract",
+        "status": "WEB_BROWSE_SESSION_OK",
+        "started_at": "2026-10-20T00:00:00Z",
+        "completed_at": "2026-10-20T00:00:01Z",
+        "browser_discovery_policy": {
+            "search_enabled": False,
+            "automated_link_following": False,
+            "candidate_source": "operator_supplied_urls",
+        },
+        "session_policy": {"max_pages": 2, "require_same_host": True},
+        "fetch_policy": {"cache_mode": "immutable_snapshot_only"},
+        "candidate_count": 2,
+        "selected_count": 1,
+        "successful_fetch_count": 1,
+        "selection_decisions": [{"decision": "SELECTED"}],
+        "fetches": [{"status": "WEB_FETCH_SNAPSHOT_OK", "url": "https://example.test/source"}],
+        "warnings": [],
+        "replay": {"tool_name": "web.fetch_session", "arguments": {"urls": ["https://example.test/source"]}},
+        "evidence_contract": _evidence_fixture(claim_type="COMPUTED", evidence_type="SESSION_LEDGER"),
+    }
+    result = validate_web_browse_session_contract(report)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "selection_decisions" for check in result["failed_checks"])
+
+
+def test_validate_answer_trace_contract_rejects_uncited_success():
+    trace = {
+        "query": "What is this?",
+        "retrieved_chunk_ids": ["chunk_1"],
+        "cited_chunk_ids": [],
+        "cited_chunks": [],
+        "validation_flags": [],
+        "citation_status": "CITATION_OK",
+        "evidence_contract": _evidence_fixture(claim_type="COMPUTED", evidence_type="CITED_RETRIEVAL_TRACE"),
+    }
+    result = validate_answer_trace_contract(trace)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "uncited_answer_not_ok" for check in result["failed_checks"])
+
+
+def test_validate_coding_review_contract_requires_hash_bound_findings():
+    report = {
+        "schema_version": "mucaro-coding-review/1.0",
+        "status": "CODING_REVIEW_FINDINGS",
+        "repo_root": "/tmp/repo",
+        "head_sha": "a" * 40,
+        "base_commit_sha": "b" * 40,
+        "changed_paths": ["src/example.py"],
+        "finding_count": 1,
+        "findings": [
+            {
+                "path": "src/example.py",
+                "line_start": 1,
+                "line_end": 1,
+                "source_sha256": "c" * 64,
+                "excerpt": "pass",
+                "excerpt_sha256": hashlib.sha256(b"pass").hexdigest(),
+            }
+        ],
+        "invariants": {"finding_count_closed": True, "changed_sources_bound": True},
+        "limitations": ["bounded review"],
+        "falsification_criteria": ["source changes"],
+        "evidence_contract": _evidence_fixture(claim_type="COMPUTED", evidence_type="CURRENT_DIFF_REVIEW"),
+    }
+    result = validate_coding_review_contract(report)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+
+    report["findings"][0]["excerpt"] = "changed"
+    tampered = validate_coding_review_contract(report)
+    assert tampered["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "findings.0.excerpt_sha256" for check in tampered["failed_checks"])
 
 
 def test_validate_ocr_report_contract_accepts_image_ocr_receipts():

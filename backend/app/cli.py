@@ -16,7 +16,15 @@ from typing import Any, Sequence
 from urllib.parse import urlparse
 
 from .config import Settings, settings
-from .capability_contracts import build_capability_contract_report, validate_gis_report_file, validate_ocr_report_file
+from .capability_contracts import (
+    build_capability_contract_report,
+    validate_answer_trace_contract,
+    validate_coding_review_file,
+    validate_gis_report_file,
+    validate_ocr_report_file,
+    validate_web_browse_session_file,
+    validate_web_snapshot_file,
+)
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -1079,6 +1087,38 @@ def build_parser() -> argparse.ArgumentParser:
     capability_validate_ocr.add_argument("report_path", type=Path, help="Path to a saved OCR report JSON file.")
     capability_validate_ocr.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     capability_validate_ocr.set_defaults(handler=run_capability_validate_ocr_report)
+
+    capability_validate_web_snapshot = capabilities_subcommands.add_parser(
+        "validate-web-snapshot",
+        help="Validate a frozen web snapshot against the governed evidence contract.",
+    )
+    capability_validate_web_snapshot.add_argument("report_path", type=Path, help="Path to a saved web snapshot JSON file.")
+    capability_validate_web_snapshot.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_web_snapshot.set_defaults(handler=run_capability_validate_web_snapshot)
+
+    capability_validate_web_session = capabilities_subcommands.add_parser(
+        "validate-web-session",
+        help="Validate a governed operator-selected web browsing session receipt.",
+    )
+    capability_validate_web_session.add_argument("report_path", type=Path, help="Path to a saved web browsing session JSON file.")
+    capability_validate_web_session.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_web_session.set_defaults(handler=run_capability_validate_web_session)
+
+    capability_validate_answer_trace = capabilities_subcommands.add_parser(
+        "validate-answer-trace",
+        help="Validate a saved answer trace against citation and evidence contracts.",
+    )
+    capability_validate_answer_trace.add_argument("report_path", type=Path, help="Path to a saved answer trace JSON file.")
+    capability_validate_answer_trace.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_answer_trace.set_defaults(handler=run_capability_validate_answer_trace)
+
+    capability_validate_coding_review = capabilities_subcommands.add_parser(
+        "validate-coding-review",
+        help="Validate a saved coding review report against the evidence contract.",
+    )
+    capability_validate_coding_review.add_argument("report_path", type=Path, help="Path to a saved coding review JSON file.")
+    capability_validate_coding_review.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_coding_review.set_defaults(handler=run_capability_validate_coding_review)
 
     memory = subcommands.add_parser("memory", help="Manage explicit local assistant memory.")
     memory_subcommands = memory.add_subparsers(dest="memory_command", required=True)
@@ -8437,6 +8477,47 @@ def run_capability_validate_ocr_report(args: argparse.Namespace, cfg: Settings) 
     if not path.is_absolute():
         path = cfg.project_root / path
     report = validate_ocr_report_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_web_snapshot(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_web_snapshot_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_web_session(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_web_browse_session_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_answer_trace(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        trace = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        emit_error("ERROR_ANSWER_TRACE_JSON", str(exc), args.format)
+        return 2
+    report = validate_answer_trace_contract(trace, report_path=str(path)) if isinstance(trace, dict) else validate_answer_trace_contract({}, report_path=str(path))
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_coding_review(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_coding_review_file(path)
     emit_payload(report, args.format)
     return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
 

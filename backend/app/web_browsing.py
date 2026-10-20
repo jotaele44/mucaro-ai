@@ -16,6 +16,7 @@ from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urldefrag, urlparse
 
+from .capability_contracts import build_evidence_contract
 from .config import Settings, settings
 from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .utils import read_json, stable_id, utc_now, write_json
@@ -689,6 +690,30 @@ def fetch_web_snapshot(
             "cite_http_error_pages": policy.cite_http_error_pages,
             "cache_mode": policy.cache_mode,
         },
+        "evidence_contract": build_evidence_contract(
+            claim_type="FACT",
+            evidence_type="DIRECT_HTTP_RESPONSE_SNAPSHOT",
+            source_identity_type="REQUESTED_FINAL_URL_PLUS_CONTENT_SHA256",
+            confidence="BOUNDED_BYTE_CAPTURE",
+            uncertainty_state="BOUNDED",
+            contradiction_state="NOT_ADJUDICATED",
+            verification_method="replay saved content_base64 and compare content_size_bytes/content_sha256",
+            limitations=[
+                "A byte-frozen response does not prove that the publisher's claims are true.",
+                "Parser previews are bounded observations and may omit non-text or truncated content.",
+                "Redirect, robots, cache, and HTTP-error policy are recorded but do not establish source authority.",
+            ],
+            falsification_criteria=[
+                "reject if decoded content bytes do not match content_size_bytes and content_sha256",
+                "reject if requested, fetch, or final URL contains credentials or an unsupported scheme",
+                "reject if HTTP error capture or citation permission is implicit",
+                "reject if immutable snapshot reuse is enabled without revalidation",
+            ],
+            unresolved_residue=[
+                *parser_warnings,
+                *[str(item) for item in parser_trace.get("trace_warnings", []) if isinstance(item, str)],
+            ],
+        ),
     }
     path = cfg.export_dir / WEB_SNAPSHOT_DIR / f"{snapshot_id}.json"
     write_json(path, snapshot)
@@ -903,6 +928,31 @@ def fetch_web_browse_session(
             },
         },
         "warnings": [] if successful_fetches else ["WEB_BROWSE_SESSION_NO_SUCCESSFUL_FETCHES"],
+        "evidence_contract": build_evidence_contract(
+            claim_type="COMPUTED",
+            evidence_type="OPERATOR_SELECTION_AND_FETCH_LEDGER",
+            source_identity_type="URL_ORDER_PLUS_SNAPSHOT_ID",
+            confidence="BOUNDED_SESSION_ACCOUNTING",
+            uncertainty_state="BOUNDED",
+            contradiction_state="NOT_ADJUDICATED",
+            verification_method="replay selection_decisions and fetch rows against candidate/selected/successful counts",
+            limitations=[
+                "Operator-supplied URL selection is not exhaustive search or source-authority proof.",
+                "A successful session records fetch evidence but does not adjudicate conflicting page claims.",
+                "Rendered browser evidence and credentialed search remain separate capabilities.",
+            ],
+            falsification_criteria=[
+                "reject if selection decisions do not close to candidate_count and selected_count",
+                "reject if successful fetch rows do not close to successful_fetch_count",
+                "reject if automated search or link following is claimed by this operator-supplied session",
+                "reject if replay arguments do not preserve the original candidate URL list",
+            ],
+            unresolved_residue=[
+                f"{fetch.get('status')}:{fetch.get('url')}"
+                for fetch in fetches
+                if fetch.get("status") != "WEB_FETCH_SNAPSHOT_OK"
+            ],
+        ),
     }
     path = _browse_session_path(cfg, session_id)
     write_json(path, receipt)
