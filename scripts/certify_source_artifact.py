@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -91,6 +92,16 @@ def extract_source_archive(manifest: dict[str, Any], temp_root: Path) -> Path:
         if roots != {expected_root}:
             raise ValueError(f"unexpected archive root: {','.join(sorted(roots)) or 'none'} expected={expected_root}")
         archive.extractall(temp_root)
+        # zipfile.extractall() materializes bytes but does not restore Unix mode bits.
+        # Source launchers are executable artifact members, so restore only the
+        # recorded regular-file mode after the archive path checks above.
+        for info in infos:
+            mode = (info.external_attr >> 16) & 0xFFFF
+            if not mode:
+                continue
+            extracted = temp_root / Path(info.filename)
+            if extracted.is_file() and not extracted.is_symlink():
+                extracted.chmod(stat.S_IMODE(mode))
     source_dir = temp_root / expected_root
     if not source_dir.is_dir():
         raise FileNotFoundError(f"extracted source root missing: {source_dir}")
