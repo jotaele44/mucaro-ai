@@ -383,6 +383,7 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             paths["raster"],
             cfg=cfg,
             band=int(parameters.get("band", 1)),
+            inclusion_rule=str(parameters.get("inclusion_rule", "cell_center")),
         )
     if operation == "zonal_stats":
         return compute_zonal_statistics(
@@ -390,6 +391,7 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             paths["raster"],
             cfg=cfg,
             band=int(parameters.get("band", 1)),
+            inclusion_rule=str(parameters.get("inclusion_rule", "cell_center")),
         )
     if operation == "raster_resample":
         return resample_raster(

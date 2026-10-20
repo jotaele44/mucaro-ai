@@ -983,8 +983,10 @@ longitude/latitude residue, a frozen real USGS 3DEP raster manifestation,
 bounded projected-metre slope/aspect controls, terrain-lineage-bound hillshade,
 bounded priority-flood depression conditioning with explicit depth and volume
 accounting, and bounded D8 flow direction/accumulation with explicit terminal
-ambiguity. The current committed denominator is 64 cases across 25 operations,
-including 26 fail-closed negative cases.
+ambiguity, plus projected-planar fractional-coverage zonal statistics with
+closed coverage areas and weighted summaries. The current committed denominator
+is 67 cases across 25 operations, including 27 fail-closed negative cases and
+paired fractional-coverage controls.
 It returns `GIS_EVAL_OK` only when the fixture and every case pass;
 `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives automation a hard
 regression signal.

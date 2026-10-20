@@ -350,8 +350,9 @@ Observed success markers:
   conditioning with explicit outlet, no-breach, and maximum-depth policy,
   bounded D8 direction/accumulation
   with explicit boundary/sink/flat/tie terminal states, and renderer/layer-bound
-  map-export provenance. `mucaro eval gis` runs 64 committed cases across 25 operations,
-  including 26
+  map-export provenance and projected-planar fractional-coverage zonal statistics
+  with closed coverage areas and weighted summaries. `mucaro eval gis` runs 67
+  committed cases across 25 operations, including 27
   fail-closed negative cases for CRS, dimensions, formats, raster extents,
   vector-raster mismatch, resampling, and export identity, plus bounded
   always-XY axis-order and antimeridian/polar line/polygon controls. The CRS
@@ -365,8 +366,8 @@ Observed success markers:
   transformations, independent-engine datum validation, vertical/time-dependent CRS, broader axis-order and
   large-geometry adjudication beyond the bounded controls, dimension-preserving
   mutation, broader topology/overlay policy,
-  fractional zonal coverage, independent rendered-map validation, larger and
-  more diverse real raster/vector corpora, additional vector/raster formats and
+  independent rendered-map validation, larger and more diverse real raster/vector
+  corpora, additional vector/raster formats and
   terrain algorithms beyond bounded slope/aspect/hillshade, remote sensing,
   hydrology beyond bounded priority-flood conditioning and D8, bathymetry, and
   temporal GIS are proven.

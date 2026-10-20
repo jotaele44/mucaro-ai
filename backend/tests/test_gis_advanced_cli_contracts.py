@@ -343,6 +343,38 @@ def test_advanced_raster_and_export_cli_commands_emit_governed_receipts(tmp_path
     assert "cell_accounting_closed=True" in output
     assert "INTERSECTS_VALID=1" in output
 
+    fractional_raster = write_raster(tmp_path / "fractional-grid.tif", crs="EPSG:3857")
+    fractional_vector = write_geojson(
+        tmp_path / "fractional-zone.geojson",
+        [
+            {
+                "type": "Feature",
+                "id": "fractional-zone",
+                "geometry": {"type": "Polygon", "coordinates": [[[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 1.5], [0.5, 0.5]]]},
+                "properties": {},
+            }
+        ],
+        crs="EPSG:3857",
+    )
+    assert main(
+        [
+            "gis",
+            "zonal-stats",
+            str(fractional_vector),
+            str(fractional_raster),
+            "--inclusion-rule",
+            "fractional_coverage",
+            "--format",
+            "text",
+        ],
+        cfg=cfg,
+    ) == 0
+    output = capsys.readouterr().out
+    assert "GIS_ZONAL_STATS_OK" in output
+    assert "cell_inclusion_rule=fractional_coverage" in output
+    assert "coverage_accounting_closed=True" in output
+    assert "weighted_statistics=True" in output
+
     assert main(
         [
             "gis",
