@@ -43,6 +43,8 @@ from .models import (
     ConversationUpdateRequest,
     DirectoryPermissionRequest,
     IngestPathRequest,
+    SecurityScanPreflightRequest,
+    SecurityScanRunRequest,
     InteractionCreateRequest,
     InteractionDismissRequest,
     InteractionResolveRequest,
@@ -84,6 +86,7 @@ from .response_flow import (
     resolve_interaction,
 )
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
+from .security_scan import SecurityScanError, preflight_repository, scan_repository
 from .services import answer_question
 from .tools import (
     ToolRuntimeError,
@@ -275,6 +278,26 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/security")
     def security_status() -> dict:
         return build_security_report(cfg)
+
+    def security_scan_local_only(request: Request) -> None:
+        if client_is_remote(request.scope):
+            raise api_error("ERROR_SCAN_LOCAL_ONLY", "Security scanning is local-only.", status_code=403)
+
+    @app.post("/security-scans/preflight")
+    def security_scan_preflight(req: SecurityScanPreflightRequest, request: Request, _auth: dict = Depends(require_auth)) -> dict:
+        security_scan_local_only(request)
+        try:
+            return preflight_repository(req.path, cfg=cfg)
+        except SecurityScanError as exc:
+            raise api_error(exc.status, exc.detail, status_code=403 if "PERMISSION" in exc.status else 409) from exc
+
+    @app.post("/security-scans/run")
+    def security_scan_run(req: SecurityScanRunRequest, request: Request, _auth: dict = Depends(require_auth)) -> dict:
+        security_scan_local_only(request)
+        try:
+            return scan_repository(req.path, req.expected_head, cfg=cfg, max_files=req.max_files)
+        except SecurityScanError as exc:
+            raise api_error(exc.status, exc.detail, status_code=403 if "PERMISSION" in exc.status else 409) from exc
 
     @app.post("/plan")
     def plan(req: PlanRequest, _auth: dict = Depends(require_auth)) -> dict:
