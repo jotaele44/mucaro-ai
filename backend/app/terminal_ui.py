@@ -311,8 +311,8 @@ def render_terminal_snapshot(
     prompt = _clip(f"> {input_buffer}", inner_width)
     rows.append(f"│{prompt.ljust(inner_width)}│")
     help_text = (
-        "Tab views • Ctrl-L current • Ctrl-S sessions • Ctrl-O issues • "
-        "Ctrl-R PRs • Ctrl-G gists • Ctrl-P palette • Ctrl-C stop/exit"
+        "Ctrl-C stop/exit • Tab views • Ctrl-L current • Ctrl-S sessions • "
+        "Ctrl-O issues • Ctrl-R PRs • Ctrl-G gists • Ctrl-P palette"
     )
     rows.append(f"│{_clip(help_text, inner_width).ljust(inner_width)}│")
     rows.append(f"│{_clip(notice, inner_width).ljust(inner_width)}│")
@@ -524,31 +524,31 @@ class TerminalController:
             "workspace_root": None,
             "arguments_sha256": None,
         }
-        for token in tokens:
-            if token == "network":
+        for option in tokens:
+            if option == "network":
                 options["allow_network"] = True
-            elif token == "mutating":
+            elif option == "mutating":
                 options["allow_mutating"] = True
-            elif token.startswith("uses="):
+            elif option.startswith("uses="):
                 try:
-                    options["max_uses"] = int(token.split("=", 1)[1])
+                    options["max_uses"] = int(option.split("=", 1)[1])
                 except ValueError as exc:
-                    raise TerminalUIError("ERROR_TUI_LEASE_USES", token) from exc
-            elif token.startswith("ttl="):
-                raw = token.split("=", 1)[1]
+                    raise TerminalUIError("ERROR_TUI_LEASE_USES", option) from exc
+            elif option.startswith("ttl="):
+                raw = option.split("=", 1)[1]
                 if raw.lower() == "none":
                     options["ttl_seconds"] = None
                 else:
                     try:
                         options["ttl_seconds"] = int(raw)
                     except ValueError as exc:
-                        raise TerminalUIError("ERROR_TUI_LEASE_TTL", token) from exc
-            elif token.startswith("workspace="):
+                        raise TerminalUIError("ERROR_TUI_LEASE_TTL", option) from exc
+            elif option.startswith("workspace="):
                 options["workspace_root"] = token.split("=", 1)[1]
-            elif token.startswith("args="):
+            elif option.startswith("args="):
                 options["arguments_sha256"] = token.split("=", 1)[1]
             else:
-                raise TerminalUIError("ERROR_TUI_LEASE_OPTION", token)
+                raise TerminalUIError("ERROR_TUI_LEASE_OPTION", option)
         return options
 
     def _grant_terminal_lease(
@@ -864,7 +864,7 @@ class _WindowsInput(AbstractContextManager["_WindowsInput"]):
             if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
                 kernel32.SetConsoleMode(handle, mode.value | 0x0004)
         except Exception:
-            pass
+            return
 
     def read_key(self, timeout: float) -> str | None:
         import msvcrt
