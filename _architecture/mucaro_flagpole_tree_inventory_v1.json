@@ -1,7 +1,7 @@
 {
   "schema": "mucaro-flagpole-exact-tree-inventory/1.0",
-  "source_sha": "96b57f1f7b609eb96cb6393b12ab4f2ff3649ee3",
-  "tree_sha": "f841a9dbe5b9b62098992c26b1449ddebf7180fd",
+  "source_sha": "fa6b5651ac1c339b47db621a958a323b772fad57",
+  "tree_sha": "558de5b33a77d37d7853f51e425526f64025b442",
   "scope": "complete tracked Git blob tree at exact HEAD",
   "exclusions": [],
   "file_count": 559,
@@ -292,7 +292,7 @@
     {
       "path": "_architecture/mucaro_flagpole_tree_inventory_v1.json",
       "mode": "100644",
-      "blob_sha": "e377a3eb8cb70bd58769d214e56dbc243daa4407",
+      "blob_sha": "a15badc7bcb8d44dd074b39e181b0fc9e0be10e3",
       "size": 115930,
       "classification": "data"
     },
@@ -1251,8 +1251,8 @@
     {
       "path": "backend/app/product_audit.py",
       "mode": "100644",
-      "blob_sha": "f138029012535e2d5d02494fffe28590229fdde8",
-      "size": 29997,
+      "blob_sha": "1c511673e8996ec50957f5b1bda49fe635a6707a",
+      "size": 30050,
       "classification": "source"
     },
     {
@@ -3930,5 +3930,5 @@
       "classification": "source"
     }
   ],
-  "inventory_sha256": "63eba345cbb296d261abe0b4af456e290805feb7eaf92fd44cf37aa46fba48c1"
+  "inventory_sha256": "eb1fc267effe019549f36ebc10548724c2e23acaa2c2584bb8e2a66dddcdb708"
 }
