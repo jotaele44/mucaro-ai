@@ -23,11 +23,15 @@ def _stable_hash(payload: Any) -> str:
     ).hexdigest()
 
 
+def _dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 def _load(path: Path) -> tuple[dict[str, Any], str]:
     raw = path.read_bytes()
     payload = json.loads(raw.decode("utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError(f"{path} did not contain an object")
+        raise TypeError(f"{path} did not contain an object")
     return payload, hashlib.sha256(raw).hexdigest()
 
 
@@ -145,7 +149,7 @@ def build_corpus_report(
         "lifecycle": "CODING_LIFECYCLE_LIVE_CERT_OK",
     }
 
-    suite = full_profile.get("suite") if isinstance(full_profile.get("suite"), dict) else {}
+    suite = _dict(full_profile.get("suite"))
     kinds = {
         row.get("kind")
         for row in suite.get("checks", [])
@@ -160,7 +164,7 @@ def build_corpus_report(
     )
 
     mutation_heads = [
-        ((mutation.get(name) or {}).get("execution") or {}).get("head_sha")
+        _dict(_dict(mutation.get(name)).get("execution")).get("head_sha")
         for name in ("positive", "negative", "rollback")
     ]
     source_bindings = {
@@ -231,7 +235,7 @@ def build_corpus_report(
         "row_count_23": certification.get("row_count") == 23,
         "state_counts_expected": certification.get("state_counts") == EXPECTED_COUNTS,
         "blocked_set_expected": blocked_ids == EXPECTED_BLOCKED,
-        "identity_closed": certification.get("identity", {}).get("identity_closed") is True,
+        "identity_closed": _dict(certification.get("identity")).get("identity_closed") is True,
         "certification_fail_closed": certification.get("certification_ready") is False
         and certification.get("status") == "CODING_CERTIFICATION_BLOCKED",
         "no_fail_or_unresolved": certification.get("state_counts", {}).get("FAIL") == 0
