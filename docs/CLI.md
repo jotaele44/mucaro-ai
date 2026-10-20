@@ -1060,15 +1060,15 @@ EPSG:3857 reprojection, CSV point conversion with explicit
 invalid-row skipping, bbox filtering with null-residue accounting, fail-closed
 invalid bbox extents, bbox clipping with null and dimensional residue
 accounting, fail-closed invalid Web Mercator latitude handling, offline-only
-PROJ candidate/grid selection, an exact-source-bound public-domain NOAA Puerto
-Rico datum grid with manifest/hash/byte/license provenance, path-escape and
+PROJ candidate/grid selection, two exact-source-bound public-domain NOAA regional
+datum grids for Puerto Rico and Florida with manifest/hash/byte/license provenance, path-escape and
 tamper rejection, and no runtime download, explicit EPSG axis-order controls, bounded WGS84
 antimeridian and polar line/polygon controls, and unresolved invalid
 longitude/latitude residue, a frozen real USGS 3DEP raster manifestation,
 bounded projected-metre slope/aspect controls, terrain-lineage-bound hillshade,
 bounded priority-flood depression conditioning with explicit depth and volume
 accounting, and bounded D8 flow direction/accumulation with explicit terminal
-ambiguity. The current committed denominator is 64 cases across 25 operations,
+ambiguity. The current committed denominator is 65 cases across 25 operations,
 including 26 fail-closed negative cases.
 It returns `GIS_EVAL_OK` only when the fixture and every case pass;
 `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives automation a hard

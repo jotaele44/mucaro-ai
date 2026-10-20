@@ -338,8 +338,8 @@ Observed success markers:
   governance gates are stronger.
   Advanced GIS now has a shared CLI/eval/contract boundary for bounded GeoJSON
   operations, explicit Shapely topology repair, pyproj/PROJ horizontal CRS
-  transformation with always-XY and pipeline identity, one exact-source-bound
-  public-domain NOAA Puerto Rico datum grid with frozen
+  transformation with always-XY and pipeline identity, two exact-source-bound
+  public-domain NOAA regional datum grids for Puerto Rico and Florida with frozen
   manifest/hash/byte/license provenance and no runtime download, WGS84 ellipsoidal
   measurement, GeoJSON/GeoPackage/Shapefile manifestation inspection, GeoTIFF
   inspection/sampling/transactional clipping/resampling, exact-CRS
@@ -350,7 +350,7 @@ Observed success markers:
   conditioning with explicit outlet, no-breach, and maximum-depth policy,
   bounded D8 direction/accumulation
   with explicit boundary/sink/flat/tie terminal states, and renderer/layer-bound
-  map-export provenance. `mucaro eval gis` runs 64 committed cases across 25 operations,
+  map-export provenance. `mucaro eval gis` runs 65 committed cases across 25 operations,
   including 26
   fail-closed negative cases for CRS, dimensions, formats, raster extents,
   vector-raster mismatch, resampling, and export identity, plus bounded
