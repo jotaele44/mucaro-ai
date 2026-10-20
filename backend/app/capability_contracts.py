@@ -1218,6 +1218,42 @@ def validate_ocr_report_contract(report: dict[str, Any], *, report_path: str | N
             ]
         )
 
+    layout = report.get("layout")
+    if layout is not None:
+        layout_invariants = layout.get("invariants") if isinstance(layout, dict) else None
+        layout_order = layout.get("reading_order_span_indices") if isinstance(layout, dict) else None
+        checks.extend(
+            [
+                _contract_check("layout.object", isinstance(layout, dict), "layout receipt must be an object when present"),
+                _contract_check("layout.lines_array", isinstance(layout.get("lines"), list) if isinstance(layout, dict) else False, "layout lines must be an array"),
+                _contract_check("layout.reading_order_array", isinstance(layout_order, list), "layout reading order must be an array"),
+                _contract_check("layout.span_accounting_closed", isinstance(layout_invariants, dict) and layout_invariants.get("span_accounting_closed") is True, "layout span accounting must close"),
+                _contract_check("layout.no_semantic_table_inference", isinstance(layout_invariants, dict) and layout_invariants.get("semantic_tables_inferred") is False, "layout receipt must not claim semantic table inference"),
+                _contract_check("layout.no_semantic_form_inference", isinstance(layout_invariants, dict) and layout_invariants.get("semantic_forms_inferred") is False, "layout receipt must not claim semantic form inference"),
+                _contract_check("layout.reading_order_matches_spans", isinstance(layout_order, list) and sorted(layout_order) == list(range(valid_span_count)), "layout reading order must account for every saved span exactly once"),
+            ]
+        )
+
+    confidence = report.get("confidence")
+    if confidence is not None:
+        confidence_counts = confidence.get("counts") if isinstance(confidence, dict) else None
+        confidence_invariants = confidence.get("invariants") if isinstance(confidence, dict) else None
+        expected_counts = {
+            "LOW": low_confidence_count,
+            "MEDIUM": sum(1 for span in spans if isinstance(span, dict) and span.get("confidence_state") == "MEDIUM") if isinstance(spans, list) else 0,
+            "HIGH": sum(1 for span in spans if isinstance(span, dict) and span.get("confidence_state") == "HIGH") if isinstance(spans, list) else 0,
+            "UNKNOWN": unknown_confidence_count,
+        }
+        checks.extend(
+            [
+                _contract_check("confidence.object", isinstance(confidence, dict), "confidence receipt must be an object when present"),
+                _contract_check("confidence.scale", isinstance(confidence, dict) and confidence.get("scale") == "0-100", "confidence receipt scale must be 0-100"),
+                _contract_check("confidence.counts_object", isinstance(confidence_counts, dict), "confidence counts must be an object"),
+                _contract_check("confidence.counts_match_spans", confidence_counts == expected_counts, "confidence counts must match saved span states"),
+                _contract_check("confidence.span_accounting_closed", isinstance(confidence_invariants, dict) and confidence_invariants.get("span_accounting_closed") is True, "confidence span accounting must close"),
+            ]
+        )
+
     warnings = report.get("warnings")
     if isinstance(warnings, list):
         checks.append(_contract_check("warning_labels_non_empty", all(isinstance(warning, str) and warning for warning in warnings), "warning labels must be non-empty strings"))

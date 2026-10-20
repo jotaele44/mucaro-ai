@@ -522,6 +522,59 @@ def test_validate_ocr_report_contract_accepts_image_ocr_receipts():
     assert result["capability_id"] == "state_of_art_ocr_analysis"
 
 
+def test_validate_ocr_report_contract_accepts_integrated_layout_and_confidence_ledgers():
+    report = {
+        "schema_version": "mucaro_ocr_report_v1",
+        "report_id": "ocrreport_integrated",
+        "status": "OCR_ANALYSIS_OK",
+        "operation": "image_ocr",
+        "created_at": "2026-09-12T00:00:00Z",
+        "source": {"sha256": "c" * 64, "mime_type": "image/png", "media_kind": "image", "bytes": 128, "width": 8, "height": 6, "parser_warnings": []},
+        "engine": {"name": "tesseract", "version": "tesseract 5.3.0", "language": "eng", "layout_mode": "auto", "confidence_scale": "0-100"},
+        "text": {"raw": "Mucaro\nAI", "normalized": "Mucaro\nAI", "canonical": "mucaro\nai"},
+        "spans": [
+            {"span_index": 0, "raw_text": "Mucaro", "normalized_text": "Mucaro", "canonical_text": "mucaro", "confidence": 96.4, "confidence_state": "HIGH", "bbox": {"x": 10, "y": 20, "width": 30, "height": 12}, "page_index": 0, "block_num": 1, "paragraph_num": 1, "line_num": 1, "word_num": 1},
+            {"span_index": 1, "raw_text": "AI", "normalized_text": "AI", "canonical_text": "ai", "confidence": 42.0, "confidence_state": "LOW", "bbox": {"x": 40, "y": 20, "width": 12, "height": 12}, "page_index": 0, "block_num": 1, "paragraph_num": 1, "line_num": 1, "word_num": 2},
+        ],
+        "invariants": {"raw_normalized_canonical_separated": True, "span_count": 2, "low_confidence_count": 1, "unknown_confidence_count": 0, "empty_text_state": False, "bounding_boxes_have_source_coordinates": True},
+        "layout": {"lines": [{"span_indices": [0, 1]}], "reading_order_span_indices": [0, 1], "invariants": {"span_accounting_closed": True, "semantic_tables_inferred": False, "semantic_forms_inferred": False}},
+        "confidence": {"scale": "0-100", "counts": {"LOW": 1, "MEDIUM": 0, "HIGH": 1, "UNKNOWN": 0}, "invariants": {"span_accounting_closed": True}},
+        "warnings": ["OCR_LOW_CONFIDENCE_PRESENT"],
+        "limitations": ["bounded OCR fixture"],
+        "falsification_criteria": ["reject if ledger accounting does not close"],
+    }
+
+    result = validate_ocr_report_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert result["counts"]["fail"] == 0
+
+
+def test_validate_ocr_report_contract_rejects_tampered_confidence_ledger():
+    report = {
+        "schema_version": "mucaro_ocr_report_v1",
+        "report_id": "ocrreport_tampered_ledger",
+        "status": "OCR_ANALYSIS_OK",
+        "operation": "image_ocr",
+        "created_at": "2026-09-12T00:00:00Z",
+        "source": {"sha256": "c" * 64, "mime_type": "image/png", "media_kind": "image", "bytes": 128, "width": 8, "height": 6, "parser_warnings": []},
+        "engine": {"name": "tesseract", "version": "tesseract 5.3.0", "language": "eng", "layout_mode": "auto", "confidence_scale": "0-100"},
+        "text": {"raw": "Mucaro", "normalized": "Mucaro", "canonical": "mucaro"},
+        "spans": [{"span_index": 0, "raw_text": "Mucaro", "normalized_text": "Mucaro", "canonical_text": "mucaro", "confidence": 96.4, "confidence_state": "HIGH", "bbox": {"x": 10, "y": 20, "width": 30, "height": 12}, "page_index": 0}],
+        "invariants": {"raw_normalized_canonical_separated": True, "span_count": 1, "low_confidence_count": 0, "unknown_confidence_count": 0, "empty_text_state": False, "bounding_boxes_have_source_coordinates": True},
+        "layout": {"lines": [], "reading_order_span_indices": [0], "invariants": {"span_accounting_closed": True, "semantic_tables_inferred": False, "semantic_forms_inferred": False}},
+        "confidence": {"scale": "0-100", "counts": {"LOW": 0, "MEDIUM": 1, "HIGH": 0, "UNKNOWN": 0}, "invariants": {"span_accounting_closed": True}},
+        "warnings": [],
+        "limitations": ["bounded OCR fixture"],
+        "falsification_criteria": ["reject if ledger accounting does not close"],
+    }
+
+    result = validate_ocr_report_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "confidence.counts_match_spans" in {check["name"] for check in result["failed_checks"]}
+
+
 def test_validate_ocr_report_contract_rejects_weak_image_ocr_receipts():
     report = {
         "schema_version": "mucaro_ocr_report_v1",
