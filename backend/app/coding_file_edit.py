@@ -189,7 +189,11 @@ def edit_repository_file_transaction(
         if operation == "DELETE":
             target.unlink()
         else:
-            assert proposed_raw is not None
+            if proposed_raw is None:
+                raise CodingFileEditError(
+                    "ERROR_CODING_FILE_EDIT_INTERNAL_CONTENT",
+                    "validated content bytes are unavailable for a content mutation",
+                )
             _atomic_write(target, proposed_raw, mode=original_mode if operation == "REPLACE" else 0o644)
 
         postimage = _snapshot(context.repo_root, canonical_path)
