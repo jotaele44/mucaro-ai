@@ -79,6 +79,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis derive-d8-flow RASTER_PATH --elevation-units meters` | Derive four-band D8 candidates, accumulation, contributing area, and explicit terminal-state output on a bounded projected-metre grid | 0 | 2 |
 | `mucaro gis validate-corpus MANIFEST_PATH` | Validate frozen authoritative GIS corpus bytes, provenance, explicit asset types, vector identities/geometries, and raster grids/value accounting | 0 | 2 |
 | `mucaro gis map-export-manifest OUTPUT_PATH --layer PATH CRS ...` | Bind an existing map/export artifact to renderer identity, extent, CRS, and source-layer hashes | 0 | 2 |
+| `mucaro gis map-render-validate OUTPUT_PATH` | Decode and independently validate rendered image dimensions, pixel accounting, visible content, and optional manifest binding | 0 | 3 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
 | `mucaro capabilities validate-web-snapshot SNAPSHOT_PATH` | Validate frozen web bytes, URL policy metadata, parser evidence, cache/robots posture, and the shared evidence contract | 0 | 2 |
 | `mucaro capabilities validate-web-session SESSION_PATH` | Validate operator-selected browsing decisions, fetch accounting, replay arguments, and the shared evidence contract | 0 | 2 |
@@ -288,6 +289,13 @@ Numeric zero, NODATA, outside, null/empty, and unresolved states remain distinct
 non-empty artifact to its output hash, extent, CRS, renderer name/version, and
 one or more source-layer hashes plus declared CRS. This proves artifact
 provenance, not visual correctness.
+
+`mucaro gis map-render-validate` is a separate image-level gate. It verifies
+that the artifact decodes, has bounded positive dimensions, closes visible and
+transparent pixel accounting, and contains nonuniform visible content. Use
+`--manifest` to require output hash and path identity against a saved
+`GIS_MAP_EXPORT_MANIFEST_OK` receipt. This does not prove layer semantics,
+projection correctness, label legibility, or cartographic accessibility.
 
 OCR analysis is intentionally separate from ingestion. `mucaro ocr analyze
 IMAGE_PATH` runs a local Tesseract engine against one image, preserves the
