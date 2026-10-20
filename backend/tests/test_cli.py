@@ -1711,8 +1711,8 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 64
-    assert payload["counts"]["passed"] == 64
+    assert payload["counts"]["cases"] == 65
+    assert payload["counts"]["passed"] == 65
     assert payload["counts"]["failed"] == 0
     assert payload["counts"]["operations"] == 25
     assert payload["counts"]["negative_cases"] == 26
