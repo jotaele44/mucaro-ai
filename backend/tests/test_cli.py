@@ -1746,6 +1746,11 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert payload["report"]["status"] == "GIS_EVAL_OK"
     assert payload["independent_datum"]["status"] == "PASS"
     assert payload["independent_datum"]["engine"] == "mucaro_independent_bilinear_grid_v1"
+    assert payload["independent_datum"]["case_count"] == 2
+    assert {case["case_id"] for case in payload["independent_datum"]["cases"]} == {
+        "puerto_rico_epsg_4326_to_32161",
+        "florida_epsg_4269_to_4152",
+    }
 
     receipt_path = tmp_path / payload["receipt"]
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))

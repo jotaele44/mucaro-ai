@@ -662,44 +662,78 @@ def build_gis_quality_certification(
 
 def _run_independent_datum_control(root: Path) -> dict[str, Any]:
     del root
-    # The governed grid is an immutable repository/package fixture; `root` is
+    # The governed grids are immutable repository/package fixtures; `root` is
     # the caller's runtime output root and may intentionally be temporary.
-    grid_path = ROOT / "backend" / "app" / "gis_grids" / "us_noaa_FL.tif"
-    grid_label = _fixture_label(grid_path)
-    expected = {
-        "lon": -80.19999922602221,
-        "lat": 25.799999256211102,
-        "grid_bytes": 8374,
-        "grid_sha256": "73b385448f09e6c1122a87b5b3137a5b5775585af9445889e0a3a8c4c5951f54",
-    }
-    checks: dict[str, bool] = {}
+    grid_root = ROOT / "backend" / "app" / "gis_grids"
+    cases = [
+        {
+            "case_id": "puerto_rico_epsg_4326_to_32161",
+            "filename": "us_noaa_pvhpgn.tif",
+            "lon": -66.0,
+            "lat": 18.2,
+            "expected_lon": -66.00000268938886,
+            "expected_lat": 18.20000860483313,
+            "grid_bytes": 3644,
+            "grid_sha256": "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d",
+        },
+        {
+            "case_id": "florida_epsg_4269_to_4152",
+            "filename": "us_noaa_FL.tif",
+            "lon": -80.2,
+            "lat": 25.8,
+            "expected_lon": -80.19999922602221,
+            "expected_lat": 25.799999256211102,
+            "grid_bytes": 8374,
+            "grid_sha256": "73b385448f09e6c1122a87b5b3137a5b5775585af9445889e0a3a8c4c5951f54",
+        },
+    ]
+    case_results: list[dict[str, Any]] = []
     try:
         import hashlib
 
-        raw = grid_path.read_bytes()
-        lon, lat = independently_interpolate_horizontal_offset(grid_path, lon=-80.2, lat=25.8)
-        checks = {
-            "grid_bytes": len(raw) == expected["grid_bytes"],
-            "grid_sha256": hashlib.sha256(raw).hexdigest() == expected["grid_sha256"],
-            "longitude": math.isclose(lon, expected["lon"], rel_tol=0.0, abs_tol=1e-12),
-            "latitude": math.isclose(lat, expected["lat"], rel_tol=0.0, abs_tol=1e-12),
-        }
+        for case in cases:
+            grid_path = grid_root / case["filename"]
+            raw = grid_path.read_bytes()
+            lon, lat = independently_interpolate_horizontal_offset(
+                grid_path,
+                lon=case["lon"],
+                lat=case["lat"],
+            )
+            checks = {
+                "grid_bytes": len(raw) == case["grid_bytes"],
+                "grid_sha256": hashlib.sha256(raw).hexdigest() == case["grid_sha256"],
+                "longitude": math.isclose(lon, case["expected_lon"], rel_tol=0.0, abs_tol=1e-12),
+                "latitude": math.isclose(lat, case["expected_lat"], rel_tol=0.0, abs_tol=1e-12),
+            }
+            case_results.append(
+                {
+                    "case_id": case["case_id"],
+                    "grid": _fixture_label(grid_path),
+                    "checks": checks,
+                    "observed": {"longitude": lon, "latitude": lat},
+                    "expected": {
+                        "longitude": case["expected_lon"],
+                        "latitude": case["expected_lat"],
+                        "grid_bytes": case["grid_bytes"],
+                        "grid_sha256": case["grid_sha256"],
+                    },
+                }
+            )
     except (IndependentDatumGridError, OSError, ValueError) as exc:
         return {
             "status": "FAIL",
             "engine": "mucaro_independent_bilinear_grid_v1",
-            "scope": "EPSG:4269_TO_EPSG:4152_FLORIDA_HORIZONTAL_OFFSET",
-            "grid": grid_label,
-            "checks": checks,
+            "scope": "TWO_GOVERNED_HORIZONTAL_OFFSET_GRIDS",
+            "cases": case_results,
             "error": f"{type(exc).__name__}: {exc}",
         }
+    checks = [check for case in case_results for check in case["checks"].values()]
     return {
-        "status": "PASS" if all(checks.values()) else "FAIL",
+        "status": "PASS" if len(case_results) == len(cases) and all(checks) else "FAIL",
         "engine": "mucaro_independent_bilinear_grid_v1",
-        "scope": "EPSG:4269_TO_EPSG:4152_FLORIDA_HORIZONTAL_OFFSET",
-        "grid": grid_label,
-        "checks": checks,
-        "expected": expected,
+        "scope": "TWO_GOVERNED_HORIZONTAL_OFFSET_GRIDS",
+        "case_count": len(case_results),
+        "cases": case_results,
         "independent_engine_certification": "BOUNDED_ONLY",
     }
 

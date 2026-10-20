@@ -248,6 +248,17 @@ def test_independent_florida_grid_interpolation_matches_governed_transform() -> 
     assert lat == pytest.approx(25.799999256211102, abs=1e-12)
 
 
+def test_independent_puerto_rico_grid_interpolation_matches_governed_transform() -> None:
+    lon, lat = independently_interpolate_horizontal_offset(
+        PACKAGE_GRID_ROOT / GOVERNED_GRID_FILENAME,
+        lon=-66.0,
+        lat=18.2,
+    )
+
+    assert lon == pytest.approx(-66.00000268938886, abs=1e-12)
+    assert lat == pytest.approx(18.20000860483313, abs=1e-12)
+
+
 def test_independent_grid_interpolation_rejects_outside_domain() -> None:
     with pytest.raises(IndependentDatumGridError, match="outside"):
         independently_interpolate_horizontal_offset(
