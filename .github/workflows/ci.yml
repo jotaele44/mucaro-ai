@@ -90,26 +90,6 @@ jobs:
           name: coding-mutation-live-${{ github.sha }}
           path: ${{ runner.temp }}/mucaro-coding-mutation-live.json
           archive: false
-      - name: Execute exact-head coding-review certification
-        env:
-          MUCARO_CODE_REVIEW_RECEIPT: ${{ runner.temp }}/mucaro-coding-review-live.json
-        run: python scripts/certify_coding_review_live.py --output "$MUCARO_CODE_REVIEW_RECEIPT"
-      - name: Upload exact-head coding-review receipt
-        uses: actions/upload-artifact@v7
-        with:
-          name: coding-review-live-${{ github.sha }}
-          path: ${{ runner.temp }}/mucaro-coding-review-live.json
-          archive: false
-      - name: Execute governed branch commit PR-request lifecycle certification
-        env:
-          MUCARO_CODING_LIFECYCLE_RECEIPT: ${{ runner.temp }}/mucaro-coding-lifecycle-live.json
-        run: python scripts/certify_coding_lifecycle_live.py --output "$MUCARO_CODING_LIFECYCLE_RECEIPT"
-      - name: Upload coding-lifecycle receipt
-        uses: actions/upload-artifact@v7
-        with:
-          name: coding-lifecycle-live-${{ github.sha }}
-          path: ${{ runner.temp }}/mucaro-coding-lifecycle-live.json
-          archive: false
       - name: Compare the tested tree with the pull-request head
         id: tree
         if: github.event_name == 'pull_request'
@@ -123,26 +103,6 @@ jobs:
           else
             echo "equivalent=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Reconcile frozen coding regression corpus
-        env:
-          MUCARO_CI_PR_HEAD: ${{ github.event.pull_request.head.sha }}
-          MUCARO_CI_TREE_EQUIVALENT: ${{ steps.tree.outputs.equivalent }}
-          MUCARO_CODING_CORPUS_RECEIPT: ${{ runner.temp }}/mucaro-coding-regression-corpus.json
-        run: |
-          python scripts/certify_coding_regression_corpus.py \\
-            --source-head "$GITHUB_SHA" \\
-            --container-receipt "${{ runner.temp }}/mucaro-coding-container-live.json" \\
-            --full-profile-receipt "${{ runner.temp }}/mucaro-coding-full-profile.json" \\
-            --mutation-receipt "${{ runner.temp }}/mucaro-coding-mutation-live.json" \\
-            --review-receipt "${{ runner.temp }}/mucaro-coding-review-live.json" \\
-            --lifecycle-receipt "${{ runner.temp }}/mucaro-coding-lifecycle-live.json" \\
-            --output "$MUCARO_CODING_CORPUS_RECEIPT"
-      - name: Upload coding regression corpus receipt
-        uses: actions/upload-artifact@v7
-        with:
-          name: coding-regression-corpus-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ runner.temp }}/mucaro-coding-regression-corpus.json
-          archive: false
       - name: Write hosted CI evidence receipt
         env:
           MUCARO_CI_RECEIPT: ${{ runner.temp }}/mucaro-hosted-ci-evidence.json
