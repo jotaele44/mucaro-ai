@@ -464,8 +464,13 @@ class TerminalController:
             conversation_id = self.ensure_conversation()
             snapshot = self.snapshot()
             repository_status = snapshot.get("repository_status")
-            head_sha = repository_status.get("head_sha") if isinstance(repository_status, dict) else None
-            if not isinstance(head_sha, str) or len(head_sha) != 40:
+            repository_result = repository_status.get("result") if isinstance(repository_status, dict) else None
+            head_sha = repository_result.get("head_sha") if isinstance(repository_result, dict) else None
+            if (
+                not isinstance(head_sha, str)
+                or len(head_sha) != 40
+                or any(char not in "0123456789abcdef" for char in head_sha)
+            ):
                 raise TerminalUIError(
                     "ERROR_TUI_AUTOPILOT_SOURCE_UNBOUND",
                     "Autopilot planning requires an exact governed coding.repo_status HEAD receipt before model planning.",
