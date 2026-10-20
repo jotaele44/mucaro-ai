@@ -1,13 +1,13 @@
 {
   "schema": "mucaro-flagpole-exact-tree-inventory/1.0",
-  "source_sha": "c2d2695ac58db36cce76bf882f30a65ef6a550af",
-  "tree_sha": "166455d4418b6fbaaae76c35ccb8baa9d1f6f554",
+  "source_sha": "247e96f462d037a6ccc50e7e1c5127df8fd5a677",
+  "tree_sha": "df0e72caa5f9bb6b23b52dea33620fdbd8319d9b",
   "scope": "complete tracked Git blob tree at exact HEAD",
   "exclusions": [],
-  "file_count": 557,
+  "file_count": 558,
   "classification_counts": {
     "configuration": 6,
-    "data": 69,
+    "data": 70,
     "documentation": 55,
     "other": 37,
     "schema": 41,
@@ -257,8 +257,8 @@
     {
       "path": "_architecture/gis_v1_control_manifest.json",
       "mode": "100644",
-      "blob_sha": "a0219bc8e5ba42d1a1d62ab8785736aa849d765e",
-      "size": 6683,
+      "blob_sha": "be85d3840003fd1b4a339d72839051645d87bebc",
+      "size": 7234,
       "classification": "data"
     },
     {
@@ -292,7 +292,7 @@
     {
       "path": "_architecture/mucaro_flagpole_tree_inventory_v1.json",
       "mode": "100644",
-      "blob_sha": "0293079b74451e3cb824078a797a8ce38db2c259",
+      "blob_sha": "3a1bc2fa05619796c622c837d5079f489bcb21cd",
       "size": 115520,
       "classification": "data"
     },
@@ -719,8 +719,8 @@
     {
       "path": "backend/app/capability_contracts.py",
       "mode": "100644",
-      "blob_sha": "02ef8c4d741aeb596866e19bed6b4804a9ee109e",
-      "size": 177077,
+      "blob_sha": "c228da343158fc2512e5b5a79ffaf763beba5d68",
+      "size": 177586,
       "classification": "source"
     },
     {
@@ -943,8 +943,8 @@
     {
       "path": "backend/app/gis_crs.py",
       "mode": "100644",
-      "blob_sha": "582652cd4fb9ab5d4782589f637f5a124dfff6c7",
-      "size": 24597,
+      "blob_sha": "3351276193b5b11ac340fd9ce527669a9e46e402",
+      "size": 25677,
       "classification": "source"
     },
     {
@@ -971,15 +971,22 @@
     {
       "path": "backend/app/gis_grids/NOTICE.md",
       "mode": "100644",
-      "blob_sha": "c2c7c56c707382a8182ff28a6b88a1e282e12c2a",
-      "size": 603,
+      "blob_sha": "e0a8fad267037f9832318e4eba8860dd477c08cb",
+      "size": 624,
       "classification": "documentation"
     },
     {
       "path": "backend/app/gis_grids/manifest.json",
       "mode": "100644",
-      "blob_sha": "b8741f6e4d4d6e28e19cb104468cf7abdf16933a",
-      "size": 2003,
+      "blob_sha": "42beb4fab038f826d01d1e371848582de7a59f65",
+      "size": 4194,
+      "classification": "data"
+    },
+    {
+      "path": "backend/app/gis_grids/us_noaa_FL.tif",
+      "mode": "100644",
+      "blob_sha": "08dac2c8821e554b1db757abe3787fbe1b556c65",
+      "size": 8374,
       "classification": "data"
     },
     {
@@ -1531,8 +1538,8 @@
     {
       "path": "backend/tests/fixtures/gis_eval.json",
       "mode": "100644",
-      "blob_sha": "4d479d49a0de7e4878a372c1117b6a2cd7c4bc29",
-      "size": 88168,
+      "blob_sha": "d1ae11b30cc35a1e11b5d492b8f2b1628099ff1f",
+      "size": 90535,
       "classification": "test"
     },
     {
@@ -1923,15 +1930,15 @@
     {
       "path": "backend/tests/test_gis_crs.py",
       "mode": "100644",
-      "blob_sha": "cc126350cb5fd37bf1644557dfc970a31e755edc",
-      "size": 10886,
+      "blob_sha": "cb8ca189480735c7097663cf5cbcb67bfd16f8c3",
+      "size": 15282,
       "classification": "test"
     },
     {
       "path": "backend/tests/test_gis_eval.py",
       "mode": "100644",
-      "blob_sha": "22396dcb4839bc6c851907443c0c6a520180bdc4",
-      "size": 10262,
+      "blob_sha": "d6265ca3d3ee53b132a288080b05cd77d967f7d2",
+      "size": 10363,
       "classification": "test"
     },
     {
@@ -1979,8 +1986,8 @@
     {
       "path": "backend/tests/test_gis_v1_independent_controls.py",
       "mode": "100644",
-      "blob_sha": "b7fc554e38fa1c8f1ee8b4c5db3509c51240a27d",
-      "size": 10388,
+      "blob_sha": "26e16f0f0eeb6847ce4cf04b39af71d73390f19e",
+      "size": 11327,
       "classification": "test"
     },
     {
@@ -3666,8 +3673,8 @@
     {
       "path": "scripts/certify_python_distribution.py",
       "mode": "100755",
-      "blob_sha": "6e6c20c9e75c3560890efed41c6c2377892f0fd3",
-      "size": 19247,
+      "blob_sha": "b3236252ea108a22befcb2e6e251ff8903b0f824",
+      "size": 19723,
       "classification": "source"
     },
     {
@@ -3916,5 +3923,5 @@
       "classification": "source"
     }
   ],
-  "inventory_sha256": "8f27fc57ecc63be33bb4e874b460128269b2346e10ae86aacc111c926fc55a72"
+  "inventory_sha256": "aa6b55eefb9b6f632d58b5c7642cff54c67632478bb9db0c7b3ee5b8fb40d4a8"
 }
