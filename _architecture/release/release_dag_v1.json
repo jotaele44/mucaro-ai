@@ -620,7 +620,8 @@
         "N24",
         "N23",
         "N21",
-        "N18"
+        "N18",
+        "N26"
       ],
       "state": "OPEN",
       "risk": "LOW",
@@ -642,16 +643,19 @@
       "dependencies": [
         "N01"
       ],
-      "state": "BLOCKED",
+      "state": "PASS",
       "risk": "HIGH",
       "user_value": "MEDIUM",
       "downstream_unlock_value": "HIGH",
       "expected_rework_cost": "MEDIUM",
       "evidence_required": [
-        "specification file + hash"
+        "docs/release/MUCARO_WORKBENCH_SPEC_BINDING_V1.md",
+        "_architecture/release/release_scope_manifest_v1.json",
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_spec_hash_mismatch_is_detected"
       ],
-      "blocker": "BLK-SPEC-001",
-      "notes": ""
+      "blocker": null,
+      "notes": "PASS: project-owner binding decision adopts the already hash-bound MUCARO_RELEASE_ENGINEERING_CONTRACT_V1 as the canonical Workbench Specification; denominator unchanged."
     }
   ]
 }
