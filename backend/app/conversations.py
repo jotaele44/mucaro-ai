@@ -4,6 +4,7 @@ import threading
 from typing import Any
 
 from .agent_store import delete_agent_conversation
+from .attachments import delete_conversation_attachments
 from .config import Settings, settings
 from .context_state import build_context_state, build_model_context
 from .db import delete_payload, init_db, list_payloads, upsert_payload
@@ -89,8 +90,9 @@ def delete_conversation(conversation_id: str, cfg: Settings = settings) -> dict[
     init_db(cfg.sqlite_path)
     removed = delete_payload("conversations", "conversation_id", conversation_id, cfg.sqlite_path)
     if removed:
-        # Claude's copy of the conversation goes with it.
+        # Claude's copy of the conversation and its attached files go with it.
         delete_agent_conversation(conversation_id, cfg)
+        delete_conversation_attachments(conversation_id, cfg)
     return {
         "status": "CONVERSATION_DELETE_OK" if removed else "ERROR_CONVERSATION_NOT_FOUND",
         "conversation_id": conversation_id,

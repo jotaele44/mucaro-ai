@@ -46,6 +46,7 @@ from .agent_store import (
 )
 from .agent_tools import AGENT_TOOLS_BY_NAME, SOURCE_URI, AgentToolInputError, client_tool_definitions, error_text
 from .app_settings import WEB_SEARCH_USD, claude_status, get_api_key, load_app_settings, model_info
+from .attachments import expand_messages, reference_block
 from .config import Settings, settings
 from .conversations import get_conversation
 from .ingestion import get_sources
@@ -87,6 +88,7 @@ What you can use:
 - web_search and web_fetch for current information, news and documentation. Use them whenever freshness or accuracy matters, and cite what you use.
 - A code sandbox (Python and shell, running in the cloud with no internet access) for calculations, data analysis and checking your work.
 - The user's own document library in Mucaro: search_sources and read_source. Cite these documents when you rely on them.
+- Files the user attaches to a message (images, PDFs, documents) appear in that message, labelled "Attachment N: name"; cite them when you rely on them.
 - Saved memory: list_memory, and remember (the user approves each save).
 - Files and Git repositories on the Mac, only inside folders the user granted under Sources > Folder access: list_directory, read_file, repo_status, repo_diff, read_repo_file, and apply_patch (the user approves each patch).
 
@@ -227,8 +229,16 @@ def _context_block(cfg: Settings) -> str:
     return "<context>\n" + "\n".join(lines) + "\n</context>"
 
 
-def _user_message(prompt: str, cfg: Settings) -> dict[str, Any]:
-    return {"role": "user", "content": [{"type": "text", "text": _context_block(cfg)}, {"type": "text", "text": prompt}]}
+def _user_message(prompt: str, cfg: Settings, attachments: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Attached files come first (Claude reads best with files before the question), each labelled by name.
+    They are stored as references and expanded into image/document blocks only when a request is built."""
+    content: list[dict[str, Any]] = []
+    for index, meta in enumerate(attachments or [], start=1):
+        content.append({"type": "text", "text": f"Attachment {index}: {meta['name']}"})
+        content.append(reference_block(meta))
+    content.append({"type": "text", "text": _context_block(cfg)})
+    content.append({"type": "text", "text": prompt})
+    return {"role": "user", "content": content}
 
 
 def _pending(role: str, content: Any, stop_reason: str | None = None) -> dict[str, Any]:
@@ -436,6 +446,12 @@ def _citation_view(number: int, citation: dict[str, Any]) -> dict[str, Any]:
             view.update({"kind": "source", "source_id": source_id, "chunk_id": chunk_id or None})
         else:
             view.update({"kind": "web", "source_url": source})
+    elif kind in {"char_location", "page_location", "content_block_location"}:
+        # A file the user attached; PDFs also say which pages.
+        view.update({"kind": "attachment", "title": citation.get("document_title") or "Attached file"})
+        if kind == "page_location" and citation.get("start_page_number"):
+            first, last = int(citation["start_page_number"]), int(citation.get("end_page_number") or citation["start_page_number"] + 1) - 1
+            view["pages"] = f"{first}" if last <= first else f"{first}–{last}"
     else:
         view.update({"kind": "document", "source_url": citation.get("url")})
     return view
@@ -964,7 +980,7 @@ def advance_turn(run: dict[str, Any], cfg: Settings, hooks: TurnHooks) -> TurnOu
         _repair_history(conversation_id, run_id, cfg)
         state["started"] = True
         state["started_at"] = utc_now()
-        state["pending"] = [_pending("user", _user_message(run.get("question") or run["prompt"], cfg)["content"])]
+        state["pending"] = [_pending("user", _user_message(run.get("question") or run["prompt"], cfg, run.get("attachments"))["content"])]
         stream.progress("status", "Thinking…")
         hooks.save(state)
     elif state.get("awaiting"):
@@ -990,6 +1006,7 @@ def advance_turn(run: dict[str, Any], cfg: Settings, hooks: TurnHooks) -> TurnOu
             hooks.emit("warning", {"status": "WARN_AGENT_STEP_LIMIT", "category": "TOOL_FAILURE", "detail": f"Stopped after {MAX_ITERATIONS} steps."})
             return _complete(state, run, hooks, "ANSWER_INCOMPLETE", cfg)
         messages = history + [{"role": row["role"], "content": json.loads(row["content_json"])} for row in state["pending"]]
+        messages = expand_messages(conversation_id, messages, cfg)
         params, betas, extra = _request(state, messages, tools, tools_config.get("container_id"))
         stream = _Stream(state, hooks.emit)
         try:

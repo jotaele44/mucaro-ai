@@ -38,6 +38,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from . import agent
+from .attachments import MAX_ATTACHMENTS_PER_MESSAGE, AttachmentError, get_attachment
 from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
 from .db import ensure_db, get_connection
@@ -338,6 +339,7 @@ def submit_message(
     idempotency_key: str | None = None,
     interrupt: bool = False,
     dismiss_pending_question: bool = False,
+    attachment_ids: list[str] | None = None,
     cfg: Settings = settings,
 ) -> dict[str, Any]:
     ensure_db(cfg.sqlite_path)
@@ -350,6 +352,7 @@ def submit_message(
         raise RunError("ERROR_RUN_MODE_INVALID", f"Mode must be one of {sorted(MODES)}.")
     if get_conversation(conversation_id, cfg) is None:
         raise RunError("ERROR_CONVERSATION_NOT_FOUND", conversation_id)
+    attachments = _checked_attachments(conversation_id, text, mode, options or {}, attachment_ids or [], cfg)
     if dismiss_pending_question:
         pending = get_pending_interaction(conversation_id, cfg)
         if pending is not None:
@@ -375,6 +378,7 @@ def submit_message(
             "prompt": text,
             "mode": mode,
             "options": dict(options or {}),
+            "attachments": attachments,
             "idempotency_key": idempotency_key,
             "created_at": now,
             "phase": "start",
@@ -405,6 +409,30 @@ def submit_message(
         stop_run(active_id, reason="SUPERSEDED_BY_NEW_MESSAGE", cfg=cfg)
     _dispatch(conversation_id, cfg)
     return {"status": "RUN_SUBMITTED", "run": get_run(run_id, cfg), "ahead": int(position)}
+
+
+def _checked_attachments(
+    conversation_id: str, text: str, mode: str, options: dict[str, Any], attachment_ids: list[str], cfg: Settings
+) -> list[dict[str, Any]]:
+    """Attachments must belong to this conversation and need Claude: the cited-answer pipeline cannot read them."""
+    if not attachment_ids:
+        return []
+    if len(attachment_ids) > MAX_ATTACHMENTS_PER_MESSAGE or len(set(attachment_ids)) != len(attachment_ids):
+        raise RunError("ERROR_ATTACHMENTS_INVALID", f"Attach up to {MAX_ATTACHMENTS_PER_MESSAGE} different files per message.")
+    _, question, _ = _parse_prompt(text)
+    if not _agent_engine({"mode": mode, "options": options}, question, cfg):
+        raise RunError(
+            "ERROR_ATTACHMENTS_NEED_CLAUDE",
+            "Attached files are read by Claude. Connect Claude in Settings (and do not use Plan mode), or remove the files.",
+        )
+    rows = []
+    for attachment_id in attachment_ids:
+        try:
+            meta = get_attachment(conversation_id, attachment_id, cfg)
+        except AttachmentError as exc:
+            raise RunError("ERROR_ATTACHMENT_NOT_FOUND", f"An attached file is missing: {attachment_id}") from exc
+        rows.append({"attachment_id": meta["attachment_id"], "name": meta["name"], "kind": meta["kind"]})
+    return rows
 
 
 def _dispatch(conversation_id: str, cfg: Settings) -> str | None:
@@ -1079,6 +1107,8 @@ def _complete(
     now = utc_now()
     user_turn = {"turn_id": stable_id("turn", run["conversation_id"], "user", run_id, length=12), "role": "user",
                  "content": run["prompt"], "created_at": run["created_at"], "status": "USER_MESSAGE", "work_run_id": run_id}
+    if run.get("attachments"):
+        user_turn["attachments"] = run["attachments"]
     if answer_trace is not None:
         assistant_turn = {
             "turn_id": stable_id("turn", run["conversation_id"], "assistant", run_id, length=12),

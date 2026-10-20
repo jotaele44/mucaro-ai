@@ -113,6 +113,7 @@ class MessageRequest(BaseModel):
     idempotency_key: str | None = Field(default=None, min_length=8, max_length=128)
     interrupt: bool = False
     dismiss_pending_question: bool = False
+    attachment_ids: list[str] = Field(default_factory=list, max_length=10)
     options: RunOptions = Field(default_factory=RunOptions)
 
 

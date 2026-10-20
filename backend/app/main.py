@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .app_settings import AppSettingsError, claude_status, delete_api_key, get_api_key, save_app_settings, store_api_key
+from .attachments import AttachmentError, attachment_file, list_attachments, save_attachment
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
 from .conversations import (
@@ -624,10 +625,43 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 idempotency_key=req.idempotency_key,
                 interrupt=req.interrupt,
                 dismiss_pending_question=req.dismiss_pending_question,
+                attachment_ids=req.attachment_ids,
                 cfg=cfg,
             )
         except RunError as exc:
             raise run_error(exc) from exc
+
+    def attachment_error(exc: AttachmentError) -> HTTPException:
+        missing = exc.status in {"ERROR_ATTACHMENT_NOT_FOUND", "ERROR_ATTACHMENT_CONVERSATION_INVALID"}
+        return api_error(exc.status, exc.detail, status_code=404 if missing else 413 if exc.status == "ERROR_ATTACHMENT_TOO_LARGE" else 422)
+
+    @app.post("/conversations/{conversation_id}/attachments")
+    async def upload_attachment(conversation_id: str, upload: UploadFile = File(...), _auth: dict = Depends(require_auth)) -> dict:
+        if get_conversation(conversation_id, cfg) is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        content = await read_limited_upload(upload, cfg.max_upload_bytes)
+        try:
+            return {"status": "ATTACHMENT_SAVED", "attachment": save_attachment(conversation_id, upload.filename, content, cfg)}
+        except AttachmentError as exc:
+            raise attachment_error(exc) from exc
+
+    @app.get("/conversations/{conversation_id}/attachments")
+    def conversation_attachments(conversation_id: str) -> dict:
+        try:
+            return {"status": "ATTACHMENTS_OK", "attachments": list_attachments(conversation_id, cfg)}
+        except AttachmentError as exc:
+            raise attachment_error(exc) from exc
+
+    @app.get("/conversations/{conversation_id}/attachments/{attachment_id}/file")
+    def attachment_download(conversation_id: str, attachment_id: str) -> FileResponse:
+        try:
+            path, meta = attachment_file(conversation_id, attachment_id, cfg)
+        except AttachmentError as exc:
+            raise attachment_error(exc) from exc
+        # Served as a download unless it is an image, so an attached HTML file is never rendered by the app.
+        inline = meta["kind"] == "image"
+        return FileResponse(path, media_type=meta["media_type"] if inline else "application/octet-stream", filename=meta["name"],
+                            content_disposition_type="inline" if inline else "attachment")
 
     @app.patch("/conversations/{conversation_id}/messages/{message_key}")
     def edit_message(
