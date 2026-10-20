@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .gis_render import GIS_RENDER_VALIDATION_SCHEMA_VERSION
+
 CAPABILITY_CONTRACT_SCHEMA_VERSION = "mucaro_advanced_capability_contracts_v1"
 CAPABILITY_OUTPUT_CONTRACT_OK = "CAPABILITY_OUTPUT_CONTRACT_OK"
 CAPABILITY_OUTPUT_CONTRACT_FAILED = "CAPABILITY_OUTPUT_CONTRACT_FAILED"
@@ -140,7 +142,11 @@ def _validate_source_identity(payload: dict[str, Any]) -> list[dict[str, str]]:
 def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
     checks: list[dict[str, str]] = [
         _contract_check("payload_object", isinstance(report, dict), "report payload must be a JSON object"),
-        _contract_check("schema_version", report.get("schema_version") == GIS_REPORT_SCHEMA_VERSION, f"schema_version must be {GIS_REPORT_SCHEMA_VERSION}"),
+        _contract_check(
+            "schema_version",
+            report.get("schema_version") in {GIS_REPORT_SCHEMA_VERSION, GIS_RENDER_VALIDATION_SCHEMA_VERSION},
+            f"schema_version must be {GIS_REPORT_SCHEMA_VERSION} or {GIS_RENDER_VALIDATION_SCHEMA_VERSION}",
+        ),
         _contract_check("report_id_present", bool(report.get("report_id")), "report_id is required"),
         _contract_check("status_present", isinstance(report.get("status"), str) and str(report.get("status")).startswith("GIS_"), "status must be a GIS status string"),
         _contract_check("operation_present", bool(report.get("operation")), "operation is required"),
@@ -1061,6 +1067,19 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 _contract_check("map_export.layer_count", isinstance(layers, list) and _dotted(report, "invariants.layer_count") == len(layers), "bound layer count must close"),
             ]
         )
+    elif operation == "validate_rendered_map":
+        checks.extend(
+            [
+                _contract_check("render.source_hash", bool(_dotted(report, "source.sha256")), "render validation source hash is required"),
+                _contract_check("render.source_bytes", isinstance(_dotted(report, "source.bytes"), int) and _dotted(report, "source.bytes") > 0, "render validation source bytes must be positive"),
+                _contract_check("render.format", bool(_dotted(report, "source.format")), "render validation image format is required"),
+                _contract_check("render.dimensions", isinstance(_dotted(report, "source.width"), int) and isinstance(_dotted(report, "source.height"), int) and _dotted(report, "source.width") > 0 and _dotted(report, "source.height") > 0, "render validation dimensions must be positive"),
+                _contract_check("render.decode", _dotted(report, "invariants.decode_success") is True, "render validation decode must succeed"),
+                _contract_check("render.alpha_accounting", _dotted(report, "invariants.alpha_accounting_closed") is True, "render validation alpha accounting must close"),
+                _contract_check("render.content", _dotted(report, "invariants.nonblank_content_present") is True, "render validation must record visible nonuniform content"),
+                _contract_check("render.output_hash", bool(_dotted(report, "source.sha256")), "render validation output hash is required"),
+            ]
+        )
     elif operation == "filter_geojson_by_bbox":
         checks.extend(
             [
@@ -1425,6 +1444,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "D8 hydrology requires projected horizontal metres and explicit vertical metres, preserves tied candidate directions, leaves boundaries/sinks/flats/ties terminal, and closes terminal accumulation and contributing-area accounting",
                 "priority-flood depression conditioning preserves edge and NODATA outlets, never lowers elevations, requires an explicit maximum fill depth, and closes changed-cell and fill-volume accounting",
                 "map/export provenance binds output hash, extent, CRS, renderer identity, and every declared source-layer hash",
+                "render validation binds decoded image format, dimensions, pixel accounting, and nonblank visible-content evidence",
             ),
             positive_regression_gates=(
                 "point-in-polygon fixture classifies FULLY_WITHIN, TOUCH_ONLY, OUTSIDE, and NULL_EMPTY",
@@ -1454,6 +1474,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "GIS report contract validator accepts real saved measurement receipts and rejects weak provenance or false accounting",
                 "GIS eval manifest runs positive and negative fixtures through the supported CLI boundary",
                 "map export fixture preserves renderer identity plus source and derived layer hashes",
+                "render validation fixture proves decoded PNG dimensions, alpha closure, nonuniform pixels, and minimum-size controls",
             ),
             negative_regression_gates=(
                 "mismatched CRS fails closed unless reprojection is explicit",
@@ -1479,6 +1500,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "depression conditioning fails closed on geographic/non-metre/rotated grids, invalid bands or depth limits, excessive required fill, and grids outside the bounded cell limit",
                 "real-corpus validation fails closed on byte drift, path escape, unknown asset type, vector ID/schema/geometry drift, or raster grid/value drift",
                 "map/export provenance fails closed on empty artifacts, invalid extents, missing layer CRS, or absent renderer identity",
+                "render validation fails closed on missing, undecodable, uniform, undersized, oversized, or manifest-mismatched artifacts",
                 "GIS report contract validation fails when warning status, source hashes, CRS, or asserted accounting are missing or inconsistent",
                 "ambiguous nearest-neighbor match remains UNRESOLVED",
                 "M:N spatial join requires explicit multiplication counts",
@@ -1496,7 +1518,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "additional regional datum-grid transformations, vertical CRS, time-dependent operations, broader axis-order cases, and independent-engine datum validation are certified",
                 "ellipsoidal hole-orientation and large-geometry edge cases close beyond the bounded antimeridian and polar control corpus",
                 "broader vector/raster formats, additional resampling kernels, remote sensing, hydrology beyond bounded priority-flood conditioning and D8, bathymetry, and temporal GIS are receipt-backed",
-                "rendered-map visual correctness and larger, more diverse real vector/raster corpora are independently certified",
+                "semantic rendered-map correctness, cartographic accessibility, and larger, more diverse real vector/raster corpora are independently certified",
             ),
         ),
         CapabilityContract(

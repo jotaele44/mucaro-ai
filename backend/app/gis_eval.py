@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import csv
 import json
 import subprocess
@@ -30,6 +31,7 @@ from .gis_processing import (
     reproject_geojson,
     spatial_join_points_to_polygons,
 )
+from .gis_render import validate_rendered_map
 from .gis_raster import (
     clip_raster_bbox,
     derive_raster_hillshade,
@@ -80,6 +82,7 @@ VALID_OPERATIONS = {
     "raster_depression_fill",
     "corpus_validate",
     "map_export",
+    "map_render_validate",
 }
 
 
@@ -181,6 +184,21 @@ def _write_raw(path: Path, payload: dict[str, Any]) -> Path:
     return path
 
 
+def _write_image(path: Path, payload: dict[str, Any]) -> Path:
+    encoded = payload.get("base64")
+    if not isinstance(encoded, str) or not encoded:
+        raise ValueError(f"{path.name} image input must include non-empty base64 data")
+    try:
+        data = base64.b64decode(encoded, validate=True)
+    except (ValueError, TypeError) as exc:
+        raise ValueError(f"{path.name} image input base64 is invalid") from exc
+    if not data:
+        raise ValueError(f"{path.name} image input must not be empty")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return path
+
+
 def _lookup_path(payload: Any, dotted_path: str) -> Any:
     current = payload
     for part in dotted_path.split("."):
@@ -263,6 +281,8 @@ def _materialize_inputs(case: dict[str, Any], input_root: Path) -> dict[str, Pat
             materialized[name] = _write_raster(input_root / f"{case_id}_{name}.tif", payload)
         elif input_format == "raw":
             materialized[name] = _write_raw(input_root / f"{case_id}_{name}.bin", payload)
+        elif input_format == "image":
+            materialized[name] = _write_image(input_root / f"{case_id}_{name}.png", payload)
         else:
             materialized[name] = _write_geojson(input_root / f"{case_id}_{name}.geojson", payload)
     return materialized
@@ -466,6 +486,24 @@ def _run_operation(case: dict[str, Any], paths: dict[str, Path], cfg: Settings) 
             output_crs=str(parameters.get("output_crs") or ""),
             renderer=str(parameters.get("renderer") or ""),
             renderer_version=str(parameters.get("renderer_version") or ""),
+        )
+    if operation == "map_render_validate":
+        image_name = str(parameters.get("image_input") or "image")
+        if image_name not in paths:
+            raise ValueError("map_render_validate parameters.image_input must name a materialized input")
+        manifest_name = parameters.get("manifest_input")
+        manifest_path = None
+        if manifest_name is not None:
+            if not isinstance(manifest_name, str) or manifest_name not in paths:
+                raise ValueError("map_render_validate parameters.manifest_input must name a materialized input")
+            manifest_path = paths[manifest_name]
+        return validate_rendered_map(
+            cfg=cfg,
+            output_path=paths[image_name],
+            manifest_path=manifest_path,
+            min_width=parameters.get("min_width"),
+            min_height=parameters.get("min_height"),
+            max_pixels=int(parameters.get("max_pixels", 50_000_000)),
         )
     raise ValueError(f"Unsupported GIS eval operation: {operation}")
 
