@@ -544,9 +544,9 @@ class TerminalController:
                     except ValueError as exc:
                         raise TerminalUIError("ERROR_TUI_LEASE_TTL", option) from exc
             elif option.startswith("workspace="):
-                options["workspace_root"] = token.split("=", 1)[1]
+                options["workspace_root"] = option.split("=", 1)[1]
             elif option.startswith("args="):
-                options["arguments_sha256"] = token.split("=", 1)[1]
+                options["arguments_sha256"] = option.split("=", 1)[1]
             else:
                 raise TerminalUIError("ERROR_TUI_LEASE_OPTION", option)
         return options
