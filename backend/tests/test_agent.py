@@ -161,6 +161,8 @@ def inline_execution():
 
 @pytest.fixture()
 def cfg(tmp_path, monkeypatch):
+    # The Anthropic SDK is an optional extra (CI installs only "dev"); these tests never need it.
+    monkeypatch.setattr("backend.app.app_settings.sdk_available", lambda: True)
     monkeypatch.setenv("MUCARO_AI_SECRET_STORE", "env")
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
     monkeypatch.delenv("MUCARO_AI_LIVE_MODE", raising=False)
@@ -422,7 +424,7 @@ def test_refusal_and_length_limit_are_reported(cfg, api, chat):
 
 
 def test_api_errors_fail_the_run_with_a_plain_status(cfg, api, chat):
-    import anthropic
+    anthropic = pytest.importorskip("anthropic")
     import httpx
 
     response = httpx.Response(401, request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"),

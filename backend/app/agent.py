@@ -704,7 +704,12 @@ def _stream_message(
     stream: _Stream,
     should_stop: Callable[[], bool],
 ) -> dict[str, Any]:
-    import anthropic
+    try:
+        import anthropic
+
+        sdk_errors: tuple[type[BaseException], ...] = (anthropic.APIError,)
+    except ImportError:  # a client injected for tests or replays works without the SDK
+        sdk_errors = ()
 
     parser = _SSEParser()
     last_check = time.monotonic()
@@ -731,7 +736,7 @@ def _stream_message(
         raise
     except AgentAPIError:
         raise
-    except anthropic.APIError as exc:
+    except sdk_errors as exc:
         with _ACTIVE_LOCK:
             stopped = run_id in _ABORTED
         if stopped:

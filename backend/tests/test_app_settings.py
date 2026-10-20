@@ -29,6 +29,8 @@ KEY = "sk-ant-api03-" + "k" * 60
 
 @pytest.fixture()
 def cfg(tmp_path, monkeypatch):
+    # The Anthropic SDK is an optional extra (CI installs only "dev"); these tests never need it.
+    monkeypatch.setattr("backend.app.app_settings.sdk_available", lambda: True)
     monkeypatch.setenv("MUCARO_AI_SECRET_STORE", "file")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("MUCARO_AI_LIVE_MODE", raising=False)

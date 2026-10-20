@@ -325,13 +325,16 @@ def public_models() -> list[dict[str, Any]]:
     ]
 
 
+def sdk_available() -> bool:
+    return importlib.util.find_spec("anthropic") is not None
+
+
 def claude_status(cfg: Settings = settings) -> dict[str, Any]:
     """What the Settings screen shows and what the agent checks before every turn. Never includes the key."""
     values = load_app_settings(cfg)
     key, source = get_api_key(cfg)
     consent, consent_source = live_consent(cfg)
-    sdk_present = importlib.util.find_spec("anthropic") is not None
-    if not sdk_present:
+    if not sdk_available():
         status, detail = "CLAUDE_SDK_MISSING", "The Anthropic SDK is not installed; open Mucaro AI again to finish setup."
     elif not key:
         status, detail = "CLAUDE_KEY_MISSING", "Add your Anthropic API key in Settings to get full answers."
