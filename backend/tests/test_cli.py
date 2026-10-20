@@ -1744,6 +1744,8 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert payload["head_sha"] == "UNKNOWN_HEAD"
     assert payload["receipt"] == "data/exports/release_receipts/gis_quality-UNKNOWN_HEAD.json"
     assert payload["report"]["status"] == "GIS_EVAL_OK"
+    assert payload["independent_datum"]["status"] == "PASS"
+    assert payload["independent_datum"]["engine"] == "mucaro_independent_bilinear_grid_v1"
 
     receipt_path = tmp_path / payload["receipt"]
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
@@ -1755,6 +1757,7 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
+    assert "independent_datum=PASS" in text_output
     assert "eval_case_count=65" in text_output
     assert "PASS raster_depression_fill raster_depression_fill_enclosed_bowl_closes_volume" in text_output
     assert "PASS raster_hillshade raster_hillshade_west_light_east_rising_plane" in text_output

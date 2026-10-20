@@ -13,6 +13,10 @@ from backend.app.capability_contracts import (
     validate_gis_report_contract,
 )
 from backend.app.config import Settings
+from backend.app.gis_datum_independent import (
+    IndependentDatumGridError,
+    independently_interpolate_horizontal_offset,
+)
 from backend.app.gis_crs import (
     GOVERNED_GRID_BYTES,
     GOVERNED_GRID_FILENAME,
@@ -231,6 +235,26 @@ def test_governed_grid_manifest_rejects_malformed_crs_operation(tmp_path: Path, 
 
     assert exc.value.status == "ERROR_GIS_CRS_GRID_OPERATION_MISMATCH"
     assert list(cfg.export_dir.iterdir()) == []
+
+
+def test_independent_florida_grid_interpolation_matches_governed_transform() -> None:
+    lon, lat = independently_interpolate_horizontal_offset(
+        PACKAGE_GRID_ROOT / FLORIDA_GRID_FILENAME,
+        lon=-80.2,
+        lat=25.8,
+    )
+
+    assert lon == pytest.approx(-80.19999922602221, abs=1e-12)
+    assert lat == pytest.approx(25.799999256211102, abs=1e-12)
+
+
+def test_independent_grid_interpolation_rejects_outside_domain() -> None:
+    with pytest.raises(IndependentDatumGridError, match="outside"):
+        independently_interpolate_horizontal_offset(
+            PACKAGE_GRID_ROOT / FLORIDA_GRID_FILENAME,
+            lon=-79.8,
+            lat=25.8,
+        )
 
 
 def test_governed_grid_supports_package_paths_with_spaces(tmp_path: Path) -> None:

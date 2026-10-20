@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,7 @@ from rasterio.transform import from_origin
 from .config import Settings
 from .gis_corpus import DEFAULT_REAL_GIS_CORPUS_MANIFEST, validate_real_gis_corpus
 from .gis_crs import reproject_geojson_crs
+from .gis_datum_independent import IndependentDatumGridError, independently_interpolate_horizontal_offset
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
 from .gis_hydrology import condition_raster_depressions, derive_raster_d8_flow
@@ -624,13 +626,15 @@ def build_gis_quality_certification(
 ) -> dict[str, Any]:
     head_sha = current_git_head(root)
     report = build_gis_eval_report(fixture_path=fixture_path)
-    status = GIS_QUALITY_OK if report["status"] == GIS_EVAL_OK else GIS_QUALITY_FAILED
+    independent_datum = _run_independent_datum_control(root)
+    status = GIS_QUALITY_OK if report["status"] == GIS_EVAL_OK and independent_datum["status"] == "PASS" else GIS_QUALITY_FAILED
     result: dict[str, Any] = {
         "status": status,
         "profile": profile,
         "head_sha": head_sha,
         "fixture": report.get("fixture"),
         "report": report,
+        "independent_datum": independent_datum,
         "failed_cases": [case for case in report.get("cases", []) if isinstance(case, dict) and case.get("status") != "PASS"],
         "receipt": None,
     }
@@ -646,6 +650,7 @@ def build_gis_quality_certification(
                     "profile": profile,
                     "fixture": report.get("fixture"),
                     "report": report,
+                    "independent_datum": independent_datum,
                 },
             )
             result["receipt"] = str(receipt.relative_to(root) if receipt.is_relative_to(root) else receipt)
@@ -653,6 +658,50 @@ def build_gis_quality_certification(
             result["status"] = GIS_QUALITY_FAILED
             result["receipt_error"] = f"{type(exc).__name__}: {exc}"
     return result
+
+
+def _run_independent_datum_control(root: Path) -> dict[str, Any]:
+    del root
+    # The governed grid is an immutable repository/package fixture; `root` is
+    # the caller's runtime output root and may intentionally be temporary.
+    grid_path = ROOT / "backend" / "app" / "gis_grids" / "us_noaa_FL.tif"
+    grid_label = _fixture_label(grid_path)
+    expected = {
+        "lon": -80.19999922602221,
+        "lat": 25.799999256211102,
+        "grid_bytes": 8374,
+        "grid_sha256": "73b385448f09e6c1122a87b5b3137a5b5775585af9445889e0a3a8c4c5951f54",
+    }
+    checks: dict[str, bool] = {}
+    try:
+        import hashlib
+
+        raw = grid_path.read_bytes()
+        lon, lat = independently_interpolate_horizontal_offset(grid_path, lon=-80.2, lat=25.8)
+        checks = {
+            "grid_bytes": len(raw) == expected["grid_bytes"],
+            "grid_sha256": hashlib.sha256(raw).hexdigest() == expected["grid_sha256"],
+            "longitude": math.isclose(lon, expected["lon"], rel_tol=0.0, abs_tol=1e-12),
+            "latitude": math.isclose(lat, expected["lat"], rel_tol=0.0, abs_tol=1e-12),
+        }
+    except (IndependentDatumGridError, OSError, ValueError) as exc:
+        return {
+            "status": "FAIL",
+            "engine": "mucaro_independent_bilinear_grid_v1",
+            "scope": "EPSG:4269_TO_EPSG:4152_FLORIDA_HORIZONTAL_OFFSET",
+            "grid": grid_label,
+            "checks": checks,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    return {
+        "status": "PASS" if all(checks.values()) else "FAIL",
+        "engine": "mucaro_independent_bilinear_grid_v1",
+        "scope": "EPSG:4269_TO_EPSG:4152_FLORIDA_HORIZONTAL_OFFSET",
+        "grid": grid_label,
+        "checks": checks,
+        "expected": expected,
+        "independent_engine_certification": "BOUNDED_ONLY",
+    }
 
 
 def format_gis_quality_certification_text(report: dict[str, Any]) -> list[str]:
@@ -663,6 +712,11 @@ def format_gis_quality_certification_text(report: dict[str, Any]) -> list[str]:
     ]
     if report.get("receipt"):
         lines.append(f"receipt={report.get('receipt')}")
+    independent_datum = report.get("independent_datum")
+    if isinstance(independent_datum, dict):
+        lines.append(f"independent_datum={independent_datum.get('status')}")
+        lines.append(f"independent_datum_engine={independent_datum.get('engine')}")
+        lines.append(f"independent_datum_scope={independent_datum.get('scope')}")
     eval_report = report.get("report", {})
     if isinstance(eval_report, dict):
         for line in format_gis_eval_text(eval_report)[:-1]:
