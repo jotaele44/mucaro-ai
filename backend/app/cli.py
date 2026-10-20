@@ -43,6 +43,7 @@ from .gis_corpus import validate_real_gis_corpus
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
 from .gis_hydrology import condition_raster_depressions, derive_raster_d8_flow
+from .gis_render import validate_rendered_map
 from .gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -879,6 +880,18 @@ def build_parser() -> argparse.ArgumentParser:
     gis_map_export.add_argument("--renderer-version", required=True, help="Renderer version.")
     gis_map_export.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_map_export.set_defaults(handler=run_gis_map_export_manifest)
+
+    gis_map_render_validate = gis_subcommands.add_parser(
+        "map-render-validate",
+        help="Independently validate that a rendered map artifact decodes and contains bounded visible content.",
+    )
+    gis_map_render_validate.add_argument("output_path", help="Path to the rendered image artifact.")
+    gis_map_render_validate.add_argument("--manifest", type=Path, help="Optional map export manifest to bind by output hash and path.")
+    gis_map_render_validate.add_argument("--min-width", type=int, help="Required minimum image width in pixels.")
+    gis_map_render_validate.add_argument("--min-height", type=int, help="Required minimum image height in pixels.")
+    gis_map_render_validate.add_argument("--max-pixels", type=int, default=50_000_000, help="Maximum decoded pixel count.")
+    gis_map_render_validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_map_render_validate.set_defaults(handler=run_gis_map_render_validate)
 
     ocr = subcommands.add_parser("ocr", help="Run local OCR analysis with source-image receipts.")
     ocr_subcommands = ocr.add_subparsers(dest="ocr_command", required=True)
@@ -2452,6 +2465,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_ZONAL_STATS_WARN",
         "GIS_CORPUS_VALIDATION_OK",
         "GIS_MAP_EXPORT_MANIFEST_OK",
+        "GIS_RENDER_VALIDATION_OK",
+        "GIS_RENDER_VALIDATION_WARN",
     }:
         print(status)
         print(f"operation={payload.get('operation')}")
@@ -2476,6 +2491,12 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 print(f"source_format={source.get('format')}")
             if "bytes" in source:
                 print(f"source_bytes={source.get('bytes')}")
+            if "width" in source:
+                print(f"source_width={source.get('width')}")
+            if "height" in source:
+                print(f"source_height={source.get('height')}")
+            if "mode" in source:
+                print(f"source_mode={source.get('mode')}")
         for source_name in ("vector_source", "raster_source"):
             named_source = payload.get(source_name)
             if isinstance(named_source, dict):
@@ -2723,6 +2744,16 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "all_layer_hashes_present",
                 "output_hash_present",
                 "renderer_identity_present",
+                "decode_success",
+                "dimensions_positive",
+                "dimensions_meet_minimum",
+                "alpha_accounting_closed",
+                "visible_pixel_count",
+                "transparent_pixel_count",
+                "unique_color_count",
+                "non_dominant_pixel_count",
+                "nonblank_content_present",
+                "manifest_binding_closed",
             ):
                 if key in invariants:
                     print(f"{key}={invariants.get(key)}")
@@ -3346,6 +3377,22 @@ def run_gis_map_export_manifest(args: argparse.Namespace, cfg: Settings) -> int:
             output_crs=args.output_crs,
             renderer=args.renderer,
             renderer_version=args.renderer_version,
+        ),
+    )
+
+
+def run_gis_map_render_validate(args: argparse.Namespace, cfg: Settings) -> int:
+    output_path = _resolve_project_path(args.output_path, cfg)
+    manifest_path = _resolve_project_path(args.manifest, cfg) if args.manifest else None
+    return _run_gis_report(
+        args,
+        lambda: validate_rendered_map(
+            cfg=cfg,
+            output_path=output_path,
+            manifest_path=manifest_path,
+            min_width=args.min_width,
+            min_height=args.min_height,
+            max_pixels=args.max_pixels,
         ),
     )
 

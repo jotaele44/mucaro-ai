@@ -1,9 +1,9 @@
 {
   "schema_version": "mucaro_gis_eval_fixture_v1",
   "minimums": {
-    "case_count": 67,
-    "operation_count": 25,
-    "negative_case_count": 27
+      "case_count": 70,
+      "operation_count": 26,
+      "negative_case_count": 29
   },
   "cases": [
     {
@@ -2440,6 +2440,69 @@
       },
       "expect_error": true,
       "expected_status": "ERROR_GIS_EXPORT_EXTENT",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "map_render_validate_binds_decoded_visible_pixels",
+      "operation": "map_render_validate",
+      "parameters": {
+        "image_input": "image",
+        "min_width": 4,
+        "min_height": 3
+      },
+      "inputs": {
+        "image": {
+          "format": "image",
+          "base64": "iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAYAAAC09K7GAAAAH0lEQVR4nGP8////fwYkwAQihBN6wRguAAJvFxSDaQADnwgCI3mG7wAAAABJRU5ErkJggg=="
+        }
+      },
+      "expected_status": "GIS_RENDER_VALIDATION_OK",
+      "expected_warnings": [],
+      "expected_invariants": {
+        "decode_success": true,
+        "dimensions_positive": true,
+        "alpha_accounting_closed": true,
+        "nonblank_content_present": true,
+        "manifest_binding_closed": true
+      },
+      "expected_fields": {
+        "source.format": "PNG",
+        "source.width": 4,
+        "source.height": 3,
+        "invariants.pixel_count": 12,
+        "invariants.unique_color_count": 2
+      }
+    },
+    {
+      "case_id": "map_render_validate_rejects_uniform_blank_image",
+      "operation": "map_render_validate",
+      "parameters": {
+        "image_input": "image"
+      },
+      "inputs": {
+        "image": {
+          "format": "image",
+          "base64": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR4nGP8////fwYGBgYmEAHCAD34BABm6tHAAAAAAElFTkSuQmCC"
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_RENDER_BLANK",
+      "expected_warnings": []
+    },
+    {
+      "case_id": "map_render_validate_rejects_non_image_bytes",
+      "operation": "map_render_validate",
+      "parameters": {
+        "image_input": "image"
+      },
+      "inputs": {
+        "image": {
+          "format": "raw",
+          "text": "not-an-image"
+        }
+      },
+      "expect_error": true,
+      "expected_status": "ERROR_GIS_RENDER_DECODE",
       "expected_warnings": []
     },
     {

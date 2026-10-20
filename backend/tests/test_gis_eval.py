@@ -12,12 +12,12 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 67,
-        "passed": 67,
+        "cases": 70,
+        "passed": 70,
         "failed": 0,
-        "positive_cases": 40,
-        "negative_cases": 27,
-        "operations": 25,
+        "positive_cases": 41,
+        "negative_cases": 29,
+        "operations": 26,
         "operation_names": [
             "bbox_filter",
             "clip_bbox",
@@ -26,6 +26,7 @@ def test_gis_eval_default_fixture_covers_core_operations():
             "csv_points",
             "inspect",
             "map_export",
+            "map_render_validate",
             "measure",
             "measure_ellipsoidal",
             "overlay",
@@ -138,6 +139,9 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["real_corpus_bytes_schema_ids_and_geometry_validate"]["observed_status"] == "GIS_CORPUS_VALIDATION_OK"
     assert by_id["map_export_binds_renderer_and_layers"]["observed_status"] == "GIS_MAP_EXPORT_MANIFEST_OK"
     assert by_id["map_export_invalid_extent_fails_closed"]["observed_status"] == "ERROR_GIS_EXPORT_EXTENT"
+    assert by_id["map_render_validate_binds_decoded_visible_pixels"]["observed_status"] == "GIS_RENDER_VALIDATION_OK"
+    assert by_id["map_render_validate_rejects_uniform_blank_image"]["observed_status"] == "ERROR_GIS_RENDER_BLANK"
+    assert by_id["map_render_validate_rejects_non_image_bytes"]["observed_status"] == "ERROR_GIS_RENDER_DECODE"
 
 
 def test_gis_eval_fails_when_expected_invariant_does_not_match(tmp_path: Path):
