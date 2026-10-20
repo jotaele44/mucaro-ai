@@ -113,4 +113,4 @@ jobs:
             ${{ runner.temp }}/mucaro-coding-lifecycle-live.json
             ${{ runner.temp }}/mucaro-coding-regression-corpus.json
           if-no-files-found: warn
-          archive: false
+          archive: true
