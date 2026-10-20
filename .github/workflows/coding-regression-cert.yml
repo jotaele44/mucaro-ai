@@ -23,6 +23,11 @@ jobs:
       - name: Install Mucaro development dependencies
         run: python -m pip install -e ".[dev]"
 
+      - name: Preflight governed branch commit PR-request lifecycle
+        env:
+          MUCARO_CODING_LIFECYCLE_RECEIPT: ${{ runner.temp }}/mucaro-coding-lifecycle-live.json
+        run: python scripts/certify_coding_lifecycle_live.py --output "$MUCARO_CODING_LIFECYCLE_RECEIPT"
+
       - name: Provision immutable coding probe image
         id: coding_image
         run: |
