@@ -14,17 +14,17 @@ Requirement denominator: 139 (arithmetic closes: yes).
 
 | State | Requirements |
 | --- | ---: |
-| PASS | 60 |
+| PASS | 61 |
 | FAIL | 0 |
 | OPEN | 45 |
-| BLOCKED | 7 |
+| BLOCKED | 6 |
 | PROVISIONAL | 26 |
 | NOT_APPLICABLE | 1 |
 
 | Terminal-rule condition | Holds |
 | --- | --- |
 | defined release scope | yes |
-| bound specification | no |
+| bound specification | yes |
 | complete requirement denominator | yes |
 | zero in scope fail | yes |
 | zero in scope open | no |
@@ -36,13 +36,13 @@ Requirement denominator: 139 (arithmetic closes: yes).
 Residue:
 
 - fail (0): none
-- blocked (6): `KERNEL-003`, `MATRIX-018`, `TGT-001`, `TGT-009`, `TGT-026`, `TGT-028`
+- blocked (5): `MATRIX-018`, `TGT-001`, `TGT-009`, `TGT-026`, `TGT-028`
 - externally blocked (1): `TGT-027`
 - provisional (26): 26 requirements (see `mucaro release scope status`)
 - open (45): 45 requirements (see `mucaro release scope status`)
-- active blockers: `BLK-LLM-001`, `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-SPEC-001`, `BLK-WEB-001`
+- active blockers: `BLK-LLM-001`, `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-WEB-001`
 - unresolved material contradictions: none
-- open specification bindings: Mucaro AI Release-Grade Workbench Specification
+- open specification bindings: none
 <!-- END GENERATED: release-scope-status -->
 
 Current package version: `0.1.23`.
