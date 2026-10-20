@@ -116,8 +116,8 @@ def main() -> int:
         base = Path(tmp)
         cfg = under(user_cfg, base, "live.sqlite3")
         cfg.ensure_dirs()
-        os.environ["MUCARO_AI_SECRET_STORE"] = "env"
-        os.environ["ANTHROPIC_API_KEY"] = key
+        # The throwaway run reads the key from the environment, never from the Keychain or a file.
+        os.environ.update({"MUCARO_AI_SECRET_STORE": "env", "ANTHROPIC_API_KEY": key})
         save_app_settings({"live_consent": True, "model": chosen["model"], "effort": chosen["effort"],
                            "web_tools": chosen["web_tools"], "code_sandbox": chosen["code_sandbox"]}, cfg)
 
