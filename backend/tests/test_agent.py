@@ -556,3 +556,25 @@ def test_engine_option_selects_the_pipeline(cfg, api, chat):
     failed = get_run(forced["run_id"], cfg)
     assert failed["state"] == "FAILED" and failed["error"]["status"] == "ERROR_CLAUDE_CONSENT_REQUIRED"
     assert api.requests == []
+
+
+LIVE_FIXTURES = sorted((Path(__file__).parent / "fixtures" / "agent_live").glob("*.json"))
+
+
+@pytest.mark.parametrize("fixture_path", LIVE_FIXTURES or [None], ids=lambda path: path.stem if path else "none")
+def test_recorded_live_streams_replay_through_the_engine(cfg, api, chat, fixture_path):
+    """Streams recorded from the real API by scripts/claude_live_smoke.py must drive the loop to the same outcome."""
+    if fixture_path is None:
+        pytest.skip("no live recording yet: run scripts/claude_live_smoke.py with an API key")
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    lines_per_response = [response["lines"] for response in fixture["responses"]]
+    api.script = [[json.loads(line[len("data:"):].strip()) for line in lines if line.startswith("data:")] for lines in lines_per_response]
+    save_app_settings({"model": fixture["model"], "effort": fixture["effort"]}, cfg)
+
+    run = ask(chat, fixture["prompt"], cfg)
+
+    finished = get_run(run["run_id"], cfg)
+    assert finished["state"] == "COMPLETED" and finished["outcome"] == fixture["outcome"]
+    assert progress(run["run_id"], cfg) == fixture["progress"]
+    assert agent._open_tool_use_ids(load_history(chat, cfg)) == []
+    assert len(api.requests) == len(lines_per_response)

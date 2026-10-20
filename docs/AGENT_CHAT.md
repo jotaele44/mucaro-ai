@@ -65,7 +65,12 @@ can be set or removed only from the Mac that runs Mucaro, not from a phone on th
   length limit, API errors, byte-identical history replay, frozen tools, granted-folder confinement, invalid
   tool input, consent and engine selection, and that the key never appears in events, history or files.
 - `backend/tests/test_app_settings.py` covers key storage, consent and the Settings API.
-- Not yet done: one live call with a real key, recorded as a fixture. Until then the request shape
+- The live gate is one command once a key is saved in Settings → Claude:
+  `.venv/bin/python scripts/claude_live_smoke.py`. It runs a real web-search question in a throwaway data
+  directory, prints the progress lines and Anthropic request ids, and writes the raw response stream to
+  `backend/tests/fixtures/agent_live/web_search.json` (it refuses to write if the key appears in it).
+  `test_recorded_live_streams_replay_through_the_engine` then replays every recording in CI. Costs a few cents.
+- Not yet done: that live run. Until then the request shape
   (beta headers `thinking-display-updates-2026-08-18`, `server-side-fallback-2026-07-01`,
   `thinking-binding-controls-2026-08-01`; `output_config.effort`; `fallbacks: "default"`; server tool versions
   `web_search_20260209`, `web_fetch_20260209`, `code_execution_20260521`) is verified only against the
