@@ -1,0 +1,25 @@
+MÚCARO AI — DEVELOPMENT WORKFLOW
+Artifact execution: NOT_APPLICABLE
+
+macOS/Linux
+git status --short
+git rev-parse HEAD
+python3 scripts/preflight.py --strict-imports
+python3 -m pytest backend/tests -q
+python3 scripts/validate_json.py
+python3 scripts/release_check.py
+
+Windows PowerShell
+git status --short
+git rev-parse HEAD
+py -3.12 scripts/preflight.py --strict-imports
+py -3.12 -m pytest backend/tests -q
+py -3.12 scripts/validate_json.py
+py -3.12 scripts/release_check.py
+
+Smoke
+python3 scripts/launch_app.py --smoke-test --no-browser
+py -3.12 scripts/launch_app.py --smoke-test --no-browser
+
+Gate
+A clean test run is development evidence only. It does not certify packaging, installation, upgrade, rollback, mobile, physical-device, signing, or exact distributed bytes.
