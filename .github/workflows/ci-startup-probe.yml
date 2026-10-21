@@ -3,6 +3,9 @@ name: CI Startup Probe
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   startup-probe:
     runs-on: ubuntu-latest
