@@ -101,6 +101,103 @@ def _local_worker_health_skill(arguments: dict[str, Any], cfg: Settings) -> dict
     }
 
 
+def _exact_head_certification_skill(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    del cfg
+    required_fields = (
+        "baseline_sha",
+        "candidate_sha",
+        "observed_head_sha",
+        "observed_remote_sha",
+        "observed_pr_head_sha",
+        "worktree_clean",
+        "required_gates",
+        "passed_gates",
+        "manifest_sha256",
+        "evidence_sha256",
+    )
+    reasons: list[str] = []
+    missing_fields = sorted(field for field in required_fields if field not in arguments)
+    if missing_fields:
+        reasons.append("missing required fields: " + ",".join(missing_fields))
+
+    def valid_hex(value: Any, length: int) -> bool:
+        return isinstance(value, str) and len(value) == length and all(ch in "0123456789abcdefABCDEF" for ch in value)
+
+    baseline_sha = arguments.get("baseline_sha")
+    candidate_sha = arguments.get("candidate_sha")
+    observed = {
+        "head": arguments.get("observed_head_sha"),
+        "remote": arguments.get("observed_remote_sha"),
+        "pr_head": arguments.get("observed_pr_head_sha"),
+    }
+    if baseline_sha is not None and not valid_hex(baseline_sha, 40):
+        reasons.append("baseline_sha must be a 40-character hexadecimal commit SHA")
+    if candidate_sha is not None and not valid_hex(candidate_sha, 40):
+        reasons.append("candidate_sha must be a 40-character hexadecimal commit SHA")
+    if valid_hex(candidate_sha, 40):
+        mismatches = sorted(name for name, value in observed.items() if value != candidate_sha)
+        if mismatches:
+            reasons.append("candidate SHA mismatch: " + ",".join(mismatches))
+    elif any(value is not None for value in observed.values()):
+        reasons.append("candidate SHA identity cannot be evaluated")
+
+    if arguments.get("worktree_clean") is not True:
+        reasons.append("worktree is not explicitly clean")
+
+    required_gates = arguments.get("required_gates")
+    passed_gates = arguments.get("passed_gates")
+    if not isinstance(required_gates, list) or not all(isinstance(item, str) and item for item in required_gates):
+        reasons.append("required_gates must be a non-empty string list")
+        required_gates = []
+    if not isinstance(passed_gates, list) or not all(isinstance(item, str) and item for item in passed_gates):
+        reasons.append("passed_gates must be a string list")
+        passed_gates = []
+    missing_gates = sorted(set(required_gates) - set(passed_gates))
+    if missing_gates:
+        reasons.append("required gates not passed: " + ",".join(missing_gates))
+
+    unresolved = arguments.get("unresolved_states", [])
+    if not isinstance(unresolved, list):
+        reasons.append("unresolved_states must be a list")
+        unresolved = ["INVALID_UNRESOLVED_STATES"]
+    unresolved = [str(item) for item in unresolved if str(item)]
+    if unresolved:
+        reasons.append("unresolved certification residue: " + ",".join(sorted(unresolved)))
+
+    superseded = arguments.get("superseded_shas", [])
+    if not isinstance(superseded, list):
+        reasons.append("superseded_shas must be a list")
+        superseded = []
+    if candidate_sha in superseded:
+        reasons.append("candidate SHA is explicitly superseded")
+
+    for field in ("manifest_sha256", "evidence_sha256"):
+        value = arguments.get(field)
+        if value is not None and not valid_hex(value, 64):
+            reasons.append(f"{field} must be a 64-character hexadecimal SHA-256")
+
+    passed = not reasons
+    return {
+        "status": "EXACT_HEAD_CERTIFICATION_PASS" if passed else "EXACT_HEAD_CERTIFICATION_OPEN",
+        "certification_state": "PASS" if passed else "OPEN",
+        "promotable": passed,
+        "fail_closed": True,
+        "baseline_sha": baseline_sha,
+        "candidate_sha": candidate_sha,
+        "identity_match": passed or (
+            valid_hex(candidate_sha, 40)
+            and all(value == candidate_sha for value in observed.values())
+        ),
+        "required_gates": sorted(set(required_gates)),
+        "passed_gates": sorted(set(passed_gates)),
+        "missing_gates": missing_gates,
+        "unresolved_states": sorted(unresolved),
+        "manifest_sha256": arguments.get("manifest_sha256"),
+        "evidence_sha256": arguments.get("evidence_sha256"),
+        "reasons": reasons,
+    }
+
+
 SKILL_REGISTRY: dict[str, SkillDefinition] = {
     "mucaro/intelligence-plane-health": SkillDefinition(
         skill_id="mucaro/intelligence-plane-health",
@@ -111,6 +208,16 @@ SKILL_REGISTRY: dict[str, SkillDefinition] = {
         input_schema="mucaro.skill-input/1.0",
         output_schema="mucaro.intelligence-plane-health/1.0",
         handler=_health_skill,
+    ),
+    "mucaro/exact-head-certification-audit": SkillDefinition(
+        skill_id="mucaro/exact-head-certification-audit",
+        version="1.0.0",
+        description="Fail-closed exact-head certification evaluator for frozen evidence and promotion gates.",
+        runtime="IN_PROCESS",
+        capabilities=(),
+        input_schema="mucaro.exact-head-certification-input/1.0",
+        output_schema="mucaro.exact-head-certification-output/1.0",
+        handler=_exact_head_certification_skill,
     ),
     "mucaro/local-worker-health": SkillDefinition(
         skill_id="mucaro/local-worker-health",
