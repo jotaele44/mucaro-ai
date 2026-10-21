@@ -86,7 +86,7 @@ jobs:
             test -n "$SHADOW_EVIDENCE_MANIFEST"
             args+=(--historical-replay --evidence-manifest "$SHADOW_EVIDENCE_MANIFEST")
           fi
-          python scripts/shadow_qa.py "${args[@]}"
+          python -m scripts.shadow_qa "${args[@]}"
       - name: Upload Shadow baseline receipt
         if: always()
         uses: actions/upload-artifact@v7
