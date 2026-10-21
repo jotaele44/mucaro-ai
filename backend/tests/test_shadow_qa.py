@@ -1,3 +1,9 @@
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
 from scripts import shadow_qa
 
 
@@ -56,3 +62,17 @@ def test_shadow_exit_codes_distinguish_pass_fail_and_provisional():
     assert shadow_qa.exit_code_for_state("FAIL") == 1
     assert shadow_qa.exit_code_for_state("PROVISIONAL") != 0
     assert shadow_qa.exit_code_for_state("BLOCKED") != 0
+
+
+def test_shadow_script_help_runs_from_repository_root() -> None:
+    root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, "scripts/shadow_qa.py", "--help"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Run bounded MUCARO Shadow QA" in result.stdout
