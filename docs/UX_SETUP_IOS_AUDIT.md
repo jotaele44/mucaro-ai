@@ -253,5 +253,5 @@ notch, edge-swipe back, HEIC upload, VoiceOver through a sheet, resume after a
 - **L9** A pairing code exchanged for a per-device token, revocable in Settings, would replace typing a 43-character token.
 - **L10** The token check has no failed-attempt throttling.
 - **L11** A QR code for the phone link needs a dependency decision (the runtime graph is hash-locked).
-- **L12** Whether WebKit's device emulation reports `(pointer: coarse)` is unknown; the touch-keyboard check forces the report so it does not depend on it. With no executing CI runner there is no WebKit evidence at all.
+- **L12** Whether hosted Playwright WebKit device emulation reports `(pointer: coarse)` identically to physical iPadOS Safari remains unknown; the touch-keyboard check forces the report so it does not depend on it. Hosted WebKit now executes after runner admission recovered, but it is not on-device Safari/WebKit evidence.
 - **L13** On an iPad with a hardware keyboard the primary pointer is still coarse, so Return adds a line (Cmd or Ctrl+Enter, or the Send button, sends). `any-pointer: fine` could refine this, but its behaviour on iPadOS is unverified.
