@@ -34,7 +34,7 @@ if str(ROOT) not in sys.path:
 
 from scripts import launch_app, lock_python_deps  # noqa: E402
 
-# desktop (pywebview) draws the native window that Mucaro AI.app (macOS) and Mucaro AI.exe (Windows) open.
+# desktop (pywebview) draws the native window that Mucaro AI Setup.app (macOS) and Mucaro AI.exe (Windows) open.
 NATIVE_WINDOW_PLATFORMS = ("darwin", "win32")
 NATIVE_WINDOW_MODULES = {
     "darwin": ("webview", "AppKit", "Foundation", "WebKit"),
