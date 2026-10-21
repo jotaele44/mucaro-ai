@@ -1,6 +1,14 @@
 name: ARM64 Portable Runtime Materialization Certification
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "packaging/runtime/macos-arm64.json"
+      - "packaging/runtime/requirements-macos-arm64.lock"
+      - "backend/app/portable_runtime_source.py"
+      - ".github/workflows/arm64-runtime-materialize-cert.yml"
   pull_request:
     paths:
       - "packaging/runtime/macos-arm64.json"
