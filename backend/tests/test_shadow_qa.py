@@ -1,4 +1,6 @@
 from pathlib import Path
+import subprocess
+import sys
 
 from scripts import shadow_qa
 
@@ -66,3 +68,13 @@ def test_shadow_workflow_invokes_runner_as_module() -> None:
 
     assert "python -m scripts.shadow_qa" in workflow
     assert "python scripts/shadow_qa.py" not in workflow
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "scripts.shadow_qa", "--help"],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "Run bounded MUCARO Shadow QA" in completed.stdout
