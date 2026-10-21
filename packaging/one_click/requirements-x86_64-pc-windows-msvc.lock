@@ -896,8 +896,8 @@ pyparsing==3.3.3 \
     #   pip-requirements-parser
     #   rasterio
 pypdf==6.21.1 \
-    --hash=sha256:553e2d42f5bb3bb2a785a7d3de8ef90bb7df74b5413eff5a7b4388007ea9254b \
-    --hash=sha256:2d62c383acd6e0dff0a96322ba8b1135229343b084d73c6f6cfd947fd291afcb
+    --hash=sha256:2d62c383acd6e0dff0a96322ba8b1135229343b084d73c6f6cfd947fd291afcb \
+    --hash=sha256:553e2d42f5bb3bb2a785a7d3de8ef90bb7df74b5413eff5a7b4388007ea9254b
     # via mucaro-ai (pyproject.toml)
 pyproj==3.7.2 \
     --hash=sha256:0a9bb26a6356fb5b033433a6d1b4542158fb71e3c51de49b4c318a1dff3aeaab \
