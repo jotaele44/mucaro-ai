@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from scripts import shadow_qa
 
 
@@ -56,3 +58,11 @@ def test_shadow_exit_codes_distinguish_pass_fail_and_provisional():
     assert shadow_qa.exit_code_for_state("FAIL") == 1
     assert shadow_qa.exit_code_for_state("PROVISIONAL") != 0
     assert shadow_qa.exit_code_for_state("BLOCKED") != 0
+
+
+def test_shadow_workflow_invokes_runner_as_module() -> None:
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github" / "workflows" / "shadow-qa.yml").read_text(encoding="utf-8")
+
+    assert "python -m scripts.shadow_qa" in workflow
+    assert "python scripts/shadow_qa.py" not in workflow
