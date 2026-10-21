@@ -18,6 +18,7 @@ The pinned uv is taken from --uv, then MUCARO_UV_BIN, then the copy the double-c
 from __future__ import annotations
 
 import argparse
+import difflib
 import os
 import subprocess
 import sys
@@ -138,6 +139,21 @@ def main(argv: list[str] | None = None) -> int:
             same = committed.is_file() and committed.read_bytes() == fresh.read_bytes()
             ok = ok and same
             print(f"{'MATCH' if same else 'MISMATCH'} {committed.relative_to(ROOT)}")
+            if not same:
+                committed_text = committed.read_text(encoding="utf-8").splitlines(keepends=True) if committed.is_file() else []
+                fresh_text = fresh.read_text(encoding="utf-8").splitlines(keepends=True)
+                diff = difflib.unified_diff(
+                    committed_text,
+                    fresh_text,
+                    fromfile=str(committed.relative_to(ROOT)),
+                    tofile=f"generated/{fresh.name}",
+                    n=3,
+                )
+                for index, line in enumerate(diff):
+                    if index >= 200:
+                        print("... DIFF_TRUNCATED ...")
+                        break
+                    print(line, end="")
     print("PYTHON_LOCKS_REPRODUCIBLE_OK" if ok else "PYTHON_LOCKS_REPRODUCIBLE_FAILED")
     return 0 if ok else 1
 
