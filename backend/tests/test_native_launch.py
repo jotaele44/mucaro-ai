@@ -58,6 +58,8 @@ def test_source_app_is_bound_to_silent_launcher_and_can_move_with_checkout(tmp_p
     shutil.copytree(ROOT / "Mucaro AI Setup.app", app)
     info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
     assert info["CFBundlePackageType"] == "APPL"
+    assert info["CFBundleName"] == "Mucaro AI Setup"
+    assert info["CFBundleDisplayName"] == "Mucaro AI Setup"
     assert info["CFBundleIdentifier"] == "ai.mucaro.source-launcher"
     exe = app / "Contents/MacOS" / info["CFBundleExecutable"]
     assert os.access(exe, os.X_OK)
