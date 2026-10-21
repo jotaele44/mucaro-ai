@@ -14,6 +14,8 @@ from backend.app.model_router import ModelProviderError, generate_answer, model_
 from backend.app.model_routing_policy import ModelRoutingError, plan_model_route
 from backend.app.offline import build_offline_manifest
 from backend.app.services import answer_question
+from backend.app.terminal_projection import build_terminal_snapshot
+from backend.app.terminal_ui import render_terminal_snapshot
 from backend.app.work_runs import get_run, list_run_events, submit_message
 from backend.tests.test_api import make_settings
 
@@ -25,6 +27,7 @@ class _FakeOpenAI(BaseHTTPRequestHandler):
 
     requests: list[dict] = []
     reply = "Lineage binds chunks to sources"
+    omit_stream_usage = False
 
     def log_message(self, *args):
         return
@@ -59,11 +62,15 @@ class _FakeOpenAI(BaseHTTPRequestHandler):
             for piece in [text[i:i + 7] for i in range(0, len(text), 7)]:
                 event = {"choices": [{"delta": {"content": piece}}]}
                 self.wfile.write(f"data: {json.dumps(event)}\n\n".encode())
-            usage_event = {
-                "choices": [],
-                "usage": {"prompt_tokens": 14, "completion_tokens": 6, "total_tokens": 20},
-            }
-            self.wfile.write(f"data: {json.dumps(usage_event)}\n\n".encode())
+            if (
+                (payload.get("stream_options") or {}).get("include_usage") is True
+                and not type(self).omit_stream_usage
+            ):
+                usage_event = {
+                    "choices": [],
+                    "usage": {"prompt_tokens": 14, "completion_tokens": 6, "total_tokens": 20},
+                }
+                self.wfile.write(f"data: {json.dumps(usage_event)}\n\n".encode())
             self.wfile.write(b"data: [DONE]\n\n")
             return
         body = json.dumps({
@@ -80,6 +87,7 @@ class _FakeOpenAI(BaseHTTPRequestHandler):
 @pytest.fixture()
 def local_server(monkeypatch):
     _FakeOpenAI.requests = []
+    _FakeOpenAI.omit_stream_usage = False
     server = ThreadingHTTPServer(("127.0.0.1", 0), _FakeOpenAI)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     monkeypatch.setenv("MUCARO_AI_LOCAL_MODEL_URL", f"http://127.0.0.1:{server.server_address[1]}/v1")
@@ -180,8 +188,59 @@ def test_run_streams_local_tokens_live(local_server, cfg):
     assert usage["metrics"]["total_tokens"]["value"] == 20
     assert usage["metrics"]["input_tokens"]["classification"] == "PROVIDER_REPORTED"
     assert usage["metrics"]["remaining_context_tokens"]["value"] == 8192 - 20
+    sent = _FakeOpenAI.requests[-1]
+    assert sent["stream"] is True
+    assert sent["stream_options"] == {"include_usage": True}
+    snapshot = build_terminal_snapshot(conversation_id=conversation, cfg=cfg)
+    assert snapshot["context_usage"] == usage
+    frame = render_terminal_snapshot(snapshot, width=120, height=32, mode="interactive")
+    assert "ctx 20/8192" in frame
     types = [event["type"] for event in events]
     assert types.index("text_delta") < types.index("citation") < types.index("final")
+
+
+def test_streaming_usage_omission_stays_explicitly_unknown(local_server, cfg):
+    _FakeOpenAI.omit_stream_usage = True
+    work_runs.set_execution_mode("inline")
+    try:
+        conversation = create_conversation("local-no-usage", cfg)["conversation_id"]
+        run = submit_message(
+            conversation,
+            "How does source lineage work?",
+            options={"model_provider": "openai_compatible_local"},
+            cfg=cfg,
+        )["run"]
+    finally:
+        work_runs.set_execution_mode("thread")
+
+    completed = get_run(run["run_id"], cfg)
+    assert completed["state"] == "COMPLETED"
+    assert completed["outcome"] == "ANSWERED"
+    sent = _FakeOpenAI.requests[-1]
+    assert sent["stream"] is True
+    assert sent["stream_options"] == {"include_usage": True}
+
+    usage = completed["context_usage"]
+    metrics = usage["metrics"]
+    assert metrics["context_limit_tokens"]["value"] == 8192
+    assert metrics["context_limit_tokens"]["classification"] == "COMPUTED"
+    for key in (
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "effective_input_tokens",
+        "context_consumed_tokens",
+        "remaining_context_tokens",
+        "context_utilization_ratio",
+    ):
+        assert metrics[key]["value"] is None
+        assert metrics[key]["classification"] == "UNKNOWN"
+    assert "WARN_INPUT_TOKENS_UNKNOWN" in usage["warnings"]
+    assert "WARN_OUTPUT_TOKENS_UNKNOWN" in usage["warnings"]
+    snapshot = build_terminal_snapshot(conversation_id=conversation, cfg=cfg)
+    assert snapshot["context_usage"] == usage
+    frame = render_terminal_snapshot(snapshot, width=120, height=32, mode="interactive")
+    assert "ctx ?/8192" in frame
 
 
 # --- MATRIX-012 routing matrix -------------------------------------------------------------
