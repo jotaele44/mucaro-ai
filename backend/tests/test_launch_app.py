@@ -184,7 +184,7 @@ def test_verify_macos_app_bundle_rejects_missing_bundle(tmp_path):
 
 def test_certify_release_large_file_allowlist_is_path_specific_and_bounded(monkeypatch, tmp_path):
     monkeypatch.setattr(certify_release, "ROOT", tmp_path)
-    icon = tmp_path / "Mucaro AI.app" / "Contents" / "Resources" / "MucaroAI.icns"
+    icon = tmp_path / "Mucaro AI Setup.app" / "Contents" / "Resources" / "MucaroAI.icns"
     icon.parent.mkdir(parents=True)
     icon.write_bytes(b"x" * 2_500_000)
 
@@ -194,7 +194,7 @@ def test_certify_release_large_file_allowlist_is_path_specific_and_bounded(monke
     icon.write_bytes(b"x" * 3_000_001)
     gate = certify_release.gate_no_large_files([icon])
     assert gate.status == "FAIL"
-    assert "Mucaro AI.app/Contents/Resources/MucaroAI.icns:3000001" in gate.detail
+    assert "Mucaro AI Setup.app/Contents/Resources/MucaroAI.icns:3000001" in gate.detail
 
     unrelated = tmp_path / "unexpected.bin"
     unrelated.write_bytes(b"x" * 1_000_001)
