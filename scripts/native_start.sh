@@ -37,6 +37,6 @@ wait "${child}"
 code=$?
 trap - TERM INT HUP
 if [ "${code}" -ne 0 ]; then
-  failure_dialog "Mucaro AI could not start (code ${code}). Details are in: ${LOG}. Open Mucaro AI.app again to retry; setup resumes where it stopped."
+  failure_dialog "Mucaro AI could not start (code ${code}). Details are in: ${LOG}. Open Mucaro AI Setup.app again to retry; setup resumes where it stopped."
 fi
 exit "${code}"
