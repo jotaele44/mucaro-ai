@@ -159,9 +159,10 @@ with the conversation-first UI. Method: static reading of all of `frontend/src`,
 then live measurement in Chromium 141 device emulation against a real backend,
 with a small fault-injecting proxy for lost responses, silent streams and
 refused streams. Evidence tiers as above; there is no T3 source. **Not
-observed:** a physical iPhone or Android phone, and WebKit (it is not installed
-in the audit environment, and the hosted runners that would run it are not
-executing jobs, see `BLK-ACTIONS-001`).
+observed:** a physical iPhone or Android phone, or an on-device Safari/WebKit
+session. GitHub-hosted runner admission later recovered
+(`BLK-ACTIONS-001` is RESOLVED); hosted WebKit execution is therefore
+available evidence, but it is not physical-device evidence.
 
 ### Regression ledger: the 2026-09-25 findings against the current UI
 
