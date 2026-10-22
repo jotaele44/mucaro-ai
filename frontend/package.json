@@ -10,9 +10,8 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.1.2",
-    "vite": "7.3.6",
     "react": "19.2.1",
-    "react-dom": "19.2.1"
-  },
-  "devDependencies": {}
+    "react-dom": "19.2.1",
+    "vite": "7.3.7"
+  }
 }

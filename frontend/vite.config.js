@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 // proxied to the local backend so the browser never needs cross-origin access.
 const apiPaths = [
   "/health", "/config", "/security", "/models", "/offline-manifest", "/conversations", "/work-runs", "/interactions",
-  "/tools", "/sources", "/chunks", "/ingest", "/ingest-path", "/permissions", "/memory", "/runs", "/exports",
+  "/tools", "/sources", "/chunks", "/ingest", "/ingest-path", "/permissions", "/memory", "/learning", "/runs", "/exports",
   "/workspaces", "/validate", "/plan", "/approve", "/ask",
 ];
 

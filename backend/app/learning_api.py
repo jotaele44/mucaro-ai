@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import learning
+from . import agent_consumers, learning
 from .config import Settings
 
 
@@ -71,6 +71,41 @@ class Scan(StrictRequest):
     purpose: str = Field(min_length=1, max_length=500)
 
 
+class ConsumerBinding(StrictRequest):
+    agent_id: str
+    candidate_id: str
+    candidate_version: int = Field(ge=1)
+    artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    recipe_id: str
+    approved: bool = False
+
+
+class ConsumerPrepare(StrictRequest):
+    binding_id: str
+    repo_root: str = Field(min_length=1, max_length=2000)
+    head_sha: str = Field(pattern=r"^[0-9a-f]{40}$")
+    base_sha: str = Field(pattern=r"^[0-9a-f]{40}$")
+    file_path: str = Field(min_length=1, max_length=2000)
+    file_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    idempotency_key: str = Field(min_length=1, max_length=200)
+
+
+class ConsumerExecute(Version):
+    plan_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    approved: bool = False
+
+
+class ConsumerStop(Version):
+    reason: str = Field(min_length=1, max_length=5000)
+
+
+class ConsumerReward(StrictRequest):
+    output_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    score: float = Field(ge=-1, le=1, allow_inf_nan=False)
+    criteria: str = Field(min_length=1, max_length=5000)
+    permitted_use: bool = False
+
+
 def router(cfg: Settings, require_auth) -> APIRouter:
     routes = APIRouter(prefix="/learning", dependencies=[Depends(require_auth)])
 
@@ -123,5 +158,33 @@ def router(cfg: Settings, require_auth) -> APIRouter:
     @routes.get("/recommend")
     def recommend(context: str):
         return invoke(learning.recommend, context)
+
+    @routes.get("/consumers")
+    def consumer_listing():
+        return invoke(agent_consumers.listing)
+
+    @routes.post("/consumers/bind")
+    def consumer_binding(req: ConsumerBinding):
+        return invoke(agent_consumers.bind, **req.model_dump())
+
+    @routes.post("/consumers/{binding_id}/revoke")
+    def consumer_revoke(binding_id: str, req: ConsumerStop):
+        return invoke(agent_consumers.unbind, binding_id, **req.model_dump())
+
+    @routes.post("/consumer-runs/prepare")
+    def consumer_prepare(req: ConsumerPrepare):
+        return invoke(agent_consumers.prepare, **req.model_dump())
+
+    @routes.post("/consumer-runs/{run_id}/execute")
+    def consumer_execute(run_id: str, req: ConsumerExecute):
+        return invoke(agent_consumers.execute, run_id, **req.model_dump())
+
+    @routes.post("/consumer-runs/{run_id}/stop")
+    def consumer_stop(run_id: str, req: ConsumerStop):
+        return invoke(agent_consumers.stop, run_id, **req.model_dump())
+
+    @routes.post("/consumer-runs/{run_id}/feedback")
+    def consumer_reward(run_id: str, req: ConsumerReward):
+        return invoke(agent_consumers.reward, run_id, **req.model_dump())
 
     return routes
