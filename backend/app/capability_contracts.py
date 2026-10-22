@@ -2209,6 +2209,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "multi-column fixture preserves reading-order evidence",
                 "accented/mojibake fixture preserves RAW/NORMALIZED/CANONICAL separation",
                 "OCR report contract validator accepts saved image OCR receipts and rejects false span/confidence accounting",
+                "report-bound OCR calibration evaluates complete independently authored span labels and rejects incomplete or mismatched gold evidence",
             ),
             negative_regression_gates=(
                 "blank image returns no-text state without synthesis",

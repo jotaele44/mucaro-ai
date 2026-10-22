@@ -87,6 +87,7 @@ from .gis_eval import (
 )
 from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .ocr_calibration import OCRCalibrationError, evaluate_ocr_calibration_files
 from .ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
 from .ocr_structure import OCRStructureError, reconstruct_ocr_report
 from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
@@ -933,6 +934,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ocr_structure.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     ocr_structure.set_defaults(handler=run_ocr_structure)
+
+    ocr_calibrate = ocr_subcommands.add_parser(
+        "calibrate",
+        help="Evaluate a saved image OCR receipt against independently authored span gold labels.",
+    )
+    ocr_calibrate.add_argument("report_path", help="Path to a saved mucaro_ocr_report_v1 JSON receipt.")
+    ocr_calibrate.add_argument("gold_path", help="Path to MUCARO_OCR_CALIBRATION_GOLD/1.0 JSON labels.")
+    ocr_calibrate.add_argument("--low-threshold", type=float, default=50.0, help="Confidence threshold below which a span is low-confidence.")
+    ocr_calibrate.add_argument("--high-threshold", type=float, default=85.0, help="Confidence threshold at or above which a span is high-confidence.")
+    ocr_calibrate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    ocr_calibrate.set_defaults(handler=run_ocr_calibrate)
 
     flagpole = subcommands.add_parser("flagpole", help="Flagpole evidence tooling bound to exact Git SHAs.")
     flagpole_subcommands = flagpole.add_subparsers(dest="flagpole_command", required=True)
@@ -3504,6 +3516,27 @@ def run_ocr_structure(args: argparse.Namespace, cfg: Settings) -> int:
         return 2
     emit_payload(result, args.format)
     return 0 if result.get("status") != "OCR_STRUCTURE_UNRESOLVED" else 2
+
+
+def run_ocr_calibrate(args: argparse.Namespace, cfg: Settings) -> int:
+    report_path = Path(args.report_path)
+    gold_path = Path(args.gold_path)
+    if not report_path.is_absolute():
+        report_path = cfg.project_root / report_path
+    if not gold_path.is_absolute():
+        gold_path = cfg.project_root / gold_path
+    try:
+        result = evaluate_ocr_calibration_files(
+            report_path,
+            gold_path,
+            low_threshold=args.low_threshold,
+            high_threshold=args.high_threshold,
+        )
+    except OCRCalibrationError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
 
 
 def run_flagpole_inventory_generate(args: argparse.Namespace, cfg: Settings) -> int:

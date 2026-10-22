@@ -85,6 +85,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis map-export-manifest OUTPUT_PATH --layer PATH CRS ...` | Bind an existing map/export artifact to renderer identity, extent, CRS, and source-layer hashes | 0 | 2 |
 | `mucaro gis map-render-validate OUTPUT_PATH` | Decode and independently validate rendered image dimensions, pixel accounting, visible content, and optional manifest binding | 0 | 3 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
+| `mucaro ocr calibrate REPORT_PATH GOLD_PATH` | Evaluate every saved OCR span against independently authored exact-match labels with confidence calibration metrics | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources, persistent index status, and semantic-store status | 0 | 2 |
@@ -321,6 +322,16 @@ span/confidence accounting. It returns `CAPABILITY_OUTPUT_CONTRACT_FAILED` when
 a report omits source or engine proof, claims text without saved spans, misses a
 required no-text or low-confidence warning, or asserts span/confidence counts
 that do not match the saved spans.
+
+Use `mucaro ocr calibrate REPORT_PATH GOLD_PATH` to evaluate a saved image OCR
+receipt against a `MUCARO_OCR_CALIBRATION_GOLD/1.0` JSON file. The gold file
+must bind its `report_sha256` to the exact OCR receipt bytes and provide exactly
+one `expected_text` label for every saved `span_index`. The result reports exact
+normalized-match accuracy, confidence coverage, Brier score, reliability bins,
+low-confidence error rate, and high-confidence precision. This is explicit
+evaluation evidence only: it does not assert semantic equivalence, create gold
+labels, certify representative-corpus accuracy, or change the OCR capability
+state by itself.
 
 Use `mucaro capabilities validate-execution-report REPORT_PATH` to validate a
 saved `skill_runtime` execution event. The validator requires a hash-backed
@@ -649,6 +660,19 @@ approved and audited.
 | `ERROR_OCR_LAYOUT_INVALID` | OCR layout mode was not one of the supported adapter modes |
 | `ERROR_OCR_TIMEOUT` | OCR engine exceeded the configured timeout |
 | `ERROR_OCR_ENGINE_FAILED` | OCR engine exited with a non-zero status |
+| `ERROR_OCR_CALIBRATION_REPORT_READ` | OCR calibration report could not be read as a JSON object |
+| `ERROR_OCR_CALIBRATION_GOLD_READ` | OCR calibration gold file could not be read as a JSON object |
+| `ERROR_OCR_CALIBRATION_REPORT_SCHEMA` | calibration requires a saved image OCR report |
+| `ERROR_OCR_CALIBRATION_GOLD_SCHEMA` | calibration gold schema is unsupported |
+| `ERROR_OCR_CALIBRATION_REPORT_SHA256` | calibration gold labels are not bound to the evaluated OCR receipt bytes |
+| `ERROR_OCR_CALIBRATION_LABELS` | OCR calibration report spans and gold labels are not arrays |
+| `ERROR_OCR_CALIBRATION_SPAN_ID` | OCR report span IDs are invalid or duplicated |
+| `ERROR_OCR_CALIBRATION_LABEL_ID` | gold span IDs are invalid, duplicated, or absent from the report |
+| `ERROR_OCR_CALIBRATION_EXPECTED_TEXT` | a gold label does not contain a string expected_text value |
+| `ERROR_OCR_CALIBRATION_INCOMPLETE` | one or more saved OCR spans lack exactly one gold label |
+| `ERROR_OCR_CALIBRATION_OBSERVED_TEXT` | a saved OCR span does not contain raw text |
+| `ERROR_OCR_CALIBRATION_CONFIDENCE` | a saved OCR confidence is not finite in the 0-100 scale |
+| `ERROR_OCR_CALIBRATION_THRESHOLDS` | calibration thresholds do not satisfy the bounded low/high ordering |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
