@@ -15,7 +15,7 @@ from backend.app.capability_policy import CapabilityPolicy
 from backend.app.config import Settings
 from backend.app.leased_agent_queue import LeasedAgentQueue
 from backend.app.governed_skill_bridge import GovernedSkillBridge
-from backend.app.outbox_budgeted_agent import execute_one_durable_task
+from backend.app.outbox_budgeted_agent import execute_one_durable_task,reconcile_completed_budgeted_task
 from backend.app.bounded_self_propulsion_pilot import execute_next_approved_task
 from backend.app.skill_runtime import (
     SKILL_REGISTRY,mount_skill,activate_skill,list_skill_executions,
@@ -114,6 +114,27 @@ class OutboxBudgetedRealSkillTests(unittest.TestCase):
         # reservation is intentionally retained pending explicit recovery.
         self.assertEqual(self.goals.select("approved")["candidate"]["task_id"],"two")
         self.assertEqual(len(list_skill_executions(self.cfg)["executions"]),1)
+        repaired=reconcile_completed_budgeted_task(
+            reactor=self.goals,bridge=self.bridge,ledger=self.budget,
+            outbox=self.outbox,goal_id="approved",task_id="one")
+        self.assertEqual(repaired["status"],"PASS")
+        self.assertTrue(repaired["reconciled_without_execution"])
+        self.assertEqual(self.budget.summary("approved")["reserved_units"],0)
+        self.assertEqual(self.budget.summary("approved")["spent_units"],1)
+        self.assertEqual(self.outbox.reconcile(intent)["status"],"VERIFIED")
+        again=reconcile_completed_budgeted_task(
+            reactor=self.goals,bridge=self.bridge,ledger=self.budget,
+            outbox=self.outbox,goal_id="approved",task_id="one")
+        self.assertEqual(again["status"],"PASS")
+        self.assertEqual(self.budget.summary("approved")["spent_units"],1)
+        self.assertEqual(len(list_skill_executions(self.cfg)["executions"]),1)
+
+    def test_unfinished_task_cannot_be_settled_as_complete(self):
+        outcome=reconcile_completed_budgeted_task(
+            reactor=self.goals,bridge=self.bridge,ledger=self.budget,
+            outbox=self.outbox,goal_id="approved",task_id="one")
+        self.assertEqual(outcome["status"],"OPEN")
+        self.assertEqual(self.budget.summary("approved")["spent_units"],0)
 
     def test_ambiguous_dispatch_does_not_retry(self):
         with patch("backend.app.outbox_budgeted_agent.execute_next_approved_task",
