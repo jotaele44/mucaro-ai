@@ -27,6 +27,8 @@ GOVERNED_CRS_GRID_MANIFEST_SHA256 = "3d49d0bb364be9f41879ef3e74aa6766131ccb13ea6
 GOVERNED_CRS_GRID_SHA256 = "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d"
 GOVERNED_CRS_GRID_BYTES = 3644
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_SHA40_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+_IMAGE_DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -1813,6 +1815,154 @@ def validate_web_snapshot_file(path: Path) -> dict[str, Any]:
     return validate_web_snapshot_contract(report if isinstance(report, dict) else {}, report_path=str(path))
 
 
+def _stable_contract_hash(payload: Any) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def validate_coding_output_contract(report: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
+    """Validate the denominator, identity, and residue closure of a coding report."""
+    checks: list[dict[str, str]] = [
+        _contract_check("payload_object", isinstance(report, dict), "coding report must be a JSON object"),
+        _contract_check("schema_version", isinstance(report, dict) and report.get("schema_version") == "mucaro-coding-certification/1.0", "coding report schema version is invalid"),
+        _contract_check("status", isinstance(report, dict) and report.get("status") in {"CODING_CERTIFICATION_READY", "CODING_CERTIFICATION_PROVISIONAL", "CODING_CERTIFICATION_FAILED", "CODING_CERTIFICATION_BLOCKED"}, "coding report status is invalid"),
+        _contract_check("certification_ready", isinstance(report, dict) and isinstance(report.get("certification_ready"), bool), "certification_ready must be boolean"),
+        _contract_check("manifest_object", isinstance(report, dict) and isinstance(report.get("manifest"), dict), "manifest identity is required"),
+        _contract_check("identity_object", isinstance(report, dict) and isinstance(report.get("identity"), dict), "coding runtime identity is required"),
+        _contract_check("state_counts_object", isinstance(report, dict) and isinstance(report.get("state_counts"), dict), "state_counts is required"),
+        _contract_check("rows_array", isinstance(report, dict) and isinstance(report.get("rows"), list), "coding evidence rows are required"),
+        _contract_check("invariants_object", isinstance(report, dict) and isinstance(report.get("invariants"), dict), "coding invariants are required"),
+        _contract_check("falsification_criteria", isinstance(report, dict) and isinstance(report.get("falsification_criteria"), list) and all(isinstance(item, str) and item for item in report["falsification_criteria"]), "falsification criteria must be non-empty strings"),
+    ]
+    if not isinstance(report, dict):
+        report = {}
+    manifest = report.get("manifest") if isinstance(report.get("manifest"), dict) else {}
+    checks.extend(
+        [
+            _contract_check("manifest.sha256", isinstance(manifest.get("sha256"), str) and bool(_SHA256_PATTERN.fullmatch(manifest["sha256"])), "manifest SHA-256 is required"),
+            _contract_check("manifest.path", isinstance(manifest.get("path"), str) and bool(manifest["path"]), "manifest path is required"),
+            _contract_check("manifest.schema_version", isinstance(manifest.get("schema_version"), str) and bool(manifest["schema_version"]), "manifest schema version is required"),
+            _contract_check("manifest.requirement_count", isinstance(manifest.get("requirement_count"), int) and manifest["requirement_count"] > 0, "manifest requirement count must be positive"),
+        ]
+    )
+    identity = report.get("identity") if isinstance(report.get("identity"), dict) else {}
+    source_head = identity.get("source_head_sha")
+    runtime_sha = identity.get("runtime_identity_sha256")
+    image_digest = identity.get("coding_image_digest")
+    source_valid = isinstance(source_head, str) and bool(_SHA40_PATTERN.fullmatch(source_head))
+    runtime_valid = isinstance(runtime_sha, str) and bool(_SHA256_PATTERN.fullmatch(runtime_sha))
+    image_valid = isinstance(image_digest, str) and bool(_IMAGE_DIGEST_PATTERN.fullmatch(image_digest))
+    checks.extend(
+        [
+            _contract_check("identity.source_shape", source_head is None or source_valid, "source HEAD must be a lowercase 40-character SHA-1 or null"),
+            _contract_check("identity.runtime_shape", runtime_sha is None or runtime_valid, "runtime identity must be a lowercase SHA-256 or null"),
+            _contract_check("identity.image_shape", image_digest is None or image_valid, "coding image identity must be sha256:<64 lowercase hex> or null"),
+            _contract_check("identity.source_valid_flag", identity.get("source_identity_valid") is source_valid, "source identity flag must match the source HEAD shape"),
+            _contract_check("identity.runtime_valid_flag", identity.get("runtime_identity_valid") is runtime_valid, "runtime identity flag must match the runtime hash shape"),
+            _contract_check("identity.image_valid_flag", identity.get("image_identity_valid") is image_valid, "image identity flag must match the image digest shape"),
+            _contract_check("identity.closed", identity.get("identity_closed") is (source_valid and runtime_valid and image_valid), "identity closure must match all identity fields"),
+        ]
+    )
+    state_counts = report.get("state_counts") if isinstance(report.get("state_counts"), dict) else {}
+    expected_states = ("PASS", "FAIL", "BLOCKED", "UNRESOLVED")
+    checks.append(_contract_check("state_counts.keys", set(state_counts) == set(expected_states), "state_counts must cover the exact coding state codebook"))
+    counts_valid = all(isinstance(state_counts.get(state), int) and not isinstance(state_counts.get(state), bool) and state_counts[state] >= 0 for state in expected_states)
+    checks.append(_contract_check("state_counts.values", counts_valid, "state counts must be non-negative integers"))
+    rows = report.get("rows") if isinstance(report.get("rows"), list) else []
+    if counts_valid:
+        checks.append(_contract_check("row_accounting", isinstance(report.get("row_count"), int) and report["row_count"] == len(rows) == sum(state_counts.values()), "coding row arithmetic must close"))
+    seen_requirement_ids: set[str] = set()
+    for index, row in enumerate(rows):
+        prefix = f"rows.{index}"
+        checks.extend(
+            [
+                _contract_check(f"{prefix}.object", isinstance(row, dict), "coding evidence row must be an object"),
+                _contract_check(f"{prefix}.requirement_id", isinstance(row, dict) and isinstance(row.get("requirement_id"), str) and bool(row["requirement_id"]), "requirement_id is required"),
+                _contract_check(f"{prefix}.state", isinstance(row, dict) and row.get("state") in set(expected_states), "coding evidence state is invalid"),
+                _contract_check(f"{prefix}.evidence", isinstance(row, dict) and isinstance(row.get("evidence"), list) and all(isinstance(item, str) and item for item in row["evidence"]), "evidence must be non-empty strings"),
+                _contract_check(f"{prefix}.evidence_sha256", isinstance(row, dict) and isinstance(row.get("evidence_sha256"), str) and bool(_SHA256_PATTERN.fullmatch(row["evidence_sha256"])), "evidence_sha256 is required"),
+            ]
+        )
+        if not isinstance(row, dict):
+            continue
+        requirement_id = row.get("requirement_id")
+        if isinstance(requirement_id, str):
+            checks.append(_contract_check(f"{prefix}.requirement_id_unique", requirement_id not in seen_requirement_ids, "requirement IDs must be unique"))
+            seen_requirement_ids.add(requirement_id)
+        evidence = row.get("evidence")
+        if isinstance(evidence, list):
+            checks.append(_contract_check(f"{prefix}.evidence_hash_matches", row.get("evidence_sha256") == _stable_contract_hash(evidence), "evidence_sha256 must match canonical evidence rows"))
+            if row.get("state") == "PASS":
+                checks.append(_contract_check(f"{prefix}.pass_has_evidence", bool(evidence), "PASS rows require evidence"))
+    checks.append(_contract_check("manifest.row_count", manifest.get("requirement_count") == len(rows), "manifest requirement count must match evidence rows"))
+    residue = report.get("material_residue") if isinstance(report.get("material_residue"), list) else []
+    identity_residue = report.get("identity_residue") if isinstance(report.get("identity_residue"), list) else []
+    checks.extend(
+        [
+            _contract_check("residue.count", report.get("material_residue_count") == len(residue) + len(identity_residue), "material residue count must close"),
+            _contract_check("residue.identity", identity_residue == ([name for name, valid in (("SOURCE_HEAD_IDENTITY", source_valid), ("RUNTIME_IDENTITY", runtime_valid), ("CODING_IMAGE_IDENTITY", image_valid)) if not valid]), "identity residue must enumerate every missing identity"),
+            _contract_check("statement.allowed_flag", isinstance(report.get("certification_statement_allowed"), bool) and report["certification_statement_allowed"] is report.get("certification_ready"), "certification statement permission must match certification_ready"),
+            _contract_check("statement.text", report.get("allowed_certification_statement") == ("MUCARO AI CODING PLANE CERTIFIED" if report.get("certification_ready") else None), "certification statement must be withheld unless ready"),
+        ]
+    )
+    invariants = report.get("invariants") if isinstance(report.get("invariants"), dict) else {}
+    checks.append(_contract_check("invariants.all_true", bool(invariants) and all(isinstance(value, bool) and value for value in invariants.values()), "coding invariants must all be explicit true"))
+    status = report.get("status")
+    expected_status = "CODING_CERTIFICATION_READY" if report.get("certification_ready") else (
+        "CODING_CERTIFICATION_FAILED" if state_counts.get("FAIL", 0) else "CODING_CERTIFICATION_BLOCKED" if state_counts.get("BLOCKED", 0) else "CODING_CERTIFICATION_PROVISIONAL"
+    )
+    checks.append(_contract_check("status_consistent", status == expected_status, "coding status must match state and certification readiness"))
+    report_hash = report.get("report_sha256")
+    hash_payload = dict(report)
+    hash_payload.pop("report_sha256", None)
+    checks.append(_contract_check("report_sha256", isinstance(report_hash, str) and bool(_SHA256_PATTERN.fullmatch(report_hash)) and report_hash == _stable_contract_hash(hash_payload), "report_sha256 must match the canonical report payload"))
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": CAPABILITY_OUTPUT_CONTRACT_OK if not failed else CAPABILITY_OUTPUT_CONTRACT_FAILED,
+        "schema_version": "mucaro_capability_output_contract_v1",
+        "capability_id": "transparency_objectivity_governance",
+        "report_path": report_path,
+        "report_status": status,
+        "operation": "coding_certification_integrity",
+        "checks": checks,
+        "counts": {
+            "pass": sum(1 for check in checks if check["status"] == "PASS"),
+            "fail": len(failed),
+            "total": len(checks),
+        },
+        "failed_checks": failed,
+    }
+
+
+def validate_coding_output_file(path: Path) -> dict[str, Any]:
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        failed_check = _contract_check("report_file_exists", False, f"coding report not found: {path}")
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "transparency_objectivity_governance",
+            "report_path": str(path),
+            "operation": "coding_certification_integrity",
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    except json.JSONDecodeError as exc:
+        failed_check = _contract_check("report_json_valid", False, str(exc))
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "transparency_objectivity_governance",
+            "report_path": str(path),
+            "operation": "coding_certification_integrity",
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    return validate_coding_output_contract(report if isinstance(report, dict) else {}, report_path=str(path))
+
+
 def list_advanced_capability_contracts() -> list[dict[str, Any]]:
     contracts = [
         CapabilityContract(
@@ -2233,6 +2383,14 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "parser_trace",
                 "parser_warnings",
                 "retrieval_utc",
+                "coding_manifest_sha256",
+                "coding_requirement_id",
+                "coding_state",
+                "coding_evidence_sha256",
+                "coding_source_head_sha",
+                "coding_runtime_identity_sha256",
+                "coding_image_digest",
+                "coding_report_sha256",
             ),
             invariants=(
                 "FACT, COMPUTED, BINDING, INFERENCE, ASSUMPTION, HYPOTHESIS, and UNKNOWN remain distinct",
@@ -2243,6 +2401,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "failed skill executions preserve a SOURCE to RECEIPT failure lineage",
                 "retrieval outputs preserve unique chunk/source IDs, strategy, scores, and ranked order",
                 "web snapshots preserve URL/redirect, robots, cache, HTTP-error, byte-hash, and parser evidence",
+                "coding certification reports close requirement states, evidence hashes, runtime identities, residue, and report hash",
             ),
             positive_regression_gates=(
                 "conflicting evidence fixture preserves both observations",
@@ -2258,6 +2417,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "malformed artifact hashes and broken parent links are rejected",
                 "duplicate retrieval IDs, mixed strategies, malformed scores, and score-order contradictions are rejected",
                 "web snapshots with tampered bytes, unsafe reuse policy, malformed URLs, or inconsistent HTTP-error state are rejected",
+                "coding reports with duplicate requirements, false identity flags, broken evidence hashes, residue arithmetic, or mutated report hashes are rejected",
             ),
             output_requirements=(
                 "evidence taxonomy",

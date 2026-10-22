@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import json
 
 from backend.app.capability_contracts import (
     CAPABILITY_CONTRACT_SCHEMA_VERSION,
@@ -9,6 +10,7 @@ from backend.app.capability_contracts import (
     validate_execution_lineage_contract,
     validate_gis_report_contract,
     validate_ocr_report_contract,
+    validate_coding_output_contract,
     validate_retrieval_output_contract,
     validate_web_snapshot_contract,
 )
@@ -256,6 +258,56 @@ def test_validate_web_snapshot_contract_rejects_tampered_bytes_and_reuse_policy(
     assert "content_size_matches_bytes" in failed_names
     assert "content_hash_matches_bytes" in failed_names
     assert "cache_policy.reuse_disabled" in failed_names
+
+
+def _coding_report() -> dict:
+    evidence = ["receipt:code-r01"]
+    evidence_hash = hashlib.sha256(json.dumps(evidence, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+    report = {
+        "schema_version": "mucaro-coding-certification/1.0",
+        "status": "CODING_CERTIFICATION_READY",
+        "certification_ready": True,
+        "manifest": {"path": "_architecture/coding_regression_manifest.json", "sha256": "a" * 64, "schema_version": "MUCARO_CODING_REGRESSION/1.1", "requirement_count": 1},
+        "identity": {
+            "source_head_sha": "b" * 40,
+            "runtime_identity_sha256": "c" * 64,
+            "coding_image_digest": "sha256:" + "d" * 64,
+            "source_identity_valid": True,
+            "runtime_identity_valid": True,
+            "image_identity_valid": True,
+            "identity_closed": True,
+        },
+        "state_counts": {"PASS": 1, "FAIL": 0, "BLOCKED": 0, "UNRESOLVED": 0},
+        "row_count": 1,
+        "rows": [{"requirement_id": "CODE-R01", "class": "positive", "gate": "discovery", "state": "PASS", "evidence": evidence, "detail": None, "evidence_sha256": evidence_hash}],
+        "material_residue_count": 0,
+        "material_residue": [],
+        "identity_residue": [],
+        "invariants": {"row_accounting_closed": True, "manifest_identity_frozen": True, "no_unknown_requirements": True, "every_requirement_has_terminal_state": True, "pass_requires_evidence": True, "certification_requires_all_pass": True, "certification_requires_identity_closure": True},
+        "certification_statement_allowed": True,
+        "allowed_certification_statement": "MUCARO AI CODING PLANE CERTIFIED",
+        "falsification_criteria": ["reject residue"],
+    }
+    report["report_sha256"] = hashlib.sha256(json.dumps(report, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+    return report
+
+
+def test_validate_coding_output_contract_accepts_closed_report():
+    result = validate_coding_output_contract(_coding_report())
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
+    assert result["operation"] == "coding_certification_integrity"
+
+
+def test_validate_coding_output_contract_rejects_mutated_report_hash_and_identity():
+    report = _coding_report()
+    report["identity"]["identity_closed"] = False
+    result = validate_coding_output_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    failed_names = {check["name"] for check in result["failed_checks"]}
+    assert "identity.closed" in failed_names
+    assert "report_sha256" in failed_names
 
 
 def test_validate_gis_report_contract_accepts_measurement_receipts():

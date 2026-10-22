@@ -10,6 +10,7 @@ import pytest
 import backend.app.cli as cli
 import backend.app.packaging as packaging
 from backend.app.cli import main
+from backend.app.coding_certification import build_coding_certification_report
 from backend.app.config import Settings
 from backend.app.release_receipts import write_release_receipt
 from backend.app.retrieval_eval import build_retrieval_eval_report
@@ -558,6 +559,30 @@ def test_cli_capabilities_validate_web_snapshot(tmp_path: Path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
     assert payload["operation"] == "web_snapshot_integrity"
+
+
+def test_cli_capabilities_validate_coding_report(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    arch = tmp_path / "_architecture"
+    arch.mkdir()
+    (arch / "coding_regression_manifest.json").write_text(
+        json.dumps({"schema_version": "MUCARO_CODING_REGRESSION/1.1", "requirements": [{"id": "CODE-R01", "class": "positive", "gate": "discovery"}]}),
+        encoding="utf-8",
+    )
+    report = build_coding_certification_report(
+        [{"requirement_id": "CODE-R01", "state": "PASS", "evidence": ["receipt:code-r01"]}],
+        source_head_sha="a" * 40,
+        runtime_identity_sha256="b" * 64,
+        coding_image_digest="sha256:" + "c" * 64,
+        cfg=cfg,
+    )
+    path = tmp_path / "coding.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-coding-report", str(path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["operation"] == "coding_certification_integrity"
 
 
 def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Path, capsys):

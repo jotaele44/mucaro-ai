@@ -57,6 +57,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro capabilities validate-execution-report REPORT_PATH` | Validate a saved skill execution artifact-lineage receipt against the transparency contract | 0 | 2 |
 | `mucaro capabilities validate-retrieval-output REPORT_PATH` | Validate a saved retrieval result for ranked chunk/source integrity | 0 | 2 |
 | `mucaro capabilities validate-web-snapshot SNAPSHOT_PATH` | Validate a saved governed web snapshot for byte, policy, and parser integrity | 0 | 2 |
+| `mucaro capabilities validate-coding-report REPORT_PATH` | Validate a saved coding certification report for denominator, identity, and residue integrity | 0 | 2 |
 | `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry/topology receipt | 0 | 2 |
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
@@ -985,6 +986,13 @@ enforces immutable snapshot-only cache policy, checks HTTP-error citation state,
 and validates parser trace accounting. It does not claim source authority,
 semantic page correctness, rendered-browser fidelity, or claim support; those
 remain separate evidence gates.
+
+Use `mucaro capabilities validate-coding-report REPORT_PATH` to validate a
+coding certification report. It checks manifest-bound requirement arithmetic,
+unique states and evidence hashes, source/runtime/pinned-image identity flags,
+residue closure, certification-statement gating, explicit invariants, and the
+report self-hash. A structurally valid report with unresolved or blocked coding
+execution remains non-certifying.
 
 Use `mucaro eval retrieval` to run the committed retrieval-quality fixture from
 the supported CLI surface. The command reports the fixture path, chunk/query
