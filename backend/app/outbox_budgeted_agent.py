@@ -103,3 +103,52 @@ def execute_one_durable_task(*, reactor: GoalReactor, bridge: GovernedSkillBridg
                 "task_id":task_id,"reservation_status":"RETAINED"}
     return {**outcome,"outbox_intent_id":intent_id,
             "budget_reservation_id":reservation_id,"budget_units_type":"DECLARED"}
+
+def reconcile_completed_budgeted_task(*, reactor: GoalReactor,
+                                      bridge: GovernedSkillBridge,
+                                      ledger: AggregateBudgetLedger,
+                                      outbox: DurableDispatchOutbox,
+                                      goal_id: str, task_id: str) -> dict:
+    """Reconcile an ALREADY completed task; NEVER invoke an executor."""
+    row=reactor.db.execute(
+        "SELECT state,source_digest,skill_id,cost,result_digest FROM tasks "
+        "WHERE goal_id=? AND task_id=?",(goal_id,task_id)).fetchone()
+    if not row:
+        return {"status":"BLOCKED","reason":"TASK_NOT_FOUND"}
+    state,binding,skill_id,units,goal_receipt=row
+    if state!="PASS" or not goal_receipt:
+        return {"status":"OPEN","reason":"GOAL_NOT_PROVEN_COMPLETE"}
+    try:
+        bridge._authorize(skill_id)
+    except Exception:
+        return {"status":"BLOCKED","reason":"SKILL_AUTHORITY_NOT_CURRENT"}
+    if reactor.summary(goal_id)["goal"][1]!=bridge.policy_digest:
+        return {"status":"BLOCKED","reason":"POLICY_IDENTITY_CONFLICT"}
+    completion=bridge.queue.verified_completion(task_id)
+    task_run_id=digest(["goal-task",goal_id,task_id])
+    if (not completion or completion["run_id"]!=task_run_id or
+        completion["phase"]!="EXECUTE" or completion["input_digest"]!=binding or
+        completion["policy_digest"]!=bridge.policy_digest or
+        completion["output_digest"]!=goal_receipt):
+        return {"status":"BLOCKED","reason":"WORKER_OR_GOAL_EVIDENCE_CONFLICT"}
+    action=_action_identity(goal_id=goal_id,task_id=task_id,
+                            binding=binding,policy_digest=bridge.policy_digest)
+    reservation_id=digest(["budget-reservation",goal_id,task_id])
+    intent_id=digest(["dispatch-intent",goal_id,task_id])
+    key=digest(["idempotency",action])
+    try:
+        journal=outbox.reconcile(intent_id)
+        if (journal["action_digest"]!=action or
+            journal["policy_digest"]!=bridge.policy_digest or
+            journal["reservation_id"]!=reservation_id or
+            journal["idempotency_key"]!=key):
+            return {"status":"BLOCKED","reason":"OUTBOX_IDENTITY_CONFLICT"}
+        if journal["status"]=="VERIFIED" and journal["result_digest"]!=goal_receipt:
+            return {"status":"BLOCKED","reason":"OUTBOX_RESULT_CONTRADICTION"}
+        outbox.record_verified_effect(intent_id=intent_id,action_digest=action,
+             result_digest=goal_receipt,idempotency_key=key)
+        ledger.settle(reservation_id,actual_units=units,action_digest=action)
+    except (BudgetGateError,OutboxGateError) as error:
+        return {"status":"BLOCKED","reason":type(error).__name__+":"+str(error)}
+    return {"status":"PASS","task_id":task_id,"reconciled_without_execution":True,
+            "result_digest":goal_receipt}
