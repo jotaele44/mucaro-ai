@@ -451,6 +451,24 @@ def test_source_artifact_extracts_expected_archive_root(tmp_path):
     assert (source_dir / "README.md").read_text(encoding="utf-8") == "# Mucaro AI\n"
 
 
+def test_source_artifact_restores_executable_member_mode(tmp_path):
+    archive_path = tmp_path / "source.zip"
+    info = certify_source_artifact.zipfile.ZipInfo("mucaro-ai-0.1.23/scripts/native_start.sh")
+    info.external_attr = 0o100755 << 16
+    with certify_source_artifact.zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(info, "#!/bin/bash\n")
+    manifest = {
+        "package_name": "mucaro-ai",
+        "version": "0.1.23",
+        "archive_path": str(archive_path),
+    }
+
+    source_dir = certify_source_artifact.extract_source_archive(manifest, tmp_path / "extract")
+
+    launcher = source_dir / "scripts/native_start.sh"
+    assert launcher.stat().st_mode & 0o111 == 0o111
+
+
 def test_source_artifact_rejects_unexpected_archive_root(tmp_path):
     archive_path = tmp_path / "source.zip"
     with certify_source_artifact.zipfile.ZipFile(archive_path, "w") as archive:

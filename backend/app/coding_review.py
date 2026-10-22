@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+from .capability_contracts import build_evidence_contract
 from .coding_workspace import CodingWorkspaceError, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
 
@@ -99,6 +100,26 @@ def build_code_review_report(
             "reject invalid or out-of-range line evidence",
             "reject review evidence that cannot bind to a current source SHA-256",
         ],
+        "evidence_contract": build_evidence_contract(
+            claim_type="COMPUTED",
+            evidence_type="CURRENT_DIFF_REVIEW",
+            source_identity_type="CHANGED_PATH_PLUS_SOURCE_SHA256",
+            confidence="BOUNDED_REVIEW",
+            uncertainty_state="BOUNDED",
+            contradiction_state="NOT_ADJUDICATED",
+            verification_method="inspect current Git diff and bind every finding to a current source excerpt hash",
+            limitations=[
+                "A review report is limited to the preserved changed and untracked text-file candidate set.",
+                "No findings is not proof that no defects exist.",
+                "Deleted, binary, non-UTF8, and runtime-only behavior require separate evidence adapters.",
+            ],
+            falsification_criteria=[
+                "reject findings outside the current changed/untracked path set",
+                "reject line evidence outside the current source file",
+                "reject an excerpt whose SHA-256 does not match the saved excerpt",
+                "reject a review result whose changed-source invariants do not close",
+            ],
+        ),
     }
 
 

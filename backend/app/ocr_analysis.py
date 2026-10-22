@@ -3,13 +3,15 @@ from __future__ import annotations
 import csv
 import hashlib
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .config import Settings, settings
 from .local_tools import resolve_tool_request
 from .multimodal import IMAGE_SUFFIXES, parse_multimodal_metadata
+from .ocr_layout import calibrate_confidence, derive_layout_receipt
 from .permission_engine import PermissionEngineError, PermissionRequest, require
 from .utils import stable_id, utc_now, write_json
 
@@ -189,6 +191,12 @@ def analyze_image_ocr(
         detail = (completed.stderr or completed.stdout or "OCR engine failed.").strip()
         raise OCRAnalysisError("ERROR_OCR_ENGINE_FAILED", detail)
     spans = _parse_tsv(completed.stdout)
+    layout_receipt = derive_layout_receipt(spans)
+    confidence_receipt = calibrate_confidence(
+        spans,
+        low_threshold=LOW_CONFIDENCE_THRESHOLD,
+        high_threshold=HIGH_CONFIDENCE_THRESHOLD,
+    )
     raw_text = "\n".join(span["raw_text"] for span in spans)
     normalized_text = "\n".join(span["normalized_text"] for span in spans)
     low_confidence_count = sum(1 for span in spans if span["confidence_state"] == "LOW")
@@ -243,12 +251,16 @@ def analyze_image_ocr(
             "unknown_confidence_count": unknown_confidence_count,
             "empty_text_state": not spans,
             "bounding_boxes_have_source_coordinates": all(bool(span["bbox"]) for span in spans),
+            "layout_span_accounting_closed": layout_receipt["invariants"]["span_accounting_closed"],
+            "confidence_span_accounting_closed": confidence_receipt["invariants"]["span_accounting_closed"],
         },
+        "layout": layout_receipt,
+        "confidence": confidence_receipt,
         "warnings": warnings,
         "limitations": [
-            "local OCR currently supports image files only, not PDF page rendering or document containers",
-            "layout evidence is word/span level and does not reconstruct tables, forms, handwriting, or reading order beyond engine output",
-            "confidence values are engine-reported and require corpus calibration before broad document-intelligence claims",
+            "local image OCR is backed by a Tesseract engine; PDF/page orchestration is reported separately",
+            "layout evidence is grouped by engine page/block/paragraph/line/word fields and does not establish semantic table, form, or handwriting identity",
+            "confidence values are engine-reported threshold classifications and require a labeled corpus before broad accuracy claims",
         ],
         "falsification_criteria": [
             "reject the OCR report if span_count does not equal the number of saved spans",

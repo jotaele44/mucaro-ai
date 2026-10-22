@@ -39,15 +39,11 @@ def completed(stdout: str = "", stderr: str = "", returncode: int = 0) -> subpro
 def test_analyze_image_ocr_preserves_text_confidence_layout_and_receipt(tmp_path: Path):
     cfg = make_settings(tmp_path)
     image = write_image(tmp_path / "scan.png")
-    tsv = "\n".join(
-        [
-            "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext",
-            "5\t1\t1\t1\t1\t1\t10\t20\t30\t12\t96.4\tMucaro",
-            "5\t1\t1\t1\t1\t2\tbad\t25\t18\t12\t42\tAI",
-            "5\t1\t1\t1\t1\t3\t50\t25\t18\t12\t-1\t",
-            "5\t2\t1\t1\t1\t1\t5\t6\t7\t8\tnan?\tTrace",
-        ]
-    )
+    tsv = """level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext
+5\t1\t1\t1\t1\t1\t10\t20\t30\t12\t96.4\tMucaro
+5\t1\t1\t1\t1\t2\tbad\t25\t18\t12\t42\tAI
+5\t1\t1\t1\t1\t3\t50\t25\t18\t12\t-1\t
+5\t2\t1\t1\t1\t1\t5\t6\t7\t8\tnan?\tTrace"""
     calls: list[list[str]] = []
 
     def fake_runner(command: list[str], timeout_seconds: int) -> subprocess.CompletedProcess[str]:
@@ -80,6 +76,10 @@ def test_analyze_image_ocr_preserves_text_confidence_layout_and_receipt(tmp_path
     assert result["invariants"]["span_count"] == 3
     assert result["invariants"]["low_confidence_count"] == 1
     assert result["invariants"]["unknown_confidence_count"] == 1
+    assert result["invariants"]["layout_span_accounting_closed"] is True
+    assert result["invariants"]["confidence_span_accounting_closed"] is True
+    assert result["layout"]["reading_order_span_indices"] == [0, 1, 2]
+    assert result["confidence"]["counts"] == {"LOW": 1, "MEDIUM": 0, "HIGH": 1, "UNKNOWN": 1}
     assert result["spans"][0]["confidence_state"] == "HIGH"
     assert result["spans"][1]["confidence_state"] == "LOW"
     assert result["spans"][1]["bbox"]["x"] == 0
@@ -108,6 +108,8 @@ def test_analyze_image_ocr_records_no_text_without_synthesis(tmp_path: Path):
     assert result["text"] == {"raw": "", "normalized": "", "canonical": ""}
     assert result["spans"] == []
     assert result["invariants"]["empty_text_state"] is True
+    assert result["layout"]["invariants"]["span_accounting_closed"] is True
+    assert result["confidence"]["invariants"]["span_accounting_closed"] is True
     assert result["warnings"] == ["OCR_NO_TEXT_DETECTED"]
 
 

@@ -79,7 +79,12 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis derive-d8-flow RASTER_PATH --elevation-units meters` | Derive four-band D8 candidates, accumulation, contributing area, and explicit terminal-state output on a bounded projected-metre grid | 0 | 2 |
 | `mucaro gis validate-corpus MANIFEST_PATH` | Validate frozen authoritative GIS corpus bytes, provenance, explicit asset types, vector identities/geometries, and raster grids/value accounting | 0 | 2 |
 | `mucaro gis map-export-manifest OUTPUT_PATH --layer PATH CRS ...` | Bind an existing map/export artifact to renderer identity, extent, CRS, and source-layer hashes | 0 | 2 |
+| `mucaro gis map-render-validate OUTPUT_PATH` | Decode and independently validate rendered image dimensions, pixel accounting, visible content, and optional manifest binding | 0 | 3 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
+| `mucaro capabilities validate-web-snapshot SNAPSHOT_PATH` | Validate frozen web bytes, URL policy metadata, parser evidence, cache/robots posture, and the shared evidence contract | 0 | 2 |
+| `mucaro capabilities validate-web-session SESSION_PATH` | Validate operator-selected browsing decisions, fetch accounting, replay arguments, and the shared evidence contract | 0 | 2 |
+| `mucaro capabilities validate-answer-trace TRACE_PATH` | Validate cited chunk closure, citation order, web citation metadata, and the shared evidence contract | 0 | 2 |
+| `mucaro capabilities validate-coding-review REVIEW_PATH` | Validate changed-path, line, source-hash, excerpt-hash, and evidence-contract closure for a coding review | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources, persistent index status, and semantic-store status | 0 | 2 |
@@ -284,6 +289,13 @@ Numeric zero, NODATA, outside, null/empty, and unresolved states remain distinct
 non-empty artifact to its output hash, extent, CRS, renderer name/version, and
 one or more source-layer hashes plus declared CRS. This proves artifact
 provenance, not visual correctness.
+
+`mucaro gis map-render-validate` is a separate image-level gate. It verifies
+that the artifact decodes, has bounded positive dimensions, closes visible and
+transparent pixel accounting, and contains nonuniform visible content. Use
+`--manifest` to require output hash and path identity against a saved
+`GIS_MAP_EXPORT_MANIFEST_OK` receipt. This does not prove layer semantics,
+projection correctness, label legibility, or cartographic accessibility.
 
 OCR analysis is intentionally separate from ingestion. `mucaro ocr analyze
 IMAGE_PATH` runs a local Tesseract engine against one image, preserves the
@@ -979,8 +991,10 @@ longitude/latitude residue, a frozen real USGS 3DEP raster manifestation,
 bounded projected-metre slope/aspect controls, terrain-lineage-bound hillshade,
 bounded priority-flood depression conditioning with explicit depth and volume
 accounting, and bounded D8 flow direction/accumulation with explicit terminal
-ambiguity. The current committed denominator is 64 cases across 25 operations,
-including 26 fail-closed negative cases.
+ambiguity, plus projected-planar fractional-coverage zonal statistics with
+closed coverage areas and weighted summaries. The current committed denominator
+is 67 cases across 25 operations, including 27 fail-closed negative cases and
+paired fractional-coverage controls.
 It returns `GIS_EVAL_OK` only when the fixture and every case pass;
 `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives automation a hard
 regression signal.
@@ -1185,6 +1199,20 @@ replay receipt under `data/exports/web_browse_sessions`.
 After reviewing a saved snapshot, use
 `mucaro sources ingest-web-snapshot SNAPSHOT_PATH` to make that frozen web
 artifact available to retrieval and answer citations.
+
+Use the capability validators before treating a saved output as evidence:
+
+```bash
+mucaro capabilities validate-web-snapshot data/exports/web_snapshots/SNAPSHOT.json --format text
+mucaro capabilities validate-web-session data/exports/web_browse_sessions/SESSION.json --format text
+mucaro capabilities validate-answer-trace data/exports/answers/TRACE.json --format text
+mucaro capabilities validate-coding-review data/exports/coding/REVIEW.json --format text
+```
+
+These commands verify provenance and accounting only. A valid byte snapshot is
+not proof that a publisher's claims are true; a citation-valid answer is not
+independent adjudication of contradictory sources; and a coding review with no
+findings is not proof that the changed code has no defects.
 
 Tool call state is stored under `data/processed/tool_calls.json`. Audit events
 are stored under `data/processed/tool_audit_log.json`. These files are local

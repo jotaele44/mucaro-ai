@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .citations import validate_citations
+from .capability_contracts import build_evidence_contract
 from .config import Settings
 from .ingestion import ingest_file, ingest_web_snapshot
 from .release_receipts import write_release_receipt
@@ -91,6 +92,28 @@ def validate_answer_trace_quality(trace: dict[str, Any]) -> dict[str, Any]:
     flags.update(_trace_shape_flags(validated))
     validated["validation_flags"] = sorted(flags)
     validated["citation_status"] = "CITATION_OK" if not any(flag.startswith("ERROR_") for flag in flags) else "CITATION_ERROR"
+    citation_ok = validated["citation_status"] == "CITATION_OK"
+    validated["evidence_contract"] = build_evidence_contract(
+        claim_type="COMPUTED" if citation_ok else "UNKNOWN",
+        evidence_type="CITED_RETRIEVAL_TRACE" if citation_ok else "INVALID_RETRIEVAL_TRACE",
+        source_identity_type="SOURCE_ID_PLUS_CHUNK_ID",
+        confidence="CITATION_BOUND" if citation_ok else "UNRESOLVED",
+        uncertainty_state="BOUNDED" if citation_ok else "UNRESOLVED",
+        contradiction_state="NOT_ADJUDICATED",
+        verification_method="validate retrieved/cited ID closure, citation order, rank, source identity, and snapshot metadata",
+        limitations=[
+            "Citation binding proves which local chunks were used, not that the underlying source claims are true.",
+            "Retrieval ranking and model output remain bounded by the configured corpus, strategy, and provider mode.",
+            "Contradictory source claims require a separate adjudication workflow.",
+        ],
+        falsification_criteria=[
+            "reject cited chunk IDs that were not retrieved",
+            "reject citation records with missing source/chunk identity or non-contiguous order",
+            "reject web citations without snapshot URL, snapshot hash, content hash, and retrieval timestamp",
+            "reject citation_ok when any validation flag begins with ERROR_",
+        ],
+        unresolved_residue=sorted(flags),
+    )
     return validated
 
 

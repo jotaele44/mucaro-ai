@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .citations import build_citation_records, score_confidence, validate_citations
+from .capability_contracts import build_evidence_contract
 from .config import Settings, settings
 from .db import ensure_db, upsert_payload
 from .exports import export_answer_trace
@@ -270,6 +271,28 @@ def answer_question(
         "created_at": utc_now(),
     }
     answer_trace = validate_citations(answer_trace)
+    citation_ok = answer_trace.get("citation_status") == "CITATION_OK"
+    answer_trace["evidence_contract"] = build_evidence_contract(
+        claim_type="COMPUTED" if citation_ok else "UNKNOWN",
+        evidence_type="CITED_RETRIEVAL_TRACE" if citation_ok else "INVALID_RETRIEVAL_TRACE",
+        source_identity_type="SOURCE_ID_PLUS_CHUNK_ID",
+        confidence="CITATION_BOUND" if citation_ok else "UNRESOLVED",
+        uncertainty_state="BOUNDED" if citation_ok else "UNRESOLVED",
+        contradiction_state="NOT_ADJUDICATED",
+        verification_method="validate retrieved/cited ID closure, citation order, rank, source identity, and snapshot metadata",
+        limitations=[
+            "Citation binding proves which local chunks were used, not that the underlying source claims are true.",
+            "Retrieval ranking and model output remain bounded by the configured corpus, strategy, and provider mode.",
+            "Contradictory source claims require a separate adjudication workflow.",
+        ],
+        falsification_criteria=[
+            "reject cited chunk IDs that were not retrieved",
+            "reject citation records with missing source/chunk identity or non-contiguous order",
+            "reject web citations without snapshot URL, snapshot hash, content hash, and retrieval timestamp",
+            "reject citation_ok when any validation flag begins with ERROR_",
+        ],
+        unresolved_residue=sorted(str(flag) for flag in answer_trace.get("validation_flags", [])),
+    )
     answer_trace["export_paths"] = export_answer_trace(answer_trace, cfg)
     if persist:
         upsert_payload("runs", "run_id", answer_trace, cfg.sqlite_path)

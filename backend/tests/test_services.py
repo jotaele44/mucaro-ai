@@ -74,6 +74,8 @@ def test_answer_question_flags_uncited_live_answer(tmp_path: Path, monkeypatch):
 
     assert result["citation_status"] == "CITATION_ERROR"
     assert "ERROR_UNCITED_ANSWER" in result["validation_flags"]
+    assert result["evidence_contract"]["claim_type"] == "UNKNOWN"
+    assert result["evidence_contract"]["uncertainty_state"] == "UNRESOLVED"
 
 
 def test_answer_question_accepts_persistent_retrieval_strategy(tmp_path: Path):
@@ -110,6 +112,8 @@ def test_answer_question_exports_citation_trace_records(tmp_path: Path, monkeypa
 
     assert result["citation_status"] == "CITATION_OK"
     assert result["source_ids"] == ["src_a"]
+    assert result["evidence_contract"]["claim_type"] == "COMPUTED"
+    assert result["evidence_contract"]["source_identity_type"] == "SOURCE_ID_PLUS_CHUNK_ID"
     citation = result["cited_chunks"][0]
     assert citation["citation_order"] == 1
     assert citation["retrieval_rank"] == 1

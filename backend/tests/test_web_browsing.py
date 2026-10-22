@@ -169,6 +169,9 @@ def test_fetch_web_snapshot_records_policy_and_bytes(tmp_path: Path):
     assert saved["robots_policy"]["allowed"] is True
     assert saved["robots_policy"]["content_sha256"]
     assert saved["http_error_policy"]["is_http_error"] is False
+    assert saved["evidence_contract"]["claim_type"] == "FACT"
+    assert saved["evidence_contract"]["source_identity_type"] == "REQUESTED_FINAL_URL_PLUS_CONTENT_SHA256"
+    assert saved["evidence_contract"]["uncertainty_state"] == "BOUNDED"
     assert saved["parser_trace"]["content_kind"] == "html"
     assert saved["parser_trace"]["html_title"] == "Mucaro Web Fixture"
     assert saved["parser_trace"]["html_heading_count"] == 1
@@ -473,6 +476,8 @@ def test_fetch_web_browse_session_writes_selection_and_replay_receipt(tmp_path: 
     assert receipt["selection_decisions"][2]["reason"] == "DUPLICATE_URL"
     assert [fetch["status"] for fetch in receipt["fetches"]] == ["WEB_FETCH_SNAPSHOT_OK", "WEB_FETCH_SNAPSHOT_OK"]
     assert receipt["replay"]["tool_name"] == "web.fetch_session"
+    assert receipt["evidence_contract"]["claim_type"] == "COMPUTED"
+    assert receipt["evidence_contract"]["source_identity_type"] == "URL_ORDER_PLUS_SNAPSHOT_ID"
     assert receipt["replay"]["arguments"]["urls"] == [first_url, second_url, first_url]
     assert receipt["replay"]["arguments"]["require_same_host"] is True
 

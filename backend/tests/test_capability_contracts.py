@@ -1,10 +1,18 @@
+import base64
+import hashlib
+
 from backend.app.capability_contracts import (
     CAPABILITY_CONTRACT_SCHEMA_VERSION,
     CAPABILITY_OUTPUT_CONTRACT_FAILED,
     CAPABILITY_OUTPUT_CONTRACT_OK,
+    build_evidence_contract,
     build_capability_contract_report,
+    validate_answer_trace_contract,
+    validate_coding_review_contract,
     validate_gis_report_contract,
     validate_ocr_report_contract,
+    validate_web_browse_session_contract,
+    validate_web_snapshot_contract,
 )
 
 
@@ -451,6 +459,178 @@ def test_validate_gis_report_contract_rejects_weak_measurement_receipts():
     assert "falsification_criteria_non_empty" in failed_names
 
 
+def _evidence_fixture(**overrides):
+    payload = build_evidence_contract(
+        claim_type="FACT",
+        evidence_type="DIRECT_TEST_FIXTURE",
+        source_identity_type="URL_PLUS_CONTENT_SHA256",
+        confidence="BOUNDED_BYTE_CAPTURE",
+        uncertainty_state="BOUNDED",
+        contradiction_state="NOT_ADJUDICATED",
+        verification_method="replay fixture and compare hashes",
+        limitations=["fixture is bounded"],
+        falsification_criteria=["tamper with the fixture"],
+    )
+    payload.update(overrides)
+    return payload
+
+
+def test_validate_web_snapshot_contract_closes_byte_and_evidence_accounting():
+    content = b"<html><body>fixture</body></html>"
+    report = {
+        "schema_version": "mucaro_web_snapshot_v1",
+        "snapshot_id": "websnap_contract",
+        "snapshot_kind": "web_page",
+        "requested_url": "https://example.test/source",
+        "fetch_url": "https://example.test/source",
+        "final_url": "https://example.test/source",
+        "redirect_chain": [],
+        "fragment_removed": False,
+        "retrieval_started_utc": "2026-10-20T00:00:00Z",
+        "retrieval_utc": "2026-10-20T00:00:01Z",
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "content_sha256": hashlib.sha256(content).hexdigest(),
+        "content_size_bytes": len(content),
+        "content_base64": base64.b64encode(content).decode("ascii"),
+        "parser_name": "web_snapshot_preview_v1",
+        "parser_trace": {"content_kind": "html", "trace_warnings": []},
+        "parser_warnings": [],
+        "charset": "utf-8",
+        "text_preview": "fixture",
+        "cache_policy": {
+            "cache_mode": "immutable_snapshot_only",
+            "reuse_allowed": False,
+            "revalidation_required_before_reuse": True,
+            "warnings": [],
+        },
+        "robots_policy": {"status": "ROBOTS_ALLOWED", "allowed": True},
+        "http_error_policy": {"is_http_error": False, "snapshot_allowed": False, "citation_allowed": False},
+        "evidence_contract": _evidence_fixture(),
+    }
+    result = validate_web_snapshot_contract(report)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert result["counts"]["fail"] == 0
+
+    report["content_base64"] = base64.b64encode(b"tampered").decode("ascii")
+    tampered = validate_web_snapshot_contract(report)
+    assert tampered["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "content_bytes_match_hash" for check in tampered["failed_checks"])
+
+
+def test_validate_web_snapshot_contract_accepts_zero_byte_body():
+    report = {
+        "schema_version": "mucaro_web_snapshot_v1",
+        "snapshot_id": "websnap_empty",
+        "snapshot_kind": "web_page",
+        "requested_url": "https://example.test/empty",
+        "fetch_url": "https://example.test/empty",
+        "final_url": "https://example.test/empty",
+        "redirect_chain": [],
+        "fragment_removed": False,
+        "retrieval_started_utc": "2026-10-20T00:00:00Z",
+        "retrieval_utc": "2026-10-20T00:00:01Z",
+        "http_status": 204,
+        "content_type": "text/plain",
+        "content_sha256": hashlib.sha256(b"").hexdigest(),
+        "content_size_bytes": 0,
+        "content_base64": "",
+        "parser_name": "web_snapshot_preview_v1",
+        "parser_trace": {"content_kind": "text", "trace_warnings": []},
+        "parser_warnings": [],
+        "charset": "utf-8",
+        "text_preview": "",
+        "cache_policy": {
+            "cache_mode": "immutable_snapshot_only",
+            "reuse_allowed": False,
+            "revalidation_required_before_reuse": True,
+            "warnings": [],
+        },
+        "robots_policy": {"status": "ROBOTS_ALLOWED", "allowed": True},
+        "http_error_policy": {"is_http_error": False, "snapshot_allowed": False, "citation_allowed": False},
+        "evidence_contract": _evidence_fixture(),
+    }
+    result = validate_web_snapshot_contract(report)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert result["counts"]["fail"] == 0
+
+
+def test_validate_web_session_contract_rejects_unaccounted_selection():
+    report = {
+        "schema_version": "mucaro_web_browse_session_v1",
+        "session_id": "websession_contract",
+        "status": "WEB_BROWSE_SESSION_OK",
+        "started_at": "2026-10-20T00:00:00Z",
+        "completed_at": "2026-10-20T00:00:01Z",
+        "browser_discovery_policy": {
+            "search_enabled": False,
+            "automated_link_following": False,
+            "candidate_source": "operator_supplied_urls",
+        },
+        "session_policy": {"max_pages": 2, "require_same_host": True},
+        "fetch_policy": {"cache_mode": "immutable_snapshot_only"},
+        "candidate_count": 2,
+        "selected_count": 1,
+        "successful_fetch_count": 1,
+        "selection_decisions": [{"decision": "SELECTED"}],
+        "fetches": [{"status": "WEB_FETCH_SNAPSHOT_OK", "url": "https://example.test/source"}],
+        "warnings": [],
+        "replay": {"tool_name": "web.fetch_session", "arguments": {"urls": ["https://example.test/source"]}},
+        "evidence_contract": _evidence_fixture(claim_type="COMPUTED", evidence_type="SESSION_LEDGER"),
+    }
+    result = validate_web_browse_session_contract(report)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "selection_decisions" for check in result["failed_checks"])
+
+
+def test_validate_answer_trace_contract_rejects_uncited_success():
+    trace = {
+        "query": "What is this?",
+        "retrieved_chunk_ids": ["chunk_1"],
+        "cited_chunk_ids": [],
+        "cited_chunks": [],
+        "validation_flags": [],
+        "citation_status": "CITATION_OK",
+        "evidence_contract": _evidence_fixture(claim_type="COMPUTED", evidence_type="CITED_RETRIEVAL_TRACE"),
+    }
+    result = validate_answer_trace_contract(trace)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "uncited_answer_not_ok" for check in result["failed_checks"])
+
+
+def test_validate_coding_review_contract_requires_hash_bound_findings():
+    report = {
+        "schema_version": "mucaro-coding-review/1.0",
+        "status": "CODING_REVIEW_FINDINGS",
+        "repo_root": "/tmp/repo",
+        "head_sha": "a" * 40,
+        "base_commit_sha": "b" * 40,
+        "changed_paths": ["src/example.py"],
+        "finding_count": 1,
+        "findings": [
+            {
+                "path": "src/example.py",
+                "line_start": 1,
+                "line_end": 1,
+                "source_sha256": "c" * 64,
+                "excerpt": "pass",
+                "excerpt_sha256": hashlib.sha256(b"pass").hexdigest(),
+            }
+        ],
+        "invariants": {"finding_count_closed": True, "changed_sources_bound": True},
+        "limitations": ["bounded review"],
+        "falsification_criteria": ["source changes"],
+        "evidence_contract": _evidence_fixture(claim_type="COMPUTED", evidence_type="CURRENT_DIFF_REVIEW"),
+    }
+    result = validate_coding_review_contract(report)
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+
+    report["findings"][0]["excerpt"] = "changed"
+    tampered = validate_coding_review_contract(report)
+    assert tampered["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "findings.0.excerpt_sha256" for check in tampered["failed_checks"])
+
+
 def test_validate_ocr_report_contract_accepts_image_ocr_receipts():
     report = {
         "schema_version": "mucaro_ocr_report_v1",
@@ -520,6 +700,59 @@ def test_validate_ocr_report_contract_accepts_image_ocr_receipts():
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
     assert result["counts"]["fail"] == 0
     assert result["capability_id"] == "state_of_art_ocr_analysis"
+
+
+def test_validate_ocr_report_contract_accepts_integrated_layout_and_confidence_ledgers():
+    report = {
+        "schema_version": "mucaro_ocr_report_v1",
+        "report_id": "ocrreport_integrated",
+        "status": "OCR_ANALYSIS_OK",
+        "operation": "image_ocr",
+        "created_at": "2026-09-12T00:00:00Z",
+        "source": {"sha256": "c" * 64, "mime_type": "image/png", "media_kind": "image", "bytes": 128, "width": 8, "height": 6, "parser_warnings": []},
+        "engine": {"name": "tesseract", "version": "tesseract 5.3.0", "language": "eng", "layout_mode": "auto", "confidence_scale": "0-100"},
+        "text": {"raw": "Mucaro\nAI", "normalized": "Mucaro\nAI", "canonical": "mucaro\nai"},
+        "spans": [
+            {"span_index": 0, "raw_text": "Mucaro", "normalized_text": "Mucaro", "canonical_text": "mucaro", "confidence": 96.4, "confidence_state": "HIGH", "bbox": {"x": 10, "y": 20, "width": 30, "height": 12}, "page_index": 0, "block_num": 1, "paragraph_num": 1, "line_num": 1, "word_num": 1},
+            {"span_index": 1, "raw_text": "AI", "normalized_text": "AI", "canonical_text": "ai", "confidence": 42.0, "confidence_state": "LOW", "bbox": {"x": 40, "y": 20, "width": 12, "height": 12}, "page_index": 0, "block_num": 1, "paragraph_num": 1, "line_num": 1, "word_num": 2},
+        ],
+        "invariants": {"raw_normalized_canonical_separated": True, "span_count": 2, "low_confidence_count": 1, "unknown_confidence_count": 0, "empty_text_state": False, "bounding_boxes_have_source_coordinates": True},
+        "layout": {"lines": [{"span_indices": [0, 1]}], "reading_order_span_indices": [0, 1], "invariants": {"span_accounting_closed": True, "semantic_tables_inferred": False, "semantic_forms_inferred": False}},
+        "confidence": {"scale": "0-100", "counts": {"LOW": 1, "MEDIUM": 0, "HIGH": 1, "UNKNOWN": 0}, "invariants": {"span_accounting_closed": True}},
+        "warnings": ["OCR_LOW_CONFIDENCE_PRESENT"],
+        "limitations": ["bounded OCR fixture"],
+        "falsification_criteria": ["reject if ledger accounting does not close"],
+    }
+
+    result = validate_ocr_report_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert result["counts"]["fail"] == 0
+
+
+def test_validate_ocr_report_contract_rejects_tampered_confidence_ledger():
+    report = {
+        "schema_version": "mucaro_ocr_report_v1",
+        "report_id": "ocrreport_tampered_ledger",
+        "status": "OCR_ANALYSIS_OK",
+        "operation": "image_ocr",
+        "created_at": "2026-09-12T00:00:00Z",
+        "source": {"sha256": "c" * 64, "mime_type": "image/png", "media_kind": "image", "bytes": 128, "width": 8, "height": 6, "parser_warnings": []},
+        "engine": {"name": "tesseract", "version": "tesseract 5.3.0", "language": "eng", "layout_mode": "auto", "confidence_scale": "0-100"},
+        "text": {"raw": "Mucaro", "normalized": "Mucaro", "canonical": "mucaro"},
+        "spans": [{"span_index": 0, "raw_text": "Mucaro", "normalized_text": "Mucaro", "canonical_text": "mucaro", "confidence": 96.4, "confidence_state": "HIGH", "bbox": {"x": 10, "y": 20, "width": 30, "height": 12}, "page_index": 0}],
+        "invariants": {"raw_normalized_canonical_separated": True, "span_count": 1, "low_confidence_count": 0, "unknown_confidence_count": 0, "empty_text_state": False, "bounding_boxes_have_source_coordinates": True},
+        "layout": {"lines": [], "reading_order_span_indices": [0], "invariants": {"span_accounting_closed": True, "semantic_tables_inferred": False, "semantic_forms_inferred": False}},
+        "confidence": {"scale": "0-100", "counts": {"LOW": 0, "MEDIUM": 1, "HIGH": 0, "UNKNOWN": 0}, "invariants": {"span_accounting_closed": True}},
+        "warnings": [],
+        "limitations": ["bounded OCR fixture"],
+        "falsification_criteria": ["reject if ledger accounting does not close"],
+    }
+
+    result = validate_ocr_report_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert "confidence.counts_match_spans" in {check["name"] for check in result["failed_checks"]}
 
 
 def test_validate_ocr_report_contract_rejects_weak_image_ocr_receipts():

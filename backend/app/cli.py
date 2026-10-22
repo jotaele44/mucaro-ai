@@ -16,7 +16,15 @@ from typing import Any, Sequence
 from urllib.parse import urlparse
 
 from .config import Settings, settings
-from .capability_contracts import build_capability_contract_report, validate_gis_report_file, validate_ocr_report_file
+from .capability_contracts import (
+    build_capability_contract_report,
+    validate_answer_trace_contract,
+    validate_coding_review_file,
+    validate_gis_report_file,
+    validate_ocr_report_file,
+    validate_web_browse_session_file,
+    validate_web_snapshot_file,
+)
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -43,6 +51,7 @@ from .gis_corpus import validate_real_gis_corpus
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
 from .gis_hydrology import condition_raster_depressions, derive_raster_d8_flow
+from .gis_render import validate_rendered_map
 from .gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -731,6 +740,7 @@ def build_parser() -> argparse.ArgumentParser:
     gis_vector_raster.add_argument("vector_path", help="Path to a GeoJSON FeatureCollection.")
     gis_vector_raster.add_argument("raster_path", help="Path to a local raster source.")
     gis_vector_raster.add_argument("--band", type=int, default=1, help="One-based raster band index.")
+    gis_vector_raster.add_argument("--inclusion-rule", choices=["cell_center", "fractional_coverage"], default="cell_center", help="Cell-center or projected planar fractional coverage inclusion.")
     gis_vector_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_vector_raster.set_defaults(handler=run_gis_vector_raster)
 
@@ -741,6 +751,7 @@ def build_parser() -> argparse.ArgumentParser:
     gis_zonal_stats.add_argument("vector_path", help="Path to a GeoJSON FeatureCollection.")
     gis_zonal_stats.add_argument("raster_path", help="Path to a local raster source.")
     gis_zonal_stats.add_argument("--band", type=int, default=1, help="One-based raster band index.")
+    gis_zonal_stats.add_argument("--inclusion-rule", choices=["cell_center", "fractional_coverage"], default="cell_center", help="Cell-center or projected planar fractional coverage inclusion.")
     gis_zonal_stats.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_zonal_stats.set_defaults(handler=run_gis_zonal_stats)
 
@@ -877,6 +888,18 @@ def build_parser() -> argparse.ArgumentParser:
     gis_map_export.add_argument("--renderer-version", required=True, help="Renderer version.")
     gis_map_export.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_map_export.set_defaults(handler=run_gis_map_export_manifest)
+
+    gis_map_render_validate = gis_subcommands.add_parser(
+        "map-render-validate",
+        help="Independently validate that a rendered map artifact decodes and contains bounded visible content.",
+    )
+    gis_map_render_validate.add_argument("output_path", help="Path to the rendered image artifact.")
+    gis_map_render_validate.add_argument("--manifest", type=Path, help="Optional map export manifest to bind by output hash and path.")
+    gis_map_render_validate.add_argument("--min-width", type=int, help="Required minimum image width in pixels.")
+    gis_map_render_validate.add_argument("--min-height", type=int, help="Required minimum image height in pixels.")
+    gis_map_render_validate.add_argument("--max-pixels", type=int, default=50_000_000, help="Maximum decoded pixel count.")
+    gis_map_render_validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_map_render_validate.set_defaults(handler=run_gis_map_render_validate)
 
     ocr = subcommands.add_parser("ocr", help="Run local OCR analysis with source-image receipts.")
     ocr_subcommands = ocr.add_subparsers(dest="ocr_command", required=True)
@@ -1079,6 +1102,38 @@ def build_parser() -> argparse.ArgumentParser:
     capability_validate_ocr.add_argument("report_path", type=Path, help="Path to a saved OCR report JSON file.")
     capability_validate_ocr.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     capability_validate_ocr.set_defaults(handler=run_capability_validate_ocr_report)
+
+    capability_validate_web_snapshot = capabilities_subcommands.add_parser(
+        "validate-web-snapshot",
+        help="Validate a frozen web snapshot against the governed evidence contract.",
+    )
+    capability_validate_web_snapshot.add_argument("report_path", type=Path, help="Path to a saved web snapshot JSON file.")
+    capability_validate_web_snapshot.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_web_snapshot.set_defaults(handler=run_capability_validate_web_snapshot)
+
+    capability_validate_web_session = capabilities_subcommands.add_parser(
+        "validate-web-session",
+        help="Validate a governed operator-selected web browsing session receipt.",
+    )
+    capability_validate_web_session.add_argument("report_path", type=Path, help="Path to a saved web browsing session JSON file.")
+    capability_validate_web_session.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_web_session.set_defaults(handler=run_capability_validate_web_session)
+
+    capability_validate_answer_trace = capabilities_subcommands.add_parser(
+        "validate-answer-trace",
+        help="Validate a saved answer trace against citation and evidence contracts.",
+    )
+    capability_validate_answer_trace.add_argument("report_path", type=Path, help="Path to a saved answer trace JSON file.")
+    capability_validate_answer_trace.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_answer_trace.set_defaults(handler=run_capability_validate_answer_trace)
+
+    capability_validate_coding_review = capabilities_subcommands.add_parser(
+        "validate-coding-review",
+        help="Validate a saved coding review report against the evidence contract.",
+    )
+    capability_validate_coding_review.add_argument("report_path", type=Path, help="Path to a saved coding review JSON file.")
+    capability_validate_coding_review.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_coding_review.set_defaults(handler=run_capability_validate_coding_review)
 
     memory = subcommands.add_parser("memory", help="Manage explicit local assistant memory.")
     memory_subcommands = memory.add_subparsers(dest="memory_command", required=True)
@@ -2450,6 +2505,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_ZONAL_STATS_WARN",
         "GIS_CORPUS_VALIDATION_OK",
         "GIS_MAP_EXPORT_MANIFEST_OK",
+        "GIS_RENDER_VALIDATION_OK",
+        "GIS_RENDER_VALIDATION_WARN",
     }:
         print(status)
         print(f"operation={payload.get('operation')}")
@@ -2474,6 +2531,12 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 print(f"source_format={source.get('format')}")
             if "bytes" in source:
                 print(f"source_bytes={source.get('bytes')}")
+            if "width" in source:
+                print(f"source_width={source.get('width')}")
+            if "height" in source:
+                print(f"source_height={source.get('height')}")
+            if "mode" in source:
+                print(f"source_mode={source.get('mode')}")
         for source_name in ("vector_source", "raster_source"):
             named_source = payload.get(source_name)
             if isinstance(named_source, dict):
@@ -2520,6 +2583,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "ellipsoid",
                 "band",
                 "cell_inclusion_rule",
+                "coverage_measurement",
+                "coverage_area_units",
+                "weighted_statistics",
                 "implicit_reprojection",
                 "requested_bbox",
                 "effective_bbox",
@@ -2656,6 +2722,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "source_and_output_hash_present",
                 "feature_accounting_closed",
                 "cell_accounting_closed",
+                "coverage_accounting_closed",
                 "crs_exactly_matched",
                 "nodata_separate_from_zero",
                 "no_implicit_reprojection",
@@ -2717,6 +2784,16 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "all_layer_hashes_present",
                 "output_hash_present",
                 "renderer_identity_present",
+                "decode_success",
+                "dimensions_positive",
+                "dimensions_meet_minimum",
+                "alpha_accounting_closed",
+                "visible_pixel_count",
+                "transparent_pixel_count",
+                "unique_color_count",
+                "non_dominant_pixel_count",
+                "nonblank_content_present",
+                "manifest_binding_closed",
             ):
                 if key in invariants:
                     print(f"{key}={invariants.get(key)}")
@@ -3236,7 +3313,7 @@ def run_gis_vector_raster(args: argparse.Namespace, cfg: Settings) -> int:
     raster_path = _resolve_project_path(args.raster_path, cfg)
     return _run_gis_report(
         args,
-        lambda: analyze_vector_raster_intersection(vector_path, raster_path, cfg=cfg, band=args.band),
+        lambda: analyze_vector_raster_intersection(vector_path, raster_path, cfg=cfg, band=args.band, inclusion_rule=args.inclusion_rule),
     )
 
 
@@ -3245,7 +3322,7 @@ def run_gis_zonal_stats(args: argparse.Namespace, cfg: Settings) -> int:
     raster_path = _resolve_project_path(args.raster_path, cfg)
     return _run_gis_report(
         args,
-        lambda: compute_zonal_statistics(vector_path, raster_path, cfg=cfg, band=args.band),
+        lambda: compute_zonal_statistics(vector_path, raster_path, cfg=cfg, band=args.band, inclusion_rule=args.inclusion_rule),
     )
 
 
@@ -3340,6 +3417,22 @@ def run_gis_map_export_manifest(args: argparse.Namespace, cfg: Settings) -> int:
             output_crs=args.output_crs,
             renderer=args.renderer,
             renderer_version=args.renderer_version,
+        ),
+    )
+
+
+def run_gis_map_render_validate(args: argparse.Namespace, cfg: Settings) -> int:
+    output_path = _resolve_project_path(args.output_path, cfg)
+    manifest_path = _resolve_project_path(args.manifest, cfg) if args.manifest else None
+    return _run_gis_report(
+        args,
+        lambda: validate_rendered_map(
+            cfg=cfg,
+            output_path=output_path,
+            manifest_path=manifest_path,
+            min_width=args.min_width,
+            min_height=args.min_height,
+            max_pixels=args.max_pixels,
         ),
     )
 
@@ -8437,6 +8530,47 @@ def run_capability_validate_ocr_report(args: argparse.Namespace, cfg: Settings) 
     if not path.is_absolute():
         path = cfg.project_root / path
     report = validate_ocr_report_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_web_snapshot(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_web_snapshot_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_web_session(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_web_browse_session_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_answer_trace(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    try:
+        trace = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        emit_error("ERROR_ANSWER_TRACE_JSON", str(exc), args.format)
+        return 2
+    report = validate_answer_trace_contract(trace, report_path=str(path)) if isinstance(trace, dict) else validate_answer_trace_contract({}, report_path=str(path))
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_coding_review(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_coding_review_file(path)
     emit_payload(report, args.format)
     return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
 

@@ -72,6 +72,8 @@ def test_review_receipt_binds_findings_to_changed_file_and_lines(tmp_path: Path)
     assert report["findings"][0]["source_sha256"]
     assert report["findings"][0]["excerpt_sha256"]
     assert report["findings"][0]["evidence_excerpt"] == "    value = 2\n    return value"
+    assert report["evidence_contract"]["claim_type"] == "COMPUTED"
+    assert report["evidence_contract"]["source_identity_type"] == "CHANGED_PATH_PLUS_SOURCE_SHA256"
     assert all(report["invariants"].values())
 
 
