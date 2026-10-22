@@ -27,6 +27,18 @@ jobs:
         working-directory: frontend
       - name: Certify release gates
         run: python scripts/certify_release.py
+      - name: Evaluate learned agent consumers on frozen operational tasks
+        run: |
+          git fetch --no-tags --depth=1 origin 2110eac33d4338a606e4e917507664e0a0135e95 404cf0afe4001c0dc6352db690f09f48dca600ae
+          MUCARO_TASK_SOURCE="$RUNNER_TEMP/mucaro-consumer-task-source"
+          git worktree add --detach "$MUCARO_TASK_SOURCE" 2110eac33d4338a606e4e917507664e0a0135e95
+          python scripts/evaluate_consumer_tasks.py --source "$MUCARO_TASK_SOURCE" --output "$RUNNER_TEMP/mucaro-consumer-task-evidence"
+      - name: Upload learned-consumer operational evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: consumer-task-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mucaro-consumer-task-evidence
+          if-no-files-found: error
       - name: Certify security gates (SBOM, audits, secrets, static triage, network exposure)
         run: python scripts/certify_security_gates.py
       - name: Upload security receipt and SBOMs

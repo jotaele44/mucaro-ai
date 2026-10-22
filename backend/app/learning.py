@@ -231,6 +231,13 @@ def prompt_context(cfg: Settings) -> list[dict]:
 
 def feedback(cfg: Settings, *, episode_id: str, candidate_id: str, context: str,
              reward: float, evidence: str, permitted_use: bool) -> dict:
+    with _store(cfg) as state:
+        return _record_feedback(state, episode_id=episode_id, candidate_id=candidate_id, context=context,
+                                reward=reward, evidence=evidence, permitted_use=permitted_use)
+
+
+def _record_feedback(state: dict, *, episode_id: str, candidate_id: str, context: str,
+                     reward: float, evidence: str, permitted_use: bool) -> dict:
     _check(permitted_use is True, "FEEDBACK_PERMITTED_USE_REQUIRED")
     _check(isinstance(reward, (float, int)) and not isinstance(reward, bool)
            and math.isfinite(reward) and -1 <= reward <= 1, "REWARD_RANGE")
@@ -238,18 +245,17 @@ def feedback(cfg: Settings, *, episode_id: str, candidate_id: str, context: str,
            and bool(evidence.strip()) and len(evidence) <= 10000, "FEEDBACK_PROVENANCE_REQUIRED")
     payload = {"episode_id": episode_id, "candidate_id": candidate_id, "context": context,
                "reward": reward, "evidence": evidence, "permitted_use": True, "source": "local_operator"}
-    with _store(cfg) as state:
-        if episode_id in state["feedback"]:
-            _check({k: v for k, v in state["feedback"][episode_id].items() if k != "artifact_sha256"} == payload, "EPISODE_REPLAY_CONFLICT")
-            return state["feedback"][episode_id]
-        row = state["candidates"].get(candidate_id)
-        _check(row is not None and row["state"] == "VERIFIED" and row["kind"] == "skill", "VERIFIED_SKILL_REQUIRED")
-        _check(context == row["scope"], "FEEDBACK_SCOPE_MISMATCH")
-        payload["artifact_sha256"] = row["artifact"]["sha256"]
-        # Compare replay on the same pinned policy artifact.
-        state["feedback"][episode_id] = payload
-        _receipt(state, "REWARD_RECORDED", candidate_id, {"episode_id": episode_id, "reward": reward})
-        return payload
+    if episode_id in state["feedback"]:
+        _check({k: v for k, v in state["feedback"][episode_id].items() if k != "artifact_sha256"} == payload, "EPISODE_REPLAY_CONFLICT")
+        return state["feedback"][episode_id]
+    row = state["candidates"].get(candidate_id)
+    _check(row is not None and row["state"] == "VERIFIED" and row["kind"] == "skill", "VERIFIED_SKILL_REQUIRED")
+    _check(context == row["scope"], "FEEDBACK_SCOPE_MISMATCH")
+    payload["artifact_sha256"] = row["artifact"]["sha256"]
+    # Compare replay on the same pinned policy artifact.
+    state["feedback"][episode_id] = payload
+    _receipt(state, "REWARD_RECORDED", candidate_id, {"episode_id": episode_id, "reward": reward})
+    return payload
 
 
 def recommend(cfg: Settings, context: str) -> dict:

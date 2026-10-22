@@ -290,6 +290,11 @@ export const api = {
   revokeDirectoryPermission: (payload) => request("/permissions/directories/revoke", json("POST", payload)),
   ingestPath: (payload) => request("/ingest-path", json("POST", payload)),
 
+  consumers: () => request("/learning/consumers"),
+  consumerBind: (payload) => request("/learning/consumers/bind", json("POST", payload)),
+  consumerRevoke: (id, payload) => request(`/learning/consumers/${encodeURIComponent(id)}/revoke`, json("POST", payload)),
+  consumerPrepare: (payload) => request("/learning/consumer-runs/prepare", json("POST", payload)),
+  consumerAction: (id, action, payload) => request(`/learning/consumer-runs/${encodeURIComponent(id)}/${action}`, json("POST", payload)),
   learning: () => request("/learning"),
   learningCapture: (payload) => request("/learning/capture", json("POST", payload)),
   learningRecognize: (payload) => request("/learning/recognize", json("POST", payload)),

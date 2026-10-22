@@ -1,7 +1,8 @@
 // Run only against an isolated local fixture backend.
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
-import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { spawn, execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -16,6 +17,14 @@ for (let i = 0; i < 100; i++) {
   try { if ((await fetch(`${base}/health`)).ok) break; } catch {}
   await new Promise((resolve) => setTimeout(resolve, 100));
 }
+const taskRepo = mkdtempSync(path.join(tmpdir(), "mucaro-consumer-qa-"));
+const git = (...args) => execFileSync("git", ["-C", taskRepo, ...args], { encoding: "utf8" }).trim();
+git("init", "-q"); writeFileSync(path.join(taskRepo, "review.txt"), "Original source.\n"); git("add", ".");
+git("-c", "user.name=QA", "-c", "user.email=qa@example.invalid", "commit", "-qm", "Initial fixture");
+const taskBase = git("rev-parse", "HEAD");
+const taskBytes = "Original source.\nReviewed update.\n"; writeFileSync(path.join(taskRepo, "review.txt"), taskBytes); git("add", ".");
+git("-c", "user.name=QA", "-c", "user.email=qa@example.invalid", "commit", "-qm", "Updated fixture");
+const taskHead = git("rev-parse", "HEAD");
 const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
 const checks = [];
 try {
@@ -88,8 +97,37 @@ try {
     assert.deepEqual(recommendation.top_candidates, [skill.candidate_id]);
     assert.equal(recommendation.execution_authorized, false);
     await post(`/${skill.candidate_id}/rollback`, { version: skill.version, reason: "End synthetic QA" });
+    let agentSkill = await post("/recognize", { text: `Read-only repository evidence procedure ${width}.`, source_id: `consumer-qa:${width}`,
+      source_bytes: "Synthetic UI fixture; no real training-effectiveness claim", permitted_use: true, purpose: "Isolated UI verification",
+      kind: "skill", scope: "repository_review" });
+    agentSkill = await post(`/${agentSkill.candidate_id}/review`, { version: agentSkill.version, accept: true, rationale: "Fixture review",
+      positive_case: "Approved recipe", negative_case: "Unapproved recipe denied", explicit_approval: true, verified_evidence: true, authority_safe: true });
+    agentSkill = await post(`/${agentSkill.candidate_id}/apply`, { version: agentSkill.version });
+    agentSkill = await post(`/${agentSkill.candidate_id}/verify`, { version: agentSkill.version, positive_pass: true, negative_pass: true,
+      evaluation_receipt: "Fixture UI gate" });
+    const grant = await page.request.post(`${base}/permissions/directories/grant`, { data: { path: taskRepo, reason: "Isolated read-only UI task" } });
+    assert.equal(grant.status(), 200);
+    await page.reload();
+    if (width < 800) await page.getByRole("button", { name: "Open navigation" }).click();
+    await click("Learning");
+    await page.getByLabel("Verified procedure", { exact: true }).selectOption(agentSkill.candidate_id);
+    await check("I approve this exact procedure and recipe binding."); await click("Bind agent workflow");
+    await page.getByRole("button", { name: "Revoke agent binding", exact: true }).waitFor();
+    await fill("Repository path", taskRepo); await fill("Exact revision", taskHead); await fill("Comparison revision", taskBase);
+    await fill("Repository-relative file", "review.txt"); await fill("Expected file SHA256", createHash("sha256").update(taskBytes).digest("hex"));
+    await fill("Unique task key", `consumer-ui-${width}`); await click("Prepare agent run");
+    await page.getByRole("heading", { name: "Agent run: PREPARED", exact: true }).waitFor();
+    await check("I approve the displayed local read-only plan."); await click("Execute agent run");
+    await page.getByRole("heading", { name: "Agent run: COMPLETED", exact: true }).waitFor();
+    await fill("Observed run score", "1"); await fill("Verified outcome criteria", "Fixture HEAD, comparison and exact file bytes verified");
+    await check("Use this run feedback to rank workflows for this task category."); await click("Learn from executed run");
+    const consumerAxe = await new AxeBuilder({ page }).include(".learning-workspace").analyze();
+    assert.deepEqual(consumerAxe.violations.filter((v) => ["serious", "critical"].includes(v.impact)).map((v) => v.id), []);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
+    await page.screenshot({ path: `${out}/agent-consumer-${width}.png`, fullPage: true });
+    await fill("Binding revocation reason", "End isolated consumer UI fixture"); await click("Revoke agent binding");
     assert.deepEqual(errors, []);
-    checks.push({ width, lifecycle: "PASS", reward_interface: "PASS", rollback: "PASS", overflow: false, serious_a11y: 0, page_errors: errors });
+    checks.push({ width, lifecycle: "PASS", reward_interface: "PASS", agent_consumer: "PASS", rollback: "PASS", overflow: false, serious_a11y: 0, page_errors: errors });
     await context.close();
   }
   writeFileSync(`${out}/receipt.json`, JSON.stringify({ status: "PASS", scope: "learning fixture UI; chromium desktop/mobile widths", checks }, null, 2));

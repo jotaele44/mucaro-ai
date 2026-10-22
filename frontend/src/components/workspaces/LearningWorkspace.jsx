@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../../api.js";
+import { AgentConsumerPanel } from "./AgentConsumerPanel.jsx";
 
 export function LearningWorkspace({ announce }) {
   const [data, setData] = useState(null);
@@ -115,6 +116,7 @@ export function LearningWorkspace({ announce }) {
     {result && <details open><summary>Latest result</summary><pre className="learning-json" tabIndex={0} aria-label="Learning evidence JSON">{JSON.stringify(result, null, 2)}</pre></details>}
     <details><summary>Audit receipts ({data?.receipts?.length || 0})</summary>
       <pre className="learning-json" tabIndex={0} aria-label="Learning evidence JSON">{JSON.stringify(data?.receipts || [], null, 2)}</pre></details>
-    <p className="muted small">Review and verification are operator attestations. Skill artifacts are reusable procedures; they do not install executable code or start worker agents.</p>
+    <AgentConsumerPanel candidates={rows} announce={announce} />
+    <p className="muted small">Review and verification are operator attestations. Procedure artifacts require an explicit agent binding and separate run approval. Model-weight training is not connected.</p>
   </section>;
 }
