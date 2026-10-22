@@ -1481,6 +1481,147 @@ def validate_execution_lineage_file(path: Path) -> dict[str, Any]:
     return validate_execution_lineage_contract(report if isinstance(report, dict) else {}, report_path=str(path))
 
 
+def validate_retrieval_output_contract(report: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
+    """Validate retrieval result integrity without claiming semantic answer support."""
+    checks: list[dict[str, str]] = [
+        _contract_check("payload_object", isinstance(report, dict), "retrieval output must be a JSON object"),
+        _contract_check(
+            "query_present",
+            isinstance(report, dict) and isinstance(report.get("query"), str) and bool(report["query"].strip()),
+            "query must be a non-empty string",
+        ),
+        _contract_check(
+            "status_present",
+            isinstance(report, dict) and isinstance(report.get("status"), str) and bool(report["status"]),
+            "retrieval status is required",
+        ),
+        _contract_check(
+            "retrieved_chunks_array",
+            isinstance(report, dict) and isinstance(report.get("retrieved_chunks"), list),
+            "retrieved_chunks must be an array",
+        ),
+    ]
+    status = report.get("status") if isinstance(report, dict) else None
+    chunks = report.get("retrieved_chunks") if isinstance(report, dict) else None
+    chunks = chunks if isinstance(chunks, list) else []
+    valid_empty_statuses = {
+        "ERROR_NO_SOURCES",
+        "ERROR_NO_VALID_CHUNKS",
+        "ERROR_NO_RETRIEVAL_CONTEXT",
+        "ERROR_INVALID_TOP_K",
+        "ERROR_EMPTY_QUERY",
+    }
+    checks.extend(
+        [
+            _contract_check(
+                "status_known",
+                status == "RETRIEVAL_OK" or status in valid_empty_statuses,
+                "retrieval status must be a known success or fail-closed empty result",
+            ),
+            _contract_check("success_has_chunks", status != "RETRIEVAL_OK" or bool(chunks), "RETRIEVAL_OK requires at least one retrieved chunk"),
+            _contract_check("empty_status_has_no_chunks", status not in valid_empty_statuses or not chunks, "fail-closed retrieval statuses cannot carry chunks"),
+        ]
+    )
+    warnings = report.get("warnings") if isinstance(report, dict) else None
+    if warnings is not None:
+        checks.append(
+            _contract_check(
+                "warnings_array",
+                isinstance(warnings, list) and all(isinstance(item, str) and item for item in warnings),
+                "warnings must be non-empty strings",
+            )
+        )
+    top_k = report.get("top_k") if isinstance(report, dict) else None
+    if top_k is not None:
+        checks.append(_contract_check("top_k_valid", isinstance(top_k, int) and not isinstance(top_k, bool) and 1 <= top_k <= 20, "top_k must be an integer between 1 and 20"))
+        checks.append(_contract_check("top_k_not_exceeded", not isinstance(top_k, int) or len(chunks) <= top_k, "retrieval output cannot exceed top_k"))
+
+    seen_chunk_ids: set[str] = set()
+    strategies: set[str] = set()
+    previous_score: float | None = None
+    for index, chunk in enumerate(chunks):
+        prefix = f"chunks.{index}"
+        checks.extend(
+            [
+                _contract_check(f"{prefix}.object", isinstance(chunk, dict), "retrieved chunk must be an object"),
+                _contract_check(f"{prefix}.chunk_id", isinstance(chunk, dict) and isinstance(chunk.get("chunk_id"), str) and bool(chunk["chunk_id"].strip()), "chunk_id is required"),
+                _contract_check(f"{prefix}.source_id", isinstance(chunk, dict) and isinstance(chunk.get("source_id"), str) and bool(chunk["source_id"].strip()), "source_id is required"),
+                _contract_check(f"{prefix}.text", isinstance(chunk, dict) and isinstance(chunk.get("text"), str) and bool(chunk["text"].strip()), "retrieved chunk text is required"),
+                _contract_check(f"{prefix}.chunk_index", isinstance(chunk, dict) and isinstance(chunk.get("chunk_index"), int) and not isinstance(chunk.get("chunk_index"), bool) and chunk["chunk_index"] >= 0, "chunk_index must be a non-negative integer"),
+                _contract_check(f"{prefix}.score", isinstance(chunk, dict) and _is_number(chunk.get("score")) and math.isfinite(float(chunk["score"])) and chunk["score"] >= 0, "score must be a finite non-negative number"),
+                _contract_check(f"{prefix}.retrieval_strategy", isinstance(chunk, dict) and isinstance(chunk.get("retrieval_strategy"), str) and bool(chunk["retrieval_strategy"].strip()), "retrieval_strategy is required"),
+                _contract_check(f"{prefix}.matched_terms", isinstance(chunk, dict) and isinstance(chunk.get("matched_terms"), list) and all(isinstance(term, str) and term for term in chunk["matched_terms"]), "matched_terms must be a list of non-empty strings"),
+            ]
+        )
+        if not isinstance(chunk, dict):
+            continue
+        chunk_id = chunk.get("chunk_id")
+        if isinstance(chunk_id, str):
+            checks.append(_contract_check(f"{prefix}.chunk_id_unique", chunk_id not in seen_chunk_ids, "chunk IDs must be unique"))
+            seen_chunk_ids.add(chunk_id)
+        strategy = chunk.get("retrieval_strategy")
+        if isinstance(strategy, str) and strategy:
+            strategies.add(strategy)
+        score = chunk.get("score")
+        if _is_number(score) and math.isfinite(float(score)):
+            if previous_score is not None:
+                checks.append(_contract_check(f"{prefix}.score_order", float(score) <= previous_score, "retrieved chunks must be ordered by non-increasing score"))
+            previous_score = float(score)
+        for score_name in ("lexical_score", "vector_score", "bm25_score"):
+            if score_name in chunk:
+                value = chunk.get(score_name)
+                checks.append(_contract_check(f"{prefix}.{score_name}", _is_number(value) and math.isfinite(float(value)) and value >= 0, f"{score_name} must be a finite non-negative number"))
+    checks.append(_contract_check("strategy_consistent", len(strategies) <= 1, "all retrieved chunks must use one retrieval strategy"))
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": CAPABILITY_OUTPUT_CONTRACT_OK if not failed else CAPABILITY_OUTPUT_CONTRACT_FAILED,
+        "schema_version": "mucaro_capability_output_contract_v1",
+        "capability_id": "transparency_objectivity_governance",
+        "report_path": report_path,
+        "report_status": status,
+        "operation": "retrieval_output_integrity",
+        "checks": checks,
+        "counts": {
+            "pass": sum(1 for check in checks if check["status"] == "PASS"),
+            "fail": len(failed),
+            "total": len(checks),
+        },
+        "retrieved_chunk_count": len(chunks),
+        "retrieval_strategies": sorted(strategies),
+        "failed_checks": failed,
+    }
+
+
+def validate_retrieval_output_file(path: Path) -> dict[str, Any]:
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        failed_check = _contract_check("report_file_exists", False, f"report not found: {path}")
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "transparency_objectivity_governance",
+            "report_path": str(path),
+            "operation": "retrieval_output_integrity",
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    except json.JSONDecodeError as exc:
+        failed_check = _contract_check("report_json_valid", False, str(exc))
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "transparency_objectivity_governance",
+            "report_path": str(path),
+            "operation": "retrieval_output_integrity",
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    return validate_retrieval_output_contract(report if isinstance(report, dict) else {}, report_path=str(path))
+
+
 def list_advanced_capability_contracts() -> list[dict[str, Any]]:
     contracts = [
         CapabilityContract(
@@ -1880,6 +2021,13 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "execution_id",
                 "artifact_lineage",
                 "artifact_sha256",
+                "retrieval_query",
+                "retrieval_status",
+                "retrieved_chunk_id",
+                "retrieved_source_id",
+                "retrieval_strategy",
+                "retrieval_score",
+                "matched_terms",
             ),
             invariants=(
                 "FACT, COMPUTED, BINDING, INFERENCE, ASSUMPTION, HYPOTHESIS, and UNKNOWN remain distinct",
@@ -1888,6 +2036,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "script success is not certification",
                 "successful skill executions close SOURCE to DERIVED artifact lineage",
                 "failed skill executions preserve a SOURCE to RECEIPT failure lineage",
+                "retrieval outputs preserve unique chunk/source IDs, strategy, scores, and ranked order",
             ),
             positive_regression_gates=(
                 "conflicting evidence fixture preserves both observations",
@@ -1901,6 +2050,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "search absence cannot prove source absence",
                 "contradictory execution output/failure lineage is rejected",
                 "malformed artifact hashes and broken parent links are rejected",
+                "duplicate retrieval IDs, mixed strategies, malformed scores, and score-order contradictions are rejected",
             ),
             output_requirements=(
                 "evidence taxonomy",

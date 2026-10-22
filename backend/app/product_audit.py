@@ -226,9 +226,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "capability_expansion",
             "All advanced capabilities preserve maximum transparency and objectivity through evidence, uncertainty, and contradiction handling.",
             "OPEN",
-            "backend/app/capability_contracts.py defines a cross-capability evidence taxonomy, uncertainty, contradiction, and falsification contract, and now includes executable validators for saved advanced GIS and local image OCR receipts.",
-            "GIS, OCR, and skill execution artifact lineage have initial executable validators, but browsing, retrieval, and coding outputs are not yet covered by shared transparency/objectivity validators; coding outputs remain absent.",
-            "Expand executable capability-output validation from GIS/OCR reports to browsing, retrieval, and coding outputs, then add fixtures that reject unsupported certainty.",
+            "backend/app/capability_contracts.py defines a cross-capability evidence taxonomy, uncertainty, contradiction, and falsification contract, and now includes executable validators for GIS, local image OCR, skill execution lineage, and retrieval output integrity.",
+            "GIS, OCR, skill execution lineage, and retrieval output integrity have initial executable validators; browsing and coding outputs are not yet covered by shared transparency/objectivity validators.",
+            "Expand executable capability-output validation from GIS/OCR/runtime/retrieval reports to browsing and coding outputs, then add fixtures that reject unsupported certainty.",
         ),
         ProductRequirement(
             "multimodal_interface",

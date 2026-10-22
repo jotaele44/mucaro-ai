@@ -6,6 +6,7 @@ from backend.app.capability_contracts import (
     validate_execution_lineage_contract,
     validate_gis_report_contract,
     validate_ocr_report_contract,
+    validate_retrieval_output_contract,
 )
 
 
@@ -120,6 +121,64 @@ def test_validate_execution_lineage_contract_rejects_malformed_hash():
     )
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
     assert any(check["name"] == "artifact_lineage.input.sha256" for check in result["failed_checks"])
+
+
+def _retrieval_result() -> dict:
+    return {
+        "status": "RETRIEVAL_OK",
+        "query": "source lineage",
+        "top_k": 2,
+        "retrieved_chunks": [
+            {
+                "chunk_id": "chunk_1",
+                "source_id": "source_1",
+                "chunk_index": 0,
+                "text": "Source lineage preserves citation identity.",
+                "score": 0.9,
+                "retrieval_strategy": "hybrid_tfidf_v1",
+                "matched_terms": ["source", "lineage"],
+            },
+            {
+                "chunk_id": "chunk_2",
+                "source_id": "source_2",
+                "chunk_index": 1,
+                "text": "Citations bind answers to source chunks.",
+                "score": 0.4,
+                "retrieval_strategy": "hybrid_tfidf_v1",
+                "matched_terms": ["source"],
+            },
+        ],
+    }
+
+
+def test_validate_retrieval_output_contract_accepts_ranked_lineage_result():
+    result = validate_retrieval_output_contract(_retrieval_result())
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
+    assert result["operation"] == "retrieval_output_integrity"
+    assert result["retrieved_chunk_count"] == 2
+
+
+def test_validate_retrieval_output_contract_rejects_duplicate_and_mixed_results():
+    report = _retrieval_result()
+    report["retrieved_chunks"][1]["chunk_id"] = "chunk_1"
+    report["retrieved_chunks"][1]["retrieval_strategy"] = "lexical_v2"
+    report["retrieved_chunks"][1]["score"] = 0.95
+    result = validate_retrieval_output_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    failed_names = {check["name"] for check in result["failed_checks"]}
+    assert "chunks.1.chunk_id_unique" in failed_names
+    assert "chunks.1.score_order" in failed_names
+    assert "strategy_consistent" in failed_names
+
+
+def test_validate_retrieval_output_contract_accepts_fail_closed_no_context():
+    result = validate_retrieval_output_contract(
+        {"status": "ERROR_NO_RETRIEVAL_CONTEXT", "query": "missing term", "retrieved_chunks": []}
+    )
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
 
 
 def test_validate_gis_report_contract_accepts_measurement_receipts():

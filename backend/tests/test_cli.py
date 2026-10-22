@@ -497,6 +497,32 @@ def test_cli_capabilities_validate_execution_report(tmp_path: Path, capsys):
     assert "operation=skill_execution_artifact_lineage" in text_output
 
 
+def test_cli_capabilities_validate_retrieval_output(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    report = {
+        "status": "RETRIEVAL_OK",
+        "query": "lineage",
+        "retrieved_chunks": [
+            {
+                "chunk_id": "chunk_1",
+                "source_id": "source_1",
+                "chunk_index": 0,
+                "text": "lineage",
+                "score": 1.0,
+                "retrieval_strategy": "lexical_v2",
+                "matched_terms": ["lineage"],
+            }
+        ],
+    }
+    path = tmp_path / "retrieval.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-retrieval-output", str(path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["operation"] == "retrieval_output_integrity"
+
+
 def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
     report = {

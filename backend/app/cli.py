@@ -21,6 +21,7 @@ from .capability_contracts import (
     validate_execution_lineage_file,
     validate_gis_report_file,
     validate_ocr_report_file,
+    validate_retrieval_output_file,
 )
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
@@ -1109,6 +1110,14 @@ def build_parser() -> argparse.ArgumentParser:
     capability_validate_execution.add_argument("report_path", type=Path, help="Path to a saved skill execution JSON file.")
     capability_validate_execution.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     capability_validate_execution.set_defaults(handler=run_capability_validate_execution_report)
+
+    capability_validate_retrieval = capabilities_subcommands.add_parser(
+        "validate-retrieval-output",
+        help="Validate a saved retrieval result against the transparency contract.",
+    )
+    capability_validate_retrieval.add_argument("report_path", type=Path, help="Path to a saved retrieval result JSON file.")
+    capability_validate_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_retrieval.set_defaults(handler=run_capability_validate_retrieval_output)
 
     memory = subcommands.add_parser("memory", help="Manage explicit local assistant memory.")
     memory_subcommands = memory.add_subparsers(dest="memory_command", required=True)
@@ -8548,6 +8557,15 @@ def run_capability_validate_execution_report(args: argparse.Namespace, cfg: Sett
     if not path.is_absolute():
         path = cfg.project_root / path
     report = validate_execution_lineage_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_retrieval_output(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_retrieval_output_file(path)
     emit_payload(report, args.format)
     return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
 
