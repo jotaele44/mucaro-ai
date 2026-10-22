@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -91,6 +92,17 @@ def extract_source_archive(manifest: dict[str, Any], temp_root: Path) -> Path:
         if roots != {expected_root}:
             raise ValueError(f"unexpected archive root: {','.join(sorted(roots)) or 'none'} expected={expected_root}")
         archive.extractall(temp_root)
+        # Python's ZipFile extractor does not restore Unix permission bits. The
+        # source package intentionally carries executable launchers, so restore
+        # the archived mode before running the extracted checkout.
+        for info in infos:
+            if info.create_system != 3:
+                continue
+            mode = stat.S_IMODE(info.external_attr >> 16)
+            if not mode:
+                continue
+            extracted = temp_root / Path(*PurePosixPath(info.filename).parts)
+            extracted.chmod(mode)
     source_dir = temp_root / expected_root
     if not source_dir.is_dir():
         raise FileNotFoundError(f"extracted source root missing: {source_dir}")
