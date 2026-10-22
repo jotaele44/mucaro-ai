@@ -462,6 +462,41 @@ def test_cli_ocr_analyze_routes_pdf_to_page_receipt(tmp_path: Path, capsys, monk
     assert observed["kwargs"]["ocr_timeout_seconds"] == 45
 
 
+def test_cli_capabilities_validate_execution_report(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    source = {
+        "schema_version": "mucaro-artifact/1.0",
+        "artifact_id": "artifact_input",
+        "artifact_type": "SOURCE",
+        "sha256": "a" * 64,
+        "byte_size": 1,
+        "logical_identity": "skill:input",
+        "producer": "skill_runtime",
+        "producer_version": "1.0.0",
+        "created_utc": "2026-10-22T00:00:00Z",
+        "parent_artifact_ids": [],
+        "schema_id": "test.input/1",
+        "source_path_or_uri": "skill://test/input",
+    }
+    output = {**source, "artifact_id": "artifact_output", "artifact_type": "DERIVED", "parent_artifact_ids": ["artifact_input"]}
+    report = {
+        "execution_id": "execution_cli",
+        "skill_id": "mucaro/test",
+        "skill_digest": "sha256:test",
+        "runtime": "IN_PROCESS",
+        "status": "PASS",
+        "artifact_lineage": {"input": source, "output": output, "failure_receipt": None},
+    }
+    report_path = tmp_path / "execution.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-execution-report", str(report_path), "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "CAPABILITY_OUTPUT_CONTRACT_OK" in text_output
+    assert "capability_id=transparency_objectivity_governance" in text_output
+    assert "operation=skill_execution_artifact_lineage" in text_output
+
+
 def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
     report = {

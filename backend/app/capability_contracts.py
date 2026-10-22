@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .gis_render import GIS_RENDER_VALIDATION_SCHEMA_VERSION
+from .artifact_identity import ALLOWED_PARENT_TYPES, ARTIFACT_SCHEMA_VERSION
 
 CAPABILITY_CONTRACT_SCHEMA_VERSION = "mucaro_advanced_capability_contracts_v1"
 CAPABILITY_OUTPUT_CONTRACT_OK = "CAPABILITY_OUTPUT_CONTRACT_OK"
@@ -20,6 +22,7 @@ CRS_ENGINE_ADAPTERS = {
 GOVERNED_CRS_GRID_MANIFEST_SHA256 = "3d49d0bb364be9f41879ef3e74aa6766131ccb13ea6aef8bc11631f35d0fa1bc"
 GOVERNED_CRS_GRID_SHA256 = "a6db010f956526a011ba719c45fe32e5aff987eeb1cb03f2b8338208a77c619d"
 GOVERNED_CRS_GRID_BYTES = 3644
+_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -1315,6 +1318,169 @@ def validate_ocr_report_file(path: Path) -> dict[str, Any]:
     return validate_ocr_report_contract(report, report_path=str(path))
 
 
+def _validate_artifact_handle(
+    checks: list[dict[str, str]],
+    name: str,
+    artifact: Any,
+    *,
+    expected_type: str,
+    expected_parents: list[str] | None = None,
+) -> None:
+    checks.extend(
+        [
+            _contract_check(f"{name}.object", isinstance(artifact, dict), "artifact handle must be an object"),
+            _contract_check(
+                f"{name}.schema_version",
+                isinstance(artifact, dict) and artifact.get("schema_version") == ARTIFACT_SCHEMA_VERSION,
+                f"artifact handle must use {ARTIFACT_SCHEMA_VERSION}",
+            ),
+            _contract_check(f"{name}.artifact_id", isinstance(artifact, dict) and bool(artifact.get("artifact_id")), "artifact_id is required"),
+            _contract_check(
+                f"{name}.artifact_type",
+                isinstance(artifact, dict) and artifact.get("artifact_type") == expected_type,
+                f"artifact_type must be {expected_type}",
+            ),
+            _contract_check(
+                f"{name}.sha256",
+                isinstance(artifact, dict) and isinstance(artifact.get("sha256"), str) and bool(_SHA256_PATTERN.fullmatch(artifact["sha256"])),
+                "artifact sha256 must be 64 lowercase hexadecimal characters",
+            ),
+            _contract_check(
+                f"{name}.byte_size",
+                isinstance(artifact, dict) and isinstance(artifact.get("byte_size"), int) and not isinstance(artifact.get("byte_size"), bool) and artifact["byte_size"] >= 0,
+                "artifact byte_size must be a non-negative integer",
+            ),
+            _contract_check(f"{name}.logical_identity", isinstance(artifact, dict) and bool(artifact.get("logical_identity")), "logical_identity is required"),
+            _contract_check(f"{name}.producer", isinstance(artifact, dict) and bool(artifact.get("producer")), "producer is required"),
+            _contract_check(f"{name}.producer_version", isinstance(artifact, dict) and bool(artifact.get("producer_version")), "producer_version is required"),
+            _contract_check(f"{name}.created_utc", isinstance(artifact, dict) and bool(artifact.get("created_utc")), "created_utc is required"),
+            _contract_check(
+                f"{name}.parent_artifact_ids",
+                isinstance(artifact, dict)
+                and isinstance(artifact.get("parent_artifact_ids"), list)
+                and all(isinstance(parent, str) and parent for parent in artifact["parent_artifact_ids"])
+                and len(artifact["parent_artifact_ids"]) == len(set(artifact["parent_artifact_ids"])),
+                "parent_artifact_ids must be a unique list of non-empty strings",
+            ),
+        ]
+    )
+    if not isinstance(artifact, dict):
+        return
+    parents = artifact.get("parent_artifact_ids")
+    if isinstance(parents, list):
+        allowed = ALLOWED_PARENT_TYPES.get(expected_type, set())
+        checks.append(
+            _contract_check(
+                f"{name}.parent_type_policy",
+                expected_type in ALLOWED_PARENT_TYPES and (expected_type == "SOURCE" or bool(allowed)),
+                "artifact type must have a declared parent policy",
+            )
+        )
+        if expected_parents is not None:
+            checks.append(
+                _contract_check(
+                    f"{name}.parents_exact",
+                    parents == expected_parents,
+                    "artifact parent handles must match the execution lineage",
+                )
+            )
+
+
+def validate_execution_lineage_contract(report: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
+    checks: list[dict[str, str]] = [
+        _contract_check("payload_object", isinstance(report, dict), "execution report must be a JSON object"),
+        _contract_check("execution_id", isinstance(report, dict) and bool(report.get("execution_id")), "execution_id is required"),
+        _contract_check("skill_id", isinstance(report, dict) and bool(report.get("skill_id")), "skill_id is required"),
+        _contract_check("skill_digest", isinstance(report, dict) and isinstance(report.get("skill_digest"), str) and report["skill_digest"].startswith("sha256:"), "skill_digest must preserve the registered skill digest"),
+        _contract_check("runtime", isinstance(report, dict) and isinstance(report.get("runtime"), str) and bool(report["runtime"]), "runtime is required"),
+        _contract_check("status", isinstance(report, dict) and report.get("status") in {"PASS", "FAIL"}, "execution status must be PASS or FAIL"),
+        _contract_check("artifact_lineage_object", isinstance(report, dict) and isinstance(report.get("artifact_lineage"), dict), "artifact_lineage must be an object"),
+    ]
+    lineage = report.get("artifact_lineage") if isinstance(report, dict) else None
+    if not isinstance(lineage, dict):
+        lineage = {}
+    input_artifact = lineage.get("input")
+    input_id = input_artifact.get("artifact_id") if isinstance(input_artifact, dict) else None
+    _validate_artifact_handle(checks, "artifact_lineage.input", input_artifact, expected_type="SOURCE", expected_parents=[])
+
+    output_artifact = lineage.get("output")
+    failure_receipt = lineage.get("failure_receipt")
+    status = report.get("status") if isinstance(report, dict) else None
+    if status == "PASS":
+        checks.extend(
+            [
+                _contract_check("success.output_present", isinstance(output_artifact, dict), "successful execution requires an output artifact"),
+                _contract_check("success.failure_receipt_absent", failure_receipt is None, "successful execution cannot carry a failure receipt"),
+            ]
+        )
+        _validate_artifact_handle(checks, "artifact_lineage.output", output_artifact, expected_type="DERIVED", expected_parents=[input_id] if isinstance(input_id, str) else None)
+    elif status == "FAIL":
+        checks.extend(
+            [
+                _contract_check("failure.output_absent", output_artifact is None, "failed execution cannot carry a derived output"),
+                _contract_check("failure.receipt_present", isinstance(failure_receipt, dict), "failed execution requires a failure receipt"),
+            ]
+        )
+        _validate_artifact_handle(checks, "artifact_lineage.failure_receipt", failure_receipt, expected_type="RECEIPT", expected_parents=[input_id] if isinstance(input_id, str) else None)
+    else:
+        _contract_check("execution.status_known", False, "execution status must select a lineage state")
+
+    handles = [item for item in (input_artifact, output_artifact, failure_receipt) if isinstance(item, dict)]
+    ids = [item.get("artifact_id") for item in handles]
+    checks.extend(
+        [
+            _contract_check("artifact_ids_present", all(isinstance(artifact_id, str) and artifact_id for artifact_id in ids), "every lineage handle must have an artifact_id"),
+            _contract_check("artifact_ids_unique", len(ids) == len(set(ids)), "lineage artifact IDs must be unique within the execution"),
+        ]
+    )
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": CAPABILITY_OUTPUT_CONTRACT_OK if not failed else CAPABILITY_OUTPUT_CONTRACT_FAILED,
+        "schema_version": "mucaro_capability_output_contract_v1",
+        "capability_id": "transparency_objectivity_governance",
+        "report_path": report_path,
+        "report_status": report.get("status") if isinstance(report, dict) else None,
+        "operation": "skill_execution_artifact_lineage",
+        "checks": checks,
+        "counts": {
+            "pass": sum(1 for check in checks if check["status"] == "PASS"),
+            "fail": len(failed),
+            "total": len(checks),
+        },
+        "failed_checks": failed,
+    }
+
+
+def validate_execution_lineage_file(path: Path) -> dict[str, Any]:
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        failed_check = _contract_check("report_file_exists", False, f"report not found: {path}")
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "transparency_objectivity_governance",
+            "report_path": str(path),
+            "operation": "skill_execution_artifact_lineage",
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    except json.JSONDecodeError as exc:
+        failed_check = _contract_check("report_json_valid", False, str(exc))
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "transparency_objectivity_governance",
+            "report_path": str(path),
+            "operation": "skill_execution_artifact_lineage",
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    return validate_execution_lineage_contract(report if isinstance(report, dict) else {}, report_path=str(path))
+
+
 def list_advanced_capability_contracts() -> list[dict[str, Any]]:
     contracts = [
         CapabilityContract(
@@ -1711,22 +1877,30 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "uncertainty_state",
                 "contradiction_state",
                 "verification_command_or_method",
+                "execution_id",
+                "artifact_lineage",
+                "artifact_sha256",
             ),
             invariants=(
                 "FACT, COMPUTED, BINDING, INFERENCE, ASSUMPTION, HYPOTHESIS, and UNKNOWN remain distinct",
                 "normalization is never sole identity proof",
                 "search/discovery results are not exhaustive unless independently proven",
                 "script success is not certification",
+                "successful skill executions close SOURCE to DERIVED artifact lineage",
+                "failed skill executions preserve a SOURCE to RECEIPT failure lineage",
             ),
             positive_regression_gates=(
                 "conflicting evidence fixture preserves both observations",
                 "unknown evidence fixture remains UNKNOWN",
                 "certification fixture requires scope, tests, hashes, and zero unresolved residue",
+                "successful and failed skill execution receipts pass artifact-lineage validation",
             ),
             negative_regression_gates=(
                 "name-only identity proof is rejected",
                 "unexplained arithmetic mismatch fails closed",
                 "search absence cannot prove source absence",
+                "contradictory execution output/failure lineage is rejected",
+                "malformed artifact hashes and broken parent links are rejected",
             ),
             output_requirements=(
                 "evidence taxonomy",

@@ -54,6 +54,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
 | `mucaro capabilities validate-gis-report REPORT_PATH` | Validate a saved GIS receipt against the advanced capability output contract | 0 | 2 |
 | `mucaro capabilities validate-ocr-report REPORT_PATH` | Validate a saved OCR receipt against the state-of-the-art OCR output contract | 0 | 2 |
+| `mucaro capabilities validate-execution-report REPORT_PATH` | Validate a saved skill execution artifact-lineage receipt against the transparency contract | 0 | 2 |
 | `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry/topology receipt | 0 | 2 |
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
@@ -317,6 +318,13 @@ span/confidence accounting. It returns `CAPABILITY_OUTPUT_CONTRACT_FAILED` when
 a report omits source or engine proof, claims text without saved spans, misses a
 required no-text or low-confidence warning, or asserts span/confidence counts
 that do not match the saved spans.
+
+Use `mucaro capabilities validate-execution-report REPORT_PATH` to validate a
+saved `skill_runtime` execution event. The validator requires a hash-backed
+input `SOURCE` artifact, then requires exactly one `DERIVED` output for a
+successful execution or one `RECEIPT` artifact for a failed execution. Broken
+parent links, duplicate artifact IDs, invalid SHA-256 values, malformed byte
+sizes, and contradictory success/failure lineage fail closed.
 
 ## Output Contracts
 

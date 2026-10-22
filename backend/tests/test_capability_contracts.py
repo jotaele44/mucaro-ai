@@ -3,6 +3,7 @@ from backend.app.capability_contracts import (
     CAPABILITY_OUTPUT_CONTRACT_FAILED,
     CAPABILITY_OUTPUT_CONTRACT_OK,
     build_capability_contract_report,
+    validate_execution_lineage_contract,
     validate_gis_report_contract,
     validate_ocr_report_contract,
 )
@@ -50,6 +51,75 @@ def test_capability_contracts_cover_expanded_scope_without_overclaiming():
     assert "content_sha256" in contracts["governed_web_browsing"]["provenance_fields"]
     assert "dirty_status" in contracts["coding_programming_expertise"]["provenance_fields"]
     assert "evidence_type" in contracts["transparency_objectivity_governance"]["provenance_fields"]
+
+
+def _execution_artifact(artifact_id: str, artifact_type: str, parents: list[str]) -> dict:
+    return {
+        "schema_version": "mucaro-artifact/1.0",
+        "artifact_id": artifact_id,
+        "artifact_type": artifact_type,
+        "sha256": "a" * 64,
+        "byte_size": 12,
+        "logical_identity": f"skill:{artifact_id}",
+        "producer": "skill_runtime",
+        "producer_version": "1.0.0",
+        "created_utc": "2026-10-22T00:00:00Z",
+        "parent_artifact_ids": parents,
+        "schema_id": "test.schema/1",
+        "source_path_or_uri": "skill://test",
+    }
+
+
+def test_validate_execution_lineage_contract_accepts_success_lineage():
+    source = _execution_artifact("artifact_input", "SOURCE", [])
+    output = _execution_artifact("artifact_output", "DERIVED", ["artifact_input"])
+    result = validate_execution_lineage_contract(
+        {
+            "execution_id": "execution_test",
+            "skill_id": "mucaro/test",
+            "skill_digest": "sha256:test",
+            "runtime": "IN_PROCESS",
+            "status": "PASS",
+            "artifact_lineage": {"input": source, "output": output, "failure_receipt": None},
+        }
+    )
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
+
+
+def test_validate_execution_lineage_contract_rejects_contradictory_failure_lineage():
+    source = _execution_artifact("artifact_input", "SOURCE", [])
+    output = _execution_artifact("artifact_output", "DERIVED", ["artifact_input"])
+    result = validate_execution_lineage_contract(
+        {
+            "execution_id": "execution_test",
+            "skill_id": "mucaro/test",
+            "skill_digest": "sha256:test",
+            "runtime": "IN_PROCESS",
+            "status": "FAIL",
+            "artifact_lineage": {"input": source, "output": output, "failure_receipt": None},
+        }
+    )
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "failure.output_absent" for check in result["failed_checks"])
+    assert any(check["name"] == "failure.receipt_present" for check in result["failed_checks"])
+
+
+def test_validate_execution_lineage_contract_rejects_malformed_hash():
+    source = _execution_artifact("artifact_input", "SOURCE", [])
+    source["sha256"] = "not-a-sha"
+    output = _execution_artifact("artifact_output", "DERIVED", ["artifact_input"])
+    result = validate_execution_lineage_contract(
+        {
+            "execution_id": "execution_test",
+            "skill_id": "mucaro/test",
+            "skill_digest": "sha256:test",
+            "runtime": "IN_PROCESS",
+            "status": "PASS",
+            "artifact_lineage": {"input": source, "output": output, "failure_receipt": None},
+        }
+    )
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "artifact_lineage.input.sha256" for check in result["failed_checks"])
 
 
 def test_validate_gis_report_contract_accepts_measurement_receipts():
