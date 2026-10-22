@@ -56,6 +56,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro capabilities validate-ocr-report REPORT_PATH` | Validate a saved OCR receipt against the state-of-the-art OCR output contract | 0 | 2 |
 | `mucaro capabilities validate-execution-report REPORT_PATH` | Validate a saved skill execution artifact-lineage receipt against the transparency contract | 0 | 2 |
 | `mucaro capabilities validate-retrieval-output REPORT_PATH` | Validate a saved retrieval result for ranked chunk/source integrity | 0 | 2 |
+| `mucaro capabilities validate-web-snapshot SNAPSHOT_PATH` | Validate a saved governed web snapshot for byte, policy, and parser integrity | 0 | 2 |
 | `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry/topology receipt | 0 | 2 |
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
@@ -976,6 +977,14 @@ chunk indices, finite scores, matched terms, one consistent strategy, and
 non-increasing score order. No-context and no-source statuses pass only when
 their result arrays are empty. Citation and answer-trace validation remains a
 separate gate.
+
+Use `mucaro capabilities validate-web-snapshot SNAPSHOT_PATH` to validate a
+frozen web snapshot. The validator recomputes the content SHA-256 from strict
+base64 bytes, checks URL and redirect continuity, requires robots evidence,
+enforces immutable snapshot-only cache policy, checks HTTP-error citation state,
+and validates parser trace accounting. It does not claim source authority,
+semantic page correctness, rendered-browser fidelity, or claim support; those
+remain separate evidence gates.
 
 Use `mucaro eval retrieval` to run the committed retrieval-quality fixture from
 the supported CLI surface. The command reports the fixture path, chunk/query

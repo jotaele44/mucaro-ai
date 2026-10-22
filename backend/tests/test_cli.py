@@ -523,6 +523,43 @@ def test_cli_capabilities_validate_retrieval_output(tmp_path: Path, capsys):
     assert payload["operation"] == "retrieval_output_integrity"
 
 
+def test_cli_capabilities_validate_web_snapshot(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    content = b"<html><body>hello</body></html>"
+    report = {
+        "schema_version": "mucaro_web_snapshot_v1",
+        "snapshot_id": "websnap_cli",
+        "snapshot_kind": "web_page",
+        "requested_url": "https://example.com/source",
+        "fetch_url": "https://example.com/source",
+        "final_url": "https://example.com/source",
+        "redirect_chain": [],
+        "fragment_removed": False,
+        "retrieval_started_utc": "2026-10-22T00:00:00Z",
+        "retrieval_utc": "2026-10-22T00:00:01Z",
+        "http_status": 200,
+        "content_type": "text/html",
+        "cache_policy": {"cache_mode": "immutable_snapshot_only", "reuse_allowed": False, "revalidation_required_before_reuse": True},
+        "robots_policy": {"status": "ROBOTS_ALLOWED", "robots_url": "https://example.com/robots.txt", "allowed": True, "checked_at": "2026-10-22T00:00:00Z"},
+        "http_error_policy": {"is_http_error": False, "snapshot_allowed": False, "citation_allowed": False},
+        "content_sha256": hashlib.sha256(content).hexdigest(),
+        "content_size_bytes": len(content),
+        "content_base64": __import__("base64").b64encode(content).decode("ascii"),
+        "parser_name": "web_snapshot_preview_v1",
+        "parser_trace": {"parser_name": "web_snapshot_preview_v1", "content_kind": "html", "text_preview_length": 5, "trace_warnings": []},
+        "parser_warnings": [],
+        "text_preview": "hello",
+        "policy": {"timeout_seconds": 5, "max_bytes": 1000000, "cache_mode": "immutable_snapshot_only"},
+    }
+    path = tmp_path / "snapshot.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-web-snapshot", str(path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["operation"] == "web_snapshot_integrity"
+
+
 def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
     report = {

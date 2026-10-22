@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from .gis_render import GIS_RENDER_VALIDATION_SCHEMA_VERSION
 from .artifact_identity import ALLOWED_PARENT_TYPES, ARTIFACT_SCHEMA_VERSION
+from .web_browsing import WEB_SNAPSHOT_SCHEMA_VERSION
 
 CAPABILITY_CONTRACT_SCHEMA_VERSION = "mucaro_advanced_capability_contracts_v1"
 CAPABILITY_OUTPUT_CONTRACT_OK = "CAPABILITY_OUTPUT_CONTRACT_OK"
@@ -1622,6 +1626,193 @@ def validate_retrieval_output_file(path: Path) -> dict[str, Any]:
     return validate_retrieval_output_contract(report if isinstance(report, dict) else {}, report_path=str(path))
 
 
+def _validate_web_url_shape(checks: list[dict[str, str]], name: str, value: Any) -> None:
+    parsed = urlparse(value) if isinstance(value, str) else None
+    checks.append(
+        _contract_check(
+            f"{name}.shape",
+            parsed is not None
+            and parsed.scheme in {"http", "https"}
+            and bool(parsed.hostname)
+            and not parsed.username
+            and not parsed.password
+            and not parsed.fragment,
+            "web URL must be http(s), include a host, exclude credentials, and be fragment-free",
+        )
+    )
+
+
+def validate_web_snapshot_contract(report: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
+    """Validate a frozen web snapshot's bytes, policy receipts, and parser evidence."""
+    checks: list[dict[str, str]] = [
+        _contract_check("payload_object", isinstance(report, dict), "web snapshot must be a JSON object"),
+        _contract_check("schema_version", isinstance(report, dict) and report.get("schema_version") == WEB_SNAPSHOT_SCHEMA_VERSION, f"schema_version must be {WEB_SNAPSHOT_SCHEMA_VERSION}"),
+        _contract_check("snapshot_id", isinstance(report, dict) and isinstance(report.get("snapshot_id"), str) and bool(report["snapshot_id"].strip()), "snapshot_id is required"),
+        _contract_check("snapshot_kind", isinstance(report, dict) and report.get("snapshot_kind") in {"web_page", "http_error_page"}, "snapshot_kind must be web_page or http_error_page"),
+        _contract_check("retrieval_started_utc", isinstance(report, dict) and isinstance(report.get("retrieval_started_utc"), str) and bool(report["retrieval_started_utc"]), "retrieval_started_utc is required"),
+        _contract_check("retrieval_utc", isinstance(report, dict) and isinstance(report.get("retrieval_utc"), str) and bool(report["retrieval_utc"]), "retrieval_utc is required"),
+        _contract_check("content_type", isinstance(report, dict) and isinstance(report.get("content_type"), str) and bool(report["content_type"]), "content_type is required"),
+        _contract_check("http_status", isinstance(report, dict) and isinstance(report.get("http_status"), int) and 100 <= report["http_status"] <= 599, "http_status must be an HTTP status integer"),
+        _contract_check("fragment_removed", isinstance(report, dict) and isinstance(report.get("fragment_removed"), bool), "fragment_removed must be boolean"),
+        _contract_check("content_sha256", isinstance(report, dict) and isinstance(report.get("content_sha256"), str) and bool(_SHA256_PATTERN.fullmatch(report["content_sha256"])), "content_sha256 must be lowercase SHA-256"),
+        _contract_check("content_size_bytes", isinstance(report, dict) and isinstance(report.get("content_size_bytes"), int) and not isinstance(report.get("content_size_bytes"), bool) and report["content_size_bytes"] >= 0, "content_size_bytes must be non-negative"),
+        _contract_check("content_base64", isinstance(report, dict) and isinstance(report.get("content_base64"), str), "content_base64 is required"),
+        _contract_check("parser_name", isinstance(report, dict) and isinstance(report.get("parser_name"), str) and bool(report["parser_name"]), "parser_name is required"),
+        _contract_check("parser_trace", isinstance(report, dict) and isinstance(report.get("parser_trace"), dict), "parser_trace is required"),
+        _contract_check("parser_warnings", isinstance(report, dict) and isinstance(report.get("parser_warnings"), list) and all(isinstance(item, str) and item for item in report["parser_warnings"]), "parser_warnings must be non-empty strings"),
+        _contract_check("text_preview", isinstance(report, dict) and isinstance(report.get("text_preview"), str), "text_preview is required"),
+        _contract_check("policy", isinstance(report, dict) and isinstance(report.get("policy"), dict), "fetch policy is required"),
+    ]
+    if not isinstance(report, dict):
+        report = {}
+    for name in ("requested_url", "fetch_url", "final_url"):
+        _validate_web_url_shape(checks, name, report.get(name))
+    checks.append(_contract_check("url_fragment_policy", report.get("fragment_removed") is True or report.get("requested_url") == report.get("fetch_url"), "fragment removal must be recorded when requested and fetch URLs differ"))
+
+    try:
+        decoded = base64.b64decode(report.get("content_base64", ""), validate=True)
+        decode_ok = True
+    except (ValueError, TypeError):
+        decoded = b""
+        decode_ok = False
+    checks.extend(
+        [
+            _contract_check("content_base64_valid", decode_ok, "content_base64 must be valid strict base64"),
+            _contract_check("content_size_matches_bytes", decode_ok and len(decoded) == report.get("content_size_bytes"), "content_size_bytes must equal decoded content length"),
+            _contract_check("content_hash_matches_bytes", decode_ok and hashlib.sha256(decoded).hexdigest() == report.get("content_sha256"), "content_sha256 must match decoded content bytes"),
+        ]
+    )
+
+    redirect_chain = report.get("redirect_chain")
+    checks.append(_contract_check("redirect_chain", isinstance(redirect_chain, list), "redirect_chain must be an array"))
+    if isinstance(redirect_chain, list):
+        previous_url = report.get("fetch_url")
+        for index, redirect in enumerate(redirect_chain):
+            prefix = f"redirect_chain.{index}"
+            checks.extend(
+                [
+                    _contract_check(f"{prefix}.object", isinstance(redirect, dict), "redirect record must be an object"),
+                    _contract_check(f"{prefix}.from_url", isinstance(redirect, dict) and isinstance(redirect.get("from_url"), str) and bool(redirect["from_url"]), "redirect from_url is required"),
+                    _contract_check(f"{prefix}.to_url", isinstance(redirect, dict) and isinstance(redirect.get("to_url"), str) and bool(redirect["to_url"]), "redirect to_url is required"),
+                    _contract_check(f"{prefix}.http_status", isinstance(redirect, dict) and isinstance(redirect.get("http_status"), int) and 300 <= redirect["http_status"] <= 399, "redirect http_status must be 3xx"),
+                    _contract_check(f"{prefix}.target_robots_policy", isinstance(redirect, dict) and isinstance(redirect.get("target_robots_policy"), dict), "redirect target robots policy is required"),
+                ]
+            )
+            if isinstance(redirect, dict):
+                _validate_web_url_shape(checks, f"{prefix}.from_url", redirect.get("from_url"))
+                _validate_web_url_shape(checks, f"{prefix}.to_url", redirect.get("to_url"))
+                checks.append(_contract_check(f"{prefix}.chain_continuity", redirect.get("from_url") == previous_url, "redirect chain must be continuous"))
+                previous_url = redirect.get("to_url")
+        if redirect_chain:
+            checks.append(_contract_check("redirect_final_url", redirect_chain[-1].get("to_url") == report.get("final_url") if isinstance(redirect_chain[-1], dict) else False, "final_url must equal the last redirect target"))
+    else:
+        redirect_chain = []
+
+    robots = report.get("robots_policy")
+    checks.extend(
+        [
+            _contract_check("robots_policy.object", isinstance(robots, dict), "robots_policy is required"),
+            _contract_check("robots_policy.status", isinstance(robots, dict) and isinstance(robots.get("status"), str) and bool(robots["status"]), "robots policy status is required"),
+            _contract_check("robots_policy.allowed", isinstance(robots, dict) and robots.get("allowed") is True, "saved snapshots must prove robots allowed"),
+            _contract_check("robots_policy.checked_at", isinstance(robots, dict) and isinstance(robots.get("checked_at"), str) and bool(robots["checked_at"]), "robots checked_at is required"),
+        ]
+    )
+    if isinstance(robots, dict) and robots.get("robots_url") is not None:
+        _validate_web_url_shape(checks, "robots_policy.robots_url", robots.get("robots_url"))
+    if isinstance(robots, dict) and robots.get("content_sha256") is not None:
+        checks.append(_contract_check("robots_policy.content_sha256", isinstance(robots.get("content_sha256"), str) and bool(_SHA256_PATTERN.fullmatch(robots["content_sha256"])), "robots content hash must be lowercase SHA-256"))
+
+    cache = report.get("cache_policy")
+    checks.extend(
+        [
+            _contract_check("cache_policy.object", isinstance(cache, dict), "cache_policy is required"),
+            _contract_check("cache_policy.mode", isinstance(cache, dict) and cache.get("cache_mode") == "immutable_snapshot_only", "cache mode must remain immutable_snapshot_only"),
+            _contract_check("cache_policy.reuse_disabled", isinstance(cache, dict) and cache.get("reuse_allowed") is False, "snapshot reuse must be disabled"),
+            _contract_check("cache_policy.revalidation_required", isinstance(cache, dict) and cache.get("revalidation_required_before_reuse") is True, "revalidation must be required before reuse"),
+        ]
+    )
+
+    error_policy = report.get("http_error_policy")
+    checks.extend(
+        [
+            _contract_check("http_error_policy.object", isinstance(error_policy, dict), "http_error_policy is required"),
+            _contract_check("http_error_policy.booleans", isinstance(error_policy, dict) and isinstance(error_policy.get("is_http_error"), bool) and isinstance(error_policy.get("snapshot_allowed"), bool) and isinstance(error_policy.get("citation_allowed"), bool), "HTTP error policy booleans are required"),
+        ]
+    )
+    if isinstance(error_policy, dict) and isinstance(report.get("http_status"), int):
+        is_error = report["http_status"] >= 400
+        checks.append(_contract_check("http_error_policy.status_consistent", error_policy.get("is_http_error") is is_error, "HTTP error policy must match HTTP status"))
+        checks.append(_contract_check("http_error_policy.snapshot_kind_consistent", (report.get("snapshot_kind") == "http_error_page") is is_error, "snapshot_kind must match HTTP error status"))
+        if is_error:
+            checks.append(_contract_check("http_error_policy.snapshot_allowed", error_policy.get("snapshot_allowed") is True, "HTTP error page snapshot must explicitly be allowed"))
+
+    parser_trace = report.get("parser_trace")
+    if isinstance(parser_trace, dict):
+        checks.extend(
+            [
+                _contract_check("parser_trace.name", parser_trace.get("parser_name") == report.get("parser_name"), "parser trace name must match parser_name"),
+                _contract_check("parser_trace.content_kind", parser_trace.get("content_kind") in {"html", "pdf", "textual", "non_text"}, "parser trace content_kind must be explicit"),
+                _contract_check("parser_trace.text_preview_length", isinstance(parser_trace.get("text_preview_length"), int) and parser_trace["text_preview_length"] == len(report.get("text_preview", "")), "parser trace text length must match text_preview"),
+                _contract_check("parser_trace.warnings", isinstance(parser_trace.get("trace_warnings"), list) and all(isinstance(item, str) and item for item in parser_trace["trace_warnings"]), "parser trace warnings must be non-empty strings"),
+            ]
+        )
+    policy = report.get("policy")
+    if isinstance(policy, dict):
+        checks.extend(
+            [
+                _contract_check("policy.timeout_seconds", isinstance(policy.get("timeout_seconds"), int) and policy["timeout_seconds"] > 0, "policy timeout must be positive"),
+                _contract_check("policy.max_bytes", isinstance(policy.get("max_bytes"), int) and policy["max_bytes"] > 0, "policy max_bytes must be positive"),
+                _contract_check("policy.cache_mode", policy.get("cache_mode") == "immutable_snapshot_only", "policy cache_mode must be immutable_snapshot_only"),
+            ]
+        )
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": CAPABILITY_OUTPUT_CONTRACT_OK if not failed else CAPABILITY_OUTPUT_CONTRACT_FAILED,
+        "schema_version": "mucaro_capability_output_contract_v1",
+        "capability_id": "transparency_objectivity_governance",
+        "report_path": report_path,
+        "report_status": "WEB_SNAPSHOT_VALIDATED",
+        "operation": "web_snapshot_integrity",
+        "checks": checks,
+        "counts": {
+            "pass": sum(1 for check in checks if check["status"] == "PASS"),
+            "fail": len(failed),
+            "total": len(checks),
+        },
+        "failed_checks": failed,
+    }
+
+
+def validate_web_snapshot_file(path: Path) -> dict[str, Any]:
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        failed_check = _contract_check("report_file_exists", False, f"snapshot not found: {path}")
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "transparency_objectivity_governance",
+            "report_path": str(path),
+            "operation": "web_snapshot_integrity",
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    except json.JSONDecodeError as exc:
+        failed_check = _contract_check("report_json_valid", False, str(exc))
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "transparency_objectivity_governance",
+            "report_path": str(path),
+            "operation": "web_snapshot_integrity",
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    return validate_web_snapshot_contract(report if isinstance(report, dict) else {}, report_path=str(path))
+
+
 def list_advanced_capability_contracts() -> list[dict[str, Any]]:
     contracts = [
         CapabilityContract(
@@ -2028,6 +2219,20 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "retrieval_strategy",
                 "retrieval_score",
                 "matched_terms",
+                "requested_url",
+                "fetch_url",
+                "final_url",
+                "redirect_chain",
+                "robots_policy",
+                "cache_policy",
+                "http_error_policy",
+                "content_sha256",
+                "content_base64",
+                "content_size_bytes",
+                "parser_name",
+                "parser_trace",
+                "parser_warnings",
+                "retrieval_utc",
             ),
             invariants=(
                 "FACT, COMPUTED, BINDING, INFERENCE, ASSUMPTION, HYPOTHESIS, and UNKNOWN remain distinct",
@@ -2037,6 +2242,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "successful skill executions close SOURCE to DERIVED artifact lineage",
                 "failed skill executions preserve a SOURCE to RECEIPT failure lineage",
                 "retrieval outputs preserve unique chunk/source IDs, strategy, scores, and ranked order",
+                "web snapshots preserve URL/redirect, robots, cache, HTTP-error, byte-hash, and parser evidence",
             ),
             positive_regression_gates=(
                 "conflicting evidence fixture preserves both observations",
@@ -2051,6 +2257,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "contradictory execution output/failure lineage is rejected",
                 "malformed artifact hashes and broken parent links are rejected",
                 "duplicate retrieval IDs, mixed strategies, malformed scores, and score-order contradictions are rejected",
+                "web snapshots with tampered bytes, unsafe reuse policy, malformed URLs, or inconsistent HTTP-error state are rejected",
             ),
             output_requirements=(
                 "evidence taxonomy",

@@ -1,3 +1,6 @@
+import base64
+import hashlib
+
 from backend.app.capability_contracts import (
     CAPABILITY_CONTRACT_SCHEMA_VERSION,
     CAPABILITY_OUTPUT_CONTRACT_FAILED,
@@ -7,6 +10,7 @@ from backend.app.capability_contracts import (
     validate_gis_report_contract,
     validate_ocr_report_contract,
     validate_retrieval_output_contract,
+    validate_web_snapshot_contract,
 )
 
 
@@ -179,6 +183,79 @@ def test_validate_retrieval_output_contract_accepts_fail_closed_no_context():
     )
 
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
+
+
+def _web_snapshot() -> dict:
+    content = b"<html><body>hello</body></html>"
+    return {
+        "schema_version": "mucaro_web_snapshot_v1",
+        "snapshot_id": "websnap_contract",
+        "snapshot_kind": "web_page",
+        "requested_url": "https://example.com/source",
+        "fetch_url": "https://example.com/source",
+        "final_url": "https://example.com/source",
+        "redirect_chain": [],
+        "fragment_removed": False,
+        "retrieval_started_utc": "2026-10-22T00:00:00Z",
+        "retrieval_utc": "2026-10-22T00:00:01Z",
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "cache_policy": {
+            "cache_mode": "immutable_snapshot_only",
+            "reuse_allowed": False,
+            "revalidation_required_before_reuse": True,
+        },
+        "robots_policy": {
+            "status": "ROBOTS_ALLOWED",
+            "robots_url": "https://example.com/robots.txt",
+            "allowed": True,
+            "checked_at": "2026-10-22T00:00:00Z",
+            "warnings": [],
+        },
+        "http_error_policy": {
+            "is_http_error": False,
+            "snapshot_allowed": False,
+            "citation_allowed": False,
+        },
+        "content_sha256": hashlib.sha256(content).hexdigest(),
+        "content_size_bytes": len(content),
+        "content_base64": base64.b64encode(content).decode("ascii"),
+        "parser_name": "web_snapshot_preview_v1",
+        "parser_trace": {
+            "parser_name": "web_snapshot_preview_v1",
+            "content_kind": "html",
+            "text_preview_length": 5,
+            "trace_warnings": [],
+        },
+        "parser_warnings": [],
+        "charset": "utf-8",
+        "text_preview": "hello",
+        "policy": {
+            "timeout_seconds": 5,
+            "max_bytes": 1000000,
+            "cache_mode": "immutable_snapshot_only",
+        },
+    }
+
+
+def test_validate_web_snapshot_contract_accepts_byte_pinned_snapshot():
+    result = validate_web_snapshot_contract(_web_snapshot())
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
+    assert result["operation"] == "web_snapshot_integrity"
+
+
+def test_validate_web_snapshot_contract_rejects_tampered_bytes_and_reuse_policy():
+    report = _web_snapshot()
+    report["content_base64"] = base64.b64encode(b"tampered").decode("ascii")
+    report["cache_policy"]["reuse_allowed"] = True
+    result = validate_web_snapshot_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    failed_names = {check["name"] for check in result["failed_checks"]}
+    assert "content_size_matches_bytes" in failed_names
+    assert "content_hash_matches_bytes" in failed_names
+    assert "cache_policy.reuse_disabled" in failed_names
 
 
 def test_validate_gis_report_contract_accepts_measurement_receipts():

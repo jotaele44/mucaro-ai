@@ -22,6 +22,7 @@ from .capability_contracts import (
     validate_gis_report_file,
     validate_ocr_report_file,
     validate_retrieval_output_file,
+    validate_web_snapshot_file,
 )
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
@@ -1118,6 +1119,14 @@ def build_parser() -> argparse.ArgumentParser:
     capability_validate_retrieval.add_argument("report_path", type=Path, help="Path to a saved retrieval result JSON file.")
     capability_validate_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     capability_validate_retrieval.set_defaults(handler=run_capability_validate_retrieval_output)
+
+    capability_validate_web = capabilities_subcommands.add_parser(
+        "validate-web-snapshot",
+        help="Validate a saved governed web snapshot against the transparency contract.",
+    )
+    capability_validate_web.add_argument("snapshot_path", type=Path, help="Path to a saved web snapshot JSON file.")
+    capability_validate_web.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_web.set_defaults(handler=run_capability_validate_web_snapshot)
 
     memory = subcommands.add_parser("memory", help="Manage explicit local assistant memory.")
     memory_subcommands = memory.add_subparsers(dest="memory_command", required=True)
@@ -8566,6 +8575,15 @@ def run_capability_validate_retrieval_output(args: argparse.Namespace, cfg: Sett
     if not path.is_absolute():
         path = cfg.project_root / path
     report = validate_retrieval_output_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_web_snapshot(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.snapshot_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_web_snapshot_file(path)
     emit_payload(report, args.format)
     return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
 
