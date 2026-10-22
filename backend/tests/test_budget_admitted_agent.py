@@ -49,13 +49,15 @@ class BudgetAdmissionTests(unittest.TestCase):
 
     def test_success_settles_exactly_once(self):
         def completed(**_):
+            self.reactor.record_result(task_id="t",state="PASS",
+                result_digest=digest("output"),policy_digest=self.policy,cost_observed=3)
             return {"status":"PASS","task_id":"t","verified_output_digest":digest("output")}
         with patch("backend.app.budget_admitted_agent.execute_next_approved_task",side_effect=completed) as run:
             first=self.call()
             second=self.call()
         self.assertEqual(first["status"],"PASS")
         self.assertEqual(second["status"],"PASS")
-        self.assertEqual(run.call_count,2)
+        self.assertEqual(run.call_count,1)
         self.assertEqual(self.ledger.summary("g"),{"limit_units":5,"reserved_units":0,"spent_units":3})
 
     def test_ambiguous_failure_keeps_reservation(self):
