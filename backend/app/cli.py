@@ -79,6 +79,7 @@ from .gis_eval import (
 )
 from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
 from .ocr_structure import OCRStructureError, reconstruct_ocr_report
 from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
 from .ingestion import (
@@ -896,8 +897,8 @@ def build_parser() -> argparse.ArgumentParser:
     ocr = subcommands.add_parser("ocr", help="Run local OCR analysis with source-image receipts.")
     ocr_subcommands = ocr.add_subparsers(dest="ocr_command", required=True)
 
-    ocr_analyze = ocr_subcommands.add_parser("analyze", help="Analyze a local image with a local OCR engine.")
-    ocr_analyze.add_argument("image_path", help="Path to a local image file.")
+    ocr_analyze = ocr_subcommands.add_parser("analyze", help="Analyze a local image or PDF with local OCR engines.")
+    ocr_analyze.add_argument("image_path", help="Path to a local image or PDF file.")
     ocr_analyze.add_argument("--language", default="eng", help="OCR language code passed to the local engine.")
     ocr_analyze.add_argument(
         "--layout",
@@ -906,6 +907,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="OCR layout mode.",
     )
     ocr_analyze.add_argument("--tesseract-path", help="Explicit path to the local tesseract executable.")
+    ocr_analyze.add_argument("--dpi", type=int, default=200, help="PDF render DPI; ignored for image inputs.")
     ocr_analyze.add_argument("--timeout-seconds", type=int, default=30, help="OCR engine timeout.")
     ocr_analyze.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     ocr_analyze.set_defaults(handler=run_ocr_analyze)
@@ -2797,6 +2799,28 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         warnings = payload.get("warnings")
         if warnings:
             print("warnings=" + ",".join(str(warning) for warning in warnings))
+    elif status in {"OCR_PDF_OK", "OCR_PDF_WARN"}:
+        print(status)
+        print(f"operation={payload.get('operation')}")
+        print(f"report_id={payload.get('report_id')}")
+        print(f"report_path={payload.get('report_path')}")
+        print(f"report_sha256={payload.get('report_sha256')}")
+        source = payload.get("source")
+        if isinstance(source, dict):
+            print(f"source_sha256={source.get('sha256')}")
+            print(f"source_page_count={source.get('page_count')}")
+        renderer = payload.get("renderer")
+        if isinstance(renderer, dict):
+            print(f"pdf_renderer={renderer.get('name')}")
+            print(f"pdf_renderer_version={renderer.get('version')}")
+            print(f"dpi={renderer.get('dpi')}")
+        invariants = payload.get("invariants")
+        if isinstance(invariants, dict):
+            for key in ("rendered_page_count", "ocr_page_count", "total_span_count", "no_text_page_count"):
+                print(f"{key}={invariants.get(key)}")
+        warnings = payload.get("warnings")
+        if warnings:
+            print("warnings=" + ",".join(str(warning) for warning in warnings))
     elif status in {"OCR_ANALYSIS_OK", "OCR_ANALYSIS_NO_TEXT"}:
         print(status)
         print(f"operation={payload.get('operation')}")
@@ -3402,15 +3426,27 @@ def run_ocr_analyze(args: argparse.Namespace, cfg: Settings) -> int:
     if not path.is_absolute():
         path = cfg.project_root / path
     try:
-        result = analyze_image_ocr(
-            path,
-            cfg=cfg,
-            language=args.language,
-            layout_mode=args.layout,
-            tesseract_path=args.tesseract_path,
-            timeout_seconds=args.timeout_seconds,
-        )
-    except OCRAnalysisError as exc:
+        if path.suffix.lower() == ".pdf":
+            result = analyze_pdf_ocr(
+                path,
+                cfg=cfg,
+                language=args.language,
+                layout_mode=args.layout,
+                dpi=args.dpi,
+                tesseract_path=args.tesseract_path,
+                render_timeout_seconds=max(args.timeout_seconds, 30),
+                ocr_timeout_seconds=args.timeout_seconds,
+            )
+        else:
+            result = analyze_image_ocr(
+                path,
+                cfg=cfg,
+                language=args.language,
+                layout_mode=args.layout,
+                tesseract_path=args.tesseract_path,
+                timeout_seconds=args.timeout_seconds,
+            )
+    except (OCRAnalysisError, PDFOCRAnalysisError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)

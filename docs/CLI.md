@@ -294,13 +294,19 @@ transparent pixel accounting, and contains nonuniform visible content. Use
 projection correctness, label legibility, or cartographic accessibility.
 
 OCR analysis is intentionally separate from ingestion. `mucaro ocr analyze
-IMAGE_PATH` runs a local Tesseract engine against one image, preserves the
-source image SHA-256, engine path/version, language, layout mode, raw text,
-normalized text, canonical text, per-span confidence state, source-coordinate
-bounding boxes, warnings, and a JSON receipt under `data/exports/ocr_reports`.
-It is a narrow local image receipt candidate; PDF/page rendering, calibrated
-document layout, handwriting, tables/forms, and optional external OCR providers
-remain future governed-document-intelligence work.
+INPUT_PATH` auto-detects a local image or `.pdf`. Image inputs run a local
+Tesseract engine and preserve the source image SHA-256, engine path/version,
+language, layout mode, raw text, normalized text, canonical text, per-span
+confidence state, source-coordinate bounding boxes, warnings, and a JSON
+receipt under `data/exports/ocr_reports`. PDF inputs render each page through
+the local `pdftoppm` adapter, then run the same OCR boundary per page; the
+receipt binds the source PDF hash, renderer/version/DPI, declared/rendered/OCR
+page counts, rendered-page hashes, per-page OCR report hashes, and explicit
+no-text warnings. Use `--dpi` to select a PDF render DPI from 72 through 600;
+it is ignored for image inputs. The implementation remains a bounded local
+receipt candidate: calibrated document layout, handwriting, difficult scans,
+and optional external OCR providers remain future governed-document-intelligence
+work.
 
 Use `mucaro capabilities validate-ocr-report REPORT_PATH` to check a saved OCR
 receipt against the executable state-of-the-art OCR output contract. The
@@ -473,6 +479,8 @@ approved and audited.
 | `CAPABILITY_OUTPUT_CONTRACT_FAILED` | Saved advanced-capability output is missing required provenance, invariant, warning, limit, falsification, or operation-specific contract fields |
 | `OCR_ANALYSIS_OK` | Local image OCR completed with at least one extracted text span and wrote an OCR receipt |
 | `OCR_ANALYSIS_NO_TEXT` | Local image OCR completed without extracting text; no text was synthesized |
+| `OCR_PDF_OK` | PDF pages rendered and OCR completed with closed page/hash accounting |
+| `OCR_PDF_WARN` | PDF OCR completed with explicit no-text-page residue |
 | `ERROR_GIS_INPUT_NOT_FOUND` | GeoJSON input path does not exist |
 | `ERROR_GIS_INVALID_JSON` | GeoJSON input could not be parsed as JSON |
 | `ERROR_GIS_UNSUPPORTED_GEOJSON` | GIS command received a JSON object that is not a FeatureCollection |
@@ -613,8 +621,18 @@ approved and audited.
 | `ERROR_GIS_MEASURE_MODE_UNSUPPORTED` | GeoJSON measurement received an unsupported measurement mode |
 | `ERROR_GIS_MEASURE_GEODESIC_CRS` | Geodesic measurement was requested for a source CRS other than EPSG:4326 |
 | `ERROR_GIS_MEASURE_INVALID_COORDINATES` | Geodesic measurement found malformed, non-finite, or out-of-range longitude/latitude coordinates |
-| `ERROR_OCR_INPUT_NOT_FOUND` | OCR input path does not exist |
-| `ERROR_OCR_UNSUPPORTED_INPUT` | OCR command received an unsupported input type; current OCR analysis supports local images only |
+| `ERROR_OCR_INPUT_NOT_FOUND` | Image OCR input path does not exist |
+| `ERROR_OCR_UNSUPPORTED_INPUT` | Image OCR command received an unsupported input type |
+| `ERROR_OCR_PDF_NOT_FOUND` | PDF OCR input path does not exist |
+| `ERROR_OCR_PDF_UNSUPPORTED_INPUT` | PDF OCR received a non-PDF input |
+| `ERROR_OCR_PDF_DPI` | PDF OCR DPI is outside the bounded 72-600 range |
+| `ERROR_OCR_PDF_PARSE` | PDF page structure could not be read |
+| `ERROR_OCR_PDF_NO_PAGES` | PDF contains no pages |
+| `ERROR_OCR_PDF_RENDERER_UNAVAILABLE` | local `pdftoppm` executable was not found |
+| `ERROR_OCR_PDF_RENDER_TIMEOUT` | PDF page rendering exceeded its timeout |
+| `ERROR_OCR_PDF_RENDER_FAILED` | PDF page renderer exited with a non-zero status |
+| `ERROR_OCR_PDF_RENDER_EMPTY` | PDF renderer produced no page images |
+| `ERROR_OCR_PDF_PAGE_COUNT_MISMATCH` | declared PDF page count differed from rendered page count |
 | `ERROR_OCR_ENGINE_UNAVAILABLE` | local Tesseract executable was not found and no explicit `--tesseract-path` was supplied |
 | `ERROR_OCR_LANGUAGE_INVALID` | OCR language code was empty or had surrounding whitespace |
 | `ERROR_OCR_LAYOUT_INVALID` | OCR layout mode was not one of the supported adapter modes |

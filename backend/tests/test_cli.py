@@ -434,6 +434,34 @@ def test_cli_ocr_analyze_reports_receipt_summary(tmp_path: Path, capsys, monkeyp
     assert "warnings=OCR_UNKNOWN_CONFIDENCE_PRESENT" in output
 
 
+def test_cli_ocr_analyze_routes_pdf_to_page_receipt(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    pdf = tmp_path / "document.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n")
+    observed = {}
+
+    def fake_analyze(path: Path, **kwargs):
+        observed.update(path=path, kwargs=kwargs)
+        return {
+            "status": "OCR_PDF_OK",
+            "report_id": "ocrpdf_fixture",
+            "report_path": str(tmp_path / "report.json"),
+            "report_sha256": "c" * 64,
+        }
+
+    monkeypatch.setattr(cli, "analyze_pdf_ocr", fake_analyze)
+
+    assert main(
+        ["ocr", "analyze", str(pdf), "--dpi", "300", "--timeout-seconds", "45", "--format", "json"],
+        cfg=cfg,
+    ) == 0
+    assert capsys.readouterr().out
+    assert observed["path"] == pdf
+    assert observed["kwargs"]["dpi"] == 300
+    assert observed["kwargs"]["render_timeout_seconds"] == 45
+    assert observed["kwargs"]["ocr_timeout_seconds"] == 45
+
+
 def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
     report = {
