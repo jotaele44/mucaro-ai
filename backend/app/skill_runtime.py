@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .artifact_identity import ArtifactIdentityError, ArtifactRecord, create_artifact_record
 from .capability_policy import RUNTIME_CAPABILITY, CapabilityPolicy, evaluate_capabilities
 from .config import Settings, settings
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
@@ -158,6 +159,17 @@ def _append_execution(event: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     events.append(event)
     write_json(_executions_path(cfg), events)
     return event
+
+
+def _canonical_payload(value: Any) -> bytes:
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise SkillRuntimeError("ERROR_SKILL_ARTIFACT_SERIALIZATION", str(exc)) from exc
+
+
+def _artifact_payload(record: ArtifactRecord) -> dict[str, Any]:
+    return record.as_dict()
 
 
 def list_skills() -> dict[str, Any]:
@@ -347,6 +359,20 @@ def execute_skill(
         started_at,
     )
     try:
+        input_artifact = create_artifact_record(
+            processed_dir=cfg.processed_dir,
+            artifact_type="SOURCE",
+            payload=_canonical_payload(arguments),
+            logical_identity=f"skill_input:{skill_id}:{execution_id}",
+            producer="skill_runtime",
+            producer_version="1.0.0",
+            schema_id=skill.input_schema,
+            source_path_or_uri=f"skill://{skill_id}/input",
+        )
+    except ArtifactIdentityError as exc:
+        raise SkillRuntimeError("ERROR_SKILL_INPUT_ARTIFACT", str(exc)) from exc
+    artifact_lineage: dict[str, Any] = {"input": _artifact_payload(input_artifact), "output": None, "failure_receipt": None}
+    try:
         routed = execute_routed(
             runtime=route,
             skill_id=skill_id,
@@ -357,6 +383,21 @@ def execute_skill(
         )
         result = routed["result"]
         adapter_receipt = routed["adapter_receipt"]
+        try:
+            output_artifact = create_artifact_record(
+                processed_dir=cfg.processed_dir,
+                artifact_type="DERIVED",
+                payload=_canonical_payload(result),
+                logical_identity=f"skill_output:{skill_id}:{execution_id}",
+                producer="skill_runtime",
+                producer_version="1.0.0",
+                parent_artifact_ids=[input_artifact.artifact_id],
+                schema_id=skill.output_schema,
+                source_path_or_uri=f"skill://{skill_id}/output",
+            )
+        except ArtifactIdentityError as exc:
+            raise SkillRuntimeError("ERROR_SKILL_OUTPUT_ARTIFACT", str(exc)) from exc
+        artifact_lineage["output"] = _artifact_payload(output_artifact)
         status = "PASS"
         error = None
     except Exception as exc:
@@ -364,6 +405,21 @@ def execute_skill(
         adapter_receipt = None
         status = "FAIL"
         error = {"type": type(exc).__name__, "detail": str(exc)}
+        try:
+            failure_artifact = create_artifact_record(
+                processed_dir=cfg.processed_dir,
+                artifact_type="RECEIPT",
+                payload=_canonical_payload(error),
+                logical_identity=f"skill_failure:{skill_id}:{execution_id}",
+                producer="skill_runtime",
+                producer_version="1.0.0",
+                parent_artifact_ids=[input_artifact.artifact_id],
+                schema_id="mucaro-skill-execution-error/1.0",
+                source_path_or_uri=f"skill://{skill_id}/failure",
+            )
+            artifact_lineage["failure_receipt"] = _artifact_payload(failure_artifact)
+        except ArtifactIdentityError as artifact_exc:
+            error["artifact_error"] = str(artifact_exc)
     finished_at = utc_now()
     event = {
         "execution_id": execution_id,
@@ -382,6 +438,7 @@ def execute_skill(
         "result": result,
         "error": error,
         "policy_decision": policy_decision,
+        "artifact_lineage": artifact_lineage,
     }
     _append_execution(event, cfg)
     if status != "PASS":

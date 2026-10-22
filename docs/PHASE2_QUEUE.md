@@ -15,11 +15,11 @@
 | Execution contract | Runtime/execution identity and status schema | Candidate in Intelligence Plane foundation |
 | Model runtime contract | Provider/model/mode/capability schema independent of provider implementation | Candidate in Intelligence Plane foundation |
 | Provider-neutral model runtime | Replace narrow provider branching with adapter registry while preserving fail-closed live-mode behavior | Complete candidate |
-| Local worker runtime adapter | Isolate general skills from the app process | Next |
+| Local worker runtime adapter | Isolate general skills from the app process | Complete bounded candidate; subprocess isolation, environment minimization, timeout/output/resource limits, network policy, and runtime receipts are covered by local-worker and routing tests |
 | Container runtime adapter | Reproducible heavy GIS/OCR/media execution with pinned runtime identity | Queued |
 | Execution router | Choose IN_PROCESS / LOCAL_WORKER / CONTAINER / SERVICE / FEDERATION_WORKER by policy, never by skill fiat | Queued |
 | Capability policy engine | Bind filesystem/network/database/subprocess/model permissions to explicit policy | Next |
-| Artifact identity/provenance | Input/output handles, SHA-256 identity, staged commit, execution receipts | Next |
+| Artifact identity/provenance | Input/output handles, SHA-256 identity, staged commit, execution receipts | Complete bounded candidate for skill execution; input SOURCE, output DERIVED, and failure RECEIPT lineage are linked into the execution ledger; broader ingestion/export coverage remains queued |
 | Exact-head release handoff | Distribution manifest, governance report, and support bundle verify against the canonical head while preserving hosted governance as OPEN | Current baseline is CLI-bound; verify with `mucaro audit completion --include-github` |
 | Hosted governance remediation | Resolve GitHub Actions startup-before-jobs, billing visibility, and private branch-protection plan gate | Open external lane |
 | Advanced capability contracts | Shared evidence, permission, uncertainty, contradiction, and falsification schema for GIS, OCR, browsing, and coding outputs | Complete candidate; inspect with `mucaro capabilities contracts` |
