@@ -255,6 +255,37 @@ def test_tool_runtime_web_search_stays_fail_closed_without_live_permission(monke
     assert exc.value.status == "ERROR_WEB_SEARCH_LIVE_NOT_ALLOWED"
 
 
+def test_malformed_tool_result_fails_before_executed_state(tmp_path: Path, monkeypatch):
+    from dataclasses import replace
+
+    from backend.app import tools as tools_module
+    from backend.app.error_categories import classify_error
+
+    cfg = make_settings(tmp_path)
+
+    malformed = replace(
+        tools_module.TOOL_REGISTRY["source_library.status"],
+        handler=lambda arguments, cfg: ["not", "a", "result"],
+    )
+    monkeypatch.setitem(tools_module.TOOL_REGISTRY, "source_library.status", malformed)
+
+    call_id = request_tool_call("source_library.status", cfg=cfg, requested_by="test")["tool_call"]["tool_call_id"]
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(call_id, cfg=cfg, executed_by="test")
+
+    assert exc.value.status == "ERROR_TOOL_RESULT_INVALID"
+    assert classify_error(exc.value.status) == "TOOL_FAILURE"
+
+    call = next(row for row in list_tool_calls(cfg)["tool_calls"] if row["tool_call_id"] == call_id)
+    assert call["status"] == "FAILED"
+    assert call["result"]["status"] == "ERROR_TOOL_RESULT_INVALID"
+    events = [row for row in list_tool_audit_events(cfg)["events"] if row.get("tool_call_id") == call_id]
+    assert [row["event"] for row in events][-2:] == ["TOOL_CALL_STARTED", "TOOL_CALL_FAILED"]
+    assert not any(row["event"] == "TOOL_CALL_EXECUTED" for row in events)
+
+
 def test_a_hung_handler_times_out_and_is_never_recorded_as_executed(tmp_path: Path, monkeypatch):
     import threading
     from dataclasses import replace
