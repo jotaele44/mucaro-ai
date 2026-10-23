@@ -5,16 +5,109 @@
   "description": "MEMORY contract: one durable, user-controlled memory row. Memory is context only and never an authorization channel (INV-021).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["memory_id", "kind", "content", "enabled", "source", "created_at", "updated_at"],
+  "required": [
+    "memory_id",
+    "kind",
+    "content",
+    "enabled",
+    "source",
+    "created_at",
+    "updated_at"
+  ],
   "properties": {
-    "memory_id": {"type": "string", "pattern": "^mem_[a-f0-9]+$"},
-    "kind": {"enum": ["preference", "profile", "instruction", "fact"]},
-    "content": {"type": "string", "minLength": 1, "maxLength": 800},
-    "enabled": {"type": "boolean"},
-    "source": {"type": "string", "minLength": 1},
-    "scope": {"enum": ["global", "workspace", "conversation"]},
-    "scope_id": {"type": ["string", "null"]},
-    "created_at": {"type": "string", "minLength": 1},
-    "updated_at": {"type": "string", "minLength": 1}
-  }
+    "memory_id": {
+      "type": "string",
+      "pattern": "^mem_[a-f0-9]+$"
+    },
+    "kind": {
+      "enum": [
+        "preference",
+        "profile",
+        "instruction",
+        "fact"
+      ]
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 800
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "enum": [
+        "global",
+        "workspace",
+        "conversation"
+      ]
+    },
+    "scope_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 160
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updated_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "scope"
+        ],
+        "properties": {
+          "scope": {
+            "const": "global"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "scope_id": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "scope"
+        ],
+        "properties": {
+          "scope": {
+            "enum": [
+              "workspace",
+              "conversation"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "scope_id"
+        ],
+        "properties": {
+          "scope_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        }
+      }
+    }
+  ]
 }
