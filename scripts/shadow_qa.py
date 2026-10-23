@@ -85,6 +85,25 @@ REQUIRED_ADVERSARIAL_VECTORS = [
     "unexpected_codes",
 ]
 
+
+VECTOR_TEST_SELECTORS = {
+    "null_empty": "backend/tests/test_response_flow.py::test_resolve_rejects_ambiguous_and_empty_responses",
+    "duplicate": "backend/tests/test_contracts.py::test_allowed_approved_action_executes_once_and_duplicate_invocation_is_refused",
+    "stale": "backend/tests/test_contracts.py::test_decision_against_stale_arguments_is_refused",
+    "m_to_n_cardinality": "backend/tests/test_gis_processing.py::test_spatial_join_preserves_holes_multipolygons_and_overlap_multiplication",
+    "race": "backend/tests/test_contracts.py::test_concurrent_runs_execute_the_handler_exactly_once",
+    "replay_idempotency": "backend/tests/test_provider_attempt_identity.py::test_accepted_operation_is_not_executed_twice",
+    "cancellation": "backend/tests/test_work_runs.py::test_stop_while_awaiting_approval_interrupts_and_cancels_pending_calls",
+    "restart_reconstruction": "backend/tests/test_work_runs.py::test_restart_interrupts_running_runs_and_resumes_waiting_ones",
+    "resume": "backend/tests/test_provider_attempt_identity.py::test_interrupted_operation_is_retried_after_resume_on_another_provider",
+    "malformed_tool_result": "backend/tests/test_tools.py::test_malformed_tool_result_fails_before_executed_state",
+    "partial_delayed_tool_result": "backend/tests/test_tools.py::test_a_hung_handler_times_out_and_is_never_recorded_as_executed",
+    "orphan_state_transition": "backend/tests/test_agent_checkpoints.py::test_every_disallowed_edge_is_rejected_and_every_allowed_edge_is_accepted",
+    "persistence_loss": "backend/tests/test_agent_checkpoint_process_recovery.py::test_checkpoint_survives_fresh_process_and_resumes_exactly_once",
+    "schema_drift": "backend/tests/test_db_upgrade.py::test_newer_schema_is_refused_and_left_untouched",
+    "unexpected_codes": "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped",
+}
+
 SHADOW_BOOTSTRAP_PATHS = {
     ".github/workflows/shadow-qa.yml",
     "backend/tests/test_shadow_baseline.py",
@@ -95,6 +114,110 @@ SHADOW_BOOTSTRAP_PATHS = {
     "scripts/shadow_evidence.py",
     "scripts/shadow_qa.py",
 }
+
+
+def _repo_relative(path: Path) -> str:
+    target = path.expanduser().resolve()
+    try:
+        return target.relative_to(ROOT).as_posix()
+    except ValueError as exc:
+        raise shadow_evidence.ShadowEvidenceError(
+            f"Shadow evidence output must stay inside the repository: {path}"
+        ) from exc
+
+
+def certify_exact_vectors(
+    *,
+    base_sha: str,
+    checkpoint_sha: str,
+    broad_gates: list[dict[str, object]],
+    execution_receipt_path: Path,
+    manifest_path: Path,
+) -> tuple[dict[str, object], dict[str, dict[str, object]], str, str]:
+    if set(VECTOR_TEST_SELECTORS) != set(REQUIRED_ADVERSARIAL_VECTORS):
+        raise shadow_evidence.ShadowEvidenceError("vector selector denominator does not match required vectors")
+
+    selectors = [VECTOR_TEST_SELECTORS[vector] for vector in REQUIRED_ADVERSARIAL_VECTORS]
+    gate = run([sys.executable, "-m", "pytest", "-q", *selectors])
+    broad_pass = all(
+        gate_row.get("state") != "BLOCKED"
+        and (not isinstance(gate_row.get("returncode"), int) or gate_row["returncode"] == 0)
+        for gate_row in broad_gates
+    )
+    status = "PASS" if broad_pass and gate["returncode"] == 0 else "FAIL"
+
+    receipt_target = execution_receipt_path.expanduser().resolve()
+    manifest_target = manifest_path.expanduser().resolve()
+    receipt_rel = _repo_relative(receipt_target)
+    manifest_rel = _repo_relative(manifest_target)
+    receipt_target.parent.mkdir(parents=True, exist_ok=True)
+    manifest_target.parent.mkdir(parents=True, exist_ok=True)
+
+    execution_receipt = {
+        "schema_version": shadow_evidence.EXECUTION_RECEIPT_SCHEMA_VERSION,
+        "base_sha": base_sha,
+        "checkpoint_sha": checkpoint_sha,
+        "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "status": status,
+        "broad_gates_passed": broad_pass,
+        "vector_selector_count": len(selectors),
+        "vector_selectors": selectors,
+        "vector_gate_returncode": gate["returncode"],
+    }
+    receipt_target.write_text(json.dumps(execution_receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    vectors = []
+    for vector in REQUIRED_ADVERSARIAL_VECTORS:
+        selector = VECTOR_TEST_SELECTORS[vector]
+        path, _, _test = selector.partition("::")
+        if status == "PASS":
+            vectors.append(
+                {
+                    "vector": vector,
+                    "state": "PASS",
+                    "rationale": "Exact-checkpoint dedicated adversarial selector passed.",
+                    "evidence": [
+                        {
+                            "evidence_id": f"{vector}-checkpoint-test",
+                            "kind": "CHECKPOINT_TEST",
+                            "path": path,
+                            "selector": selector,
+                        },
+                        {
+                            "evidence_id": f"{vector}-execution-receipt",
+                            "kind": "EXECUTION_RECEIPT",
+                            "path": receipt_rel,
+                            "selector": "",
+                        },
+                    ],
+                }
+            )
+        else:
+            vectors.append(
+                {
+                    "vector": vector,
+                    "state": "UNRESOLVED",
+                    "rationale": "Exact-checkpoint dedicated adversarial selector suite did not pass.",
+                    "evidence": [],
+                }
+            )
+
+    manifest = {
+        "schema_version": shadow_evidence.SCHEMA_VERSION,
+        "base_sha": base_sha,
+        "checkpoint_sha": checkpoint_sha,
+        "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "source": "EXACT_CHECKPOINT_GENERATED",
+        "vectors": vectors,
+    }
+    manifest_target.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    normalized = shadow_evidence.validate_manifest(
+        manifest,
+        base_sha=base_sha,
+        checkpoint_sha=checkpoint_sha,
+        required_vectors=REQUIRED_ADVERSARIAL_VECTORS,
+    )
+    return gate, normalized, receipt_rel, manifest_rel
 
 
 def adversarial_vector_results(paths: list[str]) -> dict[str, dict[str, str]]:
@@ -132,6 +255,18 @@ def main() -> int:
     parser.add_argument("--evidence-manifest", type=Path, help="Checkpoint-bound vector evidence manifest.")
     parser.add_argument("--historical-replay", action="store_true", help="Adjudicate a historical checkpoint from frozen evidence without claiming its gates were rerun.")
     parser.add_argument(
+        "--execution-receipt",
+        type=Path,
+        default=Path(os.environ.get("MUCARO_SHADOW_EXECUTION_RECEIPT", "data/exports/shadow/shadow-execution-receipt.json")),
+        help="Exact-checkpoint execution receipt emitted after broad and vector gates.",
+    )
+    parser.add_argument(
+        "--generated-evidence-manifest",
+        type=Path,
+        default=Path(os.environ.get("MUCARO_SHADOW_GENERATED_EVIDENCE", "data/exports/shadow/shadow-vector-evidence.json")),
+        help="Generated exact-checkpoint vector evidence manifest.",
+    )
+    parser.add_argument(
         "--output",
         default=os.environ.get("MUCARO_SHADOW_RECEIPT", "artifacts/shadow-qa-receipt.json"),
         help="Receipt path.",
@@ -157,8 +292,11 @@ def main() -> int:
                 "command": [],
                 "cwd": ".",
                 "returncode": None,
-                "state": "BLOCKED",
-                "reason": "Historical replay preserves evidence but does not rerun checkpoint code from the tooling checkout.",
+                "state": "AUDIT_ONLY",
+                "reason": (
+                    "Historical replay validates frozen exact-checkpoint execution evidence; "
+                    "checkpoint code is not rerun from the tooling checkout."
+                ),
             }
         ]
     else:
@@ -182,24 +320,41 @@ def main() -> int:
                 }
             )
 
-    failed = [gate for gate in gates if isinstance(gate.get("returncode"), int) and gate["returncode"] != 0]
-    blocked = [gate for gate in gates if gate.get("state") == "BLOCKED"]
-
     rendered_state, rendered_reason = classify_rendered(paths)
+    generated_manifest: str | None = None
+    execution_receipt: str | None = None
     try:
-        vector_results = (
-            shadow_evidence.load_manifest(
+        if args.evidence_manifest:
+            vector_results = shadow_evidence.load_manifest(
                 args.evidence_manifest,
                 base_sha=base_sha,
                 checkpoint_sha=head_sha,
                 required_vectors=REQUIRED_ADVERSARIAL_VECTORS,
             )
-            if args.evidence_manifest
-            else adversarial_vector_results(paths)
-        )
+        elif args.historical_replay:
+            vector_results = adversarial_vector_results(paths)
+        else:
+            initial_failed = [
+                gate for gate in gates if isinstance(gate.get("returncode"), int) and gate["returncode"] != 0
+            ]
+            initial_blocked = [gate for gate in gates if gate.get("state") == "BLOCKED"]
+            if initial_failed or initial_blocked:
+                vector_results = adversarial_vector_results(paths)
+            else:
+                vector_gate, vector_results, execution_receipt, generated_manifest = certify_exact_vectors(
+                    base_sha=base_sha,
+                    checkpoint_sha=head_sha,
+                    broad_gates=gates,
+                    execution_receipt_path=args.execution_receipt,
+                    manifest_path=args.generated_evidence_manifest,
+                )
+                gates.append(vector_gate)
     except shadow_evidence.ShadowEvidenceError as exc:
         print(f"ERROR_SHADOW_EVIDENCE {exc}", file=sys.stderr)
         return 7
+
+    failed = [gate for gate in gates if isinstance(gate.get("returncode"), int) and gate["returncode"] != 0]
+    blocked = [gate for gate in gates if gate.get("state") == "BLOCKED"]
 
     unresolved_vectors = [
         name for name, result in vector_results.items() if result["state"] == "UNRESOLVED"
@@ -268,7 +423,8 @@ def main() -> int:
             "closes": len(vector_results) == len(REQUIRED_ADVERSARIAL_VECTORS),
         },
         "execution_mode": "HISTORICAL_EVIDENCE_REPLAY" if args.historical_replay else "EXACT_CHECKPOINT_EXECUTION",
-        "evidence_manifest": str(args.evidence_manifest) if args.evidence_manifest else None,
+        "evidence_manifest": str(args.evidence_manifest) if args.evidence_manifest else generated_manifest,
+        "execution_receipt": execution_receipt,
         "tooling_head_sha": actual_head,
         "overall_state": overall,
         "scope_note": "This receipt is bounded to the exact checkpoint and declared gates; it does not claim universal defect freedom.",
