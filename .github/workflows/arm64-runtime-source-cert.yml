@@ -76,6 +76,17 @@ jobs:
           sha256sum "$OUT/requirements-macos-arm64.lock"
           cat "$OUT/requirements-macos-arm64.lock"
 
+      - name: Verify generated lock matches governed lock
+        env:
+          OUT: ${{ runner.temp }}/arm64-runtime-source
+        run: |
+          set -euo pipefail
+          if ! cmp -s "$OUT/requirements-macos-arm64.lock" packaging/runtime/requirements-macos-arm64.lock; then
+            diff -u packaging/runtime/requirements-macos-arm64.lock "$OUT/requirements-macos-arm64.lock" || true
+            echo "ERROR_PORTABLE_RUNTIME_LOCK_STALE"
+            exit 1
+          fi
+
       - name: Write source certification receipt
         env:
           OUT: ${{ runner.temp }}/arm64-runtime-source
