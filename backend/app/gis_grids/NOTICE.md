@@ -1,9 +1,9 @@
 # Governed GIS Grid Notice
 
-`us_noaa_pvhpgn.tif` is a horizontal datum-shift grid originating from the
-United States National Oceanic and Atmospheric Administration and distributed
-through the OSGeo PROJ-data project. PROJ-data identifies the underlying NOAA
-grid family as public domain.
+`us_noaa_pvhpgn.tif` and `us_noaa_FL.tif` are horizontal datum-shift grids
+originating from the United States National Oceanic and Atmospheric
+Administration and distributed through the OSGeo PROJ-data project.
+PROJ-data identifies the underlying NOAA grid family as public domain.
 
 The exact source revision, source and license evidence links, retrieval time,
 byte count, SHA-256 digest, CRS semantics, area of use, and permitted Mucaro

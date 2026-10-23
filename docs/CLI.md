@@ -54,6 +54,10 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
 | `mucaro capabilities validate-gis-report REPORT_PATH` | Validate a saved GIS receipt against the advanced capability output contract | 0 | 2 |
 | `mucaro capabilities validate-ocr-report REPORT_PATH` | Validate a saved OCR receipt against the state-of-the-art OCR output contract | 0 | 2 |
+| `mucaro capabilities validate-execution-report REPORT_PATH` | Validate a saved skill execution artifact-lineage receipt against the transparency contract | 0 | 2 |
+| `mucaro capabilities validate-retrieval-output REPORT_PATH` | Validate a saved retrieval result for ranked chunk/source integrity | 0 | 2 |
+| `mucaro capabilities validate-web-snapshot SNAPSHOT_PATH` | Validate a saved governed web snapshot for byte, policy, and parser integrity | 0 | 2 |
+| `mucaro capabilities validate-coding-report REPORT_PATH` | Validate a saved coding certification report for denominator, identity, and residue integrity | 0 | 2 |
 | `mucaro gis inspect GEOJSON_PATH` | Inspect a GeoJSON FeatureCollection and write a CRS/geometry/topology receipt | 0 | 2 |
 | `mucaro gis point-in-polygon POINTS_PATH POLYGONS_PATH` | Classify point features against polygon features and write a spatial join receipt | 0 | 2 |
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
@@ -79,7 +83,9 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis derive-d8-flow RASTER_PATH --elevation-units meters` | Derive four-band D8 candidates, accumulation, contributing area, and explicit terminal-state output on a bounded projected-metre grid | 0 | 2 |
 | `mucaro gis validate-corpus MANIFEST_PATH` | Validate frozen authoritative GIS corpus bytes, provenance, explicit asset types, vector identities/geometries, and raster grids/value accounting | 0 | 2 |
 | `mucaro gis map-export-manifest OUTPUT_PATH --layer PATH CRS ...` | Bind an existing map/export artifact to renderer identity, extent, CRS, and source-layer hashes | 0 | 2 |
+| `mucaro gis map-render-validate OUTPUT_PATH` | Decode and independently validate rendered image dimensions, pixel accounting, visible content, and optional manifest binding | 0 | 3 |
 | `mucaro ocr analyze IMAGE_PATH` | Run local image OCR and write a source-image, confidence, and layout receipt | 0 | 2 |
+| `mucaro ocr calibrate REPORT_PATH GOLD_PATH` | Evaluate every saved OCR span against independently authored exact-match labels with confidence calibration metrics | 0 | 2 |
 | `mucaro ingest PATH` | Ingest one supported file or a folder | 0 | 2 |
 | `mucaro ask QUERY` | Answer from ingested local sources | 0 | 2 or 3 |
 | `mucaro sources list` | List ingested sources, persistent index status, and semantic-store status | 0 | 2 |
@@ -285,14 +291,27 @@ non-empty artifact to its output hash, extent, CRS, renderer name/version, and
 one or more source-layer hashes plus declared CRS. This proves artifact
 provenance, not visual correctness.
 
+`mucaro gis map-render-validate` is a separate image-level gate. It verifies
+that the artifact decodes, has bounded positive dimensions, closes visible and
+transparent pixel accounting, and contains nonuniform visible content. Use
+`--manifest` to require output hash and path identity against a saved
+`GIS_MAP_EXPORT_MANIFEST_OK` receipt. This does not prove layer semantics,
+projection correctness, label legibility, or cartographic accessibility.
+
 OCR analysis is intentionally separate from ingestion. `mucaro ocr analyze
-IMAGE_PATH` runs a local Tesseract engine against one image, preserves the
-source image SHA-256, engine path/version, language, layout mode, raw text,
-normalized text, canonical text, per-span confidence state, source-coordinate
-bounding boxes, warnings, and a JSON receipt under `data/exports/ocr_reports`.
-It is a narrow local image receipt candidate; PDF/page rendering, calibrated
-document layout, handwriting, tables/forms, and optional external OCR providers
-remain future governed-document-intelligence work.
+INPUT_PATH` auto-detects a local image or `.pdf`. Image inputs run a local
+Tesseract engine and preserve the source image SHA-256, engine path/version,
+language, layout mode, raw text, normalized text, canonical text, per-span
+confidence state, source-coordinate bounding boxes, warnings, and a JSON
+receipt under `data/exports/ocr_reports`. PDF inputs render each page through
+the local `pdftoppm` adapter, then run the same OCR boundary per page; the
+receipt binds the source PDF hash, renderer/version/DPI, declared/rendered/OCR
+page counts, rendered-page hashes, per-page OCR report hashes, and explicit
+no-text warnings. Use `--dpi` to select a PDF render DPI from 72 through 600;
+it is ignored for image inputs. The implementation remains a bounded local
+receipt candidate: calibrated document layout, handwriting, difficult scans,
+and optional external OCR providers remain future governed-document-intelligence
+work.
 
 Use `mucaro capabilities validate-ocr-report REPORT_PATH` to check a saved OCR
 receipt against the executable state-of-the-art OCR output contract. The
@@ -303,6 +322,23 @@ span/confidence accounting. It returns `CAPABILITY_OUTPUT_CONTRACT_FAILED` when
 a report omits source or engine proof, claims text without saved spans, misses a
 required no-text or low-confidence warning, or asserts span/confidence counts
 that do not match the saved spans.
+
+Use `mucaro ocr calibrate REPORT_PATH GOLD_PATH` to evaluate a saved image OCR
+receipt against a `MUCARO_OCR_CALIBRATION_GOLD/1.0` JSON file. The gold file
+must bind its `report_sha256` to the exact OCR receipt bytes and provide exactly
+one `expected_text` label for every saved `span_index`. The result reports exact
+normalized-match accuracy, confidence coverage, Brier score, reliability bins,
+low-confidence error rate, and high-confidence precision. This is explicit
+evaluation evidence only: it does not assert semantic equivalence, create gold
+labels, certify representative-corpus accuracy, or change the OCR capability
+state by itself.
+
+Use `mucaro capabilities validate-execution-report REPORT_PATH` to validate a
+saved `skill_runtime` execution event. The validator requires a hash-backed
+input `SOURCE` artifact, then requires exactly one `DERIVED` output for a
+successful execution or one `RECEIPT` artifact for a failed execution. Broken
+parent links, duplicate artifact IDs, invalid SHA-256 values, malformed byte
+sizes, and contradictory success/failure lineage fail closed.
 
 ## Output Contracts
 
@@ -465,6 +501,8 @@ approved and audited.
 | `CAPABILITY_OUTPUT_CONTRACT_FAILED` | Saved advanced-capability output is missing required provenance, invariant, warning, limit, falsification, or operation-specific contract fields |
 | `OCR_ANALYSIS_OK` | Local image OCR completed with at least one extracted text span and wrote an OCR receipt |
 | `OCR_ANALYSIS_NO_TEXT` | Local image OCR completed without extracting text; no text was synthesized |
+| `OCR_PDF_OK` | PDF pages rendered and OCR completed with closed page/hash accounting |
+| `OCR_PDF_WARN` | PDF OCR completed with explicit no-text-page residue |
 | `ERROR_GIS_INPUT_NOT_FOUND` | GeoJSON input path does not exist |
 | `ERROR_GIS_INVALID_JSON` | GeoJSON input could not be parsed as JSON |
 | `ERROR_GIS_UNSUPPORTED_GEOJSON` | GIS command received a JSON object that is not a FeatureCollection |
@@ -605,13 +643,36 @@ approved and audited.
 | `ERROR_GIS_MEASURE_MODE_UNSUPPORTED` | GeoJSON measurement received an unsupported measurement mode |
 | `ERROR_GIS_MEASURE_GEODESIC_CRS` | Geodesic measurement was requested for a source CRS other than EPSG:4326 |
 | `ERROR_GIS_MEASURE_INVALID_COORDINATES` | Geodesic measurement found malformed, non-finite, or out-of-range longitude/latitude coordinates |
-| `ERROR_OCR_INPUT_NOT_FOUND` | OCR input path does not exist |
-| `ERROR_OCR_UNSUPPORTED_INPUT` | OCR command received an unsupported input type; current OCR analysis supports local images only |
+| `ERROR_OCR_INPUT_NOT_FOUND` | Image OCR input path does not exist |
+| `ERROR_OCR_UNSUPPORTED_INPUT` | Image OCR command received an unsupported input type |
+| `ERROR_OCR_PDF_NOT_FOUND` | PDF OCR input path does not exist |
+| `ERROR_OCR_PDF_UNSUPPORTED_INPUT` | PDF OCR received a non-PDF input |
+| `ERROR_OCR_PDF_DPI` | PDF OCR DPI is outside the bounded 72-600 range |
+| `ERROR_OCR_PDF_PARSE` | PDF page structure could not be read |
+| `ERROR_OCR_PDF_NO_PAGES` | PDF contains no pages |
+| `ERROR_OCR_PDF_RENDERER_UNAVAILABLE` | local `pdftoppm` executable was not found |
+| `ERROR_OCR_PDF_RENDER_TIMEOUT` | PDF page rendering exceeded its timeout |
+| `ERROR_OCR_PDF_RENDER_FAILED` | PDF page renderer exited with a non-zero status |
+| `ERROR_OCR_PDF_RENDER_EMPTY` | PDF renderer produced no page images |
+| `ERROR_OCR_PDF_PAGE_COUNT_MISMATCH` | declared PDF page count differed from rendered page count |
 | `ERROR_OCR_ENGINE_UNAVAILABLE` | local Tesseract executable was not found and no explicit `--tesseract-path` was supplied |
 | `ERROR_OCR_LANGUAGE_INVALID` | OCR language code was empty or had surrounding whitespace |
 | `ERROR_OCR_LAYOUT_INVALID` | OCR layout mode was not one of the supported adapter modes |
 | `ERROR_OCR_TIMEOUT` | OCR engine exceeded the configured timeout |
 | `ERROR_OCR_ENGINE_FAILED` | OCR engine exited with a non-zero status |
+| `ERROR_OCR_CALIBRATION_REPORT_READ` | OCR calibration report could not be read as a JSON object |
+| `ERROR_OCR_CALIBRATION_GOLD_READ` | OCR calibration gold file could not be read as a JSON object |
+| `ERROR_OCR_CALIBRATION_REPORT_SCHEMA` | calibration requires a saved image OCR report |
+| `ERROR_OCR_CALIBRATION_GOLD_SCHEMA` | calibration gold schema is unsupported |
+| `ERROR_OCR_CALIBRATION_REPORT_SHA256` | calibration gold labels are not bound to the evaluated OCR receipt bytes |
+| `ERROR_OCR_CALIBRATION_LABELS` | OCR calibration report spans and gold labels are not arrays |
+| `ERROR_OCR_CALIBRATION_SPAN_ID` | OCR report span IDs are invalid or duplicated |
+| `ERROR_OCR_CALIBRATION_LABEL_ID` | gold span IDs are invalid, duplicated, or absent from the report |
+| `ERROR_OCR_CALIBRATION_EXPECTED_TEXT` | a gold label does not contain a string expected_text value |
+| `ERROR_OCR_CALIBRATION_INCOMPLETE` | one or more saved OCR spans lack exactly one gold label |
+| `ERROR_OCR_CALIBRATION_OBSERVED_TEXT` | a saved OCR span does not contain raw text |
+| `ERROR_OCR_CALIBRATION_CONFIDENCE` | a saved OCR confidence is not finite in the 0-100 scale |
+| `ERROR_OCR_CALIBRATION_THRESHOLDS` | calibration thresholds do not satisfy the bounded low/high ordering |
 | `ERROR_INVALID_RETRIEVAL_STRATEGY` | retrieval strategy is outside the supported set |
 | `PORT_RANGE:1-65535` | `serve --port` is outside the TCP port range |
 | `CITATION_ERROR` | answer trace failed citation validation |
@@ -934,6 +995,29 @@ the descriptive capability contract and concrete GIS receipts; broader GIS
 operation-specific checks plus web, retrieval, and coding validators remain
 future work.
 
+Use `mucaro capabilities validate-retrieval-output REPORT_PATH` to validate one
+saved retrieval result without claiming that retrieval alone proves semantic
+answer support. Successful results must contain unique chunk IDs, source IDs,
+chunk indices, finite scores, matched terms, one consistent strategy, and
+non-increasing score order. No-context and no-source statuses pass only when
+their result arrays are empty. Citation and answer-trace validation remains a
+separate gate.
+
+Use `mucaro capabilities validate-web-snapshot SNAPSHOT_PATH` to validate a
+frozen web snapshot. The validator recomputes the content SHA-256 from strict
+base64 bytes, checks URL and redirect continuity, requires robots evidence,
+enforces immutable snapshot-only cache policy, checks HTTP-error citation state,
+and validates parser trace accounting. It does not claim source authority,
+semantic page correctness, rendered-browser fidelity, or claim support; those
+remain separate evidence gates.
+
+Use `mucaro capabilities validate-coding-report REPORT_PATH` to validate a
+coding certification report. It checks manifest-bound requirement arithmetic,
+unique states and evidence hashes, source/runtime/pinned-image identity flags,
+residue closure, certification-statement gating, explicit invariants, and the
+report self-hash. A structurally valid report with unresolved or blocked coding
+execution remains non-certifying.
+
 Use `mucaro eval retrieval` to run the committed retrieval-quality fixture from
 the supported CLI surface. The command reports the fixture path, chunk/query
 counts, positive/no-context query counts, expected binding counts, explicit
@@ -979,8 +1063,10 @@ longitude/latitude residue, a frozen real USGS 3DEP raster manifestation,
 bounded projected-metre slope/aspect controls, terrain-lineage-bound hillshade,
 bounded priority-flood depression conditioning with explicit depth and volume
 accounting, and bounded D8 flow direction/accumulation with explicit terminal
-ambiguity. The current committed denominator is 64 cases across 25 operations,
-including 26 fail-closed negative cases.
+ambiguity, plus projected-planar fractional-coverage zonal statistics with
+closed coverage areas and weighted summaries. The current committed denominator
+is 67 cases across 25 operations, including 27 fail-closed negative cases and
+paired fractional-coverage controls.
 It returns `GIS_EVAL_OK` only when the fixture and every case pass;
 `GIS_EVAL_FAILED` keeps broader GIS maturity open and gives automation a hard
 regression signal.

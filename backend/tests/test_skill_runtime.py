@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from backend.app.capability_policy import CapabilityPolicy
+from backend.app.artifact_identity import list_artifacts, trace_ancestors
 from backend.app.config import Settings
 from backend.app.skill_runtime import (
     SkillDefinition,
@@ -76,12 +77,53 @@ def test_skill_must_mount_then_activate_before_execution(tmp_path: Path):
     assert executed["result"]["repo_id"] == "mucaro-ai"
     assert executed["result"]["membership_status"] == "PROVISIONAL"
     assert executed["result"]["baseline_required"] is False
+    lineage = executed["execution"]["artifact_lineage"]
+    assert lineage["input"]["artifact_type"] == "SOURCE"
+    assert lineage["output"]["artifact_type"] == "DERIVED"
+    assert lineage["output"]["parent_artifact_ids"] == [lineage["input"]["artifact_id"]]
+    assert [row["artifact_id"] for row in trace_ancestors(cfg.processed_dir, lineage["output"]["artifact_id"])] == [
+        lineage["input"]["artifact_id"]
+    ]
 
     mounts = list_skill_mounts(cfg)["mounts"]
     executions = list_skill_executions(cfg)["executions"]
     assert len(mounts) == 1
     assert len(executions) == 1
     assert executions[0]["skill_digest"] == mounts[0]["digest"]
+    assert len(list_artifacts(cfg.processed_dir)) == 2
+
+
+def test_failed_skill_execution_keeps_input_and_failure_receipt_lineage(monkeypatch, tmp_path: Path):
+    from backend.app import skill_runtime
+
+    cfg = make_settings(tmp_path)
+    definition = SkillDefinition(
+        skill_id="test/failing-artifact-skill",
+        version="1.0.0",
+        description="Synthetic failure provenance test.",
+        runtime="IN_PROCESS",
+        capabilities=(),
+        input_schema="test.input/1",
+        output_schema="test.output/1",
+        handler=lambda arguments, settings: (_ for _ in ()).throw(RuntimeError("expected failure")),
+    )
+    monkeypatch.setitem(skill_runtime.SKILL_REGISTRY, definition.skill_id, definition)
+    mount_skill(definition.skill_id, cfg=cfg)
+    activate_skill(definition.skill_id, cfg=cfg)
+
+    try:
+        execute_skill(definition.skill_id, {"request": "failure"}, cfg=cfg)
+    except SkillRuntimeError as exc:
+        assert exc.status == "ERROR_SKILL_EXECUTION_FAILED"
+    else:
+        raise AssertionError("expected skill execution failure")
+
+    event = list_skill_executions(cfg)["executions"][0]
+    lineage = event["artifact_lineage"]
+    assert lineage["input"]["artifact_type"] == "SOURCE"
+    assert lineage["output"] is None
+    assert lineage["failure_receipt"]["artifact_type"] == "RECEIPT"
+    assert lineage["failure_receipt"]["parent_artifact_ids"] == [lineage["input"]["artifact_id"]]
 
 
 def test_app_store_channel_allows_only_reviewed_in_process_skill(monkeypatch, tmp_path: Path):

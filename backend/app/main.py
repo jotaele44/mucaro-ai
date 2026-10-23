@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
+from .error_categories import classify_error
 from .conversations import (
     ConversationMessageEditError,
     append_answer_turn,
@@ -122,7 +123,7 @@ GENERATED_NAME_PATTERN = re.compile(r"^(src_|run_|chunk_)", re.IGNORECASE)
 
 
 def api_error(status: str, detail: str, *, status_code: int = 400, **extra: object) -> HTTPException:
-    payload = {"status": status, "detail": detail}
+    payload = {"status": status, "category": classify_error(status), "detail": detail}
     payload.update(extra)
     return HTTPException(status_code=status_code, detail=payload)
 
