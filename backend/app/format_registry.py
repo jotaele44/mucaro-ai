@@ -13,6 +13,17 @@ from typing import Any
 
 FORMAT_REGISTRY_SCHEMA_VERSION = "mucaro-ingest-format-registry/1.0"
 
+HANDLING_NOTES = {
+    "text": "Decode as UTF-8 text with replacement for invalid byte sequences.",
+    "structured_text": "Parse structure locally and emit normalized text plus parser metadata.",
+    "document": "Extract document text locally while preserving document-specific metadata.",
+    "archive": "Inspect archive safety before bounded text-member extraction; never execute members.",
+    "email": "Extract bounded message text and supported text-like attachments without executing content.",
+    "image_metadata": "Record local image metadata only; semantic image understanding requires a model adapter.",
+    "audio_metadata": "Record local audio metadata only; semantic audio understanding requires a model adapter.",
+    "video_metadata": "Record local video/container metadata only; semantic video understanding requires a model adapter.",
+}
+
 FORMAT_REGISTRY: dict[str, dict[str, Any]] = {
     ".txt": {"mime_type": "text/plain", "parser": "text_utf8", "handling": "text", "signature_kinds": None},
     ".md": {"mime_type": "text/markdown", "parser": "text_utf8", "handling": "text", "signature_kinds": None},
@@ -85,6 +96,7 @@ def declared_format_registry() -> dict[str, Any]:
             "mime_type": row["mime_type"],
             "parser": row["parser"],
             "handling": row["handling"],
+            "handling_note": HANDLING_NOTES[row["handling"]],
             "signature_kinds": list(row["signature_kinds"]) if row["signature_kinds"] is not None else [],
         }
         for suffix, row in sorted(FORMAT_REGISTRY.items())
