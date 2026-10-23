@@ -1172,7 +1172,7 @@ def test_cli_version(capsys):
     except SystemExit as exc:
         assert exc.code == 0
     output = capsys.readouterr().out
-    assert output == "mucaro 0.1.23\n"
+    assert output == "mucaro 0.1.24\n"
 
 
 def test_cli_validate_text_output(tmp_path: Path, capsys):
@@ -2471,7 +2471,7 @@ def test_cli_certify_status_reports_release_readiness(tmp_path: Path, capsys):
     assert main(["certify", "status", "--format", "json"], cfg=cfg) == 2
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "CERTIFICATION_FAIL"
-    assert payload["version"] == "0.1.23"
+    assert payload["version"] == "0.1.24"
     assert payload["project_root"] == str(tmp_path)
     assert payload["product_audit_status"] == "PRODUCT_AUDIT_OPEN"
     assert payload["json_status"] == "JSON_OK"
@@ -4949,7 +4949,7 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
             calls.append("refresh:python_dist")
             return subprocess.CompletedProcess(cmd, 0, stdout="PYTHON_DIST_CERT_OK\n")
         if "certify_source_artifact.py" in command_text:
-            assert cmd[-1].endswith(f"mucaro-ai-0.1.23-{head_sha[:12]}-artifact-manifest.json")
+            assert cmd[-1].endswith(f"mucaro-ai-0.1.24-{head_sha[:12]}-artifact-manifest.json")
             calls.append("refresh:source_artifact")
             return subprocess.CompletedProcess(cmd, 0, stdout="SOURCE_ARTIFACT_CERT_OK\n")
         if "certify_fresh_clone.py" in command_text:
