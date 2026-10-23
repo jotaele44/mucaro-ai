@@ -291,7 +291,7 @@ export const api = {
   ingestPath: (payload) => request("/ingest-path", json("POST", payload)),
 
   memory: () => request("/memory"),
-  remember: (content, kind) => request("/memory", json("POST", { content, kind })),
+  remember: (content, kind, scope = "global", scopeId = null) => request("/memory", json("POST", { content, kind, scope, scope_id: scopeId })),
   updateMemory: (id, enabled) => request(`/memory/${id}`, json("PATCH", { enabled })),
   deleteMemory: (id) => request(`/memory/${id}`, { method: "DELETE" }),
   exportMemory: () => request("/memory/export"),
