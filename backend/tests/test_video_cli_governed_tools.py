@@ -285,6 +285,7 @@ def test_pr_request_and_remote_pr_tools_share_frozen_request_identity(
     head = "5" * 40
     request_hash = "6" * 64
     local_calls: list[dict[str, object]] = []
+    push_calls: list[dict[str, object]] = []
     remote_calls: list[dict[str, object]] = []
 
     def fake_request(repo_root, *, expected_head_sha, head_branch, base_branch, title, body, cfg):
@@ -308,6 +309,19 @@ def test_pr_request_and_remote_pr_tools_share_frozen_request_identity(
             "request_sha256": request_hash,
         }
 
+    def fake_push(repo_root, **kwargs):
+        kwargs = dict(kwargs)
+        kwargs.pop("cfg")
+        push_calls.append({"repo_root": repo_root, **kwargs})
+        return {
+            "status": "GITHUB_BRANCH_PUSH_OK",
+            "request_sha256": kwargs["expected_request_sha256"],
+            "local_head_sha": kwargs["expected_head_sha"],
+            "remote_head_sha": kwargs["expected_head_sha"],
+            "network_action_performed": True,
+            "force_used": False,
+        }
+
     def fake_remote(repo_root, **kwargs):
         kwargs = dict(kwargs)
         kwargs.pop("cfg")
@@ -323,6 +337,7 @@ def test_pr_request_and_remote_pr_tools_share_frozen_request_identity(
         }
 
     monkeypatch.setattr(tools_module, "build_pull_request_request", fake_request)
+    monkeypatch.setattr(tools_module, "push_pull_request_branch", fake_push)
     monkeypatch.setattr(tools_module, "open_or_update_pull_request", fake_remote)
 
     local_args = {
@@ -344,6 +359,20 @@ def test_pr_request_and_remote_pr_tools_share_frozen_request_identity(
         "remote_repo": "jotaele44/mucaro-ai",
         "expected_request_sha256": local_result["request_sha256"],
     }
+    requested = request_tool_call("github.branch_push", remote_args, cfg=cfg, requested_by="test")
+    push_id = requested["tool_call"]["tool_call_id"]
+
+    with pytest.raises(ToolRuntimeError) as blocked:
+        run_tool_call(push_id, cfg=cfg, executed_by="test")
+    assert blocked.value.status == "ERROR_TOOL_APPROVAL_REQUIRED"
+
+    approve_tool_call(push_id, cfg=cfg, approved_by="test")
+    push_result = run_tool_call(push_id, cfg=cfg, executed_by="test")["result"]
+    assert push_result["status"] == "GITHUB_BRANCH_PUSH_OK"
+    assert push_result["request_sha256"] == request_hash
+    assert push_result["remote_head_sha"] == head
+    assert push_result["force_used"] is False
+
     requested = request_tool_call("github.pr_open_update", remote_args, cfg=cfg, requested_by="test")
     remote_id = requested["tool_call"]["tool_call_id"]
 
@@ -356,6 +385,18 @@ def test_pr_request_and_remote_pr_tools_share_frozen_request_identity(
     assert remote_result["status"] == "GITHUB_PR_OPEN_UPDATE_OK"
     assert remote_result["request_sha256"] == request_hash
     assert local_calls == [local_args]
+    assert push_calls == [
+        {
+            "repo_root": str(tmp_path / "repo"),
+            "remote_repo": "jotaele44/mucaro-ai",
+            "expected_head_sha": head,
+            "head_branch": "feature/video-cli",
+            "base_branch": "main",
+            "title": "Parity increment",
+            "body": "Bounded body",
+            "expected_request_sha256": request_hash,
+        }
+    ]
     assert remote_calls == [
         {
             "repo_root": str(tmp_path / "repo"),

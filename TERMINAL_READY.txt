@@ -1,0 +1,95 @@
+MÚCARO AI — TERMINAL_READY
+============================
+
+PURPOSE
+-------
+This root file is the release/operator quick-start index. Commands below are copy/paste-ready for the current checkout. Do not claim release PASS from this file alone; certification is authoritative.
+
+CANONICAL QUICK START
+---------------------
+
+macOS / Linux — zero-host-tool one-click smoke:
+./"Mucaro AI.command" --smoke-test --no-browser
+
+Windows PowerShell — zero-host-tool one-click smoke:
+& ".\Mucaro AI.cmd" --smoke-test --no-browser
+
+macOS / Linux — manual developer bootstrap:
+bash scripts/bootstrap_macos.sh
+source .venv/bin/activate
+python scripts/preflight.py --strict-imports
+python scripts/mucaro.py doctor
+python scripts/launch_app.py
+
+Windows PowerShell — manual developer bootstrap:
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+Push-Location frontend; npm ci; Pop-Location
+python scripts/release_check.py
+python scripts/mucaro.py doctor
+python scripts/launch_app.py
+
+RELEASE / CERTIFICATION
+-----------------------
+python scripts/certify_release.py
+python scripts/certify_security_gates.py
+python scripts/mucaro.py certify status --format text
+python scripts/mucaro.py release receipts --current-head --format text
+
+CURRENT-CHECKOUT IDENTITY
+-------------------------
+git rev-parse HEAD
+git status --short
+
+A clean release candidate requires the intended exact HEAD and no unexplained tracked worktree residue.
+
+SMOKE EXPECTATIONS
+------------------
+One-click smoke must emit:
+ONE_CLICK_SETUP_OK
+DESKTOP_SMOKE_OK
+DESKTOP_BACKEND_PORT_CLOSED
+
+Manual bootstrap must emit:
+PREFLIGHT_OK
+RELEASE_CHECK_OK
+BOOTSTRAP_OK
+
+RELEASE CERTIFICATION EXPECTATIONS
+----------------------------------
+scripts/certify_release.py must end with:
+CERTIFY_RELEASE_OK
+
+scripts/certify_security_gates.py must complete successfully and emit its security receipt.
+
+PACKAGE / ARTIFACT VERIFICATION
+-------------------------------
+Build package manifest:
+python scripts/mucaro.py package build --format json
+
+Verify a returned manifest path against the current HEAD:
+python scripts/mucaro.py package verify PATH_TO_ARTIFACT_MANIFEST.json --require-current-head --format json
+
+Hash this operator file:
+macOS/Linux: shasum -a 256 TERMINAL_READY.txt
+Windows PowerShell: (Get-FileHash -Algorithm SHA256 .\TERMINAL_READY.txt).Hash
+
+Hash a generated artifact:
+macOS/Linux: shasum -a 256 PATH_TO_ARTIFACT
+Windows PowerShell: (Get-FileHash -Algorithm SHA256 PATH_TO_ARTIFACT).Hash
+
+FAILURE HANDLING
+----------------
+1. Stop on any non-zero command, missing PASS marker, unexpected dirty tracked file, hash mismatch, audit finding, or current-HEAD mismatch.
+2. Preserve the failing command, exact HEAD, receipt/log path, and SHA-256 of relevant artifacts.
+3. Fix only the evidenced defect; do not delete, weaken, skip, or relabel a gate to obtain PASS.
+4. Rerun the failed gate and then the full applicable release/certification sequence.
+5. Promote a release only when the exact tested HEAD has passing evidence and zero unresolved in-scope residue.
+
+DETAILED COMPANION FILES
+------------------------
+docs/terminal_ready/MACOS_LINUX.txt
+docs/terminal_ready/WINDOWS.txt
+docs/terminal_ready/VERIFY_CERTIFY.txt

@@ -1,0 +1,53 @@
+MÚCARO AI — verification and certification
+======================================
+
+1. EXACT SOURCE IDENTITY
+git rev-parse HEAD
+git status --short
+
+Expected: intended release HEAD; no unexplained tracked residue.
+
+2. LOCAL RELEASE GATES
+python scripts/certify_release.py
+
+Required terminal marker:
+CERTIFY_RELEASE_OK
+
+3. SECURITY GATES
+python scripts/certify_security_gates.py
+
+Required: successful exit and a generated security receipt under data/exports/release_receipts and/or data/exports/security.
+
+4. CLI RELEASE STATE
+python scripts/mucaro.py certify status --format text
+python scripts/mucaro.py release receipts --current-head --format text
+
+5. PACKAGE MANIFEST
+python scripts/mucaro.py package build --format json
+
+Copy the returned artifact-manifest path, then:
+python scripts/mucaro.py package verify PATH_TO_ARTIFACT_MANIFEST.json --require-current-head --format json
+
+6. SHA-256
+macOS/Linux:
+shasum -a 256 TERMINAL_READY.txt
+shasum -a 256 PATH_TO_ARTIFACT
+
+Windows PowerShell:
+(Get-FileHash -Algorithm SHA256 .\TERMINAL_READY.txt).Hash
+(Get-FileHash -Algorithm SHA256 PATH_TO_ARTIFACT).Hash
+
+7. ONE-CLICK SMOKE
+macOS/Linux:
+./"Mucaro AI.command" --smoke-test --no-browser
+
+Windows PowerShell:
+& ".\Mucaro AI.cmd" --smoke-test --no-browser
+
+Required markers:
+ONE_CLICK_SETUP_OK
+DESKTOP_SMOKE_OK
+DESKTOP_BACKEND_PORT_CLOSED
+
+8. FAILURE POLICY
+Do not promote on partial success. Preserve exact HEAD, command, receipt/log path, and hashes. Repair only the evidenced defect. Rerun the failed gate and then the complete applicable sequence. Historical PASS evidence never substitutes for exact-current-HEAD evidence.

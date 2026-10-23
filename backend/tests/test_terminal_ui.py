@@ -136,14 +136,55 @@ def test_terminal_controller_exposes_sessions_and_plan_mode(cfg: Settings) -> No
     }
 
 
-def test_terminal_autopilot_mode_refuses_unbound_natural_language(cfg: Settings) -> None:
+def test_terminal_autopilot_mode_requires_governed_source_identity(cfg: Settings) -> None:
     controller = TerminalController(cfg=cfg, mode="autopilot")
     controller.ensure_conversation()
 
     with pytest.raises(TerminalUIError) as exc:
-        controller.submit("Implement everything automatically")
+        controller.submit("Implement the bounded objective")
 
-    assert exc.value.status == "ERROR_TUI_AUTOPILOT_PROMPT_UNBOUND"
+    assert exc.value.status == "ERROR_TUI_AUTOPILOT_SOURCE_UNBOUND"
+
+
+def test_terminal_autopilot_mode_generates_plan_without_auto_authorizing(
+    cfg: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = TerminalController(cfg=cfg, mode="autopilot")
+    conversation_id = controller.ensure_conversation()
+    original_snapshot = controller.snapshot
+    monkeypatch.setattr(
+        controller,
+        "snapshot",
+        lambda: {
+            **original_snapshot(),
+            "repository_status": {
+                "tool_call_id": "tool_repo_status",
+                "executed_at": "2026-10-20T15:00:00Z",
+                "result": {"head_sha": "a" * 40, "branch": "feature/test"},
+            },
+        },
+    )
+    captured: dict[str, object] = {}
+
+    def fake_plan(**kwargs):
+        captured.update(kwargs)
+        return {
+            "status": "AUTOPILOT_MODEL_PLAN_READY",
+            "checkpoint": {
+                "checkpoint_id": "checkpoint-terminal-plan",
+                "metadata": {"autopilot": {"authorization_state": "PENDING"}},
+            },
+        }
+
+    monkeypatch.setattr("backend.app.terminal_ui.generate_autopilot_plan", fake_plan)
+    controller.submit("Inspect the repository")
+
+    assert captured["session_id"] == conversation_id
+    assert captured["run_id"] == f"tui:{conversation_id}:autopilot"
+    assert captured["source_sha"] == "a" * 40
+    assert captured["budgets"] == {"max_replans": 2}
+    assert controller.notice == "Plan ready: checkpoint-terminal-plan (authorization required)"
 
 
 def test_terminal_view_commands_are_bounded(cfg: Settings) -> None:

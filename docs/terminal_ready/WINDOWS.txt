@@ -1,0 +1,34 @@
+MÚCARO AI — Windows PowerShell terminal-ready commands
+=====================================================
+
+RECOMMENDED ONE-CLICK SMOKE
+& ".\Mucaro AI.cmd" --smoke-test --no-browser
+
+EXPECTED MARKERS
+ONE_CLICK_SETUP_OK
+DESKTOP_SMOKE_OK
+DESKTOP_BACKEND_PORT_CLOSED
+
+MANUAL DEVELOPER SETUP
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+Push-Location frontend; npm ci; Pop-Location
+python scripts/release_check.py
+python scripts/mucaro.py doctor
+python scripts/launch_app.py
+
+CERTIFY
+python scripts/certify_release.py
+python scripts/certify_security_gates.py
+python scripts/mucaro.py certify status --format text
+python scripts/mucaro.py release receipts --current-head --format text
+
+IDENTITY / HASH
+git rev-parse HEAD
+git status --short
+(Get-FileHash -Algorithm SHA256 .\TERMINAL_READY.txt).Hash
+
+FAIL CLOSED
+Any unexpected tracked change, non-zero exit, missing PASS marker, security/audit finding, current-HEAD mismatch, or artifact hash mismatch blocks promotion.

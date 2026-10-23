@@ -11,6 +11,8 @@ from backend.app.contracts import validate_contract
 from backend.app.conversations import create_conversation
 from backend.app.ingestion import ingest_file
 from backend.app.model_router import ModelProviderError, generate_answer, model_provider_status
+from backend.app.terminal_projection import build_terminal_snapshot
+from backend.app.terminal_ui import render_terminal_snapshot
 from backend.app.model_routing_policy import ModelRoutingError, plan_model_route
 from backend.app.offline import build_offline_manifest
 from backend.app.services import answer_question
@@ -25,6 +27,7 @@ class _FakeOpenAI(BaseHTTPRequestHandler):
 
     requests: list[dict] = []
     reply = "Lineage binds chunks to sources"
+    emit_stream_usage = True
 
     def log_message(self, *args):
         return
@@ -59,11 +62,13 @@ class _FakeOpenAI(BaseHTTPRequestHandler):
             for piece in [text[i:i + 7] for i in range(0, len(text), 7)]:
                 event = {"choices": [{"delta": {"content": piece}}]}
                 self.wfile.write(f"data: {json.dumps(event)}\n\n".encode())
-            usage_event = {
-                "choices": [],
-                "usage": {"prompt_tokens": 14, "completion_tokens": 6, "total_tokens": 20},
-            }
-            self.wfile.write(f"data: {json.dumps(usage_event)}\n\n".encode())
+            include_usage = bool((payload.get("stream_options") or {}).get("include_usage"))
+            if include_usage and type(self).emit_stream_usage:
+                usage_event = {
+                    "choices": [],
+                    "usage": {"prompt_tokens": 14, "completion_tokens": 6, "total_tokens": 20},
+                }
+                self.wfile.write(f"data: {json.dumps(usage_event)}\n\n".encode())
             self.wfile.write(b"data: [DONE]\n\n")
             return
         body = json.dumps({
@@ -80,6 +85,7 @@ class _FakeOpenAI(BaseHTTPRequestHandler):
 @pytest.fixture()
 def local_server(monkeypatch):
     _FakeOpenAI.requests = []
+    _FakeOpenAI.emit_stream_usage = True
     server = ThreadingHTTPServer(("127.0.0.1", 0), _FakeOpenAI)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     monkeypatch.setenv("MUCARO_AI_LOCAL_MODEL_URL", f"http://127.0.0.1:{server.server_address[1]}/v1")
@@ -175,13 +181,43 @@ def test_run_streams_local_tokens_live(local_server, cfg):
     completed = get_run(run["run_id"], cfg)
     assert completed["outcome"] == "ANSWERED"
     usage = completed["context_usage"]
+    assert _FakeOpenAI.requests[-1]["stream_options"] == {"include_usage": True}
     assert usage["metrics"]["input_tokens"]["value"] == 14
     assert usage["metrics"]["output_tokens"]["value"] == 6
     assert usage["metrics"]["total_tokens"]["value"] == 20
     assert usage["metrics"]["input_tokens"]["classification"] == "PROVIDER_REPORTED"
     assert usage["metrics"]["remaining_context_tokens"]["value"] == 8192 - 20
+    snapshot = build_terminal_snapshot(conversation_id=conversation, cfg=cfg)
+    assert snapshot["context_usage"] == usage
+    frame = render_terminal_snapshot(snapshot, width=100, height=30, mode="interactive")
+    assert "ctx 20/8192" in frame
     types = [event["type"] for event in events]
     assert types.index("text_delta") < types.index("citation") < types.index("final")
+
+
+def test_streamed_usage_stays_unknown_when_provider_omits_usage(local_server, cfg, monkeypatch):
+    monkeypatch.setattr(_FakeOpenAI, "emit_stream_usage", False)
+    work_runs.set_execution_mode("inline")
+    try:
+        conversation = create_conversation("local-no-usage", cfg)["conversation_id"]
+        run = submit_message(
+            conversation,
+            "How does source lineage work?",
+            options={"model_provider": "openai_compatible_local"},
+            cfg=cfg,
+        )["run"]
+    finally:
+        work_runs.set_execution_mode("thread")
+    completed = get_run(run["run_id"], cfg)
+    usage = completed["context_usage"]
+    assert _FakeOpenAI.requests[-1]["stream_options"] == {"include_usage": True}
+    for name in ("input_tokens", "output_tokens", "total_tokens", "context_consumed_tokens"):
+        assert usage["metrics"][name]["value"] is None
+        assert usage["metrics"][name]["classification"] == "UNKNOWN"
+    assert usage["metrics"]["context_limit_tokens"]["value"] == 8192
+    snapshot = build_terminal_snapshot(conversation_id=conversation, cfg=cfg)
+    frame = render_terminal_snapshot(snapshot, width=100, height=30, mode="interactive")
+    assert "ctx ?/8192" in frame
 
 
 # --- MATRIX-012 routing matrix -------------------------------------------------------------
@@ -300,6 +336,28 @@ def test_offline_manifest_exposes_git_backed_coding_as_a_bundle_candidate(monkey
         assert rows[capability]["local_dependency_kind"] == "binary"
         assert "BUNDLE_LOCAL_COMPONENT" in rows[capability]["independence_actions"]
         assert rows[capability]["operator_external_setup_required"] is True
+
+
+def test_branch_push_requires_both_git_and_gh(monkeypatch):
+    import backend.app.offline as offline
+
+    real_resolve = offline.resolve_local_tool
+    for missing in ("git", "gh"):
+        monkeypatch.setattr(
+            offline,
+            "resolve_local_tool",
+            lambda name, missing=missing: None if name == missing else real_resolve(name),
+        )
+        rows = {
+            row["capability"]: row
+            for row in build_offline_manifest()["capabilities"]
+        }
+        branch_push = rows["tool:github.branch_push"]
+        assert branch_push["state_now"] == "LOCAL_DEPENDENCY_MISSING"
+        assert branch_push["local_dependency"] == "git,gh"
+        assert branch_push["local_dependency_kind"] == "binary_all"
+        assert branch_push["runtime_network_required"] is True
+        assert "KEEP_EXPLICIT_NETWORK_GATE" in branch_push["independence_actions"]
 
 
 def test_frozen_manifest_reports_packaging_residue_not_operator_setup(monkeypatch):
