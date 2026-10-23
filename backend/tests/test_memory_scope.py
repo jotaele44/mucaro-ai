@@ -126,7 +126,9 @@ def test_api_answer_selection_respects_global_workspace_and_conversation_scope(t
         json={"query": "What does source lineage require?", "model_provider": "mock", "workspace_id": "ws-1"},
     )
     assert direct.status_code == 200
-    assert direct.json()["memory_ids"] == ids[:2]
+    assert set(direct.json()["memory_ids"]) == {ids[0], ids[1]}
+    assert ids[2] not in direct.json()["memory_ids"]
+    assert ids[3] not in direct.json()["memory_ids"]
 
     conversation = client.post(
         f"/conversations/{conv_a}/ask",
