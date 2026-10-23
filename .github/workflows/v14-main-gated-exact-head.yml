@@ -3,7 +3,7 @@ name: Mucaro V14 Main-Native Exact-Head Tests
 on:
   push:
     branches:
-      - feature/agent-v14-main-permission-pilot-main-gated
+      - feature/agent-v14-main-permission-pilot
     paths:
       - "backend/**"
       - "pyproject.toml"
