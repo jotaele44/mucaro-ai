@@ -91,7 +91,7 @@ scripts/launch_app.py --auto-port --exit-if-running --startup-timeout 120
 | uv | 0.12.19 | github.com/astral-sh/uv releases |
 | CPython | 3.12 (3.12.14 with uv 0.12.19) | python-build-standalone, installed by uv |
 | Node.js | 22.23.3 LTS | nodejs.org/dist |
-| Python package cutoff | 2026-09-25T00:00:00Z | `PY_EXCLUDE_NEWER` |
+| Python package cutoff | 2026-10-22T00:00:00Z | `PY_EXCLUDE_NEWER` |
 
 To update a pin, change `scripts/one_click_pins.env` using the official checksum files.
 `test_pins_cover_every_supported_platform_with_sha256` checks the format, and the
