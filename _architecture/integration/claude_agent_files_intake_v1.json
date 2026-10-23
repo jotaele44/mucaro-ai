@@ -1,0 +1,141 @@
+{
+  "schema_version": "MUCARO_CLAUDE_AGENT_INTEGRATION_INTAKE_V1",
+  "status": "INTAKE_ONLY_SOURCE_TRANSPLANT_OPEN",
+  "repository": "jotaele44/mucaro-ai",
+  "target": {
+    "branch": "integration/claude-agent-files-reviewed-20261023",
+    "base_main_sha": "25b41e33b2d832e582fc2800d52bc07461ebc4ae"
+  },
+  "candidate": {
+    "branch": "feat/claude-agent-files",
+    "merge_base_sha": "e88038cd6f79ec43f1bce519e3a4ed16ad0e6997",
+    "ahead_of_base_main": 9,
+    "behind_base_main": 42,
+    "changed_files": 32
+  },
+  "groups": [
+    {
+      "name": "runtime-and-storage",
+      "paths": [
+        "backend/app/agent.py",
+        "backend/app/agent_store.py",
+        "backend/app/agent_tools.py",
+        "backend/app/app_settings.py",
+        "backend/app/attachments.py"
+      ],
+      "resolution": "ADD_ONLY_AFTER_DEPENDENCY_AND_SECURITY_REVIEW"
+    },
+    {
+      "name": "existing-backend-overlaps",
+      "paths": [
+        "backend/app/conversations.py",
+        "backend/app/db.py",
+        "backend/app/error_categories.py",
+        "backend/app/main.py",
+        "backend/app/models.py",
+        "backend/app/tools.py",
+        "backend/app/work_runs.py"
+      ],
+      "resolution": "THREE_WAY_SEMANTIC_RECONCILIATION_REQUIRED"
+    },
+    {
+      "name": "backend-tests",
+      "paths": [
+        "backend/tests/test_agent.py",
+        "backend/tests/test_anthropic_streaming.py",
+        "backend/tests/test_app_settings.py",
+        "backend/tests/test_attachments.py",
+        "backend/tests/test_work_runs.py"
+      ],
+      "resolution": "EXECUTE_POSITIVE_AND_ADVERSARIAL"
+    },
+    {
+      "name": "frontend-and-rendered",
+      "paths": [
+        "frontend/src/App.jsx",
+        "frontend/src/api.js",
+        "frontend/src/components/ChatView.jsx",
+        "frontend/src/components/Composer.jsx",
+        "frontend/src/components/EvidencePanel.jsx",
+        "frontend/src/components/MessageActions.jsx",
+        "frontend/src/components/RichText.jsx",
+        "frontend/src/components/RunBlock.jsx",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "frontend/src/feed.js",
+        "frontend/src/styles.css",
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "resolution": "INTERFACE_AND_RENDERED_RECONCILIATION_REQUIRED"
+    },
+    {
+      "name": "docs-and-live-evaluation",
+      "paths": [
+        "docs/AGENT_CHAT.md",
+        "scripts/claude_live_smoke.py"
+      ],
+      "resolution": "SCRIPTED_PROOF_ONLY_UNTIL_LIVE_AUTHORIZATION"
+    },
+    {
+      "name": "denominator",
+      "paths": [
+        "_architecture/mucaro_flagpole_tool_denominator_v1.json"
+      ],
+      "resolution": "PRESERVE_CANONICAL_STATE_NO_AUTOMATIC_PROMOTION"
+    }
+  ],
+  "gates": [
+    {
+      "gate": "BASE_IDENTITY",
+      "status": "PASS",
+      "meaning": "Intake branch created from exact main SHA"
+    },
+    {
+      "gate": "SOURCE_TRANSPLANT",
+      "status": "OPEN"
+    },
+    {
+      "gate": "BACKEND_API_DB_COMPAT",
+      "status": "OPEN"
+    },
+    {
+      "gate": "PERMISSION_TOOL_APPROVAL_AND_RESTART",
+      "status": "OPEN"
+    },
+    {
+      "gate": "ATTACHMENT_PATH_SYMLINK_AND_DELETE",
+      "status": "OPEN"
+    },
+    {
+      "gate": "SECRET_STORAGE_AND_REDACTION",
+      "status": "OPEN"
+    },
+    {
+      "gate": "STREAM_INTERRUPT_REPLAY_IDEMPOTENCE",
+      "status": "OPEN"
+    },
+    {
+      "gate": "BACKEND_TEST_AND_SECURITY_SUITE",
+      "status": "OPEN"
+    },
+    {
+      "gate": "FRONTEND_BUILD_AND_RENDERED_DESKTOP_393_430",
+      "status": "OPEN"
+    },
+    {
+      "gate": "LIVE_ANTHROPIC_OPERATOR_AUTH",
+      "status": "OPEN"
+    },
+    {
+      "gate": "EXACT_BUILD_HASH_MANIFEST_AND_REVIEW",
+      "status": "OPEN"
+    }
+  ],
+  "rules": [
+    "No fast-forward or wholesale cherry-pick of nine diverged commits",
+    "No main mutation or deployment",
+    "Original Claude branch and PR273 unchanged",
+    "Source existence and scripted fixtures do not imply release PASS",
+    "Credentials and native/device proof last",
+    "No acceptance score change without governed evidence"
+  ]
+}
