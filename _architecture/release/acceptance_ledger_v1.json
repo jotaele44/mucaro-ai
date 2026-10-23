@@ -1501,12 +1501,14 @@
         "backend/tests/test_macos_packaging.py::test_lock_is_fully_hash_pinned_and_covers_every_input",
         "_architecture/release/evidence/arm64_runtime_source_20261016.json",
         "_architecture/release/evidence/arm64_runtime_source_20261023.json",
-        "_architecture/release/evidence/arm64_runtime_materialization_20261023.json"
+        "_architecture/release/evidence/arm64_runtime_materialization_20261023.json",
+        "_architecture/release/evidence/arm64_portable_lifecycle_20261023.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917324456"
       ],
       "state": "BLOCKED",
       "blocker_id": "BLK-SIGN-001",
       "dag_node": "N20",
-      "notes": "Both release lanes are required (A7). Native app lane: all eight TGT-026 verifications pass on macOS; the artifact remains ad-hoc signed, so it is not yet distributable under the declared Developer ID release class (BLK-SIGN-001). Portable lane source/lock evidence was refreshed at PR #278 head 2cf1a05ff7aeb1eaa446e223a446477e8264e1fd, and Apple-Silicon materialization/probe PASS is frozen by arm64_runtime_materialization_20261023.json: Darwin arm64, Python 3.13.15, runtime tree 3,909 members / 229,533,982 bytes / SHA-256 2f24b51242824170678d825ef67c4cae1cef0b53b65e1d468a67024b04ea0522. Remaining portable-lane residue is application install/launch/reinstall plus distinct-version upgrade/rollback lifecycle; signing/notarization remain independently blocked."
+      "notes": "Both release lanes are required (A7). Native app lane retains its existing macOS evidence. The native arm64 portable lane now has exact-main source/runtime/application lifecycle PASS at merge SHA 685a0866a3b70c719897e7dd06ca4413196a15f2 via run 39917324456: embedded runtime verified, install/launch/workflow/post-launch immutability/reinstall and distinct-version rollback all PASS. Remaining TGT-026 residue is Developer ID signing/notarization under BLK-SIGN-001; no clean-host or physical-input claim is inferred."
     },
     {
       "requirement_id": "TGT-027",
@@ -1560,7 +1562,7 @@
         "scripts/certify_release_grade.py"
       ],
       "dependencies": [],
-      "positive_gate": "backend/tests/test_db_upgrade.py",
+      "positive_gate": "_architecture/release/evidence/arm64_portable_lifecycle_20261023.json",
       "negative_gate": "backend/tests/test_clean_machine_macos.py::test_same_head_previous_version_is_rejected",
       "benchmark": null,
       "evidence_refs": [
@@ -1568,14 +1570,15 @@
         "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
         "docs/release/MACOS_APP.md",
         "backend/tests/test_clean_machine_macos.py::test_distinct_version_flow_emits_all_required_evidence",
-        "_architecture/release/evidence/arm64_runtime_source_20261016.json",
         "_architecture/release/evidence/arm64_runtime_source_20261023.json",
-        "_architecture/release/evidence/arm64_runtime_materialization_20261023.json"
+        "_architecture/release/evidence/arm64_runtime_materialization_20261023.json",
+        "_architecture/release/evidence/arm64_portable_lifecycle_20261023.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917324456"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N20",
-      "notes": "Both release lanes are required (A7). Native app upgrade/reinstall and database migration behavior are evidenced. The arm64 source/lock plane is refreshed by arm64_runtime_source_20261023.json and native Apple-Silicon runtime materialization/probe PASS is frozen by arm64_runtime_materialization_20261023.json. The distinct-version portable application upgrade/rollback and clean-machine packaged lifecycle still have no native Apple-Silicon receipt from two distinct portable app versions, so this row remains PROVISIONAL."
+      "notes": "PASS: native-app upgrade/reinstall and database migration evidence are retained, and the required native arm64 portable lane now has exact-main distinct-version lifecycle proof at merge SHA 685a0866a3b70c719897e7dd06ca4413196a15f2. Run 39917324456 certifies 0.1.23 -> 0.1.24 install, launch, representative workflow, post-launch bundle immutability, rollback and reinstall using the governed arm64 runtime. Clean-host, physical-input, Developer ID signing and notarization are separate requirements and are not claimed by this row."
     },
     {
       "requirement_id": "TGT-030",
@@ -1663,23 +1666,29 @@
       "requirement_id": "TGT-034",
       "requirement_text": "Error behavior",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/error_categories.py",
-        "backend/app/work_runs.py"
+        "backend/app/work_runs.py",
+        "backend/app/main.py",
+        "backend/app/auth.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_api_error_categories.py::test_bad_request_api_error_includes_input_category",
+      "negative_gate": "backend/tests/test_api_error_categories.py::test_operator_auth_error_includes_permission_category",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_work_runs.py::test_crashing_step_ends_the_run_failed_with_a_category",
-        "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped"
+        "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped",
+        "backend/tests/test_api_error_categories.py",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39885279614",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39885279596",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39885279593"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Run errors, warnings and tool results carry TGT-034 categories; plain API error payloads do not yet include a category."
+      "notes": "PASS: canonical error categories now cover run failures, warnings, tool results, Mucaro structured API errors, operator-auth failures and remote-access denial without changing existing HTTP or machine-readable status semantics. PR #268 exact head b51fc6696895051cd1827422bcd721883faff8b6 passed CI, Chromium/WebKit rendered QA and macOS build/install/open E2E."
     },
     {
       "requirement_id": "TGT-035",
@@ -2155,12 +2164,14 @@
         "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
         "_architecture/release/evidence/arm64_runtime_source_20261016.json",
         "_architecture/release/evidence/arm64_runtime_source_20261023.json",
-        "_architecture/release/evidence/arm64_runtime_materialization_20261023.json"
+        "_architecture/release/evidence/arm64_runtime_materialization_20261023.json",
+        "_architecture/release/evidence/arm64_portable_lifecycle_20261023.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917324456"
       ],
       "state": "BLOCKED",
       "blocker_id": "BLK-PHYS-001",
       "dag_node": "N20",
-      "notes": "Both release lanes are required (A7). Native app build/install/LaunchServices/GUI/workflow/relaunch evidence is retained. The arm64 portable source/lock plane and Apple-Silicon runtime materialization/probe now have executed receipts at PR #278 head 2cf1a05ff7aeb1eaa446e223a446477e8264e1fd. The portable application benchmark still lacks end-to-end install/launch/reinstall and distinct-version lifecycle evidence from the materialized runtime. A literal double-click remains independently blocked by BLK-PHYS-001."
+      "notes": "Both release lanes are required (A7). Native app build/install/LaunchServices/GUI/workflow/relaunch evidence is retained. The native arm64 portable benchmark now has exact-main end-to-end install/launch/representative-workflow/post-launch immutability/reinstall and 0.1.23 -> 0.1.24 rollback evidence at merge SHA 685a0866a3b70c719897e7dd06ca4413196a15f2 via run 39917324456. The row remains BLOCKED solely on the independently declared literal physical double-click requirement BLK-PHYS-001."
     },
     {
       "requirement_id": "MATRIX-019",
@@ -2182,12 +2193,14 @@
         "backend/tests/test_release_grade_certification.py::test_clean_machine_receipt_must_prove_the_bundle_stayed_immutable",
         "_architecture/release/evidence/release_grade_0a806c1e8c98/release_grade_receipt.json",
         "_architecture/release/evidence/release_grade_0a806c1e8c98/provenance.json",
-        "_architecture/release/evidence/arm64_runtime_source_20261016.json"
+        "_architecture/release/evidence/arm64_runtime_source_20261016.json",
+        "_architecture/release/evidence/arm64_portable_lifecycle_20261023.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917324456"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N24",
-      "notes": "The release-grade sequence still requires both release lanes (A7). Native/common gates retain their prior evidence. The arm64 portable source/lock/manifest input boundary is now frozen and reproducible, but Apple-Silicon runtime materialization, portable install/reinstall, distinct-version rollback, and clean-host packaged lifecycle receipts remain OPEN; signing/notarization and release-scope residue remain independent. Therefore this row remains PROVISIONAL."
+      "notes": "The release-grade sequence still requires both release lanes (A7). Native/common evidence is retained, and the native arm64 portable source/runtime/application lifecycle is now proven on exact main at 685a0866a3b70c719897e7dd06ca4413196a15f2, including distinct-version rollback and reinstall. This does not establish that the hosted runner was a separately provisioned clean host; physical-input, Developer ID signing/notarization and remaining release-scope residue also remain independent. Therefore MATRIX-019 stays PROVISIONAL."
     },
     {
       "requirement_id": "MATRIX-020",
