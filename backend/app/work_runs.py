@@ -37,6 +37,14 @@ import time
 from collections.abc import Iterator
 from typing import Any
 
+from .agent_checkpoints import (
+    CheckpointError,
+    begin_step,
+    complete_step,
+    create_checkpoint,
+    get_checkpoint,
+    transition_checkpoint,
+)
 from .agent_planner import build_agent_plan
 from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
@@ -58,6 +66,7 @@ from .response_flow import (
     make_tool_call_part,
     make_tool_result_part,
 )
+from .runtime_identity import current_git_head
 from .services import answer_question
 from .tools import (
     TOOL_REGISTRY,
@@ -83,7 +92,7 @@ MODES = {
 EVENT_TYPES = {
     "queued", "run_started", "route", "plan", "tool_call", "approval_request", "tool_started", "tool_result",
     "tool_summary", "agent_plan", "question", "question_resolved", "retry_requested", "user_note", "retrieval", "text_delta",
-    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final",
+    "citation", "artifact", "warning", "error", "checkpoint", "interrupted", "cancelled", "final",
 }
 MAX_PROMPT_CHARS = 20_000
 TEXT_DELTA_CHARS = 160
@@ -258,6 +267,7 @@ def summarize_run(run: dict[str, Any], cfg: Settings = settings) -> dict[str, An
         "tool_summary": summarize_tool_calls(calls),
         "event_count": int(count),
         "queue_seq": run["queue_seq"],
+        "checkpoint_id": run.get("checkpoint_id"),
     }
 
 
@@ -513,6 +523,7 @@ def _finalize_interrupt(run_id: str, cfg: Settings) -> None:
                 dismiss_interaction(pending_id, expected_version=interaction["version"], reason="RUN_STOPPED", dismissed_by="system", cfg=cfg)
             except InteractionError:
                 pass
+    _transition_run_checkpoint(run_id, "FAILED", cfg, reason=str(run.get("outcome") or "RUN_INTERRUPTED"))
 
 
 def reconcile_runs_on_startup(cfg: Settings = settings) -> dict[str, Any]:
@@ -601,6 +612,7 @@ def _fail(run_id: str, status: str, detail: str, cfg: Settings) -> None:
         _save(conn, run)
         _emit(conn, run_id, "error", run["error"])
         _emit(conn, run_id, "final", {"outcome": "FAILED", "error": run["error"]})
+    _transition_run_checkpoint(run_id, "FAILED", cfg, reason=status)
 
 
 def _update(run_id: str, cfg: Settings, change: Any, events: list[tuple[str, dict[str, Any]]] | None = None) -> dict[str, Any]:
@@ -747,12 +759,49 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
         _complete(run_id, cfg, outcome="PLAN_ONLY", assistant_text=summary)
         return
 
+    checkpoint_id: str | None = None
+    checkpoint_steps: dict[int, str] = {}
+    if run["mode"] == "agent" and commands:
+        source_sha = current_git_head(cfg.project_root)
+        if source_sha:
+            try:
+                checkpoint = create_checkpoint(
+                    session_id=run["conversation_id"],
+                    run_id=run_id,
+                    objective=question or run["prompt"],
+                    source_sha=source_sha,
+                    state="READY_FOR_APPROVAL",
+                    pending_steps=[
+                        {"id": f"agent-step-{index + 1}", "tool": command["tool"], "status": "PENDING_APPROVAL"}
+                        for index, command in enumerate(commands)
+                    ],
+                    provider=route.get("selected_provider") if route else None,
+                    model=route.get("selected_model") if route else None,
+                    metadata={"workflow": "agent_work_run", "max_actions": len(commands)},
+                    cfg=cfg,
+                )
+                checkpoint_id = checkpoint["checkpoint_id"]
+                checkpoint_steps = {index: f"agent-step-{index + 1}" for index in range(len(commands))}
+                _emit_only(
+                    run_id,
+                    cfg,
+                    "checkpoint",
+                    {"status": "AGENT_CHECKPOINT_READY", "checkpoint_id": checkpoint_id, "source_sha": source_sha},
+                )
+            except CheckpointError as exc:
+                _emit_only(run_id, cfg, "warning", {"status": exc.status, "category": "EXECUTION_BOUNDARY", "detail": exc.detail})
+        else:
+            _emit_only(run_id, cfg, "warning", {"status": "WARN_AGENT_CHECKPOINT_SOURCE_IDENTITY_UNAVAILABLE", "category": "PROVENANCE"})
+
     call_ids = []
     events: list[tuple[str, dict[str, Any]]] = []
-    for command in commands:
+    for index, command in enumerate(commands):
         try:
             requester = "agent" if run["mode"] == "agent" and command["command"] == "agent" else "user"
             reason = command.get("reason") or command["command"]
+            provenance = dict(command.get("provenance") or {})
+            if checkpoint_id:
+                provenance.update({"checkpoint_id": checkpoint_id, "checkpoint_step_id": checkpoint_steps[index]})
             call = request_tool_call(
                 command["tool"],
                 command["arguments"],
@@ -760,7 +809,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                 requested_by=requester,
                 reason=reason,
                 run_id=run_id,
-                provenance=command.get("provenance"),
+                provenance=provenance,
             )["tool_call"]
         except ToolRuntimeError as exc:
             events.append(("warning", {"status": exc.status, "category": classify_error(exc.status), "detail": exc.detail}))
@@ -773,6 +822,12 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     def change(current: dict[str, Any]) -> None:
         current["tool_call_ids"] = call_ids
         current["question"] = question
+        current["checkpoint_id"] = checkpoint_id
+        current["checkpoint_step_ids"] = {
+            call_id: checkpoint_steps[index]
+            for index, call_id in enumerate(call_ids)
+            if index in checkpoint_steps
+        }
         current["phase"] = "tools" if call_ids else "answer"
 
     _update(run_id, cfg, change, events)
@@ -831,16 +886,39 @@ def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
         return False
     if run["state"] != "RUNNING":
         _update(run_id, cfg, lambda current: current.__setitem__("state", "RUNNING"))
+    checkpoint_id = run.get("checkpoint_id")
+    if checkpoint_id:
+        checkpoint = get_checkpoint(checkpoint_id, cfg)
+        if checkpoint and checkpoint["state"] == "READY_FOR_APPROVAL":
+            transition_checkpoint(checkpoint_id, state="EXECUTING", cfg=cfg)
     for call in calls:
         if call["status"] != "APPROVED":
             continue
         if _cancel_checkpoint(run_id, cfg):
             return False
         _emit_only(run_id, cfg, "tool_started", _call_view(call))
+        step_key = (call.get("provenance") or {}).get("checkpoint_step_id")
+        if checkpoint_id and step_key:
+            try:
+                begin_step(checkpoint_id, step_id=str(step_key), idempotency_key=call["tool_call_id"], cfg=cfg)
+            except CheckpointError:
+                pass
         try:
             run_tool_call(call["tool_call_id"], cfg=cfg, executed_by=f"run:{run_id}")
         except ToolRuntimeError:
             pass  # the failure is recorded on the call; reported below from the record
+        if checkpoint_id and step_key:
+            updated_call = next((row for row in _run_calls(get_run(run_id, cfg), cfg) if row["tool_call_id"] == call["tool_call_id"]), call)
+            try:
+                complete_step(
+                    checkpoint_id,
+                    idempotency_key=call["tool_call_id"],
+                    status="PASS" if updated_call["status"] == "EXECUTED" else "FAIL",
+                    result=dict(updated_call.get("result") or {}),
+                    cfg=cfg,
+                )
+            except CheckpointError:
+                pass
     calls = _run_calls(get_run(run_id, cfg), cfg)
     reported = set(get_run(run_id, cfg)["reported_call_ids"])
     terminal = [call for call in calls if call["status"] in {"EXECUTED", "FAILED", "DENIED", "CANCELLED", "INTERRUPTED"}]
@@ -1050,6 +1128,28 @@ def _complete(
         current["answer_run_id"] = final["answer_run_id"]
 
     _update(run_id, cfg, change, [("final", final)])
+    _transition_run_checkpoint(run_id, "COMPLETED", cfg, reason=outcome)
+
+
+def _transition_run_checkpoint(run_id: str, target: str, cfg: Settings, *, reason: str) -> None:
+    run = get_run(run_id, cfg)
+    checkpoint_id = run.get("checkpoint_id")
+    if not checkpoint_id:
+        return
+    checkpoint = get_checkpoint(checkpoint_id, cfg)
+    if checkpoint is None or checkpoint["state"] in {"FAILED", "COMPLETED"}:
+        return
+    try:
+        transition_checkpoint(
+            checkpoint_id,
+            state=target,
+            pause_reason=reason if target == "FAILED" else None,
+            cfg=cfg,
+        )
+    except CheckpointError:
+        # The run ledger remains authoritative; a checkpoint cannot be forged into
+        # a terminal state when an in-flight or illegal transition is detected.
+        return
 
 
 # --- projections --------------------------------------------------------------------

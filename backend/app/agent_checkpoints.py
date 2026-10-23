@@ -290,15 +290,34 @@ def begin_step(checkpoint_id: str, *, step_id: str, idempotency_key: str, cfg: S
     return _mutate(checkpoint_id, change, cfg)
 
 
-def complete_step(checkpoint_id: str, *, idempotency_key: str, result: dict[str, Any] | None = None, cfg: Settings = settings) -> dict[str, Any]:
+def complete_step(
+    checkpoint_id: str,
+    *,
+    idempotency_key: str,
+    result: dict[str, Any] | None = None,
+    status: str = "PASS",
+    cfg: Settings = settings,
+) -> dict[str, Any]:
     """Finish the in-flight step. Completing the same idempotency key twice is a no-op, not a duplicate."""
+    if status not in {"PASS", "FAIL"}:
+        raise CheckpointError("ERROR_CHECKPOINT_STEP_STATUS", f"unsupported step status: {status}")
+
     def change(current: dict[str, Any]) -> dict[str, Any] | None:
         if any(done.get("idempotency_key") == idempotency_key for done in current["completed_steps"]):
             return None
         flight = current.get("in_flight_step")
         if not flight or flight["idempotency_key"] != idempotency_key:
             raise CheckpointError("ERROR_CHECKPOINT_STEP_NOT_IN_FLIGHT", idempotency_key)
-        current["completed_steps"] = [*current["completed_steps"], {"id": flight["step_id"], "idempotency_key": idempotency_key, "status": "PASS", "result": dict(result or {}), "completed_at": utc_now()}]
+        current["completed_steps"] = [
+            *current["completed_steps"],
+            {
+                "id": flight["step_id"],
+                "idempotency_key": idempotency_key,
+                "status": status,
+                "result": dict(result or {}),
+                "completed_at": utc_now(),
+            },
+        ]
         current["pending_steps"] = [step for step in current["pending_steps"] if step.get("id") != flight["step_id"]]
         current["in_flight_step"] = None
         return current

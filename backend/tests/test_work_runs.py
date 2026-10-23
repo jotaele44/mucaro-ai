@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import work_runs
+from backend.app.agent_checkpoints import get_checkpoint
 from backend.app.conversations import create_conversation, get_conversation
 from backend.app.ingestion import ingest_file
 from backend.app.main import create_app
@@ -237,6 +238,29 @@ def test_provider_native_agent_plan_preserves_identity_and_stops_for_approval(cf
         "provider_call_id": "toolu_test",
         "proposal_sha256": "proposal-test",
     }
+
+
+def test_agent_run_persists_checkpoint_steps_through_approval_and_completion(cfg, conversation, monkeypatch):
+    monkeypatch.setattr(work_runs, "current_git_head", lambda _root: "c" * 40)
+    run = _submit(conversation, "Inspect source library status and audit readiness.", cfg, mode="agent")
+    checkpoint_id = run["checkpoint_id"]
+    checkpoint = get_checkpoint(checkpoint_id, cfg)
+    assert checkpoint is not None
+    assert checkpoint["state"] == "READY_FOR_APPROVAL"
+    assert len(checkpoint["pending_steps"]) == 2
+
+    calls = list_tool_calls(cfg)["tool_calls"]
+    assert all(call["provenance"]["checkpoint_id"] == checkpoint_id for call in calls)
+    for call in calls:
+        approve_tool_call(call["tool_call_id"], cfg=cfg, expected_arguments_sha256=call["arguments_sha256"])
+    resume_waiting_run(run["run_id"], cfg)
+
+    assert get_run(run["run_id"], cfg)["state"] == "COMPLETED"
+    completed = get_checkpoint(checkpoint_id, cfg)
+    assert completed is not None
+    assert completed["state"] == "COMPLETED"
+    assert {step["status"] for step in completed["completed_steps"]} == {"PASS"}
+    assert completed["pending_steps"] == []
 # --- F08 / F16: truthful per-call outcomes, failure question and targeted retry ---------
 
 
