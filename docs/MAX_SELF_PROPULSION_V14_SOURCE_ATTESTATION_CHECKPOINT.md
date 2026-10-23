@@ -22,3 +22,36 @@ V14_GIT_SOURCE_INTEGRITY=UNVERIFIED_PENDING_HOSTED_CI
 MOCK_MODEL_IMPROVEMENT=NOT_DEMONSTRATED
 PROMOTION=DENY
 FINAL_CERTIFICATION=OPEN
+
+## V14 hosted verification follow-up (2026-10-22)
+Standalone exact HEAD `038c9d4f76fe572660050ae73afc77c1eff3943b`,
+GitHub Actions run `39887684693`: **PASS**, 1453 passed,
+1 skipped, 21 subtests passed, 246 warnings. Targeted Git identity and
+source tests passed, source receipt archived as artifact `12473288048`.
+This is HEAD-only verification, NOT PR merge-tree CI.
+
+PR integration CI run `39887690367`: **FAIL**, 1637 passed,
+1 failed, 1 skipped, 21 subtests passed, 405 warnings.
+The failure was `test_permission_coverage.py` from the independently
+advanced main: unclassified `local_source_integrity.py` read-only Git
+subprocess. Hosted rendered QA and macOS tests at the original head PASS.
+
+A test-only transplant of the complete newer-main policy suite
+(`4679a0d563d70b302698c3f542fd3d63eb560ce3`) was rejected:
+it caused 11 errors/failures on the older feature-source branch because its
+`permission_engine` and migrated call-site dependencies are absent.
+Its exact-source run `39891944026` is FAIL (1454 passed,
+11 failed, 1 skipped), while source-integrity targeted tests PASS.
+The transplant was **reverted** at `4e3f601ecc95abe7f30e413f55af1388270f9933`.
+Do not count reverted transplant as PASS or weaken the main permission policy.
+
+A true current-main reconciliation must preserve main's complete
+`permission_engine` migration, explicitly adjudicate whether this narrow
+read-only Git introspection is an auditable exception or needs delegated
+permission, and rerun exact source/merge-tree denominators independently.
+No merge or deployment is eligible while PR security-gate residue remains.
+
+V14_EXACT_HEAD_PREDECESSOR=PASS
+V14_CURRENT_HEAD=OPEN
+V14_MAIN_MERGE_TREE=FAIL
+V14_SECURITY_GATE=OPEN
