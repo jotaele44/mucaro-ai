@@ -3,6 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+from backend.app.parser import ParseError, parse_file
+from backend.tests.test_ingestion_safety import _set_encrypted_flag, _zip
 from scripts.certify_ingestion_benchmark import certify
 
 
@@ -33,8 +37,6 @@ def test_matrix010_certifier_uses_canonical_registry_and_contract_classes(monkey
         stdout = "pass"
         stderr = ""
 
-    real_run = benchmark.subprocess.run
-
     def fake_run(args, **kwargs):
         if args[:3] == ["git", "rev-parse", "HEAD"]:
             return type("GitResult", (), {"returncode": 0, "stdout": "a" * 40 + "\n", "stderr": ""})()
@@ -50,3 +52,10 @@ def test_matrix010_certifier_uses_canonical_registry_and_contract_classes(monkey
     assert receipt["passed_case_count"] == 16
     assert receipt["failed_case_count"] == 0
     assert receipt["arithmetic_closes"] is True
+
+
+def test_matrix010_encrypted_archive_is_rejected_before_parse(tmp_path: Path) -> None:
+    archive = _set_encrypted_flag(_zip(tmp_path / "encrypted.zip", [("secret.txt", b"secret")]))
+    with pytest.raises(ParseError) as exc:
+        parse_file(archive)
+    assert exc.value.status == "ERROR_ARCHIVE_UNSAFE"
