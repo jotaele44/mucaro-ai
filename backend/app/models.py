@@ -102,6 +102,7 @@ class RunOptions(BaseModel):
     allow_mock_fallback: bool = False
     allow_live: bool = False
     require_offline: bool = False
+    agent_planner: Literal["heuristic", "provider_native"] = "heuristic"
 
 
 class MessageRequest(BaseModel):

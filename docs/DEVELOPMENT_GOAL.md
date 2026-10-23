@@ -39,7 +39,9 @@ task rather than an unimplemented source feature. The conversational run bus now
 also exposes a bounded `agent` mode that infers up to four allowlisted actions
 from explicit user intent while preserving approval, interruption, streaming,
 and receipt boundaries; model-native tool loops, subagents, and durable DAG/fleet
-orchestration remain open.
+orchestration remain open. An explicit `provider_native` planner path now
+normalizes Anthropic and OpenAI-compatible tool proposals, preserves provider
+call identity, and fail-closes before the shared approval ledger.
 
 The finish line is no longer "make the repo exist." The finish line is to make
 the repo repeatedly prove its behavior from a clean clone through ingestion,

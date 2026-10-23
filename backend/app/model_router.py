@@ -13,9 +13,11 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
+from .agent_tool_proposals import openai_tool_schemas, parse_provider_tool_proposals, provider_tool_schemas
 from .config import Settings, settings
 from .injection_guard import neutralize_fence
-from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
+from .permission_engine import PermissionEngineError, PermissionRequest
+from .permission_engine import require as require_permission
 
 
 class ModelProviderError(RuntimeError):
@@ -39,6 +41,7 @@ class ModelProviderSpec:
     modalities: tuple[str, ...] = field(default=("text",))
     context_tokens: int = 8192
     supports_streaming: bool = False
+    supports_tool_calls: bool = False
 
 
 MODEL_PROVIDER_SPECS: dict[str, ModelProviderSpec] = {
@@ -65,6 +68,7 @@ MODEL_PROVIDER_SPECS: dict[str, ModelProviderSpec] = {
         modalities=("text",),
         context_tokens=200_000,
         supports_streaming=True,
+        supports_tool_calls=True,
     ),
     "openai_compatible_local": ModelProviderSpec(
         name="openai_compatible_local",
@@ -81,6 +85,7 @@ MODEL_PROVIDER_SPECS: dict[str, ModelProviderSpec] = {
         modalities=("text",),
         context_tokens=8192,
         supports_streaming=True,
+        supports_tool_calls=True,
     ),
 }
 
@@ -253,6 +258,7 @@ def _provider_status(spec: ModelProviderSpec, cfg: Settings) -> dict[str, Any]:
         "modalities": list(spec.modalities),
         "context_tokens": context_tokens,
         "supports_streaming": spec.supports_streaming,
+        "supports_tool_calls": spec.supports_tool_calls,
         "local_server": local,
         "name": spec.name,
         "default_model": default_model,
@@ -345,6 +351,99 @@ def _require_model_invoke(spec: ModelProviderSpec, cfg: Settings) -> None:
         )
     except PermissionEngineError as exc:
         raise ModelProviderError(exc.status, exc.detail) from exc
+
+
+def generate_tool_proposals(
+    prompt: str,
+    *,
+    model_provider: str,
+    model_name: str | None = None,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Request structured tool calls from an explicitly selected live provider.
+
+    This is intentionally separate from ``generate_answer``: a provider cannot
+    turn ordinary answer text into an action, and provider-native planning has
+    no mock fallback because that would conceal the selected execution mode.
+    """
+    spec = get_model_provider_spec(model_provider)
+    if not spec.supports_tool_calls:
+        raise ModelProviderError(
+            "ERROR_AGENT_PROVIDER_NATIVE_UNAVAILABLE",
+            f"Provider {spec.name} does not expose structured tool calls.",
+        )
+    _require_model_invoke(spec, cfg)
+    model = model_name or spec.default_model
+    system = (
+        "You are a bounded local task planner. Propose only tools that directly satisfy the user's explicit request. "
+        "Do not invent permissions, credentials, URLs, repositories, or hidden goals. Tool proposals are suggestions "
+        "only and require separate user approval before execution."
+    )
+    if spec.name == "anthropic":
+        if os.getenv("MUCARO_AI_LIVE_MODE") != "1":
+            raise ModelProviderError("ERROR_LIVE_MODE_DISABLED", "Set MUCARO_AI_LIVE_MODE=1 to permit live Anthropic planning.")
+        if spec.api_key_env and not os.getenv(spec.api_key_env):
+            raise ModelProviderError("ERROR_MODEL_API_KEY_MISSING", "Set ANTHROPIC_API_KEY before provider-native planning.")
+        try:
+            import anthropic as sdk  # type: ignore
+        except Exception as exc:
+            raise ModelProviderError(
+                "ERROR_MODEL_SDK_MISSING",
+                'Install the optional dependency group with: python -m pip install -e ".[anthropic]"',
+            ) from exc
+        try:
+            response = _anthropic_client(sdk).messages.create(
+                model=model,
+                max_tokens=1024,
+                system=system,
+                messages=[{"role": "user", "content": prompt}],
+                tools=provider_tool_schemas(),
+                tool_choice={"type": "auto"},
+            )
+        except sdk.APIError as exc:
+            raise _anthropic_error(sdk, exc) from exc
+        except Exception as exc:
+            raise classify_provider_exception(exc) from exc
+        return parse_provider_tool_proposals(
+            "anthropic",
+            response,
+            model=model,
+            response_id=getattr(response, "id", None),
+        )
+
+    local_cfg = local_model_settings()
+    base_url = local_cfg["base_url"]
+    if not _is_loopback_url(base_url):
+        raise ModelProviderError("ERROR_LOCAL_MODEL_URL_NOT_LOOPBACK", f"Local model URL must be a loopback address: {base_url}")
+    body = json.dumps(
+        {
+            "model": model,
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            "tools": openai_tool_schemas(),
+            "tool_choice": "auto",
+            "temperature": 0,
+            "stream": False,
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        f"{base_url}/chat/completions", data=body, headers={"Content-Type": "application/json"}, method="POST"
+    )
+    try:
+        with _local_opener().open(request, timeout=local_cfg["timeout_seconds"]) as response:
+            payload = json.loads(response.read(4_000_000).decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as exc:
+        status = "ERROR_MODEL_PROVIDER_RATE_LIMIT" if exc.code == 429 else "ERROR_LOCAL_MODEL_UNAVAILABLE" if exc.code >= 500 else "ERROR_LOCAL_MODEL_HTTP_ERROR"
+        raise ModelProviderError(status, f"Local model server returned HTTP {exc.code} for model {model}.") from exc
+    except (urllib.error.URLError, OSError) as exc:
+        raise ModelProviderError("ERROR_LOCAL_MODEL_UNAVAILABLE", f"Local model server unreachable at {base_url}: {exc}") from exc
+    except (ValueError, KeyError, IndexError) as exc:
+        raise ModelProviderError("ERROR_LOCAL_MODEL_RESPONSE_INVALID", f"Unexpected local model response: {exc}") from exc
+    return parse_provider_tool_proposals(
+        LOCAL_PROVIDER,
+        payload,
+        model=model,
+        response_id=payload.get("id") if isinstance(payload, dict) else None,
+    )
 
 
 def _fallback_or_error(
@@ -488,7 +587,7 @@ def _anthropic_answer(
 ) -> dict[str, Any]:
     try:
         import anthropic as sdk  # type: ignore
-    except Exception:
+    except ImportError:
         return _fallback_or_error(
             query,
             retrieved_chunks,

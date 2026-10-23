@@ -824,7 +824,12 @@ bounded intents, proposes at most four allowlisted tool calls, and records an
 `agent_plan` event before any call is requested. Every inferred call enters the
 same argument-bound approval flow as a user command; unrecognized intent
 produces no action and continues as an ordinary cited-answer request. This is
-bounded autonomy, not model-native tool use or multi-agent DAG execution.
+bounded autonomy by default. For an explicitly routed live provider, set
+`options.agent_planner` to `provider_native` alongside `options.model_provider`
+and `options.allow_live`; Anthropic and OpenAI-compatible local tool-call
+responses are normalized, allowlist-validated, bounded to four actions, hash
+bound, and then sent through the same approval ledger. Provider-native planning
+has no mock fallback, and it does not yet provide multi-agent DAG execution.
 
 Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,

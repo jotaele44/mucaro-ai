@@ -470,6 +470,7 @@ def request_tool_call(
     reason: str | None = None,
     run_id: str | None = None,
     retry_of: str | None = None,
+    provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
     arguments = arguments or {}
@@ -499,6 +500,7 @@ def request_tool_call(
         "status": "PENDING_APPROVAL",
         "requested_by": requested_by,
         "reason": reason,
+        "provenance": dict(provenance or {}),
         "run_id": run_id,
         "retry_of": retry_of,
         "created_at": created_at,

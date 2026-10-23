@@ -186,6 +186,57 @@ def test_agent_mode_builds_bounded_plan_and_keeps_inferred_actions_approval_gate
     assert get_run(run["run_id"], cfg)["state"] == "COMPLETED"
 
 
+def test_provider_native_agent_plan_preserves_identity_and_stops_for_approval(cfg, conversation, monkeypatch):
+    monkeypatch.setattr(
+        work_runs,
+        "plan_model_route",
+        lambda **_: {
+            "status": "MODEL_ROUTE_READY",
+            "selected_provider": "anthropic",
+            "selected_model": "claude-sonnet-5",
+            "selection_reason": "test",
+            "route_sha256": "route-test",
+            "candidates": [],
+        },
+    )
+    monkeypatch.setattr(
+        work_runs,
+        "generate_tool_proposals",
+        lambda *args, **kwargs: {
+            "schema_version": "mucaro-agent-tool-proposals/1.0",
+            "status": "AGENT_TOOL_PROPOSALS_VALID",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5",
+            "response_id": "msg_test",
+            "proposal_sha256": "proposal-test",
+            "proposals": [
+                {
+                    "provider_call_id": "toolu_test",
+                    "tool": "source_library.status",
+                    "arguments": {},
+                    "arguments_sha256": "args-test",
+                }
+            ],
+            "counts": {"selected_actions": 1, "max_actions": 4},
+        },
+    )
+    run = _submit(
+        conversation,
+        "Inspect the source library.",
+        cfg,
+        mode="agent",
+        options={"agent_planner": "provider_native", "model_provider": "anthropic", "allow_live": True},
+    )
+    assert run["state"] == "AWAITING_APPROVAL"
+    call = list_tool_calls(cfg)["tool_calls"][0]
+    assert call["status"] == "PENDING_APPROVAL"
+    assert call["provenance"] == {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "response_id": "msg_test",
+        "provider_call_id": "toolu_test",
+        "proposal_sha256": "proposal-test",
+    }
 # --- F08 / F16: truthful per-call outcomes, failure question and targeted retry ---------
 
 

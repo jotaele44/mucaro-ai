@@ -42,7 +42,7 @@ from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
 from .db import ensure_db, get_connection
 from .error_categories import classify_error
-from .model_router import ModelProviderError
+from .model_router import ModelProviderError, generate_tool_proposals
 from .model_routing_policy import ModelRoutingError, plan_model_route
 from .response_flow import (
     InteractionError,
@@ -653,6 +653,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     options = run.get("options", {})
     commands, question, unknown = _parse_prompt(run["prompt"])
     _emit_only(run_id, cfg, "run_started", {"mode": run["mode"], "prompt": run["prompt"]})
+    route: dict[str, Any] | None = None
     try:
         route = plan_model_route(
             task_type="cited_qa",
@@ -675,7 +676,50 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     for name in unknown:
         _emit_only(run_id, cfg, "warning", {"status": "WARN_UNKNOWN_COMMAND", "category": "INPUT_INVALID", "detail": name})
     if run["mode"] == "agent" and not commands:
-        agent_plan = build_agent_plan(run["prompt"], cfg=cfg)
+        if options.get("agent_planner") == "provider_native":
+            try:
+                if not route or route.get("status") != "MODEL_ROUTE_READY":
+                    raise ModelProviderError(
+                        "ERROR_AGENT_MODEL_ROUTE_BLOCKED",
+                        "Provider-native planning requires a successful explicit model route.",
+                    )
+                proposals = generate_tool_proposals(
+                    run["prompt"],
+                    model_provider=route["selected_provider"],
+                    model_name=route["selected_model"],
+                    cfg=cfg,
+                )
+                agent_plan = {
+                    **proposals,
+                    "planner": "provider-native",
+                    "actions": [
+                        {
+                            "tool": row["tool"],
+                            "arguments": row["arguments"],
+                            "reason": "Provider-native proposal; explicit user approval is still required.",
+                            "confidence": "PROVIDER_VALIDATED",
+                            "provenance": {
+                                "provider": proposals["provider"],
+                                "model": proposals["model"],
+                                "response_id": proposals.get("response_id"),
+                                "provider_call_id": row["provider_call_id"],
+                                "proposal_sha256": proposals["proposal_sha256"],
+                            },
+                        }
+                        for row in proposals["proposals"]
+                    ],
+                }
+            except ModelProviderError as exc:
+                agent_plan = {
+                    "schema_version": "mucaro-agent-tool-proposals/1.0",
+                    "status": "AGENT_PROVIDER_NATIVE_BLOCKED",
+                    "planner": "provider-native",
+                    "actions": [],
+                    "error": {"status": exc.status, "detail": exc.detail},
+                    "invariants": {"planner_does_not_execute": True, "blocked_fail_closed": True},
+                }
+        else:
+            agent_plan = build_agent_plan(run["prompt"], cfg=cfg)
         _emit_only(run_id, cfg, "agent_plan", agent_plan)
         commands = [
             {
@@ -684,6 +728,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                 "arguments": row["arguments"],
                 "reason": row["reason"],
                 "confidence": row["confidence"],
+                "provenance": row.get("provenance"),
             }
             for row in agent_plan["actions"]
         ]
@@ -708,7 +753,15 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
         try:
             requester = "agent" if run["mode"] == "agent" and command["command"] == "agent" else "user"
             reason = command.get("reason") or command["command"]
-            call = request_tool_call(command["tool"], command["arguments"], cfg=cfg, requested_by=requester, reason=reason, run_id=run_id)["tool_call"]
+            call = request_tool_call(
+                command["tool"],
+                command["arguments"],
+                cfg=cfg,
+                requested_by=requester,
+                reason=reason,
+                run_id=run_id,
+                provenance=command.get("provenance"),
+            )["tool_call"]
         except ToolRuntimeError as exc:
             events.append(("warning", {"status": exc.status, "category": classify_error(exc.status), "detail": exc.detail}))
             continue
@@ -733,6 +786,7 @@ def _call_view(call: dict[str, Any]) -> dict[str, Any]:
         "arguments_sha256": call.get("arguments_sha256"),
         "status": call["status"],
         "retry_of": call.get("retry_of"),
+        "provenance": call.get("provenance", {}),
     }
 
 
