@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .format_registry import EXPECTED_SIGNATURE_KINDS, TEXT_SIGNATURE_SUFFIXES
+
 SNIFF_BYTES = 4096
 
 EXECUTABLE_SIGNATURES: tuple[tuple[bytes, str], ...] = (
@@ -26,25 +28,9 @@ EXECUTABLE_SIGNATURES: tuple[tuple[bytes, str], ...] = (
     (b"\xca\xfe\xba\xbe", "macho_universal_or_java_class"),
 )
 
-# Signature -> detected kind. Order matters: more specific checks first.
-_KIND_BY_SUFFIX: dict[str, set[str]] = {
-    ".pdf": {"pdf"},
-    ".docx": {"zip"},
-    ".zip": {"zip"},
-    ".png": {"png"},
-    ".jpg": {"jpeg"},
-    ".jpeg": {"jpeg"},
-    ".gif": {"gif"},
-    ".webp": {"webp"},
-    ".wav": {"wav"},
-    ".mp3": {"mp3"},
-    ".m4a": {"iso_base_media"},
-    ".mp4": {"iso_base_media"},
-    ".mov": {"iso_base_media", "quicktime"},
-    ".webm": {"ebml"},
-    ".msg": {"ole_compound"},
-}
-TEXT_SUFFIXES = {".txt", ".md", ".csv", ".json", ".html", ".htm", ".eml", ".geojson"}
+# Signature expectations are declared by the canonical ingestion format registry.
+_KIND_BY_SUFFIX = EXPECTED_SIGNATURE_KINDS
+TEXT_SUFFIXES = TEXT_SIGNATURE_SUFFIXES
 
 
 class SignatureError(ValueError):

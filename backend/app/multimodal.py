@@ -5,10 +5,7 @@ import wave
 from pathlib import Path
 from typing import Any
 
-IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
-AUDIO_SUFFIXES = {".wav", ".mp3", ".m4a"}
-VIDEO_SUFFIXES = {".mp4", ".mov", ".webm"}
-MULTIMODAL_SUFFIXES = IMAGE_SUFFIXES | AUDIO_SUFFIXES | VIDEO_SUFFIXES
+from .format_registry import AUDIO_SUFFIXES, IMAGE_SUFFIXES, MULTIMODAL_SUFFIXES, VIDEO_SUFFIXES
 
 
 def media_kind_for_suffix(suffix: str) -> str | None:
