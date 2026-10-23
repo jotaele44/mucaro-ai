@@ -48,6 +48,7 @@ export function App() {
   const [navOpen, setNavOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [modes, setModes] = useState(null);
+  const [claude, setClaude] = useState(null);
   const [options, setOptions] = useState(() => ({ ...DEFAULT_OPTIONS, ...stored("mucaro.options", {}) }));
   const [message, setMessage] = useState("");
   // state: checking | ok | error | locked. `offline` marks a service that answered before and has gone quiet: the UI
@@ -84,6 +85,7 @@ export function App() {
       await api.health();
       const [modePayload] = await Promise.all([api.modes(), loadConversations()]);
       setModes(modePayload);
+      api.claude().then(setClaude).catch(() => setClaude(null));
       offline.current = false;
       setHealth((current) => (current.state === "ok" && !current.offline ? current : { state: "ok" }));
     } catch (err) {
@@ -261,12 +263,14 @@ export function App() {
             announce={announce}
             modes={modes}
             defaultOptions={options}
+            claude={claude}
+            onOpenSettings={() => setView("settings")}
           />
         )}
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}
         {health.state === "ok" && view === "provenance" && <ProvenanceWorkspace />}
-        {health.state === "ok" && view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions} announce={announce} />}
+        {health.state === "ok" && view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions} announce={announce} claude={claude} onClaudeChange={setClaude} />}
       </main>
       {tasksOpen && <TasksDrawer onClose={() => setTasksOpen(false)} />}
       <div className="sr-only" role="status" aria-live="polite">{message}</div>
