@@ -7,6 +7,8 @@ import pytest
 from scripts import shadow_evidence
 
 
+REAL_LOAD_EXECUTION_RECEIPT = shadow_evidence._load_execution_receipt
+
 BASE = "a" * 40
 HEAD = "b" * 40
 REQUIRED = ["stale", "unexpected_codes"]
@@ -97,14 +99,14 @@ def test_execution_receipt_is_bound_to_base_and_checkpoint(monkeypatch, tmp_path
     )
 
     monkeypatch.setattr(shadow_evidence, "ROOT", tmp_path)
-    shadow_evidence._load_execution_receipt(
+    REAL_LOAD_EXECUTION_RECEIPT(
         "execution.json",
         base_sha=BASE,
         checkpoint_sha=HEAD,
     )
 
     with pytest.raises(shadow_evidence.ShadowEvidenceError, match="base mismatch"):
-        shadow_evidence._load_execution_receipt(
+        REAL_LOAD_EXECUTION_RECEIPT(
             "execution.json",
             base_sha="c" * 40,
             checkpoint_sha=HEAD,
