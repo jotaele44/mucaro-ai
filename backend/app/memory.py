@@ -8,6 +8,7 @@ from .utils import read_json, stable_id, update_json, utc_now
 
 MEMORY_NAME = "assistant_memory.json"
 MEMORY_KINDS = {"preference", "profile", "instruction", "fact"}
+MEMORY_SCOPES = {"global", "workspace", "conversation"}
 MAX_MEMORY_CONTENT_CHARS = 800
 
 
@@ -34,9 +35,32 @@ def _validate_kind(kind: str) -> str:
     return normalized
 
 
+def _validate_scope(scope: str, scope_id: str | None) -> tuple[str, str | None]:
+    normalized = str(scope or "global").strip().lower()
+    if normalized not in MEMORY_SCOPES:
+        allowed = ", ".join(sorted(MEMORY_SCOPES))
+        raise MemoryError("ERROR_MEMORY_SCOPE_UNSUPPORTED", f"Memory scope must be one of: {allowed}.")
+    resolved_id = str(scope_id or "").strip() or None
+    if normalized == "global":
+        if resolved_id is not None:
+            raise MemoryError("ERROR_MEMORY_SCOPE_ID_FOR_GLOBAL", "Global memory must not declare scope_id.")
+        return normalized, None
+    if resolved_id is None:
+        raise MemoryError("ERROR_MEMORY_SCOPE_ID_REQUIRED", f"{normalized} memory requires scope_id.")
+    if len(resolved_id) > 160:
+        raise MemoryError("ERROR_MEMORY_SCOPE_ID_TOO_LONG", "Memory scope_id exceeds 160 characters.")
+    return normalized, resolved_id
+
+
+def _with_scope_defaults(row: dict[str, Any]) -> dict[str, Any]:
+    scope = str(row.get("scope") or "global").strip().lower()
+    scope_id = row.get("scope_id")
+    return {**row, "scope": scope, "scope_id": scope_id if scope != "global" else None}
+
+
 def _load_memory(cfg: Settings) -> list[dict[str, Any]]:
     rows = read_json(_memory_path(cfg), [])
-    return [row for row in rows if isinstance(row, dict) and isinstance(row.get("memory_id"), str)]
+    return [_with_scope_defaults(row) for row in rows if isinstance(row, dict) and isinstance(row.get("memory_id"), str)]
 
 
 def _valid_rows(rows: list[Any]) -> list[dict[str, Any]]:
@@ -66,6 +90,8 @@ def remember_memory_item(
     *,
     kind: str = "preference",
     source: str = "operator",
+    scope: str = "global",
+    scope_id: str | None = None,
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
     normalized = _normalize_content(content)
@@ -77,6 +103,7 @@ def remember_memory_item(
             f"Memory content exceeds {MAX_MEMORY_CONTENT_CHARS} characters.",
         )
     resolved_kind = _validate_kind(kind)
+    resolved_scope, resolved_scope_id = _validate_scope(scope, scope_id)
     now = utc_now()
     row = {
         "memory_id": stable_id("mem", resolved_kind, normalized, now, length=12),
@@ -84,6 +111,8 @@ def remember_memory_item(
         "content": normalized,
         "enabled": True,
         "source": source,
+        "scope": resolved_scope,
+        "scope_id": resolved_scope_id,
         "created_at": now,
         "updated_at": now,
     }
@@ -100,7 +129,7 @@ def set_memory_enabled(
     def mutate(rows: list[Any]) -> dict[str, Any] | None:
         for index, row in enumerate(rows):
             if isinstance(row, dict) and row.get("memory_id") == memory_id:
-                updated = validate_contract("memory_item", {**row, "enabled": enabled, "updated_at": utc_now()})
+                updated = validate_contract("memory_item", {**_with_scope_defaults(row), "enabled": enabled, "updated_at": utc_now()})
                 rows[index] = updated
                 return updated
         return None
