@@ -175,6 +175,21 @@ Do not promote this workflow into a reusable skill/agent after a single successf
 ## Checkpoint-specific adversarial evidence
 
 Generic release or pytest success never implies that every adversarial vector passed.
+
+For an exact-checkpoint execution, Shadow QA runs a dedicated selector for every
+required adversarial vector after the broad release gates pass. The runner then
+generates two exact-SHA artifacts:
+
+- `mucaro-shadow-execution-receipt/1.0`, bound to both the cumulative
+  `base_sha` and exact `checkpoint_sha`;
+- `mucaro-shadow-vector-evidence/1.0`, containing one disposition for every
+  required vector and naming the exact selector plus the execution receipt.
+
+The generated manifest is validated through the same evidence validator used for
+historical adjudication. A vector becomes PASS only when its dedicated selector
+executes successfully on that exact checkpoint and the exact execution receipt is
+PASS. Broad pytest/release success alone is insufficient.
+
 A real application checkpoint may close a vector only through a
 `mucaro-shadow-vector-evidence/1.0` manifest bound to the exact `base_sha`
 and `checkpoint_sha`.
@@ -196,10 +211,12 @@ states are `PASS`, `NOT_APPLICABLE`, `BLOCKED`, and `UNRESOLVED`.
   evidence absent from the checkpoint fail closed.
 
 Historical replay is evidence adjudication, not execution equivalence. The verifier
-may run from a later tooling checkout against an older exact checkpoint, but that
-mode records its execution gate as BLOCKED and must not claim the older code was
-rerun. A later exact-checkpoint execution can supersede that blocked execution
-observation.
+may run from a later tooling checkout against an older exact checkpoint and must
+not claim that checkpoint code was rerun. When a valid frozen execution receipt
+already proves that the broad and dedicated vector gates executed successfully on
+the exact historical checkpoint, replay records the tooling pass as AUDIT_ONLY
+rather than BLOCKED and may preserve the historical PASS classification. Without
+that exact receipt, PASS remains impossible.
 
 Checkpoint manifests live under `_architecture/shadow/evidence/<checkpoint_sha>.json`.
 They are append-only provenance records; a later correction supersedes rather than

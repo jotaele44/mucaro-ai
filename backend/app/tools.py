@@ -746,7 +746,15 @@ def run_tool_call(
         failure = ToolRuntimeError("ERROR_TOOL_INTERNAL_FAILURE", f"{type(exc).__name__}: {exc}")
         result = {"status": failure.status, "detail": failure.detail}
     else:
-        result = outcome["result"]
+        candidate = outcome.get("result")
+        if not isinstance(candidate, dict) or not isinstance(candidate.get("status"), str) or not candidate["status"].strip():
+            failure = ToolRuntimeError(
+                "ERROR_TOOL_RESULT_INVALID",
+                f"{tool_name} returned a malformed tool result; expected an object with a non-empty status string",
+            )
+            result = {"status": failure.status, "detail": failure.detail}
+        else:
+            result = candidate
     final_status = "FAILED" if failure else "EXECUTED"
     call = _transition(
         tool_call_id,

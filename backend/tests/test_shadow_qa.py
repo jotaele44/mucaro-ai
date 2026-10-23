@@ -78,3 +78,54 @@ def test_shadow_workflow_invokes_runner_as_module() -> None:
     )
     assert completed.returncode == 0, completed.stderr
     assert "Run bounded MUCARO Shadow QA" in completed.stdout
+
+
+def test_vector_selector_registry_closes_exact_required_denominator() -> None:
+    assert set(shadow_qa.VECTOR_TEST_SELECTORS) == set(shadow_qa.REQUIRED_ADVERSARIAL_VECTORS)
+    assert len(shadow_qa.VECTOR_TEST_SELECTORS) == len(shadow_qa.REQUIRED_ADVERSARIAL_VECTORS)
+    assert all("backend/tests/" in selector and "::test_" in selector for selector in shadow_qa.VECTOR_TEST_SELECTORS.values())
+
+
+def test_exact_vector_certification_generates_valid_bound_evidence(tmp_path, monkeypatch) -> None:
+    base = "a" * 40
+    head = "b" * 40
+    execution = tmp_path / "data" / "exports" / "shadow" / "execution.json"
+    manifest = tmp_path / "data" / "exports" / "shadow" / "manifest.json"
+
+    monkeypatch.setattr(shadow_qa, "ROOT", tmp_path)
+    monkeypatch.setattr(shadow_qa.shadow_evidence, "ROOT", tmp_path)
+
+    definitions = "\n".join(
+        f"def {selector.split('::')[-1]}():\n    pass"
+        for selector in shadow_qa.VECTOR_TEST_SELECTORS.values()
+    )
+    monkeypatch.setattr(shadow_qa.shadow_evidence, "_git_show_text", lambda checkpoint, path: definitions)
+    monkeypatch.setattr(
+        shadow_qa,
+        "run",
+        lambda command, cwd=tmp_path: {"command": command, "cwd": ".", "returncode": 0},
+    )
+
+    gate, results, receipt_path, manifest_path = shadow_qa.certify_exact_vectors(
+        base_sha=base,
+        checkpoint_sha=head,
+        broad_gates=[{"command": ["broad"], "cwd": ".", "returncode": 0}],
+        execution_receipt_path=execution,
+        manifest_path=manifest,
+    )
+
+    assert gate["returncode"] == 0
+    assert set(results) == set(shadow_qa.REQUIRED_ADVERSARIAL_VECTORS)
+    assert all(result["state"] == "PASS" for result in results.values())
+    assert receipt_path == "data/exports/shadow/execution.json"
+    assert manifest_path == "data/exports/shadow/manifest.json"
+
+    execution_payload = __import__("json").loads(execution.read_text(encoding="utf-8"))
+    manifest_payload = __import__("json").loads(manifest.read_text(encoding="utf-8"))
+    assert execution_payload["status"] == "PASS"
+    assert execution_payload["base_sha"] == base
+    assert execution_payload["checkpoint_sha"] == head
+    assert execution_payload["vector_selector_count"] == 15
+    assert manifest_payload["base_sha"] == base
+    assert manifest_payload["checkpoint_sha"] == head
+    assert len(manifest_payload["vectors"]) == 15
