@@ -104,6 +104,13 @@ class RunOptions(BaseModel):
     require_offline: bool = False
 
 
+class BranchRetryRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=20000)
+    mode: Literal["plan", "ask", "auto"] = "ask"
+    idempotency_key: str = Field(min_length=8, max_length=128)
+    options: RunOptions = Field(default_factory=RunOptions)
+
+
 class MessageRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=20000)
     mode: Literal["plan", "ask", "auto"] = "ask"

@@ -42,6 +42,16 @@ export const EditIcon = () => (
   </Icon>
 );
 
+export const BranchIcon = () => (
+  <Icon name="branch">
+    <circle cx="7" cy="5.5" r="2" />
+    <circle cx="7" cy="18.5" r="2" />
+    <circle cx="17" cy="7.5" r="2" />
+    <path d="M7 7.5v9" />
+    <path d="M17 9.5c0 4-4 4.5-8.5 7.5" />
+  </Icon>
+);
+
 export const SpeakerIcon = () => (
   <Icon name="speaker">
     <path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" />

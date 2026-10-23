@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import { copyFailureMessage, copyText } from "../clipboard.js";
 import { answerMarkdown, answerPlainText, fileBaseName, saveFile, shareFile, shareMessage } from "../files.js";
-import { CheckIcon, CopyIcon, EditIcon, SaveIcon, ShareIcon, SpeakerIcon, StopIcon } from "./Icons.jsx";
+import { BranchIcon, CheckIcon, CopyIcon, EditIcon, SaveIcon, ShareIcon, SpeakerIcon, StopIcon } from "./Icons.jsx";
 import { RichText } from "./RichText.jsx";
 import { Sheet } from "./Sheet.jsx";
 
@@ -69,7 +69,7 @@ function SaveSheet({ text, file, announce, onClose }) {
 // One canonical per-message action surface. Copy/edit never mutate the canonical transcript.
 // `file` ({ title, citations, records }) adds Save and Share for an answer.
 // The actions are icons; each button's aria-label is its name and its title the hover tooltip.
-export function MessageActions({ text, announce, onEdit, allowReadAloud = false, file = null }) {
+export function MessageActions({ text, announce, onEdit, onBranch, allowReadAloud = false, file = null }) {
   const [speaking, setSpeaking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -120,6 +120,11 @@ export function MessageActions({ text, announce, onEdit, allowReadAloud = false,
         <button type="button" className="ghost-button icon-action" onClick={onEdit} aria-label="Edit message" title="Edit">
           <EditIcon />
         </button>
+        {onBranch && (
+          <button type="button" className="ghost-button icon-action" onClick={onBranch} aria-label="Branch and retry from this message" title="Branch & retry">
+            <BranchIcon />
+          </button>
+        )}
         {canSpeak && (
           <button
             type="button"
@@ -153,6 +158,7 @@ export function EditableMessage({
   revision = 0,
   edited = false,
   onSave,
+  onBranch,
   announce,
   allowReadAloud = false,
   file = null,
@@ -253,6 +259,7 @@ export function EditableMessage({
                 setError("");
                 setEditing(true);
               }}
+              onBranch={onBranch}
               allowReadAloud={allowReadAloud}
               file={file}
             />

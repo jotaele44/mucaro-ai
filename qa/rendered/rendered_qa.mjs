@@ -173,6 +173,25 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "02-answer");
   axeRuns.push(await axe(page, viewport, "answer"));
 
+  const completedReceipt = lastRun(page).locator(".run-receipt");
+  check("completed run metadata is one collapsed receipt", viewport, (await completedReceipt.count()) === 1 && !(await completedReceipt.evaluate((node) => node.open)));
+  const answerBeforeReceipt = await lastRun(page).evaluate((node) => {
+    const answer = node.querySelector(".assistant-bubble");
+    const receipt = node.querySelector(".run-receipt");
+    return Boolean(answer && receipt && (answer.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  check("completed answer stays visually ahead of execution metadata", viewport, answerBeforeReceipt);
+  check(
+    "completed user message exposes one semantic branch action",
+    viewport,
+    (await lastRun(page).locator(".user-bubble").getByRole("button", { name: "Branch and retry from this message" }).count()) === 1,
+  );
+  check(
+    "assistant message does not duplicate semantic branch action",
+    viewport,
+    (await lastRun(page).locator(".assistant-bubble").getByRole("button", { name: "Branch and retry from this message" }).count()) === 0,
+  );
+
   // Message interaction contract: native selection plus one Copy/Edit surface on both sides.
   const completedRun = lastRun(page);
   const userMessage = completedRun.locator(".user-bubble");
@@ -319,6 +338,15 @@ async function scenario(browser, base, viewport, contextOptions) {
       (await lastRun(page).locator(".assistant-bubble").getByText("Edited assistant display for rendered QA.").count()) === 1,
   );
 
+  if (viewport === "desktop") {
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Provenance", exact: true }).click();
+    await page.getByRole("heading", { name: "Provenance" }).waitFor();
+    check("provenance empty state explains its denominator", viewport, (await page.getByRole("heading", { name: "No tool actions recorded" }).count()) === 1);
+    check("provenance empty state has one navigation-only next action", viewport, (await page.getByRole("button", { name: "Go to Chat" }).count()) === 1);
+    await page.getByRole("button", { name: "Go to Chat" }).click();
+    await page.locator(".chat").waitFor();
+  }
+
   // Evidence sheet (TGT-030), Escape closes and restores focus.
   await citations.first().click();
   const evidence = page.getByRole("dialog", { name: /Evidence \[1\]/ });
@@ -339,6 +367,9 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "04-approval");
   await approval.getByRole("button", { name: "Allow once" }).click();
   await waitRunState(page, "COMPLETED");
+  const toolReceipt = lastRun(page).locator(".run-receipt");
+  check("completed tool metadata is collapsed into the run receipt", viewport, !(await toolReceipt.evaluate((node) => node.open)));
+  await toolReceipt.locator("summary").click();
   const summary = lastRun(page).getByRole("button", { name: /Used 1 tool/ });
   check("tool summary counts from records", viewport, (await summary.count()) === 1);
   await shot(page, viewport, "05-tool-done");
@@ -474,6 +505,17 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.getByRole("heading", { name: "Sources" }).waitFor();
   await page.locator(".source-row").nth(1).waitFor();
   check("sources workspace lists ingested sources", viewport, (await page.locator(".source-row").count()) >= 2);
+  await page.getByText("Add a folder from this Mac").click();
+  const directoryAccess = page.locator(".directory-intake");
+  await directoryAccess.waitFor();
+  check(
+    "directory access has one canonical permission control surface",
+    viewport,
+    (await directoryAccess.getByRole("button", { name: "Check access" }).count()) === 1 &&
+      (await directoryAccess.getByRole("button", { name: "Ingest folder" }).count()) === 1 &&
+      (await directoryAccess.getByRole("button", { name: "Grant and Ingest" }).count()) === 0,
+  );
+  check("directory access shows current path and permission state together", viewport, (await directoryAccess.getByText("Granted root").count()) === 1);
   await page.locator(".source-row").first().click();
   await page.getByText("SHA-256").first().waitFor();
   drawerStates.push(await drawerClosed());
@@ -482,6 +524,10 @@ async function scenario(browser, base, viewport, contextOptions) {
 
   await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Memory", exact: true }).click();
+  if (viewport === "desktop") {
+    check("memory empty state explains what memory does", viewport, (await page.getByRole("heading", { name: "No memory yet" }).count()) === 1);
+    check("memory empty state navigates to the canonical Remember form", viewport, (await page.getByRole("link", { name: "Go to Remember" }).count()) === 1);
+  }
   await page.getByLabel("Remember").fill("Prefer tables for comparisons");
   await page.getByRole("button", { name: "Save" }).click();
   await page.getByText("Prefer tables for comparisons").waitFor();
@@ -503,6 +549,33 @@ async function scenario(browser, base, viewport, contextOptions) {
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "16-settings");
   axeRuns.push(await axe(page, viewport, "settings"));
+
+  await openNav();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Chat", exact: true }).click();
+  await page.locator(".chat").waitFor();
+  const sourceBranchRun = page.locator('article.run[data-state="COMPLETED"]').first();
+  await sourceBranchRun.getByRole("button", { name: "Branch and retry from this message" }).click();
+  const branchDialog = page.getByRole("dialog", { name: "Branch & retry" });
+  await branchDialog.waitFor();
+  check("branch flow states source evidence stays unchanged", viewport, (await branchDialog.getByText(/source message, answer, citations/).count()) === 1);
+  await branchDialog.getByLabel("Revised prompt").fill("Branched semantic prompt for rendered QA.");
+  await branchDialog.getByRole("button", { name: "Create branch" }).click();
+  await page.getByText(/Semantic branch · source run/).waitFor();
+  await waitRunState(page, "COMPLETED", 20000);
+  check("semantic retry creates a new conversation with one new run", viewport, (await page.locator("article.run").count()) === 1);
+  check("semantic branch run carries source lineage", viewport, (await lastRun(page).locator(".run-receipt").getByText(/branched from/).count()) === 1);
+  await openNav();
+  const conversationTitles = page.locator(".conversation-title");
+  check(
+    "source and branch conversations both remain listed",
+    viewport,
+    (await conversationTitles.filter({ hasText: `QA ${viewport} conversation` }).count()) >= 2,
+  );
+  if (viewport === "iphone") {
+    await page.locator(".nav-scrim").click();
+    await page.waitForFunction(() => document.querySelector(".sidebar").getBoundingClientRect().right <= 0, null, { timeout: 5000 });
+  }
+  await shot(page, viewport, "16b-semantic-branch");
 
   if (viewport === "iphone") {
     check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
@@ -870,11 +943,13 @@ async function resilienceScenario(browser, base) {
       // Revoke folder access (the panel lives in a collapsed section of the Sources workspace).
       await page.locator("summary", { hasText: "Add a folder from this Mac" }).click();
       await page.getByLabel("Folder path on the host computer").fill(grantRoot);
-      await page.getByRole("button", { name: "Check Access" }).click();
-      await page.getByRole("button", { name: "Grant Access", exact: true }).click();
-      const grant = page.locator(".grant-row");
+      // This PR's single permission control: Check access, Grant access, then the panel's Revoke access.
+      await page.getByRole("button", { name: "Check access", exact: true }).click();
+      await page.getByRole("button", { name: "Grant access", exact: true }).click();
+      const grant = page.locator(".grant-select", { hasText: path.basename(grantRoot) });
       await grant.waitFor({ timeout: 10000 });
-      await grant.getByRole("button", { name: "Revoke" }).click();
+      const revokeAccess = page.locator(".permission-control").getByRole("button", { name: "Revoke access", exact: true });
+      await revokeAccess.click();
       const revokeDialog = page.getByRole("dialog", { name: "Revoke folder access?" });
       const askedToRevoke = await appears(revokeDialog, { timeout: 3000 });
       let keptGrant = false;
@@ -883,7 +958,7 @@ async function resilienceScenario(browser, base) {
         await revokeDialog.getByRole("button", { name: "Keep it" }).click();
         await revokeDialog.waitFor({ state: "detached" });
         keptGrant = (await grant.count()) === 1;
-        await grant.getByRole("button", { name: "Revoke" }).click();
+        await revokeAccess.click();
         await revokeDialog.getByRole("button", { name: "Revoke access" }).click();
         revokedOnConfirm = await appears(grant, { state: "detached", timeout: 10000 });
       }
