@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Derive a fail-closed, event-aware MUCARO_100 closure register.
 
 This is an analysis artifact. It does not award certification credit, mutate
@@ -18,17 +17,17 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from backend.app.denominator_audit import (  # noqa: E402
+from backend.app.denominator_audit import (
     audit_current_denominator_state,
     load_denominator_events,
 )
-from backend.app.program_denominator import load_denominator  # noqa: E402
+from backend.app.program_denominator import load_denominator
 
 
 def _load(relative: str) -> dict[str, Any]:
     payload = json.loads((ROOT / relative).read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError(f"{relative}: expected an object")
+        raise TypeError(f"{relative}: expected an object")
     return payload
 
 
@@ -36,7 +35,7 @@ def _index(rows: list[dict[str, Any]], field: str, label: str) -> dict[str, dict
     result: dict[str, dict[str, Any]] = {}
     for row in rows:
         if not isinstance(row, dict):
-            raise ValueError(f"{label}: non-object record")
+            raise TypeError(f"{label}: non-object record")
         key = row.get(field)
         if not isinstance(key, str) or not key or key in result:
             raise ValueError(f"{label}: absent or duplicate {field}: {key!r}")
