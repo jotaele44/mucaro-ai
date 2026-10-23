@@ -5,6 +5,9 @@ prove any external human identity, IdP operation, or secure key custody.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+import hashlib
+import json
+import re
 from pathlib import Path
 from typing import FrozenSet
 from .config import Settings
@@ -32,8 +35,7 @@ class IssuerTrustRecord:
             or not self.allowed_operators
             or not self.authorized_source_paths
             or self.not_before>=self.not_after
-            or not self.trust_manifest_sha256.startswith("sha256:")
-            or len(self.trust_manifest_sha256)!=71):
+            or not re.fullmatch(r"sha256:[0-9a-f]{64}",self.trust_manifest_sha256)):
             raise IssuerTrustError("INVALID_TRUST_RECORD")
 
 @dataclass(frozen=True)
@@ -78,10 +80,13 @@ class TrustedIssuerPolicy:
                 root=root,cfg=cfg,replay_db=replay_db,now=now)
         except OperatorAdmissionError as exc:
             raise IssuerTrustError("SIGNED_SOURCE_ADMISSION_DENIED") from exc
-        return {**result,
+        data={**{k:v for k,v in result.items() if k!="receipt_sha256"},
+            "source_receipt_sha256":result["receipt_sha256"],
             "issuer_key_id":record.key_id,
             "trust_manifest_sha256":record.trust_manifest_sha256,
             "authority_version":self.authority_version,
             "external_key_custody_attested":False,
             "trusted_provider_session_attested":False,
             "promotion_authorized":False}
+        payload=json.dumps(data,sort_keys=True,separators=(",",":"),allow_nan=False).encode()
+        return {**data,"receipt_sha256":"sha256:"+hashlib.sha256(payload).hexdigest()}
