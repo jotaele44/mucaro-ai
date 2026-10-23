@@ -43,8 +43,11 @@ orchestration remain open. An explicit `provider_native` planner path now
 normalizes Anthropic and OpenAI-compatible tool proposals, preserves provider
 call identity, and fail-closes before the shared approval ledger. Agent work
 runs now also create exact-head checkpoints for inferred steps, bind checkpoint
-step identity into tool provenance, and close each step idempotently through
-approval, execution, interruption, and terminal-run paths.
+step identity into tool provenance, close each step idempotently through
+approval, execution, interruption, and terminal-run paths, and validate
+deterministic dependency DAGs with fail-closed cycle/unknown-edge handling and
+downstream blocking; parallel execution, model-native tool loops, subagents,
+fleet scheduling, and broader crash-resume semantics remain open.
 
 The finish line is no longer "make the repo exist." The finish line is to make
 the repo repeatedly prove its behavior from a clean clone through ingestion,

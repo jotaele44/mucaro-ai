@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .agent_workflow import AgentWorkflowError, normalize_agent_actions
 from .config import Settings, settings
 
 AGENT_PLAN_SCHEMA = "mucaro-agent-plan/1.0"
@@ -54,7 +55,19 @@ def build_agent_plan(prompt: str, *, cfg: Settings = settings) -> dict[str, Any]
             continue
         seen.add(key)
         deduplicated.append(candidate)
-    bounded = deduplicated[:MAX_AGENT_ACTIONS]
+    try:
+        bounded = normalize_agent_actions(deduplicated[:MAX_AGENT_ACTIONS], max_actions=MAX_AGENT_ACTIONS)
+    except AgentWorkflowError as exc:
+        return {
+            "schema_version": AGENT_PLAN_SCHEMA,
+            "planner": AGENT_PLANNER_ID,
+            "status": "AGENT_PLAN_BLOCKED",
+            "prompt": text,
+            "actions": [],
+            "counts": {"candidate_actions": len(deduplicated), "selected_actions": 0, "max_actions": MAX_AGENT_ACTIONS},
+            "error": {"status": exc.status, "detail": exc.detail},
+            "invariants": {"planner_does_not_execute": True, "blocked_fail_closed": True},
+        }
     return {
         "schema_version": AGENT_PLAN_SCHEMA,
         "planner": AGENT_PLANNER_ID,
@@ -67,6 +80,7 @@ def build_agent_plan(prompt: str, *, cfg: Settings = settings) -> dict[str, Any]
             "actions_are_bounded": len(bounded) <= MAX_AGENT_ACTIONS,
             "duplicate_actions_removed": len(bounded) == len({(row["tool"], repr(sorted(row["arguments"].items()))) for row in bounded}),
             "unrecognized_intent_fails_closed": True,
+            "workflow_is_topologically_ordered": True,
         },
         "limitations": [
             "This local planner recognizes only explicit, bounded intent patterns; it does not infer hidden permissions or autonomously broaden scope.",

@@ -237,6 +237,8 @@ def test_provider_native_agent_plan_preserves_identity_and_stops_for_approval(cf
         "response_id": "msg_test",
         "provider_call_id": "toolu_test",
         "proposal_sha256": "proposal-test",
+        "agent_step_id": "agent-step-1",
+        "agent_dependencies": [],
     }
 
 
@@ -261,6 +263,38 @@ def test_agent_run_persists_checkpoint_steps_through_approval_and_completion(cfg
     assert completed["state"] == "COMPLETED"
     assert {step["status"] for step in completed["completed_steps"]} == {"PASS"}
     assert completed["pending_steps"] == []
+
+
+def test_agent_dependency_graph_is_topological_and_checkpoint_bound(cfg, conversation, monkeypatch):
+    monkeypatch.setattr(work_runs, "current_git_head", lambda _root: "d" * 40)
+    monkeypatch.setattr(
+        work_runs,
+        "build_agent_plan",
+        lambda prompt, cfg: {
+            "schema_version": "mucaro-agent-plan/1.0",
+            "planner": "test",
+            "status": "AGENT_PLAN_READY",
+            "prompt": prompt,
+            "actions": [
+                {"id": "answer", "tool": "product.audit", "arguments": {}, "reason": "answer", "confidence": "HIGH", "depends_on": ["inspect"]},
+                {"id": "inspect", "tool": "source_library.status", "arguments": {}, "reason": "inspect", "confidence": "HIGH", "depends_on": []},
+            ],
+        },
+    )
+    run = _submit(conversation, "How does source lineage work?", cfg, mode="agent")
+    checkpoint = get_checkpoint(run["checkpoint_id"], cfg)
+    assert checkpoint is not None
+    assert [step["id"] for step in checkpoint["pending_steps"]] == ["inspect", "answer"]
+    calls = list_tool_calls(cfg)["tool_calls"]
+    assert [call["provenance"]["agent_step_id"] for call in calls] == ["inspect", "answer"]
+    assert calls[1]["provenance"]["agent_dependencies"] == ["inspect"]
+    for call in calls:
+        approve_tool_call(call["tool_call_id"], cfg=cfg, expected_arguments_sha256=call["arguments_sha256"])
+    resume_waiting_run(run["run_id"], cfg)
+    assert get_run(run["run_id"], cfg)["state"] == "COMPLETED"
+    completed = get_checkpoint(run["checkpoint_id"], cfg)
+    assert completed is not None
+    assert [step["id"] for step in completed["completed_steps"]] == ["inspect", "answer"]
 # --- F08 / F16: truthful per-call outcomes, failure question and targeted retry ---------
 
 

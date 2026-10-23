@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+from backend.app.agent_workflow import AgentWorkflowError, normalize_agent_actions
 from backend.app.cli import main
 from backend.tests.test_api import make_settings
 
@@ -34,3 +37,27 @@ def test_agent_validate_cli_accepts_anthropic_tool_use(tmp_path: Path, capsys) -
     result = json.loads(capsys.readouterr().out)
     assert result["status"] == "AGENT_TOOL_PROPOSALS_VALID"
     assert result["proposal_sha256"]
+
+
+def test_agent_workflow_reorders_dependencies_deterministically() -> None:
+    actions = normalize_agent_actions(
+        [
+            {"id": "answer", "tool": "product.audit", "arguments": {}, "depends_on": ["inspect"]},
+            {"id": "inspect", "tool": "source_library.status", "arguments": {}, "depends_on": []},
+        ],
+        max_actions=4,
+    )
+    assert [row["id"] for row in actions] == ["inspect", "answer"]
+
+
+@pytest.mark.parametrize(
+    ("actions", "status"),
+    [
+        ([{"id": "a", "depends_on": ["missing"]}], "ERROR_AGENT_WORKFLOW_UNKNOWN_DEPENDENCY"),
+        ([{"id": "a", "depends_on": ["b"]}, {"id": "b", "depends_on": ["a"]}], "ERROR_AGENT_WORKFLOW_CYCLE"),
+    ],
+)
+def test_agent_workflow_rejects_invalid_graph(actions: list[dict[str, object]], status: str) -> None:
+    with pytest.raises(AgentWorkflowError) as exc:
+        normalize_agent_actions(actions, max_actions=4)
+    assert exc.value.status == status

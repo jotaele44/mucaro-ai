@@ -46,6 +46,7 @@ from .agent_checkpoints import (
     transition_checkpoint,
 )
 from .agent_planner import build_agent_plan
+from .agent_workflow import AgentWorkflowError, normalize_agent_actions
 from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
 from .db import ensure_db, get_connection
@@ -721,6 +722,12 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                         for row in proposals["proposals"]
                     ],
                 }
+                try:
+                    agent_plan["actions"] = normalize_agent_actions(agent_plan["actions"], max_actions=4)
+                except AgentWorkflowError as exc:
+                    agent_plan["actions"] = []
+                    agent_plan["status"] = "AGENT_PROVIDER_PLAN_BLOCKED"
+                    agent_plan["error"] = {"status": exc.status, "detail": exc.detail}
             except ModelProviderError as exc:
                 agent_plan = {
                     "schema_version": "mucaro-agent-tool-proposals/1.0",
@@ -732,6 +739,12 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                 }
         else:
             agent_plan = build_agent_plan(run["prompt"], cfg=cfg)
+            try:
+                agent_plan["actions"] = normalize_agent_actions(agent_plan.get("actions", []), max_actions=4)
+            except AgentWorkflowError as exc:
+                agent_plan["actions"] = []
+                agent_plan["status"] = "AGENT_PLAN_BLOCKED"
+                agent_plan["error"] = {"status": exc.status, "detail": exc.detail}
         _emit_only(run_id, cfg, "agent_plan", agent_plan)
         commands = [
             {
@@ -740,13 +753,16 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                 "arguments": row["arguments"],
                 "reason": row["reason"],
                 "confidence": row["confidence"],
+                "step_id": row.get("id"),
+                "depends_on": list(row.get("depends_on") or []),
                 "provenance": row.get("provenance"),
             }
             for row in agent_plan["actions"]
         ]
     steps = [
         {"step": f"{command['command']} -> {command['tool']}", "tool": command["tool"], "arguments": command["arguments"],
-         "reason": command.get("reason"), "confidence": command.get("confidence"),
+         "reason": command.get("reason"), "confidence": command.get("confidence"), "step_id": command.get("step_id"),
+         "depends_on": list(command.get("depends_on") or []),
          "requires_approval": not (run["mode"] == "auto" and _auto_approvable(command["tool"]))}
         for command in commands
     ]
@@ -772,7 +788,12 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                     source_sha=source_sha,
                     state="READY_FOR_APPROVAL",
                     pending_steps=[
-                        {"id": f"agent-step-{index + 1}", "tool": command["tool"], "status": "PENDING_APPROVAL"}
+                        {
+                            "id": command.get("step_id") or f"agent-step-{index + 1}",
+                            "tool": command["tool"],
+                            "status": "PENDING_APPROVAL",
+                            "depends_on": list(command.get("depends_on") or []),
+                        }
                         for index, command in enumerate(commands)
                     ],
                     provider=route.get("selected_provider") if route else None,
@@ -781,7 +802,10 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                     cfg=cfg,
                 )
                 checkpoint_id = checkpoint["checkpoint_id"]
-                checkpoint_steps = {index: f"agent-step-{index + 1}" for index in range(len(commands))}
+                checkpoint_steps = {
+                    index: command.get("step_id") or f"agent-step-{index + 1}"
+                    for index, command in enumerate(commands)
+                }
                 _emit_only(
                     run_id,
                     cfg,
@@ -794,14 +818,23 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
             _emit_only(run_id, cfg, "warning", {"status": "WARN_AGENT_CHECKPOINT_SOURCE_IDENTITY_UNAVAILABLE", "category": "PROVENANCE"})
 
     call_ids = []
+    call_step_ids: dict[str, str] = {}
     events: list[tuple[str, dict[str, Any]]] = []
     for index, command in enumerate(commands):
         try:
             requester = "agent" if run["mode"] == "agent" and command["command"] == "agent" else "user"
             reason = command.get("reason") or command["command"]
             provenance = dict(command.get("provenance") or {})
+            if run["mode"] == "agent":
+                provenance.update({
+                    "agent_step_id": command.get("step_id") or f"agent-step-{index + 1}",
+                    "agent_dependencies": list(command.get("depends_on") or []),
+                })
             if checkpoint_id:
-                provenance.update({"checkpoint_id": checkpoint_id, "checkpoint_step_id": checkpoint_steps[index]})
+                provenance.update({
+                    "checkpoint_id": checkpoint_id,
+                    "checkpoint_step_id": checkpoint_steps[index],
+                })
             call = request_tool_call(
                 command["tool"],
                 command["arguments"],
@@ -817,6 +850,8 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
         if run["mode"] == "auto" and _auto_approvable(call["tool_name"]):
             call = approve_tool_call(call["tool_call_id"], cfg=cfg, approved_by="policy:auto-local-read-only", expected_arguments_sha256=call["arguments_sha256"])["tool_call"]
         call_ids.append(call["tool_call_id"])
+        if checkpoint_id:
+            call_step_ids[call["tool_call_id"]] = checkpoint_steps[index]
         events.append(("tool_call", _call_view(call)))
 
     def change(current: dict[str, Any]) -> None:
@@ -824,9 +859,9 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
         current["question"] = question
         current["checkpoint_id"] = checkpoint_id
         current["checkpoint_step_ids"] = {
-            call_id: checkpoint_steps[index]
-            for index, call_id in enumerate(call_ids)
-            if index in checkpoint_steps
+            call_id: call_step_ids[call_id]
+            for call_id in call_ids
+            if call_id in call_step_ids
         }
         current["phase"] = "tools" if call_ids else "answer"
 
@@ -896,6 +931,44 @@ def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
             continue
         if _cancel_checkpoint(run_id, cfg):
             return False
+        current_calls = _run_calls(get_run(run_id, cfg), cfg)
+        current_by_step = {
+            str((row.get("provenance") or {}).get("agent_step_id") or (row.get("provenance") or {}).get("checkpoint_step_id")): row
+            for row in current_calls
+            if (row.get("provenance") or {}).get("agent_step_id") or (row.get("provenance") or {}).get("checkpoint_step_id")
+        }
+        dependencies = [str(value) for value in (call.get("provenance") or {}).get("agent_dependencies", [])]
+        dependency_rows = [current_by_step.get(dependency) for dependency in dependencies]
+        if any(row is None for row in dependency_rows):
+            try:
+                cancelled = cancel_tool_call(
+                    call["tool_call_id"],
+                    cfg=cfg,
+                    cancelled_by=f"run:{run_id}",
+                    reason="AGENT_DEPENDENCY_UNKNOWN",
+                )["tool_call"]
+                _emit_only(run_id, cfg, "warning", {
+                    "status": "ERROR_AGENT_WORKFLOW_UNKNOWN_DEPENDENCY",
+                    "category": "EXECUTION_BOUNDARY",
+                    "detail": f"step {(call.get('provenance') or {}).get('checkpoint_step_id')} references an unknown dependency",
+                    "tool_call_id": cancelled["tool_call_id"],
+                })
+            except ToolRuntimeError:
+                pass
+            continue
+        if any(row["status"] in {"FAILED", "DENIED", "CANCELLED", "INTERRUPTED"} for row in dependency_rows):
+            try:
+                cancel_tool_call(
+                    call["tool_call_id"],
+                    cfg=cfg,
+                    cancelled_by=f"run:{run_id}",
+                    reason="AGENT_DEPENDENCY_FAILED",
+                )
+            except ToolRuntimeError:
+                pass
+            continue
+        if any(row["status"] != "EXECUTED" for row in dependency_rows):
+            continue
         _emit_only(run_id, cfg, "tool_started", _call_view(call))
         step_key = (call.get("provenance") or {}).get("checkpoint_step_id")
         if checkpoint_id and step_key:
