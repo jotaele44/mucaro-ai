@@ -12,12 +12,12 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert report["fixture"] == "backend/tests/fixtures/gis_eval.json"
     assert report["fixture_validation"]["status"] == "PASS"
     assert report["counts"] == {
-        "cases": 64,
-        "passed": 64,
+        "cases": 70,
+        "passed": 70,
         "failed": 0,
-        "positive_cases": 38,
-        "negative_cases": 26,
-        "operations": 25,
+        "positive_cases": 41,
+        "negative_cases": 29,
+        "operations": 26,
         "operation_names": [
             "bbox_filter",
             "clip_bbox",
@@ -26,6 +26,7 @@ def test_gis_eval_default_fixture_covers_core_operations():
             "csv_points",
             "inspect",
             "map_export",
+            "map_render_validate",
             "measure",
             "measure_ellipsoidal",
             "overlay",
@@ -114,6 +115,7 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["reproject_invalid_latitude_fails_closed"]["observed_status"] == "ERROR_GIS_REPROJECT_INVALID_COORDINATES"
     assert by_id["reproject_crs_wgs84_to_utm20n"]["observed_status"] == "GIS_CRS_REPROJECT_OK"
     assert by_id["reproject_crs_puerto_rico_governed_grid"]["observed_status"] == "GIS_CRS_REPROJECT_OK"
+    assert by_id["reproject_crs_florida_governed_grid"]["observed_status"] == "GIS_CRS_REPROJECT_OK"
     assert by_id["reproject_crs_puerto_rico_outside_grid_fails_closed"]["case_type"] == "negative"
     assert by_id["reproject_crs_puerto_rico_outside_grid_fails_closed"]["observed_status"] == "ERROR_GIS_CRS_TRANSFORM"
     assert by_id["reproject_crs_m_coordinates_fail_closed"]["observed_status"] == "ERROR_GIS_CRS_M_UNSUPPORTED"
@@ -130,11 +132,16 @@ def test_gis_eval_default_fixture_covers_core_operations():
     assert by_id["vector_raster_crs_mismatch_fails_closed"]["observed_status"] == "ERROR_GIS_VECTOR_RASTER_CRS_MISMATCH"
     assert by_id["zonal_stats_close_numeric_nodata_and_zero_accounting"]["observed_status"] == "GIS_ZONAL_STATS_OK"
     assert by_id["zonal_stats_invalid_band_fails_closed"]["observed_status"] == "ERROR_GIS_VECTOR_RASTER_BAND"
+    assert by_id["zonal_stats_fractional_projected_coverage_closes_area_and_weights"]["observed_status"] == "GIS_ZONAL_STATS_OK"
+    assert by_id["zonal_stats_fractional_geographic_crs_fails_closed"]["observed_status"] == "ERROR_GIS_VECTOR_RASTER_FRACTIONAL_CRS"
     assert by_id["raster_resample_preserves_grid_contract"]["observed_status"] == "GIS_RASTER_RESAMPLE_OK"
     assert by_id["raster_resample_invalid_dimensions_fail_closed"]["observed_status"] == "ERROR_GIS_RASTER_RESAMPLE_DIMENSIONS"
     assert by_id["real_corpus_bytes_schema_ids_and_geometry_validate"]["observed_status"] == "GIS_CORPUS_VALIDATION_OK"
     assert by_id["map_export_binds_renderer_and_layers"]["observed_status"] == "GIS_MAP_EXPORT_MANIFEST_OK"
     assert by_id["map_export_invalid_extent_fails_closed"]["observed_status"] == "ERROR_GIS_EXPORT_EXTENT"
+    assert by_id["map_render_validate_binds_decoded_visible_pixels"]["observed_status"] == "GIS_RENDER_VALIDATION_OK"
+    assert by_id["map_render_validate_rejects_uniform_blank_image"]["observed_status"] == "ERROR_GIS_RENDER_BLANK"
+    assert by_id["map_render_validate_rejects_non_image_bytes"]["observed_status"] == "ERROR_GIS_RENDER_DECODE"
 
 
 def test_gis_eval_fails_when_expected_invariant_does_not_match(tmp_path: Path):

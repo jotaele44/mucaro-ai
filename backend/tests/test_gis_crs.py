@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import shutil
 from pathlib import Path
 
@@ -22,6 +23,9 @@ from backend.app.gis_crs import (
 from backend.app.gis_processing import GISProcessingError
 
 PACKAGE_GRID_ROOT = Path(__file__).resolve().parents[1] / "app" / "gis_grids"
+FLORIDA_GRID_FILENAME = "us_noaa_FL.tif"
+FLORIDA_GRID_BYTES = 8374
+FLORIDA_GRID_SHA256 = "73b385448f09e6c1122a87b5b3137a5b5775585af9445889e0a3a8c4c5951f54"
 
 
 def make_settings(tmp_path: Path) -> Settings:
@@ -139,6 +143,94 @@ def test_puerto_rico_reprojection_uses_exact_governed_grid_binding(tmp_path: Pat
     assert abs(y - 240637.22919110494) > 0.9
     contract = validate_gis_report_contract(report)
     assert contract["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, contract["failed_checks"]
+
+
+def test_florida_reprojection_uses_second_exact_governed_grid_binding(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    source = write_fc(tmp_path / "fl-grid.geojson", "EPSG:4269", [-80.2, 25.8])
+
+    report = reproject_geojson_crs(source, target_crs="EPSG:4152", cfg=cfg)
+    parameters = report["parameters"]
+    governed = parameters["governed_grid"]
+    selected = parameters["candidate_inventory"][parameters["selected_candidate_index"]]
+    grid = selected["grids"][0]
+    output = json.loads(Path(report["output"]["path"]).read_text(encoding="utf-8"))
+    lon, lat = output["features"][0]["geometry"]["coordinates"]
+
+    assert report["status"] == "GIS_CRS_REPROJECT_OK"
+    assert report["warnings"] == []
+    assert parameters["adapter"] == "pyproj_governed_local_grid_always_xy_v1"
+    assert parameters["source_crs"] == "EPSG:4269"
+    assert parameters["target_crs"] == "EPSG:4152"
+    assert parameters["transformer_description"] == "NAD83 to NAD83(HARN) (7)"
+    assert "grids=us_noaa_FL.tif" in parameters["transformer_definition"]
+    assert selected["selection_policy"] == "exact_source_bound_governed_grid"
+    assert selected["accuracy"] == pytest.approx(0.05)
+    assert grid["grid_id"] == "us_noaa_fl"
+    assert grid["short_name"] == FLORIDA_GRID_FILENAME
+    assert grid["local_bytes"] == FLORIDA_GRID_BYTES
+    assert grid["local_sha256"] == FLORIDA_GRID_SHA256
+    assert grid["manifest_sha256"] == GOVERNED_GRID_MANIFEST_SHA256
+    assert grid["license_classification"] == "PUBLIC_DOMAIN"
+    assert governed["grid_id"] == "us_noaa_fl"
+    assert governed["independent_engine_validation"] == "OPEN"
+    assert report["invariants"]["governed_grid_binding_satisfied"] is True
+    assert lon == pytest.approx(-80.19999922602221, abs=1e-12)
+    assert lat == pytest.approx(25.799999256211102, abs=1e-12)
+    contract = validate_gis_report_contract(report)
+    assert contract["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, contract["failed_checks"]
+
+
+def test_governed_grid_manifest_rejects_duplicate_crs_operation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = make_settings(tmp_path)
+    source = write_fc(tmp_path / "fl-duplicate.geojson", "EPSG:4269", [-80.2, 25.8])
+    grid_root = copy_governed_grid_root(tmp_path, "grid-duplicate")
+    manifest_path = grid_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    florida = next(row for row in manifest["grids"] if row["grid_id"] == "us_noaa_fl")
+    manifest["grids"].append(json.loads(json.dumps(florida)))
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(
+        "backend.app.gis_crs.GOVERNED_GRID_MANIFEST_SHA256",
+        hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+    )
+
+    with pytest.raises(GISProcessingError) as exc:
+        reproject_geojson_crs(
+            source,
+            target_crs="EPSG:4152",
+            cfg=cfg,
+            _grid_root=grid_root,
+        )
+
+    assert exc.value.status == "ERROR_GIS_CRS_GRID_MANIFEST_INVALID"
+    assert list(cfg.export_dir.iterdir()) == []
+
+
+def test_governed_grid_manifest_rejects_malformed_crs_operation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = make_settings(tmp_path)
+    source = write_fc(tmp_path / "fl-malformed.geojson", "EPSG:4269", [-80.2, 25.8])
+    grid_root = copy_governed_grid_root(tmp_path, "grid-malformed")
+    manifest_path = grid_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    florida = next(row for row in manifest["grids"] if row["grid_id"] == "us_noaa_fl")
+    florida["allowed_operation"]["source_crs"] = None
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(
+        "backend.app.gis_crs.GOVERNED_GRID_MANIFEST_SHA256",
+        hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+    )
+
+    with pytest.raises(GISProcessingError) as exc:
+        reproject_geojson_crs(
+            source,
+            target_crs="EPSG:4152",
+            cfg=cfg,
+            _grid_root=grid_root,
+        )
+
+    assert exc.value.status == "ERROR_GIS_CRS_GRID_OPERATION_MISMATCH"
+    assert list(cfg.export_dir.iterdir()) == []
 
 
 def test_governed_grid_supports_package_paths_with_spaces(tmp_path: Path) -> None:

@@ -1,10 +1,18 @@
+import base64
+import hashlib
+import json
+
 from backend.app.capability_contracts import (
     CAPABILITY_CONTRACT_SCHEMA_VERSION,
     CAPABILITY_OUTPUT_CONTRACT_FAILED,
     CAPABILITY_OUTPUT_CONTRACT_OK,
     build_capability_contract_report,
+    validate_execution_lineage_contract,
     validate_gis_report_contract,
     validate_ocr_report_contract,
+    validate_coding_output_contract,
+    validate_retrieval_output_contract,
+    validate_web_snapshot_contract,
 )
 
 
@@ -50,6 +58,256 @@ def test_capability_contracts_cover_expanded_scope_without_overclaiming():
     assert "content_sha256" in contracts["governed_web_browsing"]["provenance_fields"]
     assert "dirty_status" in contracts["coding_programming_expertise"]["provenance_fields"]
     assert "evidence_type" in contracts["transparency_objectivity_governance"]["provenance_fields"]
+
+
+def _execution_artifact(artifact_id: str, artifact_type: str, parents: list[str]) -> dict:
+    return {
+        "schema_version": "mucaro-artifact/1.0",
+        "artifact_id": artifact_id,
+        "artifact_type": artifact_type,
+        "sha256": "a" * 64,
+        "byte_size": 12,
+        "logical_identity": f"skill:{artifact_id}",
+        "producer": "skill_runtime",
+        "producer_version": "1.0.0",
+        "created_utc": "2026-10-22T00:00:00Z",
+        "parent_artifact_ids": parents,
+        "schema_id": "test.schema/1",
+        "source_path_or_uri": "skill://test",
+    }
+
+
+def test_validate_execution_lineage_contract_accepts_success_lineage():
+    source = _execution_artifact("artifact_input", "SOURCE", [])
+    output = _execution_artifact("artifact_output", "DERIVED", ["artifact_input"])
+    result = validate_execution_lineage_contract(
+        {
+            "execution_id": "execution_test",
+            "skill_id": "mucaro/test",
+            "skill_digest": "sha256:test",
+            "runtime": "IN_PROCESS",
+            "status": "PASS",
+            "artifact_lineage": {"input": source, "output": output, "failure_receipt": None},
+        }
+    )
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
+
+
+def test_validate_execution_lineage_contract_rejects_contradictory_failure_lineage():
+    source = _execution_artifact("artifact_input", "SOURCE", [])
+    output = _execution_artifact("artifact_output", "DERIVED", ["artifact_input"])
+    result = validate_execution_lineage_contract(
+        {
+            "execution_id": "execution_test",
+            "skill_id": "mucaro/test",
+            "skill_digest": "sha256:test",
+            "runtime": "IN_PROCESS",
+            "status": "FAIL",
+            "artifact_lineage": {"input": source, "output": output, "failure_receipt": None},
+        }
+    )
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "failure.output_absent" for check in result["failed_checks"])
+    assert any(check["name"] == "failure.receipt_present" for check in result["failed_checks"])
+
+
+def test_validate_execution_lineage_contract_rejects_malformed_hash():
+    source = _execution_artifact("artifact_input", "SOURCE", [])
+    source["sha256"] = "not-a-sha"
+    output = _execution_artifact("artifact_output", "DERIVED", ["artifact_input"])
+    result = validate_execution_lineage_contract(
+        {
+            "execution_id": "execution_test",
+            "skill_id": "mucaro/test",
+            "skill_digest": "sha256:test",
+            "runtime": "IN_PROCESS",
+            "status": "PASS",
+            "artifact_lineage": {"input": source, "output": output, "failure_receipt": None},
+        }
+    )
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(check["name"] == "artifact_lineage.input.sha256" for check in result["failed_checks"])
+
+
+def _retrieval_result() -> dict:
+    return {
+        "status": "RETRIEVAL_OK",
+        "query": "source lineage",
+        "top_k": 2,
+        "retrieved_chunks": [
+            {
+                "chunk_id": "chunk_1",
+                "source_id": "source_1",
+                "chunk_index": 0,
+                "text": "Source lineage preserves citation identity.",
+                "score": 0.9,
+                "retrieval_strategy": "hybrid_tfidf_v1",
+                "matched_terms": ["source", "lineage"],
+            },
+            {
+                "chunk_id": "chunk_2",
+                "source_id": "source_2",
+                "chunk_index": 1,
+                "text": "Citations bind answers to source chunks.",
+                "score": 0.4,
+                "retrieval_strategy": "hybrid_tfidf_v1",
+                "matched_terms": ["source"],
+            },
+        ],
+    }
+
+
+def test_validate_retrieval_output_contract_accepts_ranked_lineage_result():
+    result = validate_retrieval_output_contract(_retrieval_result())
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
+    assert result["operation"] == "retrieval_output_integrity"
+    assert result["retrieved_chunk_count"] == 2
+
+
+def test_validate_retrieval_output_contract_rejects_duplicate_and_mixed_results():
+    report = _retrieval_result()
+    report["retrieved_chunks"][1]["chunk_id"] = "chunk_1"
+    report["retrieved_chunks"][1]["retrieval_strategy"] = "lexical_v2"
+    report["retrieved_chunks"][1]["score"] = 0.95
+    result = validate_retrieval_output_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    failed_names = {check["name"] for check in result["failed_checks"]}
+    assert "chunks.1.chunk_id_unique" in failed_names
+    assert "chunks.1.score_order" in failed_names
+    assert "strategy_consistent" in failed_names
+
+
+def test_validate_retrieval_output_contract_accepts_fail_closed_no_context():
+    result = validate_retrieval_output_contract(
+        {"status": "ERROR_NO_RETRIEVAL_CONTEXT", "query": "missing term", "retrieved_chunks": []}
+    )
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
+
+
+def _web_snapshot() -> dict:
+    content = b"<html><body>hello</body></html>"
+    return {
+        "schema_version": "mucaro_web_snapshot_v1",
+        "snapshot_id": "websnap_contract",
+        "snapshot_kind": "web_page",
+        "requested_url": "https://example.com/source",
+        "fetch_url": "https://example.com/source",
+        "final_url": "https://example.com/source",
+        "redirect_chain": [],
+        "fragment_removed": False,
+        "retrieval_started_utc": "2026-10-22T00:00:00Z",
+        "retrieval_utc": "2026-10-22T00:00:01Z",
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "cache_policy": {
+            "cache_mode": "immutable_snapshot_only",
+            "reuse_allowed": False,
+            "revalidation_required_before_reuse": True,
+        },
+        "robots_policy": {
+            "status": "ROBOTS_ALLOWED",
+            "robots_url": "https://example.com/robots.txt",
+            "allowed": True,
+            "checked_at": "2026-10-22T00:00:00Z",
+            "warnings": [],
+        },
+        "http_error_policy": {
+            "is_http_error": False,
+            "snapshot_allowed": False,
+            "citation_allowed": False,
+        },
+        "content_sha256": hashlib.sha256(content).hexdigest(),
+        "content_size_bytes": len(content),
+        "content_base64": base64.b64encode(content).decode("ascii"),
+        "parser_name": "web_snapshot_preview_v1",
+        "parser_trace": {
+            "parser_name": "web_snapshot_preview_v1",
+            "content_kind": "html",
+            "text_preview_length": 5,
+            "trace_warnings": [],
+        },
+        "parser_warnings": [],
+        "charset": "utf-8",
+        "text_preview": "hello",
+        "policy": {
+            "timeout_seconds": 5,
+            "max_bytes": 1000000,
+            "cache_mode": "immutable_snapshot_only",
+        },
+    }
+
+
+def test_validate_web_snapshot_contract_accepts_byte_pinned_snapshot():
+    result = validate_web_snapshot_contract(_web_snapshot())
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
+    assert result["operation"] == "web_snapshot_integrity"
+
+
+def test_validate_web_snapshot_contract_rejects_tampered_bytes_and_reuse_policy():
+    report = _web_snapshot()
+    report["content_base64"] = base64.b64encode(b"tampered").decode("ascii")
+    report["cache_policy"]["reuse_allowed"] = True
+    result = validate_web_snapshot_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    failed_names = {check["name"] for check in result["failed_checks"]}
+    assert "content_size_matches_bytes" in failed_names
+    assert "content_hash_matches_bytes" in failed_names
+    assert "cache_policy.reuse_disabled" in failed_names
+
+
+def _coding_report() -> dict:
+    evidence = ["receipt:code-r01"]
+    evidence_hash = hashlib.sha256(json.dumps(evidence, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+    report = {
+        "schema_version": "mucaro-coding-certification/1.0",
+        "status": "CODING_CERTIFICATION_READY",
+        "certification_ready": True,
+        "manifest": {"path": "_architecture/coding_regression_manifest.json", "sha256": "a" * 64, "schema_version": "MUCARO_CODING_REGRESSION/1.1", "requirement_count": 1},
+        "identity": {
+            "source_head_sha": "b" * 40,
+            "runtime_identity_sha256": "c" * 64,
+            "coding_image_digest": "sha256:" + "d" * 64,
+            "source_identity_valid": True,
+            "runtime_identity_valid": True,
+            "image_identity_valid": True,
+            "identity_closed": True,
+        },
+        "state_counts": {"PASS": 1, "FAIL": 0, "BLOCKED": 0, "UNRESOLVED": 0},
+        "row_count": 1,
+        "rows": [{"requirement_id": "CODE-R01", "class": "positive", "gate": "discovery", "state": "PASS", "evidence": evidence, "detail": None, "evidence_sha256": evidence_hash}],
+        "material_residue_count": 0,
+        "material_residue": [],
+        "identity_residue": [],
+        "invariants": {"row_accounting_closed": True, "manifest_identity_frozen": True, "no_unknown_requirements": True, "every_requirement_has_terminal_state": True, "pass_requires_evidence": True, "certification_requires_all_pass": True, "certification_requires_identity_closure": True},
+        "certification_statement_allowed": True,
+        "allowed_certification_statement": "MUCARO AI CODING PLANE CERTIFIED",
+        "falsification_criteria": ["reject residue"],
+    }
+    report["report_sha256"] = hashlib.sha256(json.dumps(report, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+    return report
+
+
+def test_validate_coding_output_contract_accepts_closed_report():
+    result = validate_coding_output_contract(_coding_report())
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK, result["failed_checks"]
+    assert result["operation"] == "coding_certification_integrity"
+
+
+def test_validate_coding_output_contract_rejects_mutated_report_hash_and_identity():
+    report = _coding_report()
+    report["identity"]["identity_closed"] = False
+    result = validate_coding_output_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    failed_names = {check["name"] for check in result["failed_checks"]}
+    assert "identity.closed" in failed_names
+    assert "report_sha256" in failed_names
 
 
 def test_validate_gis_report_contract_accepts_measurement_receipts():

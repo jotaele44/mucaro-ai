@@ -16,7 +16,15 @@ from typing import Any, Sequence
 from urllib.parse import urlparse
 
 from .config import Settings, settings
-from .capability_contracts import build_capability_contract_report, validate_gis_report_file, validate_ocr_report_file
+from .capability_contracts import (
+    build_capability_contract_report,
+    validate_execution_lineage_file,
+    validate_gis_report_file,
+    validate_ocr_report_file,
+    validate_retrieval_output_file,
+    validate_web_snapshot_file,
+    validate_coding_output_file,
+)
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -43,6 +51,7 @@ from .gis_corpus import validate_real_gis_corpus
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
 from .gis_hydrology import condition_raster_depressions, derive_raster_d8_flow
+from .gis_render import validate_rendered_map
 from .gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -78,6 +87,8 @@ from .gis_eval import (
 )
 from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
 from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .ocr_calibration import OCRCalibrationError, evaluate_ocr_calibration_files
+from .ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
 from .ocr_structure import OCRStructureError, reconstruct_ocr_report
 from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
 from .ingestion import (
@@ -731,6 +742,7 @@ def build_parser() -> argparse.ArgumentParser:
     gis_vector_raster.add_argument("vector_path", help="Path to a GeoJSON FeatureCollection.")
     gis_vector_raster.add_argument("raster_path", help="Path to a local raster source.")
     gis_vector_raster.add_argument("--band", type=int, default=1, help="One-based raster band index.")
+    gis_vector_raster.add_argument("--inclusion-rule", choices=["cell_center", "fractional_coverage"], default="cell_center", help="Cell-center or projected planar fractional coverage inclusion.")
     gis_vector_raster.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_vector_raster.set_defaults(handler=run_gis_vector_raster)
 
@@ -741,6 +753,7 @@ def build_parser() -> argparse.ArgumentParser:
     gis_zonal_stats.add_argument("vector_path", help="Path to a GeoJSON FeatureCollection.")
     gis_zonal_stats.add_argument("raster_path", help="Path to a local raster source.")
     gis_zonal_stats.add_argument("--band", type=int, default=1, help="One-based raster band index.")
+    gis_zonal_stats.add_argument("--inclusion-rule", choices=["cell_center", "fractional_coverage"], default="cell_center", help="Cell-center or projected planar fractional coverage inclusion.")
     gis_zonal_stats.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_zonal_stats.set_defaults(handler=run_gis_zonal_stats)
 
@@ -878,11 +891,23 @@ def build_parser() -> argparse.ArgumentParser:
     gis_map_export.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_map_export.set_defaults(handler=run_gis_map_export_manifest)
 
+    gis_map_render_validate = gis_subcommands.add_parser(
+        "map-render-validate",
+        help="Independently validate that a rendered map artifact decodes and contains bounded visible content.",
+    )
+    gis_map_render_validate.add_argument("output_path", help="Path to the rendered image artifact.")
+    gis_map_render_validate.add_argument("--manifest", type=Path, help="Optional map export manifest to bind by output hash and path.")
+    gis_map_render_validate.add_argument("--min-width", type=int, help="Required minimum image width in pixels.")
+    gis_map_render_validate.add_argument("--min-height", type=int, help="Required minimum image height in pixels.")
+    gis_map_render_validate.add_argument("--max-pixels", type=int, default=50_000_000, help="Maximum decoded pixel count.")
+    gis_map_render_validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    gis_map_render_validate.set_defaults(handler=run_gis_map_render_validate)
+
     ocr = subcommands.add_parser("ocr", help="Run local OCR analysis with source-image receipts.")
     ocr_subcommands = ocr.add_subparsers(dest="ocr_command", required=True)
 
-    ocr_analyze = ocr_subcommands.add_parser("analyze", help="Analyze a local image with a local OCR engine.")
-    ocr_analyze.add_argument("image_path", help="Path to a local image file.")
+    ocr_analyze = ocr_subcommands.add_parser("analyze", help="Analyze a local image or PDF with local OCR engines.")
+    ocr_analyze.add_argument("image_path", help="Path to a local image or PDF file.")
     ocr_analyze.add_argument("--language", default="eng", help="OCR language code passed to the local engine.")
     ocr_analyze.add_argument(
         "--layout",
@@ -891,6 +916,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="OCR layout mode.",
     )
     ocr_analyze.add_argument("--tesseract-path", help="Explicit path to the local tesseract executable.")
+    ocr_analyze.add_argument("--dpi", type=int, default=200, help="PDF render DPI; ignored for image inputs.")
     ocr_analyze.add_argument("--timeout-seconds", type=int, default=30, help="OCR engine timeout.")
     ocr_analyze.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     ocr_analyze.set_defaults(handler=run_ocr_analyze)
@@ -908,6 +934,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ocr_structure.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     ocr_structure.set_defaults(handler=run_ocr_structure)
+
+    ocr_calibrate = ocr_subcommands.add_parser(
+        "calibrate",
+        help="Evaluate a saved image OCR receipt against independently authored span gold labels.",
+    )
+    ocr_calibrate.add_argument("report_path", help="Path to a saved mucaro_ocr_report_v1 JSON receipt.")
+    ocr_calibrate.add_argument("gold_path", help="Path to MUCARO_OCR_CALIBRATION_GOLD/1.0 JSON labels.")
+    ocr_calibrate.add_argument("--low-threshold", type=float, default=50.0, help="Confidence threshold below which a span is low-confidence.")
+    ocr_calibrate.add_argument("--high-threshold", type=float, default=85.0, help="Confidence threshold at or above which a span is high-confidence.")
+    ocr_calibrate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    ocr_calibrate.set_defaults(handler=run_ocr_calibrate)
 
     flagpole = subcommands.add_parser("flagpole", help="Flagpole evidence tooling bound to exact Git SHAs.")
     flagpole_subcommands = flagpole.add_subparsers(dest="flagpole_command", required=True)
@@ -1079,6 +1116,38 @@ def build_parser() -> argparse.ArgumentParser:
     capability_validate_ocr.add_argument("report_path", type=Path, help="Path to a saved OCR report JSON file.")
     capability_validate_ocr.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     capability_validate_ocr.set_defaults(handler=run_capability_validate_ocr_report)
+
+    capability_validate_execution = capabilities_subcommands.add_parser(
+        "validate-execution-report",
+        help="Validate a skill execution artifact-lineage receipt against the transparency contract.",
+    )
+    capability_validate_execution.add_argument("report_path", type=Path, help="Path to a saved skill execution JSON file.")
+    capability_validate_execution.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_execution.set_defaults(handler=run_capability_validate_execution_report)
+
+    capability_validate_retrieval = capabilities_subcommands.add_parser(
+        "validate-retrieval-output",
+        help="Validate a saved retrieval result against the transparency contract.",
+    )
+    capability_validate_retrieval.add_argument("report_path", type=Path, help="Path to a saved retrieval result JSON file.")
+    capability_validate_retrieval.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_retrieval.set_defaults(handler=run_capability_validate_retrieval_output)
+
+    capability_validate_web = capabilities_subcommands.add_parser(
+        "validate-web-snapshot",
+        help="Validate a saved governed web snapshot against the transparency contract.",
+    )
+    capability_validate_web.add_argument("snapshot_path", type=Path, help="Path to a saved web snapshot JSON file.")
+    capability_validate_web.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_web.set_defaults(handler=run_capability_validate_web_snapshot)
+
+    capability_validate_coding = capabilities_subcommands.add_parser(
+        "validate-coding-report",
+        help="Validate a saved coding certification report against the transparency contract.",
+    )
+    capability_validate_coding.add_argument("report_path", type=Path, help="Path to a saved coding certification JSON file.")
+    capability_validate_coding.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_coding.set_defaults(handler=run_capability_validate_coding_report)
 
     memory = subcommands.add_parser("memory", help="Manage explicit local assistant memory.")
     memory_subcommands = memory.add_subparsers(dest="memory_command", required=True)
@@ -2450,6 +2519,8 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         "GIS_ZONAL_STATS_WARN",
         "GIS_CORPUS_VALIDATION_OK",
         "GIS_MAP_EXPORT_MANIFEST_OK",
+        "GIS_RENDER_VALIDATION_OK",
+        "GIS_RENDER_VALIDATION_WARN",
     }:
         print(status)
         print(f"operation={payload.get('operation')}")
@@ -2474,6 +2545,12 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 print(f"source_format={source.get('format')}")
             if "bytes" in source:
                 print(f"source_bytes={source.get('bytes')}")
+            if "width" in source:
+                print(f"source_width={source.get('width')}")
+            if "height" in source:
+                print(f"source_height={source.get('height')}")
+            if "mode" in source:
+                print(f"source_mode={source.get('mode')}")
         for source_name in ("vector_source", "raster_source"):
             named_source = payload.get(source_name)
             if isinstance(named_source, dict):
@@ -2520,6 +2597,9 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "ellipsoid",
                 "band",
                 "cell_inclusion_rule",
+                "coverage_measurement",
+                "coverage_area_units",
+                "weighted_statistics",
                 "implicit_reprojection",
                 "requested_bbox",
                 "effective_bbox",
@@ -2656,6 +2736,7 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "source_and_output_hash_present",
                 "feature_accounting_closed",
                 "cell_accounting_closed",
+                "coverage_accounting_closed",
                 "crs_exactly_matched",
                 "nodata_separate_from_zero",
                 "no_implicit_reprojection",
@@ -2717,6 +2798,16 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
                 "all_layer_hashes_present",
                 "output_hash_present",
                 "renderer_identity_present",
+                "decode_success",
+                "dimensions_positive",
+                "dimensions_meet_minimum",
+                "alpha_accounting_closed",
+                "visible_pixel_count",
+                "transparent_pixel_count",
+                "unique_color_count",
+                "non_dominant_pixel_count",
+                "nonblank_content_present",
+                "manifest_binding_closed",
             ):
                 if key in invariants:
                     print(f"{key}={invariants.get(key)}")
@@ -2757,6 +2848,28 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         layers = payload.get("layers")
         if isinstance(layers, list):
             print(f"bound_layer_count={len(layers)}")
+        warnings = payload.get("warnings")
+        if warnings:
+            print("warnings=" + ",".join(str(warning) for warning in warnings))
+    elif status in {"OCR_PDF_OK", "OCR_PDF_WARN"}:
+        print(status)
+        print(f"operation={payload.get('operation')}")
+        print(f"report_id={payload.get('report_id')}")
+        print(f"report_path={payload.get('report_path')}")
+        print(f"report_sha256={payload.get('report_sha256')}")
+        source = payload.get("source")
+        if isinstance(source, dict):
+            print(f"source_sha256={source.get('sha256')}")
+            print(f"source_page_count={source.get('page_count')}")
+        renderer = payload.get("renderer")
+        if isinstance(renderer, dict):
+            print(f"pdf_renderer={renderer.get('name')}")
+            print(f"pdf_renderer_version={renderer.get('version')}")
+            print(f"dpi={renderer.get('dpi')}")
+        invariants = payload.get("invariants")
+        if isinstance(invariants, dict):
+            for key in ("rendered_page_count", "ocr_page_count", "total_span_count", "no_text_page_count"):
+                print(f"{key}={invariants.get(key)}")
         warnings = payload.get("warnings")
         if warnings:
             print("warnings=" + ",".join(str(warning) for warning in warnings))
@@ -3236,7 +3349,7 @@ def run_gis_vector_raster(args: argparse.Namespace, cfg: Settings) -> int:
     raster_path = _resolve_project_path(args.raster_path, cfg)
     return _run_gis_report(
         args,
-        lambda: analyze_vector_raster_intersection(vector_path, raster_path, cfg=cfg, band=args.band),
+        lambda: analyze_vector_raster_intersection(vector_path, raster_path, cfg=cfg, band=args.band, inclusion_rule=args.inclusion_rule),
     )
 
 
@@ -3245,7 +3358,7 @@ def run_gis_zonal_stats(args: argparse.Namespace, cfg: Settings) -> int:
     raster_path = _resolve_project_path(args.raster_path, cfg)
     return _run_gis_report(
         args,
-        lambda: compute_zonal_statistics(vector_path, raster_path, cfg=cfg, band=args.band),
+        lambda: compute_zonal_statistics(vector_path, raster_path, cfg=cfg, band=args.band, inclusion_rule=args.inclusion_rule),
     )
 
 
@@ -3344,20 +3457,48 @@ def run_gis_map_export_manifest(args: argparse.Namespace, cfg: Settings) -> int:
     )
 
 
+def run_gis_map_render_validate(args: argparse.Namespace, cfg: Settings) -> int:
+    output_path = _resolve_project_path(args.output_path, cfg)
+    manifest_path = _resolve_project_path(args.manifest, cfg) if args.manifest else None
+    return _run_gis_report(
+        args,
+        lambda: validate_rendered_map(
+            cfg=cfg,
+            output_path=output_path,
+            manifest_path=manifest_path,
+            min_width=args.min_width,
+            min_height=args.min_height,
+            max_pixels=args.max_pixels,
+        ),
+    )
+
+
 def run_ocr_analyze(args: argparse.Namespace, cfg: Settings) -> int:
     path = Path(args.image_path)
     if not path.is_absolute():
         path = cfg.project_root / path
     try:
-        result = analyze_image_ocr(
-            path,
-            cfg=cfg,
-            language=args.language,
-            layout_mode=args.layout,
-            tesseract_path=args.tesseract_path,
-            timeout_seconds=args.timeout_seconds,
-        )
-    except OCRAnalysisError as exc:
+        if path.suffix.lower() == ".pdf":
+            result = analyze_pdf_ocr(
+                path,
+                cfg=cfg,
+                language=args.language,
+                layout_mode=args.layout,
+                dpi=args.dpi,
+                tesseract_path=args.tesseract_path,
+                render_timeout_seconds=max(args.timeout_seconds, 30),
+                ocr_timeout_seconds=args.timeout_seconds,
+            )
+        else:
+            result = analyze_image_ocr(
+                path,
+                cfg=cfg,
+                language=args.language,
+                layout_mode=args.layout,
+                tesseract_path=args.tesseract_path,
+                timeout_seconds=args.timeout_seconds,
+            )
+    except (OCRAnalysisError, PDFOCRAnalysisError) as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload(result, args.format)
@@ -3375,6 +3516,27 @@ def run_ocr_structure(args: argparse.Namespace, cfg: Settings) -> int:
         return 2
     emit_payload(result, args.format)
     return 0 if result.get("status") != "OCR_STRUCTURE_UNRESOLVED" else 2
+
+
+def run_ocr_calibrate(args: argparse.Namespace, cfg: Settings) -> int:
+    report_path = Path(args.report_path)
+    gold_path = Path(args.gold_path)
+    if not report_path.is_absolute():
+        report_path = cfg.project_root / report_path
+    if not gold_path.is_absolute():
+        gold_path = cfg.project_root / gold_path
+    try:
+        result = evaluate_ocr_calibration_files(
+            report_path,
+            gold_path,
+            low_threshold=args.low_threshold,
+            high_threshold=args.high_threshold,
+        )
+    except OCRCalibrationError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
 
 
 def run_flagpole_inventory_generate(args: argparse.Namespace, cfg: Settings) -> int:
@@ -8437,6 +8599,42 @@ def run_capability_validate_ocr_report(args: argparse.Namespace, cfg: Settings) 
     if not path.is_absolute():
         path = cfg.project_root / path
     report = validate_ocr_report_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_execution_report(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_execution_lineage_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_retrieval_output(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_retrieval_output_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_web_snapshot(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.snapshot_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_web_snapshot_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_coding_report(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.report_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_coding_output_file(path)
     emit_payload(report, args.format)
     return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
 
