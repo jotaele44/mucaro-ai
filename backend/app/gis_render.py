@@ -109,7 +109,7 @@ def validate_rendered_map(
                 )
             original_mode = image.mode
             rgba = image.convert("RGBA")
-            pixels = list(rgba.get_flattened_data())
+            pixels = list(rgba.getdata())
     except GISProcessingError:
         raise
     except (OSError, ValueError, UnidentifiedImageError) as exc:
