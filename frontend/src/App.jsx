@@ -264,7 +264,7 @@ export function App() {
           />
         )}
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
-        {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}
+        {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} currentConversationId={activeId} />}
         {health.state === "ok" && view === "provenance" && <ProvenanceWorkspace />}
         {health.state === "ok" && view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions} announce={announce} />}
       </main>
