@@ -61,6 +61,8 @@ def attest_source(*,root:Path,source_path:str,expected_head:str,
         raise SourceAttestationError("INVALID_SOURCE_PATH")
     if request.capability!="git.read" or not request.subject.strip():
         raise SourceAttestationError("GIT_READ_CAPABILITY_REQUIRED")
+    if request.origin!="operator":
+        raise SourceAttestationError("GIT_READ_PERMISSION_DENIED")
     root=Path(root).resolve()
     path=(root/source_path).resolve()
     if not path.is_relative_to(root) or not path.is_file():
