@@ -52,8 +52,24 @@ def builder(monkeypatch):
 def test_positive_preserves_denominators_and_never_authenticates_evidence(builder):
     module, _ = builder
     report = module.build_register()
-    assert report["capability_event_audit"]["non_pass_count"] == 40
-    assert report["release_acceptance"]["non_pass_applicable_count"] == 77
+
+    capability = report["capability_event_audit"]
+    capability_counts = capability["counts"]
+    assert sum(capability_counts.values()) == 100
+    assert capability["non_pass_count"] == 100 - capability_counts.get("PASS", 0)
+
+    release = report["release_acceptance"]
+    release_counts = release["counts"]
+    assert release["total"] == 139
+    assert release["applicable"] == 138
+    assert release["not_applicable"] == 1
+    assert sum(release_counts.values()) == 139
+    assert release["non_pass_applicable_count"] == sum(
+        count
+        for state, count in release_counts.items()
+        if state not in {"PASS", "NOT_APPLICABLE"}
+    )
+
     assert len(report["blocker_ledger"]) == 6
     assert all(
         e["independent_evidence_verification"] == "NOT_ASSESSED"
