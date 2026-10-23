@@ -388,6 +388,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             allow_mock_fallback=req.allow_mock_fallback,
             allow_live=req.allow_live,
             require_offline=req.require_offline,
+            memory_workspace_id=req.workspace_id,
             cfg=cfg,
         )
 
@@ -442,6 +443,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             allow_live=req.allow_live,
             require_offline=req.require_offline,
             conversation_context=conversation_context,
+            memory_workspace_id=req.workspace_id,
             memory_conversation_id=conversation_id,
             cfg=cfg,
         )
