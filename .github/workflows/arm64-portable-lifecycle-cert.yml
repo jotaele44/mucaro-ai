@@ -1,0 +1,184 @@
+name: ARM64 Portable Application Lifecycle Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/app/portable_runtime.py"
+      - "backend/app/portable_runtime_source.py"
+      - "backend/app/portable_install.py"
+      - "backend/app/clean_machine_macos.py"
+      - "scripts/certify_clean_machine_macos.py"
+      - "scripts/certify_portable_release_lane.py"
+      - "backend/tests/test_portable_release_lane.py"
+      - "packaging/runtime/macos-arm64.json"
+      - "packaging/runtime/requirements-macos-arm64.lock"
+      - "pyproject.toml"
+      - "backend/app/main.py"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
+      - ".github/workflows/arm64-portable-lifecycle-cert.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/portable_runtime.py"
+      - "backend/app/portable_runtime_source.py"
+      - "backend/app/portable_install.py"
+      - "backend/app/clean_machine_macos.py"
+      - "scripts/certify_clean_machine_macos.py"
+      - "scripts/certify_portable_release_lane.py"
+      - "packaging/runtime/macos-arm64.json"
+      - "packaging/runtime/requirements-macos-arm64.lock"
+      - "pyproject.toml"
+      - ".github/workflows/arm64-portable-lifecycle-cert.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  certify-arm64-portable-lifecycle:
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PREVIOUS_SHA: 25b41e33b2d832e582fc2800d52bc07461ebc4ae
+      RUNTIME_MANIFEST: packaging/runtime/macos-arm64.json
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Verify Apple-Silicon host and distinct committed versions
+        run: |
+          test "$(uname -s)" = "Darwin"
+          test "$(uname -m)" = "arm64"
+          CURRENT_VERSION="$(python - <<'PY'
+          import tomllib
+          print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])
+          PY
+          )"
+          PREVIOUS_VERSION="$(git show "$PREVIOUS_SHA:pyproject.toml" | python -c 'import sys,tomllib; print(tomllib.loads(sys.stdin.read())["project"]["version"])')"
+          test "$CURRENT_VERSION" = "0.1.24"
+          test "$PREVIOUS_VERSION" = "0.1.23"
+          test "$CURRENT_VERSION" != "$PREVIOUS_VERSION"
+          echo "CURRENT_VERSION=$CURRENT_VERSION" >> "$GITHUB_ENV"
+          echo "PREVIOUS_VERSION=$PREVIOUS_VERSION" >> "$GITHUB_ENV"
+
+      - name: Install current source dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Build current frontend
+        working-directory: frontend
+        run: |
+          npm ci --registry=https://registry.npmjs.org/
+          npm run build
+
+      - name: Materialize and verify current governed arm64 runtime
+        run: |
+          mkdir -p "$RUNNER_TEMP/evidence"
+          python scripts/mucaro.py package portable-runtime \
+            --manifest "$RUNTIME_MANIFEST" \
+            --output-dir "$RUNNER_TEMP/current-runtime" \
+            --format json | tee "$RUNNER_TEMP/evidence/current-runtime.json"
+          python scripts/mucaro.py package portable-runtime \
+            --manifest "$RUNTIME_MANIFEST" \
+            --verify "$RUNNER_TEMP/current-runtime" \
+            --format json | tee "$RUNNER_TEMP/evidence/current-runtime-verify.json"
+
+      - name: Build and verify current 0.1.24 portable app
+        run: |
+          python scripts/mucaro.py package portable-macos-app \
+            --runtime-manifest "$RUNTIME_MANIFEST" \
+            --runtime-dir "$RUNNER_TEMP/current-runtime" \
+            --output-dir "$RUNNER_TEMP/current-app" \
+            --format json | tee "$RUNNER_TEMP/evidence/current-app.json"
+          python scripts/mucaro.py package portable-macos-app \
+            --verify "$RUNNER_TEMP/current-app/Mucaro AI Portable.app" \
+            --expected-head "$HEAD_SHA" \
+            --format json | tee "$RUNNER_TEMP/evidence/current-app-verify.json"
+
+      - name: Prepare previous 0.1.23 source
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/previous-src" "$PREVIOUS_SHA"
+          cd "$RUNNER_TEMP/previous-src/frontend"
+          npm ci --registry=https://registry.npmjs.org/
+          npm run build
+
+      - name: Resolve previous arm64 runtime identity
+        run: |
+          PREV="$RUNNER_TEMP/previous-src"
+          if cmp -s "$RUNTIME_MANIFEST" "$PREV/$RUNTIME_MANIFEST" \
+            && cmp -s packaging/runtime/requirements-macos-arm64.lock "$PREV/packaging/runtime/requirements-macos-arm64.lock"; then
+            echo "PREVIOUS_RUNTIME=$RUNNER_TEMP/current-runtime" >> "$GITHUB_ENV"
+            echo '{"status":"REUSED_CURRENT_RUNTIME","reason":"manifest_and_lock_byte_identical"}' > "$RUNNER_TEMP/evidence/previous-runtime.json"
+          else
+            PYTHONPATH="$PREV:$PREV/backend" python "$PREV/scripts/mucaro.py" package portable-runtime \
+              --manifest "$PREV/$RUNTIME_MANIFEST" \
+              --output-dir "$RUNNER_TEMP/previous-runtime" \
+              --format json | tee "$RUNNER_TEMP/evidence/previous-runtime.json"
+            echo "PREVIOUS_RUNTIME=$RUNNER_TEMP/previous-runtime" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build previous 0.1.23 portable app
+        run: |
+          PREV="$RUNNER_TEMP/previous-src"
+          PYTHONPATH="$PREV:$PREV/backend" python "$PREV/scripts/mucaro.py" package portable-macos-app \
+            --runtime-manifest "$PREV/$RUNTIME_MANIFEST" \
+            --runtime-dir "$PREVIOUS_RUNTIME" \
+            --output-dir "$RUNNER_TEMP/previous-app" \
+            --format json | tee "$RUNNER_TEMP/evidence/previous-app.json"
+          python scripts/mucaro.py package portable-macos-app \
+            --verify "$RUNNER_TEMP/previous-app/Mucaro AI Portable.app" \
+            --format json | tee "$RUNNER_TEMP/evidence/previous-app-current-verify.json"
+
+      - name: Execute distinct-version packaged lifecycle
+        run: |
+          python scripts/certify_clean_machine_macos.py \
+            --current-app "$RUNNER_TEMP/current-app/Mucaro AI Portable.app" \
+            --previous-app "$RUNNER_TEMP/previous-app/Mucaro AI Portable.app" \
+            --head "$HEAD_SHA" \
+            --install-root "$RUNNER_TEMP/portable-install" \
+            --output "$RUNNER_TEMP/evidence/clean-machine.json"
+
+      - name: Certify arm64 portable application lane
+        run: |
+          python scripts/certify_portable_release_lane.py \
+            --current-app "$RUNNER_TEMP/current-app/Mucaro AI Portable.app" \
+            --previous-app "$RUNNER_TEMP/previous-app/Mucaro AI Portable.app" \
+            --runtime-dir "$RUNNER_TEMP/current-runtime" \
+            --runtime-manifest "$RUNTIME_MANIFEST" \
+            --clean-machine-receipt "$RUNNER_TEMP/evidence/clean-machine.json" \
+            --head "$HEAD_SHA" \
+            --expected-architecture arm64 \
+            --output "$RUNNER_TEMP/evidence/arm64-portable-release-lane.json"
+
+      - name: Archive exact portable apps
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$RUNNER_TEMP/current-app/Mucaro AI Portable.app" \
+            "$RUNNER_TEMP/evidence/current-portable-app.zip"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$RUNNER_TEMP/previous-app/Mucaro AI Portable.app" \
+            "$RUNNER_TEMP/evidence/previous-portable-app.zip"
+          shasum -a 256 "$RUNNER_TEMP/evidence/"*.zip | tee "$RUNNER_TEMP/evidence/app-zip-sha256.txt"
+
+      - name: Upload exact-head arm64 lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: arm64-portable-lifecycle-${{ env.HEAD_SHA }}
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: error

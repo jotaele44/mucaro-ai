@@ -61,9 +61,15 @@ def test_launcher_source_starts_the_silent_windows_entry_point():
     assert "CREATE_NO_WINDOW" in source
     assert "-WindowStyle" not in source  # a process flag hides the console, not a PowerShell switch
     assert "--ui" not in source
+    version = _project_version()
     rc = (WINDOWS_SRC / "mucaro_launcher.rc").read_text(encoding="utf-8")
-    assert f'VALUE "ProductVersion", "{_project_version()}"' in rc
+    assert f'VALUE "ProductVersion", "{version}"' in rc
     assert 'VALUE "OriginalFilename", "Mucaro AI.exe"' in rc
+    numeric_version = ",".join(version.split(".")) + ",0"
+    assert f"FILEVERSION {numeric_version}" in rc
+    assert f"PRODUCTVERSION {numeric_version}" in rc
+    manifest = (WINDOWS_SRC / "mucaro_launcher.manifest").read_text(encoding="utf-8")
+    assert f'version="{version}.0"' in manifest
     icon = re.search(r'^1 ICON "([^"]+)"', rc, flags=re.MULTILINE)
     assert icon is not None and (WINDOWS_SRC / icon.group(1)).resolve() == ICO
 

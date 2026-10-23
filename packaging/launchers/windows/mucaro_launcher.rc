@@ -5,8 +5,8 @@
 1 24 "mucaro_launcher.manifest"
 
 1 VERSIONINFO
-FILEVERSION 0,1,23,0
-PRODUCTVERSION 0,1,23,0
+FILEVERSION 0,1,24,0
+PRODUCTVERSION 0,1,24,0
 FILEFLAGSMASK 0x3fL
 FILEFLAGS 0x0L
 FILEOS 0x40004L
@@ -19,11 +19,11 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "Mucaro AI"
       VALUE "FileDescription", "Mucaro AI"
-      VALUE "FileVersion", "0.1.23"
+      VALUE "FileVersion", "0.1.24"
       VALUE "InternalName", "mucaro_launcher"
       VALUE "OriginalFilename", "Mucaro AI.exe"
       VALUE "ProductName", "Mucaro AI"
-      VALUE "ProductVersion", "0.1.23"
+      VALUE "ProductVersion", "0.1.24"
     END
   END
   BLOCK "VarFileInfo"
