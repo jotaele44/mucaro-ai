@@ -1,4 +1,5 @@
 import hashlib
+import json
 import subprocess
 from pathlib import Path
 from dataclasses import replace
@@ -50,6 +51,9 @@ def test_signed_scoped_trust_accepts_only_review(context):
     assert result["issuer_key_id"]=="k1"
     assert result["promotion_authorized"] is False
     assert result["external_key_custody_attested"] is False
+    assert result["source_receipt_sha256"].startswith("sha256:")
+    expected="sha256:"+hashlib.sha256(json.dumps({k:v for k,v in result.items() if k!="receipt_sha256"},sort_keys=True,separators=(",",":")).encode()).hexdigest()
+    assert result["receipt_sha256"]==expected
 
 def test_revoked_issuer_denied_before_execution(context):
     record,args=context
