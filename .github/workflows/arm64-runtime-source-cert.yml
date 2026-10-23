@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - "pyproject.toml"
+      - "packaging/runtime/requirements-macos-arm64.lock"
       - ".github/workflows/arm64-runtime-source-cert.yml"
 
 permissions:
