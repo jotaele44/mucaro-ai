@@ -102,7 +102,7 @@
       "case_id": "ADV_PASSWORD_ACCESS_BLOCKED",
       "kind": "adversarial",
       "adversarial_class": "PASSWORD_ACCESS_BLOCKED",
-      "node": "backend/tests/test_ingestion_safety.py::test_symlink_executable_and_encrypted_members_are_flagged"
+      "node": "backend/tests/test_ingestion_benchmark_certification.py::test_matrix010_encrypted_archive_is_rejected_before_parse"
     },
     {
       "case_id": "ADV_OVERSIZED",
