@@ -1,0 +1,75 @@
+name: Mucaro V6 Exact-Head Tests
+
+on:
+  push:
+    branches:
+      - feature/agent-authority-v6
+    paths:
+      - "backend/**"
+      - "pyproject.toml"
+      - ".github/workflows/v6-exact-head.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v6-exact-head-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pinned Python project dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Verify checked-out commit identity
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
+          echo "CHECKED_OUT_HEAD=$GITHUB_SHA"
+      - name: Run complete backend regression corpus
+        run: python -m pytest backend/tests -q
+      - name: Emit bounded verification receipt
+        if: success()
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          paths = [
+              "backend/app/scoped_agent_claim.py",
+              "backend/app/agent_claim_authority.py",
+              "backend/app/governed_skill_bridge.py",
+              "backend/app/leased_agent_queue.py",
+              "backend/app/bounded_self_propulsion_pilot.py",
+              "backend/tests/test_scoped_agent_claim_v6.py",
+          ]
+          record = {
+              "schema": "mucaro-v6-exact-head-ci/1.0",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "head": os.environ["GITHUB_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "execution": "backend-pytest-full",
+              "status": "PASS",
+              "files": {p: hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in paths},
+              "scope": "CI evidence only; no production promotion or independent evaluator certification",
+          }
+          data = json.dumps(record, indent=2, sort_keys=True) + "\n"
+          Path("v6-exact-head-receipt.json").write_text(data, encoding="utf-8")
+          print(data)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: v6-exact-head-${{ github.sha }}
+          path: v6-exact-head-receipt.json
+          retention-days: 30
