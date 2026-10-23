@@ -104,6 +104,13 @@ async function shot(page, viewport, name) {
 
 const lastRun = (page) => page.locator("article.run").last();
 
+async function exposeRunDetails(run) {
+  const receipt = run.locator("details.run-receipt");
+  if ((await receipt.count()) === 1 && !(await receipt.evaluate((node) => node.open))) {
+    await receipt.locator("summary").click();
+  }
+}
+
 let expectedRuns = 0;
 
 async function waitRunState(page, states, timeout = 20000) {
@@ -339,6 +346,10 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "04-approval");
   await approval.getByRole("button", { name: "Allow once" }).click();
   await waitRunState(page, "COMPLETED");
+  const completedReceipt = lastRun(page).locator("details.run-receipt");
+  const receiptCollapsed = (await completedReceipt.count()) === 1 && !(await completedReceipt.evaluate((node) => node.open));
+  check("completed answered run metadata is compact by default", viewport, receiptCollapsed);
+  await exposeRunDetails(lastRun(page));
   const summary = lastRun(page).getByRole("button", { name: /Used 1 tool/ });
   check("tool summary counts from records", viewport, (await summary.count()) === 1);
   await shot(page, viewport, "05-tool-done");
@@ -368,6 +379,7 @@ async function scenario(browser, base, viewport, contextOptions) {
     check("retry asks for a fresh approval (F16)", viewport, (await lastRun(page).getByRole("region", { name: /Permission request for web.fetch/ }).count()) === 1);
     await lastRun(page).getByRole("button", { name: "Deny" }).click();
     await waitRunState(page, "COMPLETED");
+    await exposeRunDetails(lastRun(page));
     check("per-call outcomes stay distinct after retry (F08, F16)", viewport, (await lastRun(page).getByRole("button", { name: /Used 2 tools \(1 failed, 1 denied\)/ }).count()) === 1);
     check("choice receipt persists in the feed (F13)", viewport, (await lastRun(page).getByText("You chose:").count()) === 1);
   } else {
@@ -474,6 +486,16 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.getByRole("heading", { name: "Sources" }).waitFor();
   await page.locator(".source-row").nth(1).waitFor();
   check("sources workspace lists ingested sources", viewport, (await page.locator(".source-row").count()) >= 2);
+  await page.getByText("Add a folder from this Mac", { exact: true }).click();
+  const directory = page.locator(".directory-intake");
+  await directory.getByRole("button", { name: "Check access & ingest" }).waitFor();
+  const directoryCanonical =
+    (await directory.getByRole("button", { name: "Check access & ingest" }).count()) === 1 &&
+    (await directory.getByRole("button", { name: "Check Access" }).count()) === 0 &&
+    (await directory.getByRole("button", { name: "Ingest Path" }).count()) === 0 &&
+    (await directory.getByRole("button", { name: "Grant Access" }).count()) === 0 &&
+    (await directory.getByRole("button", { name: "Grant and Ingest" }).count()) === 0;
+  check("Directory Access has one canonical check-to-ingest action", viewport, directoryCanonical);
   await page.locator(".source-row").first().click();
   await page.getByText("SHA-256").first().waitFor();
   drawerStates.push(await drawerClosed());
@@ -535,6 +557,46 @@ async function scenario(browser, base, viewport, contextOptions) {
   check("no console errors", viewport, consoleErrors.length === 0, consoleErrors.join(" | "));
   await context.close();
   return axeRuns;
+}
+
+async function emptyWorkspaceScenario(browser, viewport, contextOptions) {
+  const emptyPort = await freePort();
+  const emptyBase = `http://127.0.0.1:${emptyPort}`;
+  const emptyBackend = await startBackend(mkdtempSync(path.join(tmpdir(), "mucaro-qa-empty-")), emptyPort);
+  try {
+    if (!(await waitForHealth(emptyBase))) throw new Error(`empty-state backend did not start:\n${emptyBackend.log()}`);
+    const context = await browser.newContext({ ...contextOptions, baseURL: emptyBase });
+    const page = await context.newPage();
+    await page.goto("/");
+    await page.getByRole("heading", { name: "What should Mucaro work on?" }).waitFor();
+
+    const openNav = async () => {
+      if (viewport === "iphone") await page.getByRole("button", { name: "Open navigation" }).click();
+    };
+
+    await openNav();
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Memory", exact: true }).click();
+    await page.getByRole("heading", { name: "No saved memory" }).waitFor();
+    const memoryState = page.locator(".workspace-empty-state").filter({ hasText: "No saved memory" });
+    check(
+      "Memory empty state points to the canonical Remember field without a duplicate CTA",
+      viewport,
+      (await memoryState.getByText(/Next: use the Remember field above/).count()) === 1 && (await memoryState.getByRole("button").count()) === 0,
+    );
+
+    await openNav();
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Provenance", exact: true }).click();
+    await page.getByRole("heading", { name: "No tool actions yet" }).waitFor();
+    const provenanceState = page.locator(".workspace-empty-state").filter({ hasText: "No tool actions yet" });
+    check(
+      "Provenance empty state points back to Chat without a duplicate CTA",
+      viewport,
+      (await provenanceState.getByText(/Next: start the action from Chat/).count()) === 1 && (await provenanceState.getByRole("button").count()) === 0,
+    );
+    await context.close();
+  } finally {
+    if (!emptyBackend.killed) emptyBackend.kill("SIGTERM");
+  }
 }
 
 async function offlineScenario(browser, base, viewport, contextOptions, stopBackend) {
@@ -870,8 +932,9 @@ async function resilienceScenario(browser, base) {
       // Revoke folder access (the panel lives in a collapsed section of the Sources workspace).
       await page.locator("summary", { hasText: "Add a folder from this Mac" }).click();
       await page.getByLabel("Folder path on the host computer").fill(grantRoot);
-      await page.getByRole("button", { name: "Check Access" }).click();
-      await page.getByRole("button", { name: "Grant Access", exact: true }).click();
+      // This PR's single Directory Access flow: check, then confirm the grant (which also ingests).
+      await page.getByRole("button", { name: "Check access & ingest", exact: true }).click();
+      await page.getByRole("button", { name: "Grant access & ingest", exact: true }).click();
       const grant = page.locator(".grant-row");
       await grant.waitFor({ timeout: 10000 });
       await grant.getByRole("button", { name: "Revoke" }).click();
@@ -1436,6 +1499,8 @@ try {
     axeResults.push(...(await scenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } })));
     const iphone = devices["iPhone 13"];
     axeResults.push(...(await scenario(browser, base, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
+    await emptyWorkspaceScenario(browser, "desktop", { viewport: { width: 1440, height: 900 } });
+    await emptyWorkspaceScenario(browser, "iphone", { ...iphone, viewport: { width: 390, height: 844 } });
     await launchTokenScenario(browser, "desktop");
     const headers = (await fetch(`${base}/`)).headers;
     check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));

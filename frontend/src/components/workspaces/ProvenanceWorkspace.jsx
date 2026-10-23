@@ -56,7 +56,12 @@ export function ProvenanceWorkspace() {
           </li>
         ))}
       </ul>
-      {!calls.length && !error && <p className="empty-state muted">No actions recorded yet.</p>}
+      {!calls.length && !error && (
+        <div className="empty-state workspace-empty-state">
+          <h2>No tool actions yet</h2>
+          <p className="muted">This ledger fills only when Mucaro requests or runs a tool action. Next: start the action from Chat; its decision and result will appear here automatically.</p>
+        </div>
+      )}
     </section>
   );
 }
