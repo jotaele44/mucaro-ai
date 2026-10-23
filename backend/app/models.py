@@ -14,6 +14,7 @@ class AskRequest(BaseModel):
     allow_mock_fallback: bool = False
     allow_live: bool = False
     require_offline: bool = False
+    workspace_id: str | None = Field(default=None, max_length=160)
 
 
 class ConversationCreateRequest(BaseModel):
@@ -104,6 +105,7 @@ class RunOptions(BaseModel):
     allow_mock_fallback: bool = False
     allow_live: bool = False
     require_offline: bool = False
+    workspace_id: str | None = Field(default=None, max_length=160)
 
 
 class MessageRequest(BaseModel):
