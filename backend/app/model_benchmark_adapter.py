@@ -55,6 +55,11 @@ def execute_git_attested_mock_calibration(*,project_root:Path,
         expected_file_digest:str)->dict:
     """Allow mock calibration only after verifying exact HEAD, tree and blob."""
     from .local_source_integrity import attest_local_source
+    from inspect import getfile
+    runtime_module=Path(getfile(generate_answer)).resolve()
+    expected_module=(Path(project_root).resolve()/MODULE).resolve()
+    if runtime_module!=expected_module:
+        raise ObservedRunError("IMPORTED_MODEL_ROUTER_OUTSIDE_CHECKOUT")
     attestation=attest_local_source(project_root=project_root,
         expected_head=source_head,source_path=MODULE,
         expected_sha256=expected_file_digest)
