@@ -953,16 +953,30 @@ def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
                     "detail": f"step {(call.get('provenance') or {}).get('checkpoint_step_id')} references an unknown dependency",
                     "tool_call_id": cancelled["tool_call_id"],
                 })
+                _complete_skipped_checkpoint_step(
+                    checkpoint_id,
+                    (call.get("provenance") or {}).get("checkpoint_step_id"),
+                    call["tool_call_id"],
+                    "ERROR_AGENT_WORKFLOW_UNKNOWN_DEPENDENCY",
+                    cfg,
+                )
             except ToolRuntimeError:
                 pass
             continue
         if any(row["status"] in {"FAILED", "DENIED", "CANCELLED", "INTERRUPTED"} for row in dependency_rows):
             try:
-                cancel_tool_call(
+                cancelled = cancel_tool_call(
                     call["tool_call_id"],
                     cfg=cfg,
                     cancelled_by=f"run:{run_id}",
                     reason="AGENT_DEPENDENCY_FAILED",
+                )["tool_call"]
+                _complete_skipped_checkpoint_step(
+                    checkpoint_id,
+                    (call.get("provenance") or {}).get("checkpoint_step_id"),
+                    cancelled["tool_call_id"],
+                    "ERROR_AGENT_DEPENDENCY_FAILED",
+                    cfg,
                 )
             except ToolRuntimeError:
                 pass
@@ -1014,6 +1028,30 @@ def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
         _ask_about_failures(get_run(run_id, cfg), failed, len(round_calls), cfg)
         return False
     return True
+
+
+def _complete_skipped_checkpoint_step(
+    checkpoint_id: str | None,
+    step_id: Any,
+    idempotency_key: str,
+    status: str,
+    cfg: Settings,
+) -> None:
+    """Close a dependency-blocked step without implying that its tool ran."""
+    if not checkpoint_id or not step_id:
+        return
+    try:
+        begin_step(checkpoint_id, step_id=str(step_id), idempotency_key=idempotency_key, cfg=cfg)
+        complete_step(
+            checkpoint_id,
+            idempotency_key=idempotency_key,
+            status="FAIL",
+            result={"status": status, "executed": False},
+            cfg=cfg,
+        )
+    except CheckpointError:
+        # A concurrent resume may have already closed the step; the tool ledger remains authoritative.
+        pass
 
 
 def _ask_about_failures(run: dict[str, Any], failed: list[dict[str, Any]], total: int, cfg: Settings) -> None:

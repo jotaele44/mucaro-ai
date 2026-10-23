@@ -14,7 +14,7 @@ Mucaro is being developed independently as an `INTELLIGENCE_PLANE_CANDIDATE`. Th
 | Explicit memory controls | PRESENT | Preserve |
 | Workspace profiles | PRESENT | Preserve |
 | Model routing | PARTIAL | Provider-neutral model runtime with explicit provider capabilities |
-| Agent runtime | PARTIAL | Durable conversational runs with bounded heuristic planning plus explicit provider-native Anthropic/OpenAI-compatible tool proposals, allowlist validation, provenance hashes, exact-head checkpoint steps, deterministic dependency-DAG validation/topological execution, downstream blocking, approval receipts, interruption recovery, and streamed events; parallel DAG execution, fleet orchestration, subagents, and broader crash-resume semantics remain open |
+| Agent runtime | PARTIAL | Durable conversational runs with bounded heuristic planning plus explicit provider-native Anthropic/OpenAI-compatible tool proposals, allowlist validation, provenance hashes, exact-head checkpoint steps, deterministic dependency-DAG validation/topological execution, downstream blocking, explicit non-executed failure closure, approval receipts, interruption recovery, and streamed events; parallel DAG execution, fleet orchestration, subagents, and broader crash-resume semantics remain open |
 | Skill registry | CANDIDATE | Immutable version/digest registry with certification metadata |
 | Skill mount runtime | CANDIDATE | Mount → authorize → activate → execute lifecycle |
 | Skill execution ledger | CANDIDATE | Expand with input/output artifact digests and runtime identity |

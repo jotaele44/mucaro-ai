@@ -46,8 +46,9 @@ runs now also create exact-head checkpoints for inferred steps, bind checkpoint
 step identity into tool provenance, close each step idempotently through
 approval, execution, interruption, and terminal-run paths, and validate
 deterministic dependency DAGs with fail-closed cycle/unknown-edge handling and
-downstream blocking; parallel execution, model-native tool loops, subagents,
-fleet scheduling, and broader crash-resume semantics remain open.
+downstream blocking, and explicit non-executed failure closure for skipped
+steps; parallel execution, model-native tool loops, subagents, fleet scheduling,
+and broader crash-resume semantics remain open.
 
 The finish line is no longer "make the repo exist." The finish line is to make
 the repo repeatedly prove its behavior from a clean clone through ingestion,

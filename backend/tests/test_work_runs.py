@@ -295,6 +295,43 @@ def test_agent_dependency_graph_is_topological_and_checkpoint_bound(cfg, convers
     completed = get_checkpoint(run["checkpoint_id"], cfg)
     assert completed is not None
     assert [step["id"] for step in completed["completed_steps"]] == ["inspect", "answer"]
+
+
+def test_agent_dependency_failure_cancels_downstream_and_closes_checkpoint(cfg, conversation, monkeypatch, flaky_tool):
+    monkeypatch.setattr(work_runs, "current_git_head", lambda _root: "e" * 40)
+    monkeypatch.setattr(
+        work_runs,
+        "build_agent_plan",
+        lambda prompt, cfg: {
+            "schema_version": "mucaro-agent-plan/1.0",
+            "planner": "test",
+            "status": "AGENT_PLAN_READY",
+            "prompt": prompt,
+            "actions": [
+                {"id": "dependent", "tool": "source_library.status", "arguments": {}, "reason": "dependent", "confidence": "HIGH", "depends_on": ["unstable"]},
+                {"id": "unstable", "tool": "test.flaky", "arguments": {}, "reason": "unstable", "confidence": "HIGH", "depends_on": []},
+            ],
+        },
+    )
+    run = _submit(conversation, "How does source lineage work?", cfg, mode="agent")
+    for call in list_tool_calls(cfg)["tool_calls"]:
+        approve_tool_call(call["tool_call_id"], cfg=cfg, expected_arguments_sha256=call["arguments_sha256"])
+    resume_waiting_run(run["run_id"], cfg)
+
+    calls = {call["provenance"]["agent_step_id"]: call for call in list_tool_calls(cfg)["tool_calls"]}
+    assert calls["unstable"]["status"] == "FAILED"
+    assert calls["dependent"]["status"] == "CANCELLED"
+    question = get_pending_interaction(conversation, cfg)
+    assert question is not None
+    from backend.app.response_flow import resolve_interaction
+
+    resolve_interaction(question["interaction_id"], expected_version=question["version"], resolved_by="user", option_id="continue", cfg=cfg)
+    resume_waiting_run(run["run_id"], cfg)
+    assert get_run(run["run_id"], cfg)["state"] == "COMPLETED"
+    checkpoint = get_checkpoint(run["checkpoint_id"], cfg)
+    assert checkpoint is not None
+    assert checkpoint["pending_steps"] == []
+    assert {step["status"] for step in checkpoint["completed_steps"]} == {"FAIL"}
 # --- F08 / F16: truthful per-call outcomes, failure question and targeted retry ---------
 
 
