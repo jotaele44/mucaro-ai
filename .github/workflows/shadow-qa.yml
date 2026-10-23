@@ -79,6 +79,8 @@ jobs:
       - name: Run bounded Shadow QA
         env:
           MUCARO_SHADOW_RECEIPT: ${{ runner.temp }}/mucaro-shadow-qa-${{ env.SHADOW_CHECKPOINT_SHA }}.json
+          MUCARO_SHADOW_EXECUTION_RECEIPT: data/exports/shadow/shadow-execution-${{ env.SHADOW_CHECKPOINT_SHA }}.json
+          MUCARO_SHADOW_GENERATED_EVIDENCE: data/exports/shadow/shadow-vector-evidence-${{ env.SHADOW_CHECKPOINT_SHA }}.json
         shell: bash
         run: |
           args=(--base "$SHADOW_BASE_SHA" --head "$SHADOW_CHECKPOINT_SHA" --output "$MUCARO_SHADOW_RECEIPT")
@@ -101,5 +103,21 @@ jobs:
         with:
           name: shadow-qa-${{ env.SHADOW_CHECKPOINT_SHA }}
           path: ${{ runner.temp }}/mucaro-shadow-qa-${{ env.SHADOW_CHECKPOINT_SHA }}.json
+          if-no-files-found: error
+          archive: false
+      - name: Upload exact-checkpoint Shadow execution receipt
+        if: always() && github.event_name != 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: shadow-execution-${{ env.SHADOW_CHECKPOINT_SHA }}
+          path: data/exports/shadow/shadow-execution-${{ env.SHADOW_CHECKPOINT_SHA }}.json
+          if-no-files-found: error
+          archive: false
+      - name: Upload generated Shadow vector evidence
+        if: always() && github.event_name != 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: shadow-vector-evidence-${{ env.SHADOW_CHECKPOINT_SHA }}
+          path: data/exports/shadow/shadow-vector-evidence-${{ env.SHADOW_CHECKPOINT_SHA }}.json
           if-no-files-found: error
           archive: false
