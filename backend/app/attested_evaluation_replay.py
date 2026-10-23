@@ -10,6 +10,7 @@ from typing import Any
 from .governed_learning_loop import digest
 from .independent_evidence_admission import EvidenceAdmissionGate,EvidenceAdmissionError
 from .sealed_evaluation_gate import VerifiedEvaluationGate,SealedEvaluationError
+from .independent_evaluation_gate import EvaluationGateError
 
 class ReplayGateError(RuntimeError):
     pass
@@ -92,6 +93,6 @@ def replay_attested_evaluation(*,admission:EvidenceAdmissionGate,
           "classification":status,"promoted":False,
           "limitations":"Input outputs are caller-supplied; no externally verified task run or independently proven key custody"}
         return {**data,"receipt_hash":digest(data)}
-    except (EvidenceAdmissionError,SealedEvaluationError,KeyError,TypeError,
+    except (EvidenceAdmissionError,SealedEvaluationError,EvaluationGateError,KeyError,TypeError,
             ValueError) as exc:
         raise ReplayGateError("REPLAY_PROVENANCE_DENIED") from exc
