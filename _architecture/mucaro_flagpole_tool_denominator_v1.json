@@ -97,6 +97,7 @@
   ],
   "supporting_tools": [
     "coding.exec",
+    "coding.file_edit",
     "coding.pr_request",
     "github.branch_push",
     "github.gist_view",
