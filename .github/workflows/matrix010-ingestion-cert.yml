@@ -1,0 +1,90 @@
+name: MATRIX-010 Ingestion Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "_architecture/ingestion_benchmark_v1.json"
+      - "_architecture/ingest_format_registry_v1.json"
+      - "backend/app/archive_safety.py"
+      - "backend/app/file_signatures.py"
+      - "backend/app/format_registry.py"
+      - "backend/app/ingestion.py"
+      - "backend/app/multimodal.py"
+      - "backend/app/parser.py"
+      - "backend/tests/test_ingestion_safety.py"
+      - "backend/tests/test_parser.py"
+      - "scripts/certify_ingestion_benchmark.py"
+      - ".github/workflows/matrix010-ingestion-cert.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "_architecture/ingestion_benchmark_v1.json"
+      - "_architecture/ingest_format_registry_v1.json"
+      - "backend/app/archive_safety.py"
+      - "backend/app/file_signatures.py"
+      - "backend/app/format_registry.py"
+      - "backend/app/ingestion.py"
+      - "backend/app/multimodal.py"
+      - "backend/app/parser.py"
+      - "backend/tests/test_ingestion_safety.py"
+      - "backend/tests/test_parser.py"
+      - "scripts/certify_ingestion_benchmark.py"
+      - ".github/workflows/matrix010-ingestion-cert.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  certify-matrix010:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD_SHA }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Initialize exact-head receipt path
+        run: echo "RECEIPT=$RUNNER_TEMP/matrix010-ingestion-$HEAD_SHA.json" >> "$GITHUB_ENV"
+
+      - name: Install benchmark environment
+        run: python -m pip install -e ".[dev]"
+
+      - name: Execute frozen MATRIX-010 denominator
+        run: |
+          python scripts/certify_ingestion_benchmark.py \
+            --output "$RECEIPT"
+
+      - name: Verify exact-head receipt
+        run: |
+          python - "$RECEIPT" "$HEAD_SHA" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          receipt = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          expected_head = sys.argv[2]
+          assert receipt["status"] == "MATRIX010_INGESTION_BENCHMARK_PASS"
+          assert receipt["head_sha"] == expected_head
+          assert receipt["required_case_count"] == 16
+          assert receipt["passed_case_count"] == 16
+          assert receipt["failed_case_count"] == 0
+          assert receipt["arithmetic_closes"] is True
+          assert len(receipt["representative_handling_classes"]) == 8
+          assert len(receipt["adversarial_classes"]) == 8
+          PY
+
+      - name: Upload exact-head MATRIX-010 receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: matrix010-ingestion-${{ env.HEAD_SHA }}
+          path: ${{ env.RECEIPT }}
+          if-no-files-found: error

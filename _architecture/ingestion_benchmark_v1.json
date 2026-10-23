@@ -1,0 +1,126 @@
+{
+  "schema_version": "mucaro-ingestion-benchmark/1.0",
+  "benchmark_id": "MATRIX-010",
+  "revision": "mucaro-matrix010-ingestion-v1",
+  "registry_path": "_architecture/ingest_format_registry_v1.json",
+  "expected_registry_schema_version": "mucaro-ingest-format-registry/1.0",
+  "expected_format_count": 22,
+  "representative_handling_classes": [
+    "text",
+    "structured_text",
+    "document",
+    "email",
+    "image_metadata",
+    "audio_metadata",
+    "video_metadata",
+    "archive"
+  ],
+  "required_adversarial_classes": [
+    "MALFORMED",
+    "MISLABELED",
+    "EMPTY",
+    "TRUNCATED",
+    "PASSWORD_ACCESS_BLOCKED",
+    "OVERSIZED",
+    "ARCHIVE_ATTACK",
+    "UNSUPPORTED"
+  ],
+  "cases": [
+    {
+      "case_id": "REP_TEXT",
+      "kind": "representative",
+      "handling_class": "text",
+      "node": "backend/tests/test_parser.py::test_ingest_source_manifest_includes_parser_evidence"
+    },
+    {
+      "case_id": "REP_STRUCTURED_TEXT",
+      "kind": "representative",
+      "handling_class": "structured_text",
+      "node": "backend/tests/test_parser.py::test_csv_parser_records_delimiter_row_count_and_duplicate_headers"
+    },
+    {
+      "case_id": "REP_DOCUMENT",
+      "kind": "representative",
+      "handling_class": "document",
+      "node": "backend/tests/test_parser.py::test_docx_parser_extracts_paragraph_table_text_and_metadata"
+    },
+    {
+      "case_id": "REP_EMAIL",
+      "kind": "representative",
+      "handling_class": "email",
+      "node": "backend/tests/test_parser.py::test_eml_parser_extracts_plain_body_headers_and_attachment_metadata"
+    },
+    {
+      "case_id": "REP_IMAGE",
+      "kind": "representative",
+      "handling_class": "image_metadata",
+      "node": "backend/tests/test_parser.py::test_png_parser_records_metadata_text_and_dimensions"
+    },
+    {
+      "case_id": "REP_AUDIO",
+      "kind": "representative",
+      "handling_class": "audio_metadata",
+      "node": "backend/tests/test_parser.py::test_wav_parser_records_metadata_duration_and_channels"
+    },
+    {
+      "case_id": "REP_VIDEO",
+      "kind": "representative",
+      "handling_class": "video_metadata",
+      "node": "backend/tests/test_parser.py::test_mp4_parser_records_container_and_duration_warning"
+    },
+    {
+      "case_id": "REP_ARCHIVE",
+      "kind": "representative",
+      "handling_class": "archive",
+      "node": "backend/tests/test_ingestion_safety.py::test_safe_zip_is_inventoried_and_extracts_text_members"
+    },
+    {
+      "case_id": "ADV_MALFORMED",
+      "kind": "adversarial",
+      "adversarial_class": "MALFORMED",
+      "node": "backend/tests/test_parser.py::test_invalid_json_raises_parse_error"
+    },
+    {
+      "case_id": "ADV_MISLABELED",
+      "kind": "adversarial",
+      "adversarial_class": "MISLABELED",
+      "node": "backend/tests/test_ingestion_safety.py::test_api_upload_of_mislabeled_file_reports_status_and_discards_upload"
+    },
+    {
+      "case_id": "ADV_EMPTY",
+      "kind": "adversarial",
+      "adversarial_class": "EMPTY",
+      "node": "backend/tests/test_parser.py::test_empty_file_reports_partial_parse"
+    },
+    {
+      "case_id": "ADV_TRUNCATED",
+      "kind": "adversarial",
+      "adversarial_class": "TRUNCATED",
+      "node": "backend/tests/test_ingestion_safety.py::test_malformed_and_truncated_archives_fail_closed"
+    },
+    {
+      "case_id": "ADV_PASSWORD_ACCESS_BLOCKED",
+      "kind": "adversarial",
+      "adversarial_class": "PASSWORD_ACCESS_BLOCKED",
+      "node": "backend/tests/test_ingestion_benchmark_certification.py::test_matrix010_encrypted_archive_is_rejected_before_parse"
+    },
+    {
+      "case_id": "ADV_OVERSIZED",
+      "kind": "adversarial",
+      "adversarial_class": "OVERSIZED",
+      "node": "backend/tests/test_ingestion_safety.py::test_oversized_file_is_rejected_before_hashing"
+    },
+    {
+      "case_id": "ADV_ARCHIVE_ATTACK",
+      "kind": "adversarial",
+      "adversarial_class": "ARCHIVE_ATTACK",
+      "node": "backend/tests/test_ingestion_safety.py::test_traversal_members_make_archive_unsafe_and_nothing_escapes"
+    },
+    {
+      "case_id": "ADV_UNSUPPORTED",
+      "kind": "adversarial",
+      "adversarial_class": "UNSUPPORTED",
+      "node": "backend/tests/test_ingestion_safety.py::test_symlink_inside_granted_folder_is_not_followed"
+    }
+  ]
+}
