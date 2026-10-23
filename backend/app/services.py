@@ -34,6 +34,8 @@ def answer_question(
     require_offline: bool = False,
     conversation_context: list[dict[str, Any]] | None = None,
     memory_context: list[dict[str, Any]] | None = None,
+    memory_workspace_id: str | None = None,
+    memory_conversation_id: str | None = None,
     cfg: Settings = settings,
     persist: bool = True,
     on_text_delta: Callable[[str], None] | None = None,
@@ -59,7 +61,12 @@ def answer_question(
         return retrieval
     retrieved = retrieval["retrieved_chunks"]
     try:
-        memory_selection = select_memory_context(cfg, items=memory_context)
+        memory_selection = select_memory_context(
+            cfg,
+            items=memory_context,
+            workspace_id=memory_workspace_id,
+            conversation_id=memory_conversation_id,
+        )
     except MemorySelectionError as exc:
         return {
             "status": exc.status,
