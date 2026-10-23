@@ -1659,23 +1659,30 @@
       "requirement_id": "TGT-034",
       "requirement_text": "Error behavior",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/error_categories.py",
-        "backend/app/work_runs.py"
+        "backend/app/work_runs.py",
+        "backend/app/main.py",
+        "backend/app/auth.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_api_error_categories.py::test_bad_request_api_error_includes_input_category",
+      "negative_gate": "backend/tests/test_api_error_categories.py::test_operator_auth_error_includes_permission_category",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_work_runs.py::test_crashing_step_ends_the_run_failed_with_a_category",
-        "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped"
+        "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped",
+        "backend/tests/test_api_error_categories.py",
+        "PR#268 head b51fc6696895051cd1827422bcd721883faff8b6",
+        "CI run 39885279614 conclusion=success",
+        "Rendered UI QA run 39885279596 conclusion=success",
+        "macOS app run 39885279593 conclusion=success"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Run errors, warnings and tool results carry TGT-034 categories; plain API error payloads do not yet include a category."
+      "notes": "PASS: canonical error categories now cover run failures, warnings, tool results, Mucaro structured API errors, operator-auth failures and remote-access denial without changing existing HTTP or machine-readable status semantics. PR #268 exact head b51fc6696895051cd1827422bcd721883faff8b6 passed CI, Chromium/WebKit rendered QA and macOS build/install/open E2E."
     },
     {
       "requirement_id": "TGT-035",
