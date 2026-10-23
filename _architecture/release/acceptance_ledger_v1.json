@@ -1674,10 +1674,9 @@
         "backend/tests/test_work_runs.py::test_crashing_step_ends_the_run_failed_with_a_category",
         "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped",
         "backend/tests/test_api_error_categories.py",
-        "PR#268 head b51fc6696895051cd1827422bcd721883faff8b6",
-        "CI run 39885279614 conclusion=success",
-        "Rendered UI QA run 39885279596 conclusion=success",
-        "macOS app run 39885279593 conclusion=success"
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39885279614",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39885279596",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39885279593"
       ],
       "state": "PASS",
       "blocker_id": null,
