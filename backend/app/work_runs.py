@@ -41,6 +41,7 @@ from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
 from .db import ensure_db, get_connection
 from .error_categories import classify_error
+from .execution_records import build_run_manifest
 from .model_router import ModelProviderError
 from .model_routing_policy import ModelRoutingError, plan_model_route
 from .response_flow import (
@@ -148,11 +149,56 @@ def _auto_approvable(tool_name: str) -> bool:
 # --- persistence --------------------------------------------------------------
 
 
+_MANIFEST_STATE = {
+    "QUEUED": "PLANNING",
+    "RUNNING": "EXECUTING",
+    "AWAITING_APPROVAL": "READY_FOR_APPROVAL",
+    "AWAITING_INPUT": "BLOCKED",
+    "COMPLETED": "COMPLETE",
+    "FAILED": "FAILED",
+    "CANCELLED": "BLOCKED",
+    "INTERRUPTED": "BLOCKED",
+}
+
+
+def _project_run_manifest(run: dict[str, Any]) -> dict[str, Any]:
+    state = str(run.get("state") or "")
+    manifest_state = _MANIFEST_STATE.get(state)
+    if manifest_state is None:
+        raise RunError("ERROR_RUN_MANIFEST_STATE", f"unsupported run state for manifest: {state}")
+    outputs = []
+    for key in ("answer_run_id", "outcome"):
+        value = run.get(key)
+        if isinstance(value, str) and value:
+            outputs.append(f"{key}:{value}")
+    errors = []
+    error = run.get("error")
+    if isinstance(error, dict):
+        status = str(error.get("status") or "ERROR")
+        detail = str(error.get("detail") or "")
+        errors.append(f"{status}:{detail}" if detail else status)
+    return build_run_manifest(
+        run_id=str(run["run_id"]),
+        task_id=str(run["conversation_id"]),
+        state=manifest_state,
+        inputs=[str(run.get("prompt") or "")],
+        outputs=outputs,
+        errors=errors,
+        started_at=str(run.get("started_at") or run.get("created_at") or ""),
+        completed_at=str(run.get("finished_at")) if run.get("finished_at") else None,
+    )
+
+
 def _row_to_run(row: Any) -> dict[str, Any]:
     run = json.loads(row["payload_json"])
     run["state"] = row["state"]
     run["version"] = row["version"]
     run["queue_seq"] = row["queue_seq"]
+    projected = _project_run_manifest(run)
+    stored = run.get("run_manifest")
+    if stored is not None and stored != projected:
+        raise RunError("ERROR_RUN_MANIFEST_DRIFT", f"stored run manifest drifted: {run['run_id']}")
+    run["run_manifest"] = projected
     return run
 
 
@@ -166,6 +212,7 @@ def _load(conn: Any, run_id: str) -> dict[str, Any]:
 def _save(conn: Any, run: dict[str, Any]) -> dict[str, Any]:
     """Optimistic write: fails if another writer moved the run since it was loaded."""
     run["updated_at"] = utc_now()
+    run["run_manifest"] = _project_run_manifest(run)
     body = {key: value for key, value in run.items() if key not in {"state", "version", "queue_seq"}}
     cursor = conn.execute(
         "UPDATE work_runs SET state = ?, version = version + 1, payload_json = ? WHERE run_id = ? AND version = ?",
@@ -373,6 +420,7 @@ def submit_message(
             "round": 1,
             "cancel_requested": False,
         }
+        body["run_manifest"] = _project_run_manifest({**body, "state": "QUEUED"})
         conn.execute(
             "INSERT INTO work_runs (run_id, conversation_id, queue_seq, state, idempotency_key, version, payload_json) VALUES (?, ?, ?, 'QUEUED', ?, 1, ?)",
             (run_id, conversation_id, queue_seq, idempotency_key, json.dumps(body, ensure_ascii=False, sort_keys=True)),
