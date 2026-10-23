@@ -1,0 +1,213 @@
+{
+  "schema_version": "mucaro-ingest-format-registry/1.0",
+  "format_count": 22,
+  "formats": [
+    {
+      "suffix": ".csv",
+      "mime_type": "text/csv",
+      "parser": "csv_dictreader",
+      "handling": "structured_text",
+      "handling_note": "Parse structure locally and emit normalized text plus parser metadata.",
+      "signature_kinds": []
+    },
+    {
+      "suffix": ".docx",
+      "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "parser": "docx_text_v1",
+      "handling": "document",
+      "handling_note": "Extract document text locally while preserving document-specific metadata.",
+      "signature_kinds": [
+        "zip"
+      ]
+    },
+    {
+      "suffix": ".eml",
+      "mime_type": "message/rfc822",
+      "parser": "email_rfc822_v1",
+      "handling": "email",
+      "handling_note": "Extract bounded message text and supported text-like attachments without executing content.",
+      "signature_kinds": []
+    },
+    {
+      "suffix": ".gif",
+      "mime_type": "image/gif",
+      "parser": "image_metadata_v1",
+      "handling": "image_metadata",
+      "handling_note": "Record local image metadata only; semantic image understanding requires a model adapter.",
+      "signature_kinds": [
+        "gif"
+      ]
+    },
+    {
+      "suffix": ".htm",
+      "mime_type": "text/html",
+      "parser": "html_text_v1",
+      "handling": "structured_text",
+      "handling_note": "Parse structure locally and emit normalized text plus parser metadata.",
+      "signature_kinds": []
+    },
+    {
+      "suffix": ".html",
+      "mime_type": "text/html",
+      "parser": "html_text_v1",
+      "handling": "structured_text",
+      "handling_note": "Parse structure locally and emit normalized text plus parser metadata.",
+      "signature_kinds": []
+    },
+    {
+      "suffix": ".jpeg",
+      "mime_type": "image/jpeg",
+      "parser": "image_metadata_v1",
+      "handling": "image_metadata",
+      "handling_note": "Record local image metadata only; semantic image understanding requires a model adapter.",
+      "signature_kinds": [
+        "jpeg"
+      ]
+    },
+    {
+      "suffix": ".jpg",
+      "mime_type": "image/jpeg",
+      "parser": "image_metadata_v1",
+      "handling": "image_metadata",
+      "handling_note": "Record local image metadata only; semantic image understanding requires a model adapter.",
+      "signature_kinds": [
+        "jpeg"
+      ]
+    },
+    {
+      "suffix": ".json",
+      "mime_type": "application/json",
+      "parser": "json_parser",
+      "handling": "structured_text",
+      "handling_note": "Parse structure locally and emit normalized text plus parser metadata.",
+      "signature_kinds": []
+    },
+    {
+      "suffix": ".m4a",
+      "mime_type": "audio/mp4",
+      "parser": "audio_metadata_v1",
+      "handling": "audio_metadata",
+      "handling_note": "Record local audio metadata only; semantic audio understanding requires a model adapter.",
+      "signature_kinds": [
+        "iso_base_media"
+      ]
+    },
+    {
+      "suffix": ".md",
+      "mime_type": "text/markdown",
+      "parser": "text_utf8",
+      "handling": "text",
+      "handling_note": "Decode as UTF-8 text with replacement for invalid byte sequences.",
+      "signature_kinds": []
+    },
+    {
+      "suffix": ".mov",
+      "mime_type": "video/quicktime",
+      "parser": "video_metadata_v1",
+      "handling": "video_metadata",
+      "handling_note": "Record local video/container metadata only; semantic video understanding requires a model adapter.",
+      "signature_kinds": [
+        "iso_base_media",
+        "quicktime"
+      ]
+    },
+    {
+      "suffix": ".mp3",
+      "mime_type": "audio/mpeg",
+      "parser": "audio_metadata_v1",
+      "handling": "audio_metadata",
+      "handling_note": "Record local audio metadata only; semantic audio understanding requires a model adapter.",
+      "signature_kinds": [
+        "mp3"
+      ]
+    },
+    {
+      "suffix": ".mp4",
+      "mime_type": "video/mp4",
+      "parser": "video_metadata_v1",
+      "handling": "video_metadata",
+      "handling_note": "Record local video/container metadata only; semantic video understanding requires a model adapter.",
+      "signature_kinds": [
+        "iso_base_media"
+      ]
+    },
+    {
+      "suffix": ".msg",
+      "mime_type": "application/vnd.ms-outlook",
+      "parser": "outlook_msg_text_probe_v1",
+      "handling": "email",
+      "handling_note": "Extract bounded message text and supported text-like attachments without executing content.",
+      "signature_kinds": [
+        "ole_compound"
+      ]
+    },
+    {
+      "suffix": ".pdf",
+      "mime_type": "application/pdf",
+      "parser": "pypdf",
+      "handling": "document",
+      "handling_note": "Extract document text locally while preserving document-specific metadata.",
+      "signature_kinds": [
+        "pdf"
+      ]
+    },
+    {
+      "suffix": ".png",
+      "mime_type": "image/png",
+      "parser": "image_metadata_v1",
+      "handling": "image_metadata",
+      "handling_note": "Record local image metadata only; semantic image understanding requires a model adapter.",
+      "signature_kinds": [
+        "png"
+      ]
+    },
+    {
+      "suffix": ".txt",
+      "mime_type": "text/plain",
+      "parser": "text_utf8",
+      "handling": "text",
+      "handling_note": "Decode as UTF-8 text with replacement for invalid byte sequences.",
+      "signature_kinds": []
+    },
+    {
+      "suffix": ".wav",
+      "mime_type": "audio/wav",
+      "parser": "audio_metadata_v1",
+      "handling": "audio_metadata",
+      "handling_note": "Record local audio metadata only; semantic audio understanding requires a model adapter.",
+      "signature_kinds": [
+        "wav"
+      ]
+    },
+    {
+      "suffix": ".webm",
+      "mime_type": "video/webm",
+      "parser": "video_metadata_v1",
+      "handling": "video_metadata",
+      "handling_note": "Record local video/container metadata only; semantic video understanding requires a model adapter.",
+      "signature_kinds": [
+        "ebml"
+      ]
+    },
+    {
+      "suffix": ".webp",
+      "mime_type": "image/webp",
+      "parser": "image_metadata_v1",
+      "handling": "image_metadata",
+      "handling_note": "Record local image metadata only; semantic image understanding requires a model adapter.",
+      "signature_kinds": [
+        "webp"
+      ]
+    },
+    {
+      "suffix": ".zip",
+      "mime_type": "application/zip",
+      "parser": "zip_archive_v1",
+      "handling": "archive",
+      "handling_note": "Inspect archive safety before bounded text-member extraction; never execute members.",
+      "signature_kinds": [
+        "zip"
+      ]
+    }
+  ]
+}

@@ -1160,20 +1160,30 @@
       "requirement_id": "TGT-012",
       "requirement_text": "Multimodal file handling",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
+        "backend/app/format_registry.py",
+        "_architecture/ingest_format_registry_v1.json",
         "backend/app/parser.py",
-        "backend/app/multimodal.py"
+        "backend/app/ingestion.py",
+        "backend/app/multimodal.py",
+        "backend/app/file_signatures.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
+      "positive_gate": "backend/tests/test_format_registry.py::test_declared_format_registry_projection_is_exact",
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/ingest_format_registry_v1.json",
+        "backend/tests/test_format_registry.py",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764670",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764464",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764730"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": "No declared format registry artifact."
+      "notes": "PROVISIONAL: merged PR #287 establishes one canonical 22-format ingestion registry consumed by parser MIME detection, upload/folder suffix policy, multimodal classes and signature expectations. Exact head a48ef587e5fa4cae34531e4d64a2c91517e78bc1 passed CI, Chromium/WebKit rendered QA and macOS gates. The implementation gap is closed, but certification remains provisional until MATRIX-010 freezes and executes the declared file-ingestion benchmark across the claimed format denominator."
     },
     {
       "requirement_id": "TGT-013",
@@ -1970,7 +1980,10 @@
       "implementation_state": "PARTIAL",
       "implementation_refs": [
         "backend/tests/test_ingestion_safety.py",
-        "backend/tests/test_parser.py"
+        "backend/tests/test_parser.py",
+        "backend/app/format_registry.py",
+        "_architecture/ingest_format_registry_v1.json",
+        "backend/tests/test_format_registry.py"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -1978,12 +1991,15 @@
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_ingestion_safety.py",
-        "backend/tests/test_parser.py"
+        "backend/tests/test_parser.py",
+        "_architecture/ingest_format_registry_v1.json",
+        "backend/tests/test_format_registry.py",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764670"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": "Malformed, mislabeled, empty, truncated, encrypted, oversized, archive-attack and unsupported cases are covered; a declared format registry and a frozen benchmark receipt remain OPEN (TGT-012)."
+      "notes": "PROVISIONAL: malformed, mislabeled, empty, truncated, encrypted, oversized, archive-attack and unsupported cases are covered. The canonical 22-format registry and runtime-consumer parity are now merged and exact-head verified by PR #287. Remaining residue is a separately frozen and executed ingestion benchmark receipt across the declared format denominator."
     },
     {
       "requirement_id": "MATRIX-011",
