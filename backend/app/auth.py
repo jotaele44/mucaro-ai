@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import Header, HTTPException
 
 from .config import Settings, settings
+from .error_categories import classify_error
 
 REMOTE_ACCESS_STATUS = "ERROR_REMOTE_ACCESS_REQUIRES_TOKEN"
 
@@ -38,6 +39,7 @@ def require_operator_auth(
         status_code=401,
         detail={
             "status": "ERROR_OPERATOR_AUTH_REQUIRED",
+            "category": classify_error("ERROR_OPERATOR_AUTH_REQUIRED"),
             "detail": "Operator token required for this local action.",
         },
     )
@@ -76,6 +78,7 @@ def require_remote_token(cfg: Settings, scope: Mapping[str, Any]) -> None:
         status_code=403,
         detail={
             "status": REMOTE_ACCESS_STATUS,
+            "category": classify_error(REMOTE_ACCESS_STATUS),
             "detail": (
                 "Reaching Mucaro from another device needs an access token. "
                 "Start it with phone access on the computer (see docs/PHONE_ACCESS.md)."
