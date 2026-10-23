@@ -68,8 +68,9 @@ class LocalSourceIntegrityTests(unittest.TestCase):
     def test_nested_git_root_denied(self):
         sub=self.root/"nested"
         sub.mkdir()
+        (sub/"model.py").write_bytes(self.module.read_bytes())
         with self.assertRaisesRegex(SourceIntegrityError,"PROJECT_GIT_ROOT_MISMATCH"):
-            self.attest(project_root=sub,source_path="../model.py")
+            self.attest(project_root=sub,source_path="model.py")
 
     def test_missing_git_repo_fails_closed(self):
         with tempfile.TemporaryDirectory() as temp:
