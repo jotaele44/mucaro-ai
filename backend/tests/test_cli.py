@@ -10,6 +10,7 @@ import pytest
 import backend.app.cli as cli
 import backend.app.packaging as packaging
 from backend.app.cli import main
+from backend.app.coding_certification import build_coding_certification_report
 from backend.app.config import Settings
 from backend.app.release_receipts import write_release_receipt
 from backend.app.retrieval_eval import build_retrieval_eval_report
@@ -432,6 +433,156 @@ def test_cli_ocr_analyze_reports_receipt_summary(tmp_path: Path, capsys, monkeyp
     assert "layout_mode=auto" in output
     assert "span_count=1" in output
     assert "warnings=OCR_UNKNOWN_CONFIDENCE_PRESENT" in output
+
+
+def test_cli_ocr_analyze_routes_pdf_to_page_receipt(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    pdf = tmp_path / "document.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n")
+    observed = {}
+
+    def fake_analyze(path: Path, **kwargs):
+        observed.update(path=path, kwargs=kwargs)
+        return {
+            "status": "OCR_PDF_OK",
+            "report_id": "ocrpdf_fixture",
+            "report_path": str(tmp_path / "report.json"),
+            "report_sha256": "c" * 64,
+        }
+
+    monkeypatch.setattr(cli, "analyze_pdf_ocr", fake_analyze)
+
+    assert main(
+        ["ocr", "analyze", str(pdf), "--dpi", "300", "--timeout-seconds", "45", "--format", "json"],
+        cfg=cfg,
+    ) == 0
+    assert capsys.readouterr().out
+    assert observed["path"] == pdf
+    assert observed["kwargs"]["dpi"] == 300
+    assert observed["kwargs"]["render_timeout_seconds"] == 45
+    assert observed["kwargs"]["ocr_timeout_seconds"] == 45
+
+
+def test_cli_capabilities_validate_execution_report(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    source = {
+        "schema_version": "mucaro-artifact/1.0",
+        "artifact_id": "artifact_input",
+        "artifact_type": "SOURCE",
+        "sha256": "a" * 64,
+        "byte_size": 1,
+        "logical_identity": "skill:input",
+        "producer": "skill_runtime",
+        "producer_version": "1.0.0",
+        "created_utc": "2026-10-22T00:00:00Z",
+        "parent_artifact_ids": [],
+        "schema_id": "test.input/1",
+        "source_path_or_uri": "skill://test/input",
+    }
+    output = {**source, "artifact_id": "artifact_output", "artifact_type": "DERIVED", "parent_artifact_ids": ["artifact_input"]}
+    report = {
+        "execution_id": "execution_cli",
+        "skill_id": "mucaro/test",
+        "skill_digest": "sha256:test",
+        "runtime": "IN_PROCESS",
+        "status": "PASS",
+        "artifact_lineage": {"input": source, "output": output, "failure_receipt": None},
+    }
+    report_path = tmp_path / "execution.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-execution-report", str(report_path), "--format", "text"], cfg=cfg) == 0
+    text_output = capsys.readouterr().out
+    assert "CAPABILITY_OUTPUT_CONTRACT_OK" in text_output
+    assert "capability_id=transparency_objectivity_governance" in text_output
+    assert "operation=skill_execution_artifact_lineage" in text_output
+
+
+def test_cli_capabilities_validate_retrieval_output(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    report = {
+        "status": "RETRIEVAL_OK",
+        "query": "lineage",
+        "retrieved_chunks": [
+            {
+                "chunk_id": "chunk_1",
+                "source_id": "source_1",
+                "chunk_index": 0,
+                "text": "lineage",
+                "score": 1.0,
+                "retrieval_strategy": "lexical_v2",
+                "matched_terms": ["lineage"],
+            }
+        ],
+    }
+    path = tmp_path / "retrieval.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-retrieval-output", str(path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["operation"] == "retrieval_output_integrity"
+
+
+def test_cli_capabilities_validate_web_snapshot(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    content = b"<html><body>hello</body></html>"
+    report = {
+        "schema_version": "mucaro_web_snapshot_v1",
+        "snapshot_id": "websnap_cli",
+        "snapshot_kind": "web_page",
+        "requested_url": "https://example.com/source",
+        "fetch_url": "https://example.com/source",
+        "final_url": "https://example.com/source",
+        "redirect_chain": [],
+        "fragment_removed": False,
+        "retrieval_started_utc": "2026-10-22T00:00:00Z",
+        "retrieval_utc": "2026-10-22T00:00:01Z",
+        "http_status": 200,
+        "content_type": "text/html",
+        "cache_policy": {"cache_mode": "immutable_snapshot_only", "reuse_allowed": False, "revalidation_required_before_reuse": True},
+        "robots_policy": {"status": "ROBOTS_ALLOWED", "robots_url": "https://example.com/robots.txt", "allowed": True, "checked_at": "2026-10-22T00:00:00Z"},
+        "http_error_policy": {"is_http_error": False, "snapshot_allowed": False, "citation_allowed": False},
+        "content_sha256": hashlib.sha256(content).hexdigest(),
+        "content_size_bytes": len(content),
+        "content_base64": __import__("base64").b64encode(content).decode("ascii"),
+        "parser_name": "web_snapshot_preview_v1",
+        "parser_trace": {"parser_name": "web_snapshot_preview_v1", "content_kind": "html", "text_preview_length": 5, "trace_warnings": []},
+        "parser_warnings": [],
+        "text_preview": "hello",
+        "policy": {"timeout_seconds": 5, "max_bytes": 1000000, "cache_mode": "immutable_snapshot_only"},
+    }
+    path = tmp_path / "snapshot.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-web-snapshot", str(path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["operation"] == "web_snapshot_integrity"
+
+
+def test_cli_capabilities_validate_coding_report(tmp_path: Path, capsys):
+    cfg = make_settings(tmp_path)
+    arch = tmp_path / "_architecture"
+    arch.mkdir()
+    (arch / "coding_regression_manifest.json").write_text(
+        json.dumps({"schema_version": "MUCARO_CODING_REGRESSION/1.1", "requirements": [{"id": "CODE-R01", "class": "positive", "gate": "discovery"}]}),
+        encoding="utf-8",
+    )
+    report = build_coding_certification_report(
+        [{"requirement_id": "CODE-R01", "state": "PASS", "evidence": ["receipt:code-r01"]}],
+        source_head_sha="a" * 40,
+        runtime_identity_sha256="b" * 64,
+        coding_image_digest="sha256:" + "c" * 64,
+        cfg=cfg,
+    )
+    path = tmp_path / "coding.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    assert main(["capabilities", "validate-coding-report", str(path), "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["operation"] == "coding_certification_integrity"
 
 
 def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Path, capsys):
@@ -1711,16 +1862,16 @@ def test_cli_eval_gis_reports_fixture_manifest_results(tmp_path: Path, capsys):
     assert main(["eval", "gis", "--format", "json"], cfg=cfg) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "GIS_EVAL_OK"
-    assert payload["counts"]["cases"] == 64
-    assert payload["counts"]["passed"] == 64
+    assert payload["counts"]["cases"] == 70
+    assert payload["counts"]["passed"] == 70
     assert payload["counts"]["failed"] == 0
-    assert payload["counts"]["operations"] == 25
-    assert payload["counts"]["negative_cases"] == 26
+    assert payload["counts"]["operations"] == 26
+    assert payload["counts"]["negative_cases"] == 29
 
     assert main(["eval", "gis", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_EVAL_OK" in text_output
-    assert "operation_count=25" in text_output
+    assert "operation_count=26" in text_output
     assert "PASS raster_depression_fill raster_depression_fill_enclosed_bowl_closes_volume" in text_output
     assert "PASS raster_hillshade raster_hillshade_west_light_east_rising_plane" in text_output
     assert "PASS raster_d8_flow raster_d8_east_descent_closes_terminal_contributions" in text_output
@@ -1801,7 +1952,7 @@ def test_cli_certify_gis_quality_writes_exact_head_receipt(tmp_path: Path, capsy
     assert main(["certify", "gis-quality", "--format", "text"], cfg=cfg) == 0
     text_output = capsys.readouterr().out
     assert "GIS_QUALITY_CERT_OK" in text_output
-    assert "eval_case_count=64" in text_output
+    assert "eval_case_count=70" in text_output
     assert "PASS raster_depression_fill raster_depression_fill_enclosed_bowl_closes_volume" in text_output
     assert "PASS raster_hillshade raster_hillshade_west_light_east_rising_plane" in text_output
     assert "PASS raster_d8_flow raster_d8_east_descent_closes_terminal_contributions" in text_output
