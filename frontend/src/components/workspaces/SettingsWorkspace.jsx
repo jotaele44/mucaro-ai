@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../../api.js";
 import { CleartextNotice } from "../CleartextNotice.jsx";
+import { uiText, uiFlag } from "../../uiPreferences.js";
 
 // One settings home (TGT-033): model, retrieval, access token and offline capability view.
-export function SettingsWorkspace({ options, onOptionsChange, announce }) {
+export function SettingsWorkspace({ options, onOptionsChange, uiPrefs, onUIPrefsChange, announce }) {
   const [models, setModels] = useState([]);
   const [manifest, setManifest] = useState(null);
   const [config, setConfig] = useState(null);
@@ -28,7 +29,38 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
       </header>
       {error && <p className="error-card" role="alert">{error.status}: {error.message}</p>}
 
-      <fieldset className="panel">
+      {uiPrefs && onUIPrefsChange && (
+        <fieldset id="settings-appearance" className="panel" data-gui-source="user-uploaded-draft">
+          <legend>{uiText(uiPrefs.language, "appearance")}</legend>
+          <div className="appearance-group">
+            <span className="muted small">{uiText(uiPrefs.language, "theme")}</span>
+            <div className="appearance-options" role="radiogroup" aria-label={uiText(uiPrefs.language, "theme")}>
+              {["auto", "light", "dark"].map((theme) => (
+                <label className="appearance-option" key={theme}>
+                  <input type="radio" name="mucaro-ui-theme" value={theme} checked={uiPrefs.theme === theme}
+                    onChange={() => onUIPrefsChange({ ...uiPrefs, theme })}/>
+                  <span>{uiText(uiPrefs.language, theme)}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="appearance-group">
+            <span className="muted small">{uiText(uiPrefs.language, "language")}</span>
+            <div className="appearance-options" role="group" aria-label={uiText(uiPrefs.language, "language")}>
+              {["en","es"].map((language) => (
+                <button key={language} type="button" className="appearance-option secondary-button"
+                  aria-pressed={uiPrefs.language === language}
+                  onClick={() => onUIPrefsChange({ ...uiPrefs, language })}>
+                  <span aria-hidden="true">{uiFlag(language)}</span> {language === "es" ? "Español" : "English"}
+                </button>
+              ))}
+            </div>
+            <p className="muted small">{uiText(uiPrefs.language, "settingsNote")}</p>
+          </div>
+        </fieldset>
+      )}
+
+      <fieldset id="settings-model" className="panel">
         <legend>Answer model</legend>
         {models.map((model) => (
           <label key={model.name} className="option">
@@ -52,7 +84,7 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
         </label>
       </fieldset>
 
-      <fieldset className="panel">
+      <fieldset id="settings-retrieval" className="panel">
         <legend>Retrieval</legend>
         <label className="field">
           <span>Strategy</span>
@@ -62,7 +94,7 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
         </label>
       </fieldset>
 
-      <fieldset className="panel">
+      <fieldset id="settings-access" className="panel">
         <legend>Local access token</legend>
         <CleartextNotice />
         {api.tokenIsLaunchManaged() ? (

@@ -483,8 +483,8 @@ async function scenario(browser, base, viewport, contextOptions) {
   await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Memory", exact: true }).click();
   await page.getByLabel("Remember").fill("Prefer tables for comparisons");
-  await page.getByRole("button", { name: "Save" }).click();
-  await page.getByText("Prefer tables for comparisons").waitFor();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.locator("#memory-list").getByText("Prefer tables for comparisons", { exact: true }).first().waitFor();
   check("memory add is visible with provenance", viewport, (await page.getByText(/preference · from api/).count()) >= 1);
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "14-memory");
@@ -503,6 +503,99 @@ async function scenario(browser, base, viewport, contextOptions) {
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "16-settings");
   axeRuns.push(await axe(page, viewport, "settings"));
+
+  // Three-region regression: rail navigation must not destroy sibling tab state.
+  const tablist = page.getByRole("toolbar", { name: "Open workspace tabs" });
+  const navShell = page.locator("#navigation-shell");
+  const mobileShellInactive = viewport !== "iphone" || await navShell.evaluate((node) => node.inert === true);
+  check("primary rail and contextual sidebar are distinct regions", viewport,
+    (await page.locator(".primary-rail").count()) === 1 &&
+    (await page.locator(".context-sidebar").count()) === 1 &&
+    mobileShellInactive &&
+    (viewport === "iphone" || (
+      (await page.getByRole("navigation", { name: "Primary" }).count()) === 1 &&
+      (await page.getByRole("complementary", { name: "Settings navigation" }).count()) === 1
+    )));
+  check("visited workspaces have persistent accessible tabs", viewport,
+    (await tablist.locator(".workspace-tab").count()) >= 5 &&
+    (await tablist.getByRole("button", { name: "Settings", exact: true }).getAttribute("aria-pressed")) === "true");
+  await tablist.getByRole("button", { name: "Sources", exact: true }).click();
+  await page.getByRole("heading", { name: "Sources" }).waitFor();
+  check("source selection survives switching workspace tabs", viewport,
+    (await page.locator(".source-row.selected").count()) === 1);
+  await tablist.getByRole("button", { name: "Memory", exact: true }).click();
+  await page.locator("#memory-list").getByText("Prefer tables for comparisons", { exact: true }).first().waitFor();
+  check("memory workspace survives switching tabs", viewport, true);
+  await tablist.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByText("What works offline").waitFor();
+  if (viewport !== "iphone") {
+    const navigation = page.locator(".sidebar");
+    const beforeWidth = await navigation.evaluate((el) => el.getBoundingClientRect().width);
+    await page.getByRole("button", { name: "Collapse contextual sidebar" }).click();
+    await page.getByRole("button", { name: "Expand contextual sidebar" }).waitFor();
+    await page.waitForFunction(() => document.querySelector(".sidebar").getBoundingClientRect().width <= 70);
+    const collapsedWidth = await navigation.evaluate((el) => el.getBoundingClientRect().width);
+    check("collapsing context retains primary rail", viewport,
+      collapsedWidth <= 70 && beforeWidth > 200 &&
+      (await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).count()) === 1);
+    await page.getByRole("button", { name: "Expand contextual sidebar" }).click();
+  }
+  check("tab close does not switch unrelated active workspace", viewport,
+    (await tablist.getByRole("button", { name: "Settings", exact: true }).getAttribute("aria-pressed")) === "true");
+  await page.getByRole("button", { name: "Close Sources tab" }).click();
+  check("closing inactive tab conserves active tab", viewport,
+    (await tablist.getByRole("button", { name: "Sources", exact: true }).count()) === 0 &&
+    (await tablist.getByRole("button", { name: "Settings", exact: true }).getAttribute("aria-pressed")) === "true");
+
+  // Imported GUI integration: bundled real owl thumbnail, local palette and truthful UI controls.
+  const brand = page.locator(".brand-owl").first();
+  check("owl icon uses bundled offline data and is present", viewport,
+    (await brand.count()) === 1 &&
+    (await brand.getAttribute("src")).startsWith("data:image/webp;base64,"));
+  const appearance = page.locator("#settings-appearance");
+  check("appearance is a real Settings panel, not a second page", viewport,
+    (await appearance.count()) === 1 &&
+    (await tablist.getByRole("button", { name: "Appearance" }).count()) === 0);
+  await appearance.getByRole("radio", { name: "Dark", exact: true }).check();
+  await page.waitForFunction(() => document.documentElement.dataset.mucaroTheme === "dark");
+  check("explicit dark mode overrides current system theme", viewport, true);
+  await appearance.getByRole("radio", { name: "Light", exact: true }).check();
+  await page.waitForFunction(() => document.documentElement.dataset.mucaroTheme === "light");
+  check("explicit light mode overrides current system theme", viewport, true);
+  await appearance.getByRole("radio", { name: "System", exact: true }).check();
+
+  if (viewport === "iphone") {
+    await appearance.getByRole("button", { name: "Español" }).click();
+    check("settings locale switches to Spanish without duplicating page identity", viewport,
+      (await page.getByRole("heading", { name: "Settings" }).count()) === 1 &&
+      (await tablist.getByRole("button", { name: "Ajustes", exact: true }).count()) === 1);
+    await appearance.getByRole("button", { name: "English" }).click();
+  } else {
+    await page.getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Switch language to Spanish" }).click();
+    check("rail flag reflects active locale", viewport,
+      (await page.getByRole("button", { name: "Cambiar idioma a inglés" }).count()) === 1 &&
+      (await tablist.getByRole("button", { name: "Ajustes", exact: true }).count()) === 1);
+    await page.getByRole("button", { name: "Cambiar idioma a inglés" }).click();
+    await page.getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: "Múcaro owl" }).click();
+    const owl = page.getByRole("region", { name: "Múcaro owl controls" });
+    await owl.waitFor();
+    check("owl runtime is source-labeled rather than inferred from conversation text", viewport,
+      (await owl.locator(".mucaro-pet-state").count()) === 1);
+    await owl.getByRole("checkbox", { name: "Float over workspace" }).check();
+    check("owl can float with local image and no sprite CDN", viewport,
+      (await page.locator(".mucaro-floating-pet").count()) === 1);
+    await owl.getByRole("button", { name: "Dock in sidebar" }).click();
+    await owl.getByRole("button", { name: "Close owl controls" }).click();
+  }
+  check("no remote font or hosted-image stylesheet dependency", viewport,
+    await page.evaluate(() => {
+      const prohibited = new RegExp("fonts[.]googleapis[.]com|_cdn/static");
+      return [...document.styleSheets].every((sheet) => !prohibited.test(sheet.href || "")) &&
+        performance.getEntriesByType("resource").every((entry) => !prohibited.test(entry.name));
+    }));
+  await shot(page, viewport, "17-gui-draft-integration");
 
   if (viewport === "iphone") {
     check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));

@@ -2016,6 +2016,9 @@ mucaro = "backend.app.cli:main"
     for path in [
         "scripts/mucaro.py",
         "scripts/launch_app.py",
+        "scripts/native_start.sh",
+        "scripts/one_click.sh",
+        "scripts/one_click.py",
         "scripts/bootstrap_macos.sh",
         "scripts/bootstrap_windows.ps1",
         "scripts/certify_release.py",
