@@ -562,3 +562,45 @@ def test_api_cors_default_allows_local_frontend(tmp_path: Path):
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
+
+def test_preferences_api_roundtrip_and_version_conflict(tmp_path: Path):
+    client = make_client(tmp_path)
+
+    initial = client.get("/preferences")
+    assert initial.status_code == 200
+    payload = initial.json()
+    assert payload["revision"] == 0
+    assert payload["values"]["top_k"] == 5
+
+    changed = client.patch(
+        "/preferences",
+        json={"changes": {"top_k": 9, "theme": "dark"}, "expected_revision": 0},
+    )
+    assert changed.status_code == 200
+    assert changed.json()["revision"] == 1
+    assert changed.json()["changed"] == {"theme": "dark", "top_k": 9}
+
+    stale = client.patch(
+        "/preferences",
+        json={"changes": {"top_k": 10}, "expected_revision": 0},
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["status"] == "ERROR_PREFERENCE_VERSION_CONFLICT"
+
+    final = client.get("/preferences").json()
+    assert final["revision"] == 1
+    assert final["values"]["top_k"] == 9
+
+
+def test_preferences_mutation_respects_operator_auth(tmp_path: Path):
+    client = make_client(tmp_path, operator_token="secret-token")
+    rejected = client.patch("/preferences", json={"changes": {"theme": "dark"}})
+    assert rejected.status_code == 401
+
+    allowed = client.patch(
+        "/preferences",
+        json={"changes": {"theme": "dark"}},
+        headers={"X-Mucaro-Token": "secret-token"},
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["values"]["theme"] == "dark"

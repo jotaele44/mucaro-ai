@@ -500,12 +500,46 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByText("What works offline").waitFor();
   check("settings shows model choice and offline capabilities", viewport, (await page.getByRole("radio", { name: /openai_compatible_local/ }).count()) === 1);
+
+  const darkTheme = page.getByRole("radio", { name: "Dark" });
+  await darkTheme.click();
+  await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
+  check("persistent theme applies to the live document", viewport, await darkTheme.isChecked());
+
+  const topK = page.getByLabel("Retrieved chunks (1–20)");
+  await topK.fill("7");
+  await topK.locator("xpath=ancestor::form").getByRole("button", { name: "Save" }).click();
+  await page.waitForFunction(async () => (await (await fetch("/preferences")).json()).values.top_k === 7);
+  check("settings form persists bounded retrieval count", viewport, (await topK.inputValue()) === "7");
+
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "16-settings");
   axeRuns.push(await axe(page, viewport, "settings"));
 
+  await openNav();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Chat", exact: true }).click();
+  drawerStates.push(await drawerClosed());
+  await send(page, "Use semantic retrieval");
+  await waitRunState(page, "COMPLETED");
+  check(
+    "chat prompt updates settings without tool execution",
+    viewport,
+    (await lastRun(page).locator(".settings-receipt").count()) === 1 &&
+      (await lastRun(page).locator(".tool-summary").count()) === 0,
+  );
+
+  await openNav();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByText("What works offline").waitFor();
+  check(
+    "prompt-side settings mutation rehydrates Settings workspace",
+    viewport,
+    (await page.getByLabel("Strategy").inputValue()) === "semantic",
+  );
+  drawerStates.push(await drawerClosed());
+
   if (viewport === "iphone") {
-    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
+    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 6 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
     // iOS zooms into fields under 16px on focus; touch targets need 44px (Apple HIG).
     const touch = await page.evaluate(() => {
       const visible = (el) => {

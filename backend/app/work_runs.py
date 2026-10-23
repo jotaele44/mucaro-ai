@@ -43,6 +43,7 @@ from .db import ensure_db, get_connection
 from .error_categories import classify_error
 from .model_router import ModelProviderError
 from .model_routing_policy import ModelRoutingError, plan_model_route
+from .preferences import PreferenceError, apply_preference_prompt, parse_preference_prompt
 from .response_flow import (
     InteractionError,
     build_response_envelope,
@@ -81,7 +82,7 @@ MODES = {
 EVENT_TYPES = {
     "queued", "run_started", "route", "plan", "tool_call", "approval_request", "tool_started", "tool_result",
     "tool_summary", "question", "question_resolved", "retry_requested", "user_note", "retrieval", "text_delta",
-    "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final",
+    "citation", "artifact", "preference_update", "warning", "error", "interrupted", "cancelled", "final",
 }
 MAX_PROMPT_CHARS = 20_000
 TEXT_DELTA_CHARS = 160
@@ -335,6 +336,9 @@ def submit_message(
         raise RunError("ERROR_RUN_PROMPT_EMPTY", "Message text is required.")
     if len(text) > MAX_PROMPT_CHARS:
         raise RunError("ERROR_RUN_PROMPT_TOO_LONG", f"Message exceeds {MAX_PROMPT_CHARS} characters.")
+    preference_prompt = parse_preference_prompt(text)
+    if preference_prompt["status"] == "PREFERENCE_PROMPT_BLOCKED":
+        raise RunError("ERROR_SECRET_SETTING_PROMPT_BLOCKED", str(preference_prompt["detail"]))
     if mode not in MODES:
         raise RunError("ERROR_RUN_MODE_INVALID", f"Mode must be one of {sorted(MODES)}.")
     if get_conversation(conversation_id, cfg) is None:
@@ -430,6 +434,9 @@ def edit_queued_run(run_id: str, prompt: str, *, expected_version: int, cfg: Set
     text = (prompt or "").strip()
     if not text:
         raise RunError("ERROR_RUN_PROMPT_EMPTY", "Message text is required.")
+    preference_prompt = parse_preference_prompt(text)
+    if preference_prompt["status"] == "PREFERENCE_PROMPT_BLOCKED":
+        raise RunError("ERROR_SECRET_SETTING_PROMPT_BLOCKED", str(preference_prompt["detail"]))
     with _Tx(cfg) as conn:
         run = _load(conn, run_id)
         if run["state"] != "QUEUED":
@@ -650,7 +657,67 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     run_id = run["run_id"]
     options = run.get("options", {})
     commands, question, unknown = _parse_prompt(run["prompt"])
+    preference_prompt = parse_preference_prompt(run["prompt"])
     _emit_only(run_id, cfg, "run_started", {"mode": run["mode"], "prompt": run["prompt"]})
+
+    if preference_prompt["status"] != "PREFERENCE_PROMPT_NONE":
+        if preference_prompt["status"] == "PREFERENCE_PROMPT_MATCH":
+            changes = dict(preference_prompt.get("changes") or {})
+            steps = [{"step": f"set {key} = {value}", "setting": key, "value": value} for key, value in changes.items()]
+            _emit_only(run_id, cfg, "plan", {
+                "goal": "Update local Mucaro settings.",
+                "mode": run["mode"],
+                "steps": steps,
+                "parser": preference_prompt.get("parser"),
+            })
+            if run["mode"] == "plan":
+                summary = "Plan only; no settings changed. " + "; ".join(step["step"] for step in steps)
+                _complete(run_id, cfg, outcome="PLAN_ONLY", assistant_text=summary)
+                return
+            try:
+                applied = apply_preference_prompt(
+                    run["prompt"],
+                    source=f"conversation:{run['conversation_id']}:run:{run_id}",
+                    cfg=cfg,
+                )
+            except PreferenceError as exc:
+                detail = exc.detail
+                _emit_only(run_id, cfg, "warning", {
+                    "status": exc.status,
+                    "category": classify_error(exc.status),
+                    "detail": detail,
+                })
+                _emit_only(run_id, cfg, "text_delta", {"text": f"Settings were not changed: {detail}", "live": False})
+                _complete(run_id, cfg, outcome="PREFERENCE_UPDATE_REJECTED", assistant_text=f"Settings were not changed: {detail}")
+                return
+            update_event = {
+                "revision": applied.get("revision"),
+                "changed": applied.get("changed") or {},
+                "values_sha256": applied.get("values_sha256"),
+                "parser": applied.get("parser"),
+            }
+            assistant_text = str(applied.get("assistant_text") or "Settings updated.")
+            _emit_only(run_id, cfg, "preference_update", update_event)
+            _emit_only(run_id, cfg, "text_delta", {"text": assistant_text, "live": False})
+            _complete(run_id, cfg, outcome="PREFERENCES_UPDATED", assistant_text=assistant_text)
+            return
+
+        detail = str(preference_prompt.get("detail") or "That settings request is not valid.")
+        status = str(preference_prompt.get("error_status") or preference_prompt["status"])
+        _emit_only(run_id, cfg, "plan", {
+            "goal": "Validate a local settings request.",
+            "mode": run["mode"],
+            "steps": [{"step": "reject unsafe or invalid settings mutation"}],
+        })
+        _emit_only(run_id, cfg, "warning", {
+            "status": status,
+            "category": classify_error(status),
+            "detail": detail,
+        })
+        _emit_only(run_id, cfg, "text_delta", {"text": f"Settings were not changed: {detail}", "live": False})
+        _complete(run_id, cfg, outcome="PREFERENCE_UPDATE_REJECTED", assistant_text=f"Settings were not changed: {detail}")
+        return
+
     try:
         route = plan_model_route(
             task_type="cited_qa",

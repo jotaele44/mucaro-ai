@@ -15,7 +15,32 @@ const WORKSPACES = [
   { id: "provenance", label: "Provenance" },
   { id: "settings", label: "Settings" },
 ];
-const DEFAULT_OPTIONS = { model_provider: "mock", retrieval_strategy: "hybrid", allow_live: false, top_k: 5 };
+const DEFAULT_OPTIONS = {
+  model_provider: "mock",
+  model_name: "mock-cited-synthesizer-v1",
+  retrieval_strategy: "hybrid",
+  allow_mock_fallback: false,
+  allow_live: false,
+  require_offline: false,
+  top_k: 5,
+};
+const RUN_OPTION_KEYS = [
+  "model_provider",
+  "model_name",
+  "retrieval_strategy",
+  "allow_mock_fallback",
+  "allow_live",
+  "require_offline",
+  "top_k",
+];
+
+function optionsFromPreferences(payload, fallback = DEFAULT_OPTIONS) {
+  const values = payload?.values || {};
+  return RUN_OPTION_KEYS.reduce((next, key) => {
+    if (values[key] !== undefined) next[key] = values[key];
+    return next;
+  }, { ...fallback });
+}
 // Foreground liveness check. A phone that was away this long has lost its live streams without any error.
 const HEALTH_POLL_MS = 15000;
 const RESUME_AFTER_AWAY_MS = 3000;
@@ -49,6 +74,7 @@ export function App() {
   const [tasksOpen, setTasksOpen] = useState(false);
   const [modes, setModes] = useState(null);
   const [options, setOptions] = useState(() => ({ ...DEFAULT_OPTIONS, ...stored("mucaro.options", {}) }));
+  const [preferences, setPreferences] = useState(() => stored("mucaro.preferencesCache", null));
   const [message, setMessage] = useState("");
   // state: checking | ok | error | locked. `offline` marks a service that answered before and has gone quiet: the UI
   // stays mounted (open sheets, streams and drafts survive a network blip) and reconciles once the service is back.
@@ -78,11 +104,24 @@ export function App() {
     }
   }, []);
 
+  const acceptPreferences = useCallback((payload) => {
+    if (!payload?.values) return;
+    setPreferences(payload);
+    setOptions((current) => optionsFromPreferences(payload, current));
+    persist("mucaro.preferencesCache", payload);
+  }, []);
+
+  const loadPreferences = useCallback(async () => {
+    const payload = await api.preferences();
+    acceptPreferences(payload);
+    return payload;
+  }, [acceptPreferences]);
+
   // Startup and Retry: decides between ready and unreachable.
   const checkHealth = useCallback(async () => {
     try {
       await api.health();
-      const [modePayload] = await Promise.all([api.modes(), loadConversations()]);
+      const [modePayload] = await Promise.all([api.modes(), loadConversations(), loadPreferences()]);
       setModes(modePayload);
       offline.current = false;
       setHealth((current) => (current.state === "ok" && !current.offline ? current : { state: "ok" }));
@@ -90,7 +129,7 @@ export function App() {
       const issue = authIssueOf(err);
       setHealth((current) => (issue ? locked(current, issue) : { state: "error", error: err }));
     }
-  }, [loadConversations]);
+  }, [loadConversations, loadPreferences]);
 
   // Any call that finds the token refused (the computer restarted Mucaro and made a new one) sends the person to the gate.
   useEffect(() => onAuthIssue((reason) => setHealth((current) => locked(current, reason))), []);
@@ -124,7 +163,7 @@ export function App() {
     } finally {
       polling.current = false;
     }
-  }, [loadConversations]);
+  }, [loadConversations, loadPreferences]);
 
   useEffect(() => {
     checkHealth();
@@ -179,6 +218,12 @@ export function App() {
 
   useEffect(() => persist("mucaro.activeConversation", activeId), [activeId]);
   useEffect(() => persist("mucaro.options", options), [options]);
+
+  useEffect(() => {
+    const values = preferences?.values || {};
+    document.documentElement.dataset.theme = values.theme || "auto";
+    document.documentElement.dataset.reducedMotion = values.reduced_motion ? "true" : "false";
+  }, [preferences]);
 
   function openConversation(id) {
     setActiveId(id);
@@ -261,12 +306,20 @@ export function App() {
             announce={announce}
             modes={modes}
             defaultOptions={options}
+            onPreferencesChanged={loadPreferences}
           />
         )}
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}
         {health.state === "ok" && view === "provenance" && <ProvenanceWorkspace />}
-        {health.state === "ok" && view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions} announce={announce} />}
+        {health.state === "ok" && view === "settings" && (
+          <SettingsWorkspace
+            options={options}
+            preferences={preferences}
+            onPreferencesChanged={acceptPreferences}
+            announce={announce}
+          />
+        )}
       </main>
       {tasksOpen && <TasksDrawer onClose={() => setTasksOpen(false)} />}
       <div className="sr-only" role="status" aria-live="polite">{message}</div>

@@ -274,6 +274,12 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
             />
           </div>
         )}
+        {view.preferenceUpdate && (
+          <p className="receipt settings-receipt">
+            Settings receipt · revision {view.preferenceUpdate.revision ?? "—"} ·{" "}
+            {Object.keys(view.preferenceUpdate.changed || {}).length} changed
+          </p>
+        )}
         <Citations citations={view.citations} onOpenCitation={onOpenCitation} />
 
         {view.warnings.map((warning, index) => (

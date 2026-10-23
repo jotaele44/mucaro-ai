@@ -83,7 +83,7 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
   );
 }
 
-export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, announce, modes, defaultOptions }) {
+export function ChatView({ reconnect = 0, conversationId, onConversationCreated, onConversationsChanged, onOpenTasks, onPreferencesChanged, announce, modes, defaultOptions }) {
   const [conversation, setConversation] = useState(null);
   const [runs, setRuns] = useState(new Map());
   const [summaries, setSummaries] = useState([]);
@@ -133,6 +133,9 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
             if (!entry || entry.events.some((row) => row.seq === event.seq)) return previous;
             return new Map(previous).set(runId, { run: entry.run, events: [...entry.events, event] });
           });
+          if (event.type === "preference_update" && onPreferencesChanged) {
+            Promise.resolve(onPreferencesChanged()).catch(() => {});
+          }
           if (["approval_request", "question", "final", "interrupted", "error"].includes(event.type)) {
             loadRun(runId).catch(() => {});
           }
@@ -167,7 +170,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
           }
         });
     },
-    [loadRun],
+    [loadRun, onPreferencesChanged],
   );
 
   const refresh = useCallback(async () => {
@@ -254,7 +257,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
     try {
       let id = conversationId;
       const creating = !id;
-      if (creating) id = (await api.createConversation(prompt.slice(0, 60))).conversation_id;
+      if (creating) id = (await api.createConversation()).conversation_id;
       const key = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const result = await api.sendMessage(id, { prompt, mode, idempotency_key: key, options: defaultOptions });
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
@@ -329,7 +332,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         )}
       </header>
 
-      <div className="feed" ref={feedRef} onScroll={onScroll}>
+      <div className="feed" ref={feedRef} onScroll={onScroll} role="log" aria-label="Conversation history" aria-relevant="additions">
         {loading && <p className="muted center">Loading conversation…</p>}
         {empty && (
           <div className="empty-state">
