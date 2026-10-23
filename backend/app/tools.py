@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from .coding_container import CodingContainerError, build_coding_container_plan, run_coding_container_plan
 from .coding_mutation import CodingMutationError, apply_patch_transaction
 from .coding_patch import validate_patch_proposal
 from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
@@ -168,6 +169,84 @@ def _coding_patch_apply(arguments: dict[str, Any], cfg: Settings) -> dict[str, A
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
+
+def _coding_exec(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    image = arguments.get("image")
+    command = arguments.get("command")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.exec requires a non-empty repo_root argument.")
+    if not isinstance(image, str) or not image.strip():
+        raise ToolRuntimeError("ERROR_CODING_EXEC_IMAGE_REQUIRED", "coding.exec requires an immutable pinned image identity.")
+    if not isinstance(command, list) or not command or not all(isinstance(part, str) and part for part in command):
+        raise ToolRuntimeError("ERROR_CODING_EXEC_COMMAND_REQUIRED", "coding.exec requires a non-empty argv array of strings.")
+    if arguments.get("network_allowed") not in (None, False):
+        raise ToolRuntimeError("ERROR_CODING_EXEC_NETWORK_POLICY", "coding.exec does not permit network access.")
+
+    bounded_limits = {
+        "timeout_seconds": (1, 120),
+        "max_output_bytes": (1, 2 * 1024 * 1024),
+        "memory_mb": (128, 4096),
+        "cpus": (0.25, 4.0),
+        "pids_limit": (16, 512),
+        "workspace_mb": (64, 4096),
+    }
+    options: dict[str, Any] = {}
+    for key, (minimum, maximum) in bounded_limits.items():
+        if key not in arguments:
+            continue
+        value = arguments[key]
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or value < minimum
+            or value > maximum
+            or (key != "cpus" and not isinstance(value, int))
+        ):
+            raise ToolRuntimeError(
+                "ERROR_CODING_EXEC_RESOURCE_LIMIT",
+                f"coding.exec {key} must be within {minimum}..{maximum}.",
+            )
+        options[key] = value
+    if "engine" in arguments:
+        engine = arguments["engine"]
+        if not isinstance(engine, str) or engine not in {"docker", "podman"}:
+            raise ToolRuntimeError("ERROR_CODING_EXEC_ENGINE", "coding.exec engine must be docker or podman.")
+        options["engine"] = engine
+    try:
+        plan = build_coding_container_plan(
+            repo_root,
+            image=image,
+            command=command,
+            cfg=cfg,
+            network_allowed=False,
+            **options,
+        )
+        receipt = run_coding_container_plan(plan, cfg=cfg)
+    except CodingContainerError as exc:
+        detail = exc.detail
+        if exc.receipt is not None:
+            detail = f"{detail}; receipt_status={exc.receipt.get('status')}"
+        raise ToolRuntimeError(exc.status, detail) from exc
+
+    execution_status = str(receipt.get("execution_status") or "UNKNOWN")
+    return {
+        "status": "CODING_EXEC_OK" if execution_status == "PASS" else "CODING_EXEC_COMMAND_FAILED",
+        "execution_status": execution_status,
+        "plan_sha256": receipt.get("plan_sha256"),
+        "head_sha": receipt.get("head_sha"),
+        "command_argv": receipt.get("command_argv"),
+        "exit_code": receipt.get("exit_code"),
+        "duration_ms": receipt.get("duration_ms"),
+        "stdout": receipt.get("stdout"),
+        "stderr": receipt.get("stderr"),
+        "source_mount_read_only": receipt.get("source_mount_read_only"),
+        "workspace_ephemeral": receipt.get("workspace_ephemeral"),
+        "network_allowed": receipt.get("network_allowed"),
+        "container_receipt_sha256": receipt.get("receipt_sha256"),
+        "container_receipt": receipt,
+    }
+
 def _web_fetch(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     url = arguments.get("url")
     if not isinstance(url, str):
@@ -294,6 +373,14 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_coding_patch_apply,
+    ),
+    "coding.exec": ToolDefinition(
+        name="coding.exec",
+        description="Execute a bounded argv command in the isolated coding container with immutable image identity, network disabled, read-only host source, and an ephemeral writable workspace.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_exec,
+        timeout_seconds=150.0,
     ),
     "web.render": ToolDefinition(
         name="web.render",
