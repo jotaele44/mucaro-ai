@@ -313,15 +313,17 @@ receipt candidate: calibrated document layout, handwriting, difficult scans,
 and optional external OCR providers remain future governed-document-intelligence
 work.
 
-Use `mucaro capabilities validate-ocr-report REPORT_PATH` to check a saved OCR
-receipt against the executable state-of-the-art OCR output contract. The
-validator checks report schema, source-image hashes and dimensions, local engine
-identity, confidence scale, raw/normalized/canonical text tiers, span bounding
-boxes, warning consistency, limitations, falsification criteria, and computed
-span/confidence accounting. It returns `CAPABILITY_OUTPUT_CONTRACT_FAILED` when
-a report omits source or engine proof, claims text without saved spans, misses a
-required no-text or low-confidence warning, or asserts span/confidence counts
-that do not match the saved spans.
+Use `mucaro capabilities validate-ocr-report REPORT_PATH` to check a saved image
+or PDF OCR receipt against the executable OCR output contract. Image reports are
+checked for source-image hashes and dimensions, local engine identity, confidence
+scale, raw/normalized/canonical text tiers, span bounding boxes, warning
+consistency, limitations, falsification criteria, and computed span/confidence
+accounting. PDF reports are additionally checked for renderer identity and DPI,
+source/rendered/OCR page-count closure, contiguous page indices, per-page
+rendered and OCR receipt hashes, span accounting, and explicit no-text-page
+warnings. It returns `CAPABILITY_OUTPUT_CONTRACT_FAILED` when a report omits
+source or engine proof, claims text without saved spans, misses a required
+warning, or asserts counts that do not match the saved evidence.
 
 Use `mucaro ocr calibrate REPORT_PATH GOLD_PATH` to evaluate a saved image OCR
 receipt against a `MUCARO_OCR_CALIBRATION_GOLD/1.0` JSON file. The gold file

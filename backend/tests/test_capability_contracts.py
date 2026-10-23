@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+from typing import Any
 
 from backend.app.capability_contracts import (
     CAPABILITY_CONTRACT_SCHEMA_VERSION,
@@ -844,3 +845,77 @@ def test_validate_ocr_report_contract_rejects_weak_image_ocr_receipts():
     assert "low_confidence_has_warning" in failed_names
     assert "limitations_non_empty" in failed_names
     assert "falsification_criteria_non_empty" in failed_names
+
+
+def _pdf_ocr_report(*, no_text: bool = True) -> dict[str, Any]:
+    page_status = "OCR_ANALYSIS_NO_TEXT" if no_text else "OCR_ANALYSIS_OK"
+    page_warnings = ["OCR_NO_TEXT_DETECTED"] if no_text else []
+    return {
+        "schema_version": "mucaro_pdf_ocr_report_v1",
+        "report_id": "ocrpdf_test",
+        "status": "OCR_PDF_WARN" if no_text else "OCR_PDF_OK",
+        "operation": "pdf_page_render_ocr",
+        "created_at": "2026-09-12T00:00:00Z",
+        "source": {
+            "path": "fixtures/scan.pdf",
+            "sha256": "a" * 64,
+            "bytes": 2048,
+            "mime_type": "application/pdf",
+            "page_count": 1,
+        },
+        "renderer": {
+            "name": "pdftoppm",
+            "version": "pdftoppm version 24.01",
+            "dpi": 200,
+            "format": "png",
+        },
+        "ocr": {"engine": "tesseract", "language": "eng", "layout_mode": "auto"},
+        "pages": [
+            {
+                "page_index": 0,
+                "page_number": 1,
+                "rendered_sha256": "b" * 64,
+                "rendered_bytes": 1024,
+                "ocr_report_id": "ocrreport_page_1",
+                "ocr_report_sha256": "c" * 64,
+                "ocr_status": page_status,
+                "span_count": 0 if no_text else 1,
+                "warnings": page_warnings,
+            }
+        ],
+        "invariants": {
+            "source_page_count": 1,
+            "rendered_page_count": 1,
+            "ocr_page_count": 1,
+            "page_accounting_closed": True,
+            "page_indices_contiguous": True,
+            "all_rendered_page_hashes_present": True,
+            "all_ocr_report_hashes_present": True,
+            "total_span_count": 0 if no_text else 1,
+            "no_text_page_count": 1 if no_text else 0,
+        },
+        "warnings": ["OCR_PDF_NO_TEXT_PAGES_PRESENT"] if no_text else [],
+        "limitations": ["synthetic PDF receipt"],
+        "falsification_criteria": ["reject when page accounting does not close"],
+    }
+
+
+def test_validate_ocr_report_contract_accepts_pdf_page_receipts():
+    result = validate_ocr_report_contract(_pdf_ocr_report())
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+    assert result["counts"]["fail"] == 0
+    assert result["operation"] == "pdf_page_render_ocr"
+
+
+def test_validate_ocr_report_contract_rejects_inconsistent_pdf_page_receipts():
+    report = _pdf_ocr_report()
+    report["invariants"]["total_span_count"] = 1
+    report["pages"][0]["warnings"] = []
+
+    result = validate_ocr_report_contract(report)
+
+    assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    failed_names = {check["name"] for check in result["failed_checks"]}
+    assert "invariants.total_span_count" in failed_names
+    assert "pages.0.no_text_warning" in failed_names

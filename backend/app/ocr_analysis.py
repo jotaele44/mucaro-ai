@@ -246,7 +246,7 @@ def analyze_image_ocr(
         },
         "warnings": warnings,
         "limitations": [
-            "local OCR currently supports image files only, not PDF page rendering or document containers",
+            "local OCR supports image files directly; PDF page rendering is provided by the separate page-lineage adapter",
             "layout evidence is word/span level and does not reconstruct tables, forms, handwriting, or reading order beyond engine output",
             "confidence values are engine-reported and require corpus calibration before broad document-intelligence claims",
         ],

@@ -19,6 +19,7 @@ CAPABILITY_OUTPUT_CONTRACT_OK = "CAPABILITY_OUTPUT_CONTRACT_OK"
 CAPABILITY_OUTPUT_CONTRACT_FAILED = "CAPABILITY_OUTPUT_CONTRACT_FAILED"
 GIS_REPORT_SCHEMA_VERSION = "mucaro_gis_report_v1"
 OCR_REPORT_SCHEMA_VERSION = "mucaro_ocr_report_v1"
+PDF_OCR_REPORT_SCHEMA_VERSION = "mucaro_pdf_ocr_report_v1"
 CRS_ENGINE_ADAPTERS = {
     "pyproj_transformer_group_always_xy_v1",
     "pyproj_governed_local_grid_always_xy_v1",
@@ -1167,6 +1168,9 @@ def validate_gis_report_file(path: Path) -> dict[str, Any]:
 
 
 def validate_ocr_report_contract(report: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
+    if report.get("schema_version") == PDF_OCR_REPORT_SCHEMA_VERSION:
+        return _validate_pdf_ocr_report_contract(report, report_path=report_path)
+
     checks: list[dict[str, str]] = [
         _contract_check("payload_object", isinstance(report, dict), "report payload must be a JSON object"),
         _contract_check("schema_version", report.get("schema_version") == OCR_REPORT_SCHEMA_VERSION, f"schema_version must be {OCR_REPORT_SCHEMA_VERSION}"),
@@ -1275,6 +1279,137 @@ def validate_ocr_report_contract(report: dict[str, Any], *, report_path: str | N
             checks.append(_contract_check("unknown_confidence_has_warning", "OCR_UNKNOWN_CONFIDENCE_PRESENT" in warnings, "unknown-confidence spans must be reflected in warnings"))
     if report.get("status") == "OCR_ANALYSIS_OK":
         checks.append(_contract_check("ok_status_has_text", valid_span_count > 0, "OCR_ANALYSIS_OK requires at least one saved span"))
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": CAPABILITY_OUTPUT_CONTRACT_OK if not failed else CAPABILITY_OUTPUT_CONTRACT_FAILED,
+        "schema_version": "mucaro_capability_output_contract_v1",
+        "capability_id": "state_of_art_ocr_analysis",
+        "report_path": report_path,
+        "report_status": report.get("status"),
+        "operation": report.get("operation"),
+        "checks": checks,
+        "counts": {
+            "pass": sum(1 for check in checks if check["status"] == "PASS"),
+            "fail": len(failed),
+            "total": len(checks),
+        },
+        "failed_checks": failed,
+    }
+
+
+def _validate_pdf_ocr_report_contract(report: dict[str, Any], *, report_path: str | None = None) -> dict[str, Any]:
+    checks: list[dict[str, str]] = [
+        _contract_check("payload_object", isinstance(report, dict), "report payload must be a JSON object"),
+        _contract_check("schema_version", report.get("schema_version") == PDF_OCR_REPORT_SCHEMA_VERSION, f"schema_version must be {PDF_OCR_REPORT_SCHEMA_VERSION}"),
+        _contract_check("report_id_present", bool(report.get("report_id")), "report_id is required"),
+        _contract_check("status_valid", report.get("status") in {"OCR_PDF_OK", "OCR_PDF_WARN"}, "status must be OCR_PDF_OK or OCR_PDF_WARN"),
+        _contract_check("operation", report.get("operation") == "pdf_page_render_ocr", "PDF OCR reports must use pdf_page_render_ocr operation"),
+        _contract_check("created_at_present", bool(report.get("created_at")), "created_at is required"),
+        _contract_check("warnings_array", isinstance(report.get("warnings"), list), "warnings must be an array"),
+        _contract_check("limitations_non_empty", _non_empty_string_list(report.get("limitations")), "limitations must be non-empty strings"),
+        _contract_check("falsification_criteria_non_empty", _non_empty_string_list(report.get("falsification_criteria")), "falsification criteria must be non-empty strings"),
+    ]
+
+    source = report.get("source")
+    checks.append(_contract_check("source_object", isinstance(source, dict), "source PDF metadata must be recorded"))
+    if isinstance(source, dict):
+        checks.extend(
+            [
+                _contract_check("source.sha256_present", bool(source.get("sha256")), "source PDF must record a SHA-256"),
+                _contract_check("source.mime_type", source.get("mime_type") == "application/pdf", "source MIME type must be application/pdf"),
+                _contract_check("source.bytes_positive", isinstance(source.get("bytes"), int) and source["bytes"] > 0, "source PDF byte count must be positive"),
+                _contract_check("source.page_count_positive", isinstance(source.get("page_count"), int) and source["page_count"] > 0, "source PDF page count must be positive"),
+            ]
+        )
+
+    renderer = report.get("renderer")
+    checks.append(_contract_check("renderer_object", isinstance(renderer, dict), "PDF renderer metadata must be recorded"))
+    if isinstance(renderer, dict):
+        checks.extend(
+            [
+                _contract_check("renderer.name", renderer.get("name") == "pdftoppm", "PDF reports must identify pdftoppm"),
+                _contract_check("renderer.version_present", bool(renderer.get("version")), "PDF renderer version must be recorded"),
+                _contract_check("renderer.dpi_valid", isinstance(renderer.get("dpi"), int) and 72 <= renderer["dpi"] <= 600, "renderer DPI must be an integer from 72 through 600"),
+                _contract_check("renderer.format", renderer.get("format") == "png", "PDF renderer format must be png"),
+            ]
+        )
+
+    ocr = report.get("ocr")
+    checks.append(_contract_check("ocr_object", isinstance(ocr, dict), "PDF OCR engine metadata must be recorded"))
+    if isinstance(ocr, dict):
+        checks.extend(
+            [
+                _contract_check("ocr.engine", ocr.get("engine") == "tesseract", "PDF reports must identify Tesseract"),
+                _contract_check("ocr.language_present", bool(ocr.get("language")), "OCR language must be recorded"),
+                _contract_check("ocr.layout_mode_present", bool(ocr.get("layout_mode")), "OCR layout mode must be recorded"),
+            ]
+        )
+
+    pages = report.get("pages")
+    checks.append(_contract_check("pages_array", isinstance(pages, list), "PDF OCR pages must be an array"))
+    valid_pages: list[dict[str, Any]] = []
+    no_text_pages = 0
+    total_spans = 0
+    if isinstance(pages, list):
+        for index, page in enumerate(pages):
+            if not isinstance(page, dict):
+                checks.append(_contract_check(f"pages.{index}.object", False, "each PDF OCR page must be an object"))
+                continue
+            valid_pages.append(page)
+            page_index = page.get("page_index")
+            page_number = page.get("page_number")
+            page_status = page.get("ocr_status")
+            span_count = page.get("span_count")
+            if page_status == "OCR_ANALYSIS_NO_TEXT":
+                no_text_pages += 1
+            if isinstance(span_count, int) and span_count >= 0:
+                total_spans += span_count
+            checks.extend(
+                [
+                    _contract_check(f"pages.{index}.page_index", isinstance(page_index, int) and page_index == index, "page_index must be contiguous and match array order"),
+                    _contract_check(f"pages.{index}.page_number", isinstance(page_number, int) and page_number == index + 1, "page_number must be one-based and match page_index"),
+                    _contract_check(f"pages.{index}.rendered_sha256", bool(page.get("rendered_sha256")), "rendered page SHA-256 must be recorded"),
+                    _contract_check(f"pages.{index}.rendered_bytes", isinstance(page.get("rendered_bytes"), int) and page["rendered_bytes"] > 0, "rendered page byte count must be positive"),
+                    _contract_check(f"pages.{index}.ocr_report_id", bool(page.get("ocr_report_id")), "per-page OCR report ID must be recorded"),
+                    _contract_check(f"pages.{index}.ocr_report_sha256", bool(page.get("ocr_report_sha256")), "per-page OCR report SHA-256 must be recorded"),
+                    _contract_check(f"pages.{index}.ocr_status", page_status in {"OCR_ANALYSIS_OK", "OCR_ANALYSIS_NO_TEXT"}, "per-page OCR status must be terminal and known"),
+                    _contract_check(f"pages.{index}.span_count", isinstance(span_count, int) and span_count >= 0, "per-page span_count must be a non-negative integer"),
+                    _contract_check(f"pages.{index}.warnings", isinstance(page.get("warnings"), list), "per-page warnings must be an array"),
+                ]
+            )
+            if page_status == "OCR_ANALYSIS_NO_TEXT":
+                checks.append(_contract_check(f"pages.{index}.no_text_warning", "OCR_NO_TEXT_DETECTED" in page.get("warnings", []), "no-text pages must preserve the image OCR warning"))
+            if page_status == "OCR_ANALYSIS_OK":
+                checks.append(_contract_check(f"pages.{index}.ok_has_spans", isinstance(span_count, int) and span_count > 0, "successful page OCR requires at least one span"))
+
+    invariants = report.get("invariants")
+    checks.append(_contract_check("invariants_object", isinstance(invariants, dict), "PDF OCR invariants must be an object"))
+    if isinstance(invariants, dict) and isinstance(source, dict):
+        page_count = source.get("page_count")
+        checks.extend(
+            [
+                _contract_check("invariants.source_page_count", invariants.get("source_page_count") == page_count, "source page count must match source metadata"),
+                _contract_check("invariants.rendered_page_count", invariants.get("rendered_page_count") == len(valid_pages), "rendered page count must match saved pages"),
+                _contract_check("invariants.ocr_page_count", invariants.get("ocr_page_count") == len(valid_pages), "OCR page count must match saved pages"),
+                _contract_check("invariants.page_accounting_closed", invariants.get("page_accounting_closed") is True and page_count == len(valid_pages), "PDF page accounting must close"),
+                _contract_check("invariants.page_indices_contiguous", invariants.get("page_indices_contiguous") is True and [page.get("page_index") for page in valid_pages] == list(range(len(valid_pages))), "PDF page indices must be contiguous"),
+                _contract_check("invariants.rendered_hashes_present", invariants.get("all_rendered_page_hashes_present") is True and all(bool(page.get("rendered_sha256")) for page in valid_pages), "all rendered page hashes must be present"),
+                _contract_check("invariants.ocr_hashes_present", invariants.get("all_ocr_report_hashes_present") is True and all(bool(page.get("ocr_report_sha256")) for page in valid_pages), "all per-page OCR hashes must be present"),
+                _contract_check("invariants.total_span_count", invariants.get("total_span_count") == total_spans, "total span count must equal saved page counts"),
+                _contract_check("invariants.no_text_page_count", invariants.get("no_text_page_count") == no_text_pages, "no-text page count must equal saved page statuses"),
+            ]
+        )
+
+    warnings = report.get("warnings")
+    if isinstance(warnings, list):
+        checks.append(_contract_check("warning_labels_non_empty", all(isinstance(warning, str) and warning for warning in warnings), "warning labels must be non-empty strings"))
+        if no_text_pages:
+            checks.append(_contract_check("no_text_pages_have_warning", "OCR_PDF_NO_TEXT_PAGES_PRESENT" in warnings, "PDF no-text pages must be reflected in warnings"))
+        if report.get("status") == "OCR_PDF_WARN":
+            checks.append(_contract_check("warn_status_has_warning", bool(warnings), "OCR_PDF_WARN must preserve at least one warning"))
+        if report.get("status") == "OCR_PDF_OK":
+            checks.append(_contract_check("ok_status_has_no_text_pages", no_text_pages == 0, "OCR_PDF_OK cannot contain no-text pages"))
 
     failed = [check for check in checks if check["status"] == "FAIL"]
     return {
