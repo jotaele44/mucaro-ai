@@ -170,6 +170,22 @@ def test_auto_mode_preapproves_only_local_read_only_tools(cfg, conversation):
     assert final["outcome"] == "ACTIONS_COMPLETED"
 
 
+def test_agent_mode_builds_bounded_plan_and_keeps_inferred_actions_approval_gated(cfg, conversation):
+    run = _submit(conversation, "Inspect source library status and audit readiness, then summarize.", cfg, mode="agent")
+    events = list_run_events(run["run_id"], cfg=cfg)
+    agent_plan = next(event for event in events if event["type"] == "agent_plan")["data"]
+    assert agent_plan["status"] == "AGENT_PLAN_READY"
+    assert agent_plan["planner"] == "mucaro-local-intent-v1"
+    assert agent_plan["counts"]["selected_actions"] == 2
+    assert all(event["data"]["tool_name"] in {"source_library.status", "product.audit"} for event in events if event["type"] == "approval_request")
+    calls = list_tool_calls(cfg)["tool_calls"]
+    assert all(call["requested_by"] == "agent" and call["status"] == "PENDING_APPROVAL" for call in calls)
+    for call in calls:
+        approve_tool_call(call["tool_call_id"], cfg=cfg, expected_arguments_sha256=call["arguments_sha256"])
+    resume_waiting_run(run["run_id"], cfg)
+    assert get_run(run["run_id"], cfg)["state"] == "COMPLETED"
+
+
 # --- F08 / F16: truthful per-call outcomes, failure question and targeted retry ---------
 
 
@@ -448,7 +464,7 @@ def test_api_message_stream_replays_and_ends(cfg, conversation):
     envelope = client.get(f"/conversations/{conversation}/envelope").json()
     assert [row["turn_id"] for row in envelope["run_envelopes"]] == [run_id]
     modes = client.get("/work-runs/modes").json()
-    assert {row["mode"] for row in modes["modes"]} == {"plan", "ask", "auto"}
+    assert {row["mode"] for row in modes["modes"]} == {"plan", "ask", "auto", "agent"}
 
 
 def test_api_tool_decision_resumes_the_waiting_run(cfg, conversation):

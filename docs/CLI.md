@@ -818,6 +818,14 @@ model, readiness status, and warnings. The mock provider is always local and
 ready; live providers remain disabled or not ready until their explicit gates
 are satisfied.
 
+The conversation API also exposes an `agent` work-run mode through
+`POST /conversations/{conversation_id}/messages`. It recognizes only explicit
+bounded intents, proposes at most four allowlisted tool calls, and records an
+`agent_plan` event before any call is requested. Every inferred call enters the
+same argument-bound approval flow as a user command; unrecognized intent
+produces no action and continues as an ordinary cited-answer request. This is
+bounded autonomy, not model-native tool use or multi-agent DAG execution.
+
 Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,

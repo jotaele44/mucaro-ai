@@ -106,7 +106,7 @@ class RunOptions(BaseModel):
 
 class MessageRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=20000)
-    mode: Literal["plan", "ask", "auto"] = "ask"
+    mode: Literal["plan", "ask", "auto", "agent"] = "ask"
     idempotency_key: str | None = Field(default=None, min_length=8, max_length=128)
     interrupt: bool = False
     dismiss_pending_question: bool = False

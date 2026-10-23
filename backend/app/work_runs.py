@@ -37,6 +37,7 @@ import time
 from collections.abc import Iterator
 from typing import Any
 
+from .agent_planner import build_agent_plan
 from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
 from .db import ensure_db, get_connection
@@ -77,10 +78,11 @@ MODES = {
     "plan": "Show the plan and proposed actions; execute nothing.",
     "ask": "Ask before every action (default).",
     "auto": "Pre-approve local read-only actions; anything that changes state or uses the network still asks.",
+    "agent": "Infer a bounded allowlisted plan from the request; every inferred action still asks before execution.",
 }
 EVENT_TYPES = {
     "queued", "run_started", "route", "plan", "tool_call", "approval_request", "tool_started", "tool_result",
-    "tool_summary", "question", "question_resolved", "retry_requested", "user_note", "retrieval", "text_delta",
+    "tool_summary", "agent_plan", "question", "question_resolved", "retry_requested", "user_note", "retrieval", "text_delta",
     "citation", "artifact", "warning", "error", "interrupted", "cancelled", "final",
 }
 MAX_PROMPT_CHARS = 20_000
@@ -672,8 +674,22 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     _emit_only(run_id, cfg, "route", route_event)
     for name in unknown:
         _emit_only(run_id, cfg, "warning", {"status": "WARN_UNKNOWN_COMMAND", "category": "INPUT_INVALID", "detail": name})
+    if run["mode"] == "agent" and not commands:
+        agent_plan = build_agent_plan(run["prompt"], cfg=cfg)
+        _emit_only(run_id, cfg, "agent_plan", agent_plan)
+        commands = [
+            {
+                "command": "agent",
+                "tool": row["tool"],
+                "arguments": row["arguments"],
+                "reason": row["reason"],
+                "confidence": row["confidence"],
+            }
+            for row in agent_plan["actions"]
+        ]
     steps = [
         {"step": f"{command['command']} -> {command['tool']}", "tool": command["tool"], "arguments": command["arguments"],
+         "reason": command.get("reason"), "confidence": command.get("confidence"),
          "requires_approval": not (run["mode"] == "auto" and _auto_approvable(command["tool"]))}
         for command in commands
     ]
@@ -690,7 +706,9 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     events: list[tuple[str, dict[str, Any]]] = []
     for command in commands:
         try:
-            call = request_tool_call(command["tool"], command["arguments"], cfg=cfg, requested_by="user", reason=command["command"], run_id=run_id)["tool_call"]
+            requester = "agent" if run["mode"] == "agent" and command["command"] == "agent" else "user"
+            reason = command.get("reason") or command["command"]
+            call = request_tool_call(command["tool"], command["arguments"], cfg=cfg, requested_by=requester, reason=reason, run_id=run_id)["tool_call"]
         except ToolRuntimeError as exc:
             events.append(("warning", {"status": exc.status, "category": classify_error(exc.status), "detail": exc.detail}))
             continue

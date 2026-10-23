@@ -35,7 +35,11 @@ release receipts, package artifacts, fresh-clone certification, and a
 conversation-first local GUI. The GUI now exposes Chat as the canonical primary
 surface with dedicated Sources, Directory Access, Memory, Planning, and Settings
 workspaces; rendered desktop/mobile/accessibility proof remains a certification
-task rather than an unimplemented source feature.
+task rather than an unimplemented source feature. The conversational run bus now
+also exposes a bounded `agent` mode that infers up to four allowlisted actions
+from explicit user intent while preserving approval, interruption, streaming,
+and receipt boundaries; model-native tool loops, subagents, and durable DAG/fleet
+orchestration remain open.
 
 The finish line is no longer "make the repo exist." The finish line is to make
 the repo repeatedly prove its behavior from a clean clone through ingestion,

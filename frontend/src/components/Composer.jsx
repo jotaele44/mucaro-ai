@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-const MODE_LABEL = { plan: "Plan", ask: "Ask first", auto: "Auto (local read-only)" };
+const MODE_LABEL = { plan: "Plan", ask: "Ask first", auto: "Auto (local read-only)", agent: "Agent (bounded)" };
 
 // Touch keyboards have no Shift+Enter, so on a coarse pointer Return adds a line and the Send button submits;
 // otherwise a stray Return would send a half-typed prompt and multi-line prompts would be impossible.
