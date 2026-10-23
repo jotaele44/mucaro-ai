@@ -8,7 +8,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .coding_patch import validate_patch_proposal
-from .coding_workspace import inspect_repository, resolve_repository
+from .coding_workspace import CodingWorkspaceError, inspect_repository, resolve_repository
 from .config import Settings, settings
 from .local_tools import resolve_local_tool
 from .permissions import is_within_path
@@ -293,7 +293,7 @@ def _rollback_file_edit_and_raise(
     restored = _current_preimage(repo_root, path)
     try:
         after_rollback = inspect_repository(repo_root, cfg=cfg)
-    except Exception as exc:  # fail closed: repository status itself is part of rollback proof
+    except CodingWorkspaceError as exc:  # fail closed: repository status itself is part of rollback proof
         after_rollback = {"head_sha": None, "dirty_paths": []}
         rollback_error = rollback_error or str(exc)
     rollback_succeeded = bool(
@@ -390,7 +390,11 @@ def apply_file_edit_transaction(
         if operation == "DELETE":
             target.unlink()
         else:
-            assert proposed_bytes is not None
+            if proposed_bytes is None:
+                raise CodingMutationError(
+                    "ERROR_CODING_FILE_EDIT_CONTENT_REQUIRED",
+                    f"{operation} reached mutation without an approved UTF-8 postimage",
+                )
             mode = original_mode if original_mode is not None else 0o644
             _atomic_write_file(target, proposed_bytes, mode=mode)
     except OSError as exc:

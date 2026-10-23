@@ -562,3 +562,182 @@ def _local_answer(
     if reported_usage is not None:
         result["model_usage"] = reported_usage
     return result
+
+
+MAX_GENERIC_PROMPT_CHARS = 240_000
+MAX_GENERIC_COMPLETION_TOKENS = 4_096
+
+
+def generate_text(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    model_provider: str | None = None,
+    model_name: str | None = None,
+    max_tokens: int = 1_600,
+    temperature: float = 0.0,
+) -> dict[str, Any]:
+    """Generate bounded freeform text for structured internal workflows.
+
+    This is deliberately separate from grounded cited QA. The caller remains
+    responsible for parsing and validating the returned text before it can
+    influence tools, permissions, checkpoints, or other state.
+    """
+    if not isinstance(system_prompt, str) or not system_prompt.strip():
+        raise ModelProviderError("ERROR_MODEL_TEXT_SYSTEM_PROMPT", "system_prompt is required")
+    if not isinstance(user_prompt, str) or not user_prompt.strip():
+        raise ModelProviderError("ERROR_MODEL_TEXT_USER_PROMPT", "user_prompt is required")
+    if len(system_prompt) + len(user_prompt) > MAX_GENERIC_PROMPT_CHARS:
+        raise ModelProviderError("ERROR_MODEL_TEXT_PROMPT_TOO_LARGE", f"prompt exceeds {MAX_GENERIC_PROMPT_CHARS} characters")
+    if (
+        not isinstance(max_tokens, int)
+        or isinstance(max_tokens, bool)
+        or max_tokens < 1
+        or max_tokens > MAX_GENERIC_COMPLETION_TOKENS
+    ):
+        raise ModelProviderError(
+            "ERROR_MODEL_TEXT_MAX_TOKENS",
+            f"max_tokens must be 1..{MAX_GENERIC_COMPLETION_TOKENS}",
+        )
+    if not isinstance(temperature, (int, float)) or isinstance(temperature, bool) or not 0.0 <= float(temperature) <= 1.0:
+        raise ModelProviderError("ERROR_MODEL_TEXT_TEMPERATURE", "temperature must be within 0..1")
+
+    spec = get_model_provider_spec(model_provider)
+    if spec.name == "mock":
+        raise ModelProviderError(
+            "ERROR_MODEL_TEXT_MOCK_UNSUPPORTED",
+            "The deterministic cited-QA mock is not a generative planning model.",
+        )
+    if spec.name == LOCAL_PROVIDER:
+        return _local_text(
+            system_prompt,
+            user_prompt,
+            model_name=model_name,
+            max_tokens=max_tokens,
+            temperature=float(temperature),
+        )
+    if spec.name == "anthropic":
+        if os.getenv("MUCARO_AI_LIVE_MODE") != "1":
+            raise ModelProviderError(
+                "ERROR_LIVE_MODE_DISABLED",
+                "Set MUCARO_AI_LIVE_MODE=1 to permit live Anthropic calls.",
+            )
+        if spec.api_key_env and not os.getenv(spec.api_key_env):
+            raise ModelProviderError("ERROR_MODEL_API_KEY_MISSING", "Set ANTHROPIC_API_KEY before using model_provider=anthropic.")
+        return _anthropic_text(
+            system_prompt,
+            user_prompt,
+            model_name=model_name,
+            max_tokens=max_tokens,
+            temperature=float(temperature),
+        )
+    raise ModelProviderError("ERROR_UNSUPPORTED_MODEL_PROVIDER", spec.name)
+
+
+def _anthropic_text(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    model_name: str | None,
+    max_tokens: int,
+    temperature: float,
+) -> dict[str, Any]:
+    try:
+        from anthropic import Anthropic  # type: ignore
+    except Exception as exc:
+        raise ModelProviderError(
+            "ERROR_MODEL_SDK_MISSING",
+            'Install the optional dependency group with: python -m pip install -e ".[anthropic]"',
+        ) from exc
+    model = model_name or os.getenv("MUCARO_AI_MODEL", MODEL_PROVIDER_SPECS["anthropic"].default_model)
+    client = Anthropic()
+    response = client.messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    text = "\n".join(block.text for block in response.content if getattr(block, "type", None) == "text").strip()
+    if not text:
+        raise ModelProviderError("ERROR_MODEL_TEXT_EMPTY_RESPONSE", f"Anthropic model {model} returned no text.")
+    usage_obj = getattr(response, "usage", None)
+    model_usage = _build_model_usage(
+        input_tokens=getattr(usage_obj, "input_tokens", None),
+        output_tokens=getattr(usage_obj, "output_tokens", None),
+        cache_creation_input_tokens=getattr(usage_obj, "cache_creation_input_tokens", None),
+        cache_read_input_tokens=getattr(usage_obj, "cache_read_input_tokens", None),
+        source_prefix="anthropic.response.usage",
+    )
+    result: dict[str, Any] = {
+        "model_provider": "anthropic",
+        "model_name": model,
+        "text": text,
+    }
+    if model_usage is not None:
+        result["model_usage"] = model_usage
+    return result
+
+
+def _local_text(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    model_name: str | None,
+    max_tokens: int,
+    temperature: float,
+) -> dict[str, Any]:
+    local_cfg = local_model_settings()
+    base_url = local_cfg["base_url"]
+    if not _is_loopback_url(base_url):
+        raise ModelProviderError("ERROR_LOCAL_MODEL_URL_NOT_LOOPBACK", f"Local model URL must be a loopback address: {base_url}")
+    model = model_name or local_cfg["model"]
+    body = json.dumps(
+        {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": False,
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        f"{base_url}/chat/completions",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with _local_opener().open(request, timeout=local_cfg["timeout_seconds"]) as response:
+            payload = json.loads(response.read(4_000_000).decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as exc:
+        status = "ERROR_LOCAL_MODEL_NOT_INSTALLED" if exc.code == 404 else "ERROR_LOCAL_MODEL_HTTP_ERROR"
+        raise ModelProviderError(status, f"Local model server returned HTTP {exc.code} for model {model}.") from exc
+    except (urllib.error.URLError, OSError) as exc:
+        raise ModelProviderError("ERROR_LOCAL_MODEL_UNAVAILABLE", f"Local model server unreachable at {base_url}: {exc}") from exc
+    except (ValueError, KeyError, IndexError) as exc:
+        raise ModelProviderError("ERROR_LOCAL_MODEL_RESPONSE_INVALID", f"Unexpected local model response: {exc}") from exc
+
+    text = str(((payload.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+    if not text:
+        raise ModelProviderError("ERROR_MODEL_TEXT_EMPTY_RESPONSE", f"Local model {model} returned no text.")
+    usage = payload.get("usage")
+    reported_usage = None
+    if isinstance(usage, dict):
+        reported_usage = _build_model_usage(
+            input_tokens=usage.get("prompt_tokens"),
+            output_tokens=usage.get("completion_tokens"),
+            total_tokens=usage.get("total_tokens"),
+            source_prefix="openai_compatible.response.usage",
+        )
+    result: dict[str, Any] = {
+        "model_provider": LOCAL_PROVIDER,
+        "model_name": model,
+        "text": text,
+    }
+    if reported_usage is not None:
+        result["model_usage"] = reported_usage
+    return result
