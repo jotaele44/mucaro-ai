@@ -14,11 +14,11 @@ Requirement denominator: 139 (arithmetic closes: yes).
 
 | State | Requirements |
 | --- | ---: |
-| PASS | 61 |
+| PASS | 63 |
 | FAIL | 0 |
-| OPEN | 45 |
+| OPEN | 44 |
 | BLOCKED | 6 |
-| PROVISIONAL | 26 |
+| PROVISIONAL | 25 |
 | NOT_APPLICABLE | 1 |
 
 | Terminal-rule condition | Holds |
@@ -38,8 +38,8 @@ Residue:
 - fail (0): none
 - blocked (5): `MATRIX-018`, `TGT-001`, `TGT-009`, `TGT-026`, `TGT-028`
 - externally blocked (1): `TGT-027`
-- provisional (26): 26 requirements (see `mucaro release scope status`)
-- open (45): 45 requirements (see `mucaro release scope status`)
+- provisional (25): `GOAL-001`, `GOAL-002`, `INV-004`, `INV-005`, `INV-007`, `INV-018`, `INV-022`, `MATRIX-008`, `MATRIX-010`, `MATRIX-015`, `MATRIX-019`, `MATRIX-020`, `MOB-F01`, `MOB-F15`, `MOB-F20`, `SD-012`, `TGT-002`, `TGT-008`, `TGT-012`, `TGT-014`, `TGT-016`, `TGT-019`, `TGT-024`, `TGT-035`, `TGT-036`
+- open (44): 44 requirements (see `mucaro release scope status`)
 - active blockers: `BLK-LLM-001`, `BLK-PHYS-001`, `BLK-SIGN-001`, `BLK-WEB-001`
 - unresolved material contradictions: none
 - open specification bindings: none
