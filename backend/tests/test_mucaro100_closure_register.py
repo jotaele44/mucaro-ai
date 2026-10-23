@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -148,6 +150,40 @@ def test_additional_na_credit_rejected(builder):
     row["state"] = "NOT_APPLICABLE"
     with pytest.raises(ValueError, match="NOT_APPLICABLE"):
         module.build_register()
+
+
+def test_exact_head_generation_is_byte_for_byte_deterministic_and_source_bound(tmp_path: Path) -> None:
+    first = tmp_path / "closure-register-first.json"
+    second = tmp_path / "closure-register-second.json"
+
+    for target in (first, second):
+        subprocess.run(
+            [sys.executable, str(GENERATOR), "--output", str(target)],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    assert first.read_bytes() == second.read_bytes()
+
+    payload = json.loads(first.read_text(encoding="utf-8"))
+    expected_head = subprocess.check_output(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+    expected_tree = subprocess.check_output(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD^{tree}"],
+        text=True,
+    ).strip()
+
+    assert payload["schema_version"] == "MUCARO_100_CLOSURE_REGISTER/1.0"
+    assert payload["artifact_class"] == "DERIVED_ANALYSIS_NOT_CERTIFICATION"
+    assert payload["source"]["commit"] == expected_head
+    assert payload["source"]["tree"] == expected_tree
+    assert payload["source"]["worktree_porcelain"] == ""
+    assert sum(payload["capability_event_audit"]["counts"].values()) == 100
+    assert sum(payload["release_acceptance"]["counts"].values()) == 139
 
 
 def test_output_must_not_be_inside_source_worktree(builder, monkeypatch):
