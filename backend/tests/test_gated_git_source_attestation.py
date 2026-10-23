@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from backend.app.config import Settings
 from backend.app.permission_engine import PermissionRequest
-from backend.app.gated_git_source_attestation import attest_source,SourceAttestationError
+from backend.app.gated_git_source_attestation import attest_source,SourceAttestationError,_git
 
 def _git(root,*args):
     return subprocess.run(["git","-C",str(root),*args],check=True,
@@ -83,3 +83,9 @@ def test_missing_and_parent_escape_rejected(site):
         attest_source(**{**site,"source_path":"../missing"})
     with pytest.raises(SourceAttestationError,match="SOURCE_OUTSIDE_OR_MISSING"):
         attest_source(**{**site,"source_path":"missing.py"})
+
+def test_git_mutation_is_rejected_before_permission_or_process(site):
+    with pytest.raises(SourceAttestationError,
+                       match="GIT_ARGUMENTS_OUTSIDE_READ_ONLY_ALLOWLIST"):
+        _git(site["root"],("reset","--hard","HEAD"),
+             cfg=site["cfg"],request=site["request"])
