@@ -49,3 +49,19 @@ def execute_mock_calibration(*,project_root:Path,source_head:str,
         "classification":"SYNTHETIC_PROVIDER_CALIBRATION_ONLY",
         "independent_model_improvement":False}
     return {**payload,"receipt_hash":digest(payload)}
+
+def execute_git_attested_mock_calibration(*,project_root:Path,
+        source_head:str,inputs:dict[str,str],run_id:str,runner_id:str,
+        expected_file_digest:str)->dict:
+    """Allow mock calibration only after verifying exact HEAD, tree and blob."""
+    from .local_source_integrity import attest_local_source
+    attestation=attest_local_source(project_root=project_root,
+        expected_head=source_head,source_path=MODULE,
+        expected_sha256=expected_file_digest)
+    recorded=execute_mock_calibration(project_root=project_root,
+        source_head=source_head,inputs=inputs,run_id=run_id,
+        runner_id=runner_id,expected_file_digest=expected_file_digest)
+    body={k:v for k,v in recorded.items() if k!="receipt_hash"}
+    body["git_source_receipt_hash"]=attestation["receipt_hash"]
+    body["source_identity_classification"]="LOCAL_GIT_CHECKOUT_ONLY"
+    return {**body,"receipt_hash":digest(body)}
