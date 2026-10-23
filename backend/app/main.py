@@ -60,6 +60,7 @@ from .models import (
 from .model_router import list_model_providers
 from .multimodal import MULTIMODAL_SUFFIXES
 from .offline import build_offline_manifest
+from .learning_api import router as learning_router
 from .memory import (
     MemoryError,
     delete_memory_item,
@@ -825,6 +826,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     def validate() -> dict:
         return validate_project_json(cfg)
 
+    app.include_router(learning_router(cfg, require_auth))
     frontend_dist = cfg.project_root / "frontend" / "dist"
     if frontend_dist.exists():
         app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
