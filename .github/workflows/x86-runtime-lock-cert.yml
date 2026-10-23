@@ -44,6 +44,17 @@ jobs:
           sha256sum "$OUT/requirements-macos-x86_64.lock"
           cat "$OUT/requirements-macos-x86_64.lock"
 
+      - name: Verify generated lock matches governed lock
+        env:
+          OUT: ${{ runner.temp }}/x86-runtime-lock
+        run: |
+          set -euo pipefail
+          if ! cmp -s "$OUT/requirements-macos-x86_64.lock" packaging/runtime/requirements-macos-x86_64.lock; then
+            diff -u packaging/runtime/requirements-macos-x86_64.lock "$OUT/requirements-macos-x86_64.lock" || true
+            echo "ERROR_PORTABLE_RUNTIME_LOCK_STALE"
+            exit 1
+          fi
+
       - name: Upload exact-head x86_64 lock evidence
         if: always()
         uses: actions/upload-artifact@v7
