@@ -900,6 +900,7 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
             allow_live=bool(options.get("allow_live")),
             require_offline=bool(options.get("require_offline")),
             conversation_context=build_conversation_context(conversation),
+            memory_workspace_id=options.get("workspace_id"),
             memory_conversation_id=run["conversation_id"],
             cfg=cfg,
             on_text_delta=stream_delta,
