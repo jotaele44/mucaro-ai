@@ -28,6 +28,9 @@ def find_project_root() -> Path:
     env_root = os.getenv("MUCARO_AI_ROOT")
     if env_root:
         return Path(env_root).expanduser().resolve()
+    cwd = Path.cwd().resolve()
+    if (cwd / "schemas").is_dir() and (cwd / "backend").is_dir():
+        return cwd
     current = Path(__file__).resolve()
     for parent in current.parents:
         if (parent / "schemas").exists() and (parent / "backend").exists():

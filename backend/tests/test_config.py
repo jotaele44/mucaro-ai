@@ -9,6 +9,18 @@ def test_parse_positive_int_uses_default_for_invalid_values():
     assert parse_positive_int("1024", DEFAULT_MAX_UPLOAD_BYTES) == 1024
 
 
+def test_settings_prefers_repository_shaped_current_working_directory(monkeypatch, tmp_path):
+    root = tmp_path / "isolated-worktree"
+    (root / "schemas").mkdir(parents=True)
+    (root / "backend").mkdir()
+    monkeypatch.delenv("MUCARO_AI_ROOT", raising=False)
+    monkeypatch.chdir(root)
+
+    cfg = Settings.load()
+
+    assert cfg.project_root == root.resolve()
+
+
 def test_settings_loads_explicit_distribution_channel(monkeypatch, tmp_path):
     monkeypatch.setenv("MUCARO_AI_ROOT", str(tmp_path))
     monkeypatch.setenv("MUCARO_AI_DATA_DIR", str(tmp_path.parent / "application-support"))
