@@ -1,0 +1,63 @@
+{
+  "schema_version": "mucaro-matrix010-ingestion-benchmark/1.0",
+  "benchmark_id": "MATRIX-010-v1",
+  "format_registry_path": "_architecture/ingest_format_registry_v1.json",
+  "required_format_count": 22,
+  "positive_gate": {
+    "required_status": "INGEST_OK",
+    "require_declared_parser": true,
+    "require_declared_mime_type": true,
+    "require_source_sha256_match": true,
+    "require_provenance_sha256_match": true,
+    "require_input_path_binding": true
+  },
+  "adversarial_cases": [
+    {
+      "case_id": "MALFORMED",
+      "fixture": "invalid_json",
+      "expected_outcome": "ERROR_PARSE_FAILED"
+    },
+    {
+      "case_id": "MISLABELED",
+      "fixture": "pdf_bytes_named_png",
+      "expected_outcome": "ERROR_SIGNATURE_EXTENSION_MISMATCH"
+    },
+    {
+      "case_id": "EMPTY",
+      "fixture": "empty_markdown",
+      "expected_outcome": "SAFE_PARTIAL"
+    },
+    {
+      "case_id": "TRUNCATED",
+      "fixture": "truncated_zip",
+      "expected_outcome": "ERROR_ARCHIVE_MALFORMED"
+    },
+    {
+      "case_id": "PASSWORD_ACCESS_BLOCKED",
+      "fixture": "encrypted_zip_member",
+      "expected_outcome": "ERROR_ARCHIVE_UNSAFE"
+    },
+    {
+      "case_id": "OVERSIZED",
+      "fixture": "oversized_markdown",
+      "expected_outcome": "ERROR_INGEST_FILE_TOO_LARGE"
+    },
+    {
+      "case_id": "ARCHIVE_ATTACK",
+      "fixture": "zip_path_traversal",
+      "expected_outcome": "ERROR_ARCHIVE_UNSAFE"
+    },
+    {
+      "case_id": "UNSUPPORTED",
+      "fixture": "unsupported_folder_member",
+      "expected_outcome": "UNSUPPORTED_FORMAT"
+    }
+  ],
+  "required_adversarial_case_count": 8,
+  "terminal_rule": {
+    "format_denominator_closes": true,
+    "all_declared_formats_pass": true,
+    "all_adversarial_cases_pass": true,
+    "zero_unexpected_outcomes": true
+  }
+}
