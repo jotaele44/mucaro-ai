@@ -1,0 +1,82 @@
+name: Temporary Windows Launcher Blob Builder
+
+on:
+  pull_request:
+    paths:
+      - "Mucaro AI.exe"
+      - "packaging/launchers/windows/**"
+      - "packaging/launchers/build-requirements.txt"
+      - "scripts/build_launchers.py"
+      - ".github/workflows/tmp-windows-launcher-blob.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-unreferenced-blobs:
+    if: github.head_ref == 'release/arm64-portable-lifecycle-0.1.24'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD_SHA }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Build deterministic launcher outputs
+        run: python scripts/build_launchers.py
+
+      - name: Verify icon stayed byte-identical
+        run: git diff --exit-code -- packaging/icons/mucaro.ico
+
+      - name: Create unreferenced Git blobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          token = os.environ["GH_TOKEN"]
+          repository = os.environ["REPOSITORY"]
+
+          def create_blob(path: Path) -> tuple[str, str, int]:
+              raw = path.read_bytes()
+              body = json.dumps({
+                  "content": base64.b64encode(raw).decode("ascii"),
+                  "encoding": "base64",
+              }).encode("utf-8")
+              request = urllib.request.Request(
+                  f"https://api.github.com/repos/{repository}/git/blobs",
+                  data=body,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "Content-Type": "application/json",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+                  method="POST",
+              )
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  payload = json.load(response)
+              return payload["sha"], hashlib.sha256(raw).hexdigest(), len(raw)
+
+          for label, filename in [
+              ("EXE", "Mucaro AI.exe"),
+              ("BUILD_SHA256", "packaging/launchers/windows/BUILD_SHA256"),
+          ]:
+              sha, digest, size = create_blob(Path(filename))
+              print(f"{label}_BLOB_SHA={sha}")
+              print(f"{label}_SHA256={digest}")
+              print(f"{label}_BYTES={size}")
+          PY
