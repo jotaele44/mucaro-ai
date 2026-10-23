@@ -1,0 +1,62 @@
+{
+  "schema_version": "mucaro-arm64-runtime-materialization-evidence/1.0",
+  "status": "ARM64_RUNTIME_MATERIALIZATION_PASS",
+  "observed_utc": "2026-10-23T03:04:38Z",
+  "repository": "jotaele44/mucaro-ai",
+  "certification": {
+    "pull_request": 278,
+    "head_sha": "2cf1a05ff7aeb1eaa446e223a446477e8264e1fd",
+    "merged_main_sha": "25b41e33b2d832e582fc2800d52bc07461ebc4ae",
+    "workflow_run_id": 39892977956,
+    "job_id": 120216793082,
+    "conclusion": "success",
+    "artifact_id": 12475800946,
+    "artifact_name": "arm64-runtime-materialization-2cf1a05ff7aeb1eaa446e223a446477e8264e1fd",
+    "artifact_bytes": 5910,
+    "artifact_sha256": "a99772281d37fb0d381d29947a3716ed526f4a0a0565bf295b6cda4bec20dd8e"
+  },
+  "host": {
+    "platform": "Darwin",
+    "machine": "arm64",
+    "macos_version": "14.8.9"
+  },
+  "source": {
+    "project": "astral-sh/python-build-standalone",
+    "release": "20260901",
+    "asset_name": "cpython-3.13.15+20260901-aarch64-apple-darwin-install_only.tar.gz",
+    "bytes": 25293188,
+    "sha256": "b9054a9d3d54f4cb5573d44907fddb29874b08909bde73f29f2868cf872223ee"
+  },
+  "target": {
+    "archive_root": "python",
+    "platform": "darwin",
+    "machine": "arm64",
+    "python_version": "3.13.15",
+    "runtime_python": "bin/python3"
+  },
+  "manifest": {
+    "path": "packaging/runtime/macos-arm64.json",
+    "sha256": "db164083c2831f15239ec34e45c90e21bd64f2f90486d3d6238af83d47f10b0c"
+  },
+  "dependency_lock": {
+    "path": "packaging/runtime/requirements-macos-arm64.lock",
+    "sha256": "0e1cc8681290c5b52250bea327ebd705ef1877f68ed5345e95d82d7e365192f2"
+  },
+  "runtime": {
+    "provenance_sha256": "ddeaf2e6465397038493cf4851fc695b8f8fb4aa9e810ce29302ea1c6e7cefdd",
+    "member_count": 3909,
+    "total_bytes": 229533982,
+    "tree_sha256": "2f24b51242824170678d825ef67c4cae1cef0b53b65e1d468a67024b04ea0522",
+    "probe": {
+      "platform": "darwin",
+      "machine": "arm64",
+      "python_version": "3.13.15",
+      "user_site_present": false
+    }
+  },
+  "limitations": [
+    "This evidence certifies runtime materialization and probe on one Apple-Silicon macOS runner.",
+    "It does not certify portable application install, launch, reinstall, distinct-version upgrade or rollback lifecycle.",
+    "It does not certify clean-host execution, physical input, Developer ID signing or notarization."
+  ]
+}
