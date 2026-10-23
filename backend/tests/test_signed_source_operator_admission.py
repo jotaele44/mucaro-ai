@@ -34,7 +34,7 @@ def context(tmp_path):
     return dict(authorization=claim,verifier_key=KEY,
        trusted_issuer_id="trusted-external-idp",
        expected_operator_id="named-fixture-operator",
-       root=tmp_path,cfg=cfg,replay_db=tmp_path/"consumed.sqlite",now=120)
+       root=tmp_path,cfg=cfg,replay_db=tmp_path.parent/(tmp_path.name+"-consumed.sqlite"),now=120)
 
 def test_scoped_one_use_operator_gate(context):
     result=attest_authorized_source(**context)
