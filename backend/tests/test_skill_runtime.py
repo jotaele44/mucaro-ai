@@ -319,3 +319,77 @@ def test_execute_rejects_tampered_mount_grant(monkeypatch, tmp_path: Path):
         assert "network.public_http" in exc.detail
     else:
         raise AssertionError("expected tampered grant to be refused at execution")
+
+
+
+def _exact_head_arguments() -> dict:
+    candidate = "a155464486798b5e0bd6d6f623138b37982013c5"
+    return {
+        "baseline_sha": "916a4e3793550d0bf22e5be22a8c0bc0a7c17ffa",
+        "candidate_sha": candidate,
+        "observed_head_sha": candidate,
+        "observed_remote_sha": candidate,
+        "observed_pr_head_sha": candidate,
+        "worktree_clean": True,
+        "required_gates": ["CI", "SECURITY", "RUNTIME", "ADVERSARIAL"],
+        "passed_gates": ["ADVERSARIAL", "RUNTIME", "SECURITY", "CI"],
+        "unresolved_states": [],
+        "superseded_shas": ["f19646924fc057fd69834257e85e14f7a06dcd03"],
+        "manifest_sha256": "a" * 64,
+        "evidence_sha256": "b" * 64,
+    }
+
+
+def test_exact_head_certification_skill_passes_only_closed_exact_identity(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/exact-head-certification-audit"
+    mount_skill(skill_id, cfg=cfg)
+    activate_skill(skill_id, cfg=cfg)
+    result = execute_skill(skill_id, _exact_head_arguments(), cfg=cfg)["result"]
+
+    assert result["status"] == "EXACT_HEAD_CERTIFICATION_PASS"
+    assert result["certification_state"] == "PASS"
+    assert result["promotable"] is True
+    assert result["fail_closed"] is True
+    assert result["identity_match"] is True
+    assert result["missing_gates"] == []
+    assert result["unresolved_states"] == []
+    assert result["reasons"] == []
+
+
+def test_exact_head_certification_skill_fails_closed_on_sha_drift_and_gate_residue(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/exact-head-certification-audit"
+    mount_skill(skill_id, cfg=cfg)
+    activate_skill(skill_id, cfg=cfg)
+    arguments = _exact_head_arguments()
+    arguments["observed_remote_sha"] = "0" * 40
+    arguments["passed_gates"] = ["CI", "SECURITY"]
+    arguments["unresolved_states"] = ["RUNTIME_OPEN"]
+    result = execute_skill(skill_id, arguments, cfg=cfg)["result"]
+
+    assert result["status"] == "EXACT_HEAD_CERTIFICATION_OPEN"
+    assert result["certification_state"] == "OPEN"
+    assert result["promotable"] is False
+    assert result["identity_match"] is False
+    assert result["missing_gates"] == ["ADVERSARIAL", "RUNTIME"]
+    assert result["unresolved_states"] == ["RUNTIME_OPEN"]
+    assert any("candidate SHA mismatch: remote" in reason for reason in result["reasons"])
+    assert any("required gates not passed" in reason for reason in result["reasons"])
+    assert any("unresolved certification residue" in reason for reason in result["reasons"])
+
+
+def test_exact_head_certification_skill_rejects_superseded_candidate_and_bad_hashes(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/exact-head-certification-audit"
+    mount_skill(skill_id, cfg=cfg)
+    activate_skill(skill_id, cfg=cfg)
+    arguments = _exact_head_arguments()
+    arguments["superseded_shas"] = [arguments["candidate_sha"]]
+    arguments["manifest_sha256"] = "not-a-hash"
+    result = execute_skill(skill_id, arguments, cfg=cfg)["result"]
+
+    assert result["certification_state"] == "OPEN"
+    assert result["promotable"] is False
+    assert "candidate SHA is explicitly superseded" in result["reasons"]
+    assert any("manifest_sha256" in reason for reason in result["reasons"])
