@@ -831,6 +831,21 @@ responses are normalized, allowlist-validated, bounded to four actions, hash
 bound, and then sent through the same approval ledger. Provider-native planning
 has no mock fallback, and it does not yet provide multi-agent DAG execution.
 
+The equivalent read-only CLI surfaces are:
+
+```bash
+mucaro agent plan "Check source status and audit readiness" --format text
+mucaro agent plan "Inspect the repository" --planner provider_native \
+  --provider anthropic --model claude-sonnet-5 --allow-live --format json
+mucaro agent validate-proposals anthropic data/provider-response.json \
+  --model claude-sonnet-5 --format json
+```
+
+`mucaro agent plan` never executes a tool. `validate-proposals` accepts a saved
+provider response, verifies its tool names, call identities, argument objects,
+duplicate policy, action limit, and proposal hash, and returns a nonzero status
+when the payload is malformed or outside the local allowlist.
+
 Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,

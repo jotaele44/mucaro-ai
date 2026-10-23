@@ -15,16 +15,8 @@ from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlparse
 
-from .config import Settings, settings
-from .capability_contracts import (
-    build_capability_contract_report,
-    validate_execution_lineage_file,
-    validate_gis_report_file,
-    validate_ocr_report_file,
-    validate_retrieval_output_file,
-    validate_web_snapshot_file,
-    validate_coding_output_file,
-)
+from .agent_planner import build_agent_plan
+from .agent_tool_proposals import AgentToolProposalError, parse_provider_tool_proposals
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -35,6 +27,17 @@ from .answer_trace_eval import (
     format_answer_trace_eval_text,
     format_answer_trace_quality_certification_text,
 )
+from .capability_contracts import (
+    build_capability_contract_report,
+    validate_coding_output_file,
+    validate_execution_lineage_file,
+    validate_gis_report_file,
+    validate_ocr_report_file,
+    validate_retrieval_output_file,
+    validate_web_snapshot_file,
+)
+from .config import Settings, settings
+from .contracts import contract_errors, list_contracts
 from .conversations import (
     append_answer_turn,
     build_conversation_context,
@@ -46,12 +49,27 @@ from .conversations import (
 )
 from .db import list_payloads
 from .execution_gate import analyze_task
-from .gis_crs import reproject_geojson_crs
+from .flagpole_inventory import dirty_paths
+from .flagpole_inventory import generate as generate_flagpole_inventory
+from .flagpole_inventory import validate as validate_flagpole_inventory
+from .flagpole_inventory import validate_schema as validate_flagpole_inventory_schema
+from .flagpole_inventory import verify_receipt as verify_flagpole_receipt
+from .flagpole_inventory import write_inventory as write_flagpole_inventory
 from .gis_corpus import validate_real_gis_corpus
+from .gis_crs import reproject_geojson_crs
+from .gis_eval import (
+    DEFAULT_GIS_EVAL_FIXTURE,
+    GIS_EVAL_OK,
+    GIS_QUALITY_OK,
+    GIS_QUALITY_PROFILE,
+    build_gis_eval_report,
+    build_gis_quality_certification,
+    format_gis_eval_text,
+    format_gis_quality_certification_text,
+)
 from .gis_export import create_map_export_manifest
 from .gis_geodesy import measure_geojson_ellipsoidal
 from .gis_hydrology import condition_raster_depressions, derive_raster_d8_flow
-from .gis_render import validate_rendered_map
 from .gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -72,25 +90,10 @@ from .gis_raster import (
     resample_raster,
     sample_raster,
 )
+from .gis_render import validate_rendered_map
 from .gis_topology_repair import repair_geojson_topology
 from .gis_vector_formats import inspect_vector_format
 from .gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
-from .gis_eval import (
-    DEFAULT_GIS_EVAL_FIXTURE,
-    GIS_EVAL_OK,
-    GIS_QUALITY_OK,
-    GIS_QUALITY_PROFILE,
-    build_gis_eval_report,
-    build_gis_quality_certification,
-    format_gis_eval_text,
-    format_gis_quality_certification_text,
-)
-from .flagpole_inventory import dirty_paths, generate as generate_flagpole_inventory, validate as validate_flagpole_inventory, validate_schema as validate_flagpole_inventory_schema, verify_receipt as verify_flagpole_receipt, write_inventory as write_flagpole_inventory
-from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
-from .ocr_calibration import OCRCalibrationError, evaluate_ocr_calibration_files
-from .ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
-from .ocr_structure import OCRStructureError, reconstruct_ocr_report
-from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
 from .ingestion import (
     IngestLimitError,
     delete_source,
@@ -101,10 +104,7 @@ from .ingestion import (
     ingest_web_snapshot,
     reindex_sources,
 )
-from .contracts import contract_errors, list_contracts
-from .offline import build_offline_manifest
 from .macos_app_store import build_macos_app_store_readiness
-from .parser import ParseError
 from .memory import (
     MemoryError,
     delete_memory_item,
@@ -113,6 +113,24 @@ from .memory import (
     remember_memory_item,
     set_memory_enabled,
 )
+from .model_router import (
+    ModelProviderError,
+    generate_tool_proposals,
+    list_model_providers,
+    model_provider_names,
+    model_provider_status,
+)
+from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .ocr_calibration import OCRCalibrationError, evaluate_ocr_calibration_files
+from .ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
+from .ocr_structure import OCRStructureError, reconstruct_ocr_report
+from .offline import build_offline_manifest
+from .operator_workflow_certification import (
+    OPERATOR_WORKFLOW_OK,
+    OPERATOR_WORKFLOW_PROFILE,
+    build_operator_workflow_certification,
+    format_operator_workflow_certification_text,
+)
 from .packaging import (
     DISTRIBUTION_MANIFEST_DIR,
     REQUIRED_DISTRIBUTION_RECEIPTS,
@@ -120,9 +138,24 @@ from .packaging import (
     build_macos_app_bundle,
     build_package_status,
     build_release_artifacts,
-    verify_macos_app_bundle,
     verify_distribution_manifest,
+    verify_macos_app_bundle,
     verify_release_artifact,
+)
+from .parser import ParseError
+from .permission_engine import PermissionEngineError, PermissionRequest
+from .permission_engine import require as require_permission
+from .permissions import (
+    DirectoryPermissionError,
+    check_directory_permission,
+    grant_directory,
+    load_directory_grants,
+    revoke_directory,
+)
+from .portable_install import (
+    PortableInstallError,
+    install_portable_macos_app,
+    rollback_portable_macos_app,
 )
 from .portable_runtime import (
     PortableRuntimeError,
@@ -137,20 +170,13 @@ from .portable_runtime_source import (
     materialize_portable_runtime,
     verify_materialized_runtime,
 )
-from .portable_install import (
-    PortableInstallError,
-    install_portable_macos_app,
-    rollback_portable_macos_app,
-)
-from .permissions import (
-    DirectoryPermissionError,
-    check_directory_permission,
-    grant_directory,
-    load_directory_grants,
-    revoke_directory,
-)
 from .product_audit import build_product_audit, build_product_roadmap
-from .release_receipts import find_release_receipt, list_release_receipts, load_release_receipt, summarize_release_receipts
+from .release_receipts import (
+    find_release_receipt,
+    list_release_receipts,
+    load_release_receipt,
+    summarize_release_receipts,
+)
 from .release_scope import (
     capture_state_snapshot,
     compute_release_status,
@@ -168,13 +194,6 @@ from .retrieval_quality_certification import (
     format_retrieval_quality_certification_text,
 )
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
-from .model_router import ModelProviderError, list_model_providers, model_provider_names, model_provider_status
-from .operator_workflow_certification import (
-    OPERATOR_WORKFLOW_OK,
-    OPERATOR_WORKFLOW_PROFILE,
-    build_operator_workflow_certification,
-    format_operator_workflow_certification_text,
-)
 from .services import answer_question
 from .tools import (
     ToolRuntimeError,
@@ -1642,6 +1661,26 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--approval-state", default="NOT_REQUESTED", help="Current approval state.")
     plan.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     plan.set_defaults(handler=run_plan)
+
+    agent = subcommands.add_parser("agent", help="Preview bounded agent plans and validate provider tool proposals.")
+    agent_subcommands = agent.add_subparsers(dest="agent_command", required=True)
+
+    agent_plan = agent_subcommands.add_parser("plan", help="Build a bounded read-only agent plan.")
+    agent_plan.add_argument("request", nargs="+", help="User request to plan.")
+    agent_plan.add_argument("--planner", choices=["heuristic", "provider_native"], default="heuristic")
+    agent_plan.add_argument("--provider", choices=model_provider_names(), help="Provider for provider-native planning.")
+    agent_plan.add_argument("--model", help="Model name for provider-native planning.")
+    agent_plan.add_argument("--allow-live", action="store_true", help="Acknowledge explicit live-provider planning intent.")
+    agent_plan.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    agent_plan.set_defaults(handler=run_agent_plan)
+
+    agent_validate = agent_subcommands.add_parser("validate-proposals", help="Validate a saved provider response without executing tools.")
+    agent_validate.add_argument("provider", choices=["anthropic", "openai_compatible_local"])
+    agent_validate.add_argument("payload", type=Path, help="JSON provider response payload.")
+    agent_validate.add_argument("--model", required=True, help="Provider model identity recorded in the validation result.")
+    agent_validate.add_argument("--response-id", help="Provider response identity when it is not present in the payload.")
+    agent_validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    agent_validate.set_defaults(handler=run_agent_validate_proposals)
 
     validate = subcommands.add_parser("validate", help="Validate project JSON artifacts.")
     validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
@@ -8712,6 +8751,47 @@ def run_plan(args: argparse.Namespace, cfg: Settings) -> int:
         inputs_available=args.input,
         approval_state=args.approval_state,
     )
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_agent_plan(args: argparse.Namespace, cfg: Settings) -> int:
+    prompt = " ".join(args.request)
+    try:
+        if args.planner == "heuristic":
+            result = build_agent_plan(prompt, cfg=cfg)
+        else:
+            if not args.provider:
+                raise MucaroCLIError("ERROR_AGENT_PROVIDER_REQUIRED", "--provider is required for --planner provider_native.")
+            if not args.allow_live and args.provider == "anthropic":
+                raise MucaroCLIError("ERROR_AGENT_LIVE_OPT_IN_REQUIRED", "Pass --allow-live for provider-native Anthropic planning.")
+            result = generate_tool_proposals(prompt, model_provider=args.provider, model_name=args.model, cfg=cfg)
+    except (AgentToolProposalError, ModelProviderError) as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if result.get("status") in {"AGENT_PLAN_READY", "AGENT_NO_SAFE_ACTIONS", "AGENT_TOOL_PROPOSALS_VALID", "AGENT_NO_TOOL_PROPOSALS"} else 2
+
+
+def run_agent_validate_proposals(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.payload if args.payload.is_absolute() else cfg.project_root / args.payload
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        result = parse_provider_tool_proposals(
+            args.provider,
+            payload,
+            model=args.model,
+            response_id=args.response_id,
+        )
+    except FileNotFoundError:
+        emit_error("ERROR_AGENT_PAYLOAD_NOT_FOUND", str(path), args.format)
+        return 2
+    except json.JSONDecodeError as exc:
+        emit_error("ERROR_AGENT_PAYLOAD_JSON_INVALID", exc.msg, args.format)
+        return 2
+    except AgentToolProposalError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
     emit_payload(result, args.format)
     return 0
 
