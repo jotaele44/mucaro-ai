@@ -93,6 +93,7 @@ def test_exact_vector_certification_generates_valid_bound_evidence(tmp_path, mon
     manifest = tmp_path / "data" / "exports" / "shadow" / "manifest.json"
 
     monkeypatch.setattr(shadow_qa, "ROOT", tmp_path)
+    monkeypatch.setattr(shadow_qa.shadow_evidence, "ROOT", tmp_path)
 
     definitions = "\n".join(
         f"def {selector.split('::')[-1]}():\n    pass"
