@@ -860,7 +860,8 @@ role, a prompt, and optional `depends_on` IDs:
 }
 ```
 
-Run it with `mucaro agent fleet plan.json --max-parallel 2`. The scheduler
+Run it with `mucaro agent fleet plan.json --max-parallel 2`. Add
+`--synthesize` when a final parent answer is required. The scheduler
 validates cycles and unknown dependencies, persists every batch in the agent
 checkpoint ledger, runs independent agents concurrently within the bounded
 limit, records each result, and closes unexecuted dependents explicitly after

@@ -56,8 +56,10 @@ and checkpoint ledger. The bounded checkpointed subagent fleet now validates
 stable roles/prompts and dependency batches, executes independent agents within
 a bounded worker limit, records per-agent results, closes unexecuted dependents
 after failure, and reclaims recorded in-flight work after a process crash.
-Hosted/live fleet certification, parent synthesis UX, and broader crash-resume
-certification remain open.
+The CLI/API can optionally request a source-bound parent synthesis; it returns
+an explicit blocked result when the local evidence cannot support a citeable
+answer. Hosted/live fleet certification and broader crash-resume certification
+remain open.
 
 The finish line is no longer "make the repo exist." The finish line is to make
 the repo repeatedly prove its behavior from a clean clone through ingestion,

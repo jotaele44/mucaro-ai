@@ -86,6 +86,7 @@ class AgentFleetRequest(BaseModel):
     allow_mock_fallback: bool = False
     allow_live: bool = False
     require_offline: bool = False
+    synthesize: bool = False
     checkpoint_id: str | None = Field(default=None, min_length=1, max_length=120)
 
 

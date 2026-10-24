@@ -173,6 +173,67 @@ def _default_executor(agent: dict[str, Any], context: dict[str, Any], *, cfg: Se
     return _compact_result(agent["id"], trace)
 
 
+def synthesize_fleet_results(
+    plan: dict[str, Any],
+    agents: dict[str, dict[str, Any]],
+    *,
+    checkpoint_id: str,
+    options: dict[str, Any] | None = None,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Produce an optional parent answer without hiding missing source evidence."""
+    from .services import answer_question
+
+    options = dict(options or {})
+    reports = [
+        {"agent_id": agent_id, "role": next(agent["role"] for agent in plan["agents"] if agent["id"] == agent_id), "report": result}
+        for agent_id, result in agents.items()
+    ]
+    report_text = json.dumps(reports, ensure_ascii=False, sort_keys=True)[:40_000]
+    query = (
+        "Synthesize the completed subagent reports into one evidence-aware answer. "
+        "Preserve uncertainty and distinguish source citations from subagent claims.\n"
+        f"Fleet objective: {plan['objective']}\nReports:\n{report_text}"
+    )
+    trace = answer_question(
+        query,
+        top_k=5,
+        retrieval_strategy="hybrid",
+        model_provider=options.get("model_provider"),
+        model_name=options.get("model_name"),
+        allow_mock_fallback=bool(options.get("allow_mock_fallback")),
+        allow_live=bool(options.get("allow_live")),
+        require_offline=bool(options.get("require_offline")),
+        conversation_context=[
+            {"role": "assistant", "content": f"Subagent {row['agent_id']} ({row['role']}): {json.dumps(row['report'], ensure_ascii=False)}"}
+            for row in reports
+        ],
+        cfg=cfg,
+        persist=False,
+    )
+    if "answer" not in trace or not trace.get("cited_chunk_ids"):
+        return {
+            "status": "FLEET_SYNTHESIS_BLOCKED",
+            "detail": str(trace.get("detail") or "Parent synthesis requires retrieved, citeable source chunks."),
+            "fleet_id": plan["fleet_id"],
+            "checkpoint_id": checkpoint_id,
+            "source_status": trace.get("status"),
+            "cited_chunk_ids": list(trace.get("cited_chunk_ids") or []),
+        }
+    return {
+        "status": "FLEET_SYNTHESIS_OK",
+        "fleet_id": plan["fleet_id"],
+        "checkpoint_id": checkpoint_id,
+        "answer": trace["answer"],
+        "citation_status": trace.get("citation_status"),
+        "cited_chunk_ids": list(trace.get("cited_chunk_ids") or []),
+        "retrieved_chunk_ids": list(trace.get("retrieved_chunk_ids") or []),
+        "source_ids": list(trace.get("source_ids") or []),
+        "model_provider": trace.get("model_provider"),
+        "model_name": trace.get("model_name"),
+    }
+
+
 def _context_for(agent: dict[str, Any], completed: dict[str, dict[str, Any]], plan: dict[str, Any], options: dict[str, Any]) -> dict[str, Any]:
     return {
         "objective": plan["objective"],
@@ -209,7 +270,16 @@ def execute_fleet_plan(
         metadata={"workflow": "agent_fleet", "fleet_id": plan["fleet_id"], "plan_sha256": plan["plan_sha256"], "options": options},
         cfg=cfg,
     )
-    return _run_checkpoint(plan, checkpoint["checkpoint_id"], options=options, executor=executor, cfg=cfg)
+    result = _run_checkpoint(plan, checkpoint["checkpoint_id"], options=options, executor=executor, cfg=cfg)
+    if result["status"] == "FLEET_COMPLETED" and options.get("synthesize"):
+        result["synthesis"] = synthesize_fleet_results(
+            plan,
+            result["agents"],
+            checkpoint_id=checkpoint["checkpoint_id"],
+            options=options,
+            cfg=cfg,
+        )
+    return result
 
 
 def resume_fleet_plan(
@@ -230,10 +300,28 @@ def resume_fleet_plan(
     if checkpoint["state"] in {"PAUSED_PROVIDER", "PAUSED_RESOURCE", "BLOCKED_EXTERNAL"}:
         checkpoint = resume_checkpoint(checkpoint_id, cfg)
     if checkpoint["state"] == "COMPLETED":
-        return {"status": "FLEET_COMPLETED", "checkpoint_id": checkpoint_id, "fleet_id": plan["fleet_id"], "agents": {}}
+        agents = {
+            item["id"]: _compact_result(item["id"], item.get("result") or {})
+            for item in checkpoint.get("completed_steps", [])
+            if item.get("status") == "PASS"
+        }
+        result = {"status": "FLEET_COMPLETED", "checkpoint_id": checkpoint_id, "fleet_id": plan["fleet_id"], "agents": agents}
+        if (options or {}).get("synthesize"):
+            result["synthesis"] = synthesize_fleet_results(plan, agents, checkpoint_id=checkpoint_id, options=options, cfg=cfg)
+        return result
     if checkpoint["state"] != "EXECUTING":
         raise FleetError("ERROR_AGENT_FLEET_NOT_RESUMABLE", f"checkpoint state is {checkpoint['state']}")
-    return _run_checkpoint(plan, checkpoint_id, options=dict(options or metadata.get("options") or {}), executor=executor, cfg=cfg)
+    resolved_options = dict(options or metadata.get("options") or {})
+    result = _run_checkpoint(plan, checkpoint_id, options=resolved_options, executor=executor, cfg=cfg)
+    if result["status"] == "FLEET_COMPLETED" and resolved_options.get("synthesize"):
+        result["synthesis"] = synthesize_fleet_results(
+            plan,
+            result["agents"],
+            checkpoint_id=checkpoint_id,
+            options=resolved_options,
+            cfg=cfg,
+        )
+    return result
 
 
 def _run_checkpoint(

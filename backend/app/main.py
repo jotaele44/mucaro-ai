@@ -564,6 +564,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 "allow_mock_fallback": req.allow_mock_fallback,
                 "allow_live": req.allow_live,
                 "require_offline": req.require_offline,
+                "synthesize": req.synthesize,
             }
             if req.checkpoint_id:
                 result = resume_fleet_plan(req.checkpoint_id, plan, options=options, cfg=cfg)

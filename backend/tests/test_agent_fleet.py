@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from backend.app.agent_checkpoints import begin_steps, create_checkpoint, get_checkpoint
-from backend.app.agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, resume_fleet_plan
+from backend.app.agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, resume_fleet_plan, synthesize_fleet_results
 from backend.app.config import Settings
 
 
@@ -155,3 +155,47 @@ def test_fleet_resume_rejects_plan_identity_drift(tmp_path: Path) -> None:
     with pytest.raises(FleetError) as exc:
         resume_fleet_plan(checkpoint["checkpoint_id"], changed, cfg=cfg)
     assert exc.value.status == "ERROR_AGENT_FLEET_PLAN_MISMATCH"
+
+
+def test_fleet_parent_synthesis_requires_citeable_evidence(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    plan = normalize_fleet_plan("Synthesize evidence", [{"id": "research", "role": "researcher", "prompt": "Find evidence."}])
+    monkeypatch.setattr(
+        "backend.app.services.answer_question",
+        lambda *args, **kwargs: {"status": "ERROR_NO_RETRIEVAL_CONTEXT", "detail": "no local sources", "cited_chunk_ids": []},
+    )
+    result = synthesize_fleet_results(
+        plan,
+        {"research": {"agent_id": "research", "status": "PASS", "answer": "claim"}},
+        checkpoint_id="checkpoint-1",
+        cfg=cfg,
+    )
+    assert result["status"] == "FLEET_SYNTHESIS_BLOCKED"
+    assert result["cited_chunk_ids"] == []
+
+
+def test_fleet_parent_synthesis_returns_source_bound_answer(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_settings(tmp_path)
+    plan = normalize_fleet_plan("Synthesize evidence", [{"id": "research", "role": "researcher", "prompt": "Find evidence."}])
+    monkeypatch.setattr(
+        "backend.app.services.answer_question",
+        lambda *args, **kwargs: {
+            "status": "ANSWER_OK",
+            "answer": "grounded synthesis",
+            "citation_status": "CITATION_OK",
+            "cited_chunk_ids": ["chunk-1"],
+            "retrieved_chunk_ids": ["chunk-1"],
+            "source_ids": ["source-1"],
+            "model_provider": "mock",
+            "model_name": "mock",
+        },
+    )
+    result = synthesize_fleet_results(
+        plan,
+        {"research": {"agent_id": "research", "status": "PASS", "answer": "claim"}},
+        checkpoint_id="checkpoint-1",
+        cfg=cfg,
+    )
+    assert result["status"] == "FLEET_SYNTHESIS_OK"
+    assert result["citation_status"] == "CITATION_OK"
+    assert result["source_ids"] == ["source-1"]

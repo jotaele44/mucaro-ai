@@ -1692,6 +1692,7 @@ def build_parser() -> argparse.ArgumentParser:
     agent_fleet.add_argument("--allow-live", action="store_true", help="Acknowledge explicit live-provider execution intent.")
     agent_fleet.add_argument("--allow-mock-fallback", action="store_true", help="Permit explicit provider fallback to mock mode.")
     agent_fleet.add_argument("--require-offline", action="store_true", help="Reject remote model routing for every subagent.")
+    agent_fleet.add_argument("--synthesize", action="store_true", help="Request a citeable parent synthesis after all subagents complete.")
     agent_fleet.add_argument("--max-parallel", type=int, default=2, help="Maximum concurrent subagents, from 1 to 4.")
     agent_fleet.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     agent_fleet.set_defaults(handler=run_agent_fleet)
@@ -8834,6 +8835,7 @@ def run_agent_fleet(args: argparse.Namespace, cfg: Settings) -> int:
             "allow_live": args.allow_live,
             "allow_mock_fallback": args.allow_mock_fallback,
             "require_offline": args.require_offline,
+            "synthesize": args.synthesize,
         }
         if args.resume:
             result = resume_fleet_plan(args.resume, plan, options=options, cfg=cfg)
