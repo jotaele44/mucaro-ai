@@ -24,7 +24,7 @@ def test_capability_contracts_cover_expanded_scope_without_overclaiming():
     assert report["schema_version"] == CAPABILITY_CONTRACT_SCHEMA_VERSION
     assert report["contract_count"] == 5
     assert report["complete_contract_count"] == 5
-    assert report["implementation_states"] == {"ABSENT": 1, "CANDIDATE": 4}
+    assert report["implementation_states"] == {"CANDIDATE": 5}
 
     contracts = {contract["capability_id"]: contract for contract in report["contracts"]}
     assert set(contracts) == {

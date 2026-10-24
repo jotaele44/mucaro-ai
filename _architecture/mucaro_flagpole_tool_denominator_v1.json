@@ -53,10 +53,10 @@
       "id": "TOOL-06",
       "capability": "regression.run",
       "clause": "run applicable regression gates",
-      "satisfied_by": [],
-      "state": "ABSENT",
+      "satisfied_by": ["coding.check_suite"],
+      "state": "PRESENT",
       "owner_domain": "V19",
-      "note": "coding_checks.execute_coding_check_suite exists outside the governed tool runtime."
+      "note": "Approved coding check suites execute only through the isolated pinned-container boundary and return terminal PASS/FAIL/BLOCKED receipts."
     },
     {
       "id": "TOOL-07",
@@ -85,6 +85,7 @@
     "web.fetch_session",
     "web.render",
     "web.search",
+    "coding.review",
     "workspace_profiles.list"
   ]
 }

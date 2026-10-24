@@ -897,6 +897,25 @@ provider response, verifies its tool names, call identities, argument objects,
 duplicate policy, action limit, and proposal hash, and returns a nonzero status
 when the payload is malformed or outside the local allowlist.
 
+The governed coding tool surface is also available to conversational and
+provider-native agent runs through the normal request → approval → execution
+ledger:
+
+- `coding.repo_status`, `coding.read_file`, `coding.diff`, and
+  `coding.patch_check` provide bounded repository evidence.
+- `coding.patch_apply` applies only a pre-approved patch after exact HEAD,
+  patch-hash, candidate-set, preimage, and dirty-overlap revalidation.
+- `coding.check_suite` executes declared test/lint/type/build/security/
+  benchmark checks only through the pinned isolated coding-container boundary
+  and returns terminal `PASS`, `FAIL`, or `BLOCKED` evidence.
+- `coding.review` binds findings to current changed paths, source SHA-256
+  values, and exact source line ranges.
+
+The coding tools do not expose arbitrary shell execution, writable host mounts,
+implicit image pulls, network-enabled containers, or unapproved Git mutation.
+An unavailable engine or image is recorded as `BLOCKED`, never as a passing
+regression result.
+
 Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,

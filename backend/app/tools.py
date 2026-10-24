@@ -6,7 +6,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from .coding_mutation import CodingMutationError, apply_patch_transaction
+from .coding_checks import CodingCheck, CodingCheckError, execute_coding_check_suite
 from .coding_patch import validate_patch_proposal
+from .coding_review import CodingReviewError, build_code_review_report
 from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
 from .contracts import validate_contract
@@ -168,6 +170,47 @@ def _coding_patch_apply(arguments: dict[str, Any], cfg: Settings) -> dict[str, A
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
+def _coding_check_suite(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    image = arguments.get("image")
+    checks = arguments.get("checks")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.check_suite requires a non-empty repo_root argument.")
+    if not isinstance(image, str) or not image.strip():
+        raise ToolRuntimeError("ERROR_CODING_IMAGE_REQUIRED", "coding.check_suite requires an immutable image identifier.")
+    if not isinstance(checks, list) or not checks:
+        raise ToolRuntimeError("ERROR_CODING_CHECKS_REQUIRED", "coding.check_suite requires a non-empty checks array.")
+    try:
+        normalized = [
+            CodingCheck(
+                check_id=row.get("check_id"),
+                kind=row.get("kind"),
+                command=tuple(row.get("command") or ()),
+                required=bool(row.get("required", True)),
+            )
+            for row in checks
+            if isinstance(row, dict)
+        ]
+        if len(normalized) != len(checks):
+            raise CodingCheckError("ERROR_CODING_CHECK_DEFINITION", "every coding check must be an object")
+        return execute_coding_check_suite(repo_root, image=image, checks=normalized, cfg=cfg)
+    except CodingCheckError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _coding_review(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    findings = arguments.get("findings")
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.review requires a non-empty repo_root argument.")
+    if not isinstance(findings, list):
+        raise ToolRuntimeError("ERROR_CODING_REVIEW_FINDINGS", "coding.review requires a findings array.")
+    try:
+        return build_code_review_report(repo_root, findings, cfg=cfg)
+    except CodingReviewError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
 def _web_fetch(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     url = arguments.get("url")
     if not isinstance(url, str):
@@ -294,6 +337,20 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_coding_patch_apply,
+    ),
+    "coding.check_suite": ToolDefinition(
+        name="coding.check_suite",
+        description="Run an explicitly approved test, lint, type, build, security, or benchmark suite through the isolated pinned coding-container boundary; returns terminal PASS, FAIL, or BLOCKED receipts.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_check_suite,
+    ),
+    "coding.review": ToolDefinition(
+        name="coding.review",
+        description="Bind proposed code-review findings to the current changed-path set, source SHA-256 values, and exact source line evidence.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_coding_review,
     ),
     "web.render": ToolDefinition(
         name="web.render",

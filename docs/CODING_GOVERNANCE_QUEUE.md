@@ -2,7 +2,7 @@
 
 Dependency order after the merged execution and Git-lifecycle source increments:
 
-1. Close the stale coding capability-contract classification (`ABSENT` → bounded `CANDIDATE`) without changing frozen denominator membership.
+1. CLOSED: adjudicate the stale coding capability-contract classification (`ABSENT` → bounded `CANDIDATE`) and preserve the displaced class as `SUPERSEDED`.
 2. Freeze a real coding runtime identity: exact pinned coding image digest, Docker/Podman engine identity, toolchain versions, source HEAD, and coding regression manifest SHA-256.
 3. Execute the isolated positive/negative coding corpus on that frozen runtime, including host-source immutability, network denial, output ceilings, stale-plan rejection, patch rollback, branch rollback, commit rollback, review-line binding, and test/lint/type/build/security/benchmark receipts.
 4. Feed one terminal evidence row for every coding-regression gate into `coding_certification.py`; missing rows remain `UNRESOLVED`, and duplicate/unknown evidence fails closed.

@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+import backend.app.tools as tools_module
+from backend.app.coding_checks import CodingCheck
 from backend.app.coding_patch import validate_patch_proposal
 from backend.app.config import Settings
 from backend.app.tools import (
@@ -151,3 +153,69 @@ def test_patch_apply_requires_approval_and_exact_proposal_receipt(tmp_path: Path
     assert executed["result"]["status"] == "CODING_MUTATION_APPLIED"
     assert executed["result"]["head_sha"] == head
     assert (repo / "tracked.txt").read_text(encoding="utf-8") == "beta\n"
+
+
+def test_coding_check_suite_is_approval_gated_and_preserves_blocked_receipts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+
+    def fake_suite(repo_root, *, image, checks, cfg):
+        assert repo_root == str(repo)
+        assert image == "sha256:" + "a" * 64
+        assert [check.check_id for check in checks] == ["tests"]
+        return {
+            "status": "CODING_CHECK_SUITE_EXECUTED_BLOCKED",
+            "execution_status": "BLOCKED",
+            "state_counts": {"PASS": 0, "FAIL": 0, "BLOCKED": 1},
+        }
+
+    monkeypatch.setattr(tools_module, "execute_coding_check_suite", fake_suite)
+    requested = request_tool_call(
+        "coding.check_suite",
+        {
+            "repo_root": str(repo),
+            "image": "sha256:" + "a" * 64,
+            "checks": [{"check_id": "tests", "kind": "test", "command": ["pytest", "-q"]}],
+        },
+        cfg=cfg,
+        requested_by="test",
+    )
+    call_id = requested["tool_call"]["tool_call_id"]
+    with pytest.raises(ToolRuntimeError) as blocked:
+        run_tool_call(call_id, cfg=cfg, executed_by="test")
+    assert blocked.value.status == "ERROR_TOOL_APPROVAL_REQUIRED"
+
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+    executed = run_tool_call(call_id, cfg=cfg, executed_by="test")
+    assert executed["result"]["status"] == "CODING_CHECK_SUITE_EXECUTED_BLOCKED"
+    assert executed["result"]["execution_status"] == "BLOCKED"
+
+
+def test_coding_review_binds_findings_to_changed_source_lines(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    (repo / "tracked.txt").write_text("beta\n", encoding="utf-8")
+
+    requested = request_tool_call(
+        "coding.review",
+        {
+            "repo_root": str(repo),
+            "findings": [
+                {
+                    "path": "tracked.txt",
+                    "severity": "HIGH",
+                    "line_start": 1,
+                    "line_end": 1,
+                    "summary": "Changed value requires confirmation.",
+                    "evidence": "The changed line alters the tracked value.",
+                }
+            ],
+        },
+        cfg=cfg,
+        requested_by="test",
+    )
+    call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(call_id, cfg=cfg, approved_by="test")
+    executed = run_tool_call(call_id, cfg=cfg, executed_by="test")
+    assert executed["result"]["status"] == "CODING_REVIEW_FINDINGS"
+    assert executed["result"]["findings"][0]["source_sha256"]

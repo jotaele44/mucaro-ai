@@ -7,7 +7,9 @@ Scope: source-level governed coding substrate layered on top of merged PR #21.
 - `coding.patch_apply` is routed through the existing request → approve → run tool lifecycle and is declared `mutates_state=true`.
 - Patch mutation accepts only a pre-approved Git patch and revalidates exact HEAD, patch SHA-256, candidate path set, preimages, and dirty overlap immediately before mutation.
 - Post-mutation HEAD conservation is enforced. Unexpected dirty expansion or HEAD drift triggers explicit reverse-patch rollback handling; rollback failure remains material residue.
-- Test/lint/type/build/security/benchmark checks produce deterministic, read-only, network-disabled container plans only. They do not claim execution or PASS.
+- Test/lint/type/build/security/benchmark checks produce deterministic, read-only, network-disabled container plans and can be attempted through the approval-gated `coding.check_suite` tool. The tool records terminal `PASS`, `FAIL`, or `BLOCKED`; trusted pinned-runtime execution evidence and certification remain separate gates.
+- `coding.check_suite` routes bounded check execution through the existing request → approve → run lifecycle. Terminal `PASS`, `FAIL`, and `BLOCKED` states remain visible; an unavailable engine or image cannot be mislabeled as a passing test.
+- `coding.review` routes changed-path and exact-line review evidence through the same governed runtime.
 - Code-review findings bind to changed/untracked source paths, source SHA-256, and exact line evidence.
 - `_architecture/coding_regression_manifest.json` defines positive, negative, provisional, blocked, and certification gates for the coding plane.
 

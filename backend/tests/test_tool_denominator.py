@@ -50,7 +50,6 @@ def test_absent_flagpole_capabilities_keep_certification_open() -> None:
     assert report["certification_state"] == "OPEN"
     assert set(report["open_capabilities"]) == {
         "ci.status.read",
-        "regression.run",
         "vcs.branch_commit",
         "pull_request.open_update",
     }
@@ -64,9 +63,11 @@ def test_runtime_evidence_is_derived_from_governed_requests() -> None:
     assert tools["web.fetch"]["evidence_state"] == "EXERCISED"
     assert "backend/tests/test_tools.py::test_tool_runtime_executes_governed_web_fetch" in tools["web.fetch"]["runtime_evidence"]
     assert tools["source_library.status"]["evidence_state"] == "EXERCISED"
-    for name in ("coding.repo_status", "coding.read_file", "coding.diff", "coding.patch_check", "coding.patch_apply"):
+    for name in ("coding.repo_status", "coding.read_file", "coding.diff", "coding.patch_check", "coding.patch_apply", "coding.check_suite"):
         assert tools[name]["evidence_state"] == "EXERCISED", name
         assert tools[name]["classification"] == "REQUIRED"
+    assert tools["coding.review"]["evidence_state"] == "EXERCISED"
+    assert tools["coding.review"]["classification"] == "SUPPORTING"
     assert all(row["requires_approval"] for row in tools.values())
 
 

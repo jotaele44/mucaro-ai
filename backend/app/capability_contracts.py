@@ -2428,7 +2428,7 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
         CapabilityContract(
             capability_id="coding_programming_expertise",
             title="Coding and programming expertise",
-            implementation_status="ABSENT",
+            implementation_status="CANDIDATE",
             contract_status="CONTRACT_DEFINED",
             purpose="Read, modify, test, and review code through explicit repository safety and evidence boundaries.",
             permission_gates=(
@@ -2471,9 +2471,9 @@ def list_advanced_capability_contracts() -> list[dict[str, Any]]:
                 "next verification command",
             ),
             unavailable_until=(
-                "coding action runtime exists",
-                "sandbox/workspace policy exists",
-                "patch and review fixtures pass",
+                "live pinned coding image and container-engine identity are frozen",
+                "isolated test/lint/type/build/security/benchmark execution receipts pass",
+                "coding regression corpus closes with zero unresolved residue",
             ),
         ),
         CapabilityContract(

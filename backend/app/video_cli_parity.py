@@ -16,7 +16,7 @@ FLAGPOLE_REL = Path("_architecture") / "mucaro_flagpole_v1.json"
 DENOMINATOR_SCHEMA = "mucaro-video-cli-parity-denominator/1.0"
 GAP_SCHEMA = "mucaro-video-cli-parity-gap-matrix/1.0"
 DENOMINATOR_ID = "VIDEO_CLI_PARITY_V1"
-IMPLEMENTATION_STATES = ("IMPLEMENTED", "PARTIAL", "ABSENT", "UNVERIFIED")
+IMPLEMENTATION_STATES = ("IMPLEMENTED", "CANDIDATE", "PARTIAL", "ABSENT", "UNVERIFIED")
 CERTIFICATION_STATES = (
     "PASS",
     "FAIL",
