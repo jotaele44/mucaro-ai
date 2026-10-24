@@ -52,7 +52,11 @@ batch size and exact step identities are persisted in checkpoint metadata and
 tool-batch events. Explicit provider-native model tool loops now persist the
 provider message history, return terminal tool results to the provider, enforce
 a bounded turn count, and route continuation calls through the same approval
-and checkpoint ledger. Subagents, fleet scheduling, and broader crash-resume
+and checkpoint ledger. The bounded checkpointed subagent fleet now validates
+stable roles/prompts and dependency batches, executes independent agents within
+a bounded worker limit, records per-agent results, closes unexecuted dependents
+after failure, and reclaims recorded in-flight work after a process crash.
+Hosted/live fleet certification, parent synthesis UX, and broader crash-resume
 certification remain open.
 
 The finish line is no longer "make the repo exist." The finish line is to make

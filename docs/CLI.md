@@ -839,9 +839,36 @@ work run, while every continuation call still requires approval and a checkpoint
 step. Independent approved steps in an agent run execute in bounded parallel
 batches; set `options.max_parallel_actions` from 1 through 4 (the default is 2)
 to choose the concurrency limit. The run records the limit, step identities,
-batch event, and per-step checkpoint outcomes. This is still single-agent
-execution: subagents, fleet scheduling, and broader crash-resume certification
-remain open.
+batch event, and per-step checkpoint outcomes. This remains a single
+conversational run; the separate bounded fleet surface below provides explicit
+subagent scheduling without granting implicit approval.
+
+### Bounded subagent fleets
+
+The CLI supports a bounded, checkpointed subagent fleet. A fleet plan is JSON
+with an `objective` and an `agents` array. Each agent has a stable `id`, a
+role, a prompt, and optional `depends_on` IDs:
+
+```json
+{
+  "objective": "Review the local source library",
+  "agents": [
+    {"id": "research", "role": "researcher", "prompt": "Find relevant evidence."},
+    {"id": "audit", "role": "reviewer", "prompt": "Check the evidence for gaps."},
+    {"id": "synthesis", "role": "analyst", "prompt": "Summarize the findings.", "depends_on": ["research", "audit"]}
+  ]
+}
+```
+
+Run it with `mucaro agent fleet plan.json --max-parallel 2`. The scheduler
+validates cycles and unknown dependencies, persists every batch in the agent
+checkpoint ledger, runs independent agents concurrently within the bounded
+limit, records each result, and closes unexecuted dependents explicitly after
+a failure. A process restart can reclaim a recorded in-flight batch with
+`--resume CHECKPOINT_ID`, but the plan identity must match the checkpoint.
+Provider selection, live-mode opt-in, offline routing, and mock fallback remain
+explicit CLI flags. Fleet execution does not bypass permissions or turn model
+output into implicit approval.
 
 The equivalent read-only CLI surfaces are:
 

@@ -39,6 +39,15 @@ def test_agent_validate_cli_accepts_anthropic_tool_use(tmp_path: Path, capsys) -
     assert result["proposal_sha256"]
 
 
+def test_agent_fleet_cli_rejects_invalid_plan_without_execution(tmp_path: Path, capsys) -> None:
+    cfg = make_settings(tmp_path)
+    plan_path = tmp_path / "fleet.json"
+    plan_path.write_text(json.dumps({"objective": "", "agents": []}), encoding="utf-8")
+    assert main(["agent", "fleet", str(plan_path), "--format", "json"], cfg=cfg) == 2
+    result = json.loads(capsys.readouterr().err)
+    assert result["status"] == "ERROR_AGENT_FLEET_OBJECTIVE"
+
+
 def test_agent_workflow_reorders_dependencies_deterministically() -> None:
     actions = normalize_agent_actions(
         [

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlparse
 
+from .agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, resume_fleet_plan
 from .agent_planner import build_agent_plan
 from .agent_tool_proposals import AgentToolProposalError, parse_provider_tool_proposals
 from .answer_trace_eval import (
@@ -185,6 +186,7 @@ from .release_scope import (
     write_state_snapshot,
     write_status_doc,
 )
+from .runtime_identity import current_git_head
 from .retrieval import MAX_TOP_K, MIN_TOP_K, RETRIEVAL_STRATEGIES
 from .retrieval_eval import DEFAULT_FIXTURE, build_retrieval_eval_report, format_retrieval_eval_text
 from .retrieval_quality_certification import (
@@ -1681,6 +1683,18 @@ def build_parser() -> argparse.ArgumentParser:
     agent_validate.add_argument("--response-id", help="Provider response identity when it is not present in the payload.")
     agent_validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     agent_validate.set_defaults(handler=run_agent_validate_proposals)
+
+    agent_fleet = agent_subcommands.add_parser("fleet", help="Execute a bounded, checkpointed subagent fleet from a JSON plan.")
+    agent_fleet.add_argument("plan", type=Path, help="JSON file with objective and agents[].")
+    agent_fleet.add_argument("--resume", metavar="CHECKPOINT_ID", help="Resume a previously checkpointed fleet.")
+    agent_fleet.add_argument("--provider", choices=model_provider_names(), help="Model provider for each subagent.")
+    agent_fleet.add_argument("--model", help="Model identity for each subagent.")
+    agent_fleet.add_argument("--allow-live", action="store_true", help="Acknowledge explicit live-provider execution intent.")
+    agent_fleet.add_argument("--allow-mock-fallback", action="store_true", help="Permit explicit provider fallback to mock mode.")
+    agent_fleet.add_argument("--require-offline", action="store_true", help="Reject remote model routing for every subagent.")
+    agent_fleet.add_argument("--max-parallel", type=int, default=2, help="Maximum concurrent subagents, from 1 to 4.")
+    agent_fleet.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    agent_fleet.set_defaults(handler=run_agent_fleet)
 
     validate = subcommands.add_parser("validate", help="Validate project JSON artifacts.")
     validate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
@@ -8794,6 +8808,52 @@ def run_agent_validate_proposals(args: argparse.Namespace, cfg: Settings) -> int
         return 2
     emit_payload(result, args.format)
     return 0
+
+
+def run_agent_fleet(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.plan if args.plan.is_absolute() else cfg.project_root / args.plan
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        emit_error("ERROR_AGENT_FLEET_PLAN_NOT_FOUND", str(path), args.format)
+        return 2
+    except (OSError, UnicodeError) as exc:
+        emit_error("ERROR_AGENT_FLEET_PLAN_READ", str(exc), args.format)
+        return 2
+    except json.JSONDecodeError as exc:
+        emit_error("ERROR_AGENT_FLEET_PLAN_JSON_INVALID", exc.msg, args.format)
+        return 2
+
+    raw_agents = payload if isinstance(payload, list) else payload.get("agents") if isinstance(payload, dict) else None
+    objective = payload.get("objective") if isinstance(payload, dict) else None
+    try:
+        plan = normalize_fleet_plan(objective or "", raw_agents or [], max_parallel=args.max_parallel)
+        options = {
+            "model_provider": args.provider,
+            "model_name": args.model,
+            "allow_live": args.allow_live,
+            "allow_mock_fallback": args.allow_mock_fallback,
+            "require_offline": args.require_offline,
+        }
+        if args.resume:
+            result = resume_fleet_plan(args.resume, plan, options=options, cfg=cfg)
+        else:
+            source_sha = current_git_head(cfg.project_root)
+            if not source_sha:
+                raise FleetError("ERROR_AGENT_FLEET_SOURCE_IDENTITY", "fleet execution requires a canonical Git HEAD")
+            result = execute_fleet_plan(
+                plan,
+                session_id=f"cli-{plan['fleet_id']}",
+                run_id=f"cli-{plan['fleet_id']}",
+                source_sha=source_sha,
+                options=options,
+                cfg=cfg,
+            )
+    except FleetError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0 if result.get("status") == "FLEET_COMPLETED" else 2
 
 
 def run_validate(args: argparse.Namespace, cfg: Settings) -> int:
