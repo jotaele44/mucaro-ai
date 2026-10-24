@@ -27,7 +27,7 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
             "agent_runtime": {
                 "state": "PARTIAL",
                 "contract": None,
-                "notes": "Planning/execution gates, conversations, bounded natural-language intent planning, approval-gated tools, skills, local memory and coding lifecycle primitives exist; provider-native Anthropic/OpenAI-compatible tool loops and a bounded checkpointed subagent fleet now persist message history, per-agent results and in-flight batch recovery, while hosted/live fleet certification, parent synthesis UX and broader crash-resume semantics remain open.",
+                "notes": "Planning/execution gates, conversations, bounded natural-language intent planning, approval-gated tools, skills, local memory and coding lifecycle primitives exist; provider-native Anthropic/OpenAI-compatible tool loops and a bounded checkpointed subagent fleet now persist message history, per-agent results, in-flight batch recovery, and optional source-bound parent synthesis, while hosted/live fleet certification and broader crash-resume semantics remain open.",
             },
             "tool_runtime": {
                 "state": "AVAILABLE",
