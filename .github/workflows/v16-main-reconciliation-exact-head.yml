@@ -7,14 +7,14 @@ on:
     paths:
       - "backend/**"
       - "pyproject.toml"
-      - ".github/workflows/v16-issuer-trust-exact-head.yml"
+      - ".github/workflows/v16-main-reconciliation-exact-head.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: v16-issuer-trust-exact-head-${{ github.ref }}
+  group: v16-main-reconciliation-exact-head-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -58,7 +58,7 @@ jobs:
               "backend/tests/test_permission_coverage.py",
           ]
           record = {
-              "schema": "mucaro-v16-issuer-trust-exact-head-ci/1.0",
+              "schema": "mucaro-v16-main-reconciliation-exact-head-ci/1.0",
               "repository": os.environ["GITHUB_REPOSITORY"],
               "head": os.environ["GITHUB_SHA"],
               "run_id": os.environ["GITHUB_RUN_ID"],
@@ -68,12 +68,12 @@ jobs:
               "scope": "CI evidence only; no production promotion or independent evaluator certification",
           }
           data = json.dumps(record, indent=2, sort_keys=True) + "\n"
-          Path("v16-issuer-trust-exact-head-receipt.json").write_text(data, encoding="utf-8")
+          Path("v16-main-reconciliation-exact-head-receipt.json").write_text(data, encoding="utf-8")
           print(data)
           PY
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: v16-issuer-trust-exact-head-${{ github.sha }}
-          path: v16-issuer-trust-exact-head-receipt.json
+          name: v16-main-reconciliation-exact-head-${{ github.sha }}
+          path: v16-main-reconciliation-exact-head-receipt.json
           retention-days: 30
