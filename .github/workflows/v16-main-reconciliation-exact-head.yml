@@ -7,6 +7,9 @@ on:
     paths:
       - "backend/**"
       - "pyproject.toml"
+      - "scripts/one_click_pins.env"
+      - "packaging/one_click/**"
+      - "packaging/runtime/**"
       - ".github/workflows/v16-main-reconciliation-exact-head.yml"
   workflow_dispatch:
 
@@ -37,6 +40,30 @@ jobs:
           echo "CHECKED_OUT_HEAD=$GITHUB_SHA"
       - name: Run Git source attestation and benchmark adversarial suite
         run: python -m pytest -q backend/tests/test_issuer_trust_policy.py backend/tests/test_signed_source_operator_admission.py backend/tests/test_gated_git_source_attestation.py backend/tests/test_permission_coverage.py
+      - name: Verify pypdf source and all hash-locked manifests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          assert '"pypdf==6.21.2"' in Path("pyproject.toml").read_text()
+          pins=Path("scripts/one_click_pins.env").read_text()
+          assert "PY_SECURITY_PYPDF_VERSION=6.21.2" in pins
+          names = [
+              "packaging/one_click/requirements-aarch64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-unknown-linux-gnu.lock",
+              "packaging/one_click/requirements-x86_64-pc-windows-msvc.lock",
+              "packaging/runtime/requirements-macos-arm64.lock",
+              "packaging/runtime/requirements-macos-x86_64.lock",
+          ]
+          for path in names:
+              data=Path(path).read_text()
+              assert data.count("pypdf==6.21.2")==1, path
+              assert "pypdf==6.21.1" not in data, path
+              assert "sha256:1d44d1a3a200f25062adff0085b02040e4646431ac2ccac22e42679e91466084" in data, path
+              assert "sha256:0a3e1c5c886a1be03646c16a04827cc166c2a0575c971b26a4bf89686551c2d4" in data, path
+          print("PYPDF_SOURCE_HASH_AND_SIX_LOCKS_PASS")
+          PY
       - name: Run complete backend regression corpus
         run: python -m pytest backend/tests -q
       - name: Emit bounded verification receipt
@@ -56,6 +83,14 @@ jobs:
               "backend/app/permission_engine.py",
               "backend/tests/test_gated_git_source_attestation.py",
               "backend/tests/test_permission_coverage.py",
+              "pyproject.toml",
+              "scripts/one_click_pins.env",
+              "packaging/one_click/requirements-aarch64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-unknown-linux-gnu.lock",
+              "packaging/one_click/requirements-x86_64-pc-windows-msvc.lock",
+              "packaging/runtime/requirements-macos-arm64.lock",
+              "packaging/runtime/requirements-macos-x86_64.lock",
           ]
           record = {
               "schema": "mucaro-v16-main-reconciliation-exact-head-ci/1.0",
