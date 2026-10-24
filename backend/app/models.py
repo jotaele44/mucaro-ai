@@ -70,6 +70,25 @@ class ToolDecisionRequest(BaseModel):
     arguments_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
+class AgentFleetAgentRequest(BaseModel):
+    id: str = Field(min_length=1, max_length=32, pattern=r"^[a-z][a-z0-9_-]{0,31}$")
+    role: str = Field(default="analyst", min_length=1, max_length=32, pattern=r"^[a-z][a-z0-9_-]{0,31}$")
+    prompt: str = Field(min_length=1, max_length=8000)
+    depends_on: list[str] = Field(default_factory=list, max_length=4)
+
+
+class AgentFleetRequest(BaseModel):
+    objective: str = Field(min_length=1, max_length=20000)
+    agents: list[AgentFleetAgentRequest] = Field(min_length=1, max_length=4)
+    max_parallel: int = Field(default=2, ge=1, le=4)
+    model_provider: str | None = None
+    model_name: str | None = None
+    allow_mock_fallback: bool = False
+    allow_live: bool = False
+    require_offline: bool = False
+    checkpoint_id: str | None = Field(default=None, min_length=1, max_length=120)
+
+
 class InteractionOptionInput(BaseModel):
     option_id: str = Field(min_length=1, max_length=80)
     label: str = Field(min_length=1, max_length=200)

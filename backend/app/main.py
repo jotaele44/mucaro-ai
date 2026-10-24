@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from .agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, resume_fleet_plan
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
 from .conversations import (
@@ -37,6 +38,7 @@ from .ingestion import (
 )
 from .parser import ParseError
 from .models import (
+    AgentFleetRequest,
     ApprovalRequest,
     AskRequest,
     ConversationCreateRequest,
@@ -57,7 +59,6 @@ from .models import (
     WorkspaceProfileRequest,
 )
 from .model_router import list_model_providers
-from .multimodal import MULTIMODAL_SUFFIXES
 from .offline import build_offline_manifest
 from .memory import (
     MemoryError,
@@ -85,6 +86,7 @@ from .response_flow import (
 )
 from .security import SecurityProfileError, build_security_report, enforce_startup_security
 from .services import answer_question
+from .runtime_identity import current_git_head
 from .tools import (
     ToolRuntimeError,
     approve_tool_call,
@@ -116,6 +118,7 @@ from .work_runs import (
     submit_message,
 )
 from .workspaces import list_workspace_profiles, upsert_workspace_profile
+from .utils import stable_id, utc_now
 
 SUPPORTED_UPLOAD_SUFFIXES = FOLDER_SUPPORTED_SUFFIXES
 GENERATED_NAME_PATTERN = re.compile(r"^(src_|run_|chunk_)", re.IGNORECASE)
@@ -546,6 +549,40 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/models")
     def models() -> dict:
         return {"status": "MODEL_PROVIDERS_OK", "providers": list_model_providers(cfg)}
+
+    @app.post("/agent/fleet")
+    def agent_fleet(req: AgentFleetRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            plan = normalize_fleet_plan(
+                req.objective,
+                [agent.model_dump() for agent in req.agents],
+                max_parallel=req.max_parallel,
+            )
+            options = {
+                "model_provider": req.model_provider,
+                "model_name": req.model_name,
+                "allow_mock_fallback": req.allow_mock_fallback,
+                "allow_live": req.allow_live,
+                "require_offline": req.require_offline,
+            }
+            if req.checkpoint_id:
+                result = resume_fleet_plan(req.checkpoint_id, plan, options=options, cfg=cfg)
+            else:
+                source_sha = current_git_head(cfg.project_root)
+                if not source_sha:
+                    raise FleetError("ERROR_AGENT_FLEET_SOURCE_IDENTITY", "fleet execution requires a canonical Git HEAD")
+                run_id = stable_id("api-fleet-run", plan["fleet_id"], utc_now())
+                result = execute_fleet_plan(
+                    plan,
+                    session_id=f"api-{plan['fleet_id']}",
+                    run_id=run_id,
+                    source_sha=source_sha,
+                    options=options,
+                    cfg=cfg,
+                )
+            return result
+        except FleetError as exc:
+            raise api_error(exc.status, exc.detail, status_code=409 if "CHECKPOINT" in exc.status else 400) from exc
 
     @app.get("/offline-manifest")
     def offline_manifest(offline: bool = False) -> dict:

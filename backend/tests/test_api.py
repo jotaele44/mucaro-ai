@@ -4,6 +4,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+import backend.app.agent_fleet as agent_fleet_module
+import backend.app.main as main_module
 from backend.app.config import Settings
 from backend.app.main import create_app, sanitize_upload_filename
 
@@ -94,6 +96,31 @@ def test_api_happy_path_covers_operator_routes(tmp_path: Path):
     validate = client.post("/validate")
     assert validate.status_code == 200
     assert validate.json()["status"] == "JSON_OK"
+
+
+def test_api_agent_fleet_creates_checkpointed_subagents(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(main_module, "current_git_head", lambda root: "a" * 40)
+    monkeypatch.setattr(
+        agent_fleet_module,
+        "_default_executor",
+        lambda agent, context, cfg: {"status": "PASS", "answer": f"completed:{agent['id']}"},
+    )
+    client = make_client(tmp_path)
+    response = client.post(
+        "/agent/fleet",
+        json={
+            "objective": "Review the local source",
+            "agents": [
+                {"id": "research", "role": "researcher", "prompt": "Find evidence."},
+                {"id": "synthesis", "role": "analyst", "prompt": "Summarize evidence.", "depends_on": ["research"]},
+            ],
+        },
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert result["status"] == "FLEET_COMPLETED"
+    assert result["checkpoint_id"]
+    assert set(result["agents"]) == {"research", "synthesis"}
 
 
 def test_api_optional_operator_auth_protects_mutations(tmp_path: Path):
