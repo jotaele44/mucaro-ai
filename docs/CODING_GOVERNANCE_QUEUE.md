@@ -11,3 +11,16 @@ Dependency order after the merged execution and Git-lifecycle source increments:
 7. Close the hosted-CI zero-job startup failure or freeze an independent trusted execution surface as the authoritative coding evidence plane.
 8. Issue `MUCARO AI CODING PLANE CERTIFIED` only when every coding gate is PASS, source/runtime/image identity is closed, and the certification ledger has zero residue.
 9. The product-level `MUCARO AI RELEASE-GRADE CERTIFIED` statement remains separately gated by all non-coding tracks and the final release certification pipeline.
+
+## Operator preflight
+
+Run the non-executing readiness receipt before requesting the isolated suite:
+
+```bash
+python -m backend.app.cli coding readiness /path/to/repository \
+  --image registry.example/mucaro-coding@sha256:<64-lowercase-hex>
+```
+
+The command records the exact source HEAD, dirty candidate set, regression-manifest SHA-256, container-engine identity, and immutable image identity. It returns `CODING_READINESS_READY` only when all four identities are present. It does not run tests and never produces a coding `PASS`.
+
+If Docker or Podman is unavailable, or the image is omitted or mutable, the command returns `CODING_READINESS_BLOCKED` with named blockers. That receipt is useful evidence of an explicit environmental gap, but it cannot satisfy the live execution or certification gates above.

@@ -8,7 +8,9 @@ from pathlib import Path
 import pytest
 
 import backend.app.cli as cli
+import backend.app.coding_readiness as coding_readiness
 import backend.app.packaging as packaging
+from backend.app.container_runtime import ContainerRuntimeError
 from backend.app.cli import main
 from backend.app.coding_certification import build_coding_certification_report
 from backend.app.config import Settings
@@ -583,6 +585,34 @@ def test_cli_capabilities_validate_coding_report(tmp_path: Path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
     assert payload["operation"] == "coding_certification_integrity"
+
+
+def test_cli_coding_readiness_reports_blockers_without_execution(tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch):
+    cfg = make_settings(tmp_path)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "mucaro-tests@example.invalid"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Mucaro Tests"], cwd=repo, check=True)
+    (repo / "tracked.txt").write_text("alpha\n", encoding="utf-8")
+    subprocess.run(["git", "add", "tracked.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "initial"], cwd=repo, check=True, capture_output=True)
+    arch = tmp_path / "_architecture"
+    arch.mkdir()
+    (arch / "coding_regression_manifest.json").write_text(
+        json.dumps({"schema_version": "test", "requirements": [{"id": "CODE-R01", "class": "positive", "gate": "status"}]}),
+        encoding="utf-8",
+    )
+
+    def no_engine(preferred: str | None = None) -> str:
+        raise ContainerRuntimeError("ERROR_CODING_ENGINE_UNAVAILABLE", preferred or "docker,podman")
+
+    monkeypatch.setattr(coding_readiness, "resolve_container_engine", no_engine)
+    assert main(["coding", "readiness", str(repo), "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CODING_READINESS_BLOCKED"
+    assert payload["execution_status"] == "NOT_EXECUTED"
+    assert payload["blockers"] == ["CONTAINER_ENGINE", "CODING_IMAGE"]
 
 
 def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Path, capsys):

@@ -39,6 +39,7 @@ from .capability_contracts import (
     validate_web_snapshot_file,
 )
 from .capability_policy import CapabilityPolicy, RUNTIME_CAPABILITY
+from .coding_readiness import CodingReadinessError, build_coding_readiness
 from .config import Settings, settings
 from .contracts import contract_errors, list_contracts
 from .conversations import (
@@ -1254,6 +1255,21 @@ def build_parser() -> argparse.ArgumentParser:
     tools_verify = tools_subcommands.add_parser("verify-audit", help="Verify the tool audit hash chain.")
     tools_verify.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tools_verify.set_defaults(handler=run_tools_verify_audit)
+
+    coding = subcommands.add_parser("coding", help="Inspect governed coding-plane runtime readiness.")
+    coding_subcommands = coding.add_subparsers(dest="coding_command", required=True)
+    coding_readiness = coding_subcommands.add_parser(
+        "readiness",
+        help="Build a non-executing exact-head receipt for the pinned coding runtime prerequisites.",
+    )
+    coding_readiness.add_argument("repo_root", type=Path, help="Repository path to inspect.")
+    coding_readiness.add_argument(
+        "--image",
+        help="Immutable name@sha256:<digest> or exact local sha256 image ID; omit to report the blocker.",
+    )
+    coding_readiness.add_argument("--engine", help="Optional Docker or Podman executable/path to validate.")
+    coding_readiness.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    coding_readiness.set_defaults(handler=run_coding_readiness)
 
     offline = subcommands.add_parser("offline", help="Report which capabilities work without a network.")
     offline_subcommands = offline.add_subparsers(dest="offline_command", required=True)
@@ -9118,6 +9134,19 @@ def run_capability_validate_coding_report(args: argparse.Namespace, cfg: Setting
     report = validate_coding_output_file(path)
     emit_payload(report, args.format)
     return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_coding_readiness(args: argparse.Namespace, cfg: Settings) -> int:
+    repo_root = args.repo_root
+    if not repo_root.is_absolute():
+        repo_root = cfg.project_root / repo_root
+    try:
+        report = build_coding_readiness(repo_root, image=args.image, engine=args.engine, cfg=cfg)
+    except CodingReadinessError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CODING_READINESS_READY" else 2
 
 
 def run_memory_list(args: argparse.Namespace, cfg: Settings) -> int:
