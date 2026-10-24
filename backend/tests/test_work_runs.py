@@ -187,6 +187,68 @@ def test_agent_mode_builds_bounded_plan_and_keeps_inferred_actions_approval_gate
     assert get_run(run["run_id"], cfg)["state"] == "COMPLETED"
 
 
+def test_agent_fleet_reenters_the_normal_answer_and_event_workflow(cfg, conversation, monkeypatch):
+    monkeypatch.setattr(work_runs, "current_git_head", lambda _: "source-sha-test")
+
+    def fake_execute(plan, *, session_id, run_id, source_sha, options, cfg):
+        assert session_id == conversation
+        assert source_sha == "source-sha-test"
+        assert options["synthesize"] is False
+        return {
+            "status": "FLEET_COMPLETED",
+            "fleet_id": plan["fleet_id"],
+            "checkpoint_id": "chk_fleet_test",
+            "agents": {
+                "research": {
+                    "agent_id": "research",
+                    "status": "PASS",
+                    "answer": "The corpus binds chunks to source SHA-256 identities.",
+                    "cited_chunks": [],
+                }
+            },
+        }
+
+    monkeypatch.setattr(work_runs, "execute_fleet_plan", fake_execute)
+    run = _submit(
+        conversation,
+        "How does source lineage work?",
+        cfg,
+        mode="agent",
+        options={
+            "fleet_agents": [{"id": "research", "role": "analyst", "prompt": "Find the source lineage evidence model."}],
+            "fleet_max_parallel": 1,
+        },
+    )
+
+    assert run["state"] == "COMPLETED", run.get("error")
+    assert run["fleet_checkpoint_id"] == "chk_fleet_test"
+    assert run["fleet_id"].startswith("fleet_")
+    events = list_run_events(run["run_id"], cfg=cfg)
+    types = [event["type"] for event in events]
+    assert types.index("agent_plan") < types.index("checkpoint") < types.index("fleet_result")
+    assert "retrieval" in types
+    assert types[-1] == "final"
+
+
+def test_agent_fleet_plan_errors_fail_closed(cfg, conversation, monkeypatch):
+    monkeypatch.setattr(work_runs, "current_git_head", lambda _: "source-sha-test")
+    run = _submit(
+        conversation,
+        "Use the fleet.",
+        cfg,
+        mode="agent",
+        options={
+            "fleet_agents": [
+                {"id": "research", "role": "analyst", "prompt": "one"},
+                {"id": "research", "role": "analyst", "prompt": "duplicate"},
+            ]
+        },
+    )
+    assert run["state"] == "FAILED"
+    assert run["error"]["status"] == "ERROR_AGENT_FLEET_DUPLICATE"
+    assert any(event["type"] == "error" for event in list_run_events(run["run_id"], cfg=cfg))
+
+
 def test_provider_native_agent_plan_preserves_identity_and_stops_for_approval(cfg, conversation, monkeypatch):
     monkeypatch.setattr(
         work_runs,

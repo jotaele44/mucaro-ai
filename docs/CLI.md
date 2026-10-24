@@ -843,6 +843,17 @@ batch event, and per-step checkpoint outcomes. This remains a single
 conversational run; the separate bounded fleet surface below provides explicit
 subagent scheduling without granting implicit approval.
 
+An agent work run can also carry a bounded fleet directly through
+`options.fleet_agents`. Each entry uses the same `id`, `role`, `prompt`, and
+`depends_on` fields as the CLI plan, with `options.fleet_max_parallel` capped at
+four. The run records an `AGENT_FLEET_PLAN_READY` event, a separate
+`fleet_checkpoint_id`, one `fleet_result` event per subagent, and then feeds the
+bounded reports into the normal cited-answer phase. This keeps one parent
+retrieval, citation, validation, export, and conversation-turn boundary; a
+subagent report is evidence, never an implicit citation or approval. Supplying
+`options.fleet_checkpoint_id` resumes the exact plan against an existing fleet
+checkpoint and fails closed when the plan identity does not match.
+
 ### Bounded subagent fleets
 
 The CLI supports a bounded, checkpointed subagent fleet. A fleet plan is JSON
