@@ -7,6 +7,7 @@ import { SkillsWorkspace } from "./components/workspaces/SkillsWorkspace.jsx";
 import { TokenGate } from "./components/TokenGate.jsx";
 import { MemoryWorkspace } from "./components/workspaces/MemoryWorkspace.jsx";
 import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace.jsx";
+import { ReadinessWorkspace } from "./components/workspaces/ReadinessWorkspace.jsx";
 import { SettingsWorkspace } from "./components/workspaces/SettingsWorkspace.jsx";
 import { SourcesWorkspace } from "./components/workspaces/SourcesWorkspace.jsx";
 
@@ -17,6 +18,7 @@ const WORKSPACES = [
   { id: "sources", label: "Sources" },
   { id: "memory", label: "Memory" },
   { id: "provenance", label: "Provenance" },
+  { id: "readiness", label: "Readiness" },
   { id: "settings", label: "Settings" },
 ];
 const DEFAULT_OPTIONS = { model_provider: "mock", retrieval_strategy: "hybrid", allow_live: false, top_k: 5 };
@@ -276,6 +278,7 @@ export function App() {
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}
         {health.state === "ok" && view === "provenance" && <ProvenanceWorkspace />}
+        {health.state === "ok" && view === "readiness" && <ReadinessWorkspace />}
         {health.state === "ok" && view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions} announce={announce} />}
       </main>
       {tasksOpen && <TasksDrawer onClose={() => setTasksOpen(false)} />}

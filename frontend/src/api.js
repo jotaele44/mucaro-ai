@@ -247,6 +247,8 @@ export const api = {
   },
   health: () => request("/health", { timeoutMs: HEALTH_TIMEOUT_MS }),
   config: () => request("/config"),
+  security: () => request("/security"),
+  intelligencePlane: () => request("/intelligence-plane"),
   models: () => request("/models"),
   offlineManifest: () => request("/offline-manifest"),
   modes: () => request("/work-runs/modes"),

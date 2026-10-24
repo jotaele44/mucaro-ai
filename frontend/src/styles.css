@@ -1132,6 +1132,23 @@ details summary {
   border-bottom: 0;
 }
 
+.readiness-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.readiness-row {
+  gap: 8px;
+}
+
+.readiness-row p {
+  margin: 0;
+}
+
 .panel legend {
   font-weight: 650;
   padding: 0 4px;

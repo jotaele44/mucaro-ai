@@ -98,6 +98,17 @@ def test_api_happy_path_covers_operator_routes(tmp_path: Path):
     assert validate.json()["status"] == "JSON_OK"
 
 
+def test_api_intelligence_plane_reports_declared_capability_states(tmp_path: Path):
+    client = make_client(tmp_path)
+    response = client.get("/intelligence-plane")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "INTELLIGENCE_PLANE_OK"
+    assert payload["descriptor"]["repo_id"] == "mucaro-ai"
+    assert payload["descriptor"]["capabilities"]["tool_runtime"]["state"] == "AVAILABLE"
+    assert "agent_runtime" in payload["descriptor"]["capabilities"]
+
+
 def test_api_agent_fleet_creates_checkpointed_subagents(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(main_module, "current_git_head", lambda root: "a" * 40)
     monkeypatch.setattr(

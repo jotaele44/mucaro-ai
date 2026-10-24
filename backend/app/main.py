@@ -51,6 +51,7 @@ from .ingestion import (
     ingest_folder,
     reindex_sources,
 )
+from .intelligence_plane import build_intelligence_plane_descriptor
 from .parser import ParseError
 from .models import (
     AgentFleetRequest,
@@ -310,6 +311,10 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/security")
     def security_status() -> dict:
         return build_security_report(cfg)
+
+    @app.get("/intelligence-plane")
+    def intelligence_plane(_auth: dict = Depends(require_auth)) -> dict:
+        return {"status": "INTELLIGENCE_PLANE_OK", "descriptor": build_intelligence_plane_descriptor()}
 
     @app.post("/plan")
     def plan(req: PlanRequest, _auth: dict = Depends(require_auth)) -> dict:
