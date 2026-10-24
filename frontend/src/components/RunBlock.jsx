@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { STATE_LABEL, TERMINAL_STATES, toolSummaryLabel } from "../feed.js";
+import { STATE_LABEL, TERMINAL_STATES, toolSummaryLabel, workSummary } from "../feed.js";
 import { answerRecords } from "../files.js";
 import { EditableMessage } from "./MessageActions.jsx";
 import { Sheet } from "./Sheet.jsx";
@@ -11,7 +11,79 @@ const OUTCOME_TEXT = {
   STOPPED_BY_USER_CHOICE: "Stopped at your choice; nothing else ran.",
   QUESTION_DISMISSED: "The question was dismissed, so no further actions ran.",
   CANCELLED_BEFORE_START: "Cancelled before it started.",
+  DECLINED: "Claude declined this request.",
 };
+
+// What an approval is for, in words, for the tools Claude can ask to use.
+const ACTION_TITLE = {
+  "memory.remember": "Save this to your memory?",
+  "coding.patch_apply": "Apply this change to your files?",
+  "sources.search": "Search your documents?",
+  "sources.read": "Read a document from your library?",
+  "files.read_file": "Read this file?",
+  "files.list_directory": "List this folder?",
+};
+
+// A short single line streamed while Claude works is usually what it is about to do ("I'll check the docs"), which
+// becomes a progress line once a tool starts. Showing it as the status line keeps it from flashing up as an answer.
+const PROVISIONAL_CHARS = 200;
+
+function provisionalText(view) {
+  const text = view.answer || "";
+  return view.state === "RUNNING" && text && !text.includes("\n") && text.length <= PROVISIONAL_CHARS ? text.trim() : "";
+}
+
+function secondsSince(iso, now) {
+  const at = Date.parse(iso || "");
+  return Number.isNaN(at) ? 0 : Math.max(0, Math.round((now - at) / 1000));
+}
+
+// One line at a time while Claude works; the full list folds into a summary when the turn ends.
+function ProgressLine({ view }) {
+  const running = view.state === "RUNNING";
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running) return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [running]);
+
+  const lines = view.progress;
+  if (!lines.length) return null;
+  if (TERMINAL_STATES.has(view.state)) {
+    const cost = view.usage?.estimated_cost_usd;
+    return (
+      <details className="work-details">
+        <summary>{workSummary(view)}</summary>
+        <ol className="work-steps">
+          {lines.map((line, index) => <li key={index} className={`work-step step-${line.kind}`}>{line.text}</li>)}
+        </ol>
+        {view.usage && (
+          <p className="muted small">
+            {view.usage.model} · {(view.usage.input_tokens || 0) + (view.usage.cache_read_input_tokens || 0)} tokens in
+            {view.usage.cache_read_input_tokens ? ` (${view.usage.cache_read_input_tokens} cached)` : ""} · {view.usage.output_tokens || 0} out
+            {cost != null ? ` · about $${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}` : ""}
+          </p>
+        )}
+      </details>
+    );
+  }
+  const last = lines[lines.length - 1];
+  const waited = secondsSince(last.at, now);
+  let text = last.text;
+  if (view.state === "AWAITING_APPROVAL") text = "Waiting for your approval";
+  else if (running && provisionalText(view)) text = provisionalText(view);
+  else if (view.answer && running) text = "Writing the answer";
+  else if (running && last.kind === "status" && waited >= 5) text = "Still thinking";
+  text = text.replace(/(…|\.\.\.)$/, "");
+  return (
+    <p className="progress-line" role="status" aria-live="polite">
+      {running && <span className="spinner" aria-hidden="true" />}
+      <span key={`${lines.length}-${text}`} className="progress-text">{text}…</span>
+      {running && waited >= 3 && <span className="muted small progress-time">{waited} s</span>}
+    </p>
+  );
+}
 
 function Json({ value }) {
   return (
@@ -43,7 +115,9 @@ function ApprovalCard({ request, onDecided, announce }) {
   return (
     <section className="card approval-card" aria-label={`Permission request for ${request.tool_name}`}>
       <p className="card-kicker">Permission needed</p>
-      <h3 className="card-title">{request.tool_name}</h3>
+      <h3 className="card-title">{ACTION_TITLE[request.tool_name] || request.tool_name}</h3>
+      {request.arguments?.summary && <p>{request.arguments.summary}</p>}
+      {request.tool_name === "memory.remember" && request.arguments?.content && <p>“{request.arguments.content}”</p>}
       <details open>
         <summary>Arguments</summary>
         <Json value={request.arguments} />
@@ -177,7 +251,7 @@ function Citations({ citations, onOpenCitation }) {
           onClick={() => onOpenCitation(citation)}
           aria-label={`Open citation ${citation.citation_order}: ${citation.source_url || citation.source_id}`}
         >
-          [{citation.citation_order}] {citation.source_url ? hostOf(citation.source_url) : citation.source_id.slice(0, 14)}
+          [{citation.citation_order}] {citation.title ? `${citation.title.slice(0, 40)}${citation.title.length > 40 ? "…" : ""}` : citation.source_url ? hostOf(citation.source_url) : String(citation.source_id || "").slice(0, 14)}
           {citation.trust === "UNTRUSTED_CONTENT" && <span className="sr-only"> (untrusted content)</span>}
         </button>
       ))}
@@ -209,15 +283,17 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
           onSave={(content, revision) => onEditMessage(userMessageKey, content, revision)}
           announce={announce}
         >
-          {view.mode !== "ask" && <span className="mode-tag">{view.mode}</span>}
+          {!["ask", "agent"].includes(view.mode) && <span className="mode-tag">{view.mode}</span>}
         </EditableMessage>
       </div>
 
       <div className="assistant-block">
+        {view.agent && view.progress.length > 0 && <ProgressLine view={view} />}
+        {!(view.agent && view.progress.length > 0) && (
         <div className="run-status">
           <span className={`status-chip status-${view.state.toLowerCase()}`}>{STATE_LABEL[view.state] || view.state}</span>
           {view.state === "RUNNING" && <span className="spinner" aria-hidden="true" />}
-          {(planSteps.length > 0 || view.route) && (
+          {!view.agent && (planSteps.length > 0 || view.route) && (
             <details className="plan-details">
               <summary>Plan · {planSteps.length} step{planSteps.length === 1 ? "" : "s"}</summary>
               <ol>
@@ -236,6 +312,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
             </details>
           )}
         </div>
+        )}
 
         {toolLabel && (
           <button type="button" className="tool-summary" onClick={() => setToolsOpen(true)} aria-haspopup="dialog">
@@ -261,7 +338,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
           </p>
         )}
 
-        {view.answer && (
+        {view.answer && !(view.agent && provisionalText(view)) && (
           <div className="bubble assistant-bubble">
             <EditableMessage
               text={String(assistantEdit?.content ?? view.answer ?? "")}
@@ -271,6 +348,11 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
               announce={announce}
               allowReadAloud
               file={answerFile}
+              streaming={!TERMINAL_STATES.has(view.state)}
+              onCite={(number) => {
+                const match = view.citations.find((row) => row.citation_order === number);
+                if (match) onOpenCitation(match);
+              }}
             />
           </div>
         )}

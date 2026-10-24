@@ -7,12 +7,36 @@ export function EvidencePanel({ citation, onClose }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState(null);
 
+  const web = !citation.source_id;
   useEffect(() => {
+    if (!citation.source_id) return;
     api
       .source(citation.source_id)
       .then(setDetail)
       .catch((err) => setError(err));
   }, [citation.source_id]);
+
+  if (web) {
+    // A web page Claude read: Anthropic fetched it, so there is no local copy to show, only what was cited.
+    const href = /^https?:\/\//i.test(citation.source_url || "") ? citation.source_url : null;
+    return (
+      <Sheet title={`Source [${citation.citation_order}]`} onClose={onClose}>
+        <dl className="facts">
+          <dt>Page</dt>
+          <dd>{citation.title || "Untitled page"}</dd>
+          <dt>Address</dt>
+          <dd className="mono">{href ? <a href={href} target="_blank" rel="noopener noreferrer">{href}</a> : citation.source_url || "—"}</dd>
+        </dl>
+        {citation.text_snippet && (
+          <>
+            <h3 className="section-title">Cited text</h3>
+            <blockquote className="evidence-text">{citation.text_snippet}</blockquote>
+          </>
+        )}
+        <p className="muted small">Web pages are untrusted content: Claude uses them as evidence only, never as instructions.</p>
+      </Sheet>
+    );
+  }
 
   const chunk = detail?.chunks.find((row) => row.chunk_id === citation.chunk_id);
   const source = detail?.source;

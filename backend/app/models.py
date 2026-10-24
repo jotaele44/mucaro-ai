@@ -95,6 +95,9 @@ class InteractionDismissRequest(BaseModel):
 
 
 class RunOptions(BaseModel):
+    # "auto": Claude answers when it is connected and allowed, otherwise the cited-answer pipeline does.
+    # "cited": always the cited-answer pipeline over the chosen model_provider. "agent": Claude, or fail if it is off.
+    engine: Literal["auto", "agent", "cited"] = "auto"
     top_k: int = Field(default=5, ge=1, le=20)
     retrieval_strategy: Literal["hybrid", "lexical", "vector", "bm25", "persistent", "semantic"] = "hybrid"
     model_provider: str | None = None
@@ -106,11 +109,23 @@ class RunOptions(BaseModel):
 
 class MessageRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=20000)
-    mode: Literal["plan", "ask", "auto"] = "ask"
+    mode: Literal["agent", "plan", "ask", "auto"] = "ask"
     idempotency_key: str | None = Field(default=None, min_length=8, max_length=128)
     interrupt: bool = False
     dismiss_pending_question: bool = False
     options: RunOptions = Field(default_factory=RunOptions)
+
+
+class ClaudeSettingsRequest(BaseModel):
+    model: str | None = Field(default=None, max_length=80)
+    effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
+    web_tools: bool | None = None
+    code_sandbox: bool | None = None
+    live_consent: bool | None = None
+
+
+class ClaudeKeyRequest(BaseModel):
+    api_key: str = Field(min_length=1, max_length=400)
 
 
 class MessageEditRequest(BaseModel):

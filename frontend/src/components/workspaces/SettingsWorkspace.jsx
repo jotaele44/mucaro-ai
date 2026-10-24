@@ -2,8 +2,114 @@ import React, { useEffect, useState } from "react";
 import { api } from "../../api.js";
 import { CleartextNotice } from "../CleartextNotice.jsx";
 
+// Claude connection: the key is write-only here (the server never sends it back), and nothing is sent to
+// Anthropic until the person turns on the consent switch.
+function ClaudePanel({ claude, onClaudeChange, announce }) {
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  async function run(action, success) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await action();
+      if (result?.status?.startsWith("CLAUDE_") && result.models) onClaudeChange(result);
+      else onClaudeChange(await api.claude());
+      const text = typeof success === "function" ? success(result) : success;
+      setMessage({ ok: true, text });
+      announce(text);
+      return true;
+    } catch (err) {
+      setMessage({ ok: false, text: err.message || String(err.status) });
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!claude) return null;
+  const model = claude.models.find((row) => row.id === claude.model) || claude.models[0];
+  return (
+    <fieldset className="panel claude-panel">
+      <legend>Claude</legend>
+      <p className={claude.ready ? "status-ok" : "muted"} role="status">
+        {claude.ready ? `Connected · ${model.label}` : claude.detail}
+      </p>
+
+      <form
+        className="inline-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!key.trim()) return;
+          run(() => api.saveClaudeKey(key.trim()), (result) => `API key saved${result?.stored_in === "keychain" ? " in your Keychain" : ""}.`).then((ok) => ok && setKey(""));
+        }}
+      >
+        <label className="field grow">
+          <span>Anthropic API key {claude.key_present && <span className="muted small">(saved: {claude.key_hint}{claude.key_source === "env" ? ", from the environment" : ""})</span>}</span>
+          <input type="password" autoComplete="off" spellCheck="false" placeholder={claude.key_present ? "Paste a new key to replace it" : "sk-ant-api…"}
+            value={key} onChange={(event) => setKey(event.target.value)} disabled={busy} />
+        </label>
+        <button type="submit" className="secondary-button" disabled={busy || !key.trim()}>Save</button>
+      </form>
+      <p className="muted small">
+        Create a key at console.anthropic.com (a Claude Pro or Max subscription does not include API use). Usage is billed by
+        Anthropic to that account; each answer shows its approximate cost.
+      </p>
+      <div className="button-row">
+        <button type="button" className="ghost-button" disabled={busy || !claude.key_present} onClick={() => run(api.testClaude, (result) => result.detail)}>
+          Test connection
+        </button>
+        {claude.key_present && claude.key_source !== "env" && (
+          <button type="button" className="ghost-button" disabled={busy} onClick={() => run(api.removeClaudeKey, "API key removed.")}>
+            Remove key
+          </button>
+        )}
+      </div>
+
+      <label className="switch">
+        <input type="checkbox" checked={Boolean(claude.live_consent)} disabled={busy}
+          onChange={(event) => run(() => api.updateClaude({ live_consent: event.target.checked }), event.target.checked ? "Claude turned on." : "Claude turned off.")} />
+        <span>Send my messages to Anthropic so Claude can answer them (with the documents, files and web pages it reads)</span>
+      </label>
+
+      <label className="field">
+        <span>Model</span>
+        <select value={claude.model} disabled={busy} onChange={(event) => run(() => api.updateClaude({ model: event.target.value }), "Model changed.")}>
+          {claude.models.map((row) => (
+            <option key={row.id} value={row.id}>
+              {row.label} — ${row.pricing.input} / ${row.pricing.output} per million tokens
+            </option>
+          ))}
+        </select>
+        <span className="muted small">{model.summary}</span>
+      </label>
+      {model.efforts.length > 0 && (
+        <label className="field">
+          <span>Effort</span>
+          <select value={claude.effort} disabled={busy} onChange={(event) => run(() => api.updateClaude({ effort: event.target.value }), "Effort changed.")}>
+            {model.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
+          </select>
+          <span className="muted small">Higher effort thinks longer and costs more; medium suits most questions.</span>
+        </label>
+      )}
+      <label className="switch">
+        <input type="checkbox" checked={Boolean(claude.web_tools)} disabled={busy}
+          onChange={(event) => run(() => api.updateClaude({ web_tools: event.target.checked }), "Saved. Applies to new chats.")} />
+        <span>Web search and page reading (new chats)</span>
+      </label>
+      <label className="switch">
+        <input type="checkbox" checked={Boolean(claude.code_sandbox)} disabled={busy}
+          onChange={(event) => run(() => api.updateClaude({ code_sandbox: event.target.checked }), "Saved. Applies to new chats.")} />
+        <span>Code sandbox for calculations and data analysis (new chats)</span>
+      </label>
+      {message && <p className={message.ok ? "status-ok small" : "error-text"} role={message.ok ? "status" : "alert"}>{message.text}</p>}
+    </fieldset>
+  );
+}
+
 // One settings home (TGT-033): model, retrieval, access token and offline capability view.
-export function SettingsWorkspace({ options, onOptionsChange, announce }) {
+export function SettingsWorkspace({ options, onOptionsChange, announce, claude = null, onClaudeChange = () => {} }) {
   const [models, setModels] = useState([]);
   const [manifest, setManifest] = useState(null);
   const [config, setConfig] = useState(null);
@@ -28,8 +134,10 @@ export function SettingsWorkspace({ options, onOptionsChange, announce }) {
       </header>
       {error && <p className="error-card" role="alert">{error.status}: {error.message}</p>}
 
+      <ClaudePanel claude={claude} onClaudeChange={onClaudeChange} announce={announce} />
+
       <fieldset className="panel">
-        <legend>Answer model</legend>
+        <legend>Offline answers (when Claude is off)</legend>
         {models.map((model) => (
           <label key={model.name} className="option">
             <input

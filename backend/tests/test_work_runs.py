@@ -448,7 +448,8 @@ def test_api_message_stream_replays_and_ends(cfg, conversation):
     envelope = client.get(f"/conversations/{conversation}/envelope").json()
     assert [row["turn_id"] for row in envelope["run_envelopes"]] == [run_id]
     modes = client.get("/work-runs/modes").json()
-    assert {row["mode"] for row in modes["modes"]} == {"plan", "ask", "auto"}
+    assert {row["mode"] for row in modes["modes"]} == {"agent", "plan", "ask", "auto"}
+    assert modes["default_mode"] == "agent"
 
 
 def test_api_tool_decision_resumes_the_waiting_run(cfg, conversation):

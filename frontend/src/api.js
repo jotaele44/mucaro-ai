@@ -250,6 +250,11 @@ export const api = {
   models: () => request("/models"),
   offlineManifest: () => request("/offline-manifest"),
   modes: () => request("/work-runs/modes"),
+  claude: () => request("/settings/claude"),
+  updateClaude: (changes) => request("/settings/claude", json("PUT", changes)),
+  saveClaudeKey: (apiKey) => request("/settings/claude/key", json("PUT", { api_key: apiKey })),
+  removeClaudeKey: () => request("/settings/claude/key", { method: "DELETE" }),
+  testClaude: () => request("/settings/claude/test", { method: "POST" }),
 
   conversations: () => request("/conversations"),
   createConversation: (title) => request("/conversations", json("POST", { title })),
