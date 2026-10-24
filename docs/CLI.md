@@ -170,8 +170,10 @@ The command does not repair invalid topology or transform geometries.
 boundary. It uses Shapely `make_valid` only for planar XY geometries, writes
 source and output geometry hashes per feature, and preserves
 `UNCHANGED_VALID`, `REPAIRED`, `NULL_EMPTY`, `UNRESOLVED`, and
-`UNSUPPORTED` as distinct states. Z/M geometries are not flattened; they
-remain unresolved. Inspection never invokes repair implicitly.
+`UNSUPPORTED` as distinct states. Valid Z geometries are preserved without
+mutation and their coordinate dimensionality is recorded before and after;
+invalid Z topology and M geometries remain unresolved rather than being
+flattened or semantically guessed. Inspection never invokes repair implicitly.
 
 `mucaro gis filter-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y`
 retains whole GeoJSON features whose coordinate extent intersects the query
@@ -211,8 +213,9 @@ output, records per-feature `RETAINED_CLIPPED`, `RETAINED_UNCHANGED`,
 records source/output coordinate counts, and closes retained/excluded/clipped
 accounting. Z and M dimensions are not flattened; they are recorded as
 unresolved residue until a dimension-preserving clipping adapter is added.
-Broader clipping/overlay operation support, dimension-preserving mutation, and
-independent planar overlay validation remain future GIS work.
+Broader clipping/overlay operation support, dimension-preserving mutation for
+derived geometry outputs, and independent planar overlay validation remain
+future GIS work.
 
 `mucaro gis measure GEOJSON_PATH` measures Point, MultiPoint, LineString,
 MultiLineString, Polygon, and MultiPolygon features. The default

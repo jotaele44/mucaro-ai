@@ -51,11 +51,22 @@ def test_valid_geometry_is_not_mutated(tmp_path: Path) -> None:
     assert row["source_geometry_sha256"] == row["output_geometry_sha256"]
 
 
-def test_z_geometry_fails_closed_as_unresolved(tmp_path: Path) -> None:
+def test_valid_z_geometry_is_preserved_without_mutation(tmp_path: Path) -> None:
     cfg = make_settings(tmp_path)
     source = write_fc(tmp_path / "z.geojson", [{"type": "Feature", "id": "z", "properties": {}, "geometry": {"type": "Polygon", "coordinates": [[[0, 0, 1], [2, 0, 1], [2, 2, 1], [0, 2, 1], [0, 0, 1]]]}}])
+    report = repair_geojson_topology(source, cfg=cfg)
+    assert report["status"] == "GIS_TOPOLOGY_REPAIR_OK"
+    assert report["state_counts"]["UNCHANGED_VALID"] == 1
+    assert report["features"][0]["dimension_conserved"] is True
+    assert report["features"][0]["output_coordinate_dimension"] == "XYZ"
+    assert report["invariants"]["dimension_conservation_closed"] is True
+
+
+def test_invalid_z_geometry_fails_closed_as_unresolved(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    source = write_fc(tmp_path / "invalid-z.geojson", [{"type": "Feature", "id": "z", "properties": {}, "geometry": {"type": "Polygon", "coordinates": [[[0, 0, 1], [2, 2, 1], [0, 2, 1], [2, 0, 1], [0, 0, 1]]]}}])
     report = repair_geojson_topology(source, cfg=cfg)
     assert report["status"] == "GIS_TOPOLOGY_REPAIR_WARN"
     assert report["state_counts"]["UNRESOLVED"] == 1
     assert report["output"]["feature_count"] == 0
-    assert "GIS_REPAIR_COORDINATE_DIMENSION_UNSUPPORTED" in report["features"][0]["warnings"]
+    assert "GIS_REPAIR_Z_INVALID_TOPOLOGY_UNSUPPORTED" in report["features"][0]["warnings"]

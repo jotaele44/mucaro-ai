@@ -54,14 +54,22 @@ def repair_geojson_topology(path: Path, *, cfg: Settings = settings) -> dict[str
             "source_geometry_type": classification["geometry_type"],
             "source_geometry_status": classification["geometry_status"],
             "source_geometry_sha256": _geometry_sha256(geometry),
+            "source_coordinate_dimension": dimensions["coordinate_dimension"],
+            "source_dimension_counts": dimensions["dimension_counts"],
             "output_geometry_type": None,
             "output_geometry_sha256": None,
+            "output_coordinate_dimension": None,
+            "output_dimension_counts": None,
+            "dimension_conserved": None,
             "repair_state": "UNRESOLVED",
             "adapter": TOPOLOGY_REPAIR_ADAPTER,
             "warnings": list(classification["warnings"]),
         }
         if classification["geometry_status"] == "NULL_EMPTY":
             row["repair_state"] = "NULL_EMPTY"
+            row["output_coordinate_dimension"] = "EMPTY"
+            row["output_dimension_counts"] = {}
+            row["dimension_conserved"] = True
             states["NULL_EMPTY"] += 1
             output_features.append(deepcopy(feature))
             receipts.append(row)
@@ -71,14 +79,19 @@ def repair_geojson_topology(path: Path, *, cfg: Settings = settings) -> dict[str
             states["UNSUPPORTED"] += 1
             receipts.append(row)
             continue
-        if dimensions["has_z"] or dimensions["has_m"]:
-            row["warnings"] = ["GIS_REPAIR_COORDINATE_DIMENSION_UNSUPPORTED"]
+        if dimensions["has_m"]:
+            row["warnings"] = ["GIS_REPAIR_M_COORDINATE_DIMENSION_UNSUPPORTED"]
             states["UNRESOLVED"] += 1
             receipts.append(row)
             continue
         try:
             shaped = shapely_shape(geometry)
             input_topology_valid = shaped.is_valid
+            if dimensions["has_z"] and not input_topology_valid:
+                row["warnings"] = ["GIS_REPAIR_Z_INVALID_TOPOLOGY_UNSUPPORTED"]
+                states["UNRESOLVED"] += 1
+                receipts.append(row)
+                continue
             repaired = shaped if input_topology_valid else make_valid(shaped)
         except (AttributeError, ShapelyError, TypeError, ValueError) as exc:
             row["warnings"] = ["ERROR_GIS_REPAIR_RUNTIME"]
@@ -103,6 +116,13 @@ def repair_geojson_topology(path: Path, *, cfg: Settings = settings) -> dict[str
             # mapping() may return tuples; JSON serialization converts them losslessly to arrays.
             import json
             output_geometry = json.loads(json.dumps(output_geometry))
+        output_dimensions = _coordinate_dimension_summary(output_geometry)
+        dimension_conserved = set(output_dimensions["dimension_counts"]) == set(dimensions["dimension_counts"])
+        if not dimension_conserved:
+            row["warnings"] = ["GIS_REPAIR_COORDINATE_DIMENSION_CHANGED"]
+            states["UNRESOLVED"] += 1
+            receipts.append(row)
+            continue
         retained = deepcopy(feature)
         retained["geometry"] = output_geometry
         output_features.append(retained)
@@ -112,6 +132,9 @@ def repair_geojson_topology(path: Path, *, cfg: Settings = settings) -> dict[str
             "repair_state": state,
             "output_geometry_type": repaired.geom_type,
             "output_geometry_sha256": _geometry_sha256(output_geometry),
+            "output_coordinate_dimension": output_dimensions["coordinate_dimension"],
+            "output_dimension_counts": output_dimensions["dimension_counts"],
+            "dimension_conserved": True,
             "warnings": [],
         })
         receipts.append(row)
@@ -144,11 +167,21 @@ def repair_geojson_topology(path: Path, *, cfg: Settings = settings) -> dict[str
             "output_accounting_closed": len(output_features) == retained_count,
             "crs_preserved": True,
             "repair_is_explicit": True,
+            "dimension_conservation_closed": all(
+                row.get("dimension_conserved") is True
+                for row in receipts
+                if row.get("repair_state") in {"UNCHANGED_VALID", "REPAIRED", "NULL_EMPTY"}
+            ),
         },
         "warnings": warnings,
-        "limitations": ["repair is planar XY", "Z/M geometries remain unresolved", "geometry type may legitimately change after make_valid"],
+        "limitations": [
+            "repair is planar XY",
+            "valid Z geometries are preserved without mutation; invalid Z and all M geometries remain unresolved",
+            "geometry type may legitimately change after make_valid",
+        ],
         "falsification_criteria": [
             "reject if row or output accounting does not close",
+            "reject if retained feature coordinate dimensions change",
             "reject if source/output hashes do not match saved artifacts",
             "reject any claim that inspect_geojson silently repairs topology",
         ],

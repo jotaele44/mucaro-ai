@@ -1893,7 +1893,7 @@
               "type": "Feature",
               "id": "z",
               "properties": {},
-              "geometry": {"type": "Polygon", "coordinates": [[[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 0, 1]]]}
+              "geometry": {"type": "Polygon", "coordinates": [[[0, 0, 1], [1, 1, 1], [0, 1, 1], [1, 0, 1], [0, 0, 1]]]}
             }
           ]
         }
@@ -1910,7 +1910,7 @@
       "expected_fields": {
         "state_counts.UNRESOLVED": 1,
         "features.0.repair_state": "UNRESOLVED",
-        "features.0.warnings.0": "GIS_REPAIR_COORDINATE_DIMENSION_UNSUPPORTED",
+        "features.0.warnings.0": "GIS_REPAIR_Z_INVALID_TOPOLOGY_UNSUPPORTED",
         "output.feature_count": 0
       }
     },
