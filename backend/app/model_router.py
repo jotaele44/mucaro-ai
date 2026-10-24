@@ -493,15 +493,16 @@ def _local_answer(
     model = model_name or local_cfg["model"]
     system, user = build_grounded_prompt(query, retrieved_chunks, conversation_context, memory_context)
     stream = on_text_delta is not None
-    body = json.dumps(
-        {
-            "model": model,
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "temperature": 0.2,
-            "max_tokens": 900,
-            "stream": stream,
-        }
-    ).encode("utf-8")
+    request_payload: dict[str, Any] = {
+        "model": model,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        "temperature": 0.2,
+        "max_tokens": 900,
+        "stream": stream,
+    }
+    if stream:
+        request_payload["stream_options"] = {"include_usage": True}
+    body = json.dumps(request_payload).encode("utf-8")
     request = urllib.request.Request(
         f"{base_url}/chat/completions", data=body, headers={"Content-Type": "application/json"}, method="POST"
     )

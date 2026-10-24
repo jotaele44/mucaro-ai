@@ -69,6 +69,22 @@ def compile_lock(uv: Path, pins: dict[str, str], target: str, output: Path) -> N
     extras = [f"--extra={extra}" for extra in TARGETS[target]]
     env = {key: value for key, value in os.environ.items() if not key.startswith("UV_")}
     env["UV_NO_CONFIG"] = "1"
+    security_args: list[str] = []
+    for package, version_key, cutoff_key in (
+        ("certifi", "PY_SECURITY_CERTIFI_VERSION", "PY_EXCLUDE_NEWER_CERTIFI"),
+        ("pypdf", "PY_SECURITY_PYPDF_VERSION", "PY_EXCLUDE_NEWER_PYPDF"),
+    ):
+        version = pins.get(version_key)
+        cutoff = pins.get(cutoff_key)
+        if version and cutoff:
+            security_args.extend(
+                [
+                    "--exclude-newer-package",
+                    f"{package}={cutoff}",
+                    "--upgrade-package",
+                    f"{package}=={version}",
+                ]
+            )
     subprocess.run(
         [
             str(uv),
@@ -84,6 +100,7 @@ def compile_lock(uv: Path, pins: dict[str, str], target: str, output: Path) -> N
             "--generate-hashes",
             "--exclude-newer",
             pins["PY_EXCLUDE_NEWER"],
+            *security_args,
             "--custom-compile-command",
             COMPILE_COMMAND,
             "--quiet",
