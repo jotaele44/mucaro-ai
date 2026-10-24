@@ -217,9 +217,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "capability_expansion",
             "Assistant supports state-of-the-art OCR analysis with confidence, layout, and source-image traceability.",
             "OPEN",
-            "backend/app/ocr_analysis.py and mucaro ocr analyze provide a local Tesseract-backed image OCR receipt candidate with source SHA-256, engine identity, raw/normalized/canonical text separation, confidence states, bounding boxes, no-text handling, parser warnings, limitations, and falsification criteria; backend/app/capability_contracts.py now validates saved OCR receipt accounting.",
-            "The implemented boundary is still narrow: PDF/page rendering, page-level evidence, representative document accuracy, layout reconstruction, table/form/handwriting support, confidence calibration, optional provider policy, and broader OCR regression corpus remain open.",
-            "Expand the OCR candidate into document-intelligence gates with frozen image/PDF fixtures, layout and confidence thresholds, broader output validation, and optional cloud/private engines only behind explicit privacy policy.",
+            "backend/app/ocr_analysis.py and mucaro ocr analyze provide a local Tesseract-backed image OCR receipt candidate with source SHA-256, engine identity, raw/normalized/canonical text separation, confidence states, bounding boxes, no-text handling, parser warnings, limitations, and falsification criteria; saved-report validation, exact span calibration, OCR-08 structure controls, and the release-gated OCR v1 runtime/boundary receipt now execute against frozen denominators.",
+            "The implemented boundary is still narrow: representative real-document accuracy, independent confidence calibration, PDF/page evidence promotion, semantic table/form/handwriting support, optional provider policy, and broader OCR regression corpus remain open. Synthetic runtime controls do not close those claims.",
+            "Expand the OCR candidate into independently authored document-intelligence evaluations with frozen real image/PDF fixtures, layout and confidence thresholds, broader output validation, and optional cloud/private engines only behind explicit privacy policy.",
         ),
         ProductRequirement(
             "governed_web_browsing",

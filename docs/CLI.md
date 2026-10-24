@@ -55,6 +55,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro capabilities validate-gis-report REPORT_PATH` | Validate a saved GIS receipt against the advanced capability output contract | 0 | 2 |
 | `mucaro capabilities validate-ocr-report REPORT_PATH` | Validate a saved OCR receipt against the state-of-the-art OCR output contract | 0 | 2 |
 | `mucaro capabilities validate-ocr-structure-receipt RECEIPT_PATH` | Validate a derived OCR structure receipt for source binding, span accounting, and fail-closed inference state | 0 | 2 |
+| `python3 scripts/certify_ocr_v1_runtime.py` | Execute the bounded OCR v1 runtime corpus and explicit unsupported-state boundary control | 0 | 2 |
 | `mucaro capabilities validate-execution-report REPORT_PATH` | Validate a saved skill execution artifact-lineage receipt against the transparency contract | 0 | 2 |
 | `mucaro capabilities validate-retrieval-output REPORT_PATH` | Validate a saved retrieval result for ranked chunk/source integrity | 0 | 2 |
 | `mucaro capabilities validate-web-snapshot SNAPSHOT_PATH` | Validate a saved governed web snapshot for byte, policy, and parser integrity | 0 | 2 |
@@ -356,6 +357,14 @@ low-confidence error rate, and high-confidence precision. This is explicit
 evaluation evidence only: it does not assert semantic equivalence, create gold
 labels, certify representative-corpus accuracy, or change the OCR capability
 state by itself.
+
+Use `python3 scripts/certify_ocr_v1_runtime.py` for the release-gated OCR v1
+runtime control. It executes the eight supported/provisional image cases through
+the local Tesseract adapter, preserves explicit no-text and low-confidence
+states, and accounts for the four unsupported semantic classes without making
+table, form, or handwriting claims. Its scope is synthetic runtime and boundary
+accounting; it does not certify representative accuracy, provider parity, or
+semantic handwriting/table/form understanding.
 
 Use `mucaro capabilities validate-execution-report REPORT_PATH` to validate a
 saved `skill_runtime` execution event. The validator requires a hash-backed
