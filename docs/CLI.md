@@ -54,6 +54,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro capabilities contracts` | List advanced GIS, OCR, browsing, coding, and transparency/objectivity proof contracts | 0 | 2 |
 | `mucaro capabilities validate-gis-report REPORT_PATH` | Validate a saved GIS receipt against the advanced capability output contract | 0 | 2 |
 | `mucaro capabilities validate-ocr-report REPORT_PATH` | Validate a saved OCR receipt against the state-of-the-art OCR output contract | 0 | 2 |
+| `mucaro capabilities validate-ocr-structure-receipt RECEIPT_PATH` | Validate a derived OCR structure receipt for source binding, span accounting, and fail-closed inference state | 0 | 2 |
 | `mucaro capabilities validate-execution-report REPORT_PATH` | Validate a saved skill execution artifact-lineage receipt against the transparency contract | 0 | 2 |
 | `mucaro capabilities validate-retrieval-output REPORT_PATH` | Validate a saved retrieval result for ranked chunk/source integrity | 0 | 2 |
 | `mucaro capabilities validate-web-snapshot SNAPSHOT_PATH` | Validate a saved governed web snapshot for byte, policy, and parser integrity | 0 | 2 |
@@ -330,6 +331,17 @@ rendered and OCR receipt hashes, span accounting, and explicit no-text-page
 warnings. It returns `CAPABILITY_OUTPUT_CONTRACT_FAILED` when a report omits
 source or engine proof, claims text without saved spans, misses a required
 warning, or asserts counts that do not match the saved evidence.
+
+Use `mucaro ocr structure REPORT_PATH --kind multi_column|table|form` to derive a
+bounded structure receipt from an existing image OCR receipt. The derived receipt
+preserves the exact input-report SHA-256 and records the structure kind, raw span
+assignments, accounting invariants, limitations, and epistemic state. Geometry-based
+reconstruction is inference only: successful output remains
+`CANDIDATE_NOT_IDENTITY`, while ambiguous or incomplete assignments remain
+`UNRESOLVED` and return a failure exit code. Validate the saved artifact with
+`mucaro capabilities validate-ocr-structure-receipt RECEIPT_PATH`; this validator
+rejects missing input binding and any attempt to promote derived structure to fact
+or identity.
 
 Use `mucaro ocr calibrate REPORT_PATH GOLD_PATH` to evaluate a saved image OCR
 receipt against a `MUCARO_OCR_CALIBRATION_GOLD/1.0` JSON file. The gold file

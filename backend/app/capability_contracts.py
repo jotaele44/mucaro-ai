@@ -20,6 +20,7 @@ CAPABILITY_OUTPUT_CONTRACT_FAILED = "CAPABILITY_OUTPUT_CONTRACT_FAILED"
 GIS_REPORT_SCHEMA_VERSION = "mucaro_gis_report_v1"
 OCR_REPORT_SCHEMA_VERSION = "mucaro_ocr_report_v1"
 PDF_OCR_REPORT_SCHEMA_VERSION = "mucaro_pdf_ocr_report_v1"
+OCR_STRUCTURE_RECEIPT_SCHEMA_VERSION = "mucaro-ocr-structure-receipt/1.0"
 CRS_ENGINE_ADAPTERS = {
     "pyproj_transformer_group_always_xy_v1",
     "pyproj_governed_local_grid_always_xy_v1",
@@ -1457,6 +1458,215 @@ def validate_ocr_report_file(path: Path) -> dict[str, Any]:
     if not isinstance(report, dict):
         report = {}
     return validate_ocr_report_contract(report, report_path=str(path))
+
+
+def validate_ocr_structure_receipt_contract(
+    receipt: dict[str, Any], *, receipt_path: str | None = None
+) -> dict[str, Any]:
+    """Validate a derived OCR structure receipt without promoting inference to identity."""
+
+    checks: list[dict[str, str]] = [
+        _contract_check(
+            "payload_object",
+            isinstance(receipt, dict),
+            "structure receipt payload must be a JSON object",
+        ),
+        _contract_check(
+            "schema_version",
+            receipt.get("schema_version") == OCR_STRUCTURE_RECEIPT_SCHEMA_VERSION,
+            f"schema_version must be {OCR_STRUCTURE_RECEIPT_SCHEMA_VERSION}",
+        ),
+        _contract_check("structure_id_present", bool(receipt.get("structure_id")), "structure_id is required"),
+        _contract_check(
+            "status_valid",
+            receipt.get("status") in {"OCR_STRUCTURE_UNRESOLVED", "OCR_MULTI_COLUMN_OK", "OCR_TABLE_RECONSTRUCTION_OK", "OCR_FORM_RECONSTRUCTION_OK"},
+            "structure receipt status must be known",
+        ),
+        _contract_check(
+            "kind_valid",
+            receipt.get("kind") in {"multi_column", "table", "form"},
+            "structure receipt kind must be multi_column, table, or form",
+        ),
+        _contract_check(
+            "input_ocr_report_object",
+            isinstance(receipt.get("input_ocr_report"), dict),
+            "input OCR report provenance must be an object",
+        ),
+        _contract_check(
+            "structure_object",
+            isinstance(receipt.get("structure"), dict),
+            "derived structure must be an object",
+        ),
+        _contract_check(
+            "invariants_object",
+            isinstance(receipt.get("invariants"), dict),
+            "structure receipt invariants must be an object",
+        ),
+        _contract_check(
+            "limitations_non_empty",
+            _non_empty_string_list(receipt.get("limitations")),
+            "structure receipt limitations must be non-empty strings",
+        ),
+    ]
+
+    input_report = receipt.get("input_ocr_report")
+    if isinstance(input_report, dict):
+        checks.extend(
+            [
+                _contract_check(
+                    "input_ocr_report.sha256",
+                    bool(_SHA256_PATTERN.fullmatch(str(input_report.get("sha256", "")))),
+                    "input OCR report SHA-256 must be recorded",
+                ),
+                _contract_check(
+                    "input_ocr_report.report_id",
+                    bool(input_report.get("report_id")),
+                    "input OCR report ID must be recorded",
+                ),
+                _contract_check(
+                    "input_ocr_report.engine",
+                    isinstance(input_report.get("engine"), dict) or isinstance(input_report.get("engine"), str),
+                    "input OCR engine metadata must be recorded",
+                ),
+            ]
+        )
+
+    structure = receipt.get("structure")
+    if isinstance(structure, dict):
+        kind = receipt.get("kind")
+        expected_status = {
+            "multi_column": "OCR_MULTI_COLUMN_OK",
+            "table": "OCR_TABLE_RECONSTRUCTION_OK",
+            "form": "OCR_FORM_RECONSTRUCTION_OK",
+        }.get(kind)
+        structure_invariants = structure.get("invariants")
+        checks.extend(
+            [
+                _contract_check(
+                    "structure.schema_version",
+                    structure.get("schema_version") == "mucaro-ocr-structure/1.0",
+                    "derived structure schema version must be recorded",
+                ),
+                _contract_check(
+                    "structure.kind_matches_receipt",
+                    structure.get("kind") == str(kind).upper(),
+                    "derived structure kind must match receipt kind",
+                ),
+                _contract_check(
+                    "structure.status_matches_receipt",
+                    structure.get("status") == receipt.get("status"),
+                    "derived structure status must match receipt status",
+                ),
+                _contract_check(
+                    "structure.epistemic_classification",
+                    structure.get("epistemic_classification") == "INFERENCE",
+                    "derived structure must remain classified as inference",
+                ),
+                _contract_check(
+                    "structure.certification_state",
+                    structure.get("certification_state") in {"CANDIDATE_NOT_IDENTITY", "UNRESOLVED"},
+                    "derived structure must not claim identity certification",
+                ),
+                _contract_check(
+                    "structure.invariants_object",
+                    isinstance(structure_invariants, dict),
+                    "derived structure invariants must be an object",
+                ),
+            ]
+        )
+        if isinstance(structure_invariants, dict):
+            is_ok = receipt.get("status") == expected_status
+            checks.extend(
+                [
+                    _contract_check(
+                        "structure.all_input_spans_classified",
+                        structure_invariants.get("all_input_spans_classified") is is_ok,
+                        "span classification state must match terminal structure status",
+                    ),
+                    _contract_check(
+                        "structure.semantic_structure_claimed",
+                        structure_invariants.get("semantic_structure_claimed") is is_ok,
+                        "semantic structure claim must match terminal structure status",
+                    ),
+                ]
+            )
+
+    invariants = receipt.get("invariants")
+    if isinstance(invariants, dict):
+        checks.extend(
+            [
+                _contract_check(
+                    "invariants.input_report_sha256_present",
+                    invariants.get("input_report_sha256_present") is True,
+                    "receipt must assert input report hash presence",
+                ),
+                _contract_check(
+                    "invariants.input_report_schema_bound",
+                    invariants.get("input_report_schema_bound") is True,
+                    "receipt must assert input report schema binding",
+                ),
+                _contract_check(
+                    "invariants.structure_kind_exact",
+                    invariants.get("structure_kind_exact") is True,
+                    "receipt must assert exact structure kind binding",
+                ),
+                _contract_check(
+                    "invariants.structure_span_count_matches_input",
+                    invariants.get("structure_span_count_matches_input") is True,
+                    "receipt must assert input span accounting",
+                ),
+            ]
+        )
+
+    failed = [check for check in checks if check["status"] == "FAIL"]
+    return {
+        "status": CAPABILITY_OUTPUT_CONTRACT_OK if not failed else CAPABILITY_OUTPUT_CONTRACT_FAILED,
+        "schema_version": "mucaro_capability_output_contract_v1",
+        "capability_id": "state_of_art_ocr_analysis",
+        "artifact_kind": "ocr_structure_receipt",
+        "receipt_path": receipt_path,
+        "report_status": receipt.get("status"),
+        "operation": "ocr_structure_reconstruction",
+        "checks": checks,
+        "counts": {
+            "pass": sum(1 for check in checks if check["status"] == "PASS"),
+            "fail": len(failed),
+            "total": len(checks),
+        },
+        "failed_checks": failed,
+    }
+
+
+def validate_ocr_structure_receipt_file(path: Path) -> dict[str, Any]:
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        failed_check = _contract_check("receipt_file_exists", False, f"structure receipt not found: {path}")
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "state_of_art_ocr_analysis",
+            "artifact_kind": "ocr_structure_receipt",
+            "receipt_path": str(path),
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        failed_check = _contract_check("receipt_json_valid", False, str(exc))
+        return {
+            "status": CAPABILITY_OUTPUT_CONTRACT_FAILED,
+            "schema_version": "mucaro_capability_output_contract_v1",
+            "capability_id": "state_of_art_ocr_analysis",
+            "artifact_kind": "ocr_structure_receipt",
+            "receipt_path": str(path),
+            "checks": [failed_check],
+            "counts": {"pass": 0, "fail": 1, "total": 1},
+            "failed_checks": [failed_check],
+        }
+    if not isinstance(receipt, dict):
+        receipt = {}
+    return validate_ocr_structure_receipt_contract(receipt, receipt_path=str(path))
 
 
 def _validate_artifact_handle(

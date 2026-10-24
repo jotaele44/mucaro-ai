@@ -35,6 +35,7 @@ from .capability_contracts import (
     validate_execution_lineage_file,
     validate_gis_report_file,
     validate_ocr_report_file,
+    validate_ocr_structure_receipt_file,
     validate_retrieval_output_file,
     validate_web_snapshot_file,
 )
@@ -1318,6 +1319,14 @@ def build_parser() -> argparse.ArgumentParser:
     capability_validate_ocr.add_argument("report_path", type=Path, help="Path to a saved OCR report JSON file.")
     capability_validate_ocr.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     capability_validate_ocr.set_defaults(handler=run_capability_validate_ocr_report)
+
+    capability_validate_ocr_structure = capabilities_subcommands.add_parser(
+        "validate-ocr-structure-receipt",
+        help="Validate a derived OCR structure receipt without promoting inference to identity.",
+    )
+    capability_validate_ocr_structure.add_argument("receipt_path", type=Path, help="Path to a saved OCR structure receipt JSON file.")
+    capability_validate_ocr_structure.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    capability_validate_ocr_structure.set_defaults(handler=run_capability_validate_ocr_structure_receipt)
 
     capability_validate_execution = capabilities_subcommands.add_parser(
         "validate-execution-report",
@@ -9114,6 +9123,15 @@ def run_capability_validate_ocr_report(args: argparse.Namespace, cfg: Settings) 
     if not path.is_absolute():
         path = cfg.project_root / path
     report = validate_ocr_report_file(path)
+    emit_payload(report, args.format)
+    return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
+
+
+def run_capability_validate_ocr_structure_receipt(args: argparse.Namespace, cfg: Settings) -> int:
+    path = args.receipt_path
+    if not path.is_absolute():
+        path = cfg.project_root / path
+    report = validate_ocr_structure_receipt_file(path)
     emit_payload(report, args.format)
     return 0 if report.get("status") == "CAPABILITY_OUTPUT_CONTRACT_OK" else 2
 

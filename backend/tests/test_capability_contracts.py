@@ -847,6 +847,81 @@ def test_validate_ocr_report_contract_rejects_weak_image_ocr_receipts():
     assert "falsification_criteria_non_empty" in failed_names
 
 
+def test_validate_ocr_structure_receipt_contract_accepts_hash_bound_inference_receipt():
+    from backend.app.capability_contracts import validate_ocr_structure_receipt_contract
+
+    receipt = {
+        "schema_version": "mucaro-ocr-structure-receipt/1.0",
+        "structure_id": "ocrstructure_fixture",
+        "status": "OCR_FORM_RECONSTRUCTION_OK",
+        "kind": "form",
+        "input_ocr_report": {
+            "path": "/tmp/ocr.json",
+            "sha256": "a" * 64,
+            "report_id": "ocrreport_fixture",
+            "source_sha256": "b" * 64,
+            "engine": {"name": "tesseract"},
+        },
+        "structure": {
+            "schema_version": "mucaro-ocr-structure/1.0",
+            "kind": "FORM",
+            "status": "OCR_FORM_RECONSTRUCTION_OK",
+            "epistemic_classification": "INFERENCE",
+            "certification_state": "CANDIDATE_NOT_IDENTITY",
+            "invariants": {
+                "all_input_spans_classified": True,
+                "semantic_structure_claimed": True,
+            },
+        },
+        "invariants": {
+            "input_report_sha256_present": True,
+            "input_report_schema_bound": True,
+            "structure_kind_exact": True,
+            "structure_span_count_matches_input": True,
+        },
+        "limitations": ["bounded colon-delimited form reconstruction"],
+    }
+
+    result = validate_ocr_structure_receipt_contract(receipt)
+
+    assert result["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert result["artifact_kind"] == "ocr_structure_receipt"
+    assert result["counts"]["fail"] == 0
+
+
+def test_validate_ocr_structure_receipt_contract_rejects_identity_promotion_and_bad_binding():
+    from backend.app.capability_contracts import validate_ocr_structure_receipt_contract
+
+    receipt = {
+        "schema_version": "mucaro-ocr-structure-receipt/1.0",
+        "structure_id": "ocrstructure_bad",
+        "status": "OCR_FORM_RECONSTRUCTION_OK",
+        "kind": "form",
+        "input_ocr_report": {"sha256": "not-a-hash", "report_id": "ocrreport_bad", "engine": {}},
+        "structure": {
+            "schema_version": "mucaro-ocr-structure/1.0",
+            "kind": "FORM",
+            "status": "OCR_FORM_RECONSTRUCTION_OK",
+            "epistemic_classification": "FACT",
+            "certification_state": "PASS",
+            "invariants": {"all_input_spans_classified": True, "semantic_structure_claimed": True},
+        },
+        "invariants": {
+            "input_report_sha256_present": False,
+            "input_report_schema_bound": True,
+            "structure_kind_exact": True,
+            "structure_span_count_matches_input": True,
+        },
+        "limitations": ["missing safeguards"],
+    }
+
+    result = validate_ocr_structure_receipt_contract(receipt)
+
+    assert result["status"] == "CAPABILITY_OUTPUT_CONTRACT_FAILED"
+    assert any(check["name"] == "structure.epistemic_classification" for check in result["failed_checks"])
+    assert any(check["name"] == "input_ocr_report.sha256" for check in result["failed_checks"])
+
+
 def _pdf_ocr_report(*, no_text: bool = True) -> dict[str, Any]:
     page_status = "OCR_ANALYSIS_NO_TEXT" if no_text else "OCR_ANALYSIS_OK"
     page_warnings = ["OCR_NO_TEXT_DETECTED"] if no_text else []

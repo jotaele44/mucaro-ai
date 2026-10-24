@@ -5934,3 +5934,51 @@ def test_cli_ocr_structure_returns_nonzero_for_unresolved(tmp_path: Path, capsys
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "OCR_STRUCTURE_UNRESOLVED"
     assert payload["structure"]["certification_state"] == "UNRESOLVED"
+
+
+def test_cli_validates_ocr_structure_receipt(tmp_path: Path, capsys) -> None:
+    cfg = make_settings(tmp_path)
+    receipt_path = tmp_path / "ocr-structure.json"
+    receipt_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "mucaro-ocr-structure-receipt/1.0",
+                "structure_id": "ocrstructure_cli",
+                "status": "OCR_STRUCTURE_UNRESOLVED",
+                "kind": "multi_column",
+                "input_ocr_report": {
+                    "path": "/tmp/ocr.json",
+                    "sha256": "a" * 64,
+                    "report_id": "ocrreport_cli",
+                    "engine": {"name": "tesseract"},
+                },
+                "structure": {
+                    "schema_version": "mucaro-ocr-structure/1.0",
+                    "kind": "MULTI_COLUMN",
+                    "status": "OCR_STRUCTURE_UNRESOLVED",
+                    "epistemic_classification": "INFERENCE",
+                    "certification_state": "UNRESOLVED",
+                    "invariants": {
+                        "all_input_spans_classified": False,
+                        "semantic_structure_claimed": False,
+                    },
+                },
+                "invariants": {
+                    "input_report_sha256_present": True,
+                    "input_report_schema_bound": True,
+                    "structure_kind_exact": True,
+                    "structure_span_count_matches_input": True,
+                },
+                "limitations": ["bounded structure inference"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(
+        ["capabilities", "validate-ocr-structure-receipt", str(receipt_path), "--format", "json"],
+        cfg=cfg,
+    ) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CAPABILITY_OUTPUT_CONTRACT_OK"
+    assert payload["artifact_kind"] == "ocr_structure_receipt"
