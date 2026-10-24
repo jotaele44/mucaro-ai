@@ -70,3 +70,23 @@ def test_agent_workflow_rejects_invalid_graph(actions: list[dict[str, object]], 
     with pytest.raises(AgentWorkflowError) as exc:
         normalize_agent_actions(actions, max_actions=4)
     assert exc.value.status == status
+
+
+def test_task_cli_persists_dependency_dag_and_rejects_early_completion(tmp_path: Path, capsys) -> None:
+    cfg = make_settings(tmp_path)
+    assert main(["tasks", "create", "Prepare", "workspace", "--task-id", "prepare", "--format", "json"], cfg=cfg) == 0
+    prepare = json.loads(capsys.readouterr().out)
+    assert prepare["status"] == "TASK_CREATED"
+    assert main(
+        ["tasks", "create", "Implement", "feature", "--task-id", "implement", "--depends-on", "prepare", "--format", "json"],
+        cfg=cfg,
+    ) == 0
+    capsys.readouterr()
+
+    assert main(["tasks", "update", "implement", "--status", "DONE", "--format", "json"], cfg=cfg) == 2
+    error = json.loads(capsys.readouterr().err)
+    assert error["status"] == "ERROR_TASK_DEPENDENCIES_NOT_READY"
+
+    assert main(["tasks", "list", "--format", "json"], cfg=cfg) == 0
+    listed = json.loads(capsys.readouterr().out)
+    assert listed["ready_task_ids"] == ["prepare"]

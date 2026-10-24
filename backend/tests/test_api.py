@@ -123,6 +123,30 @@ def test_api_agent_fleet_creates_checkpointed_subagents(tmp_path: Path, monkeypa
     assert set(result["agents"]) == {"research", "synthesis"}
 
 
+def test_api_tasks_expose_durable_dependency_dag(tmp_path: Path):
+    client = make_client(tmp_path)
+    created = client.post("/tasks", json={"task_id": "api-foundation", "title": "Prepare API"})
+    assert created.status_code == 200
+    assert created.json()["status"] == "TASK_CREATED"
+
+    dependent = client.post(
+        "/tasks",
+        json={"task_id": "api-dependent", "title": "Use API", "depends_on": ["api-foundation"]},
+    )
+    assert dependent.status_code == 200
+
+    blocked = client.patch("/tasks/api-dependent", json={"status": "DONE"})
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["status"] == "ERROR_TASK_DEPENDENCIES_NOT_READY"
+
+    listed = client.get("/tasks")
+    assert listed.status_code == 200
+    assert listed.json()["ready_task_ids"] == ["api-foundation"]
+    shown = client.get("/tasks/api-dependent")
+    assert shown.status_code == 200
+    assert shown.json()["task"]["depends_on"] == ["api-foundation"]
+
+
 def test_api_optional_operator_auth_protects_mutations(tmp_path: Path):
     client = make_client(tmp_path, operator_token="secret-token")
 

@@ -916,6 +916,17 @@ implicit image pulls, network-enabled containers, or unapproved Git mutation.
 An unavailable engine or image is recorded as `BLOCKED`, never as a passing
 regression result.
 
+The durable agent task DAG is available through the CLI:
+
+- `mucaro tasks create TITLE [--depends-on TASK_ID]` creates a persistent task.
+- `mucaro tasks list` shows state counts and dependency-valid ready tasks.
+- `mucaro tasks show TASK_ID` shows one task's state, dependencies, and sequence.
+- `mucaro tasks update TASK_ID --status STATE` performs a legal transition.
+
+The corresponding governed tools are `task.list`, `task.show`, `task.create`,
+and `task.update`. Unknown dependencies, cycles, unfinished prerequisites,
+invalid transitions, and stale sequence updates fail closed.
+
 Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,

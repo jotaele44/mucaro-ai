@@ -86,6 +86,10 @@
     "web.render",
     "web.search",
     "coding.review",
+    "task.list",
+    "task.show",
+    "task.create",
+    "task.update",
     "workspace_profiles.list"
   ]
 }

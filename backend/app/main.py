@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, resume_fleet_plan
+from .agent_tasks import TaskError, create_task, get_task, list_tasks, task_summary, update_task
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
 from .conversations import (
@@ -56,6 +57,8 @@ from .models import (
     PlanRequest,
     ToolCallRequest,
     ToolDecisionRequest,
+    TaskCreateRequest,
+    TaskUpdateRequest,
     WorkspaceProfileRequest,
 )
 from .model_router import list_model_providers
@@ -584,6 +587,60 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             return result
         except FleetError as exc:
             raise api_error(exc.status, exc.detail, status_code=409 if "CHECKPOINT" in exc.status else 400) from exc
+
+    @app.get("/tasks")
+    def tasks(status: str | None = None, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return {**task_summary(cfg), "tasks": list_tasks(cfg, status=status)}
+        except TaskError as exc:
+            raise api_error(exc.status, exc.detail) from exc
+
+    @app.post("/tasks")
+    def create_agent_task(req: TaskCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            task = create_task(
+                req.title,
+                description=req.description,
+                priority=req.priority,
+                depends_on=req.depends_on,
+                owner=req.owner,
+                task_id=req.task_id,
+                cfg=cfg,
+            )
+            return {"status": "TASK_CREATED", "task": task}
+        except TaskError as exc:
+            status_code = 409 if exc.status in {"ERROR_TASK_DUPLICATE_ID", "ERROR_TASK_UNKNOWN_DEPENDENCY", "ERROR_TASK_DEPENDENCY_CYCLE"} else 400
+            raise api_error(exc.status, exc.detail, status_code=status_code) from exc
+
+    @app.get("/tasks/{task_id}")
+    def show_agent_task(task_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            task = get_task(task_id, cfg)
+        except TaskError as exc:
+            raise api_error(exc.status, exc.detail) from exc
+        if task is None:
+            raise api_error("ERROR_TASK_NOT_FOUND", task_id, status_code=404)
+        return {"status": "TASK_SHOW_OK", "task": task}
+
+    @app.patch("/tasks/{task_id}")
+    def update_agent_task(task_id: str, req: TaskUpdateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            task = update_task(
+                task_id,
+                status=req.status,
+                blocked_reason=req.blocked_reason,
+                expected_sequence=req.expected_sequence,
+                cfg=cfg,
+            )
+            return {"status": "TASK_UPDATED", "task": task}
+        except TaskError as exc:
+            status_code = 404 if exc.status == "ERROR_TASK_NOT_FOUND" else 409 if exc.status in {
+                "ERROR_TASK_CONFLICT",
+                "ERROR_TASK_TRANSITION",
+                "ERROR_TASK_DEPENDENCIES_NOT_READY",
+                "ERROR_TASK_BLOCKED_REASON_REQUIRED",
+            } else 400
+            raise api_error(exc.status, exc.detail, status_code=status_code) from exc
 
     @app.get("/offline-manifest")
     def offline_manifest(offline: bool = False) -> dict:

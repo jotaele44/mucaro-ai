@@ -90,6 +90,21 @@ class AgentFleetRequest(BaseModel):
     checkpoint_id: str | None = Field(default=None, min_length=1, max_length=120)
 
 
+class TaskCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=500)
+    description: str = Field(default="", max_length=10000)
+    priority: Literal["low", "normal", "high", "urgent"] = "normal"
+    depends_on: list[str] = Field(default_factory=list, max_length=32)
+    owner: str | None = Field(default=None, max_length=160)
+    task_id: str | None = Field(default=None, max_length=160)
+
+
+class TaskUpdateRequest(BaseModel):
+    status: Literal["TODO", "IN_PROGRESS", "BLOCKED", "DONE", "FAILED", "CANCELLED"]
+    blocked_reason: str | None = Field(default=None, max_length=2000)
+    expected_sequence: int | None = Field(default=None, ge=0)
+
+
 class InteractionOptionInput(BaseModel):
     option_id: str = Field(min_length=1, max_length=80)
     label: str = Field(min_length=1, max_length=200)

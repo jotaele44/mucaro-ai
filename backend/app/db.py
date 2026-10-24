@@ -10,7 +10,7 @@ from typing import Any
 from .config import parse_bool, settings
 
 # Bump when tables change; init_db only ever moves the recorded version forward.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def get_connection(sqlite_path: Path | None = None) -> sqlite3.Connection:
@@ -56,6 +56,10 @@ _SCHEMA_SQL = """
             );
             CREATE TABLE IF NOT EXISTS agent_checkpoints (
                 checkpoint_id TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS agent_tasks (
+                task_id TEXT PRIMARY KEY,
                 payload_json TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS interactions (
@@ -137,7 +141,7 @@ def ensure_db(sqlite_path: Path | None = None) -> None:
     _INITIALIZED_PATHS.add(str(path.resolve()))
 
 
-PAYLOAD_TABLES = frozenset({"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints", "interactions"})
+PAYLOAD_TABLES = frozenset({"sources", "chunks", "runs", "execution_gates", "conversations", "agent_checkpoints", "agent_tasks", "interactions"})
 _IDENTIFIER = re.compile(r"^[a-z_][a-z0-9_]{0,63}$")
 
 

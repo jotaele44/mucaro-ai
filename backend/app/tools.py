@@ -12,6 +12,7 @@ from .coding_review import CodingReviewError, build_code_review_report
 from .coding_workspace import CodingWorkspaceError, inspect_repository, inspect_repository_diff, read_repository_file
 from .config import Settings, settings
 from .contracts import validate_contract
+from .agent_tasks import TaskError, create_task, get_task, list_tasks, task_summary, update_task
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
 from .product_audit import build_product_audit
@@ -211,6 +212,69 @@ def _coding_review(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
+def _task_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    status = arguments.get("status")
+    if status is not None and not isinstance(status, str):
+        raise ToolRuntimeError("ERROR_TASK_STATE_INVALID", "task.list status must be a string")
+    try:
+        return {**task_summary(cfg), "tasks": list_tasks(cfg, status=status)}
+    except TaskError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _task_show(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    task_id = arguments.get("task_id")
+    if not isinstance(task_id, str) or not task_id.strip():
+        raise ToolRuntimeError("ERROR_TASK_TASK_ID_INVALID", "task.show requires task_id")
+    try:
+        task = get_task(task_id, cfg)
+    except TaskError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+    if task is None:
+        raise ToolRuntimeError("ERROR_TASK_NOT_FOUND", task_id)
+    return {"status": "TASK_SHOW_OK", "task": task}
+
+
+def _task_create(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    title = arguments.get("title")
+    if not isinstance(title, str) or not title.strip():
+        raise ToolRuntimeError("ERROR_TASK_TITLE_REQUIRED", "task.create requires title")
+    try:
+        task = create_task(
+            title,
+            description=arguments.get("description", ""),
+            priority=arguments.get("priority", "normal"),
+            depends_on=arguments.get("depends_on"),
+            owner=arguments.get("owner"),
+            task_id=arguments.get("task_id"),
+            metadata=arguments.get("metadata"),
+            cfg=cfg,
+        )
+    except TaskError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+    return {"status": "TASK_CREATED", "task": task}
+
+
+def _task_update(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    task_id = arguments.get("task_id")
+    if not isinstance(task_id, str) or not task_id.strip():
+        raise ToolRuntimeError("ERROR_TASK_TASK_ID_INVALID", "task.update requires task_id")
+    if not isinstance(arguments.get("status"), str) or not arguments["status"].strip():
+        raise ToolRuntimeError("ERROR_TASK_STATE_REQUIRED", "task.update requires status")
+    try:
+        task = update_task(
+            task_id,
+            status=arguments.get("status"),
+            blocked_reason=arguments.get("blocked_reason"),
+            depends_on=arguments.get("depends_on"),
+            expected_sequence=arguments.get("expected_sequence"),
+            cfg=cfg,
+        )
+    except TaskError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+    return {"status": "TASK_UPDATED", "task": task}
+
+
 def _web_fetch(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     url = arguments.get("url")
     if not isinstance(url, str):
@@ -351,6 +415,34 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_review,
+    ),
+    "task.list": ToolDefinition(
+        name="task.list",
+        description="List the durable user task DAG with dependency-valid readiness and state counts.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_task_list,
+    ),
+    "task.show": ToolDefinition(
+        name="task.show",
+        description="Show one durable task, including dependencies, state, sequence, and blocked reason.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_task_show,
+    ),
+    "task.create": ToolDefinition(
+        name="task.create",
+        description="Create a durable task with explicit priority and dependency identities; rejects unknown dependencies and cycles.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_task_create,
+    ),
+    "task.update": ToolDefinition(
+        name="task.update",
+        description="Advance one durable task through dependency-valid states using sequence-checked transitions.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_task_update,
     ),
     "web.render": ToolDefinition(
         name="web.render",

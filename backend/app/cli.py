@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 from .agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, resume_fleet_plan
 from .agent_planner import build_agent_plan
 from .agent_tool_proposals import AgentToolProposalError, parse_provider_tool_proposals
+from .agent_tasks import TASK_PRIORITIES, TASK_STATES, TaskError, create_task, get_task, list_tasks, task_summary, update_task
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -1026,6 +1027,37 @@ def build_parser() -> argparse.ArgumentParser:
     conversations_ask.add_argument("--require-offline", action="store_true", help="Require an offline model route.")
     conversations_ask.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     conversations_ask.set_defaults(handler=run_conversations_ask)
+
+    tasks = subcommands.add_parser("tasks", help="Manage the durable agent task and dependency DAG.")
+    tasks_subcommands = tasks.add_subparsers(dest="tasks_command", required=True)
+
+    tasks_list = tasks_subcommands.add_parser("list", help="List durable tasks and readiness.")
+    tasks_list.add_argument("--status", choices=TASK_STATES, help="Filter by task state.")
+    tasks_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tasks_list.set_defaults(handler=run_tasks_list)
+
+    tasks_show = tasks_subcommands.add_parser("show", help="Show one durable task.")
+    tasks_show.add_argument("task_id", help="Task identifier.")
+    tasks_show.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tasks_show.set_defaults(handler=run_tasks_show)
+
+    tasks_create = tasks_subcommands.add_parser("create", help="Create a durable task.")
+    tasks_create.add_argument("title", nargs="+", help="Task title.")
+    tasks_create.add_argument("--description", default="", help="Optional task description.")
+    tasks_create.add_argument("--priority", choices=TASK_PRIORITIES, default="normal")
+    tasks_create.add_argument("--depends-on", action="append", default=[], help="Existing task ID; repeatable.")
+    tasks_create.add_argument("--owner", help="Optional task owner label.")
+    tasks_create.add_argument("--task-id", help="Optional stable task identifier.")
+    tasks_create.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tasks_create.set_defaults(handler=run_tasks_create)
+
+    tasks_update = tasks_subcommands.add_parser("update", help="Advance a durable task through a legal state transition.")
+    tasks_update.add_argument("task_id", help="Task identifier.")
+    tasks_update.add_argument("--status", choices=TASK_STATES, required=True)
+    tasks_update.add_argument("--blocked-reason", help="Required when setting BLOCKED.")
+    tasks_update.add_argument("--expected-sequence", type=int, help="Compare-and-swap sequence guard.")
+    tasks_update.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    tasks_update.set_defaults(handler=run_tasks_update)
 
     runs = subcommands.add_parser("runs", help="Inspect persisted answer runs.")
     runs_subcommands = runs.add_subparsers(dest="runs_command", required=True)
@@ -8471,6 +8503,63 @@ def run_conversations_ask(args: argparse.Namespace, cfg: Settings) -> int:
     return 0 if answer.get("citation_status") == "CITATION_OK" else 3
 
 
+def run_tasks_list(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = {**task_summary(cfg), "tasks": list_tasks(cfg, status=args.status)}
+    except TaskError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_tasks_show(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        task = get_task(args.task_id, cfg)
+        if task is None:
+            raise TaskError("ERROR_TASK_NOT_FOUND", args.task_id)
+        result = {"status": "TASK_SHOW_OK", "task": task}
+    except TaskError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_tasks_create(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        task = create_task(
+            " ".join(args.title),
+            description=args.description,
+            priority=args.priority,
+            depends_on=args.depends_on,
+            owner=args.owner,
+            task_id=args.task_id,
+            cfg=cfg,
+        )
+    except TaskError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload({"status": "TASK_CREATED", "task": task}, args.format)
+    return 0
+
+
+def run_tasks_update(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        task = update_task(
+            args.task_id,
+            status=args.status,
+            blocked_reason=args.blocked_reason,
+            expected_sequence=args.expected_sequence,
+            cfg=cfg,
+        )
+    except TaskError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload({"status": "TASK_UPDATED", "task": task}, args.format)
+    return 0
+
+
 def run_runs_list(args: argparse.Namespace, cfg: Settings) -> int:
     result = {"status": "RUNS_OK", "runs": list_payloads("runs", cfg.sqlite_path)}
     emit_payload(result, args.format)
@@ -8925,6 +9014,9 @@ def main(argv: Sequence[str] | None = None, cfg: Settings = settings) -> int:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
         return exc.exit_code
     except ModelProviderError as exc:
+        emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
+        return 2
+    except TaskError as exc:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
         return 2
     except DirectoryPermissionError as exc:

@@ -68,6 +68,8 @@ def test_runtime_evidence_is_derived_from_governed_requests() -> None:
         assert tools[name]["classification"] == "REQUIRED"
     assert tools["coding.review"]["evidence_state"] == "EXERCISED"
     assert tools["coding.review"]["classification"] == "SUPPORTING"
+    for name in ("task.list", "task.show", "task.create", "task.update"):
+        assert tools[name]["classification"] == "SUPPORTING", name
     assert all(row["requires_approval"] for row in tools.values())
 
 

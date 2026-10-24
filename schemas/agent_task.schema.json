@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/agent_task.schema.json",
+  "title": "Mucaro durable agent task",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "task_id", "title", "description", "status", "priority", "depends_on", "owner", "blocked_reason", "created_at", "updated_at", "sequence", "metadata"],
+  "properties": {
+    "schema_version": {"const": "mucaro-agent-task/1.0"},
+    "task_id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "title": {"type": "string", "minLength": 1, "maxLength": 500},
+    "description": {"type": "string"},
+    "status": {"enum": ["TODO", "IN_PROGRESS", "BLOCKED", "DONE", "FAILED", "CANCELLED"]},
+    "priority": {"enum": ["low", "normal", "high", "urgent"]},
+    "depends_on": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "owner": {"type": ["string", "null"]},
+    "blocked_reason": {"type": ["string", "null"]},
+    "created_at": {"type": "string", "minLength": 1},
+    "updated_at": {"type": "string", "minLength": 1},
+    "sequence": {"type": "integer", "minimum": 0},
+    "metadata": {"type": "object"}
+  }
+}
