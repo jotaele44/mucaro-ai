@@ -614,6 +614,11 @@ def test_cli_coding_readiness_reports_blockers_without_execution(tmp_path: Path,
     assert payload["execution_status"] == "NOT_EXECUTED"
     assert payload["blockers"] == ["CONTAINER_ENGINE", "CODING_IMAGE"]
 
+    assert main(["coding", "readiness", str(repo), "--format", "text"], cfg=cfg) == 2
+    text_output = capsys.readouterr().out
+    assert "execution_status=NOT_EXECUTED" in text_output
+    assert "blockers=CONTAINER_ENGINE,CODING_IMAGE" in text_output
+
 
 def test_cli_capabilities_validate_ocr_report_checks_saved_receipts(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)

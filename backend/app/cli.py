@@ -1897,7 +1897,25 @@ def emit_payload(payload: dict[str, Any], output_format: str) -> None:
         return
     status = payload.get("status") or payload.get("citation_status") or "OK"
     print(status)
-    if status in {"CERTIFICATION_READY", "CERTIFICATION_WARN", "CERTIFICATION_FAIL"}:
+    if status in {"CODING_READINESS_READY", "CODING_READINESS_BLOCKED"}:
+        print(f"execution_status={payload.get('execution_status')}")
+        print(f"repo_root={payload.get('repo_root')}")
+        source = payload.get("source", {})
+        if isinstance(source, dict):
+            print(f"head_sha={source.get('head_sha')}")
+            print(f"branch={source.get('branch')}")
+            print(f"dirty_status={source.get('dirty_status')}")
+            print(f"dirty_path_count={source.get('dirty_path_count')}")
+        runtime = payload.get("runtime", {})
+        if isinstance(runtime, dict):
+            print(f"engine={runtime.get('engine')}")
+            print(f"image={runtime.get('image')}")
+            print(f"network_allowed={runtime.get('network_allowed')}")
+            print(f"implicit_image_pull_allowed={runtime.get('implicit_image_pull_allowed')}")
+        blockers = payload.get("blockers", [])
+        if isinstance(blockers, list):
+            print(f"blockers={','.join(str(blocker) for blocker in blockers)}")
+    elif status in {"CERTIFICATION_READY", "CERTIFICATION_WARN", "CERTIFICATION_FAIL"}:
         print(f"version={payload.get('version')}")
         print(f"project_root={payload.get('project_root')}")
         git = payload.get("git", {})
