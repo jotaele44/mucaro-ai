@@ -27,7 +27,7 @@ def build_intelligence_plane_descriptor() -> dict[str, Any]:
             "agent_runtime": {
                 "state": "PARTIAL",
                 "contract": None,
-                "notes": "Planning/execution gates, conversations, bounded natural-language intent planning, approval-gated tools, skills, local memory and coding lifecycle primitives exist; model-native tool use, durable multi-step workflow DAG orchestration, subagents, fleet scheduling and crash-resume semantics beyond the run state machine remain open.",
+                "notes": "Planning/execution gates, conversations, bounded natural-language intent planning, approval-gated tools, skills, local memory and coding lifecycle primitives exist; provider-native Anthropic/OpenAI-compatible tool loops now persist message history and terminal tool-result continuation under bounded turns, while subagents, fleet scheduling and crash-resume semantics beyond the run state machine remain open.",
             },
             "tool_runtime": {
                 "state": "AVAILABLE",
