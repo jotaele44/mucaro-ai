@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from backend.app.config import Settings
+from backend.app.permission_leases import create_permission_lease
 from backend.app.tools import (
     ToolRuntimeError,
     approve_tool_call,
@@ -40,6 +41,31 @@ def test_tool_runtime_lists_allowlisted_tools():
     assert by_name["web.fetch"]["mutates_state"] is True
     assert by_name["web.fetch_session"]["requires_approval"] is True
     assert by_name["web.fetch_session"]["mutates_state"] is True
+    assert by_name["permission.lease_create"]["requires_approval"] is True
+    assert by_name["permission.lease_revoke"]["mutates_state"] is True
+
+
+def test_permission_lease_tool_crosses_approval_and_audit_boundary(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    lease = create_permission_lease("run-tool", "subprocess.execute", "agent-tool", cfg=cfg)
+    requested = request_tool_call(
+        "permission.lease_consume",
+        {
+            "lease_id": lease["lease_id"],
+            "run_id": "run-tool",
+            "capability": "subprocess.execute",
+            "subject": "agent-tool",
+        },
+        cfg=cfg,
+        requested_by="test",
+    )
+    tool_call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
+    executed = run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
+
+    assert executed["result"]["status"] == "PERMISSION_LEASE_CONSUMED"
+    assert executed["result"]["lease"]["uses"] == 1
+    assert list_tool_audit_events(cfg)["events"][-1]["event"] == "TOOL_CALL_EXECUTED"
 
 
 def test_tool_runtime_requires_approval_before_execution(tmp_path: Path):

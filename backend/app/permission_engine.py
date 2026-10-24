@@ -13,6 +13,7 @@ from .distribution_policy import (
     SUPPORTED_DISTRIBUTION_CHANNELS,
 )
 from .permissions import DirectoryPermissionError, check_directory_permission
+from .permission_leases import PermissionLeaseError, consume_permission_lease, inspect_permission_lease
 
 PERMISSION_DECISION_SCHEMA_VERSION = "mucaro-permission-decision/1.0"
 
@@ -59,6 +60,8 @@ class PermissionRequest:
     origin: str = "agent"
     approved: bool = False
     declared: frozenset[str] | None = None  # None = subject declares exactly what it requests
+    run_id: str | None = None
+    lease_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.declared is not None and not isinstance(self.declared, frozenset):
@@ -135,6 +138,23 @@ def evaluate(
     if request.capability not in KNOWN_CAPABILITIES:
         return _decision(request, DENY, [f"unknown capability: {request.capability}"])
 
+    if (request.run_id is None) != (request.lease_id is None):
+        return _decision(request, DENY, ["run-scoped permission leases require both run_id and lease_id"])
+    lease_active = False
+    if request.lease_id is not None and request.run_id is not None:
+        try:
+            inspect_permission_lease(
+                request.lease_id,
+                run_id=request.run_id,
+                capability=request.capability,
+                subject=request.subject,
+                target=request.target,
+                cfg=cfg,
+            )
+            lease_active = True
+        except PermissionLeaseError as exc:
+            return _decision(request, DENY, [exc.detail])
+
     declared = request.declared if request.declared is not None else frozenset({request.capability})
     capability_decision = evaluate_capabilities(
         policy=policy,
@@ -166,7 +186,7 @@ def evaluate(
         if request.origin == "planning":
             # Even approved=True does not help: approval must arrive as a fresh execution request.
             return _decision(request, ASK, ["planning never authorizes execution; explicit approval required"])
-        if not (request.origin == "operator" or request.approved):
+        if not (request.origin == "operator" or request.approved or lease_active):
             return _decision(request, ASK, [f"approval required for side-effecting capability: {request.capability}"])
 
     return _decision(request, ALLOW, [])
@@ -182,4 +202,16 @@ def require(
     decision = evaluate(request, cfg=cfg, policy=policy, distribution_channel=distribution_channel)
     if not decision.allowed:
         raise PermissionEngineError(decision)
+    if request.lease_id is not None and request.run_id is not None:
+        try:
+            consume_permission_lease(
+                request.lease_id,
+                run_id=request.run_id,
+                capability=request.capability,
+                subject=request.subject,
+                target=request.target,
+                cfg=cfg,
+            )
+        except PermissionLeaseError as exc:
+            raise PermissionEngineError(_decision(request, DENY, [exc.detail])) from exc
     return decision

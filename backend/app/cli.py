@@ -147,6 +147,12 @@ from .packaging import (
 from .parser import ParseError
 from .permission_engine import PermissionEngineError, PermissionRequest
 from .permission_engine import require as require_permission
+from .permission_leases import (
+    PermissionLeaseError,
+    create_permission_lease,
+    list_permission_leases,
+    revoke_permission_lease,
+)
 from .permissions import (
     DirectoryPermissionError,
     check_directory_permission,
@@ -1058,6 +1064,26 @@ def build_parser() -> argparse.ArgumentParser:
     tasks_update.add_argument("--expected-sequence", type=int, help="Compare-and-swap sequence guard.")
     tasks_update.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tasks_update.set_defaults(handler=run_tasks_update)
+
+    leases = subcommands.add_parser("leases", help="Manage bounded run-scoped permission leases.")
+    leases_subcommands = leases.add_subparsers(dest="leases_command", required=True)
+    leases_list = leases_subcommands.add_parser("list", help="List permission leases.")
+    leases_list.add_argument("--run-id", help="Filter by run identity.")
+    leases_list.add_argument("--format", choices=["json", "text"], default="json")
+    leases_list.set_defaults(handler=run_leases_list)
+    leases_create = leases_subcommands.add_parser("create", help="Create a permission lease.")
+    leases_create.add_argument("run_id")
+    leases_create.add_argument("capability")
+    leases_create.add_argument("subject")
+    leases_create.add_argument("--target")
+    leases_create.add_argument("--ttl-seconds", type=int, default=300)
+    leases_create.add_argument("--max-uses", type=int, default=1)
+    leases_create.add_argument("--format", choices=["json", "text"], default="json")
+    leases_create.set_defaults(handler=run_leases_create)
+    leases_revoke = leases_subcommands.add_parser("revoke", help="Revoke a permission lease.")
+    leases_revoke.add_argument("lease_id")
+    leases_revoke.add_argument("--format", choices=["json", "text"], default="json")
+    leases_revoke.set_defaults(handler=run_leases_revoke)
 
     runs = subcommands.add_parser("runs", help="Inspect persisted answer runs.")
     runs_subcommands = runs.add_subparsers(dest="runs_command", required=True)
@@ -8557,6 +8583,45 @@ def run_tasks_update(args: argparse.Namespace, cfg: Settings) -> int:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload({"status": "TASK_UPDATED", "task": task}, args.format)
+    return 0
+
+
+def run_leases_list(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = {"status": "PERMISSION_LEASES_OK", "leases": list_permission_leases(cfg, run_id=args.run_id)}
+    except PermissionLeaseError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_leases_create(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        lease = create_permission_lease(
+            args.run_id,
+            args.capability,
+            args.subject,
+            target=args.target,
+            ttl_seconds=args.ttl_seconds,
+            max_uses=args.max_uses,
+            granted_by="cli",
+            cfg=cfg,
+        )
+    except PermissionLeaseError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload({"status": "PERMISSION_LEASE_CREATED", "lease": lease}, args.format)
+    return 0
+
+
+def run_leases_revoke(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        lease = revoke_permission_lease(args.lease_id, cfg)
+    except PermissionLeaseError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload({"status": "PERMISSION_LEASE_REVOKED", "lease": lease}, args.format)
     return 0
 
 

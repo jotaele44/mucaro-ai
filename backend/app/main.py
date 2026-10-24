@@ -45,6 +45,8 @@ from .models import (
     ConversationCreateRequest,
     ConversationUpdateRequest,
     DirectoryPermissionRequest,
+    PermissionLeaseConsumeRequest,
+    PermissionLeaseCreateRequest,
     IngestPathRequest,
     InteractionCreateRequest,
     InteractionDismissRequest,
@@ -77,6 +79,13 @@ from .permissions import (
     grant_directory,
     load_directory_grants,
     revoke_directory,
+)
+from .permission_leases import (
+    PermissionLeaseError,
+    consume_permission_lease,
+    create_permission_lease,
+    list_permission_leases,
+    revoke_permission_lease,
 )
 from .response_flow import (
     InteractionError,
@@ -354,6 +363,52 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             return revoke_directory(req.path, cfg)
         except DirectoryPermissionError as exc:
             raise api_error(exc.status, exc.detail, status_code=400) from exc
+
+    @app.get("/permissions/leases")
+    def permission_leases(run_id: str | None = None, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return {"status": "PERMISSION_LEASES_OK", "leases": list_permission_leases(cfg, run_id=run_id)}
+        except PermissionLeaseError as exc:
+            raise api_error(exc.status, exc.detail, status_code=400) from exc
+
+    @app.post("/permissions/leases")
+    def create_permission_lease_route(req: PermissionLeaseCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            lease = create_permission_lease(
+                req.run_id,
+                req.capability,
+                req.subject,
+                target=req.target,
+                ttl_seconds=req.ttl_seconds,
+                max_uses=req.max_uses,
+                granted_by="api",
+                cfg=cfg,
+            )
+            return {"status": "PERMISSION_LEASE_CREATED", "lease": lease}
+        except PermissionLeaseError as exc:
+            raise api_error(exc.status, exc.detail, status_code=400) from exc
+
+    @app.post("/permissions/leases/{lease_id}/consume")
+    def consume_permission_lease_route(lease_id: str, req: PermissionLeaseConsumeRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            lease = consume_permission_lease(
+                lease_id,
+                run_id=req.run_id,
+                capability=req.capability,
+                subject=req.subject,
+                target=req.target,
+                cfg=cfg,
+            )
+            return {"status": "PERMISSION_LEASE_CONSUMED", "lease": lease}
+        except PermissionLeaseError as exc:
+            raise api_error(exc.status, exc.detail, status_code=409) from exc
+
+    @app.post("/permissions/leases/{lease_id}/revoke")
+    def revoke_permission_lease_route(lease_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return {"status": "PERMISSION_LEASE_REVOKED", "lease": revoke_permission_lease(lease_id, cfg)}
+        except PermissionLeaseError as exc:
+            raise api_error(exc.status, exc.detail, status_code=404 if exc.status == "ERROR_LEASE_NOT_FOUND" else 400) from exc
 
     @app.get("/sources")
     def sources() -> dict:

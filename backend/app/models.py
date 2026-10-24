@@ -54,6 +54,22 @@ class DirectoryPermissionRequest(BaseModel):
     reason: str | None = None
 
 
+class PermissionLeaseCreateRequest(BaseModel):
+    run_id: str = Field(min_length=1, max_length=160)
+    capability: str = Field(min_length=1, max_length=120)
+    subject: str = Field(min_length=1, max_length=160)
+    target: str | None = Field(default=None, max_length=2000)
+    ttl_seconds: int = Field(default=300, ge=1, le=3600)
+    max_uses: int = Field(default=1, ge=1, le=100)
+
+
+class PermissionLeaseConsumeRequest(BaseModel):
+    run_id: str = Field(min_length=1, max_length=160)
+    capability: str = Field(min_length=1, max_length=120)
+    subject: str = Field(min_length=1, max_length=160)
+    target: str | None = Field(default=None, max_length=2000)
+
+
 class IngestPathRequest(BaseModel):
     path: str = Field(min_length=1)
 

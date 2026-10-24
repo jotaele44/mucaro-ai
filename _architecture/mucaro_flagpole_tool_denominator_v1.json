@@ -90,6 +90,10 @@
     "task.show",
     "task.create",
     "task.update",
+    "permission.lease_list",
+    "permission.lease_create",
+    "permission.lease_consume",
+    "permission.lease_revoke",
     "workspace_profiles.list"
   ]
 }

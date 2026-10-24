@@ -927,6 +927,19 @@ The corresponding governed tools are `task.list`, `task.show`, `task.create`,
 and `task.update`. Unknown dependencies, cycles, unfinished prerequisites,
 invalid transitions, and stale sequence updates fail closed.
 
+Run-scoped permission leases are available through the CLI:
+
+- `mucaro leases create RUN_ID CAPABILITY SUBJECT [--ttl-seconds N] [--max-uses N]`
+  creates a bounded, expiring lease bound to one run and exact capability identity.
+- `mucaro leases list [--run-id RUN_ID]` lists leases with derived effective state.
+- `mucaro leases revoke LEASE_ID` revokes a lease before it can authorize execution.
+
+The governed tools `permission.lease_list`, `permission.lease_create`,
+`permission.lease_consume`, and `permission.lease_revoke` use the same durable
+SQLite records. Permission evaluation only inspects an active lease; the
+execution-time `require()` gate consumes one use atomically and rejects expired,
+revoked, exhausted, or identity-mismatched leases.
+
 Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,

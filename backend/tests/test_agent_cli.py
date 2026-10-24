@@ -90,3 +90,18 @@ def test_task_cli_persists_dependency_dag_and_rejects_early_completion(tmp_path:
     assert main(["tasks", "list", "--format", "json"], cfg=cfg) == 0
     listed = json.loads(capsys.readouterr().out)
     assert listed["ready_task_ids"] == ["prepare"]
+
+
+def test_permission_lease_cli_creates_lists_and_revokes(tmp_path: Path, capsys) -> None:
+    cfg = make_settings(tmp_path)
+    assert main(["leases", "create", "run-cli", "subprocess.execute", "agent-cli", "--format", "json"], cfg=cfg) == 0
+    created = json.loads(capsys.readouterr().out)
+    lease_id = created["lease"]["lease_id"]
+
+    assert main(["leases", "list", "--run-id", "run-cli", "--format", "json"], cfg=cfg) == 0
+    listed = json.loads(capsys.readouterr().out)
+    assert listed["leases"][0]["lease_id"] == lease_id
+
+    assert main(["leases", "revoke", lease_id, "--format", "json"], cfg=cfg) == 0
+    revoked = json.loads(capsys.readouterr().out)
+    assert revoked["lease"]["state"] == "REVOKED"

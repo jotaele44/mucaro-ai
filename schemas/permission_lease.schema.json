@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro.local/schemas/permission_lease.schema.json",
+  "title": "Mucaro run-scoped permission lease",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "lease_id", "run_id", "capability", "subject", "target", "state", "created_at", "expires_at", "revoked_at", "uses", "max_uses", "granted_by", "sequence"],
+  "properties": {
+    "schema_version": {"const": "mucaro-permission-lease/1.0"},
+    "lease_id": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "capability": {"type": "string", "minLength": 1},
+    "subject": {"type": "string", "minLength": 1},
+    "target": {"type": ["string", "null"]},
+    "state": {"enum": ["ACTIVE", "EXHAUSTED", "EXPIRED", "REVOKED"]},
+    "created_at": {"type": "string", "minLength": 1},
+    "expires_at": {"type": "string", "minLength": 1},
+    "revoked_at": {"type": ["string", "null"]},
+    "uses": {"type": "integer", "minimum": 0},
+    "max_uses": {"type": "integer", "minimum": 1, "maximum": 100},
+    "granted_by": {"type": "string", "minLength": 1},
+    "sequence": {"type": "integer", "minimum": 0}
+  }
+}

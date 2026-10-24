@@ -15,6 +15,13 @@ from .contracts import validate_contract
 from .agent_tasks import TaskError, create_task, get_task, list_tasks, task_summary, update_task
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
+from .permission_leases import (
+    PermissionLeaseError,
+    consume_permission_lease,
+    create_permission_lease,
+    list_permission_leases,
+    revoke_permission_lease,
+)
 from .product_audit import build_product_audit
 from .utils import canonical_sha256, read_json, stable_id, update_json, utc_now
 from .web_browsing import (
@@ -275,6 +282,56 @@ def _task_update(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     return {"status": "TASK_UPDATED", "task": task}
 
 
+def _permission_lease_list(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    run_id = arguments.get("run_id")
+    if run_id is not None and not isinstance(run_id, str):
+        raise ToolRuntimeError("ERROR_LEASE_RUN_ID_INVALID", "permission.lease_list run_id must be a string")
+    try:
+        return {"status": "PERMISSION_LEASES_OK", "leases": list_permission_leases(cfg, run_id=run_id)}
+    except PermissionLeaseError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _permission_lease_create(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    try:
+        lease = create_permission_lease(
+            arguments.get("run_id"),
+            arguments.get("capability"),
+            arguments.get("subject"),
+            target=arguments.get("target"),
+            ttl_seconds=arguments.get("ttl_seconds", 300),
+            max_uses=arguments.get("max_uses", 1),
+            granted_by=str(arguments.get("granted_by") or "tool"),
+            cfg=cfg,
+        )
+    except PermissionLeaseError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+    return {"status": "PERMISSION_LEASE_CREATED", "lease": lease}
+
+
+def _permission_lease_consume(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    try:
+        lease = consume_permission_lease(
+            arguments.get("lease_id"),
+            run_id=arguments.get("run_id"),
+            capability=arguments.get("capability"),
+            subject=arguments.get("subject"),
+            target=arguments.get("target"),
+            cfg=cfg,
+        )
+    except PermissionLeaseError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+    return {"status": "PERMISSION_LEASE_CONSUMED", "lease": lease}
+
+
+def _permission_lease_revoke(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    try:
+        lease = revoke_permission_lease(arguments.get("lease_id"), cfg)
+    except PermissionLeaseError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+    return {"status": "PERMISSION_LEASE_REVOKED", "lease": lease}
+
+
 def _web_fetch(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     url = arguments.get("url")
     if not isinstance(url, str):
@@ -443,6 +500,34 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_task_update,
+    ),
+    "permission.lease_list": ToolDefinition(
+        name="permission.lease_list",
+        description="List run-scoped permission leases and derived effective states.",
+        mutates_state=False,
+        requires_approval=True,
+        handler=_permission_lease_list,
+    ),
+    "permission.lease_create": ToolDefinition(
+        name="permission.lease_create",
+        description="Create a bounded, expiring, run-scoped permission lease for one capability identity.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_permission_lease_create,
+    ),
+    "permission.lease_consume": ToolDefinition(
+        name="permission.lease_consume",
+        description="Consume one use of a run-scoped permission lease with exact identity binding.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_permission_lease_consume,
+    ),
+    "permission.lease_revoke": ToolDefinition(
+        name="permission.lease_revoke",
+        description="Revoke a run-scoped permission lease so it cannot authorize later execution.",
+        mutates_state=True,
+        requires_approval=True,
+        handler=_permission_lease_revoke,
     ),
     "web.render": ToolDefinition(
         name="web.render",

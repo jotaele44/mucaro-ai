@@ -147,6 +147,32 @@ def test_api_tasks_expose_durable_dependency_dag(tmp_path: Path):
     assert shown.json()["task"]["depends_on"] == ["api-foundation"]
 
 
+def test_api_permission_leases_are_run_scoped_and_atomic(tmp_path: Path):
+    client = make_client(tmp_path)
+    created = client.post(
+        "/permissions/leases",
+        json={"run_id": "run-api", "capability": "subprocess.execute", "subject": "agent-api", "max_uses": 1},
+    )
+    assert created.status_code == 200
+    lease = created.json()["lease"]
+
+    listed = client.get("/permissions/leases", params={"run_id": "run-api"})
+    assert listed.status_code == 200
+    assert listed.json()["leases"][0]["lease_id"] == lease["lease_id"]
+
+    consumed = client.post(
+        f"/permissions/leases/{lease['lease_id']}/consume",
+        json={"run_id": "run-api", "capability": "subprocess.execute", "subject": "agent-api"},
+    )
+    assert consumed.status_code == 200
+    exhausted = client.post(
+        f"/permissions/leases/{lease['lease_id']}/consume",
+        json={"run_id": "run-api", "capability": "subprocess.execute", "subject": "agent-api"},
+    )
+    assert exhausted.status_code == 409
+    assert exhausted.json()["detail"]["status"] == "ERROR_LEASE_EXHAUSTED"
+
+
 def test_api_optional_operator_auth_protects_mutations(tmp_path: Path):
     client = make_client(tmp_path, operator_token="secret-token")
 
