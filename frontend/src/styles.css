@@ -230,6 +230,14 @@ textarea {
   white-space: nowrap;
 }
 
+.archived-row {
+  opacity: 0.72;
+}
+
+.archive-toggle {
+  align-self: flex-start;
+}
+
 .main {
   display: flex;
   flex-direction: column;

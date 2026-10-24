@@ -251,10 +251,12 @@ export const api = {
   offlineManifest: () => request("/offline-manifest"),
   modes: () => request("/work-runs/modes"),
 
-  conversations: () => request("/conversations"),
+  conversations: (includeArchived = false) => request(`/conversations${includeArchived ? "?include_archived=true" : ""}`),
   createConversation: (title) => request("/conversations", json("POST", { title })),
   conversation: (id) => request(`/conversations/${id}`),
   renameConversation: (id, title) => request(`/conversations/${id}`, json("PATCH", { title })),
+  branchConversation: (id, title) => request(`/conversations/${encodeURIComponent(id)}/branch`, json("POST", { title })),
+  archiveConversation: (id, archived = true) => request(`/conversations/${encodeURIComponent(id)}/archive`, json("PATCH", { archived })),
   deleteConversation: (id) => request(`/conversations/${id}`, { method: "DELETE" }),
   conversationRuns: (id) => request(`/conversations/${id}/runs?limit=100`),
 

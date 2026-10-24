@@ -97,6 +97,9 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro conversations ask CONVERSATION_ID QUERY` | Ask with saved conversation context | 0 | 2 or 3 |
 | `mucaro conversations show CONVERSATION_ID` | Show a saved conversation and its turns | 0 | 2 |
 | `mucaro conversations rename CONVERSATION_ID TITLE` | Rename a saved conversation | 0 | 2 |
+| `mucaro conversations branch CONVERSATION_ID` | Copy a saved conversation into a new transcript branch | 0 | 2 |
+| `mucaro conversations archive CONVERSATION_ID` | Hide a conversation without deleting its transcript or receipts | 0 | 2 |
+| `mucaro conversations restore CONVERSATION_ID` | Restore an archived conversation | 0 | 2 |
 | `mucaro conversations delete CONVERSATION_ID` | Delete a saved conversation while preserving runs | 0 | 2 |
 | `mucaro runs list` | List persisted answer traces | 0 | 2 |
 | `mucaro runs summary` | Summarize persisted answer traces | 0 | 2 |
@@ -1379,7 +1382,9 @@ Use `mucaro conversations create` to start a saved chat session and `mucaro
 conversations ask CONVERSATION_ID QUERY` to ask follow-up questions with recent
 turn context. Conversation deletion only removes the chat session; persisted
 answer traces remain inspectable through `mucaro runs list`, `mucaro runs
-summary`, and `mucaro runs show RUN_ID`.
+summary`, and `mucaro runs show RUN_ID`. Use `mucaro conversations branch` to
+create a durable copy with a `branched_from` identity, and use `archive` or
+`restore` to control active-list visibility without deleting transcript data.
 
 ## Explicit Memory
 

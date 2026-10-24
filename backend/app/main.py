@@ -16,6 +16,8 @@ from .capability_policy import CapabilityPolicy, RUNTIME_CAPABILITY
 from .conversations import (
     ConversationMessageEditError,
     append_answer_turn,
+    archive_conversation,
+    branch_conversation,
     build_conversation_context,
     create_conversation,
     delete_conversation,
@@ -55,6 +57,8 @@ from .models import (
     ApprovalRequest,
     AskRequest,
     ConversationCreateRequest,
+    ConversationArchiveRequest,
+    ConversationBranchRequest,
     ConversationUpdateRequest,
     DirectoryPermissionRequest,
     GoalCreateRequest,
@@ -570,8 +574,8 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         )
 
     @app.get("/conversations")
-    def conversations() -> dict:
-        return {"conversations": list_conversations(cfg)}
+    def conversations(include_archived: bool = False) -> dict:
+        return {"conversations": list_conversations(cfg, include_archived=include_archived)}
 
     @app.post("/conversations")
     def create_chat(req: ConversationCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
@@ -596,6 +600,28 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
         except ValueError as exc:
             raise api_error(str(exc), "Conversation title is required.") from exc
+
+    @app.post("/conversations/{conversation_id}/branch")
+    def branch_chat(
+        conversation_id: str,
+        req: ConversationBranchRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return branch_conversation(conversation_id, req.title, cfg)
+        except KeyError as exc:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
+
+    @app.patch("/conversations/{conversation_id}/archive")
+    def archive_chat(
+        conversation_id: str,
+        req: ConversationArchiveRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return archive_conversation(conversation_id, archived=req.archived, cfg=cfg)
+        except KeyError as exc:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404) from exc
 
     @app.delete("/conversations/{conversation_id}")
     def delete_chat(conversation_id: str, _auth: dict = Depends(require_auth)) -> dict:

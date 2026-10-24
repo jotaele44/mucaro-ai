@@ -48,6 +48,7 @@ export function App() {
   const [view, setView] = useState("chat");
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(() => stored("mucaro.activeConversation", null));
+  const [showArchived, setShowArchived] = useState(false);
   const [filter, setFilter] = useState("");
   const [navOpen, setNavOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
@@ -75,12 +76,12 @@ export function App() {
 
   const loadConversations = useCallback(async () => {
     try {
-      const payload = await api.conversations();
+      const payload = await api.conversations(showArchived);
       setConversations(payload.conversations || []);
     } catch {
       /* surfaced by the health banner */
     }
-  }, []);
+  }, [showArchived]);
 
   // Startup and Retry: decides between ready and unreachable.
   const checkHealth = useCallback(async () => {
@@ -226,12 +227,15 @@ export function App() {
             <span className="sr-only">Filter conversations</span>
             <input type="search" placeholder="Filter conversations" value={filter} onChange={(event) => setFilter(event.target.value)} />
           </label>
+          <button type="button" className="ghost-button archive-toggle" onClick={() => setShowArchived((value) => !value)} aria-pressed={showArchived}>
+            {showArchived ? "Hide archived" : "Show archived"}
+          </button>
           <ul className="conversation-list" aria-label="Conversations">
             {visible.map((row) => (
-              <li key={row.conversation_id}>
+              <li key={row.conversation_id} className={row.archived ? "archived-row" : undefined}>
                 <button type="button" aria-current={row.conversation_id === activeId && view === "chat" ? "true" : undefined} onClick={() => openConversation(row.conversation_id)}>
                   <span className="conversation-title">{row.title}</span>
-                  <span className="muted small">{row.turn_count} turns</span>
+                  <span className="muted small">{row.turn_count} turns{row.archived ? " · archived" : ""}</span>
                 </button>
               </li>
             ))}

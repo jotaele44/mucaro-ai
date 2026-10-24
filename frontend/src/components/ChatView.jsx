@@ -13,7 +13,7 @@ import { Sheet } from "./Sheet.jsx";
 const MAX_STREAM_RETRIES = 10;
 const bump = (map, key) => map.set(key, (map.get(key) || 0) + 1);
 
-function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, announce }) {
+function ConversationMenu({ conversation, onRename, onDelete, onArchive, onBranch, onOpenTasks, announce }) {
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState(null);
   const [title, setTitle] = useState(conversation?.title || "");
@@ -42,6 +42,22 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
     announce(result.ok ? "Transcript copied." : copyFailureMessage(result));
   }
 
+  async function shareTranscript() {
+    setOpen(false);
+    const text = transcriptText(conversation?.turns || []);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: conversation?.title || "Mucaro conversation", text });
+        announce("Transcript shared.");
+        return;
+      } catch (err) {
+        if (err?.name === "AbortError") return;
+      }
+    }
+    const result = await copyText(text);
+    announce(result.ok ? "Sharing is unavailable; transcript copied instead." : copyFailureMessage(result));
+  }
+
   return (
     <div className="menu-wrap">
       <button type="button" className="icon-button" aria-haspopup="menu" aria-expanded={open} aria-label="Conversation menu" onClick={() => setOpen((value) => !value)}>
@@ -51,7 +67,10 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
         <ul className="menu" role="menu">
           <li role="none"><button role="menuitem" type="button" onClick={() => { setOpen(false); setTitle(conversation?.title || ""); setRenameError(null); setDialog("rename"); }}>Rename</button></li>
           <li role="none"><button role="menuitem" type="button" onClick={copyTranscript}>Copy transcript</button></li>
+          <li role="none"><button role="menuitem" type="button" onClick={shareTranscript}>Share transcript</button></li>
+          <li role="none"><button role="menuitem" type="button" onClick={() => { setOpen(false); onBranch(); }}>Copy branch</button></li>
           <li role="none"><button role="menuitem" type="button" onClick={() => { setOpen(false); onOpenTasks(); }}>Background tasks</button></li>
+          <li role="none"><button role="menuitem" type="button" onClick={() => { setOpen(false); setDialog("archive"); }}>{conversation?.archived ? "Restore" : "Archive"}</button></li>
           <li role="none"><button role="menuitem" type="button" className="danger-text" onClick={() => { setOpen(false); setDialog("delete"); }}>Delete…</button></li>
         </ul>
       )}
@@ -77,6 +96,11 @@ function ConversationMenu({ conversation, onRename, onDelete, onOpenTasks, annou
       {dialog === "delete" && (
         <ConfirmSheet title="Delete conversation?" confirmLabel="Delete permanently" onConfirm={onDelete} onClose={() => setDialog(null)}>
           <p>This permanently deletes the conversation and its transcript from the computer that runs Mucaro. Sources, memory and receipts are kept. There is no archive or undo.</p>
+        </ConfirmSheet>
+      )}
+      {dialog === "archive" && (
+        <ConfirmSheet title={conversation?.archived ? "Restore conversation?" : "Archive conversation?"} confirmLabel={conversation?.archived ? "Restore conversation" : "Archive conversation"} onConfirm={onArchive} onClose={() => setDialog(null)}>
+          <p>{conversation?.archived ? "Restore this conversation to the active list. Its transcript, source citations, and run receipts remain unchanged." : "This removes the conversation from the active list without deleting its transcript, source citations, or run receipts. You can restore it with “Show archived.”"}</p>
         </ConfirmSheet>
       )}
     </div>
@@ -322,6 +346,19 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
               await api.deleteConversation(conversation.conversation_id);
               onConversationCreated(null);
               onConversationsChanged();
+            }}
+            onArchive={async () => {
+              const archived = !conversation.archived;
+              await api.archiveConversation(conversation.conversation_id, archived);
+              if (archived) onConversationCreated(null);
+              onConversationsChanged();
+              announce(archived ? "Conversation archived." : "Conversation restored.");
+            }}
+            onBranch={async () => {
+              const result = await api.branchConversation(conversation.conversation_id);
+              onConversationCreated(result.conversation.conversation_id);
+              onConversationsChanged();
+              announce("Conversation branch created.");
             }}
             onOpenTasks={onOpenTasks}
             announce={announce}

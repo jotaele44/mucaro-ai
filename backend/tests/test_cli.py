@@ -5531,6 +5531,21 @@ def test_cli_conversations_ask_and_runs(tmp_path: Path, capsys):
     renamed = json.loads(capsys.readouterr().out)
     assert renamed["title"] == "Renamed Lineage"
 
+    assert main(["conversations", "branch", conversation_id, "--title", "Review branch", "--format", "json"], cfg=cfg) == 0
+    branch = json.loads(capsys.readouterr().out)["conversation"]
+    assert branch["conversation_id"] != conversation_id
+    assert branch["branched_from"] == conversation_id
+    assert len(branch["turns"]) == 2
+
+    assert main(["conversations", "archive", conversation_id, "--format", "json"], cfg=cfg) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "CONVERSATION_ARCHIVED"
+    assert main(["conversations", "list", "--format", "json"], cfg=cfg) == 0
+    assert conversation_id not in {row["conversation_id"] for row in json.loads(capsys.readouterr().out)["conversations"]}
+    assert main(["conversations", "list", "--include-archived", "--format", "json"], cfg=cfg) == 0
+    assert any(row["conversation_id"] == conversation_id for row in json.loads(capsys.readouterr().out)["conversations"])
+    assert main(["conversations", "restore", conversation_id, "--format", "json"], cfg=cfg) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "CONVERSATION_RESTORED"
+
     assert main(["conversations", "delete", conversation_id, "--format", "json"], cfg=cfg) == 0
     deleted = json.loads(capsys.readouterr().out)
     assert deleted["status"] == "CONVERSATION_DELETE_OK"

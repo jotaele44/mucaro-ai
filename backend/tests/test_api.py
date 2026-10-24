@@ -183,6 +183,35 @@ def test_api_goals_expose_set_goal_lifecycle_and_events(tmp_path: Path):
     assert invalid.json()["goal"]["status"] == "ACTIVE"
 
 
+def test_api_conversation_branch_archive_and_restore_preserve_identity(tmp_path: Path):
+    client = make_client(tmp_path)
+    created = client.post("/conversations", json={"title": "Source conversation"})
+    assert created.status_code == 200
+    source = created.json()
+    source_id = source["conversation_id"]
+
+    branched = client.post(f"/conversations/{source_id}/branch", json={})
+    assert branched.status_code == 200
+    branch = branched.json()["conversation"]
+    assert branch["conversation_id"] != source_id
+    assert branch["branched_from"] == source_id
+    assert branch["turns"] == source["turns"] == []
+
+    archived = client.patch(f"/conversations/{source_id}/archive", json={"archived": True})
+    assert archived.status_code == 200
+    assert archived.json()["conversation"]["archived"] is True
+    assert source_id not in {row["conversation_id"] for row in client.get("/conversations").json()["conversations"]}
+    all_conversations = client.get("/conversations", params={"include_archived": "true"})
+    assert all_conversations.status_code == 200
+    assert any(row["conversation_id"] == source_id and row["archived"] for row in all_conversations.json()["conversations"])
+
+    restored = client.patch(f"/conversations/{source_id}/archive", json={"archived": False})
+    assert restored.status_code == 200
+    assert restored.json()["conversation"]["archived"] is False
+    assert client.patch("/conversations/missing/archive", json={"archived": True}).status_code == 404
+    assert client.post("/conversations/missing/branch", json={}).status_code == 404
+
+
 def test_api_skill_mount_activation_invocation_and_receipt(tmp_path: Path):
     client = make_client(tmp_path)
     listed = client.get("/skills")

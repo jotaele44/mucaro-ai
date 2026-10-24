@@ -20,6 +20,14 @@ class ConversationCreateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=120)
 
 
+class ConversationBranchRequest(BaseModel):
+    title: str | None = Field(default=None, max_length=120)
+
+
+class ConversationArchiveRequest(BaseModel):
+    archived: bool = True
+
+
 class ConversationUpdateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=120)
 

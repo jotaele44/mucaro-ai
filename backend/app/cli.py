@@ -43,6 +43,8 @@ from .config import Settings, settings
 from .contracts import contract_errors, list_contracts
 from .conversations import (
     append_answer_turn,
+    archive_conversation,
+    branch_conversation,
     build_conversation_context,
     create_conversation,
     delete_conversation,
@@ -1009,6 +1011,7 @@ def build_parser() -> argparse.ArgumentParser:
     conversations_subcommands = conversations.add_subparsers(dest="conversations_command", required=True)
 
     conversations_list = conversations_subcommands.add_parser("list", help="List saved conversations.")
+    conversations_list.add_argument("--include-archived", action="store_true", help="Include archived conversations.")
     conversations_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     conversations_list.set_defaults(handler=run_conversations_list)
 
@@ -1027,6 +1030,22 @@ def build_parser() -> argparse.ArgumentParser:
     conversations_rename.add_argument("title", nargs="+", help="New conversation title.")
     conversations_rename.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     conversations_rename.set_defaults(handler=run_conversations_rename)
+
+    conversations_branch = conversations_subcommands.add_parser("branch", help="Copy one conversation into a new branch.")
+    conversations_branch.add_argument("conversation_id", help="Conversation identifier.")
+    conversations_branch.add_argument("--title", default=None, help="Optional branch title.")
+    conversations_branch.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    conversations_branch.set_defaults(handler=run_conversations_branch)
+
+    conversations_archive = conversations_subcommands.add_parser("archive", help="Archive one conversation without deleting it.")
+    conversations_archive.add_argument("conversation_id", help="Conversation identifier.")
+    conversations_archive.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    conversations_archive.set_defaults(handler=run_conversations_archive)
+
+    conversations_restore = conversations_subcommands.add_parser("restore", help="Restore one archived conversation.")
+    conversations_restore.add_argument("conversation_id", help="Conversation identifier.")
+    conversations_restore.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    conversations_restore.set_defaults(handler=run_conversations_restore)
 
     conversations_delete = conversations_subcommands.add_parser("delete", help="Delete one saved conversation.")
     conversations_delete.add_argument("conversation_id", help="Conversation identifier.")
@@ -8555,7 +8574,7 @@ def run_sources_delete(args: argparse.Namespace, cfg: Settings) -> int:
 
 
 def run_conversations_list(args: argparse.Namespace, cfg: Settings) -> int:
-    result = {"status": "CONVERSATIONS_OK", "conversations": list_conversations(cfg)}
+    result = {"status": "CONVERSATIONS_OK", "conversations": list_conversations(cfg, include_archived=args.include_archived)}
     emit_payload(result, args.format)
     return 0
 
@@ -8583,6 +8602,36 @@ def run_conversations_rename(args: argparse.Namespace, cfg: Settings) -> int:
         return 2
     except ValueError as exc:
         raise MucaroCLIError(str(exc), "Conversation title is required.") from exc
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_conversations_branch(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = branch_conversation(args.conversation_id, args.title, cfg)
+    except KeyError:
+        emit_payload({"status": "ERROR_CONVERSATION_NOT_FOUND", "conversation_id": args.conversation_id}, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_conversations_archive(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = archive_conversation(args.conversation_id, archived=True, cfg=cfg)
+    except KeyError:
+        emit_payload({"status": "ERROR_CONVERSATION_NOT_FOUND", "conversation_id": args.conversation_id}, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_conversations_restore(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = archive_conversation(args.conversation_id, archived=False, cfg=cfg)
+    except KeyError:
+        emit_payload({"status": "ERROR_CONVERSATION_NOT_FOUND", "conversation_id": args.conversation_id}, args.format)
+        return 2
     emit_payload(result, args.format)
     return 0
 

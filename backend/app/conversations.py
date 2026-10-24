@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import threading
 from typing import Any
 
@@ -37,6 +38,8 @@ def create_conversation(title: str | None = None, cfg: Settings = settings) -> d
         "title": resolved_title,
         "created_at": now,
         "updated_at": now,
+        "archived": False,
+        "archived_at": None,
         "turns": [],
         "message_edits": {},
     }
@@ -44,11 +47,14 @@ def create_conversation(title: str | None = None, cfg: Settings = settings) -> d
     return conversation
 
 
-def list_conversations(cfg: Settings = settings) -> list[dict[str, Any]]:
+def list_conversations(cfg: Settings = settings, *, include_archived: bool = False) -> list[dict[str, Any]]:
     init_db(cfg.sqlite_path)
     conversations = list_payloads("conversations", cfg.sqlite_path)
     summaries = []
     for conversation in conversations:
+        archived = bool(conversation.get("archived", False))
+        if archived and not include_archived:
+            continue
         turns = conversation.get("turns", [])
         summaries.append(
             {
@@ -58,6 +64,8 @@ def list_conversations(cfg: Settings = settings) -> list[dict[str, Any]]:
                 "updated_at": conversation.get("updated_at"),
                 "turn_count": len(turns),
                 "last_status": turns[-1].get("status") if turns else "EMPTY",
+                "archived": archived,
+                "archived_at": conversation.get("archived_at"),
             }
         )
     return sorted(summaries, key=lambda item: item.get("updated_at") or "", reverse=True)
@@ -82,6 +90,43 @@ def rename_conversation(conversation_id: str, title: str, cfg: Settings = settin
     conversation["updated_at"] = utc_now()
     upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
     return conversation
+
+
+def archive_conversation(conversation_id: str, *, archived: bool = True, cfg: Settings = settings) -> dict[str, Any]:
+    """Hide or restore a conversation without deleting its canonical turns or receipts."""
+    with _CONVERSATION_LOCK:
+        conversation = get_conversation(conversation_id, cfg)
+        if conversation is None:
+            raise KeyError(conversation_id)
+        now = utc_now()
+        conversation["archived"] = bool(archived)
+        conversation["archived_at"] = now if archived else None
+        conversation["updated_at"] = now
+        upsert_payload("conversations", "conversation_id", conversation, cfg.sqlite_path)
+        return {
+            "status": "CONVERSATION_ARCHIVED" if archived else "CONVERSATION_RESTORED",
+            "conversation": conversation,
+        }
+
+
+def branch_conversation(conversation_id: str, title: str | None = None, cfg: Settings = settings) -> dict[str, Any]:
+    """Create a new conversation with a deep-copied transcript and preserved source/run references."""
+    with _CONVERSATION_LOCK:
+        source = get_conversation(conversation_id, cfg)
+        if source is None:
+            raise KeyError(conversation_id)
+        now = utc_now()
+        resolved_title = " ".join((title or f"Branch of {source.get('title', DEFAULT_TITLE)}").strip().split())[:120]
+        branch = copy.deepcopy(source)
+        branch["conversation_id"] = stable_id("conv-branch", conversation_id, now, length=12)
+        branch["title"] = resolved_title or "Branch"
+        branch["created_at"] = now
+        branch["updated_at"] = now
+        branch["archived"] = False
+        branch["archived_at"] = None
+        branch["branched_from"] = conversation_id
+        upsert_payload("conversations", "conversation_id", branch, cfg.sqlite_path)
+        return {"status": "CONVERSATION_BRANCHED", "conversation": branch}
 
 
 def delete_conversation(conversation_id: str, cfg: Settings = settings) -> dict[str, Any]:
