@@ -295,6 +295,16 @@ export const api = {
   updateMemory: (id, enabled) => request(`/memory/${id}`, json("PATCH", { enabled })),
   deleteMemory: (id) => request(`/memory/${id}`, { method: "DELETE" }),
   exportMemory: () => request("/memory/export"),
+  goals: () => request("/goals"),
+  goalEvents: (id) => request(`/goals/${encodeURIComponent(id)}/events`),
+  createGoal: (payload) => request("/goals", json("POST", payload)),
+  updateGoal: (id, payload) => request(`/goals/${encodeURIComponent(id)}`, json("PATCH", payload)),
+  skills: () => request("/skills"),
+  skillMounts: () => request("/skills/mounts"),
+  skillExecutions: () => request("/skills/executions"),
+  mountSkill: (id) => request(`/skills/${encodeURIComponent(id)}/mount`, { method: "POST" }),
+  activateSkill: (id, payload = {}) => request(`/skills/${encodeURIComponent(id)}/activate`, json("POST", payload)),
+  executeSkill: (id, skillArguments = {}) => request(`/skills/${encodeURIComponent(id)}/execute`, json("POST", { arguments: skillArguments })),
   // One of the files saved with an answer: kind is "markdown", "json" or "csv".
   exportFile: (runId, kind) => request(`/exports/${encodeURIComponent(runId)}/files/${encodeURIComponent(kind)}`, { as: "blob" }),
 };

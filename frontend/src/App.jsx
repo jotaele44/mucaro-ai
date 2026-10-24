@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api, authIssueOf, onAuthIssue } from "./api.js";
 import { ChatView } from "./components/ChatView.jsx";
+import { GoalWorkspace } from "./components/workspaces/GoalWorkspace.jsx";
 import { TasksDrawer } from "./components/TasksDrawer.jsx";
+import { SkillsWorkspace } from "./components/workspaces/SkillsWorkspace.jsx";
 import { TokenGate } from "./components/TokenGate.jsx";
 import { MemoryWorkspace } from "./components/workspaces/MemoryWorkspace.jsx";
 import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace.jsx";
@@ -10,6 +12,8 @@ import { SourcesWorkspace } from "./components/workspaces/SourcesWorkspace.jsx";
 
 const WORKSPACES = [
   { id: "chat", label: "Chat" },
+  { id: "goals", label: "Goals" },
+  { id: "skills", label: "Skills" },
   { id: "sources", label: "Sources" },
   { id: "memory", label: "Memory" },
   { id: "provenance", label: "Provenance" },
@@ -263,6 +267,8 @@ export function App() {
             defaultOptions={options}
           />
         )}
+        {health.state === "ok" && view === "goals" && <GoalWorkspace announce={announce} />}
+        {health.state === "ok" && view === "skills" && <SkillsWorkspace announce={announce} />}
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}
         {health.state === "ok" && view === "provenance" && <ProvenanceWorkspace />}

@@ -328,6 +328,7 @@ button:disabled {
 
 .field input,
 .field select,
+.field textarea,
 .other-input {
   font-size: 15px;
   color: var(--text);
@@ -336,6 +337,11 @@ button:disabled {
   border-radius: 8px;
   padding: 8px 10px;
   min-height: 38px;
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 80px;
 }
 
 .field.compact input {
@@ -1048,6 +1054,74 @@ details summary {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.panel-heading {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.goal-list,
+.skill-list,
+.event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.goal-card,
+.skill-card {
+  gap: 12px;
+}
+
+.goal-card.selected {
+  border-color: var(--accent);
+}
+
+.goal-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.goal-head h2,
+.skill-card h2 {
+  font-size: 16px;
+  margin: 6px 0 2px;
+  overflow-wrap: anywhere;
+}
+
+.goal-head p,
+.skill-card p {
+  margin: 0;
+}
+
+.goal-detail,
+.skill-invoke {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.nested-panel {
+  background: var(--surface-2);
+  margin-top: 2px;
+}
+
+.event-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.event-list li:last-child {
+  border-bottom: 0;
 }
 
 .panel legend {
