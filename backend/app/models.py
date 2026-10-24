@@ -103,6 +103,8 @@ class RunOptions(BaseModel):
     allow_live: bool = False
     require_offline: bool = False
     agent_planner: Literal["heuristic", "provider_native"] = "heuristic"
+    model_native_loop: bool = False
+    max_agent_turns: int = Field(default=4, ge=1, le=8)
 
 
 class MessageRequest(BaseModel):

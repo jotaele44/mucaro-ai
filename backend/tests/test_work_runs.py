@@ -242,6 +242,98 @@ def test_provider_native_agent_plan_preserves_identity_and_stops_for_approval(cf
     }
 
 
+def test_provider_native_loop_returns_terminal_tool_results_before_next_turn(cfg, conversation, monkeypatch):
+    monkeypatch.setattr(
+        work_runs,
+        "plan_model_route",
+        lambda **_: {
+            "status": "MODEL_ROUTE_READY",
+            "selected_provider": "anthropic",
+            "selected_model": "claude-sonnet-5",
+            "selection_reason": "test",
+            "route_sha256": "route-loop-test",
+            "candidates": [],
+        },
+    )
+    turns = [
+        {
+            "schema_version": "mucaro-agent-tool-proposals/1.0",
+            "status": "AGENT_TOOL_PROPOSALS_VALID",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5",
+            "response_id": "msg_loop_1",
+            "proposal_sha256": "proposal-loop-1",
+            "proposals": [{"provider_call_id": "toolu_loop_1", "tool": "source_library.status", "arguments": {}}],
+            "messages": [
+                {"role": "user", "content": "Inspect the source library and continue if needed."},
+                {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_loop_1", "name": "source_library.status", "input": {}}]},
+            ],
+            "assistant_text": "",
+        },
+        {
+            "schema_version": "mucaro-agent-tool-proposals/1.0",
+            "status": "AGENT_NO_TOOL_PROPOSALS",
+            "provider": "anthropic",
+            "model": "claude-sonnet-5",
+            "response_id": "msg_loop_2",
+            "proposal_sha256": "proposal-loop-2",
+            "proposals": [],
+            "messages": [
+                {"role": "user", "content": "Inspect the source library and continue if needed."},
+                {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_loop_1", "name": "source_library.status", "input": {}}]},
+                {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_loop_1", "content": '{"status": "SOURCE_LIBRARY_OK"}'}]},
+                {"role": "assistant", "content": [{"type": "text", "text": "The inspection is complete."}]},
+            ],
+            "assistant_text": "The inspection is complete.",
+        },
+    ]
+    monkeypatch.setattr(work_runs, "generate_tool_turn", lambda *args, **kwargs: turns.pop(0))
+    monkeypatch.setattr(work_runs, "current_git_head", lambda _root: "a" * 40)
+
+    run = _submit(
+        conversation,
+        "Inspect the source library and continue if needed.",
+        cfg,
+        mode="agent",
+        options={
+            "agent_planner": "provider_native",
+            "model_provider": "anthropic",
+            "model_native_loop": True,
+            "allow_live": True,
+            "allow_mock_fallback": True,
+        },
+    )
+    assert run["state"] == "AWAITING_APPROVAL"
+    call = list_tool_calls(cfg)["tool_calls"][0]
+    approve_tool_call(call["tool_call_id"], cfg=cfg, expected_arguments_sha256=call["arguments_sha256"])
+    resume_waiting_run(run["run_id"], cfg)
+
+    final = get_run(run["run_id"], cfg)
+    assert final["state"] == "COMPLETED", final.get("error")
+    assert final["agent_turn"] == 2
+    agent_events = [event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "agent_plan"]
+    assert [event["data"]["status"] for event in agent_events] == ["AGENT_LOOP_TOOL_PROPOSALS_READY", "AGENT_LOOP_STOPPED"]
+    assert any(message.get("role") == "user" and isinstance(message.get("content"), list) for message in final["provider_messages"])
+
+
+def test_model_native_loop_requires_provider_native_planner(cfg, conversation):
+    with pytest.raises(RunError) as exc:
+        submit_message(conversation, "Inspect the source library.", mode="agent", options={"model_native_loop": True}, cfg=cfg)
+    assert exc.value.status == "ERROR_AGENT_LOOP_PROVIDER_REQUIRED"
+
+
+def test_model_native_loop_requires_explicit_provider(cfg, conversation):
+    with pytest.raises(RunError) as exc:
+        submit_message(
+            conversation,
+            "Inspect the source library.",
+            mode="agent",
+            options={"agent_planner": "provider_native", "model_native_loop": True},
+            cfg=cfg,
+        )
+    assert exc.value.status == "ERROR_AGENT_PROVIDER_REQUIRED"
+
+
 def test_agent_run_persists_checkpoint_steps_through_approval_and_completion(cfg, conversation, monkeypatch):
     monkeypatch.setattr(work_runs, "current_git_head", lambda _root: "c" * 40)
     run = _submit(conversation, "Inspect source library status and audit readiness.", cfg, mode="agent")

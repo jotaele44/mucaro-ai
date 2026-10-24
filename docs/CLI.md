@@ -831,12 +831,17 @@ bounded autonomy by default. For an explicitly routed live provider, set
 and `options.allow_live`; Anthropic and OpenAI-compatible local tool-call
 responses are normalized, allowlist-validated, bounded to four actions, hash
 bound, and then sent through the same approval ledger. Provider-native planning
-has no mock fallback. Independent approved steps in an agent run execute in
-bounded parallel batches; set `options.max_parallel_actions` from 1 through 4
-(the default is 2) to choose the concurrency limit. The run records the limit,
-step identities, batch event, and per-step checkpoint outcomes. This is still
-single-agent execution: subagents, fleet scheduling, model-native tool loops,
-and broader crash-resume certification remain open.
+has no mock fallback. Set `options.model_native_loop` to `true` to let the
+selected provider receive terminal tool results and request bounded continuation
+turns; `options.max_agent_turns` defaults to 4 and is capped at 8. Provider
+message history, turn identity, and loop stop/limit events are persisted in the
+work run, while every continuation call still requires approval and a checkpoint
+step. Independent approved steps in an agent run execute in bounded parallel
+batches; set `options.max_parallel_actions` from 1 through 4 (the default is 2)
+to choose the concurrency limit. The run records the limit, step identities,
+batch event, and per-step checkpoint outcomes. This is still single-agent
+execution: subagents, fleet scheduling, and broader crash-resume certification
+remain open.
 
 The equivalent read-only CLI surfaces are:
 

@@ -38,8 +38,7 @@ workspaces; rendered desktop/mobile/accessibility proof remains a certification
 task rather than an unimplemented source feature. The conversational run bus now
 also exposes a bounded `agent` mode that infers up to four allowlisted actions
 from explicit user intent while preserving approval, interruption, streaming,
-and receipt boundaries; model-native tool loops, subagents, and durable DAG/fleet
-orchestration remain open. An explicit `provider_native` planner path now
+and receipt boundaries. An explicit `provider_native` planner path now
 normalizes Anthropic and OpenAI-compatible tool proposals, preserves provider
 call identity, and fail-closes before the shared approval ledger. Agent work
 runs now also create exact-head checkpoints for inferred steps, bind checkpoint
@@ -50,8 +49,11 @@ downstream blocking, and explicit non-executed failure closure for skipped
 steps. Agent runs now execute dependency-independent approved steps in bounded
 parallel batches, defaulting to two workers and rejecting values above four;
 batch size and exact step identities are persisted in checkpoint metadata and
-tool-batch events. Model-native tool loops, subagents, fleet scheduling, and
-broader crash-resume certification remain open.
+tool-batch events. Explicit provider-native model tool loops now persist the
+provider message history, return terminal tool results to the provider, enforce
+a bounded turn count, and route continuation calls through the same approval
+and checkpoint ledger. Subagents, fleet scheduling, and broader crash-resume
+certification remain open.
 
 The finish line is no longer "make the repo exist." The finish line is to make
 the repo repeatedly prove its behavior from a clean clone through ingestion,

@@ -11,7 +11,7 @@ from backend.app import model_router, work_runs
 from backend.app.contracts import validate_contract
 from backend.app.conversations import create_conversation
 from backend.app.ingestion import ingest_file
-from backend.app.model_router import ModelProviderError, generate_answer, model_provider_status
+from backend.app.model_router import ModelProviderError, generate_answer, generate_tool_turn, model_provider_status
 from backend.app.model_routing_policy import ModelRoutingError, plan_model_route
 from backend.app.offline import build_offline_manifest
 from backend.app.services import answer_question
@@ -49,6 +49,40 @@ class _FakeOpenAI(BaseHTTPRequestHandler):
         if payload.get("model") != MODEL:
             self.send_response(404)
             self.end_headers()
+            return
+        if payload.get("tools"):
+            has_tool_result = any(message.get("role") == "tool" for message in payload.get("messages", []))
+            if has_tool_result:
+                body = json.dumps(
+                    {"id": "chat-loop-2", "choices": [{"message": {"role": "assistant", "content": "Inspection complete.", "tool_calls": []}, "finish_reason": "stop"}]}
+                ).encode()
+            else:
+                body = json.dumps(
+                    {
+                        "id": "chat-loop-1",
+                        "choices": [
+                            {
+                                "message": {
+                                    "role": "assistant",
+                                    "content": None,
+                                    "tool_calls": [
+                                        {
+                                            "id": "call-loop-1",
+                                            "type": "function",
+                                            "function": {"name": "source_library.status", "arguments": "{}"},
+                                        }
+                                    ],
+                                },
+                                "finish_reason": "tool_calls",
+                            }
+                        ],
+                    }
+                ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         user = payload["messages"][-1]["content"]
         chunk_id = user.split('chunk_id="', 1)[1].split('"', 1)[0] if 'chunk_id="' in user else "none"
@@ -141,6 +175,24 @@ def test_local_model_404_maps_to_not_installed(local_server):
     with pytest.raises(ModelProviderError) as exc:
         generate_answer("q", CHUNK, model_provider="openai_compatible_local", model_name="other:1b")
     assert exc.value.status == "ERROR_LOCAL_MODEL_NOT_INSTALLED"
+
+
+def test_local_provider_native_turn_round_trips_tool_results(local_server, cfg):
+    first = generate_tool_turn("Inspect the source library.", model_provider="openai_compatible_local", model_name=MODEL, cfg=cfg)
+    assert first["proposals"][0]["provider_call_id"] == "call-loop-1"
+    assert first["messages"][-1]["role"] == "assistant"
+    second = generate_tool_turn(
+        "Inspect the source library.",
+        model_provider="openai_compatible_local",
+        model_name=MODEL,
+        history=first["messages"],
+        tool_results=[{"provider_call_id": "call-loop-1", "result": {"status": "SOURCE_LIBRARY_OK"}, "is_error": False}],
+        cfg=cfg,
+    )
+    assert second["proposals"] == []
+    assert second["assistant_text"] == "Inspection complete."
+    sent = _FakeOpenAI.requests[-1]
+    assert any(message.get("role") == "tool" and message.get("tool_call_id") == "call-loop-1" for message in sent["messages"])
 
 
 @pytest.mark.parametrize(

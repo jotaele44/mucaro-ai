@@ -446,6 +446,136 @@ def generate_tool_proposals(
     )
 
 
+def generate_tool_turn(
+    prompt: str,
+    *,
+    model_provider: str,
+    model_name: str | None = None,
+    history: list[dict[str, Any]] | None = None,
+    tool_results: list[dict[str, Any]] | None = None,
+    max_actions: int = 4,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    """Run one bounded provider-native tool turn and return resumable messages.
+
+    ``history`` is provider-shaped but JSON-safe and is persisted by the work-run
+    ledger. Tool results are appended only after the local tool ledger reaches a
+    terminal state, so a provider never observes an action that was not actually
+    recorded as executed, failed, denied, or cancelled.
+    """
+    spec = get_model_provider_spec(model_provider)
+    if not spec.supports_tool_calls:
+        raise ModelProviderError("ERROR_AGENT_PROVIDER_NATIVE_UNAVAILABLE", f"Provider {spec.name} does not expose structured tool calls.")
+    _require_model_invoke(spec, cfg)
+    model = model_name or spec.default_model
+    system = (
+        "You are a bounded local task agent. Use only the supplied tools to satisfy the user's explicit request. "
+        "Do not invent permissions, credentials, URLs, repositories, or hidden goals. Tool calls are suggestions "
+        "and will be separately approved before execution. Stop requesting tools when the task is sufficiently inspected."
+    )
+    results = list(tool_results or [])
+    messages = [dict(message) for message in (history or [{"role": "user", "content": prompt}])]
+    if results:
+        if spec.name == "anthropic":
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": str(result["provider_call_id"]),
+                            "content": json.dumps(result.get("result") or {}, ensure_ascii=False, sort_keys=True),
+                            "is_error": bool(result.get("is_error")),
+                        }
+                        for result in results
+                    ],
+                }
+            )
+        else:
+            messages.extend(
+                {
+                    "role": "tool",
+                    "tool_call_id": str(result["provider_call_id"]),
+                    "content": json.dumps(result.get("result") or {}, ensure_ascii=False, sort_keys=True),
+                }
+                for result in results
+            )
+
+    if spec.name == "anthropic":
+        if os.getenv("MUCARO_AI_LIVE_MODE") != "1":
+            raise ModelProviderError("ERROR_LIVE_MODE_DISABLED", "Set MUCARO_AI_LIVE_MODE=1 to permit live Anthropic tool turns.")
+        if spec.api_key_env and not os.getenv(spec.api_key_env):
+            raise ModelProviderError("ERROR_MODEL_API_KEY_MISSING", "Set ANTHROPIC_API_KEY before provider-native tool turns.")
+        try:
+            import anthropic as sdk  # type: ignore
+        except Exception as exc:
+            raise ModelProviderError("ERROR_MODEL_SDK_MISSING", 'Install the optional dependency group with: python -m pip install -e ".[anthropic]"') from exc
+        try:
+            response = _anthropic_client(sdk).messages.create(
+                model=model,
+                max_tokens=ANTHROPIC_MAX_OUTPUT_TOKENS,
+                system=system,
+                messages=messages,
+                tools=provider_tool_schemas(),
+                tool_choice={"type": "auto"},
+            )
+        except sdk.APIError as exc:
+            raise _anthropic_error(sdk, exc) from exc
+        except Exception as exc:
+            raise classify_provider_exception(exc) from exc
+        content: list[dict[str, Any]] = []
+        for block in list(getattr(response, "content", []) or []):
+            block_type = getattr(block, "type", None)
+            if block_type == "tool_use":
+                content.append({"type": "tool_use", "id": getattr(block, "id", None), "name": getattr(block, "name", None), "input": getattr(block, "input", {})})
+            elif block_type == "text":
+                content.append({"type": "text", "text": getattr(block, "text", "")})
+        assistant_message = {"role": "assistant", "content": content}
+        next_messages = messages + [assistant_message]
+        parsed = parse_provider_tool_proposals("anthropic", assistant_message, model=model, response_id=getattr(response, "id", None), max_actions=max_actions)
+        return {
+            **parsed,
+            "assistant_text": "\n".join(str(block.get("text", "")) for block in content if block.get("type") == "text").strip(),
+            "messages": next_messages,
+            "stop_reason": getattr(response, "stop_reason", None),
+        }
+
+    local_cfg = local_model_settings()
+    base_url = local_cfg["base_url"]
+    if not _is_loopback_url(base_url):
+        raise ModelProviderError("ERROR_LOCAL_MODEL_URL_NOT_LOOPBACK", f"Local model URL must be a loopback address: {base_url}")
+    request_messages = [{"role": "system", "content": system}, *messages]
+    body = json.dumps(
+        {
+            "model": model,
+            "messages": request_messages,
+            "tools": openai_tool_schemas(),
+            "tool_choice": "auto",
+            "temperature": 0,
+            "stream": False,
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(f"{base_url}/chat/completions", data=body, headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with _local_opener().open(request, timeout=local_cfg["timeout_seconds"]) as response:
+            payload = json.loads(response.read(4_000_000).decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as exc:
+        status = "ERROR_MODEL_PROVIDER_RATE_LIMIT" if exc.code == 429 else "ERROR_LOCAL_MODEL_UNAVAILABLE" if exc.code >= 500 else "ERROR_LOCAL_MODEL_HTTP_ERROR"
+        raise ModelProviderError(status, f"Local model server returned HTTP {exc.code} for model {model}.") from exc
+    except (urllib.error.URLError, OSError) as exc:
+        raise ModelProviderError("ERROR_LOCAL_MODEL_UNAVAILABLE", f"Local model server unreachable at {base_url}: {exc}") from exc
+    except (ValueError, KeyError, IndexError) as exc:
+        raise ModelProviderError("ERROR_LOCAL_MODEL_RESPONSE_INVALID", f"Unexpected local model response: {exc}") from exc
+    choices = payload.get("choices") if isinstance(payload, dict) else None
+    message = choices[0].get("message") if isinstance(choices, list) and choices and isinstance(choices[0], dict) else None
+    if not isinstance(message, dict):
+        raise ModelProviderError("ERROR_MODEL_PROVIDER_RESPONSE_INVALID", "Local model response message is missing.")
+    assistant_message = {"role": "assistant", "content": message.get("content"), "tool_calls": message.get("tool_calls") or []}
+    next_messages = messages + [assistant_message]
+    parsed = parse_provider_tool_proposals(LOCAL_PROVIDER, payload, model=model, response_id=payload.get("id"), max_actions=max_actions)
+    return {**parsed, "assistant_text": str(message.get("content") or "").strip(), "messages": next_messages, "stop_reason": choices[0].get("finish_reason")}
+
+
 def _fallback_or_error(
     query: str,
     retrieved_chunks: list[dict[str, Any]],

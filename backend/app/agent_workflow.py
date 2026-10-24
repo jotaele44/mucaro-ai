@@ -6,6 +6,8 @@ from typing import Any
 
 DEFAULT_AGENT_PARALLELISM = 2
 MAX_AGENT_PARALLELISM = 4
+DEFAULT_AGENT_TURNS = 4
+MAX_AGENT_TURNS = 8
 
 
 class AgentWorkflowError(ValueError):
@@ -26,6 +28,17 @@ def normalize_agent_parallelism(value: Any = None) -> int:
             "ERROR_AGENT_PARALLELISM",
             f"max_parallel_actions must be between 1 and {MAX_AGENT_PARALLELISM}",
         )
+    return value
+
+
+def normalize_agent_turns(value: Any = None) -> int:
+    """Validate the bounded number of provider-native tool rounds."""
+    if value is None:
+        return DEFAULT_AGENT_TURNS
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise AgentWorkflowError("ERROR_AGENT_TURNS", "max_agent_turns must be an integer")
+    if value < 1 or value > MAX_AGENT_TURNS:
+        raise AgentWorkflowError("ERROR_AGENT_TURNS", f"max_agent_turns must be between 1 and {MAX_AGENT_TURNS}")
     return value
 
 

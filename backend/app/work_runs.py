@@ -50,12 +50,12 @@ from .agent_checkpoints import (
     transition_checkpoint,
 )
 from .agent_planner import build_agent_plan
-from .agent_workflow import AgentWorkflowError, normalize_agent_actions, normalize_agent_parallelism
+from .agent_workflow import AgentWorkflowError, normalize_agent_actions, normalize_agent_parallelism, normalize_agent_turns
 from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
 from .db import ensure_db, get_connection
 from .error_categories import classify_error
-from .model_router import ModelProviderError, generate_tool_proposals
+from .model_router import ModelProviderError, generate_tool_proposals, generate_tool_turn
 from .model_routing_policy import ModelRoutingError, plan_model_route
 from .response_flow import (
     InteractionError,
@@ -358,6 +358,11 @@ def submit_message(
     if mode == "agent":
         try:
             normalized_options["max_parallel_actions"] = normalize_agent_parallelism(normalized_options.get("max_parallel_actions"))
+            normalized_options["max_agent_turns"] = normalize_agent_turns(normalized_options.get("max_agent_turns"))
+            if normalized_options.get("model_native_loop") and normalized_options.get("agent_planner") != "provider_native":
+                raise AgentWorkflowError("ERROR_AGENT_LOOP_PROVIDER_REQUIRED", "model_native_loop requires agent_planner=provider_native")
+            if normalized_options.get("model_native_loop") and not normalized_options.get("model_provider"):
+                raise AgentWorkflowError("ERROR_AGENT_PROVIDER_REQUIRED", "model_native_loop requires an explicit model_provider")
         except AgentWorkflowError as exc:
             raise RunError(exc.status, exc.detail) from exc
     if get_conversation(conversation_id, cfg) is None:
@@ -698,6 +703,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     _emit_only(run_id, cfg, "route", route_event)
     for name in unknown:
         _emit_only(run_id, cfg, "warning", {"status": "WARN_UNKNOWN_COMMAND", "category": "INPUT_INVALID", "detail": name})
+    provider_turn: dict[str, Any] | None = None
     if run["mode"] == "agent" and not commands:
         if options.get("agent_planner") == "provider_native":
             try:
@@ -706,12 +712,22 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                         "ERROR_AGENT_MODEL_ROUTE_BLOCKED",
                         "Provider-native planning requires a successful explicit model route.",
                     )
-                proposals = generate_tool_proposals(
-                    run["prompt"],
-                    model_provider=route["selected_provider"],
-                    model_name=route["selected_model"],
-                    cfg=cfg,
-                )
+                if options.get("model_native_loop"):
+                    provider_turn = generate_tool_turn(
+                        run["prompt"],
+                        model_provider=route["selected_provider"],
+                        model_name=route["selected_model"],
+                        max_actions=4,
+                        cfg=cfg,
+                    )
+                    proposals = provider_turn
+                else:
+                    proposals = generate_tool_proposals(
+                        run["prompt"],
+                        model_provider=route["selected_provider"],
+                        model_name=route["selected_model"],
+                        cfg=cfg,
+                    )
                 agent_plan = {
                     **proposals,
                     "planner": "provider-native",
@@ -732,6 +748,14 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                         for row in proposals["proposals"]
                     ],
                 }
+                if provider_turn is not None:
+                    agent_plan["status"] = "AGENT_LOOP_TOOL_PROPOSALS_READY" if agent_plan["actions"] else "AGENT_LOOP_STOPPED"
+                    agent_plan["loop"] = {
+                        "enabled": True,
+                        "turn": 1,
+                        "max_turns": int(options.get("max_agent_turns", 4)),
+                        "assistant_text": provider_turn.get("assistant_text", ""),
+                    }
                 try:
                     agent_plan["actions"] = normalize_agent_actions(agent_plan["actions"], max_actions=4)
                 except AgentWorkflowError as exc:
@@ -872,6 +896,12 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
         current["tool_call_ids"] = call_ids
         current["question"] = question
         current["checkpoint_id"] = checkpoint_id
+        current["model_native_loop"] = provider_turn is not None
+        if provider_turn is not None:
+            current["provider_messages"] = provider_turn.get("messages", [])
+            current["agent_turn"] = 1
+            current["max_agent_turns"] = int(options.get("max_agent_turns", 4))
+            current["agent_final_text"] = provider_turn.get("assistant_text", "")
         current["checkpoint_step_ids"] = {
             call_id: call_step_ids[call_id]
             for call_id in call_ids
@@ -985,6 +1015,156 @@ def _execute_tool_batch(
                 pass
 
 
+def _provider_tool_results(calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert terminal local ledger records into bounded provider tool results."""
+    results: list[dict[str, Any]] = []
+    for call in calls:
+        provider_call_id = (call.get("provenance") or {}).get("provider_call_id")
+        if not provider_call_id:
+            raise RunError("ERROR_AGENT_PROVIDER_CALL_ID_MISSING", f"Tool {call['tool_name']} has no provider call identity")
+        results.append(
+            {
+                "provider_call_id": provider_call_id,
+                "result": _compact(call.get("result") or {"status": call.get("status")}),
+                "is_error": call.get("status") != "EXECUTED",
+            }
+        )
+    return results
+
+
+def _advance_provider_loop(run: dict[str, Any], round_calls: list[dict[str, Any]], cfg: Settings) -> bool:
+    """Return the provider's next tool turn after a completed approved batch."""
+    run_id = run["run_id"]
+    next_turn = int(run.get("agent_turn", 1)) + 1
+    max_turns = int(run.get("max_agent_turns", run.get("options", {}).get("max_agent_turns", 4)))
+    if next_turn > max_turns:
+        _update(
+            run_id,
+            cfg,
+            lambda current: current.__setitem__("phase", "answer"),
+            [("warning", {"status": "WARN_AGENT_MAX_TURNS_REACHED", "category": "EXECUTION_BOUNDARY", "max_agent_turns": max_turns})],
+        )
+        return True
+    route_provider = (run.get("provider") or run.get("options", {}).get("model_provider"))
+    route_model = run.get("model") or run.get("options", {}).get("model_name")
+    if not route_provider:
+        _fail(run_id, "ERROR_AGENT_PROVIDER_IDENTITY_MISSING", "Provider-native loop has no selected provider.", cfg)
+        return False
+    try:
+        provider_turn = generate_tool_turn(
+            run["prompt"],
+            model_provider=route_provider,
+            model_name=route_model,
+            history=list(run.get("provider_messages") or []),
+            tool_results=_provider_tool_results(round_calls),
+            max_actions=4,
+            cfg=cfg,
+        )
+    except (ModelProviderError, ValueError) as exc:
+        _fail(run_id, getattr(exc, "status", "ERROR_AGENT_PROVIDER_TURN_FAILED"), getattr(exc, "detail", str(exc)), cfg)
+        return False
+
+    proposals = list(provider_turn.get("proposals") or [])
+    if not proposals:
+        def finish(current: dict[str, Any]) -> None:
+            current["provider_messages"] = provider_turn.get("messages", [])
+            current["agent_turn"] = next_turn
+            current["agent_final_text"] = provider_turn.get("assistant_text", "")
+            current["phase"] = "answer"
+
+        _update(
+            run_id,
+            cfg,
+            finish,
+            [
+                (
+                    "agent_plan",
+                    {
+                        "planner": "provider-native-loop",
+                        "status": "AGENT_LOOP_STOPPED",
+                        "turn": next_turn,
+                        "max_turns": max_turns,
+                        "assistant_text": provider_turn.get("assistant_text", ""),
+                        "selected_actions": 0,
+                    },
+                )
+            ],
+        )
+        return True
+
+    checkpoint_id = run.get("checkpoint_id")
+    new_ids: list[str] = []
+    new_steps: list[dict[str, Any]] = []
+    step_map: dict[str, str] = {}
+    events: list[tuple[str, dict[str, Any]]] = []
+    for index, proposal in enumerate(proposals):
+        step_id = f"agent-turn-{next_turn}-step-{index + 1}"
+        provenance = {
+            "provider": provider_turn.get("provider"),
+            "model": provider_turn.get("model"),
+            "response_id": provider_turn.get("response_id"),
+            "provider_call_id": proposal["provider_call_id"],
+            "proposal_sha256": provider_turn.get("proposal_sha256"),
+            "agent_step_id": step_id,
+            "agent_dependencies": [],
+            "agent_turn": next_turn,
+        }
+        if checkpoint_id:
+            provenance.update({"checkpoint_id": checkpoint_id, "checkpoint_step_id": step_id})
+        try:
+            call = request_tool_call(
+                proposal["tool"],
+                dict(proposal["arguments"]),
+                cfg=cfg,
+                requested_by="agent",
+                reason="Provider-native loop continuation; explicit approval is still required.",
+                run_id=run_id,
+                provenance=provenance,
+            )["tool_call"]
+        except ToolRuntimeError as exc:
+            events.append(("warning", {"status": exc.status, "category": classify_error(exc.status), "detail": exc.detail}))
+            continue
+        new_ids.append(call["tool_call_id"])
+        step_map[call["tool_call_id"]] = step_id
+        new_steps.append({"id": step_id, "tool": call["tool_name"], "status": "PENDING_APPROVAL", "depends_on": []})
+        events.append(("tool_call", _call_view(call)))
+
+    if checkpoint_id and new_steps:
+        try:
+            transition_checkpoint(checkpoint_id, state="EXECUTING", pending_steps=new_steps, cfg=cfg)
+        except CheckpointError as exc:
+            _fail(run_id, exc.status, exc.detail, cfg)
+            return False
+
+    def continue_run(current: dict[str, Any]) -> None:
+        current["tool_call_ids"] = list(current.get("tool_call_ids") or []) + new_ids
+        current["round_call_ids"] = new_ids
+        current["round"] = int(current.get("round", 1)) + 1
+        current["provider_messages"] = provider_turn.get("messages", [])
+        current["agent_turn"] = next_turn
+        current["agent_final_text"] = provider_turn.get("assistant_text", "")
+        current["checkpoint_step_ids"] = {**dict(current.get("checkpoint_step_ids") or {}), **step_map}
+        current["phase"] = "tools" if new_ids else "answer"
+        current["state"] = "RUNNING"
+
+    events.insert(
+        0,
+        (
+            "agent_plan",
+            {
+                "planner": "provider-native-loop",
+                "status": "AGENT_LOOP_TOOL_PROPOSALS_READY" if new_ids else "AGENT_LOOP_NO_EXECUTABLE_PROPOSALS",
+                "turn": next_turn,
+                "max_turns": max_turns,
+                "selected_actions": len(new_ids),
+                "response_id": provider_turn.get("response_id"),
+            },
+        ),
+    )
+    _update(run_id, cfg, continue_run, events)
+    return True
+
+
 def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
     run_id = run["run_id"]
     calls = _run_calls(run, cfg)
@@ -1078,6 +1258,9 @@ def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
     if failed:
         _ask_about_failures(get_run(run_id, cfg), failed, len(round_calls), cfg)
         return False
+    current_run = get_run(run_id, cfg)
+    if current_run.get("model_native_loop"):
+        return _advance_provider_loop(current_run, round_calls, cfg)
     return True
 
 
