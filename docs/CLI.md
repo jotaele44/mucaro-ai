@@ -65,6 +65,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis overlay LEFT_PATH RIGHT_PATH` | Overlay matched polygon GeoJSON features and write a derived-output receipt | 0 | 2 |
 | `mucaro gis reproject GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON between supported local CRS pairs and write a transformation receipt | 0 | 2 |
 | `mucaro gis reproject-crs GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON through pyproj/PROJ with explicit axis policy and frozen transformer identity | 0 | 2 |
+| `python3 scripts/certify_gis_datum_cli_parity.py` | Run the frozen Puerto Rico and Florida datum-grid controls through the PROJ `cct` executable and verify byte/hash/coordinate parity | 0 | 2 |
 | `mucaro gis csv-points CSV_PATH --lat-column LAT --lon-column LON` | Convert CSV coordinate rows into GeoJSON point features and write a row-accounted GIS receipt | 0 | 2 |
 | `mucaro gis filter-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Filter whole GeoJSON features by bbox extent and write retained/excluded accounting | 0 | 2 |
 | `mucaro gis clip-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Clip GeoJSON geometries to a bbox and write clipped/unchanged/excluded accounting | 0 | 2 |
@@ -245,9 +246,12 @@ output hash, and per-feature state. The default network policy is
 remote-only grids are skipped, and selected local grids are frozen by byte
 count and SHA-256. A lower-accuracy offline candidate therefore produces an
 explicit warning rather than silently downloading a grid. Z is passed through
-without vertical transformation and is warned; M fails closed. Independently
-frozen local datum-grid transformations, broader axis-order coverage, and
-vertical or time-dependent CRS certification remain outside the V1 claim.
+without vertical transformation and is warned; M fails closed. Frozen local
+Puerto Rico and Florida datum-grid transformations are covered by source-bound
+manifests, and the separate `cct` control verifies executable parity for both
+frozen pipelines. This is not independent-vendor engine certification. Broader
+axis-order coverage and vertical or time-dependent CRS certification remain
+outside the V1 claim.
 
 `inspect-vector`, `inspect-raster`, `sample-raster`,
 `clip-raster-bbox`, `vector-raster`, `zonal-stats`, `resample-raster`,
