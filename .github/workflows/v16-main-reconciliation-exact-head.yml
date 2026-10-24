@@ -56,7 +56,6 @@ jobs:
               "packaging/one_click/requirements-x86_64-pc-windows-msvc.lock",
               "packaging/runtime/requirements-macos-arm64.lock",
               "packaging/runtime/requirements-macos-x86_64.lock",
-              ".github/workflows/arm64-runtime-source-cert.yml",
           ]
           for path in names:
               data=Path(path).read_text()
