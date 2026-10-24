@@ -207,6 +207,10 @@ def test_api_skill_mount_activation_invocation_and_receipt(tmp_path: Path):
     assert executed.json()["status"] == "SKILL_EXECUTED"
     assert executed.json()["execution"]["artifact_lineage"]["input"]["artifact_id"]
 
+    encoded_executed = client.post("/skills/mucaro%2Fintelligence-plane-health/execute", json={"arguments": {}})
+    assert encoded_executed.status_code == 200
+    assert encoded_executed.json()["status"] == "SKILL_EXECUTED"
+
     executions = client.get("/skills/executions")
     assert executions.status_code == 200
     assert executions.json()["executions"][0]["policy_decision"]["policy_id"] == "api-skill-policy"
