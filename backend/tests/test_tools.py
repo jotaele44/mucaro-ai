@@ -4,6 +4,7 @@ import pytest
 
 from backend.app.config import Settings
 from backend.app.permission_leases import create_permission_lease
+from backend.app.permission_leases import list_permission_leases
 from backend.app.tools import (
     ToolRuntimeError,
     approve_tool_call,
@@ -66,6 +67,41 @@ def test_permission_lease_tool_crosses_approval_and_audit_boundary(tmp_path: Pat
     assert executed["result"]["status"] == "PERMISSION_LEASE_CONSUMED"
     assert executed["result"]["lease"]["uses"] == 1
     assert list_tool_audit_events(cfg)["events"][-1]["event"] == "TOOL_CALL_EXECUTED"
+
+
+def test_autonomous_mutating_tool_requires_run_identity(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    with pytest.raises(ToolRuntimeError) as exc:
+        request_tool_call(
+            "task.create",
+            {"title": "autonomous task"},
+            cfg=cfg,
+            requested_by="agent",
+        )
+    assert exc.value.status == "ERROR_AUTONOMOUS_RUN_ID_REQUIRED"
+
+
+def test_autonomous_mutating_tool_gets_one_use_lease_and_consumes_before_execution(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    requested = request_tool_call(
+        "task.create",
+        {"title": "autonomous task", "task_id": "auto-task"},
+        cfg=cfg,
+        requested_by="agent",
+        run_id="run-auto",
+    )
+    call = requested["tool_call"]
+    assert call["lease_id"]
+    lease_id = call["lease_id"]
+    assert list_permission_leases(cfg, run_id="run-auto")[0]["effective_state"] == "ACTIVE"
+
+    approve_tool_call(call["tool_call_id"], cfg=cfg, approved_by="operator")
+    executed = run_tool_call(call["tool_call_id"], cfg=cfg, executed_by="run:run-auto")
+
+    assert executed["result"]["status"] == "TASK_CREATED"
+    lease = next(row for row in list_permission_leases(cfg) if row["lease_id"] == lease_id)
+    assert lease["uses"] == 1
+    assert lease["effective_state"] == "EXHAUSTED"
 
 
 def test_tool_runtime_requires_approval_before_execution(tmp_path: Path):

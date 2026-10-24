@@ -940,6 +940,12 @@ SQLite records. Permission evaluation only inspects an active lease; the
 execution-time `require()` gate consumes one use atomically and rejects expired,
 revoked, exhausted, or identity-mismatched leases.
 
+Autonomous agent-origin capability-bearing tool calls are stricter than
+operator-origin calls: mutating or externally executing tools must carry a
+`run_id`, receive a one-use lease bound to the tool capability and target, and
+consume that lease immediately before the handler starts. A missing run
+identity or lease fails closed before the call can execute.
+
 Use `mucaro release state` to classify the current repo against the bounded
 release path: `CANONICAL_LOCAL`, `LOCAL_RELEASE_CERTIFIED`,
 `FRESH_CLONE_CERTIFIED`, `SOURCE_ARTIFACT_PACKAGING`,

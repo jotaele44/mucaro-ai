@@ -1042,6 +1042,7 @@ def _call_view(call: dict[str, Any]) -> dict[str, Any]:
         "tool_name": call["tool_name"],
         "arguments": call.get("arguments", {}),
         "arguments_sha256": call.get("arguments_sha256"),
+        "lease_id": call.get("lease_id"),
         "status": call["status"],
         "retry_of": call.get("retry_of"),
         "provenance": call.get("provenance", {}),

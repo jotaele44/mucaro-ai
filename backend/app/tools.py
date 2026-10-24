@@ -15,10 +15,13 @@ from .contracts import validate_contract
 from .agent_tasks import TaskError, create_task, get_task, list_tasks, task_summary, update_task
 from .ingestion import get_chunks, get_index_status, get_sources
 from .memory import list_memory_items
+from .permission_engine import PermissionEngineError, PermissionRequest
+from .permission_engine import require as require_permission
 from .permission_leases import (
     PermissionLeaseError,
     consume_permission_lease,
     create_permission_lease,
+    inspect_permission_lease,
     list_permission_leases,
     revoke_permission_lease,
 )
@@ -60,6 +63,8 @@ class ToolDefinition:
     # "none": local only; "remote": contacts an external service (TGT-019 offline classification).
     network: str = "none"
     timeout_seconds: float = DEFAULT_TOOL_TIMEOUT_SECONDS
+    permission_capability: str | None = None
+    permission_target_field: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -69,6 +74,8 @@ class ToolDefinition:
             "requires_approval": self.requires_approval,
             "network": self.network,
             "timeout_seconds": self.timeout_seconds,
+            "permission_capability": self.permission_capability,
+            "permission_target_field": self.permission_target_field,
             "offline_availability": "AVAILABLE_LOCALLY" if self.network == "none" else "REQUIRES_REMOTE_SERVICE",
         }
 
@@ -458,6 +465,8 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_coding_patch_apply,
+        permission_capability="filesystem.write",
+        permission_target_field="repo_root",
     ),
     "coding.check_suite": ToolDefinition(
         name="coding.check_suite",
@@ -465,6 +474,8 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=False,
         requires_approval=True,
         handler=_coding_check_suite,
+        permission_capability="runtime.container",
+        permission_target_field="repo_root",
     ),
     "coding.review": ToolDefinition(
         name="coding.review",
@@ -493,6 +504,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_task_create,
+        permission_capability="database.write",
     ),
     "task.update": ToolDefinition(
         name="task.update",
@@ -500,6 +512,8 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         mutates_state=True,
         requires_approval=True,
         handler=_task_update,
+        permission_capability="database.write",
+        permission_target_field="task_id",
     ),
     "permission.lease_list": ToolDefinition(
         name="permission.lease_list",
@@ -536,6 +550,8 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         network="remote",
         handler=_web_render,
+        permission_capability="network.public_http",
+        permission_target_field="url",
     ),
     "web.search": ToolDefinition(
         name="web.search",
@@ -544,6 +560,8 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         network="remote",
         handler=_web_search,
+        permission_capability="network.public_http",
+        permission_target_field="query",
     ),
     "web.fetch": ToolDefinition(
         name="web.fetch",
@@ -552,6 +570,8 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         network="remote",
         handler=_web_fetch,
+        permission_capability="network.public_http",
+        permission_target_field="url",
     ),
     "web.fetch_session": ToolDefinition(
         name="web.fetch_session",
@@ -560,6 +580,8 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         network="remote",
         handler=_web_fetch_session,
+        permission_capability="network.public_http",
+        permission_target_field="urls",
     ),
 }
 
@@ -582,6 +604,99 @@ def _load_audit_events(cfg: Settings) -> list[dict[str, Any]]:
 
 def arguments_digest(arguments: dict[str, Any]) -> str:
     return canonical_sha256(arguments)
+
+
+def _agent_tool_subject(tool_name: str) -> str:
+    return f"agent.tool:{tool_name}"
+
+
+def _agent_tool_target(tool: ToolDefinition, arguments: dict[str, Any]) -> str | None:
+    field = tool.permission_target_field
+    if not field:
+        return None
+    value = arguments.get(field)
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return canonical_sha256(value)
+    return str(value)
+
+
+def _ensure_agent_lease(
+    tool_name: str,
+    tool: ToolDefinition,
+    arguments: dict[str, Any],
+    *,
+    run_id: str | None,
+    lease_id: str | None,
+    cfg: Settings,
+) -> str | None:
+    """Bind autonomous capability-bearing calls to one run-scoped lease.
+
+    Creating the lease allocates a run budget; it does not approve the tool
+    call. The call remains pending until the normal approval boundary passes.
+    Consumption occurs only in ``run_tool_call`` immediately before execution.
+    """
+    if tool.permission_capability is None:
+        return lease_id
+    if not run_id:
+        raise ToolRuntimeError(
+            "ERROR_AUTONOMOUS_RUN_ID_REQUIRED",
+            f"{tool_name} is an autonomous capability-bearing action and requires run_id",
+        )
+    target = _agent_tool_target(tool, arguments)
+    subject = _agent_tool_subject(tool_name)
+    try:
+        if lease_id:
+            inspect_permission_lease(
+                lease_id,
+                run_id=run_id,
+                capability=tool.permission_capability,
+                subject=subject,
+                target=target,
+                cfg=cfg,
+            )
+            return lease_id
+        lease = create_permission_lease(
+            run_id,
+            tool.permission_capability,
+            subject,
+            target=target,
+            ttl_seconds=300,
+            max_uses=1,
+            granted_by=f"agent-run:{run_id}",
+            cfg=cfg,
+        )
+        return str(lease["lease_id"])
+    except PermissionLeaseError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
+def _consume_agent_tool_lease(call: dict[str, Any], tool: ToolDefinition, cfg: Settings) -> None:
+    if call.get("requested_by") != "agent" or tool.permission_capability is None:
+        return
+    run_id = call.get("run_id")
+    lease_id = call.get("lease_id")
+    if not isinstance(run_id, str) or not run_id or not isinstance(lease_id, str) or not lease_id:
+        raise ToolRuntimeError(
+            "ERROR_AUTONOMOUS_LEASE_REQUIRED",
+            f"{tool.name} requires a run-scoped lease before autonomous execution",
+        )
+    target = _agent_tool_target(tool, dict(call.get("arguments") or {}))
+    try:
+        require_permission(
+            PermissionRequest(
+                capability=tool.permission_capability,
+                subject=_agent_tool_subject(tool.name),
+                target=target,
+                origin="agent",
+                run_id=run_id,
+                lease_id=lease_id,
+            ),
+            cfg=cfg,
+        )
+    except PermissionEngineError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
 def _binding_failure(call: dict[str, Any], cfg: Settings, *, anchors: tuple[str, ...]) -> tuple[str, str] | None:
@@ -703,6 +818,7 @@ def request_tool_call(
     requested_by: str = "operator",
     reason: str | None = None,
     run_id: str | None = None,
+    lease_id: str | None = None,
     retry_of: str | None = None,
     provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -723,6 +839,17 @@ def request_tool_call(
         )
         raise ToolRuntimeError("ERROR_TOOL_NOT_ALLOWED", f"Tool is not in the local allowlist: {tool_name}")
 
+    tool = TOOL_REGISTRY[tool_name]
+    if requested_by == "agent":
+        lease_id = _ensure_agent_lease(
+            tool_name,
+            tool,
+            arguments,
+            run_id=run_id,
+            lease_id=lease_id,
+            cfg=cfg,
+        )
+
     created_at = utc_now()
     digest = arguments_digest(arguments)
     tool_call_id = stable_id("toolcall", tool_name, digest, created_at)
@@ -736,6 +863,7 @@ def request_tool_call(
         "reason": reason,
         "provenance": dict(provenance or {}),
         "run_id": run_id,
+        "lease_id": lease_id,
         "retry_of": retry_of,
         "created_at": created_at,
         "approved_by": None,
@@ -756,6 +884,7 @@ def request_tool_call(
             "actor": requested_by,
             "reason": reason,
             "arguments_sha256": digest,
+            "lease_id": lease_id,
         },
         cfg,
     )
@@ -950,6 +1079,34 @@ def run_tool_call(
         {"event": "TOOL_CALL_STARTED", "tool_call_id": tool_call_id, "tool_name": tool_name, "status": "RUNNING", "actor": executed_by},
         cfg,
     )
+    try:
+        _consume_agent_tool_lease(call, tool, cfg)
+    except ToolRuntimeError as exc:
+        result = {"status": exc.status, "detail": exc.detail}
+        call = _transition(
+            tool_call_id,
+            cfg,
+            lambda current: {
+                **current,
+                "status": "FAILED",
+                "executed_at": utc_now(),
+                "executed_by": executed_by,
+                "result": result,
+            },
+        )
+        _append_audit_event(
+            {
+                "event": "TOOL_CALL_FAILED",
+                "tool_call_id": tool_call_id,
+                "tool_name": tool_name,
+                "status": exc.status,
+                "actor": executed_by,
+                "result_status": exc.status,
+                "lease_id": call.get("lease_id"),
+            },
+            cfg,
+        )
+        raise
     failure: ToolRuntimeError | None = None
     outcome: dict[str, Any] = {}
 

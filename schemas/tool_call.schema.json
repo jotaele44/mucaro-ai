@@ -11,6 +11,7 @@
     "tool_name": {"type": "string", "minLength": 1},
     "arguments": {"type": "object"},
     "arguments_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "lease_id": {"type": ["string", "null"], "minLength": 1},
     "status": {"enum": ["PENDING_APPROVAL", "APPROVED", "DENIED", "CANCELLED", "RUNNING", "EXECUTED", "FAILED", "INTERRUPTED"]},
     "requested_by": {"type": "string", "minLength": 1},
     "reason": {"type": ["string", "null"]},
