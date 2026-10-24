@@ -91,6 +91,7 @@ def create_checkpoint(
         "sequence": 0,
         "completed_steps": list(completed_steps or []),
         "pending_steps": list(pending_steps or []),
+        "in_flight_steps": [],
         "contradictions": _merged_contradictions([], contradictions or []),
         "pause_reason": None,
         "provider": provider,
@@ -242,7 +243,7 @@ def transition_checkpoint(
         if contradictions is not None:
             current["contradictions"] = _merged_contradictions(current["contradictions"], contradictions)
         if state == "COMPLETED":
-            if current.get("in_flight_step"):
+            if current.get("in_flight_step") or current.get("in_flight_steps"):
                 raise CheckpointError("ERROR_CHECKPOINT_STEP_IN_FLIGHT", "cannot complete while a step is in flight")
             open_ids = sorted(str(c.get("id")) for c in current["contradictions"] if not _adjudicated(c))
             if open_ids:
@@ -280,11 +281,51 @@ def begin_step(checkpoint_id: str, *, step_id: str, idempotency_key: str, cfg: S
     def change(current: dict[str, Any]) -> dict[str, Any]:
         if current["state"] != "EXECUTING":
             raise CheckpointError("ERROR_CHECKPOINT_STEP_STATE", f"steps run only in EXECUTING, not {current['state']}")
-        if current.get("in_flight_step"):
-            raise CheckpointError("ERROR_CHECKPOINT_STEP_IN_FLIGHT", f"step already in flight: {current['in_flight_step']['step_id']}")
+        if current.get("in_flight_step") or current.get("in_flight_steps"):
+            existing = current.get("in_flight_step") or current.get("in_flight_steps", [{}])[0]
+            raise CheckpointError("ERROR_CHECKPOINT_STEP_IN_FLIGHT", f"step already in flight: {existing['step_id']}")
         if any(done.get("idempotency_key") == idempotency_key for done in current["completed_steps"]):
             raise CheckpointError("ERROR_CHECKPOINT_STEP_ALREADY_COMPLETED", idempotency_key)
         current["in_flight_step"] = {"step_id": step_id, "idempotency_key": idempotency_key, "started_at": utc_now()}
+        return current
+
+    return _mutate(checkpoint_id, change, cfg)
+
+
+def begin_steps(checkpoint_id: str, *, steps: list[dict[str, str]], cfg: Settings = settings) -> dict[str, Any]:
+    """Atomically mark an independent batch of steps in flight.
+
+    The batch API is intentionally separate from ``begin_step``: existing
+    single-step integrations retain their strict one-flight invariant, while
+    the bounded DAG executor can persist all concurrently launched work before
+    any handler starts.
+    """
+    if not steps or any(
+        not isinstance(step, dict)
+        or not isinstance(step.get("step_id"), str)
+        or not step["step_id"].strip()
+        or not isinstance(step.get("idempotency_key"), str)
+        or not step["idempotency_key"].strip()
+        for step in steps
+    ):
+        raise CheckpointError("ERROR_CHECKPOINT_STEP_BATCH", "steps must contain step_id and idempotency_key strings")
+    step_ids = [step["step_id"] for step in steps]
+    keys = [step["idempotency_key"] for step in steps]
+    if len(set(step_ids)) != len(step_ids) or len(set(keys)) != len(keys):
+        raise CheckpointError("ERROR_CHECKPOINT_STEP_BATCH_DUPLICATE", "parallel steps must have unique identities")
+
+    def change(current: dict[str, Any]) -> dict[str, Any]:
+        if current["state"] != "EXECUTING":
+            raise CheckpointError("ERROR_CHECKPOINT_STEP_STATE", f"steps run only in EXECUTING, not {current['state']}")
+        if current.get("in_flight_step") or current.get("in_flight_steps"):
+            raise CheckpointError("ERROR_CHECKPOINT_STEP_IN_FLIGHT", "another step batch is already in flight")
+        completed_keys = {done.get("idempotency_key") for done in current["completed_steps"]}
+        if any(key in completed_keys for key in keys):
+            raise CheckpointError("ERROR_CHECKPOINT_STEP_ALREADY_COMPLETED", ",".join(keys))
+        current["in_flight_steps"] = [
+            {"step_id": step["step_id"], "idempotency_key": step["idempotency_key"], "started_at": utc_now()}
+            for step in steps
+        ]
         return current
 
     return _mutate(checkpoint_id, change, cfg)
@@ -305,9 +346,12 @@ def complete_step(
     def change(current: dict[str, Any]) -> dict[str, Any] | None:
         if any(done.get("idempotency_key") == idempotency_key for done in current["completed_steps"]):
             return None
-        flight = current.get("in_flight_step")
-        if not flight or flight["idempotency_key"] != idempotency_key:
+        flights = list(current.get("in_flight_steps") or [])
+        flight_index = next((index for index, flight in enumerate(flights) if flight.get("idempotency_key") == idempotency_key), None)
+        legacy_flight = current.get("in_flight_step")
+        if flight_index is None and not (legacy_flight and legacy_flight.get("idempotency_key") == idempotency_key):
             raise CheckpointError("ERROR_CHECKPOINT_STEP_NOT_IN_FLIGHT", idempotency_key)
+        flight = flights[flight_index] if flight_index is not None else legacy_flight
         current["completed_steps"] = [
             *current["completed_steps"],
             {
@@ -319,7 +363,10 @@ def complete_step(
             },
         ]
         current["pending_steps"] = [step for step in current["pending_steps"] if step.get("id") != flight["step_id"]]
-        current["in_flight_step"] = None
+        if flight_index is not None:
+            current["in_flight_steps"] = [item for index, item in enumerate(flights) if index != flight_index]
+        else:
+            current["in_flight_step"] = None
         return current
 
     return _mutate(checkpoint_id, change, cfg)

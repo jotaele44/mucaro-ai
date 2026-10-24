@@ -172,6 +172,31 @@ def test_step_in_flight_survives_crash_and_completion_is_idempotent(tmp_path: Pa
     assert replay.value.status == "ERROR_CHECKPOINT_STEP_ALREADY_COMPLETED"
 
 
+def test_parallel_step_batch_persists_all_in_flight_steps_and_closes_idempotently(tmp_path: Path) -> None:
+    from backend.app.agent_checkpoints import begin_steps, complete_step
+
+    cfg = make_settings(tmp_path)
+    created = _executing(cfg, pending_steps=[{"id": "a"}, {"id": "b"}])
+    begun = begin_steps(
+        created["checkpoint_id"],
+        steps=[
+            {"step_id": "a", "idempotency_key": "k-a"},
+            {"step_id": "b", "idempotency_key": "k-b"},
+        ],
+        cfg=cfg,
+    )
+    assert [step["step_id"] for step in begun["in_flight_steps"]] == ["a", "b"]
+    assert get_checkpoint(created["checkpoint_id"], cfg)["in_flight_steps"] == begun["in_flight_steps"]
+
+    after_a = complete_step(created["checkpoint_id"], idempotency_key="k-a", result={"ok": True}, cfg=cfg)
+    assert [step["step_id"] for step in after_a["in_flight_steps"]] == ["b"]
+    after_b = complete_step(created["checkpoint_id"], idempotency_key="k-b", result={"ok": True}, cfg=cfg)
+    again = complete_step(created["checkpoint_id"], idempotency_key="k-b", result={"changed": True}, cfg=cfg)
+    assert after_b["in_flight_steps"] == []
+    assert after_b["pending_steps"] == []
+    assert again == after_b
+
+
 def test_completing_a_step_twice_writes_nothing(tmp_path: Path) -> None:
     from backend.app.agent_checkpoints import begin_step, complete_step
 

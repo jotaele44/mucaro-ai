@@ -4,12 +4,29 @@ from __future__ import annotations
 
 from typing import Any
 
+DEFAULT_AGENT_PARALLELISM = 2
+MAX_AGENT_PARALLELISM = 4
+
 
 class AgentWorkflowError(ValueError):
     def __init__(self, status: str, detail: str) -> None:
         super().__init__(detail)
         self.status = status
         self.detail = detail
+
+
+def normalize_agent_parallelism(value: Any = None) -> int:
+    """Validate the bounded concurrency policy used by autonomous plans."""
+    if value is None:
+        return DEFAULT_AGENT_PARALLELISM
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise AgentWorkflowError("ERROR_AGENT_PARALLELISM", "max_parallel_actions must be an integer")
+    if value < 1 or value > MAX_AGENT_PARALLELISM:
+        raise AgentWorkflowError(
+            "ERROR_AGENT_PARALLELISM",
+            f"max_parallel_actions must be between 1 and {MAX_AGENT_PARALLELISM}",
+        )
+    return value
 
 
 def normalize_agent_actions(actions: list[dict[str, Any]], *, max_actions: int) -> list[dict[str, Any]]:

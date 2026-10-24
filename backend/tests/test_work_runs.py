@@ -297,6 +297,59 @@ def test_agent_dependency_graph_is_topological_and_checkpoint_bound(cfg, convers
     assert [step["id"] for step in completed["completed_steps"]] == ["inspect", "answer"]
 
 
+def test_agent_independent_steps_execute_in_a_bounded_parallel_batch(cfg, conversation, monkeypatch):
+    barrier = threading.Barrier(2)
+    started: list[str] = []
+    started_lock = threading.Lock()
+
+    def parallel_tool(arguments, settings):
+        del settings
+        with started_lock:
+            started.append(str(arguments["name"]))
+        barrier.wait(timeout=2)
+        return {"status": "PARALLEL_OK", "name": arguments["name"]}
+
+    for name in ("test.parallel_a", "test.parallel_b"):
+        monkeypatch.setitem(TOOL_REGISTRY, name, ToolDefinition(name, name, False, True, parallel_tool))
+    monkeypatch.setattr(
+        work_runs,
+        "build_agent_plan",
+        lambda prompt, cfg: {
+            "schema_version": "mucaro-agent-plan/1.0",
+            "planner": "test",
+            "status": "AGENT_PLAN_READY",
+            "prompt": prompt,
+            "actions": [
+                {"id": "a", "tool": "test.parallel_a", "arguments": {"name": "a"}, "reason": "a", "confidence": "HIGH", "depends_on": []},
+                {"id": "b", "tool": "test.parallel_b", "arguments": {"name": "b"}, "reason": "b", "confidence": "HIGH", "depends_on": []},
+            ],
+        },
+    )
+    monkeypatch.setattr(work_runs, "current_git_head", lambda _root: "f" * 40)
+    run = _submit(conversation, "How does source lineage work? Run independent checks.", cfg, mode="agent", options={"max_parallel_actions": 2})
+    assert run["state"] == "AWAITING_APPROVAL"
+    for call in list_tool_calls(cfg)["tool_calls"]:
+        approve_tool_call(call["tool_call_id"], cfg=cfg, expected_arguments_sha256=call["arguments_sha256"])
+    resume_waiting_run(run["run_id"], cfg)
+
+    final = get_run(run["run_id"], cfg)
+    assert final["state"] == "COMPLETED", final.get("error")
+    assert sorted(started) == ["a", "b"]
+    batch = next(event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "tool_batch")
+    assert batch["data"]["parallel"] is True
+    checkpoint = get_checkpoint(run["checkpoint_id"], cfg)
+    assert checkpoint is not None
+    assert checkpoint["metadata"]["max_parallel_actions"] == 2
+    assert checkpoint["in_flight_steps"] == []
+
+
+def test_agent_parallelism_is_bounded_and_explicit(cfg, conversation):
+    for value in (0, 5, True, "2"):
+        with pytest.raises(RunError) as exc:
+            submit_message(conversation, "Inspect the source library.", mode="agent", options={"max_parallel_actions": value}, cfg=cfg)
+        assert exc.value.status == "ERROR_AGENT_PARALLELISM"
+
+
 def test_agent_dependency_failure_cancels_downstream_and_closes_checkpoint(cfg, conversation, monkeypatch, flaky_tool):
     monkeypatch.setattr(work_runs, "current_git_head", lambda _root: "e" * 40)
     monkeypatch.setattr(

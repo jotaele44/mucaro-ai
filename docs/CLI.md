@@ -831,7 +831,12 @@ bounded autonomy by default. For an explicitly routed live provider, set
 and `options.allow_live`; Anthropic and OpenAI-compatible local tool-call
 responses are normalized, allowlist-validated, bounded to four actions, hash
 bound, and then sent through the same approval ledger. Provider-native planning
-has no mock fallback, and it does not yet provide multi-agent DAG execution.
+has no mock fallback. Independent approved steps in an agent run execute in
+bounded parallel batches; set `options.max_parallel_actions` from 1 through 4
+(the default is 2) to choose the concurrency limit. The run records the limit,
+step identities, batch event, and per-step checkpoint outcomes. This is still
+single-agent execution: subagents, fleet scheduling, model-native tool loops,
+and broader crash-resume certification remain open.
 
 The equivalent read-only CLI surfaces are:
 

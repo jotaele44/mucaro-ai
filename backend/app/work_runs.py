@@ -21,6 +21,8 @@ Guarantees (MOB F02-F04, F07-F09, F13-F16, F18; TGT-014, TGT-018):
   non-mutating tools; everything else still waits for the user.
 - Tool outcomes (executed, failed, denied, cancelled) are reported one per
   call and aggregated from the call records, never from narration.
+- Independent approved agent steps execute in bounded dependency-aware batches;
+  batch size and multi-flight checkpoint state are persisted before handlers run.
 - A failed action is never retried implicitly; retry asks the user and
   creates a new call that needs a fresh approval. Successful calls are not
   repeated.
@@ -35,18 +37,20 @@ import json
 import threading
 import time
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from .agent_checkpoints import (
     CheckpointError,
     begin_step,
+    begin_steps,
     complete_step,
     create_checkpoint,
     get_checkpoint,
     transition_checkpoint,
 )
 from .agent_planner import build_agent_plan
-from .agent_workflow import AgentWorkflowError, normalize_agent_actions
+from .agent_workflow import AgentWorkflowError, normalize_agent_actions, normalize_agent_parallelism
 from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
 from .db import ensure_db, get_connection
@@ -93,7 +97,7 @@ MODES = {
 EVENT_TYPES = {
     "queued", "run_started", "route", "plan", "tool_call", "approval_request", "tool_started", "tool_result",
     "tool_summary", "agent_plan", "question", "question_resolved", "retry_requested", "user_note", "retrieval", "text_delta",
-    "citation", "artifact", "warning", "error", "checkpoint", "interrupted", "cancelled", "final",
+    "citation", "artifact", "warning", "error", "checkpoint", "tool_batch", "interrupted", "cancelled", "final",
 }
 MAX_PROMPT_CHARS = 20_000
 TEXT_DELTA_CHARS = 160
@@ -350,6 +354,12 @@ def submit_message(
         raise RunError("ERROR_RUN_PROMPT_TOO_LONG", f"Message exceeds {MAX_PROMPT_CHARS} characters.")
     if mode not in MODES:
         raise RunError("ERROR_RUN_MODE_INVALID", f"Mode must be one of {sorted(MODES)}.")
+    normalized_options = dict(options or {})
+    if mode == "agent":
+        try:
+            normalized_options["max_parallel_actions"] = normalize_agent_parallelism(normalized_options.get("max_parallel_actions"))
+        except AgentWorkflowError as exc:
+            raise RunError(exc.status, exc.detail) from exc
     if get_conversation(conversation_id, cfg) is None:
         raise RunError("ERROR_CONVERSATION_NOT_FOUND", conversation_id)
     if dismiss_pending_question:
@@ -376,7 +386,7 @@ def submit_message(
             "conversation_id": conversation_id,
             "prompt": text,
             "mode": mode,
-            "options": dict(options or {}),
+            "options": normalized_options,
             "idempotency_key": idempotency_key,
             "created_at": now,
             "phase": "start",
@@ -798,7 +808,11 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                     ],
                     provider=route.get("selected_provider") if route else None,
                     model=route.get("selected_model") if route else None,
-                    metadata={"workflow": "agent_work_run", "max_actions": len(commands)},
+                    metadata={
+                        "workflow": "agent_work_run",
+                        "max_actions": len(commands),
+                        "max_parallel_actions": int(run.get("options", {}).get("max_parallel_actions", 2)),
+                    },
                     cfg=cfg,
                 )
                 checkpoint_id = checkpoint["checkpoint_id"]
@@ -906,6 +920,71 @@ def _compact(value: Any, depth: int = 0) -> Any:
     return value
 
 
+def _agent_step_id(call: dict[str, Any]) -> str | None:
+    provenance = call.get("provenance") or {}
+    value = provenance.get("agent_step_id") or provenance.get("checkpoint_step_id")
+    return str(value) if value else None
+
+
+def _execute_tool_batch(
+    run_id: str,
+    batch: list[dict[str, Any]],
+    *,
+    checkpoint_id: str | None,
+    cfg: Settings,
+) -> None:
+    """Execute one dependency-independent batch and close its durable steps."""
+    if checkpoint_id:
+        begin_steps(
+            checkpoint_id,
+            steps=[
+                {"step_id": str(_agent_step_id(call)), "idempotency_key": call["tool_call_id"]}
+                for call in batch
+            ],
+            cfg=cfg,
+        )
+    for call in batch:
+        _emit_only(run_id, cfg, "tool_started", _call_view(call))
+    _emit_only(
+        run_id,
+        cfg,
+        "tool_batch",
+        {
+            "step_ids": [step_id for step_id in (_agent_step_id(call) for call in batch) if step_id],
+            "tool_call_ids": [call["tool_call_id"] for call in batch],
+            "parallel": len(batch) > 1,
+        },
+    )
+
+    def execute(call: dict[str, Any]) -> None:
+        try:
+            run_tool_call(call["tool_call_id"], cfg=cfg, executed_by=f"run:{run_id}")
+        except ToolRuntimeError:
+            # The call ledger records the terminal failure; reporting is centralized below.
+            pass
+
+    with ThreadPoolExecutor(max_workers=len(batch), thread_name_prefix=f"agent-{run_id[:8]}") as executor:
+        futures = [executor.submit(execute, call) for call in batch]
+        for future in futures:
+            future.result()
+
+    if checkpoint_id:
+        updated_calls = {call["tool_call_id"]: call for call in _run_calls(get_run(run_id, cfg), cfg)}
+        for call in batch:
+            updated = updated_calls.get(call["tool_call_id"], call)
+            try:
+                complete_step(
+                    checkpoint_id,
+                    idempotency_key=call["tool_call_id"],
+                    status="PASS" if updated["status"] == "EXECUTED" else "FAIL",
+                    result=dict(updated.get("result") or {}),
+                    cfg=cfg,
+                )
+            except CheckpointError:
+                # The tool ledger remains authoritative if a concurrent recovery path already closed it.
+                pass
+
+
 def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
     run_id = run["run_id"]
     calls = _run_calls(run, cfg)
@@ -926,86 +1005,58 @@ def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
         checkpoint = get_checkpoint(checkpoint_id, cfg)
         if checkpoint and checkpoint["state"] == "READY_FOR_APPROVAL":
             transition_checkpoint(checkpoint_id, state="EXECUTING", cfg=cfg)
-    for call in calls:
-        if call["status"] != "APPROVED":
-            continue
+    parallel_limit = 1
+    if run.get("mode") == "agent":
+        parallel_limit = normalize_agent_parallelism(run.get("options", {}).get("max_parallel_actions"))
+
+    while True:
         if _cancel_checkpoint(run_id, cfg):
             return False
         current_calls = _run_calls(get_run(run_id, cfg), cfg)
         current_by_step = {
-            str((row.get("provenance") or {}).get("agent_step_id") or (row.get("provenance") or {}).get("checkpoint_step_id")): row
+            str(_agent_step_id(row)): row
             for row in current_calls
-            if (row.get("provenance") or {}).get("agent_step_id") or (row.get("provenance") or {}).get("checkpoint_step_id")
+            if _agent_step_id(row)
         }
-        dependencies = [str(value) for value in (call.get("provenance") or {}).get("agent_dependencies", [])]
-        dependency_rows = [current_by_step.get(dependency) for dependency in dependencies]
-        if any(row is None for row in dependency_rows):
+        ready: list[dict[str, Any]] = []
+        cancellations: list[tuple[dict[str, Any], str, str]] = []
+        for call in current_calls:
+            if call["status"] != "APPROVED":
+                continue
+            dependencies = [str(value) for value in (call.get("provenance") or {}).get("agent_dependencies", [])]
+            dependency_rows = [current_by_step.get(dependency) for dependency in dependencies]
+            step_id = _agent_step_id(call)
+            if any(row is None for row in dependency_rows):
+                cancellations.append((call, "AGENT_DEPENDENCY_UNKNOWN", "ERROR_AGENT_WORKFLOW_UNKNOWN_DEPENDENCY"))
+            elif any(row["status"] in {"FAILED", "DENIED", "CANCELLED", "INTERRUPTED"} for row in dependency_rows):
+                cancellations.append((call, "AGENT_DEPENDENCY_FAILED", "ERROR_AGENT_DEPENDENCY_FAILED"))
+            elif all(row["status"] == "EXECUTED" for row in dependency_rows):
+                ready.append(call)
+
+        for call, reason, status in cancellations:
             try:
                 cancelled = cancel_tool_call(
                     call["tool_call_id"],
                     cfg=cfg,
                     cancelled_by=f"run:{run_id}",
-                    reason="AGENT_DEPENDENCY_UNKNOWN",
+                    reason=reason,
                 )["tool_call"]
-                _emit_only(run_id, cfg, "warning", {
-                    "status": "ERROR_AGENT_WORKFLOW_UNKNOWN_DEPENDENCY",
-                    "category": "EXECUTION_BOUNDARY",
-                    "detail": f"step {(call.get('provenance') or {}).get('checkpoint_step_id')} references an unknown dependency",
-                    "tool_call_id": cancelled["tool_call_id"],
-                })
-                _complete_skipped_checkpoint_step(
-                    checkpoint_id,
-                    (call.get("provenance") or {}).get("checkpoint_step_id"),
-                    call["tool_call_id"],
-                    "ERROR_AGENT_WORKFLOW_UNKNOWN_DEPENDENCY",
-                    cfg,
-                )
+                if status == "ERROR_AGENT_WORKFLOW_UNKNOWN_DEPENDENCY":
+                    _emit_only(run_id, cfg, "warning", {
+                        "status": status,
+                        "category": "EXECUTION_BOUNDARY",
+                        "detail": f"step {_agent_step_id(call)} references an unknown dependency",
+                        "tool_call_id": cancelled["tool_call_id"],
+                    })
+                _complete_skipped_checkpoint_step(checkpoint_id, _agent_step_id(call), cancelled["tool_call_id"], status, cfg)
             except ToolRuntimeError:
                 pass
+        if cancellations:
             continue
-        if any(row["status"] in {"FAILED", "DENIED", "CANCELLED", "INTERRUPTED"} for row in dependency_rows):
-            try:
-                cancelled = cancel_tool_call(
-                    call["tool_call_id"],
-                    cfg=cfg,
-                    cancelled_by=f"run:{run_id}",
-                    reason="AGENT_DEPENDENCY_FAILED",
-                )["tool_call"]
-                _complete_skipped_checkpoint_step(
-                    checkpoint_id,
-                    (call.get("provenance") or {}).get("checkpoint_step_id"),
-                    cancelled["tool_call_id"],
-                    "ERROR_AGENT_DEPENDENCY_FAILED",
-                    cfg,
-                )
-            except ToolRuntimeError:
-                pass
+        if ready:
+            _execute_tool_batch(run_id, ready[:parallel_limit], checkpoint_id=checkpoint_id, cfg=cfg)
             continue
-        if any(row["status"] != "EXECUTED" for row in dependency_rows):
-            continue
-        _emit_only(run_id, cfg, "tool_started", _call_view(call))
-        step_key = (call.get("provenance") or {}).get("checkpoint_step_id")
-        if checkpoint_id and step_key:
-            try:
-                begin_step(checkpoint_id, step_id=str(step_key), idempotency_key=call["tool_call_id"], cfg=cfg)
-            except CheckpointError:
-                pass
-        try:
-            run_tool_call(call["tool_call_id"], cfg=cfg, executed_by=f"run:{run_id}")
-        except ToolRuntimeError:
-            pass  # the failure is recorded on the call; reported below from the record
-        if checkpoint_id and step_key:
-            updated_call = next((row for row in _run_calls(get_run(run_id, cfg), cfg) if row["tool_call_id"] == call["tool_call_id"]), call)
-            try:
-                complete_step(
-                    checkpoint_id,
-                    idempotency_key=call["tool_call_id"],
-                    status="PASS" if updated_call["status"] == "EXECUTED" else "FAIL",
-                    result=dict(updated_call.get("result") or {}),
-                    cfg=cfg,
-                )
-            except CheckpointError:
-                pass
+        break
     calls = _run_calls(get_run(run_id, cfg), cfg)
     reported = set(get_run(run_id, cfg)["reported_call_ids"])
     terminal = [call for call in calls if call["status"] in {"EXECUTED", "FAILED", "DENIED", "CANCELLED", "INTERRUPTED"}]

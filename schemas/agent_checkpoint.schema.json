@@ -117,6 +117,19 @@
         "idempotency_key": {"type": "string", "minLength": 1},
         "started_at": {"type": "string", "minLength": 1}
       }
+    },
+    "in_flight_steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step_id", "idempotency_key", "started_at"],
+        "properties": {
+          "step_id": {"type": "string", "minLength": 1},
+          "idempotency_key": {"type": "string", "minLength": 1},
+          "started_at": {"type": "string", "minLength": 1}
+        }
+      }
     }
   }
 }
