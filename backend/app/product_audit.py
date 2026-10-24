@@ -78,6 +78,15 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "Keep launcher smoke in release and fresh-clone certification.",
         ),
         ProductRequirement(
+            "durable_goal_control",
+            "assistant_surface",
+            "Operator can set, inspect, update, and resume a durable goal with an active vector and explicit gaps.",
+            _status_from_files(cfg, [("backend", "app", "goals.py"), ("schemas", "goal.schema.json"), ("backend", "app", "cli.py")]),
+            "SQLite-backed goal contract with current-goal switching, legal state transitions, append-only events, CLI commands, and authenticated API routes",
+            "A goal is durable and auditable, but automatic promotion from goal state to completion still requires independent evidence gates.",
+            "Bind future plan/task/run workflows to the selected goal without allowing goal metadata to override evidence status.",
+        ),
+        ProductRequirement(
             "installable_cli",
             "assistant_surface",
             "Installable CLI exposes assistant operations.",
@@ -184,6 +193,15 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "backend/app/tools.py with allowlisted tools, explicit approvals, execution gates, and audit events",
             "The allowlist includes read-only inspection plus approval-gated governed fetch/session, web search, rendered-browser, coding workspace and controlled coding lifecycle tools; live provider/runtime evidence remains separately gated.",
             "Add narrowly scoped write/action tools only with per-tool policies and stronger UX review.",
+        ),
+        ProductRequirement(
+            "skill_activation_invocation",
+            "controlled_assistant_behavior",
+            "Operator can inspect, mount, authorize, activate, invoke, and audit immutable skills through supported surfaces.",
+            _status_from_files(cfg, [("backend", "app", "skill_runtime.py"), ("backend", "app", "cli.py"), ("schemas", "skill_mount.schema.json")]),
+            "Skill Fabric mount → capability policy → activation → routed execution lifecycle is exposed through authenticated API and CLI commands with artifact-lineage receipts.",
+            "Third-party registry discovery and live container/federation worker execution remain separate open capability lanes.",
+            "Add signed external plugin manifests only after registry trust, distribution policy, and live runtime evidence are independently closed.",
         ),
         ProductRequirement(
             "advanced_gis_processing",
@@ -343,6 +361,7 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
             "Canonical operator surface",
             (
                 "local_desktop_app",
+                "durable_goal_control",
                 "installable_cli",
                 "readiness_diagnostics",
                 "durable_conversations",
@@ -372,6 +391,7 @@ def build_product_roadmap(cfg: Settings = settings) -> dict[str, Any]:
             (
                 "personalization_memory",
                 "tool_use_and_actions",
+                "skill_activation_invocation",
                 "live_model_adapter",
                 "multimodal_interface",
                 "production_security",

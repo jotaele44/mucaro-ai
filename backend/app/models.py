@@ -49,6 +49,36 @@ class ApprovalRequest(BaseModel):
     approved_mode: str
 
 
+class GoalCreateRequest(BaseModel):
+    objective: str = Field(min_length=1, max_length=4000)
+    active_vector: str = Field(default="general_task_execution", min_length=1, max_length=240)
+    assumptions: list[str] = Field(default_factory=list, max_length=32)
+    gaps: list[str] = Field(default_factory=list, max_length=32)
+    variables: list[str] = Field(default_factory=list, max_length=32)
+    metadata: dict = Field(default_factory=dict)
+    goal_id: str | None = Field(default=None, max_length=160)
+    make_current: bool = True
+
+
+class GoalUpdateRequest(BaseModel):
+    status: Literal["ACTIVE", "PAUSED", "COMPLETE", "BLOCKED", "CANCELLED"] | None = None
+    active_vector: str | None = Field(default=None, min_length=1, max_length=240)
+    assumptions: list[str] | None = Field(default=None, max_length=32)
+    gaps: list[str] | None = Field(default=None, max_length=32)
+    variables: list[str] | None = Field(default=None, max_length=32)
+    make_current: bool | None = None
+
+
+class SkillActivateRequest(BaseModel):
+    allowed_capabilities: list[str] = Field(default_factory=list, max_length=32)
+    policy_id: str = Field(default="operator-skill-activation", min_length=1, max_length=160)
+    denied_capabilities: list[str] = Field(default_factory=list, max_length=32)
+
+
+class SkillExecuteRequest(BaseModel):
+    arguments: dict = Field(default_factory=dict)
+
+
 class DirectoryPermissionRequest(BaseModel):
     path: str = Field(min_length=1)
     reason: str | None = None

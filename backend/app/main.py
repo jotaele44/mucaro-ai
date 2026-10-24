@@ -12,6 +12,7 @@ from .agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, r
 from .agent_tasks import TaskError, create_task, get_task, list_tasks, task_summary, update_task
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
+from .capability_policy import CapabilityPolicy, RUNTIME_CAPABILITY
 from .conversations import (
     ConversationMessageEditError,
     append_answer_turn,
@@ -26,6 +27,17 @@ from .conversations import (
 from .db import init_db, list_payloads, upsert_payload
 from .execution_gate import analyze_task, approve_execution
 from .exports import EXPORT_FILES, export_file_path
+from .goals import GoalError, create_goal, get_goal, list_goal_events, list_goals, update_goal
+from .skill_runtime import (
+    SKILL_REGISTRY,
+    SkillRuntimeError,
+    activate_skill,
+    execute_skill,
+    list_skill_executions,
+    list_skill_mounts,
+    list_skills,
+    mount_skill,
+)
 from .ingestion import (
     FOLDER_SUPPORTED_SUFFIXES,
     IngestLimitError,
@@ -45,6 +57,10 @@ from .models import (
     ConversationCreateRequest,
     ConversationUpdateRequest,
     DirectoryPermissionRequest,
+    GoalCreateRequest,
+    GoalUpdateRequest,
+    SkillActivateRequest,
+    SkillExecuteRequest,
     PermissionLeaseConsumeRequest,
     PermissionLeaseCreateRequest,
     IngestPathRequest,
@@ -305,6 +321,108 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             raise api_error("ERROR_INVALID_APPROVAL_MODE", str(exc)) from exc
         upsert_payload("execution_gates", "task_id", gate, cfg.sqlite_path)
         return gate
+
+    @app.get("/goals")
+    def goals(status: str | None = None, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return list_goals(cfg, status=status)
+        except GoalError as exc:
+            raise api_error(exc.status, exc.detail) from exc
+
+    @app.post("/goals")
+    def create_operator_goal(req: GoalCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return create_goal(
+                req.objective,
+                active_vector=req.active_vector,
+                assumptions=req.assumptions,
+                gaps=req.gaps,
+                variables=req.variables,
+                metadata=req.metadata,
+                goal_id=req.goal_id,
+                make_current=req.make_current,
+                created_by="api",
+                cfg=cfg,
+            )
+        except GoalError as exc:
+            status_code = 409 if exc.status == "ERROR_GOAL_DUPLICATE_ID" else 400
+            raise api_error(exc.status, exc.detail, status_code=status_code) from exc
+
+    @app.get("/goals/{goal_id}")
+    def show_operator_goal(goal_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            goal = get_goal(goal_id, cfg)
+        except GoalError as exc:
+            raise api_error(exc.status, exc.detail) from exc
+        if goal is None:
+            raise api_error("ERROR_GOAL_NOT_FOUND", goal_id, status_code=404)
+        return {"status": "GOAL_OK", "goal": goal}
+
+    @app.get("/goals/{goal_id}/events")
+    def show_operator_goal_events(goal_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return list_goal_events(goal_id, cfg)
+        except GoalError as exc:
+            raise api_error(exc.status, exc.detail, status_code=404 if exc.status == "ERROR_GOAL_NOT_FOUND" else 400) from exc
+
+    @app.patch("/goals/{goal_id}")
+    def update_operator_goal(goal_id: str, req: GoalUpdateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return update_goal(
+                goal_id,
+                status=req.status,
+                active_vector=req.active_vector,
+                assumptions=req.assumptions,
+                gaps=req.gaps,
+                variables=req.variables,
+                make_current=req.make_current,
+                updated_by="api",
+                cfg=cfg,
+            )
+        except GoalError as exc:
+            status_code = 404 if exc.status == "ERROR_GOAL_NOT_FOUND" else 409 if exc.status in {"ERROR_GOAL_TRANSITION", "ERROR_GOAL_UPDATE_EMPTY"} else 400
+            raise api_error(exc.status, exc.detail, status_code=status_code) from exc
+
+    @app.get("/skills")
+    def skills(_auth: dict = Depends(require_auth)) -> dict:
+        return list_skills()
+
+    @app.get("/skills/mounts")
+    def skill_mounts(_auth: dict = Depends(require_auth)) -> dict:
+        return list_skill_mounts(cfg)
+
+    @app.get("/skills/executions")
+    def skill_executions(_auth: dict = Depends(require_auth)) -> dict:
+        return list_skill_executions(cfg)
+
+    @app.post("/skills/{skill_id:path}/mount")
+    def mount_operator_skill(skill_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return mount_skill(skill_id, cfg=cfg, mounted_by="api")
+        except SkillRuntimeError as exc:
+            raise api_error(exc.status, exc.detail, status_code=409 if exc.status == "ERROR_SKILL_MOUNT_CONFLICT" else 400) from exc
+
+    @app.post("/skills/{skill_id:path}/activate")
+    def activate_operator_skill(skill_id: str, req: SkillActivateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            skill = SKILL_REGISTRY.get(skill_id)
+            if skill is None:
+                raise SkillRuntimeError("ERROR_SKILL_NOT_REGISTERED", skill_id)
+            policy = CapabilityPolicy.build(
+                policy_id=req.policy_id,
+                allowed=set(req.allowed_capabilities) | {RUNTIME_CAPABILITY[skill.runtime]},
+                denied=set(req.denied_capabilities),
+            )
+            return activate_skill(skill_id, policy=policy, cfg=cfg, activated_by="api")
+        except SkillRuntimeError as exc:
+            raise api_error(exc.status, exc.detail, status_code=403 if "CAPABILITY" in exc.status or "POLICY" in exc.status else 400) from exc
+
+    @app.post("/skills/{skill_id:path}/execute")
+    def execute_operator_skill(skill_id: str, req: SkillExecuteRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return execute_skill(skill_id, req.arguments, cfg=cfg, executed_by="api")
+        except SkillRuntimeError as exc:
+            raise api_error(exc.status, exc.detail, status_code=409 if exc.status in {"ERROR_SKILL_NOT_ACTIVE", "ERROR_SKILL_DIGEST_MISMATCH"} else 400) from exc
 
     @app.post("/ingest")
     async def ingest(upload: UploadFile = File(...), _auth: dict = Depends(require_auth)) -> dict:

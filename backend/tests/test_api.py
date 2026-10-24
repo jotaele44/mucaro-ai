@@ -147,6 +147,71 @@ def test_api_tasks_expose_durable_dependency_dag(tmp_path: Path):
     assert shown.json()["task"]["depends_on"] == ["api-foundation"]
 
 
+def test_api_goals_expose_set_goal_lifecycle_and_events(tmp_path: Path):
+    client = make_client(tmp_path)
+    created = client.post(
+        "/goals",
+        json={
+            "goal_id": "api-goal",
+            "objective": "Finish the governed agent workflow",
+            "active_vector": "product_parity",
+            "gaps": ["hosted governance"],
+        },
+    )
+    assert created.status_code == 200
+    assert created.json()["status"] == "GOAL_CREATED"
+    assert created.json()["goal"]["is_current"] is True
+
+    listed = client.get("/goals")
+    assert listed.status_code == 200
+    assert listed.json()["current_goal_id"] == "api-goal"
+
+    updated = client.patch("/goals/api-goal", json={"status": "BLOCKED", "gaps": ["user decision"]})
+    assert updated.status_code == 200
+    assert updated.json()["goal"]["status"] == "BLOCKED"
+
+    shown = client.get("/goals/api-goal")
+    assert shown.status_code == 200
+    assert shown.json()["goal"]["active_vector"] == "product_parity"
+
+    events = client.get("/goals/api-goal/events")
+    assert events.status_code == 200
+    assert [event["event_type"] for event in events.json()["events"]] == ["GOAL_CREATED", "GOAL_STATUS_CHANGED"]
+
+    invalid = client.patch("/goals/api-goal", json={"status": "ACTIVE"})
+    assert invalid.status_code == 200
+    assert invalid.json()["goal"]["status"] == "ACTIVE"
+
+
+def test_api_skill_mount_activation_invocation_and_receipt(tmp_path: Path):
+    client = make_client(tmp_path)
+    listed = client.get("/skills")
+    assert listed.status_code == 200
+    skill_id = "mucaro/intelligence-plane-health"
+    assert any(skill["skill_id"] == skill_id for skill in listed.json()["skills"])
+
+    mounted = client.post(f"/skills/{skill_id}/mount")
+    assert mounted.status_code == 200
+    assert mounted.json()["status"] == "SKILL_MOUNTED"
+
+    activated = client.post(
+        f"/skills/{skill_id}/activate",
+        json={"policy_id": "api-skill-policy"},
+    )
+    assert activated.status_code == 200
+    assert activated.json()["status"] == "SKILL_ACTIVATED"
+    assert activated.json()["policy_decision"]["policy_id"] == "api-skill-policy"
+
+    executed = client.post(f"/skills/{skill_id}/execute", json={"arguments": {}})
+    assert executed.status_code == 200
+    assert executed.json()["status"] == "SKILL_EXECUTED"
+    assert executed.json()["execution"]["artifact_lineage"]["input"]["artifact_id"]
+
+    executions = client.get("/skills/executions")
+    assert executions.status_code == 200
+    assert executions.json()["executions"][0]["policy_decision"]["policy_id"] == "api-skill-policy"
+
+
 def test_api_permission_leases_are_run_scoped_and_atomic(tmp_path: Path):
     client = make_client(tmp_path)
     created = client.post(

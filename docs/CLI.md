@@ -768,6 +768,14 @@ mucaro ask "How does source lineage work?" --format json --no-persist
 mucaro ask "How does source lineage work?" --strategy persistent --format text
 mucaro ask "How does source lineage work?" --strategy semantic --format text
 mucaro plan "Add CLI capability" --input mucaro-ai --format text
+mucaro goal set "Finish the governed Mucaro AI agent workflow" --active-vector product_parity --format text
+mucaro goal list --format text
+mucaro goal update GOAL_ID --status BLOCKED --gap "Awaiting hosted CI evidence" --format text
+mucaro skills list --format text
+mucaro skills mount mucaro/intelligence-plane-health --format text
+mucaro skills activate mucaro/intelligence-plane-health --policy-id local-operator --format text
+mucaro skills execute mucaro/intelligence-plane-health --arguments '{}' --format text
+mucaro skills executions --format text
 mucaro validate --format text
 mucaro serve --host 127.0.0.1 --port 8000
 ```
@@ -926,6 +934,57 @@ The durable agent task DAG is available through the CLI:
 The corresponding governed tools are `task.list`, `task.show`, `task.create`,
 and `task.update`. Unknown dependencies, cycles, unfinished prerequisites,
 invalid transitions, and stale sequence updates fail closed.
+
+## Durable goals
+
+`mucaro goal set OBJECTIVE` persists an operator objective in the local SQLite
+store. A goal records its active vector, assumptions, gaps, variables, current
+focus, and lifecycle state. Creating a goal makes it current by default; use
+`--not-current` when recording a secondary objective. Only one goal can be
+current at a time, and terminal goals automatically leave current focus.
+
+```bash
+mucaro goal set "Finish the governed agent workflow" \
+  --active-vector product_parity \
+  --assumption "local-first default" \
+  --gap "hosted governance" \
+  --format json
+mucaro goal list --format text
+mucaro goal show GOAL_ID --format json
+mucaro goal update GOAL_ID --status PAUSED --format json
+mucaro goal events GOAL_ID --format json
+```
+
+The API equivalents are `GET /goals`, `POST /goals`, `GET /goals/{goal_id}`,
+`PATCH /goals/{goal_id}`, and `GET /goals/{goal_id}/events`. Goal transitions
+are validated, objective identity is preserved, and every creation or update
+appends a local event. Goal metadata never substitutes for release evidence or
+turns an open capability into a passing certification.
+
+## Skill activation and invocation
+
+The Skill Fabric is the governed plugin boundary. A skill must be registered,
+mounted at its immutable digest, authorized against its declared capabilities,
+activated, and then invoked through the runtime router. The CLI and API expose
+the same lifecycle; direct handler calls are not the operator contract.
+
+```bash
+mucaro skills list --format text
+mucaro skills mounts --format text
+mucaro skills mount mucaro/intelligence-plane-health
+mucaro skills activate mucaro/intelligence-plane-health \
+  --policy-id local-operator
+mucaro skills execute mucaro/intelligence-plane-health --arguments '{}'
+mucaro skills executions --format text
+```
+
+The API equivalents are `GET /skills`, `GET /skills/mounts`,
+`POST /skills/{skill_id}/mount`, `POST /skills/{skill_id}/activate`,
+`POST /skills/{skill_id}/execute`, and `GET /skills/executions`. Activation
+records the policy decision; invocation rechecks the stored digest and policy,
+selects the permitted runtime, and writes input/output or failure artifact
+lineage. Unsupported runtimes, stale digests, missing mounts, denied
+capabilities, and failed handlers remain explicit errors.
 
 Run-scoped permission leases are available through the CLI:
 

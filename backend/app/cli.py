@@ -38,6 +38,7 @@ from .capability_contracts import (
     validate_retrieval_output_file,
     validate_web_snapshot_file,
 )
+from .capability_policy import CapabilityPolicy, RUNTIME_CAPABILITY
 from .config import Settings, settings
 from .contracts import contract_errors, list_contracts
 from .conversations import (
@@ -96,6 +97,17 @@ from .gis_render import validate_rendered_map
 from .gis_topology_repair import repair_geojson_topology
 from .gis_vector_formats import inspect_vector_format
 from .gis_vector_raster import analyze_vector_raster_intersection, compute_zonal_statistics
+from .goals import GOAL_STATES, GoalError, create_goal, get_goal, list_goal_events, list_goals, update_goal
+from .skill_runtime import (
+    SKILL_REGISTRY,
+    SkillRuntimeError,
+    activate_skill,
+    execute_skill,
+    list_skill_executions,
+    list_skill_mounts,
+    list_skills,
+    mount_skill,
+)
 from .ingestion import (
     IngestLimitError,
     delete_source,
@@ -1064,6 +1076,82 @@ def build_parser() -> argparse.ArgumentParser:
     tasks_update.add_argument("--expected-sequence", type=int, help="Compare-and-swap sequence guard.")
     tasks_update.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     tasks_update.set_defaults(handler=run_tasks_update)
+
+    goals = subcommands.add_parser("goal", help="Set and inspect a durable operator goal.")
+    goals_subcommands = goals.add_subparsers(dest="goal_command", required=True)
+
+    goals_list = goals_subcommands.add_parser("list", help="List saved goals and the current goal.")
+    goals_list.add_argument("--status", choices=GOAL_STATES, help="Filter by goal state.")
+    goals_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    goals_list.set_defaults(handler=run_goals_list)
+
+    goals_set = goals_subcommands.add_parser("set", help="Create a durable goal and make it current by default.")
+    goals_set.add_argument("objective", nargs="+", help="Objective to pursue.")
+    goals_set.add_argument("--active-vector", default="general_task_execution", help="Current development vector.")
+    goals_set.add_argument("--assumption", action="append", default=[], help="Bounded assumption; repeatable.")
+    goals_set.add_argument("--gap", action="append", default=[], help="Known gap; repeatable.")
+    goals_set.add_argument("--variable", action="append", default=[], help="Variable or decision; repeatable.")
+    goals_set.add_argument("--goal-id", help="Optional stable goal identifier.")
+    goals_set.add_argument("--not-current", action="store_true", help="Persist without changing the current goal.")
+    goals_set.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    goals_set.set_defaults(handler=run_goals_set)
+
+    goals_show = goals_subcommands.add_parser("show", help="Show one saved goal.")
+    goals_show.add_argument("goal_id", help="Goal identifier.")
+    goals_show.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    goals_show.set_defaults(handler=run_goals_show)
+
+    goals_update = goals_subcommands.add_parser("update", help="Advance or annotate one saved goal.")
+    goals_update.add_argument("goal_id", help="Goal identifier.")
+    goals_update.add_argument("--status", choices=GOAL_STATES)
+    goals_update.add_argument("--active-vector")
+    goals_update.add_argument("--assumption", action="append", default=None, help="Replace assumptions; repeatable.")
+    goals_update.add_argument("--gap", action="append", default=None, help="Replace gaps; repeatable.")
+    goals_update.add_argument("--variable", action="append", default=None, help="Replace variables; repeatable.")
+    current_group = goals_update.add_mutually_exclusive_group()
+    current_group.add_argument("--make-current", action="store_true", default=None)
+    current_group.add_argument("--not-current", dest="make_current", action="store_false")
+    goals_update.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    goals_update.set_defaults(handler=run_goals_update)
+
+    goals_events = goals_subcommands.add_parser("events", help="Show the append-only history for one goal.")
+    goals_events.add_argument("goal_id", help="Goal identifier.")
+    goals_events.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    goals_events.set_defaults(handler=run_goals_events)
+
+    skills = subcommands.add_parser("skills", help="Inspect, activate, and invoke governed skills.")
+    skills_subcommands = skills.add_subparsers(dest="skills_command", required=True)
+
+    skills_list = skills_subcommands.add_parser("list", help="List registered skills and immutable digests.")
+    skills_list.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    skills_list.set_defaults(handler=run_skills_list)
+
+    skills_mounts = skills_subcommands.add_parser("mounts", help="List mounted skill versions and states.")
+    skills_mounts.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    skills_mounts.set_defaults(handler=run_skills_mounts)
+
+    skills_mount = skills_subcommands.add_parser("mount", help="Mount one registered skill by immutable digest.")
+    skills_mount.add_argument("skill_id", help="Registered skill identifier.")
+    skills_mount.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    skills_mount.set_defaults(handler=run_skills_mount)
+
+    skills_activate = skills_subcommands.add_parser("activate", help="Authorize and activate one mounted skill.")
+    skills_activate.add_argument("skill_id", help="Registered skill identifier.")
+    skills_activate.add_argument("--allow-capability", action="append", default=[], help="Additional declared capability to grant; repeatable.")
+    skills_activate.add_argument("--deny-capability", action="append", default=[], help="Capability to deny; repeatable.")
+    skills_activate.add_argument("--policy-id", default="operator-skill-activation", help="Policy identity recorded in the activation decision.")
+    skills_activate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    skills_activate.set_defaults(handler=run_skills_activate)
+
+    skills_execute = skills_subcommands.add_parser("execute", help="Invoke one active skill with JSON arguments.")
+    skills_execute.add_argument("skill_id", help="Registered skill identifier.")
+    skills_execute.add_argument("--arguments", default="{}", help="JSON object passed to the skill.")
+    skills_execute.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    skills_execute.set_defaults(handler=run_skills_execute)
+
+    skills_executions = skills_subcommands.add_parser("executions", help="List skill execution receipts and artifact lineage.")
+    skills_executions.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    skills_executions.set_defaults(handler=run_skills_executions)
 
     leases = subcommands.add_parser("leases", help="Manage bounded run-scoped permission leases.")
     leases_subcommands = leases.add_subparsers(dest="leases_command", required=True)
@@ -8583,6 +8671,142 @@ def run_tasks_update(args: argparse.Namespace, cfg: Settings) -> int:
         emit_error(exc.status, exc.detail, args.format)
         return 2
     emit_payload({"status": "TASK_UPDATED", "task": task}, args.format)
+    return 0
+
+
+def run_goals_list(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = list_goals(cfg, status=args.status)
+    except GoalError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_goals_set(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = create_goal(
+            " ".join(args.objective),
+            active_vector=args.active_vector,
+            assumptions=args.assumption,
+            gaps=args.gap,
+            variables=args.variable,
+            goal_id=args.goal_id,
+            make_current=not args.not_current,
+            created_by="cli",
+            cfg=cfg,
+        )
+    except GoalError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_goals_show(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        goal = get_goal(args.goal_id, cfg)
+        if goal is None:
+            raise GoalError("ERROR_GOAL_NOT_FOUND", args.goal_id)
+        result = {"status": "GOAL_OK", "goal": goal}
+    except GoalError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_goals_update(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = update_goal(
+            args.goal_id,
+            status=args.status,
+            active_vector=args.active_vector,
+            assumptions=args.assumption,
+            gaps=args.gap,
+            variables=args.variable,
+            make_current=args.make_current,
+            updated_by="cli",
+            cfg=cfg,
+        )
+    except GoalError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_goals_events(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = list_goal_events(args.goal_id, cfg)
+    except GoalError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_skills_list(args: argparse.Namespace, cfg: Settings) -> int:
+    del cfg
+    emit_payload(list_skills(), args.format)
+    return 0
+
+
+def run_skills_mounts(args: argparse.Namespace, cfg: Settings) -> int:
+    emit_payload(list_skill_mounts(cfg), args.format)
+    return 0
+
+
+def run_skills_mount(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = mount_skill(args.skill_id, cfg=cfg, mounted_by="cli")
+    except SkillRuntimeError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_skills_activate(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        skill = SKILL_REGISTRY.get(args.skill_id)
+        if skill is None:
+            raise SkillRuntimeError("ERROR_SKILL_NOT_REGISTERED", args.skill_id)
+        policy = CapabilityPolicy.build(
+            policy_id=args.policy_id,
+            allowed=set(args.allow_capability) | {RUNTIME_CAPABILITY[skill.runtime]},
+            denied=set(args.deny_capability),
+        )
+        result = activate_skill(args.skill_id, policy=policy, cfg=cfg, activated_by="cli")
+    except SkillRuntimeError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_skills_execute(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        arguments = json.loads(args.arguments)
+        if not isinstance(arguments, dict):
+            raise ValueError("skill arguments must be a JSON object")
+        result = execute_skill(args.skill_id, arguments, cfg=cfg, executed_by="cli")
+    except json.JSONDecodeError as exc:
+        emit_error("ERROR_SKILL_ARGUMENTS_JSON_INVALID", exc.msg, args.format)
+        return 2
+    except (ValueError, SkillRuntimeError) as exc:
+        if isinstance(exc, SkillRuntimeError):
+            emit_error(exc.status, exc.detail, args.format)
+        else:
+            emit_error("ERROR_SKILL_ARGUMENTS_NOT_OBJECT", str(exc), args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_skills_executions(args: argparse.Namespace, cfg: Settings) -> int:
+    emit_payload(list_skill_executions(cfg), args.format)
     return 0
 
 
