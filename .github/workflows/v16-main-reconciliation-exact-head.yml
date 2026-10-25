@@ -78,7 +78,7 @@ jobs:
           ]
           for path in governed:
               data = Path(path).read_text()
-              assert data.count("setuptools==84.1.0") == 1, path
+              assert data.count("\nsetuptools==84.1.0 \\") == 1, path
               assert "setuptools==84.0.0" not in data, path
               assert "sha256:5231689c6ac8156cd155cfb98c3fd6fb252c3e7e9bd3d78b64d3c55f132624c9" in data, path
               assert "sha256:23657205b63d4d31395ab917815247f694aafad28cd21316bf5fd45a51048ea0" in data, path
