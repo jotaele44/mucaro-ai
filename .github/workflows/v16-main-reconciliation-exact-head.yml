@@ -1,0 +1,138 @@
+name: Mucaro V16 Main Reconciliation Exact-Head
+
+on:
+  push:
+    branches:
+      - integration/v16-issuer-trust-main-20261024
+    paths:
+      - "backend/**"
+      - "pyproject.toml"
+      - "backend/requirements.txt"
+      - "packaging/macos/**"
+      - "scripts/one_click_pins.env"
+      - "packaging/one_click/**"
+      - "packaging/runtime/**"
+      - ".github/workflows/v16-main-reconciliation-exact-head.yml"
+      - ".github/workflows/arm64-runtime-source-cert.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v16-main-reconciliation-exact-head-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pinned Python project dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Verify checked-out commit identity
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
+          echo "CHECKED_OUT_HEAD=$GITHUB_SHA"
+      - name: Run Git source attestation and benchmark adversarial suite
+        run: python -m pytest -q backend/tests/test_issuer_trust_policy.py backend/tests/test_signed_source_operator_admission.py backend/tests/test_gated_git_source_attestation.py backend/tests/test_permission_coverage.py
+      - name: Verify pypdf source and all hash-locked manifests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          assert '"pypdf==6.21.2"' in Path("pyproject.toml").read_text()
+          assert "pypdf==6.21.2" in Path("backend/requirements.txt").read_text()
+          assert "pypdf==6.21.1" not in Path("backend/requirements.txt").read_text()
+          assert "pypdf==6.21.2" in Path("packaging/macos/requirements-macos-arm64.in").read_text()
+          pins=Path("scripts/one_click_pins.env").read_text()
+          assert "PY_SECURITY_PYPDF_VERSION=6.21.2" in pins
+          names = [
+              "packaging/one_click/requirements-aarch64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-unknown-linux-gnu.lock",
+              "packaging/one_click/requirements-x86_64-pc-windows-msvc.lock",
+              "packaging/runtime/requirements-macos-arm64.lock",
+              "packaging/runtime/requirements-macos-x86_64.lock",
+              "packaging/macos/requirements-macos-arm64.lock",
+          ]
+          for path in names:
+              data=Path(path).read_text()
+              assert data.count("pypdf==6.21.2")==1, path
+              assert "pypdf==6.21.1" not in data, path
+              assert "sha256:1d44d1a3a200f25062adff0085b02040e4646431ac2ccac22e42679e91466084" in data, path
+              assert "sha256:0a3e1c5c886a1be03646c16a04827cc166c2a0575c971b26a4bf89686551c2d4" in data, path
+          governed = [
+              "packaging/macos/requirements-macos-arm64.lock",
+              "packaging/one_click/requirements-aarch64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-unknown-linux-gnu.lock",
+              "packaging/one_click/requirements-x86_64-pc-windows-msvc.lock",
+          ]
+          for path in governed:
+              data = Path(path).read_text()
+              assert data.count("\nsetuptools==84.1.0 \\") == 1, path
+              assert "setuptools==84.0.0" not in data, path
+              assert "sha256:5231689c6ac8156cd155cfb98c3fd6fb252c3e7e9bd3d78b64d3c55f132624c9" in data, path
+              assert "sha256:23657205b63d4d31395ab917815247f694aafad28cd21316bf5fd45a51048ea0" in data, path
+          assert "PY_SECURITY_SETUPTOOLS_VERSION=84.1.0" in pins
+          print("PYTHON_PIN_HASH_AND_PACKAGING_LOCKS_PASS")
+          PY
+      - name: Run complete backend regression corpus
+        run: python -m pytest backend/tests -q
+      - name: Emit bounded verification receipt
+        if: success()
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          paths = [
+              "backend/app/issuer_trust_policy.py",
+              "backend/tests/test_issuer_trust_policy.py",
+              "backend/app/signed_source_operator_admission.py",
+              "backend/tests/test_signed_source_operator_admission.py",
+              "backend/app/gated_git_source_attestation.py",
+              "backend/app/permission_engine.py",
+              "backend/tests/test_gated_git_source_attestation.py",
+              "backend/tests/test_permission_coverage.py",
+              "pyproject.toml",
+              "backend/requirements.txt",
+              "packaging/macos/requirements-macos-arm64.in",
+              "packaging/macos/requirements-macos-arm64.lock",
+              "scripts/one_click_pins.env",
+              "packaging/one_click/requirements-aarch64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-unknown-linux-gnu.lock",
+              "packaging/one_click/requirements-x86_64-pc-windows-msvc.lock",
+              "packaging/runtime/requirements-macos-arm64.lock",
+              "packaging/runtime/requirements-macos-x86_64.lock",
+          ]
+          record = {
+              "schema": "mucaro-v16-main-reconciliation-exact-head-ci/1.0",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "head": os.environ["GITHUB_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "execution": "backend-pytest-full",
+              "status": "PASS",
+              "files": {p: hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in paths},
+              "scope": "CI evidence only; no production promotion or independent evaluator certification",
+          }
+          data = json.dumps(record, indent=2, sort_keys=True) + "\n"
+          Path("v16-main-reconciliation-exact-head-receipt.json").write_text(data, encoding="utf-8")
+          print(data)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: v16-main-reconciliation-exact-head-${{ github.sha }}
+          path: v16-main-reconciliation-exact-head-receipt.json
+          retention-days: 30
