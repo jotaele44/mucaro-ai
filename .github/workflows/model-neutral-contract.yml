@@ -1,0 +1,25 @@
+name: Model-neutral contract (isolated)
+on:
+  push:
+    branches:
+      - dev/model-neutral-foundation-20261025
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile contract and tests
+        run: python -m py_compile backend/app/model_contract_v1.py backend/tests/test_model_contract_v1.py
+      - name: Execute deterministic contract tests
+        run: python -m unittest -v backend.tests.test_model_contract_v1
+      - name: Print exact tested revision
+        run: git rev-parse HEAD
+# This workflow is an isolated contract check, not full-release certification.
