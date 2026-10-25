@@ -175,9 +175,16 @@ def _is_loopback_url(url: str) -> bool:
         return False
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Reject all redirects from local model endpoints, including off-device targets."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def _local_opener() -> urllib.request.OpenerDirector:
-    # Never route loopback traffic through an environment proxy.
-    return urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    # No environment proxy and no redirect to a remote host.
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
 
 
 def _probe_local_server(base_url: str, model: str) -> dict[str, Any]:
