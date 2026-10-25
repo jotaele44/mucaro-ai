@@ -293,7 +293,7 @@ def generate_answer(
                 messages=(("user", query),),
                 locality=spec.locality,
                 allow_remote=os.getenv("MUCARO_AI_LIVE_MODE") == "1",
-                stream_requested=on_text_delta is not None and spec.supports_streaming,
+                stream_requested=on_text_delta is not None,
                 max_output_tokens=512,
             ),
             ModelCapabilities(
