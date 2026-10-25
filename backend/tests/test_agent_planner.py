@@ -34,3 +34,30 @@ def test_agent_planner_fails_closed_for_unrecognized_intent(tmp_path: Path) -> N
     assert plan["status"] == "AGENT_NO_SAFE_ACTIONS"
     assert plan["actions"] == []
     assert plan["invariants"]["unrecognized_intent_fails_closed"] is True
+
+
+def test_agent_planner_routes_coding_edit_to_read_only_preflight(tmp_path: Path) -> None:
+    plan = build_agent_plan(
+        "Implement the API change in backend/app/main.py and inspect the current diff first.",
+        cfg=settings(tmp_path),
+    )
+
+    assert plan["status"] == "AGENT_PLAN_READY"
+    assert [row["tool"] for row in plan["actions"]] == ["coding.repo_status", "coding.diff", "coding.read_file"]
+    assert plan["actions"][0]["id"] == "coding-status"
+    assert plan["actions"][1]["depends_on"] == ["coding-status"]
+    assert plan["actions"][2]["depends_on"] == ["coding-status"]
+    assert plan["actions"][2]["arguments"]["path"] == "backend/app/main.py"
+    assert all(row["tool"] != "coding.patch_apply" for row in plan["actions"])
+    assert all(row["tool"] != "coding.check_suite" for row in plan["actions"])
+
+
+def test_agent_planner_reads_only_explicit_repo_relative_paths(tmp_path: Path) -> None:
+    plan = build_agent_plan(
+        "Read `backend/app/main.py` and ../secrets.env, then explain the implementation.",
+        cfg=settings(tmp_path),
+    )
+
+    assert [row["tool"] for row in plan["actions"]] == ["coding.repo_status", "coding.read_file"]
+    assert plan["actions"][1]["arguments"]["path"] == "backend/app/main.py"
+    assert "secrets.env" not in repr(plan["actions"])
