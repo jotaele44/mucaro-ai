@@ -85,8 +85,8 @@ def test_setuptools_84_0_0_security_regression_is_absent_and_fixed_pin_is_hashed
         if "setuptools==" not in text:
             continue
         setuptools_locks.append(path.relative_to(ROOT).as_posix())
-        assert "setuptools==84.1.0" in text
-        stanza = text.split("setuptools==84.1.0", 1)[1].split("\n", 4)[:3]
+        assert "\nsetuptools==84.1.0 \\" in text
+        stanza = text.split("\nsetuptools==84.1.0 ", 1)[1].split("\n", 4)[:3]
         joined = "\n".join(stanza)
         for digest in expected_hashes:
             assert f"--hash=sha256:{digest}" in joined
