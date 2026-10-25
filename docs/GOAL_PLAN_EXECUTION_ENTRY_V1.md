@@ -4,7 +4,7 @@ Status: CANDIDATE_NOT_CERTIFIED. Scope: entry semantics and qualification requir
 
 ## Source anchor
 
-Reviewed GitHub default branch `main` at `7cb23cbba879e7aa6f99f9ce52ada4ad1b29001f` (2026-10-24 acquisition). Existing distinct layers: `backend/app/execution_gate.py` (planning/approval), `backend/app/work_runs.py` (persisted conversational run bus), and `docs/EXECUTION_GATE.md`. Do not equate `work_runs` `plan|ask|auto` with the proposed product `GOAL|PLAN` mode; they are different dimensions. Preserve `work_runs` approval, idempotency, interruption, and queue controls.
+Initial contract review used GitHub default branch `main` at `7cb23cbba879e7aa6f99f9ce52ada4ad1b29001f` (2026-10-24 acquisition). The current candidate has since been reconciled onto security-fixed canonical main `918275ab0d26d6f6e62cbac8b18d2fce87d7d4a5` without changing the contract semantics. Existing distinct layers: `backend/app/execution_gate.py` (planning/approval), `backend/app/work_runs.py` (persisted conversational run bus), and `docs/EXECUTION_GATE.md`. Do not equate `work_runs` `plan|ask|auto` with the proposed product `GOAL|PLAN` mode; they are different dimensions. Preserve `work_runs` approval, idempotency, interruption, and queue controls.
 
 ## User-visible decision point
 
