@@ -269,7 +269,6 @@ def _provider_status(spec: ModelProviderSpec, cfg: Settings) -> dict[str, Any]:
     }
 
 
-
 def _provider_token_metric(value: Any, source: str) -> dict[str, Any] | None:
     if value is None:
         return None
