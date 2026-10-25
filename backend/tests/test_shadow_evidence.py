@@ -7,6 +7,8 @@ import pytest
 from scripts import shadow_evidence
 
 
+REAL_LOAD_EXECUTION_RECEIPT = shadow_evidence._load_execution_receipt
+
 BASE = "a" * 40
 HEAD = "b" * 40
 REQUIRED = ["stale", "unexpected_codes"]
@@ -54,7 +56,11 @@ def fake_checkpoint(monkeypatch):
         "_git_show_text",
         lambda checkpoint, path: "def test_stale():\n    pass\n",
     )
-    monkeypatch.setattr(shadow_evidence, "_load_execution_receipt", lambda path, checkpoint_sha: None)
+    monkeypatch.setattr(
+        shadow_evidence,
+        "_load_execution_receipt",
+        lambda path, base_sha, checkpoint_sha: None,
+    )
 
 
 def validate(payload):
@@ -77,6 +83,34 @@ def test_rejects_stale_base_binding():
     payload["base_sha"] = "c" * 40
     with pytest.raises(shadow_evidence.ShadowEvidenceError, match="base_sha mismatch"):
         validate(payload)
+
+
+def test_execution_receipt_is_bound_to_base_and_checkpoint(monkeypatch, tmp_path):
+    receipt = tmp_path / "execution.json"
+    receipt.write_text(
+        """{
+  "schema_version": "mucaro-shadow-execution-receipt/1.0",
+  "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "checkpoint_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "status": "PASS"
+}
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(shadow_evidence, "ROOT", tmp_path)
+    REAL_LOAD_EXECUTION_RECEIPT(
+        "execution.json",
+        base_sha=BASE,
+        checkpoint_sha=HEAD,
+    )
+
+    with pytest.raises(shadow_evidence.ShadowEvidenceError, match="base mismatch"):
+        REAL_LOAD_EXECUTION_RECEIPT(
+            "execution.json",
+            base_sha="c" * 40,
+            checkpoint_sha=HEAD,
+        )
 
 
 def test_rejects_stale_checkpoint_binding():
