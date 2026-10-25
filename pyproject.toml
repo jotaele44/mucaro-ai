@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools==84.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -14,7 +14,7 @@ dependencies = [
     "pydantic==2.13.4",
     "python-multipart==0.0.32",
     "jsonschema==4.26.0",
-    "pypdf==6.21.1",
+    "pypdf==6.21.2",
     "shapely==2.1.2",
     "pyproj==3.7.2",
     "rasterio==1.4.3",
