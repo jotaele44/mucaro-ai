@@ -249,6 +249,13 @@ export const api = {
   config: () => request("/config"),
   security: () => request("/security"),
   intelligencePlane: () => request("/intelligence-plane"),
+  codingReadiness: ({ image, engine } = {}) => {
+    const params = new URLSearchParams();
+    if (image) params.set("image", image);
+    if (engine) params.set("engine", engine);
+    const query = params.toString();
+    return request(`/coding/readiness${query ? `?${query}` : ""}`);
+  },
   models: () => request("/models"),
   offlineManifest: () => request("/offline-manifest"),
   modes: () => request("/work-runs/modes"),

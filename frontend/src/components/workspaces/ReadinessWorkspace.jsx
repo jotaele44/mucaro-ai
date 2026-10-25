@@ -5,19 +5,25 @@ function stateClass(state) {
   return state === "AVAILABLE" ? "completed" : state === "CANDIDATE" || state === "PARTIAL" ? "queued" : state === "ABSENT" ? "failed" : "pending";
 }
 
+function codingStateClass(status) {
+  return status === "CODING_READINESS_READY" ? "completed" : status === "CODING_READINESS_BLOCKED" ? "failed" : "pending";
+}
+
 // Readiness is an evidence display, not a second audit engine: it reports the backend's declared state and limitations.
 export function ReadinessWorkspace() {
   const [descriptor, setDescriptor] = useState(null);
   const [offline, setOffline] = useState(null);
   const [security, setSecurity] = useState(null);
+  const [coding, setCoding] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    Promise.all([api.intelligencePlane(), api.offlineManifest(), api.security()])
-      .then(([plane, offlineManifest, securityReport]) => {
+    Promise.all([api.intelligencePlane(), api.offlineManifest(), api.security(), api.codingReadiness()])
+      .then(([plane, offlineManifest, securityReport, codingReport]) => {
         setDescriptor(plane.descriptor);
         setOffline(offlineManifest);
         setSecurity(securityReport);
+        setCoding(codingReport);
       })
       .catch(setError);
   }, []);
@@ -40,6 +46,25 @@ export function ReadinessWorkspace() {
             <dt>Schema</dt><dd className="mono">{descriptor.schema}</dd>
           </dl>
         </div>
+      )}
+      {coding && (
+        <section className="panel" aria-labelledby="coding-readiness-title">
+          <div className="tool-row-head">
+            <span className={`status-chip status-${codingStateClass(coding.status)}`}>{coding.status}</span>
+            <h2 id="coding-readiness-title">Coding plane</h2>
+          </div>
+          <p className="muted small">Prerequisite diagnostics only. No test, lint, build, security check, image pull, or repository mutation was executed.</p>
+          <dl className="facts">
+            <dt>Execution</dt><dd>{coding.execution_status}</dd>
+            <dt>Source HEAD</dt><dd className="mono">{coding.source?.head_sha || "UNKNOWN"}</dd>
+            <dt>Container engine</dt><dd>{coding.runtime?.engine || coding.runtime?.engine_error?.status || "UNAVAILABLE"}</dd>
+            <dt>Coding image</dt><dd className="mono">{coding.runtime?.image || coding.runtime?.image_error?.status || "REQUIRED"}</dd>
+            <dt>Network</dt><dd>{coding.runtime?.network_allowed === false ? "DISABLED" : "UNVERIFIED"}</dd>
+          </dl>
+          {coding.blockers?.length > 0 && (
+            <p className="error-card" role="status">Blocked prerequisites: {coding.blockers.join(", ")}</p>
+          )}
+        </section>
       )}
       <ul className="readiness-list">
         {capabilities.map(([name, capability]) => (

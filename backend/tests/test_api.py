@@ -109,6 +109,33 @@ def test_api_intelligence_plane_reports_declared_capability_states(tmp_path: Pat
     assert "agent_runtime" in payload["descriptor"]["capabilities"]
 
 
+def test_api_coding_readiness_exposes_non_executing_runtime_boundary(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        main_module,
+        "build_coding_readiness",
+        lambda repo_root, *, image=None, engine=None, cfg=None: {
+            "status": "CODING_READINESS_BLOCKED",
+            "execution_status": "NOT_EXECUTED",
+            "source": {"head_sha": "a" * 40},
+            "runtime": {
+                "engine": None,
+                "image": image,
+                "network_allowed": False,
+                "implicit_image_pull_allowed": False,
+            },
+            "blockers": ["CONTAINER_ENGINE", "CODING_IMAGE"],
+        },
+    )
+    client = make_client(tmp_path)
+    response = client.get("/coding/readiness")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "CODING_READINESS_BLOCKED"
+    assert payload["execution_status"] == "NOT_EXECUTED"
+    assert payload["runtime"]["network_allowed"] is False
+    assert payload["blockers"] == ["CONTAINER_ENGINE", "CODING_IMAGE"]
+
+
 def test_api_agent_fleet_creates_checkpointed_subagents(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(main_module, "current_git_head", lambda root: "a" * 40)
     monkeypatch.setattr(

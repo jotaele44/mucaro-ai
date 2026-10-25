@@ -13,6 +13,7 @@ from .agent_tasks import TaskError, create_task, get_task, list_tasks, task_summ
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
 from .capability_policy import CapabilityPolicy, RUNTIME_CAPABILITY
+from .coding_readiness import CodingReadinessError, build_coding_readiness
 from .conversations import (
     ConversationMessageEditError,
     append_answer_turn,
@@ -315,6 +316,18 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/intelligence-plane")
     def intelligence_plane(_auth: dict = Depends(require_auth)) -> dict:
         return {"status": "INTELLIGENCE_PLANE_OK", "descriptor": build_intelligence_plane_descriptor()}
+
+    @app.get("/coding/readiness")
+    def coding_readiness(
+        image: str | None = None,
+        engine: str | None = None,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        """Report coding-plane prerequisites without executing repository commands."""
+        try:
+            return build_coding_readiness(cfg.project_root, image=image, engine=engine, cfg=cfg)
+        except CodingReadinessError as exc:
+            raise api_error(exc.status, exc.detail) from exc
 
     @app.post("/plan")
     def plan(req: PlanRequest, _auth: dict = Depends(require_auth)) -> dict:
