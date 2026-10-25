@@ -176,6 +176,7 @@ from .operator_workflow_certification import (
     format_operator_workflow_certification_text,
 )
 from .services import answer_question
+from .terminal_context_status import build_terminal_context_status
 from .tools import (
     ToolRuntimeError,
     approve_tool_call,
@@ -189,6 +190,7 @@ from .tools import (
     verify_tool_audit_chain,
 )
 from .validation import validate_project_json
+from .work_runs import RunError, get_run
 
 
 class MucaroCLIError(RuntimeError):
@@ -1021,6 +1023,14 @@ def build_parser() -> argparse.ArgumentParser:
     runs_show.add_argument("run_id", help="Run identifier.")
     runs_show.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     runs_show.set_defaults(handler=run_runs_show)
+
+    runs_context = runs_subcommands.add_parser(
+        "context",
+        help="Show canonical context/token usage for one persisted run.",
+    )
+    runs_context.add_argument("run_id", help="Run identifier.")
+    runs_context.add_argument("--format", choices=["json", "text"], default="text", help="Output format.")
+    runs_context.set_defaults(handler=run_runs_context)
 
     tools = subcommands.add_parser("tools", help="Request and audit approved local tool calls.")
     tools_subcommands = tools.add_subparsers(dest="tools_command", required=True)
@@ -8449,6 +8459,20 @@ def run_runs_show(args: argparse.Namespace, cfg: Settings) -> int:
             return 0
     emit_payload({"status": "ERROR_RUN_NOT_FOUND", "run_id": args.run_id}, args.format)
     return 2
+
+
+def run_runs_context(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        run = get_run(args.run_id, cfg)
+    except RunError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    report = build_terminal_context_status(run)
+    if args.format == "text":
+        print(report["display"])
+    else:
+        emit_payload(report, args.format)
+    return 0
 
 
 def run_tools_list(args: argparse.Namespace, cfg: Settings) -> int:

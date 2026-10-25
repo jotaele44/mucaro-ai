@@ -15,6 +15,7 @@ from backend.app.model_router import ModelProviderError, generate_answer, model_
 from backend.app.model_routing_policy import ModelRoutingError, plan_model_route
 from backend.app.offline import build_offline_manifest
 from backend.app.services import answer_question
+from backend.app.terminal_context_status import build_terminal_context_status
 from backend.app.work_runs import get_run, list_run_events, submit_message
 from backend.tests.test_api import make_settings
 
@@ -222,6 +223,11 @@ def test_run_streams_local_tokens_live(local_server, cfg):
     sent = _FakeOpenAI.requests[-1]
     assert sent["stream"] is True
     assert sent["stream_options"] == {"include_usage": True}
+    status = build_terminal_context_status(completed)
+    assert status["context_consumed_tokens"] == 20
+    assert status["context_limit_tokens"] == 8192
+    assert status["display"] == "ctx 20/8192"
+    assert status["invariants"]["estimated_missing_values"] is False
     types = [event["type"] for event in events]
     assert types.index("text_delta") < types.index("citation") < types.index("final")
 
@@ -264,6 +270,11 @@ def test_streaming_usage_omission_stays_explicitly_unknown(local_server, cfg):
         assert metrics[key]["classification"] == "UNKNOWN"
     assert "WARN_INPUT_TOKENS_UNKNOWN" in usage["warnings"]
     assert "WARN_OUTPUT_TOKENS_UNKNOWN" in usage["warnings"]
+    status = build_terminal_context_status(completed)
+    assert status["context_consumed_tokens"] is None
+    assert status["context_limit_tokens"] == 8192
+    assert status["display"] == "ctx ?/8192"
+    assert status["status"] == "CONTEXT_STATUS_PARTIAL"
 
 
 # --- MATRIX-012 routing matrix -------------------------------------------------------------
