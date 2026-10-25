@@ -198,6 +198,8 @@ class RunOptions(BaseModel):
     fleet_max_parallel: int = Field(default=2, ge=1, le=4)
     fleet_synthesize: bool = False
     fleet_checkpoint_id: str | None = Field(default=None, min_length=1, max_length=120)
+    goal_id: str | None = Field(default=None, min_length=1, max_length=160)
+    task_id: str | None = Field(default=None, min_length=1, max_length=160)
 
 
 class MessageRequest(BaseModel):

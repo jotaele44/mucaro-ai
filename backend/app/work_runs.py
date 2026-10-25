@@ -51,11 +51,13 @@ from .agent_checkpoints import (
 )
 from .agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, resume_fleet_plan
 from .agent_planner import build_agent_plan
+from .agent_tasks import TaskError, get_task
 from .agent_workflow import AgentWorkflowError, normalize_agent_actions, normalize_agent_parallelism, normalize_agent_turns
 from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
 from .db import ensure_db, get_connection
 from .error_categories import classify_error
+from .goals import GoalError, get_goal, list_goals
 from .model_router import ModelProviderError, generate_tool_proposals, generate_tool_turn
 from .model_routing_policy import ModelRoutingError, plan_model_route
 from .response_flow import (
@@ -98,7 +100,7 @@ MODES = {
 EVENT_TYPES = {
     "queued", "run_started", "route", "plan", "tool_call", "approval_request", "tool_started", "tool_result",
     "tool_summary", "agent_plan", "question", "question_resolved", "retry_requested", "user_note", "retrieval", "text_delta",
-    "citation", "artifact", "warning", "error", "checkpoint", "fleet_result", "fleet_synthesis", "tool_batch", "interrupted", "cancelled", "final",
+    "citation", "artifact", "warning", "error", "checkpoint", "fleet_result", "fleet_synthesis", "tool_batch", "context_bound", "interrupted", "cancelled", "final",
 }
 MAX_PROMPT_CHARS = 20_000
 TEXT_DELTA_CHARS = 160
@@ -264,6 +266,8 @@ def summarize_run(run: dict[str, Any], cfg: Settings = settings) -> dict[str, An
         "state": run["state"],
         "version": run["version"],
         "mode": run.get("mode"),
+        "goal_id": (run.get("orchestration") or {}).get("goal_id"),
+        "task_id": (run.get("orchestration") or {}).get("task_id"),
         "prompt_preview": run.get("prompt", "")[:120],
         "created_at": run.get("created_at"),
         "started_at": run.get("started_at"),
@@ -338,6 +342,55 @@ def _parse_prompt(prompt: str) -> tuple[list[dict[str, Any]], str, list[str]]:
     return commands, "\n".join(question_lines).strip(), unknown
 
 
+def _resolve_run_context(options: dict[str, Any], *, mode: str, cfg: Settings) -> dict[str, Any] | None:
+    """Resolve goal/task references without changing their lifecycle state."""
+    requested_goal_id = options.get("goal_id")
+    requested_task_id = options.get("task_id")
+    if requested_goal_id is not None and (not isinstance(requested_goal_id, str) or not requested_goal_id.strip()):
+        raise RunError("ERROR_RUN_GOAL_ID_INVALID", "goal_id must be a non-empty string")
+    if requested_task_id is not None and (not isinstance(requested_task_id, str) or not requested_task_id.strip()):
+        raise RunError("ERROR_RUN_TASK_ID_INVALID", "task_id must be a non-empty string")
+
+    goal_id = requested_goal_id.strip() if isinstance(requested_goal_id, str) else None
+    if goal_id is None and mode == "agent":
+        goal_id = list_goals(cfg).get("current_goal_id")
+    goal = None
+    task = None
+    try:
+        if goal_id:
+            goal = get_goal(goal_id, cfg)
+            if goal is None:
+                raise RunError("ERROR_RUN_GOAL_NOT_FOUND", goal_id)
+        if requested_task_id:
+            task_id = requested_task_id.strip()
+            task = get_task(task_id, cfg)
+            if task is None:
+                raise RunError("ERROR_RUN_TASK_NOT_FOUND", task_id)
+    except (GoalError, TaskError) as exc:
+        raise RunError(exc.status, exc.detail) from exc
+
+    if goal is None and task is None:
+        return None
+    return {
+        "goal_id": goal["goal_id"] if goal else None,
+        "task_id": task["task_id"] if task else None,
+        "goal": {
+            "status": goal["status"],
+            "active_vector": goal["active_vector"],
+            "objective": goal["objective"],
+            "updated_at": goal["updated_at"],
+        } if goal else None,
+        "task": {
+            "status": task["status"],
+            "title": task["title"],
+            "sequence": task["sequence"],
+            "depends_on": list(task.get("depends_on") or []),
+            "updated_at": task["updated_at"],
+        } if task else None,
+        "resolution": "current_goal" if requested_goal_id is None and goal is not None and mode == "agent" else "explicit_orchestration_reference",
+    }
+
+
 def submit_message(
     conversation_id: str,
     prompt: str,
@@ -358,6 +411,7 @@ def submit_message(
     if mode not in MODES:
         raise RunError("ERROR_RUN_MODE_INVALID", f"Mode must be one of {sorted(MODES)}.")
     normalized_options = dict(options or {})
+    orchestration = _resolve_run_context(normalized_options, mode=mode, cfg=cfg)
     if mode == "agent":
         try:
             normalized_options["max_parallel_actions"] = normalize_agent_parallelism(normalized_options.get("max_parallel_actions"))
@@ -403,6 +457,7 @@ def submit_message(
             "approval_requested_ids": [],
             "round": 1,
             "cancel_requested": False,
+            "orchestration": orchestration,
         }
         conn.execute(
             "INSERT INTO work_runs (run_id, conversation_id, queue_seq, state, idempotency_key, version, payload_json) VALUES (?, ?, ?, 'QUEUED', ?, 1, ?)",
@@ -412,7 +467,9 @@ def submit_message(
             "SELECT COUNT(*) AS n FROM work_runs WHERE conversation_id = ? AND state IN ('QUEUED','RUNNING','AWAITING_APPROVAL','AWAITING_INPUT') AND queue_seq < ?",
             (conversation_id, queue_seq),
         ).fetchone()["n"]
-        _emit(conn, run_id, "queued", {"mode": mode, "ahead": int(position)})
+        _emit(conn, run_id, "queued", {"mode": mode, "ahead": int(position), "orchestration": orchestration})
+        if orchestration:
+            _emit(conn, run_id, "context_bound", {"orchestration": orchestration})
         if interrupt:
             active = conn.execute(
                 "SELECT * FROM work_runs WHERE conversation_id = ? AND state IN ('RUNNING','AWAITING_APPROVAL','AWAITING_INPUT')",
@@ -683,7 +740,12 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     run_id = run["run_id"]
     options = run.get("options", {})
     commands, question, unknown = _parse_prompt(run["prompt"])
-    _emit_only(run_id, cfg, "run_started", {"mode": run["mode"], "prompt": run["prompt"]})
+    _emit_only(
+        run_id,
+        cfg,
+        "run_started",
+        {"mode": run["mode"], "prompt": run["prompt"], "orchestration": run.get("orchestration")},
+    )
     route: dict[str, Any] | None = None
     try:
         route = plan_model_route(
@@ -728,6 +790,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                     "agents": fleet_plan["agents"],
                     "max_parallel": fleet_plan["max_parallel"],
                     "synthesis_requested": bool(options.get("fleet_synthesize")),
+                    "orchestration": run.get("orchestration"),
                 },
             )
             source_sha = current_git_head(cfg.project_root)
@@ -844,6 +907,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                 agent_plan = {
                     **proposals,
                     "planner": "provider-native",
+                    "context": run.get("orchestration"),
                     "actions": [
                         {
                             "tool": row["tool"],
@@ -881,11 +945,16 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
                     "status": "AGENT_PROVIDER_NATIVE_BLOCKED",
                     "planner": "provider-native",
                     "actions": [],
+                    "context": run.get("orchestration"),
                     "error": {"status": exc.status, "detail": exc.detail},
                     "invariants": {"planner_does_not_execute": True, "blocked_fail_closed": True},
                 }
         else:
-            agent_plan = build_agent_plan(run["prompt"], cfg=cfg)
+            orchestration = run.get("orchestration")
+            if orchestration:
+                agent_plan = build_agent_plan(run["prompt"], context=orchestration, cfg=cfg)
+            else:
+                agent_plan = build_agent_plan(run["prompt"], cfg=cfg)
             try:
                 agent_plan["actions"] = normalize_agent_actions(agent_plan.get("actions", []), max_actions=4)
             except AgentWorkflowError as exc:
@@ -926,7 +995,17 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
         )
     if question:
         steps += [{"step": "retrieve local sources"}, {"step": "compose a cited answer"}]
-    _emit_only(run_id, cfg, "plan", {"goal": question or "Run the requested actions.", "mode": run["mode"], "steps": steps})
+    _emit_only(
+        run_id,
+        cfg,
+        "plan",
+        {
+            "goal": question or "Run the requested actions.",
+            "mode": run["mode"],
+            "steps": steps,
+            "orchestration": run.get("orchestration"),
+        },
+    )
 
     if run["mode"] == "plan":
         summary = "Plan only; nothing was executed. Steps: " + "; ".join(step["step"] for step in steps) if steps else "Plan only; nothing to do."
@@ -1330,7 +1409,6 @@ def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
                 continue
             dependencies = [str(value) for value in (call.get("provenance") or {}).get("agent_dependencies", [])]
             dependency_rows = [current_by_step.get(dependency) for dependency in dependencies]
-            step_id = _agent_step_id(call)
             if any(row is None for row in dependency_rows):
                 cancellations.append((call, "AGENT_DEPENDENCY_UNKNOWN", "ERROR_AGENT_WORKFLOW_UNKNOWN_DEPENDENCY"))
             elif any(row["status"] in {"FAILED", "DENIED", "CANCELLED", "INTERRUPTED"} for row in dependency_rows):

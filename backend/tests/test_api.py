@@ -185,6 +185,33 @@ def test_api_tasks_expose_durable_dependency_dag(tmp_path: Path):
     assert shown.json()["task"]["depends_on"] == ["api-foundation"]
 
 
+def test_api_message_persists_goal_and_task_orchestration_context(tmp_path: Path):
+    client = make_client(tmp_path)
+    goal = client.post(
+        "/goals",
+        json={"goal_id": "api-goal", "objective": "Operate the agent safely", "active_vector": "run_binding"},
+    )
+    assert goal.status_code == 200
+    task = client.post("/tasks", json={"task_id": "api-run-task", "title": "Bind the run"})
+    assert task.status_code == 200
+    conversation = client.post("/conversations", json={"title": "Bound run"})
+    assert conversation.status_code == 200
+    conversation_id = conversation.json()["conversation_id"]
+
+    response = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={
+            "prompt": "Inspect the current repository state.",
+            "mode": "plan",
+            "options": {"goal_id": "api-goal", "task_id": "api-run-task"},
+        },
+    )
+    assert response.status_code == 200
+    orchestration = response.json()["run"]["orchestration"]
+    assert orchestration["goal_id"] == "api-goal"
+    assert orchestration["task_id"] == "api-run-task"
+
+
 def test_api_goals_expose_set_goal_lifecycle_and_events(tmp_path: Path):
     client = make_client(tmp_path)
     created = client.post(

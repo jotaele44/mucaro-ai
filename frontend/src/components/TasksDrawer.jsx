@@ -67,6 +67,13 @@ export function TasksDrawer({ onClose }) {
                 {counts.DENIED ? ` · ${counts.DENIED} denied` : ""} · {run.event_count} events
                 {run.error ? ` · ${run.error.category}` : ""}
               </p>
+              {(run.goal_id || run.task_id) && (
+                <p className="muted small">
+                  {run.goal_id ? <>Goal <span className="mono">{run.goal_id}</span></> : null}
+                  {run.goal_id && run.task_id ? " · " : ""}
+                  {run.task_id ? <>Task <span className="mono">{run.task_id}</span></> : null}
+                </p>
+              )}
               <button type="button" className="ghost-button" aria-expanded={open === run.run_id} onClick={() => setOpen(open === run.run_id ? null : run.run_id)}>
                 {open === run.run_id ? "Hide transcript" : "View transcript"}
               </button>

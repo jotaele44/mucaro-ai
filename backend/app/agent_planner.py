@@ -63,7 +63,12 @@ def _has_coding_intent(lowered: str, paths: list[str]) -> bool:
     return bool(paths) or any(term in lowered for term in _CODING_INTENT_TERMS)
 
 
-def build_agent_plan(prompt: str, *, cfg: Settings = settings) -> dict[str, Any]:
+def build_agent_plan(
+    prompt: str,
+    *,
+    context: dict[str, Any] | None = None,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
     """Create a bounded local plan from explicit user intent.
 
     This planner never executes a tool and never interprets source/model text as
@@ -146,6 +151,7 @@ def build_agent_plan(prompt: str, *, cfg: Settings = settings) -> dict[str, Any]
             "status": "AGENT_PLAN_BLOCKED",
             "prompt": text,
             "actions": [],
+            "context": context,
             "counts": {"candidate_actions": len(deduplicated), "selected_actions": 0, "max_actions": MAX_AGENT_ACTIONS},
             "error": {"status": exc.status, "detail": exc.detail},
             "invariants": {"planner_does_not_execute": True, "blocked_fail_closed": True},
@@ -156,6 +162,7 @@ def build_agent_plan(prompt: str, *, cfg: Settings = settings) -> dict[str, Any]
         "status": "AGENT_PLAN_READY" if bounded else "AGENT_NO_SAFE_ACTIONS",
         "prompt": text,
         "actions": bounded,
+        "context": context,
         "counts": {"candidate_actions": len(deduplicated), "selected_actions": len(bounded), "max_actions": MAX_AGENT_ACTIONS},
         "invariants": {
             "planner_does_not_execute": True,

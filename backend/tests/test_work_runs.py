@@ -9,7 +9,9 @@ from fastapi.testclient import TestClient
 
 from backend.app import work_runs
 from backend.app.agent_checkpoints import get_checkpoint
+from backend.app.agent_tasks import create_task, get_task
 from backend.app.conversations import create_conversation, get_conversation
+from backend.app.goals import create_goal
 from backend.app.ingestion import ingest_file
 from backend.app.main import create_app
 from backend.app.response_flow import get_interaction, get_pending_interaction
@@ -185,6 +187,42 @@ def test_agent_mode_builds_bounded_plan_and_keeps_inferred_actions_approval_gate
         approve_tool_call(call["tool_call_id"], cfg=cfg, expected_arguments_sha256=call["arguments_sha256"])
     resume_waiting_run(run["run_id"], cfg)
     assert get_run(run["run_id"], cfg)["state"] == "COMPLETED"
+
+
+def test_agent_run_binds_current_goal_and_explicit_task_without_claiming_completion(cfg, conversation):
+    goal = create_goal("Finish the governed agent workflow", active_vector="durable_orchestration", goal_id="goal-agent", cfg=cfg)["goal"]
+    task = create_task("Bind an agent run", task_id="task-agent", cfg=cfg)
+
+    run = _submit(
+        conversation,
+        "Inspect the repository status and summarize the next step.",
+        cfg,
+        mode="agent",
+        options={"task_id": task["task_id"]},
+    )
+
+    assert run["orchestration"]["goal_id"] == goal["goal_id"]
+    assert run["orchestration"]["task_id"] == task["task_id"]
+    assert run["orchestration"]["resolution"] == "current_goal"
+    assert get_task(task["task_id"], cfg)["status"] == "TODO"
+    events = list_run_events(run["run_id"], cfg=cfg)
+    bound = next(event for event in events if event["type"] == "context_bound")
+    assert bound["data"]["orchestration"]["task"]["sequence"] == 0
+    plan = next(event for event in events if event["type"] == "agent_plan")
+    assert plan["data"]["context"]["goal"]["active_vector"] == "durable_orchestration"
+
+
+@pytest.mark.parametrize(
+    "options,status",
+    [
+        ({"goal_id": "missing-goal"}, "ERROR_RUN_GOAL_NOT_FOUND"),
+        ({"task_id": "missing-task"}, "ERROR_RUN_TASK_NOT_FOUND"),
+    ],
+)
+def test_run_rejects_missing_orchestration_references(cfg, conversation, options, status):
+    with pytest.raises(RunError) as exc:
+        submit_message(conversation, "Inspect the current state.", mode="agent", options=options, cfg=cfg)
+    assert exc.value.status == status
 
 
 def test_agent_fleet_reenters_the_normal_answer_and_event_workflow(cfg, conversation, monkeypatch):
