@@ -5884,3 +5884,67 @@ def test_cli_ocr_structure_returns_nonzero_for_unresolved(tmp_path: Path, capsys
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "OCR_STRUCTURE_UNRESOLVED"
     assert payload["structure"]["certification_state"] == "UNRESOLVED"
+
+
+def test_cli_runs_context_text_reports_provider_usage_without_estimation(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    monkeypatch.setattr(
+        cli,
+        "get_run",
+        lambda run_id, settings: {
+            "run_id": run_id,
+            "state": "COMPLETED",
+            "context_usage": {
+                "model": {"provider": "openai_compatible_local", "name": "tiny-local:1b"},
+                "metrics": {
+                    "context_consumed_tokens": {"value": 20, "classification": "PROVIDER_REPORTED"},
+                    "context_limit_tokens": {"value": 8192, "classification": "COMPUTED"},
+                },
+                "warnings": [],
+            },
+        },
+    )
+
+    assert main(["runs", "context", "run-1", "--format", "text"], cfg=cfg) == 0
+    assert capsys.readouterr().out == "ctx 20/8192\n"
+
+
+def test_cli_runs_context_json_preserves_unknown_usage(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+    monkeypatch.setattr(
+        cli,
+        "get_run",
+        lambda run_id, settings: {
+            "run_id": run_id,
+            "state": "COMPLETED",
+            "context_usage": {
+                "model": {"provider": "openai_compatible_local", "name": "tiny-local:1b"},
+                "metrics": {
+                    "context_consumed_tokens": {"value": None, "classification": "UNKNOWN"},
+                    "context_limit_tokens": {"value": 8192, "classification": "COMPUTED"},
+                },
+                "warnings": ["WARN_INPUT_TOKENS_UNKNOWN"],
+            },
+        },
+    )
+
+    assert main(["runs", "context", "run-2", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "CONTEXT_STATUS_PARTIAL"
+    assert payload["context_consumed_tokens"] is None
+    assert payload["context_limit_tokens"] == 8192
+    assert payload["display"] == "ctx ?/8192"
+    assert payload["invariants"]["estimated_missing_values"] is False
+
+
+def test_cli_runs_context_missing_run_fails_closed(tmp_path: Path, capsys, monkeypatch):
+    cfg = make_settings(tmp_path)
+
+    def missing(run_id, settings):
+        raise cli.RunError("ERROR_RUN_NOT_FOUND", run_id)
+
+    monkeypatch.setattr(cli, "get_run", missing)
+
+    assert main(["runs", "context", "missing", "--format", "json"], cfg=cfg) == 2
+    payload = json.loads(capsys.readouterr().err)
+    assert payload == {"status": "ERROR_RUN_NOT_FOUND", "detail": "missing"}

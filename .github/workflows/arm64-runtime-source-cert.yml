@@ -71,7 +71,7 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET: "14.0"
         run: |
           set -euo pipefail
-          uv pip compile pyproject.toml             --python-version 3.13             --python-platform aarch64-apple-darwin             --generate-hashes             --only-binary :all:             --output-file "$OUT/requirements-macos-arm64.lock"
+          uv pip compile pyproject.toml             --upgrade-package certifi==2026.10.19             --python-version 3.13             --python-platform aarch64-apple-darwin             --generate-hashes             --only-binary :all:             --output-file "$OUT/requirements-macos-arm64.lock"
           test -s "$OUT/requirements-macos-arm64.lock"
           sha256sum "$OUT/requirements-macos-arm64.lock"
           cat "$OUT/requirements-macos-arm64.lock"
