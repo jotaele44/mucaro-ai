@@ -2299,6 +2299,14 @@ def write_distribution_manifest_fixture_receipts(root: Path, head_sha: str) -> d
         command=["python3", "scripts/certify_operator_workflow.py"],
         payload={"checks": []},
     )
+    write_release_receipt(
+        root,
+        receipt_type="ocr_v1_runtime_boundary",
+        status="OCR_V1_RUNTIME_BOUNDARY_CERT_OK",
+        head_sha=head_sha,
+        command=["python3", "scripts/certify_ocr_v1_runtime.py", "--receipt"],
+        payload={"scope": "SYNTHETIC_OCR_V1_RUNTIME_AND_BOUNDARY_ACCOUNTING", "counts": {"total": 12}},
+    )
     return artifacts
 
 
@@ -2802,6 +2810,7 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
         ("retrieval_quality", "RETRIEVAL_QUALITY_CERT_OK"),
         ("gis_quality", "GIS_QUALITY_CERT_OK"),
         ("operator_workflow", "OPERATOR_WORKFLOW_CERT_OK"),
+        ("ocr_v1_runtime_boundary", "OCR_V1_RUNTIME_BOUNDARY_CERT_OK"),
     ]:
         write_release_receipt(
             tmp_path,
@@ -2896,8 +2905,8 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert payload["current_state"] == "GITHUB_GOVERNANCE_OPEN"
     assert payload["head_sha"] == head_sha
     assert payload["tags_at_head"] == [tag_name]
-    assert payload["current_head_receipts_summary"]["total"] == 8
-    assert payload["current_head_receipts_summary"]["valid"] == 8
+    assert payload["current_head_receipts_summary"]["total"] == 9
+    assert payload["current_head_receipts_summary"]["valid"] == 9
     assert payload["startup_blocker"]["status"] == "FAIL"
     assert payload["github_actions"]["check_suites"]["total_count"] == 2
     assert payload["github_actions"]["check_suites"]["suites"][0]["latest_check_runs_count"] == 0
@@ -2924,8 +2933,8 @@ def test_cli_release_governance_report_summarizes_current_head_handoff(tmp_path:
     assert "startup_blocker_causes=" in text_output
     assert "github_support_classification=HOSTED_STARTUP_BEFORE_JOBS" in text_output
     assert "github_support_check_suite_counts=github_actions=2 zero_check_run_startup_failures=2 queued_external=0" in text_output
-    assert "receipt_count=8" in text_output
-    assert "receipt_valid=8" in text_output
+    assert "receipt_count=9" in text_output
+    assert "receipt_valid=9" in text_output
     assert "next_action=Upgrade GitHub plan or make the repository public" in text_output
 
     output_path = tmp_path / "data" / "exports" / "governance_reports" / "handoff.json"
@@ -3078,7 +3087,7 @@ def write_dashboard_governance_report_fixture(root: Path, head_sha: str) -> Path
             "status": "GOVERNANCE_REPORT_OPEN",
             "current_state": "GITHUB_GOVERNANCE_OPEN",
             "head_sha": head_sha,
-            "current_head_receipts_summary": {"total": 8, "valid": 8, "invalid": 0},
+            "current_head_receipts_summary": {"total": 9, "valid": 9, "invalid": 0},
             "startup_blocker": {"status": "FAIL"},
         },
     }
@@ -3131,7 +3140,7 @@ def test_cli_release_dashboard_summarizes_current_handoff_artifacts(tmp_path: Pa
     assert payload["distribution_manifest_status"] == "DISTRIBUTION_MANIFEST_VERIFIED"
     assert payload["governance_report_status"] == "GOVERNANCE_REPORT_VERIFIED"
     assert payload["remote_branch_status"] == "PASS"
-    assert payload["current_head_receipts_summary"]["total"] == 8
+    assert payload["current_head_receipts_summary"]["total"] == 9
     assert checks["current_head_receipts"]["status"] == "PASS"
     assert checks["distribution_manifest"]["status"] == "PASS"
     assert checks["governance_report"]["status"] == "PASS"
@@ -3292,7 +3301,7 @@ def test_cli_release_support_bundle_save_creates_missing_governance_report(tmp_p
             "status": "GOVERNANCE_REPORT_OPEN",
             "current_state": "GITHUB_GOVERNANCE_OPEN",
             "head_sha": head_sha,
-            "current_head_receipts_summary": {"total": 8, "valid": 8, "invalid": 0},
+            "current_head_receipts_summary": {"total": 9, "valid": 9, "invalid": 0},
             "startup_blocker": {"status": "FAIL"},
         }
 
@@ -3634,7 +3643,7 @@ def test_cli_audit_completion_reports_hosted_governance_open(tmp_path: Path, cap
                     ],
                 },
             },
-            "current_head_receipts_summary": {"total": 8, "valid": 8, "invalid": 0},
+            "current_head_receipts_summary": {"total": 9, "valid": 9, "invalid": 0},
             "next_commands": ["mucaro release dashboard --include-github --format text"],
         }
 
@@ -3731,7 +3740,7 @@ def test_cli_audit_completion_is_ready_when_release_grade_gates_pass(tmp_path: P
             "distribution_manifest_status": "DISTRIBUTION_MANIFEST_VERIFIED",
             "governance_report_status": "GOVERNANCE_REPORT_VERIFIED",
             "hosted_governance_status": "PASS",
-            "current_head_receipts_summary": {"total": 8, "valid": 8, "invalid": 0},
+            "current_head_receipts_summary": {"total": 9, "valid": 9, "invalid": 0},
             "next_commands": [],
         }
 
@@ -3814,7 +3823,7 @@ def test_cli_audit_completion_fails_bad_artifact_status(tmp_path: Path, capsys, 
             "distribution_manifest_status": "DISTRIBUTION_MANIFEST_VERIFY_FAILED",
             "governance_report_status": "GOVERNANCE_REPORT_VERIFIED",
             "hosted_governance_status": "PASS",
-            "current_head_receipts_summary": {"total": 8, "valid": 8, "invalid": 0},
+            "current_head_receipts_summary": {"total": 9, "valid": 9, "invalid": 0},
             "next_commands": [],
         }
 
@@ -4783,7 +4792,7 @@ def test_cli_release_handoff_saves_and_verifies_ordered_artifact_set(tmp_path: P
     next_actions_path = tmp_path / "data" / "exports" / "release_next_actions" / f"next-actions-{head_sha[:12]}.json"
     receipts = [
         {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-        for index in range(8)
+        for index in range(9)
     ]
 
     def fake_command_output(_cfg: Settings, args: list[str]) -> tuple[bool, str]:
@@ -4999,7 +5008,7 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
             return []
         return [
             {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-            for index in range(8)
+            for index in range(9)
         ]
 
     def fake_distribution(root: Path, *, output_path: Path | None = None, save: bool = False):
@@ -5149,7 +5158,7 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
         "source_artifact",
         "fresh_clone",
     ]
-    assert payload["current_head_receipts_summary"]["total"] == 8
+    assert payload["current_head_receipts_summary"]["total"] == 9
     assert receipt_calls["count"] == 2
     assert calls == [
         "refresh:local_release",
@@ -5204,7 +5213,7 @@ def test_cli_release_handoff_refresh_step_selects_canonical_subset(tmp_path: Pat
             return []
         return [
             {"head_sha": head_sha, "receipt_type": f"receipt_{index}", "status": "OK", "valid": True}
-            for index in range(8)
+            for index in range(9)
         ]
 
     monkeypatch.setattr(cli, "_command_output", fake_command_output)

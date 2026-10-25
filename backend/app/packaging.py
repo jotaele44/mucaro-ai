@@ -69,6 +69,7 @@ REQUIRED_DISTRIBUTION_RECEIPTS = [
     ("retrieval_quality", "RETRIEVAL_QUALITY_CERT_OK"),
     ("gis_quality", "GIS_QUALITY_CERT_OK"),
     ("operator_workflow", "OPERATOR_WORKFLOW_CERT_OK"),
+    ("ocr_v1_runtime_boundary", "OCR_V1_RUNTIME_BOUNDARY_CERT_OK"),
 ]
 
 

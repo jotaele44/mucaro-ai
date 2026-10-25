@@ -8280,6 +8280,11 @@ def build_release_state_report(
         receipt_type="gis_quality",
         head_sha=head_sha,
     )
+    ocr_v1_runtime_boundary_receipt = load_release_receipt(
+        cfg.project_root,
+        receipt_type="ocr_v1_runtime_boundary",
+        head_sha=head_sha,
+    )
     local_release_status, local_release_evidence = _receipt_state(local_release_receipt, "CERTIFY_RELEASE_OK")
     fresh_clone_status, fresh_clone_evidence = _receipt_state(fresh_clone_receipt, "FRESH_CLONE_CERT_OK")
     source_artifact_status, source_artifact_evidence = _receipt_state(source_artifact_receipt, "SOURCE_ARTIFACT_CERT_OK")
@@ -8477,6 +8482,7 @@ def build_release_state_report(
             "answer_trace_quality": answer_trace_quality_receipt,
             "retrieval_quality": retrieval_quality_receipt,
             "gis_quality": gis_quality_receipt,
+            "ocr_v1_runtime_boundary": ocr_v1_runtime_boundary_receipt,
         },
         "product_audit_status": audit.get("status"),
         "package_status": package.get("status"),
