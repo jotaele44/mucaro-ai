@@ -1171,7 +1171,7 @@
       ],
       "dependencies": [],
       "positive_gate": ".github/workflows/matrix010-ingestion-cert.yml",
-      "negative_gate": null,
+      "negative_gate": "backend/tests/test_matrix010_ingestion_benchmark.py::test_matrix010_full_benchmark_closes_22_plus_8_denominator",
       "benchmark": "_architecture/ingestion_benchmark_v1.json",
       "evidence_refs": [
         "_architecture/ingest_format_registry_v1.json",
