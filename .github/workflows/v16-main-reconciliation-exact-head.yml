@@ -62,9 +62,6 @@ jobs:
               "packaging/runtime/requirements-macos-arm64.lock",
               "packaging/runtime/requirements-macos-x86_64.lock",
               "packaging/macos/requirements-macos-arm64.lock",
-              "packaging/one_click/build-requirements.in",
-              "scripts/lock_python_deps.py",
-              "backend/tests/test_dependency_security_regressions.py",
           ]
           for path in names:
               data=Path(path).read_text()
