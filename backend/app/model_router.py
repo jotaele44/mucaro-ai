@@ -14,6 +14,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .config import Settings, settings
+from .model_contract_v1 import ContractError, ModelCapabilities, ModelRequest, validate_request
 from .injection_guard import neutralize_fence
 from .permission_engine import PermissionEngineError, PermissionRequest, require as require_permission
 
@@ -282,6 +283,26 @@ def generate_answer(
     cfg: Settings = settings,
 ) -> dict[str, Any]:
     spec = get_model_provider_spec(model_provider)
+    # Contract validation is non-executing: it cannot authorize any tool or network call.
+    # Existing provider permission gates remain the sole execution authority.
+    try:
+        validate_request(
+            ModelRequest(
+                provider=spec.name,
+                model=model_name or spec.default_model,
+                messages=(("user", query),),
+                locality=spec.locality,
+                allow_remote=os.getenv("MUCARO_AI_LIVE_MODE") == "1",
+                stream_requested=on_text_delta is not None and spec.supports_streaming,
+                max_output_tokens=512,
+            ),
+            ModelCapabilities(
+                streaming=spec.supports_streaming,
+                context_tokens=spec.context_tokens,
+            ),
+        )
+    except ContractError as exc:
+        raise ModelProviderError("ERROR_MODEL_CONTRACT", str(exc)) from exc
     if spec.name == LOCAL_PROVIDER:
         _require_model_invoke(spec, cfg)
         return _local_answer(
