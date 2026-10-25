@@ -26,6 +26,13 @@ class TestRouterContractIntegration(unittest.TestCase):
         self.assertEqual(raised.exception.status, "ERROR_MODEL_CONTRACT")
         remote.assert_not_called()
 
+    def test_mock_streaming_is_rejected_not_silently_ignored(self):
+        with patch("backend.app.model_router._mock_answer") as mock:
+            with self.assertRaises(ModelProviderError) as raised:
+                generate_answer("hello", [], model_provider="mock", on_text_delta=lambda _: None)
+        self.assertEqual(raised.exception.status, "ERROR_MODEL_CONTRACT")
+        mock.assert_not_called()
+
     def test_local_permission_gate_is_retained(self):
         with patch("backend.app.model_router._require_model_invoke", side_effect=ModelProviderError("ERROR_PERMISSION_DENIED","denied")) as gate:
             with patch("backend.app.model_router._local_answer") as local:
