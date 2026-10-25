@@ -5,12 +5,14 @@ import argparse
 import hashlib
 import json
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
 
 from backend.app.config import Settings
 from backend.app.ocr_analysis import analyze_image_ocr
+from backend.app.release_receipts import write_release_receipt
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "_architecture" / "ocr_v1_corpus_manifest.json"
@@ -189,7 +191,7 @@ def _unsupported_case(case_id: str, expected_state: str, image_path: Path) -> di
     }
 
 
-def run_certification(output_path: Path) -> dict[str, Any]:
+def run_certification(output_path: Path | None = None) -> dict[str, Any]:
     manifest = _load_manifest()
     expected = {row["id"]: row for row in manifest["cases"]}
     with tempfile.TemporaryDirectory(prefix="mucaro-ocr-v1-") as temporary:
@@ -254,14 +256,16 @@ def run_certification(output_path: Path) -> dict[str, Any]:
             "This receipt does not establish broad accuracy, provider parity, or physical-document performance.",
         ],
     }
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
     return result
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the bounded OCR v1 runtime and unsupported-state boundary control.")
-    parser.add_argument("--output", type=Path, default=ROOT / "data" / "exports" / "release_receipts" / "ocr-v1-runtime-boundary.json")
+    parser.add_argument("--output", type=Path, default=None, help="Optional raw detail JSON path outside the release receipt registry.")
+    parser.add_argument("--receipt", action="store_true", help="Write the result through the canonical release receipt envelope.")
     args = parser.parse_args()
     try:
         result = run_certification(args.output)
@@ -269,6 +273,16 @@ def main() -> int:
         print(STATUS_FAILED)
         print(f"error={type(exc).__name__}:{exc}")
         return 2
+    if args.receipt:
+        receipt = write_release_receipt(
+            ROOT,
+            receipt_type="ocr_v1_runtime_boundary",
+            status=result["status"],
+            head_sha=result["head_sha"],
+            command=[sys.executable, "scripts/certify_ocr_v1_runtime.py", "--receipt"],
+            payload=result,
+        )
+        print(f"OCR_V1_RUNTIME_RECEIPT {receipt.relative_to(ROOT)}")
     print(result["status"])
     print(f"head_sha={result['head_sha']}")
     print(f"scope={result['scope']}")
