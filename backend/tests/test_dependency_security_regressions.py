@@ -100,6 +100,14 @@ def test_setuptools_security_fix_is_hash_pinned_in_governed_packaging_locks() ->
     assert len(checked) >= 5, checked
     pins = (ROOT / "scripts" / "one_click_pins.env").read_text()
     generator = (ROOT / "scripts" / "lock_python_deps.py").read_text()
+    parsed = dict(
+        line.split("=", 1)
+        for line in pins.splitlines()
+        if line and not line.lstrip().startswith("#") and "=" in line
+    )
+    assert parsed.get("PY_SECURITY_SETUPTOOLS_VERSION") == "84.1.0"
+    assert parsed.get("PY_EXCLUDE_NEWER_SETUPTOOLS") == "2026-10-21T00:00:00Z"
+    assert "\\nPY_SECURITY_SETUPTOOLS_VERSION" not in pins
     assert "PY_SECURITY_SETUPTOOLS_VERSION=84.1.0" in pins
     assert '"PY_SECURITY_SETUPTOOLS_VERSION"' in generator
     assert '"PY_EXCLUDE_NEWER_SETUPTOOLS"' in generator
