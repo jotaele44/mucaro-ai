@@ -95,8 +95,11 @@ def test_setuptools_84_0_0_security_regression_is_absent_and_fixed_pin_is_hashed
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     one_click_build = (ROOT / "packaging" / "one_click" / "build-requirements.in").read_text(encoding="utf-8")
     macos_lock = (ROOT / "packaging" / "macos" / "requirements-macos-arm64.lock").read_text(encoding="utf-8")
+    coding_dockerfile = (ROOT / "docker" / "coding.Dockerfile").read_text(encoding="utf-8")
     assert 'requires = ["setuptools==84.1.0"]' in pyproject
     assert "setuptools==84.1.0" in one_click_build
+    assert 'pip download --no-cache-dir "setuptools==84.1.0" wheel -d /wheelhouse' in coding_dockerfile
+    assert 'pip download --no-cache-dir "setuptools>=69" wheel -d /wheelhouse' not in coding_dockerfile
     assert "--exclude-newer-package setuptools=2026-10-20T00:00:00Z" in macos_lock
     assert "--upgrade-package setuptools==84.1.0" in macos_lock
 
