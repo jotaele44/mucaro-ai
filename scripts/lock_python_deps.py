@@ -75,6 +75,7 @@ def compile_lock(uv: Path, pins: dict[str, str], target: str, output: Path) -> N
         ("certifi", "PY_SECURITY_CERTIFI_VERSION", "PY_EXCLUDE_NEWER_CERTIFI"),
         ("pillow", "PY_SECURITY_PILLOW_VERSION", "PY_EXCLUDE_NEWER_PILLOW"),
         ("pypdf", "PY_SECURITY_PYPDF_VERSION", "PY_EXCLUDE_NEWER_PYPDF"),
+        ("setuptools", "PY_SECURITY_SETUPTOOLS_VERSION", "PY_EXCLUDE_NEWER_SETUPTOOLS"),
     ):
         version = pins.get(version_key)
         cutoff = pins.get(cutoff_key)
