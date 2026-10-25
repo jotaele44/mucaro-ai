@@ -62,6 +62,9 @@ jobs:
               "packaging/runtime/requirements-macos-arm64.lock",
               "packaging/runtime/requirements-macos-x86_64.lock",
               "packaging/macos/requirements-macos-arm64.lock",
+              "packaging/one_click/build-requirements.in",
+              "scripts/lock_python_deps.py",
+              "backend/tests/test_dependency_security_regressions.py",
           ]
           for path in names:
               data=Path(path).read_text()
@@ -69,7 +72,21 @@ jobs:
               assert "pypdf==6.21.1" not in data, path
               assert "sha256:1d44d1a3a200f25062adff0085b02040e4646431ac2ccac22e42679e91466084" in data, path
               assert "sha256:0a3e1c5c886a1be03646c16a04827cc166c2a0575c971b26a4bf89686551c2d4" in data, path
-          print("PYPDF_SOURCE_HASH_AND_SIX_LOCKS_PASS")
+          governed = [
+              "packaging/macos/requirements-macos-arm64.lock",
+              "packaging/one_click/requirements-aarch64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-unknown-linux-gnu.lock",
+              "packaging/one_click/requirements-x86_64-pc-windows-msvc.lock",
+          ]
+          for path in governed:
+              data = Path(path).read_text()
+              assert data.count("setuptools==84.1.0") == 1, path
+              assert "setuptools==84.0.0" not in data, path
+              assert "sha256:5231689c6ac8156cd155cfb98c3fd6fb252c3e7e9bd3d78b64d3c55f132624c9" in data, path
+              assert "sha256:23657205b63d4d31395ab917815247f694aafad28cd21316bf5fd45a51048ea0" in data, path
+          assert "PY_SECURITY_SETUPTOOLS_VERSION=84.1.0" in pins
+          print("PYTHON_PIN_HASH_AND_PACKAGING_LOCKS_PASS")
           PY
       - name: Run complete backend regression corpus
         run: python -m pytest backend/tests -q
