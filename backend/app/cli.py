@@ -177,7 +177,6 @@ from .operator_workflow_certification import (
 )
 from .services import answer_question
 from .terminal_context_status import build_terminal_context_status
-from .work_runs import RunError, get_run
 from .tools import (
     ToolRuntimeError,
     approve_tool_call,
@@ -191,6 +190,7 @@ from .tools import (
     verify_tool_audit_chain,
 )
 from .validation import validate_project_json
+from .work_runs import RunError, get_run
 
 
 class MucaroCLIError(RuntimeError):
