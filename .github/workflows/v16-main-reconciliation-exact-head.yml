@@ -7,6 +7,8 @@ on:
     paths:
       - "backend/**"
       - "pyproject.toml"
+      - "backend/requirements.txt"
+      - "packaging/macos/**"
       - "scripts/one_click_pins.env"
       - "packaging/one_click/**"
       - "packaging/runtime/**"
@@ -47,6 +49,9 @@ jobs:
           from pathlib import Path
           import re
           assert '"pypdf==6.21.2"' in Path("pyproject.toml").read_text()
+          assert "pypdf==6.21.2" in Path("backend/requirements.txt").read_text()
+          assert "pypdf==6.21.1" not in Path("backend/requirements.txt").read_text()
+          assert "pypdf==6.21.2" in Path("packaging/macos/requirements-macos-arm64.in").read_text()
           pins=Path("scripts/one_click_pins.env").read_text()
           assert "PY_SECURITY_PYPDF_VERSION=6.21.2" in pins
           names = [
@@ -56,6 +61,7 @@ jobs:
               "packaging/one_click/requirements-x86_64-pc-windows-msvc.lock",
               "packaging/runtime/requirements-macos-arm64.lock",
               "packaging/runtime/requirements-macos-x86_64.lock",
+              "packaging/macos/requirements-macos-arm64.lock",
           ]
           for path in names:
               data=Path(path).read_text()
@@ -85,6 +91,9 @@ jobs:
               "backend/tests/test_gated_git_source_attestation.py",
               "backend/tests/test_permission_coverage.py",
               "pyproject.toml",
+              "backend/requirements.txt",
+              "packaging/macos/requirements-macos-arm64.in",
+              "packaging/macos/requirements-macos-arm64.lock",
               "scripts/one_click_pins.env",
               "packaging/one_click/requirements-aarch64-apple-darwin.lock",
               "packaging/one_click/requirements-x86_64-apple-darwin.lock",
