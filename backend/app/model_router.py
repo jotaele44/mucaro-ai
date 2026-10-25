@@ -269,6 +269,45 @@ def _provider_status(spec: ModelProviderSpec, cfg: Settings) -> dict[str, Any]:
     }
 
 
+
+def _provider_token_metric(value: Any, source: str) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ModelProviderError("ERROR_MODEL_USAGE_INVALID", f"{source} must be a non-negative integer")
+    return {
+        "value": value,
+        "classification": "PROVIDER_REPORTED",
+        "source": source,
+        "basis": [],
+    }
+
+
+def _build_model_usage(
+    *,
+    input_tokens: Any = None,
+    output_tokens: Any = None,
+    cache_creation_input_tokens: Any = None,
+    cache_read_input_tokens: Any = None,
+    total_tokens: Any = None,
+    source_prefix: str,
+) -> dict[str, Any] | None:
+    raw = {
+        "input_tokens": _provider_token_metric(input_tokens, f"{source_prefix}.input_tokens"),
+        "output_tokens": _provider_token_metric(output_tokens, f"{source_prefix}.output_tokens"),
+        "cache_creation_input_tokens": _provider_token_metric(
+            cache_creation_input_tokens,
+            f"{source_prefix}.cache_creation_input_tokens",
+        ),
+        "cache_read_input_tokens": _provider_token_metric(
+            cache_read_input_tokens,
+            f"{source_prefix}.cache_read_input_tokens",
+        ),
+        "total_tokens": _provider_token_metric(total_tokens, f"{source_prefix}.total_tokens"),
+    }
+    usage = {key: value for key, value in raw.items() if value is not None}
+    return usage or None
+
 def generate_answer(
     query: str,
     retrieved_chunks: list[dict[str, Any]],
@@ -525,7 +564,15 @@ def _anthropic_answer(
     if not text.strip():
         raise ModelProviderError("ERROR_MODEL_PROVIDER_MALFORMED_RESPONSE", "provider returned no text content")
     cited = [c["chunk_id"] for c in retrieved_chunks if c["chunk_id"] in text]
-    return {
+    usage_obj = getattr(final, "usage", None)
+    model_usage = _build_model_usage(
+        input_tokens=getattr(usage_obj, "input_tokens", None),
+        output_tokens=getattr(usage_obj, "output_tokens", None),
+        cache_creation_input_tokens=getattr(usage_obj, "cache_creation_input_tokens", None),
+        cache_read_input_tokens=getattr(usage_obj, "cache_read_input_tokens", None),
+        source_prefix="anthropic.response.usage",
+    )
+    result = {
         "model_provider": "anthropic",
         "model_name": model,
         "answer": text,
@@ -534,6 +581,9 @@ def _anthropic_answer(
         "stop_reason": getattr(final, "stop_reason", None),
         "effort": effort,
     }
+    if model_usage is not None:
+        result["model_usage"] = model_usage
+    return result
 
 
 def build_grounded_prompt(
@@ -582,19 +632,21 @@ def _local_answer(
     model = model_name or local_cfg["model"]
     system, user = build_grounded_prompt(query, retrieved_chunks, conversation_context, memory_context)
     stream = on_text_delta is not None
-    body = json.dumps(
-        {
-            "model": model,
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "temperature": 0.2,
-            "max_tokens": 900,
-            "stream": stream,
-        }
-    ).encode("utf-8")
+    request_payload: dict[str, Any] = {
+        "model": model,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        "temperature": 0.2,
+        "max_tokens": 900,
+        "stream": stream,
+    }
+    if stream:
+        request_payload["stream_options"] = {"include_usage": True}
+    body = json.dumps(request_payload).encode("utf-8")
     request = urllib.request.Request(
         f"{base_url}/chat/completions", data=body, headers={"Content-Type": "application/json"}, method="POST"
     )
     parts: list[str] = []
+    reported_usage: dict[str, Any] | None = None
     try:
         with _local_opener().open(request, timeout=local_cfg["timeout_seconds"]) as response:
             if stream:
@@ -605,12 +657,29 @@ def _local_answer(
                     data = line[5:].strip()
                     if data == "[DONE]":
                         break
-                    delta = (json.loads(data).get("choices") or [{}])[0].get("delta", {}).get("content") or ""
+                    event = json.loads(data)
+                    usage = event.get("usage")
+                    if isinstance(usage, dict):
+                        reported_usage = _build_model_usage(
+                            input_tokens=usage.get("prompt_tokens"),
+                            output_tokens=usage.get("completion_tokens"),
+                            total_tokens=usage.get("total_tokens"),
+                            source_prefix="openai_compatible.response.usage",
+                        )
+                    delta = (event.get("choices") or [{}])[0].get("delta", {}).get("content") or ""
                     if delta:
                         parts.append(delta)
                         on_text_delta(delta)  # type: ignore[misc]
             else:
                 payload = json.loads(response.read(4_000_000).decode("utf-8", errors="replace"))
+                usage = payload.get("usage")
+                if isinstance(usage, dict):
+                    reported_usage = _build_model_usage(
+                        input_tokens=usage.get("prompt_tokens"),
+                        output_tokens=usage.get("completion_tokens"),
+                        total_tokens=usage.get("total_tokens"),
+                        source_prefix="openai_compatible.response.usage",
+                    )
                 parts.append(str(((payload.get("choices") or [{}])[0].get("message") or {}).get("content") or ""))
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
@@ -632,4 +701,13 @@ def _local_answer(
     if not text:
         raise ModelProviderError("ERROR_LOCAL_MODEL_EMPTY_RESPONSE", f"Local model {model} returned no text.")
     cited = [c["chunk_id"] for c in retrieved_chunks if c["chunk_id"] in text]
-    return {"model_provider": LOCAL_PROVIDER, "model_name": model, "answer": text, "cited_chunk_ids": cited, "streamed": stream}
+    result = {
+        "model_provider": LOCAL_PROVIDER,
+        "model_name": model,
+        "answer": text,
+        "cited_chunk_ids": cited,
+        "streamed": stream,
+    }
+    if reported_usage is not None:
+        result["model_usage"] = reported_usage
+    return result
