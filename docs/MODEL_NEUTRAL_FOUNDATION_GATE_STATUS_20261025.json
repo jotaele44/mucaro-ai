@@ -1,0 +1,38 @@
+{
+  "schema_version": "mucaro-foundation-gate/1.0",
+  "baseline_commit": "7cb23cbba879e7aa6f99f9ce52ada4ad1b29001f",
+  "development_branch": "dev/model-neutral-foundation-20261025",
+  "assessment": "AUDIT_ONLY",
+  "scope": "model-neutral contract and coding governance; not V00-V23 exhaustion",
+  "evidence": {
+    "contract_source": "backend/app/model_contract_v1.py",
+    "router_source": "backend/app/model_router.py",
+    "contract_tests": "backend/tests/test_model_contract_v1.py",
+    "router_tests": "backend/tests/test_model_contract_router_integration.py",
+    "ci_workflow": ".github/workflows/model-neutral-contract.yml"
+  },
+  "gates": {
+    "baseline_identified": "PASS",
+    "isolated_branch_created": "PASS",
+    "contract_source_committed": "PASS",
+    "router_integration_committed": "PASS",
+    "mock_tests_exact_head": "UNVERIFIED",
+    "hosted_ci_exact_head": "UNVERIFIED",
+    "v00_v23_full_inventory": "OPEN",
+    "coding_governance_b01_b06": "OPEN",
+    "local_model_live_compatibility": "NOT_RUN",
+    "independent_security_review": "OPEN",
+    "rollback_rehearsal": "NOT_RUN",
+    "production_certification": "BLOCKED",
+    "deployment": "WITHHELD",
+    "skill_promotion": "WITHHELD"
+  },
+  "known_risks": [
+    "Request contract validates metadata but does not grant or enforce tool execution permissions.",
+    "Contract context limit is declared metadata; actual prompt token usage is not measured.",
+    "Local inference compatibility with Ollama, llama.cpp and LM Studio has not been tested on exact head.",
+    "The development workflow has no confirmed hosted job receipts.",
+    "The full foundation V00-V23 and coding blocker ledgers remain unreconciled."
+  ],
+  "release_rule": "No PASS certification without exact-head tests, complete required-domain audit, real local model evidence, independent verification, and successful rollback rehearsal."
+}
