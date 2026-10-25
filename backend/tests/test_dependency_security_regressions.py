@@ -42,8 +42,11 @@ def test_one_click_lock_generator_preserves_bounded_security_exceptions() -> Non
     assert "PY_EXCLUDE_NEWER_CERTIFI=2026-10-21T00:00:00Z" in pins
     assert "PY_SECURITY_PYPDF_VERSION=6.21.2" in pins
     assert "PY_EXCLUDE_NEWER_PYPDF=2026-10-24T23:59:59Z" in pins
+    assert "PY_SECURITY_SETUPTOOLS_VERSION=84.1.0" in pins
+    assert "PY_EXCLUDE_NEWER_SETUPTOOLS=2026-10-20T00:00:00Z" in pins
     assert '("certifi", "PY_SECURITY_CERTIFI_VERSION", "PY_EXCLUDE_NEWER_CERTIFI")' in generator
     assert '("pypdf", "PY_SECURITY_PYPDF_VERSION", "PY_EXCLUDE_NEWER_PYPDF")' in generator
+    assert '("setuptools", "PY_SECURITY_SETUPTOOLS_VERSION", "PY_EXCLUDE_NEWER_SETUPTOOLS")' in generator
     assert "--exclude-newer-package" in generator
     assert "--upgrade-package" in generator
 
@@ -67,6 +70,35 @@ def test_pypdf_security_fix_is_pinned_and_hashed_in_all_governed_locks() -> None
         for digest in expected_hashes:
             assert f"--hash=sha256:{digest}" in joined
     assert pypdf_locks, "expected pypdf in governed packaging locks"
+
+
+def test_setuptools_84_0_0_security_regression_is_absent_and_fixed_pin_is_hashed() -> None:
+    expected_hashes = {
+        "23657205b63d4d31395ab917815247f694aafad28cd21316bf5fd45a51048ea0",
+        "5231689c6ac8156cd155cfb98c3fd6fb252c3e7e9bd3d78b64d3c55f132624c9",
+    }
+    locks = sorted(PACKAGING.rglob("*.lock"))
+    setuptools_locks = []
+    for path in locks:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        assert "setuptools==84.0.0" not in text, f"vulnerable setuptools remains in {path.relative_to(ROOT)}"
+        if "setuptools==" not in text:
+            continue
+        setuptools_locks.append(path.relative_to(ROOT).as_posix())
+        assert "setuptools==84.1.0" in text
+        stanza = text.split("setuptools==84.1.0", 1)[1].split("\n", 4)[:3]
+        joined = "\n".join(stanza)
+        for digest in expected_hashes:
+            assert f"--hash=sha256:{digest}" in joined
+    assert setuptools_locks, "expected setuptools in governed packaging locks"
+
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    one_click_build = (ROOT / "packaging" / "one_click" / "build-requirements.in").read_text(encoding="utf-8")
+    macos_lock = (ROOT / "packaging" / "macos" / "requirements-macos-arm64.lock").read_text(encoding="utf-8")
+    assert 'requires = ["setuptools==84.1.0"]' in pyproject
+    assert "setuptools==84.1.0" in one_click_build
+    assert "--exclude-newer-package setuptools=2026-10-20T00:00:00Z" in macos_lock
+    assert "--upgrade-package setuptools==84.1.0" in macos_lock
 
 
 def test_vite_7_3_6_security_regression_is_absent() -> None:
