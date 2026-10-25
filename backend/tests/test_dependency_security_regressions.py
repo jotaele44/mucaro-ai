@@ -42,8 +42,11 @@ def test_one_click_lock_generator_preserves_bounded_security_exceptions() -> Non
     assert "PY_EXCLUDE_NEWER_CERTIFI=2026-10-21T00:00:00Z" in pins
     assert "PY_SECURITY_PYPDF_VERSION=6.21.2" in pins
     assert "PY_EXCLUDE_NEWER_PYPDF=2026-10-24T23:59:59Z" in pins
+    assert "PY_SECURITY_SETUPTOOLS_VERSION=84.1.0" in pins
+    assert "PY_EXCLUDE_NEWER_SETUPTOOLS=2026-10-20T00:00:00Z" in pins
     assert '("certifi", "PY_SECURITY_CERTIFI_VERSION", "PY_EXCLUDE_NEWER_CERTIFI")' in generator
     assert '("pypdf", "PY_SECURITY_PYPDF_VERSION", "PY_EXCLUDE_NEWER_PYPDF")' in generator
+    assert '("setuptools", "PY_SECURITY_SETUPTOOLS_VERSION", "PY_EXCLUDE_NEWER_SETUPTOOLS")' in generator
     assert "--exclude-newer-package" in generator
     assert "--upgrade-package" in generator
 
@@ -69,6 +72,38 @@ def test_pypdf_security_fix_is_pinned_and_hashed_in_all_governed_locks() -> None
     assert pypdf_locks, "expected pypdf in governed packaging locks"
 
 
+def test_setuptools_84_0_0_security_regression_is_absent_and_fixed_pin_is_hashed() -> None:
+    expected_hashes = {
+        "23657205b63d4d31395ab917815247f694aafad28cd21316bf5fd45a51048ea0",
+        "5231689c6ac8156cd155cfb98c3fd6fb252c3e7e9bd3d78b64d3c55f132624c9",
+    }
+    locks = sorted(PACKAGING.rglob("*.lock"))
+    setuptools_locks = []
+    for path in locks:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        assert "setuptools==84.0.0" not in text, f"vulnerable setuptools remains in {path.relative_to(ROOT)}"
+        if "setuptools==" not in text:
+            continue
+        setuptools_locks.append(path.relative_to(ROOT).as_posix())
+        assert "\nsetuptools==84.1.0 \\" in text
+        stanza = text.split("\nsetuptools==84.1.0 ", 1)[1].split("\n", 4)[:3]
+        joined = "\n".join(stanza)
+        for digest in expected_hashes:
+            assert f"--hash=sha256:{digest}" in joined
+    assert setuptools_locks, "expected setuptools in governed packaging locks"
+
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    one_click_build = (ROOT / "packaging" / "one_click" / "build-requirements.in").read_text(encoding="utf-8")
+    macos_lock = (ROOT / "packaging" / "macos" / "requirements-macos-arm64.lock").read_text(encoding="utf-8")
+    coding_dockerfile = (ROOT / "docker" / "coding.Dockerfile").read_text(encoding="utf-8")
+    assert 'requires = ["setuptools==84.1.0"]' in pyproject
+    assert "setuptools==84.1.0" in one_click_build
+    assert 'pip download --no-cache-dir "setuptools==84.1.0" wheel -d /wheelhouse' in coding_dockerfile
+    assert 'pip download --no-cache-dir "setuptools>=69" wheel -d /wheelhouse' not in coding_dockerfile
+    assert "--exclude-newer-package setuptools=2026-10-20T00:00:00Z" in macos_lock
+    assert "--upgrade-package setuptools==84.1.0" in macos_lock
+
+
 def test_vite_7_3_6_security_regression_is_absent() -> None:
     package_json = (ROOT / "frontend" / "package.json").read_text(encoding="utf-8")
     package_lock = (ROOT / "frontend" / "package-lock.json").read_text(encoding="utf-8")
@@ -77,37 +112,3 @@ def test_vite_7_3_6_security_regression_is_absent() -> None:
     assert "vite-7.3.6.tgz" not in package_lock
     assert '"vite": "7.3.7"' in package_json
     assert "vite-7.3.7.tgz" in package_lock
-
-
-def test_setuptools_security_fix_is_hash_pinned_in_governed_packaging_locks() -> None:
-    """GHSA-xmj3-9gf7-h52w: reject vulnerable setuptools and missing wheel/sdist hashes."""
-    expected = {
-        "23657205b63d4d31395ab917815247f694aafad28cd21316bf5fd45a51048ea0",
-        "5231689c6ac8156cd155cfb98c3fd6fb252c3e7e9bd3d78b64d3c55f132624c9",
-    }
-    locks = sorted(PACKAGING.rglob("*.lock"))
-    checked = []
-    for path in locks:
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if "setuptools==" not in text:
-            continue
-        checked.append(path.relative_to(ROOT).as_posix())
-        assert "setuptools==84.0.0" not in text, str(path)
-        assert text.count("setuptools==84.1.0") == 1, str(path)
-        stanza = "\\n".join(text.split("setuptools==84.1.0", 1)[1].split("\\n", 4)[:3])
-        for digest in expected:
-            assert "--hash=sha256:" + digest in stanza, str(path)
-    assert len(checked) >= 5, checked
-    pins = (ROOT / "scripts" / "one_click_pins.env").read_text()
-    generator = (ROOT / "scripts" / "lock_python_deps.py").read_text()
-    parsed = dict(
-        line.split("=", 1)
-        for line in pins.splitlines()
-        if line and not line.lstrip().startswith("#") and "=" in line
-    )
-    assert parsed.get("PY_SECURITY_SETUPTOOLS_VERSION") == "84.1.0"
-    assert parsed.get("PY_EXCLUDE_NEWER_SETUPTOOLS") == "2026-10-21T00:00:00Z"
-    assert "\\nPY_SECURITY_SETUPTOOLS_VERSION" not in pins
-    assert "PY_SECURITY_SETUPTOOLS_VERSION=84.1.0" in pins
-    assert '"PY_SECURITY_SETUPTOOLS_VERSION"' in generator
-    assert '"PY_EXCLUDE_NEWER_SETUPTOOLS"' in generator

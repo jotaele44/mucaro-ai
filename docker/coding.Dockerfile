@@ -11,7 +11,7 @@ RUN apt-get update \
 
 RUN python -m pip install --no-cache-dir ".[dev]" ruff mypy build \
     && mkdir -p /wheelhouse \
-    && python -m pip download --no-cache-dir "setuptools>=69" wheel -d /wheelhouse \
+    && python -m pip download --no-cache-dir "setuptools==84.1.0" wheel -d /wheelhouse \
     && rm -rf /opt/mucaro-build
 
 ENV PIP_NO_INDEX=1
