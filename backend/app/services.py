@@ -252,6 +252,7 @@ def answer_question(
         "source_ids": source_ids,
         "answer": model["answer"],
         "answer_streamed": bool(model.get("streamed")),
+        "model_usage": model.get("model_usage"),
         "confidence": score_confidence(cited_ids, source_ids, bool(retrieved)),
         "validation_flags": (["WARN_UNTRUSTED_INSTRUCTIONS_IN_SOURCES"] if source_signals else [])
         + (["WARN_MODEL_OUTPUT_CONTAINS_INSTRUCTIONS"] if output_scan["suspected"] else [])
