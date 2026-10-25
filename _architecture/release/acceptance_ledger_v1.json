@@ -2908,12 +2908,13 @@
         "backend/tests/test_phone_access.py::test_phone_launch_binds_all_interfaces_with_a_token_and_prints_the_links",
         "backend/tests/test_phone_access.py::test_native_phone_launch_keeps_the_token_out_of_the_log_and_offers_the_link_in_a_dialog",
         "qa/rendered/rendered_qa.mjs",
-        "docs/PHONE_ACCESS.md"
+        "docs/PHONE_ACCESS.md",
+        "_architecture/release/evidence/actions_runner_admission_resolved_20261013.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "PROVISIONAL, not PASS. The automated gates simulate a remote peer in-process (TestClient client=(ip, port)) and drive an emulated iPhone in Chromium against a real backend reached through a non-loopback address of the test machine. No physical iPhone or real network session has been observed. OPEN: signing in on a real iPhone, the on-screen keyboard and password field, resume after the phone locks, the macOS firewall prompt, a network that isolates clients, and WebKit (hosted runners are not executing jobs, BLK-ACTIONS-001). Not part of this requirement: an installable web app, a native client (SD-010) and serving from the packaged app, which stays loopback-only."
+      "notes": "PROVISIONAL, not PASS. The automated gates simulate a remote peer in-process (TestClient client=(ip, port)) and drive an emulated iPhone in Chromium against a real backend reached through a non-loopback address of the test machine. GitHub-hosted runner admission is resolved and hosted WebKit can execute; that does not substitute for physical-device evidence. No physical iPhone or real network session has been observed. OPEN: signing in on a real iPhone, the on-screen keyboard and password field, resume after the phone locks, the macOS firewall prompt, a network that isolates clients, and an on-device Safari/WebKit session. Not part of this requirement: an installable web app, a native client (SD-010) and serving from the packaged app, which stays loopback-only."
     }
   ]
 }
