@@ -15,6 +15,8 @@ from backend.app.model_router import ModelProviderError, generate_answer, model_
 from backend.app.model_routing_policy import ModelRoutingError, plan_model_route
 from backend.app.offline import build_offline_manifest
 from backend.app.services import answer_question
+from backend.app.terminal_projection import build_terminal_snapshot
+from backend.app.terminal_ui import render_terminal_snapshot
 from backend.app.work_runs import get_run, list_run_events, submit_message
 from backend.tests.test_api import make_settings
 
@@ -222,6 +224,10 @@ def test_run_streams_local_tokens_live(local_server, cfg):
     sent = _FakeOpenAI.requests[-1]
     assert sent["stream"] is True
     assert sent["stream_options"] == {"include_usage": True}
+    snapshot = build_terminal_snapshot(conversation_id=conversation, cfg=cfg)
+    assert snapshot["context_usage"] == usage
+    frame = render_terminal_snapshot(snapshot, width=120, height=32, mode="interactive")
+    assert "ctx 20/8192" in frame
     types = [event["type"] for event in events]
     assert types.index("text_delta") < types.index("citation") < types.index("final")
 
@@ -264,6 +270,10 @@ def test_streaming_usage_omission_stays_explicitly_unknown(local_server, cfg):
         assert metrics[key]["classification"] == "UNKNOWN"
     assert "WARN_INPUT_TOKENS_UNKNOWN" in usage["warnings"]
     assert "WARN_OUTPUT_TOKENS_UNKNOWN" in usage["warnings"]
+    snapshot = build_terminal_snapshot(conversation_id=conversation, cfg=cfg)
+    assert snapshot["context_usage"] == usage
+    frame = render_terminal_snapshot(snapshot, width=120, height=32, mode="interactive")
+    assert "ctx ?/8192" in frame
 
 
 # --- MATRIX-012 routing matrix -------------------------------------------------------------
