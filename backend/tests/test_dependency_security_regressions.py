@@ -77,3 +77,29 @@ def test_vite_7_3_6_security_regression_is_absent() -> None:
     assert "vite-7.3.6.tgz" not in package_lock
     assert '"vite": "7.3.7"' in package_json
     assert "vite-7.3.7.tgz" in package_lock
+
+
+def test_setuptools_security_fix_is_hash_pinned_in_governed_packaging_locks() -> None:
+    """GHSA-xmj3-9gf7-h52w: reject vulnerable setuptools and missing wheel/sdist hashes."""
+    expected = {
+        "23657205b63d4d31395ab917815247f694aafad28cd21316bf5fd45a51048ea0",
+        "5231689c6ac8156cd155cfb98c3fd6fb252c3e7e9bd3d78b64d3c55f132624c9",
+    }
+    locks = sorted(PACKAGING.rglob("*.lock"))
+    checked = []
+    for path in locks:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if "setuptools==" not in text:
+            continue
+        checked.append(path.relative_to(ROOT).as_posix())
+        assert "setuptools==84.0.0" not in text, str(path)
+        assert text.count("setuptools==84.1.0") == 1, str(path)
+        stanza = "\\n".join(text.split("setuptools==84.1.0", 1)[1].split("\\n", 4)[:3])
+        for digest in expected:
+            assert "--hash=sha256:" + digest in stanza, str(path)
+    assert len(checked) >= 5, checked
+    pins = (ROOT / "scripts" / "one_click_pins.env").read_text()
+    generator = (ROOT / "scripts" / "lock_python_deps.py").read_text()
+    assert "PY_SECURITY_SETUPTOOLS_VERSION=84.1.0" in pins
+    assert '"PY_SECURITY_SETUPTOOLS_VERSION"' in generator
+    assert '"PY_EXCLUDE_NEWER_SETUPTOOLS"' in generator
