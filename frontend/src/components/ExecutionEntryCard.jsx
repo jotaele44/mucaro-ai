@@ -157,9 +157,14 @@ export function ExecutionEntryCard({ context, locale = "en", onAction, onInspect
             <dt>Decision</dt><dd><code>{decision.decision_id}</code></dd>
             <dt>Mode</dt><dd>{decision.mode}</dd>
             <dt>Action</dt><dd>{decision.action}</dd>
-            <dt>Revision</dt><dd>{decision.revision}</dd>
+            <dt>Objective</dt><dd><code>{decision.objective_id}</code></dd>
+            <dt>{decision.mode === "GOAL" ? "Vector" : "Plan"}</dt>
+            <dd><code>{decision.mode === "GOAL" ? decision.vector_id : decision.plan_id}</code></dd>
+            <dt>Revision</dt><dd>{decision.mode === "GOAL" ? decision.vector_revision : decision.plan_revision}</dd>
             <dt>Actor</dt><dd>{decision.actor}</dd>
+            <dt>Policy</dt><dd><code>{decision.policy_version}</code></dd>
             <dt>Source</dt><dd><code>{decision.source_commit}</code></dd>
+            <dt>Artifact SHA-256</dt><dd><code>{decision.artifact_sha256}</code></dd>
             <dt>Receipt SHA-256</dt><dd><code>{decision.receipt_sha256}</code></dd>
             <dt>Run</dt><dd>{run?.run_id || decision.run_id || "Not dispatched"}</dd>
             <dt>Run state</dt><dd>{run?.state || decision.state}</dd>
