@@ -582,6 +582,7 @@ def dispatch_entry_decision(decision_id: str, cfg: Settings = settings) -> dict[
     if decision["state"] != "CLAIMED":
         return decision
     artifact = get_entry_artifact(decision["artifact_id"], decision["revision"], cfg)
+    _assert_runtime_source(artifact["source_commit"], cfg)
     try:
         result = submit_message(
             artifact["conversation_id"],
@@ -669,6 +670,7 @@ def resume_interrupted_entry_decision(
 ) -> dict[str, Any]:
     decision = get_entry_decision(decision_id, cfg)
     artifact = get_entry_artifact(decision["artifact_id"], decision["revision"], cfg)
+    _assert_runtime_source(artifact["source_commit"], cfg)
     if actor not in artifact.get("authorized_actors", []):
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_UNAUTHORIZED_ACTOR", actor)
     idempotency_key = (idempotency_key or "").strip()
