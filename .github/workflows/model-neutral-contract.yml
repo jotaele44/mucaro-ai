@@ -26,6 +26,8 @@ jobs:
         run: python -m unittest -v backend.tests.test_model_contract_router_integration
       - name: Execute Auto Mode scheduler tests
         run: python -m unittest -v backend.tests.test_auto_mode_scheduler
+      - name: Execute offline Auto Mode checkpoint tests
+        run: python -m unittest -v backend.tests.test_auto_mode_checkpoint
       - name: Execute local transport security test
         run: python -m unittest -v backend.tests.test_model_local_redirect_security
       - name: Print exact tested revision
