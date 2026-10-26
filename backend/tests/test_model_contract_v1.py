@@ -27,6 +27,34 @@ class TestContract(unittest.TestCase):
         with self.assertRaisesRegex(ContractError, "INVALID_MESSAGES"): validate_request(req(messages=()), CAP)
     def test_invalid_locality(self):
         with self.assertRaisesRegex(ContractError, "INVALID_LOCALITY"): validate_request(req(locality="lan"), CAP)
+    def test_none_model_fails_closed(self):
+        with self.assertRaisesRegex(ContractError, "MODEL_IDENTITY_REQUIRED"):
+            validate_request(req(model=None), CAP)
+
+    def test_non_string_content_fails_closed(self):
+        with self.assertRaisesRegex(ContractError, "INVALID_MESSAGES"):
+            validate_request(req(messages=(("user", None),)), CAP)
+
+    def test_malformed_message_shape_fails_closed(self):
+        with self.assertRaisesRegex(ContractError, "INVALID_MESSAGES"):
+            validate_request(req(messages=(("user",),)), CAP)
+
+    def test_string_budget_fails_closed(self):
+        with self.assertRaisesRegex(ContractError, "INVALID_TOKEN_BUDGET"):
+            validate_request(req(max_output_tokens="512"), CAP)
+
+    def test_boolean_budget_fails_closed(self):
+        with self.assertRaisesRegex(ContractError, "INVALID_TOKEN_BUDGET"):
+            validate_request(req(max_output_tokens=True), CAP)
+
+    def test_string_remote_opt_in_fails_closed(self):
+        with self.assertRaisesRegex(ContractError, "INVALID_FLAGS"):
+            validate_request(req(locality="remote", allow_remote="true"), CAP)
+
+    def test_string_capability_fails_closed(self):
+        with self.assertRaisesRegex(ContractError, "INVALID_CAPABILITIES"):
+            validate_request(req(), ModelCapabilities(streaming="true"))
+
     def test_capability_pass(self): self.assertTrue(validate_request(req(tools_requested=True,stream_requested=True,structured_requested=True), CAP).tools_requested)
 
 if __name__ == "__main__": unittest.main()
