@@ -137,7 +137,8 @@ def test_p01_goal_ready_proceed_dispatches_exact_revision(cfg, conversation):
 # P02
 def test_p02_goal_adjust_creates_revision_without_execution(cfg, conversation):
     original = _artifact(cfg, conversation)
-    second = _artifact(cfg, conversation)
+    other_conversation = create_conversation("execution entry other", cfg)["conversation_id"]
+    second = _artifact(cfg, other_conversation)
     assert second["artifact_id"] != original["artifact_id"]
     decision = _decide(cfg, original, "Adjust", "p02-adjust", changes={"prompt": "Adjusted objective."})
     revised = get_entry_artifact(original["artifact_id"], 2, cfg)
@@ -204,6 +205,9 @@ def test_p07_completed_stage_keeps_verifiable_artifact_and_decision_receipts(cfg
     assert get_run(decision["run_id"], cfg)["state"] == "COMPLETED"
     assert len(get_entry_artifact(ready["artifact_id"], 1, cfg)["artifact_sha256"]) == 64
     assert len(get_entry_decision(decision["decision_id"], cfg)["receipt_sha256"]) == 64
+    next_entry = _artifact(cfg, conversation, mode="PLAN", prompt="Prepare the next governed plan.")
+    assert next_entry["mode"] == "PLAN"
+    assert next_entry["state"] == "PLAN_CANDIDATE"
 
 
 # P08
@@ -226,6 +230,9 @@ def test_p08_localized_labels_preserve_action_semantics():
 # N01
 def test_n01_stale_vector_revision_is_rejected(cfg, conversation):
     original = _artifact(cfg, conversation)
+    with pytest.raises(ExecutionEntryError) as duplicate_exc:
+        _artifact(cfg, conversation)
+    assert duplicate_exc.value.status == "ERROR_EXECUTION_ENTRY_EXISTING_ARTIFACT"
     _decide(cfg, original, "Adjust", "n01-adjust", changes={"prompt": "next"})
     with pytest.raises(ExecutionEntryError) as approval_exc:
         transition_entry_artifact(
