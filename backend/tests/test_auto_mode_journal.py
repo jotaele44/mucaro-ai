@@ -50,6 +50,27 @@ class TestAutoModeJournal(unittest.TestCase):
         append_transition(self.path, "job", "ROLLED_BACK")
         self.assertEqual(replay(self.path, "job").history[-2:], ("FAILED", "ROLLED_BACK"))
 
+    def test_concurrent_writers_do_not_lose_records(self):
+        from concurrent.futures import ThreadPoolExecutor
+        append_transition(self.path, "job", "AUTHORIZED", token="permit")
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            outcomes = list(pool.map(
+                lambda _: append_transition(self.path, "job", "AUTHORIZED", token="permit"),
+                range(40),
+            ))
+        self.assertEqual(len(outcomes), 40)
+        self.assertEqual(replay(self.path, "job").state, "AUTHORIZED")
+        self.assertEqual(len(self.path.read_bytes().splitlines()), 1)
+
+    def test_symlink_lockfile_denied(self):
+        lock = Path(str(self.path) + ".lock")
+        target = Path(self.tmp.name) / "protected"
+        target.write_text("untouched")
+        lock.symlink_to(target)
+        with self.assertRaisesRegex(AutoModeError, "INVALID_JOURNAL_PATH"):
+            append_transition(self.path, "job", "AUTHORIZED", token="permit")
+        self.assertEqual(target.read_text(), "untouched")
+
     def test_symlink_denied(self):
         target = Path(self.tmp.name) / "target"
         target.write_text("protected")
