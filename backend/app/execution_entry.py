@@ -482,7 +482,6 @@ def _decision_request(
         "mode": artifact["mode"],
         **_decision_binding_fields(artifact, expected_version),
         "action": action,
-        "expected_version": expected_version,
         "actor": actor,
         "idempotency_key": idempotency_key,
         "source_commit": source_commit,
