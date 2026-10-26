@@ -34,6 +34,30 @@ class TestAutoModeScheduler(unittest.TestCase):
     def test_unknown_approval_denied(self):
         with self.assertRaisesRegex(AutoModeError, "UNKNOWN_AUTHORIZATION"):
             schedule((Vector("a"),), {}, frozenset({"missing"}))
+    def test_non_string_id_denied(self):
+        with self.assertRaisesRegex(AutoModeError, "INVALID_VECTOR_SCHEMA"):
+            schedule((Vector(None),), {})
+
+    def test_malformed_dependency_denied(self):
+        with self.assertRaisesRegex(AutoModeError, "INVALID_VECTOR_SCHEMA"):
+            schedule((Vector("a", dependencies=[1]),), {})
+
+    def test_invalid_authorization_type_denied(self):
+        with self.assertRaisesRegex(AutoModeError, "UNKNOWN_AUTHORIZATION"):
+            schedule((Vector("a"),), {}, {"a"})
+
+    def test_non_boolean_approval_flag_denied(self):
+        with self.assertRaisesRegex(AutoModeError, "INVALID_VECTOR_SCHEMA"):
+            schedule((Vector("a", requires_authorization="false"),), {})
+
+    def test_non_mapping_states_denied(self):
+        with self.assertRaisesRegex(AutoModeError, "INVALID_STATE"):
+            schedule((Vector("a"),), None)
+
+    def test_non_string_isolation_key_denied(self):
+        with self.assertRaisesRegex(AutoModeError, "INVALID_VECTOR_SCHEMA"):
+            schedule((Vector("a", isolation_key=42),), {})
+
     def test_terminal_only_on_full_pass(self):
         v = (Vector("a"), Vector("b", ("a",)))
         self.assertFalse(schedule(v, {"a":"PASS"}).terminal)
