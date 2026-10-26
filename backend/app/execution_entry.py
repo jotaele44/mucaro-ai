@@ -232,10 +232,16 @@ def current_conversation_entry_context(conversation_id: str, cfg: Settings = set
             (entry["artifact_id"], entry["revision"]),
         ).fetchone()
     decision = None
+    run = None
     if row is not None:
         decision = _row_payload(row)
         _verify_hash(decision, "receipt_sha256", "ERROR_EXECUTION_ENTRY_RECEIPT_CORRUPT")
-    return {"status": "EXECUTION_ENTRY_OK", "entry": entry, "decision": decision}
+        if decision.get("run_id"):
+            try:
+                run = get_run(str(decision["run_id"]), cfg)
+            except RunError:
+                run = None
+    return {"status": "EXECUTION_ENTRY_OK", "entry": entry, "decision": decision, "run": run}
 
 
 def transition_entry_artifact(
