@@ -426,6 +426,7 @@ def _create_revision_locked(
     *,
     actor: str,
     changes: dict[str, Any],
+    cfg: Settings,
 ) -> dict[str, Any]:
     latest = conn.execute(
         "SELECT revision FROM execution_entry_artifacts WHERE artifact_id = ? ORDER BY revision DESC LIMIT 1",
@@ -439,6 +440,7 @@ def _create_revision_locked(
         if key in changes:
             next_payload[key] = changes[key]
     next_payload["source_commit"] = _require_source_commit(next_payload["source_commit"])
+    _assert_runtime_source(next_payload["source_commit"], cfg)
     if next_payload["runtime_mode"] not in {"plan", "ask", "auto"}:
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_RUNTIME_MODE", str(next_payload["runtime_mode"]))
     next_payload["required_gates"] = _validate_gates(next_payload["required_gates"])
@@ -545,7 +547,13 @@ def decide_entry(
         decision_id = stable_id("entrydec", artifact_id, str(revision), action, idempotency_key, length=18)
         now = utc_now()
         if action in {"Adjust", "Revise"}:
-            revised = _create_revision_locked(conn, artifact, actor=actor, changes=dict(changes or {}))
+            revised = _create_revision_locked(
+                conn,
+                artifact,
+                actor=actor,
+                changes=dict(changes or {}),
+                cfg=cfg,
+            )
             decision = {
                 "schema_version": ENTRY_SCHEMA_VERSION,
                 "decision_id": decision_id,
@@ -767,7 +775,7 @@ def resume_interrupted_entry_decision(
                 "resume_of_run_id": run_id,
             },
         },
-        idempotency_key=f"entry-resume:{decision_id}:{idempotency_key}",
+        idempotency_key=f"entry-resume:{decision_id}:{run_id}",
         require_idle=True,
         cfg=cfg,
     )
@@ -782,6 +790,16 @@ def resume_interrupted_entry_decision(
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_DECISION_NOT_FOUND", decision_id)
         current = _row_payload(row)
         _verify_hash(current, "receipt_sha256", "ERROR_EXECUTION_ENTRY_RECEIPT_CORRUPT")
+        current_run_id = str(current.get("run_id") or "")
+        if current_run_id != run_id:
+            if current_run_id == next_run["run_id"]:
+                conn.execute("COMMIT")
+                current["run"] = next_run
+                return current
+            raise ExecutionEntryError(
+                "ERROR_EXECUTION_ENTRY_RESUME_CONFLICT",
+                f"expected interrupted run {run_id}; decision now points to {current_run_id or 'none'}",
+            )
         prior = list(current.get("prior_run_ids") or [])
         if run_id not in prior:
             prior.append(run_id)
