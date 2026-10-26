@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import subprocess
 from typing import Any
 
 from .config import Settings, settings
@@ -56,6 +58,37 @@ def _require_source_commit(value: str) -> str:
     if not SOURCE_COMMIT_RE.fullmatch(value or ""):
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_SOURCE_COMMIT", "source_commit must be an exact 40-character Git SHA")
     return value
+
+
+def _runtime_source_commit(cfg: Settings) -> str:
+    configured = str(os.getenv("MUCARO_AI_SOURCE_COMMIT") or "").strip()
+    if configured:
+        return _require_source_commit(configured)
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(cfg.project_root), "rev-parse", "HEAD"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_SOURCE_IDENTITY_UNAVAILABLE", str(exc)) from exc
+    observed = proc.stdout.strip() if proc.returncode == 0 else ""
+    if not SOURCE_COMMIT_RE.fullmatch(observed):
+        raise ExecutionEntryError(
+            "ERROR_EXECUTION_ENTRY_SOURCE_IDENTITY_UNAVAILABLE",
+            "runtime has neither MUCARO_AI_SOURCE_COMMIT nor a readable Git HEAD",
+        )
+    return observed
+
+
+def _assert_runtime_source(expected: str, cfg: Settings) -> str:
+    observed = _runtime_source_commit(cfg)
+    if observed != expected:
+        raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_SOURCE_DRIFT", f"expected={expected} observed={observed}")
+    return observed
 
 
 def _require_mode(mode: str) -> str:
@@ -146,6 +179,7 @@ def create_entry_artifact(
         authorized.append(actor)
         authorized.sort()
     source_commit = _require_source_commit(source_commit)
+    _assert_runtime_source(source_commit, cfg)
     if runtime_mode not in {"plan", "ask", "auto"}:
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_RUNTIME_MODE", runtime_mode)
     gates = _validate_gates(required_gates)
@@ -265,6 +299,7 @@ def transition_entry_artifact(
         payload = _row_payload(row)
         _verify_hash(payload, "artifact_sha256", "ERROR_EXECUTION_ENTRY_ARTIFACT_CORRUPT")
         _validate_artifact_identity(payload)
+        _assert_runtime_source(payload["source_commit"], cfg)
         if actor not in payload.get("authorized_actors", []):
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_UNAUTHORIZED_ACTOR", actor)
         if payload["version"] != expected_version:
@@ -440,6 +475,7 @@ def decide_entry(
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_VERSION_CONFLICT", f"expected={expected_version} actual={artifact['version']}")
         if artifact["source_commit"] != source_commit:
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_SOURCE_DRIFT", f"expected={artifact['source_commit']} observed={source_commit}")
+        _assert_runtime_source(artifact["source_commit"], cfg)
         latest = conn.execute(
             "SELECT MAX(revision) AS revision FROM execution_entry_artifacts WHERE artifact_id = ?",
             (artifact_id,),
