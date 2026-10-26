@@ -19,7 +19,7 @@ An entry decision is not a blanket approval for downstream external mutations. E
 
 ## Data and invariants
 
-Each decision records immutable `decision_id`, `mode`, `action`, `objective_id`, `vector_id` and `vector_revision` for GOAL or `plan_id` and `plan_revision` for PLAN, `expected_version`, `actor`, `policy_version`, `idempotency_key`, `created_at`, and `source_commit`. Store exact artifact digests and authorization receipt references; do not mint identities from display names or titles.
+Each decision records immutable `decision_id`, `mode`, `action`, `objective_id`, `vector_id` and `vector_revision` for GOAL or `plan_id` and `plan_revision` for PLAN, `expected_version`, `actor`, `policy_version`, `idempotency_key`, `created_at`, and `source_commit`. Store exact artifact digests and authorization receipt references; do not mint identities from display names or titles. Every mandatory gate record carries `evidence_ref` plus `evidence_sha256`; the entry controller binds those references immutably and fails closed when either is absent or malformed. Whether the referenced evidence itself is authoritative remains the responsibility of the upstream gate producer/governance layer and must not be inferred from the reference alone.
 
 1. `Proceed` checks `VECTOR_READY`, exact vector revision, dependencies, scope, authorization, and no conflicting active execution. Atomically claim the vector and append entry receipt before any action; reject stale revision, duplicate conflicting key, missing source binding, and unauthorized scope.
 2. `Adjust` never executes. Create `VECTOR_CANDIDATE` from the current version; validate; require explicit re-authorization when scope, side effects, or policy changes. Prior revision and receipts remain append-only.
