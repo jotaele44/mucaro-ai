@@ -558,9 +558,9 @@ async function executionEntryScenario(browser, base, viewport, contextOptions, m
       options: { model_provider: "mock" },
       source_commit: head,
       required_gates: [
-        { gate_id: "scope", state: "PASS" },
-        { gate_id: "authorization", state: "PASS" },
-        { gate_id: "dependencies", state: "PASS" },
+        { gate_id: "scope", state: "PASS", evidence_ref: "qa://execution-entry/scope", evidence_sha256: "1".repeat(64) },
+        { gate_id: "authorization", state: "PASS", evidence_ref: "qa://execution-entry/authorization", evidence_sha256: "2".repeat(64) },
+        { gate_id: "dependencies", state: "PASS", evidence_ref: "qa://execution-entry/dependencies", evidence_sha256: "3".repeat(64) },
       ],
     }),
   );
