@@ -151,7 +151,7 @@ class EntryStore:
                 "dispatch_authorized": False,
             }
             conn.execute(
-                "INSERT INTO execution_entry_decisions VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO execution_entry_decisions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (receipt["decision_id"], request.idempotency_key, fingerprint,
                  request.mode, request.action, request.object_id, request.revision,
                  request.actor, request.source_commit, request.policy_version,
