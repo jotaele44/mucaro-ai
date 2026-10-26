@@ -537,6 +537,121 @@ async function scenario(browser, base, viewport, contextOptions) {
   return axeRuns;
 }
 
+async function executionEntryScenario(browser, base, viewport, contextOptions) {
+  const title = `Execution entry QA ${viewport}`;
+  const createdConversation = await fetch(`${base}/conversations`, jsonPost({ title }));
+  if (!createdConversation.ok) throw new Error(`entry conversation create failed: ${createdConversation.status}`);
+  const conversation = await createdConversation.json();
+  const createdEntry = await fetch(
+    `${base}/execution-entry/artifacts`,
+    jsonPost({
+      mode: "GOAL",
+      objective_id: `qa-goal-${viewport}`,
+      conversation_id: conversation.conversation_id,
+      prompt: "Execute the approved Goal/Plan entry browser proof.",
+      runtime_mode: "plan",
+      options: { model_provider: "mock" },
+      source_commit: head,
+      required_gates: [
+        { gate_id: "scope", state: "PASS" },
+        { gate_id: "authorization", state: "PASS" },
+        { gate_id: "dependencies", state: "PASS" },
+      ],
+      actor: "user",
+      authorized_actors: ["user"],
+    }),
+  );
+  if (!createdEntry.ok) throw new Error(`entry artifact create failed: ${createdEntry.status} ${await createdEntry.text()}`);
+  const entry = await createdEntry.json();
+
+  const context = await browser.newContext({ ...contextOptions, baseURL: base });
+  const page = await context.newPage();
+  const consoleErrors = [];
+  let decisionPosts = 0;
+  page.on("console", (msg) => msg.type() === "error" && consoleErrors.push(msg.text()));
+  page.on("pageerror", (err) => consoleErrors.push(String(err)));
+  page.on("request", (req) => {
+    const pathname = new URL(req.url()).pathname;
+    if (req.method() === "POST" && /\/execution-entry\/artifacts\/[^/]+\/\d+\/decisions$/.test(pathname)) {
+      decisionPosts += 1;
+    }
+  });
+
+  try {
+    await page.goto("/");
+    if (viewport !== "desktop") await page.getByRole("button", { name: "Open navigation" }).click();
+    await page.getByRole("list", { name: "Conversations" }).getByRole("button", { name: new RegExp(title) }).click();
+    const card = page.locator(".execution-entry-card");
+    await card.getByRole("heading", { name: `qa-goal-${viewport}` }).waitFor();
+
+    const primary = card.getByRole("button", { name: "Proceed" });
+    const secondary = card.getByRole("button", { name: "Adjust" });
+    check("entry candidate renders exactly two pre-execution actions", viewport, (await card.getByRole("button").count()) === 2 && await secondary.isEnabled());
+    check("N19 not-ready primary action is natively disabled", viewport, await primary.isDisabled());
+    await primary.evaluate((node) => node.focus());
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(250);
+    check("N19 keyboard activation of a disabled primary sends no decision", viewport, decisionPosts === 0, `decision POSTs=${decisionPosts}`);
+
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "language", { value: "es-PR", configurable: true });
+      window.dispatchEvent(new Event("languagechange"));
+    });
+    await card.getByRole("button", { name: "Ajustar" }).waitFor();
+    check(
+      "N20 locale switch changes labels without execution",
+      viewport,
+      (await card.getByRole("button", { name: "Proceder" }).count()) === 1 && decisionPosts === 0,
+      `decision POSTs=${decisionPosts}`,
+    );
+
+    const focusOrder = await card.getByRole("button").evaluateAll((buttons) =>
+      buttons.map((button) => ({ name: button.textContent.trim(), disabled: button.disabled, height: Math.round(button.getBoundingClientRect().height) })),
+    );
+    check("entry controls expose native button semantics and usable targets", viewport, focusOrder.every((row) => row.height >= 36), JSON.stringify(focusOrder));
+    await shot(page, viewport, "execution-entry-candidate");
+    const entryAxe = await axe(page, viewport, "execution entry candidate");
+
+    const approved = await fetch(
+      `${base}/execution-entry/artifacts/${entry.artifact_id}/1/state`,
+      jsonPost({ expected_version: 1, target_state: "VECTOR_READY", actor: "user" }),
+    );
+    if (!approved.ok) throw new Error(`entry approval failed: ${approved.status} ${await approved.text()}`);
+
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "language", { value: "es-PR", configurable: true });
+    });
+    await page.reload();
+    const approvedCard = page.locator(".execution-entry-card");
+    const proceed = approvedCard.getByRole("button", { name: "Proceder" });
+    await proceed.waitFor();
+    check("approved Goal renders enabled localized primary action", viewport, await proceed.isEnabled());
+
+    await proceed.evaluate((node) => {
+      node.click();
+      node.click();
+    });
+    await approvedCard.getByRole("button", { name: "Inspect" }).waitFor({ timeout: 10000 });
+    check("N15 rapid double activation creates exactly one decision request", viewport, decisionPosts === 1, `decision POSTs=${decisionPosts}`);
+    check("entry actions are replaced after execution starts", viewport, (await approvedCard.getByRole("button", { name: "Proceder" }).count()) === 0);
+    await shot(page, viewport, "execution-entry-dispatched");
+
+    const overflow = await page.evaluate(() => {
+      const cardNode = document.querySelector(".execution-entry-card");
+      const box = cardNode?.getBoundingClientRect();
+      return {
+        page: document.documentElement.scrollWidth > window.innerWidth + 1,
+        card: !box || box.left < -1 || box.right > window.innerWidth + 1,
+      };
+    });
+    check("execution-entry card has no horizontal overflow", viewport, !overflow.page && !overflow.card, JSON.stringify(overflow));
+    check("execution-entry scenario has no console errors", viewport, consoleErrors.length === 0, consoleErrors.join(" | "));
+    return [entryAxe];
+  } finally {
+    await context.close();
+  }
+}
+
 async function offlineScenario(browser, base, viewport, contextOptions, stopBackend) {
   const context = await browser.newContext({ ...contextOptions, baseURL: base });
   const page = await context.newPage();
@@ -1436,6 +1551,10 @@ try {
     axeResults.push(...(await scenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } })));
     const iphone = devices["iPhone 13"];
     axeResults.push(...(await scenario(browser, base, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
+    axeResults.push(...(await executionEntryScenario(browser, base, "entry-desktop", { viewport: { width: 1440, height: 900 } })));
+    const entryPhone = devices["iPhone 13"];
+    axeResults.push(...(await executionEntryScenario(browser, base, "entry-393", { ...entryPhone, viewport: { width: 393, height: 852 } })));
+    axeResults.push(...(await executionEntryScenario(browser, base, "entry-430", { ...entryPhone, viewport: { width: 430, height: 932 } })));
     await launchTokenScenario(browser, "desktop");
     const headers = (await fetch(`${base}/`)).headers;
     check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
@@ -1472,7 +1591,12 @@ const receipt = {
   dirty_paths: dirtyPaths,
   created_utc: new Date().toISOString(),
   browser: `${browserName} ${browserVersion}`,
-  viewports: { desktop: "1440x900", iphone: "390x844 (iPhone 13 profile, touch, DPR 3)" },
+  viewports: {
+    desktop: "1440x900",
+    iphone: "390x844 (iPhone 13 profile, touch, DPR 3)",
+    entry_393: "393x852 touch profile",
+    entry_430: "430x932 touch profile",
+  },
   checks,
   passed: checks.filter((row) => row.pass).length,
   failed: checks.filter((row) => !row.pass).length,
