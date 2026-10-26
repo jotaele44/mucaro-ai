@@ -26,7 +26,7 @@ from .db import init_db, list_payloads, upsert_payload
 from .execution_entry import (
     ExecutionEntryError,
     create_entry_artifact,
-    current_conversation_entry,
+    current_conversation_entry_context,
     decide_entry,
     get_entry_artifact,
     entry_labels,
@@ -336,7 +336,10 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     def conversation_execution_entry(conversation_id: str) -> dict:
         if get_conversation(conversation_id, cfg) is None:
             raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
-        return {"status": "EXECUTION_ENTRY_OK", "entry": current_conversation_entry(conversation_id, cfg)}
+        try:
+            return current_conversation_entry_context(conversation_id, cfg)
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
 
     @app.post("/execution-entry/artifacts/{artifact_id}/{revision}/state")
     def approve_execution_entry(
