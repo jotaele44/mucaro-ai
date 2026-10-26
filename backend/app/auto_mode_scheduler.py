@@ -22,6 +22,24 @@ class Plan:
 
 def schedule(vectors: tuple[Vector, ...], states: Mapping[str, str], authorized: frozenset[str] = frozenset()) -> Plan:
     """Compute one deterministic wave. Unknown or failed dependencies never run."""
+    if not isinstance(vectors, tuple) or any(
+        not isinstance(v, Vector)
+        or not isinstance(v.id, str)
+        or not isinstance(v.dependencies, tuple)
+        or any(not isinstance(d, str) or not d.strip() for d in v.dependencies)
+        or not isinstance(v.isolation_key, str)
+        or type(v.requires_authorization) is not bool
+        for v in vectors
+    ):
+        raise AutoModeError("INVALID_VECTOR_SCHEMA")
+    if not isinstance(states, Mapping) or any(
+        not isinstance(k, str) or not isinstance(v, str) for k, v in states.items()
+    ):
+        raise AutoModeError("INVALID_STATE")
+    if not isinstance(authorized, frozenset) or any(
+        not isinstance(item, str) for item in authorized
+    ):
+        raise AutoModeError("UNKNOWN_AUTHORIZATION")
     by_id = {v.id: v for v in vectors}
     if len(by_id) != len(vectors) or any(not v.id.strip() for v in vectors):
         raise AutoModeError("DUPLICATE_OR_EMPTY_VECTOR")
