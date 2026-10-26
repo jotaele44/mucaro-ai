@@ -92,7 +92,7 @@ _SCHEMA_SQL = """
                 PRIMARY KEY (artifact_id, revision)
             );
             CREATE INDEX IF NOT EXISTS execution_entry_artifacts_conversation
-                ON execution_entry_artifacts(conversation_id, rowid);
+                ON execution_entry_artifacts(conversation_id, revision);
             CREATE TABLE IF NOT EXISTS execution_entry_decisions (
                 decision_id TEXT PRIMARY KEY,
                 artifact_id TEXT NOT NULL,
