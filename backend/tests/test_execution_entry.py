@@ -142,6 +142,7 @@ def test_p01_goal_ready_proceed_dispatches_exact_revision(cfg, conversation):
     ready = _ready(cfg, _artifact(cfg, conversation))
     decision = _decide(cfg, ready, "Proceed", "p01-proceed")
     assert decision["state"] == "DISPATCHED"
+    assert decision["artifact_sha256"] == ready["artifact_sha256"]
     run = get_run(decision["run_id"], cfg)
     assert run["options"]["execution_entry"]["revision"] == 1
     assert run["options"]["execution_entry"]["artifact_id"] == ready["artifact_id"]
@@ -209,6 +210,7 @@ def test_p06_interrupted_run_resume_preserves_entry_revision(cfg, conversation, 
     assert replayed["run_id"] == resumed["run_id"]
     assert resumed["prior_run_ids"] == [old_run["run_id"]]
     assert new_run["options"]["execution_entry"]["revision"] == 1
+    assert new_run["options"]["execution_entry"]["artifact_sha256"] == ready["artifact_sha256"]
     assert new_run["options"]["execution_entry"]["resume_of_run_id"] == old_run["run_id"]
 
     # A separate interrupted decision must remain exactly-once even when two
@@ -251,8 +253,11 @@ def test_p07_completed_stage_keeps_verifiable_artifact_and_decision_receipts(cfg
     ready = _ready(cfg, _artifact(cfg, conversation))
     decision = _decide(cfg, ready, "Proceed", "p07-receipts")
     assert get_run(decision["run_id"], cfg)["state"] == "COMPLETED"
-    assert len(get_entry_artifact(ready["artifact_id"], 1, cfg)["artifact_sha256"]) == 64
-    assert len(get_entry_decision(decision["decision_id"], cfg)["receipt_sha256"]) == 64
+    artifact_receipt = get_entry_artifact(ready["artifact_id"], 1, cfg)
+    decision_receipt = get_entry_decision(decision["decision_id"], cfg)
+    assert len(artifact_receipt["artifact_sha256"]) == 64
+    assert decision_receipt["artifact_sha256"] == artifact_receipt["artifact_sha256"]
+    assert len(decision_receipt["receipt_sha256"]) == 64
     next_entry = _artifact(cfg, conversation, mode="PLAN", prompt="Prepare the next governed plan.")
     assert next_entry["mode"] == "PLAN"
     assert next_entry["state"] == "PLAN_CANDIDATE"
