@@ -131,6 +131,44 @@ def _tx(cfg: Settings):
     return conn
 
 
+def _assert_conversation_accepts_new_artifact_locked(conn: Any, conversation_id: str) -> None:
+    row = conn.execute(
+        "SELECT artifact_id, revision, payload_json FROM execution_entry_artifacts "
+        "WHERE conversation_id = ? ORDER BY rowid DESC LIMIT 1",
+        (conversation_id,),
+    ).fetchone()
+    if row is None:
+        return
+    artifact = _row_payload(row)
+    _verify_hash(artifact, "artifact_sha256", "ERROR_EXECUTION_ENTRY_ARTIFACT_CORRUPT")
+    _validate_artifact_identity(artifact)
+    decision_row = conn.execute(
+        "SELECT payload_json FROM execution_entry_decisions WHERE artifact_id = ? AND revision = ? "
+        "ORDER BY rowid DESC LIMIT 1",
+        (artifact["artifact_id"], artifact["revision"]),
+    ).fetchone()
+    if decision_row is None:
+        raise ExecutionEntryError(
+            "ERROR_EXECUTION_ENTRY_EXISTING_ARTIFACT",
+            f"{artifact['artifact_id']} revision {artifact['revision']} is still unresolved",
+        )
+    decision = _row_payload(decision_row)
+    _verify_hash(decision, "receipt_sha256", "ERROR_EXECUTION_ENTRY_RECEIPT_CORRUPT")
+    run_id = str(decision.get("run_id") or "")
+    if decision.get("state") != "DISPATCHED" or not run_id:
+        raise ExecutionEntryError(
+            "ERROR_EXECUTION_ENTRY_EXISTING_ARTIFACT",
+            f"{artifact['artifact_id']} revision {artifact['revision']} has decision state {decision.get('state')}",
+        )
+    run_row = conn.execute("SELECT state FROM work_runs WHERE run_id = ?", (run_id,)).fetchone()
+    if run_row is None or str(run_row["state"]) not in {"COMPLETED", "FAILED", "CANCELLED"}:
+        state = "MISSING" if run_row is None else str(run_row["state"])
+        raise ExecutionEntryError(
+            "ERROR_EXECUTION_ENTRY_EXISTING_ARTIFACT",
+            f"{artifact['artifact_id']} revision {artifact['revision']} run {run_id} is {state}",
+        )
+
+
 def _row_payload(row: Any) -> dict[str, Any]:
     return json.loads(row["payload_json"])
 
@@ -198,12 +236,20 @@ def create_entry_artifact(
         "created_at": now,
     }
     payload["artifact_sha256"] = _canonical_hash(payload)
-    with get_connection(cfg.sqlite_path) as conn:
+    conn = _tx(cfg)
+    try:
+        _assert_conversation_accepts_new_artifact_locked(conn, conversation_id)
         conn.execute(
             "INSERT INTO execution_entry_artifacts (artifact_id, revision, mode, state, conversation_id, source_commit, payload_json) "
             "VALUES (?, 1, ?, ?, ?, ?, ?)",
             (artifact_id, mode, payload["state"], conversation_id, source_commit, json.dumps(payload, ensure_ascii=False, sort_keys=True)),
         )
+        conn.execute("COMMIT")
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.close()
     return payload
 
 
