@@ -44,3 +44,14 @@ source_items = classified_items + unresolved_items. Mandatory runtime requiremen
 6. Promote reusable skill/agent only from passing tests and observed behavior.
 
 No release promotion until IND-01 through IND-12 pass within explicit scope.
+
+
+## October 26, 2026 — live integration gate (AUDIT_ONLY)
+- Reacquired `main` head: `8e66f535f6ea7bb0a7f710678a5d764467717a1f`.
+- PR #241 head before this audit: `ad27db17096b4797ce545b445e53c26f1fe0680b`.
+- Compare current main -> PR head: DIVERGED; PR 8 commits ahead and 130 behind, source compare includes six PR paths.
+- Historical CI lookup for `ad27db17096b4797ce545b445e53c26f1fe0680b` returned zero runs, NOT a PASS or a proof that CI is disabled.
+- Existing canonical execution areas include `backend/app/work_runs.py`, `backend/app/execution_gate.py`, `backend/app/model_router.py`, `backend/app/offline.py`, and `backend/app/db.py`.
+- STOP-GATE: no rebasing, cherry-picking, API binding, GUI work, merge or promotion until source differences and canonical ownership are resolved against frozen current `main` and independently tested.
+- Do not project historical CI, old release receipts or branch source tests onto exact binary certification.
+- PR remains draft, documentation-and-prototype only; native packaging, mobile validation, rollback and production certification remain OPEN/BLOCKED.
