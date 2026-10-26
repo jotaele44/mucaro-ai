@@ -316,7 +316,6 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
     const result = await api.decideExecutionEntry(entry.artifact_id, entry.revision, {
       action,
       expected_version: entry.version,
-      actor: "user",
       idempotency_key: idempotencyKey,
       source_commit: entry.source_commit,
       changes,
@@ -328,7 +327,6 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
 
   async function resumeExecutionEntry(decision) {
     await api.resumeExecutionEntry(decision.decision_id, {
-      actor: "user",
       idempotency_key: `resume-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     });
     announce("Execution resumed on the same approved revision.");
