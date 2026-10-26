@@ -221,6 +221,23 @@ def current_conversation_entry(conversation_id: str, cfg: Settings = settings) -
     return payload
 
 
+def current_conversation_entry_context(conversation_id: str, cfg: Settings = settings) -> dict[str, Any]:
+    entry = current_conversation_entry(conversation_id, cfg)
+    if entry is None:
+        return {"status": "EXECUTION_ENTRY_NONE", "entry": None, "decision": None}
+    with get_connection(cfg.sqlite_path) as conn:
+        row = conn.execute(
+            "SELECT payload_json FROM execution_entry_decisions "
+            "WHERE artifact_id = ? AND revision = ? ORDER BY rowid DESC LIMIT 1",
+            (entry["artifact_id"], entry["revision"]),
+        ).fetchone()
+    decision = None
+    if row is not None:
+        decision = _row_payload(row)
+        _verify_hash(decision, "receipt_sha256", "ERROR_EXECUTION_ENTRY_RECEIPT_CORRUPT")
+    return {"status": "EXECUTION_ENTRY_OK", "entry": entry, "decision": decision}
+
+
 def transition_entry_artifact(
     artifact_id: str,
     revision: int,
