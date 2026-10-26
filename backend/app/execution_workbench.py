@@ -22,6 +22,7 @@ class ExecutionPlan:
     lanes: tuple[str, ...]
     model_lanes: tuple[str, ...]
     blocked_lanes: tuple[str, ...]
+    lane_status: tuple[tuple[str, str], ...] = ()
     state: str = "PLAN_ONLY"
     certification: str = "BLOCKED"
 
@@ -34,7 +35,7 @@ def create_plan(profile: str, network: str, hardware: str, platforms: list[str])
     # Model-dependent lanes are designated for capability planning only;
     # actual test IDs must be reconciled with the authoritative T00-T19 catalog.
     model_lanes: tuple[str, ...] = ()
-    return ExecutionPlan(profile, network, hardware, tuple(sorted(platforms)), lanes, model_lanes, (), "PLAN_ONLY", "BLOCKED")
+    return ExecutionPlan(profile, network, hardware, tuple(sorted(platforms)), lanes, model_lanes, (), tuple((lane, "UNATTEMPTED") for lane in lanes), "PLAN_ONLY", "BLOCKED")
 
 def plan_json(plan: ExecutionPlan) -> str:
     return json.dumps(asdict(plan), sort_keys=True, indent=2) + "\n"
