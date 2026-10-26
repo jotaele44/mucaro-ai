@@ -1,0 +1,26 @@
+name: Offline foundation gates
+on:
+  push:
+    branches:
+      - dev/model-neutral-foundation-20261025
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Identify exact source revision
+        run: git rev-parse HEAD
+      - name: Compile contract, router and regression modules
+        run: python3 -m py_compile backend/app/model_contract_v1.py backend/app/model_router.py backend/tests/test_model_contract_v1.py backend/tests/test_model_contract_router_integration.py backend/tests/test_model_local_redirect_security.py
+      - name: Execute dependency-free contract regression suite
+        run: python3 -m unittest -v backend.tests.test_model_contract_v1
+      - name: Verify immutable baseline is in ancestry
+        run: git merge-base --is-ancestor 7cb23cbba879e7aa6f99f9ce52ada4ad1b29001f HEAD
+      - name: Report test scope
+        run: echo "PASS here covers only offline contract and syntax gates; native integration, real-model and release certification remain OPEN."
