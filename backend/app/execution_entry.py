@@ -128,7 +128,8 @@ def _validate_gates(required_gates: list[dict[str, Any]]) -> list[dict[str, str]
     return normalized
 
 
-def _assert_all_gates_pass(gates: list[dict[str, str]]) -> None:
+def _assert_all_gates_pass(gates: list[dict[str, Any]]) -> None:
+    gates = _validate_gates(gates)
     blocked = [row for row in gates if row["state"] not in PASS_STATES]
     if blocked:
         raise ExecutionEntryError(
