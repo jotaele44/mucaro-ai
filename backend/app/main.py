@@ -29,7 +29,9 @@ from .execution_entry import (
     current_conversation_entry,
     decide_entry,
     get_entry_artifact,
+    entry_labels,
     get_entry_decision,
+    resume_interrupted_entry_decision,
     resume_pending_entry_decisions,
     transition_entry_artifact,
 )
@@ -55,6 +57,7 @@ from .models import (
     DirectoryPermissionRequest,
     ExecutionEntryCreateRequest,
     ExecutionEntryDecisionRequest,
+    ExecutionEntryResumeRequest,
     ExecutionEntryStateRequest,
     IngestPathRequest,
     InteractionCreateRequest,
@@ -315,6 +318,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 source_commit=req.source_commit,
                 required_gates=[row.model_dump() for row in req.required_gates],
                 actor=req.actor,
+                authorized_actors=req.authorized_actors,
                 policy_version=req.policy_version,
                 cfg=cfg,
             )
@@ -381,6 +385,31 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     def execution_entry_decision_detail(decision_id: str) -> dict:
         try:
             return get_entry_decision(decision_id, cfg)
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
+
+    @app.post("/execution-entry/decisions/{decision_id}/resume")
+    def resume_execution_entry_decision(
+        decision_id: str,
+        req: ExecutionEntryResumeRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return resume_interrupted_entry_decision(
+                decision_id,
+                actor=req.actor,
+                idempotency_key=req.idempotency_key,
+                cfg=cfg,
+            )
+        except (ExecutionEntryError, RunError) as exc:
+            if isinstance(exc, ExecutionEntryError):
+                raise execution_entry_error(exc) from exc
+            raise run_error(exc) from exc
+
+    @app.get("/execution-entry/labels")
+    def execution_entry_labels(locale: str = "en", mode: str = "GOAL") -> dict:
+        try:
+            return entry_labels(locale, mode)
         except ExecutionEntryError as exc:
             raise execution_entry_error(exc) from exc
 
