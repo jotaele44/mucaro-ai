@@ -256,6 +256,9 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         conflict = exc.status in {"ERROR_RUN_VERSION_CONFLICT", "ERROR_RUN_NOT_QUEUED", "ERROR_RUN_ALREADY_FINISHED"}
         return api_error(exc.status, exc.detail, status_code=404 if not_found else 409 if conflict else 400)
 
+    def execution_entry_actor(auth: dict) -> str:
+        return "operator" if auth.get("status") == "AUTH_OK" else "local_operator"
+
     def execution_entry_error(exc: ExecutionEntryError) -> HTTPException:
         not_found = exc.status in {"ERROR_EXECUTION_ENTRY_NOT_FOUND", "ERROR_EXECUTION_ENTRY_DECISION_NOT_FOUND"}
         conflict = exc.status in {
@@ -317,8 +320,8 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 options=req.options,
                 source_commit=req.source_commit,
                 required_gates=[row.model_dump() for row in req.required_gates],
-                actor=req.actor,
-                authorized_actors=req.authorized_actors,
+                actor=execution_entry_actor(_auth),
+                authorized_actors=[execution_entry_actor(_auth)],
                 policy_version=req.policy_version,
                 cfg=cfg,
             )
@@ -354,7 +357,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 revision,
                 expected_version=req.expected_version,
                 target_state=req.target_state,
-                actor=req.actor,
+                actor=execution_entry_actor(_auth),
                 cfg=cfg,
             )
         except ExecutionEntryError as exc:
@@ -373,7 +376,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 revision,
                 action=req.action,
                 expected_version=req.expected_version,
-                actor=req.actor,
+                actor=execution_entry_actor(_auth),
                 idempotency_key=req.idempotency_key,
                 source_commit=req.source_commit,
                 changes=req.changes,
@@ -400,7 +403,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         try:
             return resume_interrupted_entry_decision(
                 decision_id,
-                actor=req.actor,
+                actor=execution_entry_actor(_auth),
                 idempotency_key=req.idempotency_key,
                 cfg=cfg,
             )
