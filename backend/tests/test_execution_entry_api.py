@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 from fastapi.testclient import TestClient
 
 from backend.app.conversations import create_conversation
@@ -8,10 +10,17 @@ from backend.tests.test_api import make_settings
 
 SHA = "a" * 40
 OTHER_SHA = "b" * 40
-GATES = [
-    {"gate_id": "scope", "state": "PASS"},
-    {"gate_id": "authorization", "state": "PASS"},
-]
+def _gate(gate_id: str) -> dict[str, str]:
+    evidence = f"fixture://execution-entry-api/{gate_id}"
+    return {
+        "gate_id": gate_id,
+        "state": "PASS",
+        "evidence_ref": evidence,
+        "evidence_sha256": hashlib.sha256(evidence.encode("utf-8")).hexdigest(),
+    }
+
+
+GATES = [_gate("scope"), _gate("authorization")]
 
 
 def _client(tmp_path, monkeypatch, *, token: str | None = None):
