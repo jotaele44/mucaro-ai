@@ -1,0 +1,55 @@
+name: Goal Plan Execution Entry Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "_architecture/execution_entry_denominator_v1.json"
+      - "backend/app/db.py"
+      - "backend/app/execution_entry.py"
+      - "backend/app/main.py"
+      - "backend/app/models.py"
+      - "backend/app/work_runs.py"
+      - "backend/tests/test_execution_entry.py"
+      - "docs/GOAL_PLAN_EXECUTION_ENTRY_V1.md"
+      - "scripts/certify_execution_entry.py"
+      - ".github/workflows/execution-entry-cert.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "_architecture/execution_entry_denominator_v1.json"
+      - "backend/app/db.py"
+      - "backend/app/execution_entry.py"
+      - "backend/app/main.py"
+      - "backend/app/models.py"
+      - "backend/app/work_runs.py"
+      - "backend/tests/test_execution_entry.py"
+      - "docs/GOAL_PLAN_EXECUTION_ENTRY_V1.md"
+      - "scripts/certify_execution_entry.py"
+      - ".github/workflows/execution-entry-cert.yml"
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    env:
+      CERT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.CERT_SHA }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install Python package
+        run: python -m pip install -e ".[dev]"
+      - name: Certify exact 28-case backend denominator
+        run: python scripts/certify_execution_entry.py --head-sha "$CERT_SHA" --output-dir "$RUNNER_TEMP/execution-entry"
+      - name: Upload execution-entry backend receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: execution-entry-backend-${{ env.CERT_SHA }}
+          path: ${{ runner.temp }}/execution-entry/execution-entry-backend-receipt.json
+          archive: false
+          if-no-files-found: error
