@@ -178,7 +178,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
     const [conv, runList, entryPayload] = await Promise.all([
       api.conversation(conversationId),
       api.conversationRuns(conversationId),
-      api.executionEntry(conversationId),
+      api.executionEntry(conversationId).catch(() => ({ status: "EXECUTION_ENTRY_UNAVAILABLE", entry: null, decision: null, run: null })),
     ]);
     setConversation(conv);
     setSummaries(runList.runs);
