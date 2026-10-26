@@ -126,6 +126,8 @@ class RunEditRequest(BaseModel):
 class ExecutionEntryGateInput(BaseModel):
     gate_id: str = Field(min_length=1, max_length=120)
     state: str = Field(min_length=1, max_length=40)
+    evidence_ref: str = Field(min_length=1, max_length=500)
+    evidence_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class ExecutionEntryCreateRequest(BaseModel):
