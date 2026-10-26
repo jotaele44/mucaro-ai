@@ -26,16 +26,40 @@ class ModelRequest:
     max_output_tokens: int = 512
 
 def validate_request(request: ModelRequest, capabilities: ModelCapabilities) -> ModelRequest:
-    if not request.provider.strip() or not request.model.strip():
+    """Reject malformed runtime values before dispatch; dataclass hints are not runtime checks."""
+    if not isinstance(request, ModelRequest) or not isinstance(capabilities, ModelCapabilities):
+        raise ContractError("INVALID_CONTRACT_TYPES")
+    if (
+        not isinstance(request.provider, str) or not request.provider.strip()
+        or not isinstance(request.model, str) or not request.model.strip()
+    ):
         raise ContractError("MODEL_IDENTITY_REQUIRED")
     if request.locality not in ("local", "remote"):
         raise ContractError("INVALID_LOCALITY")
+    if type(request.allow_remote) is not bool or any(
+        type(flag) is not bool
+        for flag in (request.tools_requested, request.stream_requested, request.structured_requested)
+    ):
+        raise ContractError("INVALID_FLAGS")
     if request.locality == "remote" and not request.allow_remote:
         raise ContractError("REMOTE_REQUIRES_OPT_IN")
-    if not request.messages or any(role not in ("system", "user", "assistant", "tool") or not isinstance(content, str) or not content.strip() for role, content in request.messages):
+    if not isinstance(request.messages, tuple) or not request.messages or any(
+        not isinstance(message, tuple) or len(message) != 2
+        or not isinstance(message[0], str) or message[0] not in ("system", "user", "assistant", "tool")
+        or not isinstance(message[1], str) or not message[1].strip()
+        for message in request.messages
+    ):
         raise ContractError("INVALID_MESSAGES")
-    if capabilities.context_tokens <= 0 or request.max_output_tokens <= 0 or request.max_output_tokens >= capabilities.context_tokens:
+    if (
+        type(capabilities.context_tokens) is not int or type(request.max_output_tokens) is not int
+        or capabilities.context_tokens <= 0 or request.max_output_tokens <= 0
+        or request.max_output_tokens >= capabilities.context_tokens
+    ):
         raise ContractError("INVALID_TOKEN_BUDGET")
+    if any(type(flag) is not bool for flag in (
+        capabilities.tool_calls, capabilities.streaming, capabilities.structured_output
+    )):
+        raise ContractError("INVALID_CAPABILITIES")
     if request.tools_requested and not capabilities.tool_calls:
         raise ContractError("TOOL_CALLS_UNSUPPORTED")
     if request.stream_requested and not capabilities.streaming:
