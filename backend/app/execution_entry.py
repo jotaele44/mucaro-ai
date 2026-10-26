@@ -370,6 +370,9 @@ def decide_entry(
         if row is None:
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_NOT_FOUND", artifact_id)
         artifact = _row_payload(row)
+        _verify_hash(artifact, "artifact_sha256", "ERROR_EXECUTION_ENTRY_ARTIFACT_CORRUPT")
+        if actor not in artifact.get("authorized_actors", []):
+            raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_UNAUTHORIZED_ACTOR", actor)
         if action not in ENTRY_ACTIONS[artifact["mode"]]:
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_ACTION", f"{artifact['mode']} does not support {action}")
         request = _decision_request(
@@ -384,12 +387,27 @@ def decide_entry(
         request_sha256 = _canonical_hash(request)
         existing = _existing_decision(conn, idempotency_key, request_sha256)
         if existing is not None:
+            _verify_hash(existing, "receipt_sha256", "ERROR_EXECUTION_ENTRY_RECEIPT_CORRUPT")
             conn.execute("COMMIT")
             return existing
         if artifact["version"] != expected_version:
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_VERSION_CONFLICT", f"expected={expected_version} actual={artifact['version']}")
         if artifact["source_commit"] != source_commit:
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_SOURCE_DRIFT", f"expected={artifact['source_commit']} observed={source_commit}")
+        latest = conn.execute(
+            "SELECT MAX(revision) AS revision FROM execution_entry_artifacts WHERE artifact_id = ?",
+            (artifact_id,),
+        ).fetchone()
+        if latest is None or int(latest["revision"] or 0) != revision:
+            raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_STALE_REVISION", artifact_id)
+        if action in {"Proceed", "Execute"}:
+            active_decision = conn.execute(
+                "SELECT decision_id FROM execution_entry_decisions WHERE artifact_id = ? AND revision = ? "
+                "AND state IN ('CLAIMED','DISPATCHED') LIMIT 1",
+                (artifact_id, revision),
+            ).fetchone()
+            if active_decision is not None:
+                raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_ALREADY_CLAIMED", str(active_decision["decision_id"]))
 
         decision_id = stable_id("entrydec", artifact_id, str(revision), action, idempotency_key, length=18)
         now = utc_now()
@@ -477,7 +495,9 @@ def get_entry_decision(decision_id: str, cfg: Settings = settings) -> dict[str, 
         ).fetchone()
     if row is None:
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_DECISION_NOT_FOUND", decision_id)
-    return _row_payload(row)
+    payload = _row_payload(row)
+    _verify_hash(payload, "receipt_sha256", "ERROR_EXECUTION_ENTRY_RECEIPT_CORRUPT")
+    return payload
 
 
 def dispatch_entry_decision(decision_id: str, cfg: Settings = settings) -> dict[str, Any]:
@@ -497,7 +517,16 @@ def dispatch_entry_decision(decision_id: str, cfg: Settings = settings) -> dict[
             artifact["conversation_id"],
             artifact["prompt"],
             mode=artifact["runtime_mode"],
-            options=artifact["options"],
+            options={
+                **artifact["options"],
+                "execution_entry": {
+                    "decision_id": decision_id,
+                    "artifact_id": artifact["artifact_id"],
+                    "revision": artifact["revision"],
+                    "mode": artifact["mode"],
+                    "source_commit": artifact["source_commit"],
+                },
+            },
             idempotency_key=f"entry:{decision_id}",
             require_idle=True,
             cfg=cfg,
