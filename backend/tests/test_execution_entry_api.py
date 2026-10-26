@@ -10,6 +10,8 @@ from backend.tests.test_api import make_settings
 
 SHA = "a" * 40
 OTHER_SHA = "b" * 40
+
+
 def _gate(gate_id: str) -> dict[str, str]:
     evidence = f"fixture://execution-entry-api/{gate_id}"
     return {
