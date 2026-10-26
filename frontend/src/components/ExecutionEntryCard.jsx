@@ -124,7 +124,7 @@ export function ExecutionEntryCard({ context, locale = "en", onAction, onInspect
               className="primary-button"
               disabled={busy || !ready}
               aria-describedby={!ready ? `execution-entry-reason-${entry.artifact_id}` : undefined}
-              onClick={() => perform(labels?.primary || fallbackLabels(entry.mode).primary)}
+              onClick={() => perform(entry.mode === "GOAL" ? "Proceed" : "Execute")}
             >
               {busy ? "Working…" : labels?.primary || fallbackLabels(entry.mode).primary}
             </button>
