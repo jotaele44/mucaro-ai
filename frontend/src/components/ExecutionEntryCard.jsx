@@ -27,6 +27,7 @@ export function ExecutionEntryCard({ context, locale = "en", onAction, onInspect
   const [labels, setLabels] = useState(() => (entry ? fallbackLabels(entry.mode) : null));
   const [busy, setBusy] = useState(false);
   const [editor, setEditor] = useState(false);
+  const [inspectOpen, setInspectOpen] = useState(false);
   const [draft, setDraft] = useState(entry?.prompt || "");
   const [error, setError] = useState(null);
   const actionLock = useRef(false);
@@ -34,6 +35,7 @@ export function ExecutionEntryCard({ context, locale = "en", onAction, onInspect
   useEffect(() => {
     setDraft(entry?.prompt || "");
     setEditor(false);
+    setInspectOpen(false);
     setError(null);
   }, [entry?.artifact_id, entry?.revision, entry?.prompt]);
 
@@ -59,9 +61,15 @@ export function ExecutionEntryCard({ context, locale = "en", onAction, onInspect
   if (!entry) return null;
 
   const consumed = decision && ["CLAIMED", "DISPATCHED"].includes(decision.state);
-  const ready = entry.state === READY[entry.mode];
+  const sourceCurrent = context?.source_matches_runtime !== false;
+  const stateReady = entry.state === READY[entry.mode];
+  const ready = stateReady && sourceCurrent;
   const candidate = entry.state === CANDIDATE[entry.mode];
-  const disabledReason = !ready ? `Requires ${READY[entry.mode]} with every mandatory gate PASS.` : "";
+  const disabledReason = !sourceCurrent
+    ? `Source identity is not current (${context?.source_identity_status || "SOURCE_IDENTITY_UNKNOWN"}).`
+    : !stateReady
+      ? `Requires ${READY[entry.mode]} with every mandatory gate PASS.`
+      : "";
   const revisionLabel = entry.mode === "GOAL" ? `Vector revision ${entry.vector_revision}` : `Plan revision ${entry.plan_revision}`;
 
   async function perform(action, changes = {}) {
@@ -95,7 +103,16 @@ export function ExecutionEntryCard({ context, locale = "en", onAction, onInspect
 
       {consumed ? (
         <div className="button-row execution-entry-actions" aria-label={`${entry.mode} execution controls`}>
-          <button type="button" className="secondary-button" onClick={() => onInspect?.(decision, run)}>Inspect</button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => {
+              setInspectOpen(true);
+              onInspect?.(decision, run);
+            }}
+          >
+            Inspect
+          </button>
           {canStop && <button type="button" className="secondary-button" onClick={() => onStop?.(run)}>Stop</button>}
           {canResume && (
             <button type="button" className="primary-button" onClick={() => onResume?.(decision)} disabled={busy}>
@@ -133,6 +150,22 @@ export function ExecutionEntryCard({ context, locale = "en", onAction, onInspect
       )}
 
       {error && <p className="error-text small" role="alert">{error}</p>}
+
+      {inspectOpen && decision && (
+        <Sheet title="Execution receipt" onClose={() => setInspectOpen(false)} side="center">
+          <dl className="facts">
+            <dt>Decision</dt><dd><code>{decision.decision_id}</code></dd>
+            <dt>Mode</dt><dd>{decision.mode}</dd>
+            <dt>Action</dt><dd>{decision.action}</dd>
+            <dt>Revision</dt><dd>{decision.revision}</dd>
+            <dt>Actor</dt><dd>{decision.actor}</dd>
+            <dt>Source</dt><dd><code>{decision.source_commit}</code></dd>
+            <dt>Receipt SHA-256</dt><dd><code>{decision.receipt_sha256}</code></dd>
+            <dt>Run</dt><dd>{run?.run_id || decision.run_id || "Not dispatched"}</dd>
+            <dt>Run state</dt><dd>{run?.state || decision.state}</dd>
+          </dl>
+        </Sheet>
+      )}
 
       {editor && (
         <Sheet title={entry.mode === "GOAL" ? "Adjust goal" : "Revise plan"} onClose={() => setEditor(false)} side="center">

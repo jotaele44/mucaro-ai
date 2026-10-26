@@ -537,17 +537,21 @@ async function scenario(browser, base, viewport, contextOptions) {
   return axeRuns;
 }
 
-async function executionEntryScenario(browser, base, viewport, contextOptions) {
+async function executionEntryScenario(browser, base, viewport, contextOptions, mode = "GOAL", activation = "double") {
   const mobileEntry = Number(contextOptions?.viewport?.width || 0) < 700;
-  const title = `Execution entry QA ${viewport}`;
+  const title = `Execution entry QA ${mode} ${viewport}`;
+  const primaryEnglish = mode === "PLAN" ? "Execute" : "Proceed";
+  const secondaryEnglish = mode === "PLAN" ? "Revise" : "Adjust";
+  const primarySpanish = mode === "PLAN" ? "Ejecutar" : "Proceder";
+  const secondarySpanish = mode === "PLAN" ? "Revisar" : "Ajustar";
   const createdConversation = await fetch(`${base}/conversations`, jsonPost({ title }));
   if (!createdConversation.ok) throw new Error(`entry conversation create failed: ${createdConversation.status}`);
   const conversation = await createdConversation.json();
   const createdEntry = await fetch(
     `${base}/execution-entry/artifacts`,
     jsonPost({
-      mode: "GOAL",
-      objective_id: `qa-goal-${viewport}`,
+      mode,
+      objective_id: `qa-${mode.toLowerCase()}-${viewport}`,
       conversation_id: conversation.conversation_id,
       prompt: "Execute the approved Goal/Plan entry browser proof.",
       runtime_mode: "plan",
@@ -581,10 +585,10 @@ async function executionEntryScenario(browser, base, viewport, contextOptions) {
     if (mobileEntry) await page.getByRole("button", { name: "Open navigation" }).click();
     await page.getByRole("list", { name: "Conversations" }).getByRole("button", { name: new RegExp(title) }).click();
     const card = page.locator(".execution-entry-card");
-    await card.getByRole("heading", { name: `qa-goal-${viewport}` }).waitFor();
+    await card.getByRole("heading", { name: `qa-${mode.toLowerCase()}-${viewport}` }).waitFor();
 
-    const primary = card.getByRole("button", { name: "Proceed" });
-    const secondary = card.getByRole("button", { name: "Adjust" });
+    const primary = card.getByRole("button", { name: primaryEnglish });
+    const secondary = card.getByRole("button", { name: secondaryEnglish });
     check("entry candidate renders exactly two pre-execution actions", viewport, (await card.getByRole("button").count()) === 2 && await secondary.isEnabled());
     check("N19 not-ready primary action is natively disabled", viewport, await primary.isDisabled());
     await primary.evaluate((node) => node.focus());
@@ -596,11 +600,11 @@ async function executionEntryScenario(browser, base, viewport, contextOptions) {
       Object.defineProperty(navigator, "language", { value: "es-PR", configurable: true });
       window.dispatchEvent(new Event("languagechange"));
     });
-    await card.getByRole("button", { name: "Ajustar" }).waitFor();
+    await card.getByRole("button", { name: secondarySpanish }).waitFor();
     check(
       "N20 locale switch changes labels without execution",
       viewport,
-      (await card.getByRole("button", { name: "Proceder" }).count()) === 1 && decisionPosts === 0,
+      (await card.getByRole("button", { name: primarySpanish }).count()) === 1 && decisionPosts === 0,
       `decision POSTs=${decisionPosts}`,
     );
 
@@ -619,7 +623,7 @@ async function executionEntryScenario(browser, base, viewport, contextOptions) {
 
     const approved = await fetch(
       `${base}/execution-entry/artifacts/${entry.artifact_id}/1/state`,
-      jsonPost({ expected_version: 1, target_state: "VECTOR_READY" }),
+      jsonPost({ expected_version: 1, target_state: mode === "PLAN" ? "PLAN_APPROVED" : "VECTOR_READY" }),
     );
     if (!approved.ok) throw new Error(`entry approval failed: ${approved.status} ${await approved.text()}`);
 
@@ -628,17 +632,30 @@ async function executionEntryScenario(browser, base, viewport, contextOptions) {
     });
     await page.reload();
     const approvedCard = page.locator(".execution-entry-card");
-    const proceed = approvedCard.getByRole("button", { name: "Proceder" });
+    const proceed = approvedCard.getByRole("button", { name: primarySpanish });
     await proceed.waitFor();
-    check("approved Goal renders enabled localized primary action", viewport, await proceed.isEnabled());
+    check(`approved ${mode} renders enabled localized primary action`, viewport, await proceed.isEnabled());
 
-    await proceed.evaluate((node) => {
-      node.click();
-      node.click();
-    });
-    await approvedCard.getByRole("button", { name: "Inspect" }).waitFor({ timeout: 10000 });
-    check("N15 rapid double activation creates exactly one decision request", viewport, decisionPosts === 1, `decision POSTs=${decisionPosts}`);
-    check("entry actions are replaced after execution starts", viewport, (await approvedCard.getByRole("button", { name: "Proceder" }).count()) === 0);
+    if (activation === "keyboard") {
+      await proceed.focus();
+      await page.keyboard.press("Enter");
+      await approvedCard.getByRole("button", { name: "Inspect" }).waitFor({ timeout: 10000 });
+      check("enabled entry primary activates from keyboard exactly once", viewport, decisionPosts === 1, `decision POSTs=${decisionPosts}`);
+    } else {
+      await proceed.evaluate((node) => {
+        node.click();
+        node.click();
+      });
+      await approvedCard.getByRole("button", { name: "Inspect" }).waitFor({ timeout: 10000 });
+      check("N15 rapid double activation creates exactly one decision request", viewport, decisionPosts === 1, `decision POSTs=${decisionPosts}`);
+    }
+    check("entry actions are replaced after execution starts", viewport, (await approvedCard.getByRole("button", { name: primarySpanish }).count()) === 0);
+
+    await approvedCard.getByRole("button", { name: "Inspect" }).click();
+    const receiptSheet = page.getByRole("dialog", { name: "Execution receipt" });
+    await receiptSheet.waitFor();
+    check("Inspect exposes immutable entry receipt fields", viewport, await receiptSheet.getByText("Receipt SHA-256").isVisible());
+    await receiptSheet.getByRole("button", { name: "Close" }).click();
     await shot(page, viewport, "execution-entry-dispatched");
 
     const overflow = await page.evaluate(() => {
@@ -1557,6 +1574,14 @@ try {
     const iphone = devices["iPhone 13"];
     axeResults.push(...(await scenario(browser, base, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
     axeResults.push(...(await executionEntryScenario(browser, base, "entry-desktop", { viewport: { width: 1440, height: 900 } })));
+    axeResults.push(...(await executionEntryScenario(
+      browser,
+      base,
+      "entry-plan-desktop",
+      { viewport: { width: 1440, height: 900 } },
+      "PLAN",
+      "keyboard",
+    )));
     const entryPhone = devices["iPhone 13"];
     axeResults.push(...(await executionEntryScenario(browser, base, "entry-393", { ...entryPhone, viewport: { width: 393, height: 852 } })));
     axeResults.push(...(await executionEntryScenario(browser, base, "entry-430", { ...entryPhone, viewport: { width: 430, height: 932 } })));

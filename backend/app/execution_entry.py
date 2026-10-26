@@ -309,7 +309,24 @@ def current_conversation_entry_context(conversation_id: str, cfg: Settings = set
                 run = get_run(str(decision["run_id"]), cfg)
             except RunError:
                 run = None
-    return {"status": "EXECUTION_ENTRY_OK", "entry": entry, "decision": decision, "run": run}
+    runtime_source_commit = None
+    source_identity_status = "SOURCE_IDENTITY_OK"
+    try:
+        runtime_source_commit = _runtime_source_commit(cfg)
+    except ExecutionEntryError as exc:
+        source_identity_status = exc.status
+    source_matches_runtime = runtime_source_commit == entry["source_commit"] if runtime_source_commit else False
+    if runtime_source_commit and not source_matches_runtime:
+        source_identity_status = "ERROR_EXECUTION_ENTRY_SOURCE_DRIFT"
+    return {
+        "status": "EXECUTION_ENTRY_OK",
+        "entry": entry,
+        "decision": decision,
+        "run": run,
+        "runtime_source_commit": runtime_source_commit,
+        "source_matches_runtime": source_matches_runtime,
+        "source_identity_status": source_identity_status,
+    }
 
 
 def transition_entry_artifact(
