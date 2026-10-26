@@ -41,7 +41,7 @@ def inline_runs():
 
 @pytest.fixture()
 def cfg(tmp_path, monkeypatch):
-    monkeypatch.setenv("MUCARO_AI_SOURCE_COMMIT", SHA)
+    monkeypatch.setenv("MUCARO_SOURCE_HEAD", SHA)
     settings = make_settings(tmp_path)
     settings.ensure_dirs()
     return settings
