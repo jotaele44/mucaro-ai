@@ -106,12 +106,25 @@ def _validate_gates(required_gates: list[dict[str, Any]]) -> list[dict[str, str]
     for row in required_gates:
         gate_id = str(row.get("gate_id") or "").strip()
         state = str(row.get("state") or "").upper()
+        evidence_ref = str(row.get("evidence_ref") or "").strip()
+        evidence_sha256 = str(row.get("evidence_sha256") or "").strip().lower()
         if not gate_id or gate_id in seen:
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_GATES", "gate_id values must be non-empty and unique")
         if not state:
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_GATES", f"{gate_id} has no state")
+        if not evidence_ref:
+            raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_GATES", f"{gate_id} has no evidence_ref")
+        if not re.fullmatch(r"[0-9a-f]{64}", evidence_sha256):
+            raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_GATES", f"{gate_id} has no valid evidence_sha256")
         seen.add(gate_id)
-        normalized.append({"gate_id": gate_id, "state": state})
+        normalized.append(
+            {
+                "gate_id": gate_id,
+                "state": state,
+                "evidence_ref": evidence_ref,
+                "evidence_sha256": evidence_sha256,
+            }
+        )
     return normalized
 
 
