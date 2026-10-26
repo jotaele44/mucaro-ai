@@ -28,6 +28,8 @@ jobs:
         run: python -m unittest -v backend.tests.test_auto_mode_scheduler
       - name: Execute offline Auto Mode checkpoint tests
         run: python -m unittest -v backend.tests.test_auto_mode_checkpoint
+      - name: Execute offline Auto Mode transaction tests
+        run: python -m unittest -v backend.tests.test_auto_mode_transaction
       - name: Execute local transport security test
         run: python -m unittest -v backend.tests.test_model_local_redirect_security
       - name: Print exact tested revision
