@@ -351,3 +351,56 @@ def test_exact_head_certification_skill_rejects_superseded_candidate_and_bad_has
     assert result["promotable"] is False
     assert "candidate SHA is explicitly superseded" in result["reasons"]
     assert any("manifest_sha256" in reason for reason in result["reasons"])
+
+
+
+def test_exact_head_certification_skill_rejects_null_empty_required_values(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/exact-head-certification-audit"
+    mount_skill(skill_id, cfg=cfg)
+    activate_skill(skill_id, cfg=cfg)
+    arguments = {
+        "baseline_sha": None,
+        "candidate_sha": None,
+        "observed_head_sha": None,
+        "observed_remote_sha": None,
+        "observed_pr_head_sha": None,
+        "worktree_clean": True,
+        "required_gates": [],
+        "passed_gates": [],
+        "manifest_sha256": None,
+        "evidence_sha256": None,
+        "unresolved_states": [],
+        "superseded_shas": [],
+    }
+    result = execute_skill(skill_id, arguments, cfg=cfg)["result"]
+
+    assert result["certification_state"] == "OPEN"
+    assert result["promotable"] is False
+    assert result["identity_match"] is False
+    assert "required_gates must be a nonempty string list" in result["reasons"]
+    assert any("baseline_sha" in reason for reason in result["reasons"])
+    assert any("candidate_sha" in reason for reason in result["reasons"])
+    assert any("manifest_sha256" in reason for reason in result["reasons"])
+    assert any("evidence_sha256" in reason for reason in result["reasons"])
+
+
+def test_exact_head_certification_skill_normalizes_sha_case_for_supersession(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/exact-head-certification-audit"
+    mount_skill(skill_id, cfg=cfg)
+    activate_skill(skill_id, cfg=cfg)
+    arguments = _exact_head_arguments()
+    upper = arguments["candidate_sha"].upper()
+    arguments["candidate_sha"] = upper
+    arguments["observed_head_sha"] = upper
+    arguments["observed_remote_sha"] = upper
+    arguments["observed_pr_head_sha"] = upper
+    arguments["superseded_shas"] = [upper.lower()]
+    result = execute_skill(skill_id, arguments, cfg=cfg)["result"]
+
+    assert result["certification_state"] == "OPEN"
+    assert result["promotable"] is False
+    assert result["candidate_sha"] == upper.lower()
+    assert result["identity_match"] is True
+    assert "candidate SHA is explicitly superseded" in result["reasons"]
