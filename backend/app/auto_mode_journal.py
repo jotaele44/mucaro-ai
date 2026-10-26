@@ -8,6 +8,8 @@ import hashlib
 import hmac
 import json
 import os
+import fcntl
+from contextlib import contextmanager
 from pathlib import Path
 
 from backend.app.auto_mode_scheduler import AutoModeError
@@ -63,33 +65,51 @@ def replay(path: Path, transaction_id: str) -> Transaction:
         current = transition(current, record["target"], token=record["token"], operation_id=record["operation_id"])
     return current
 
+@contextmanager
+def _exclusive_journal_lock(path: Path):
+    """POSIX/macOS advisory lock on a stable sibling lockfile."""
+    lock_path = path.with_name(path.name + ".lock")
+    if lock_path.is_symlink():
+        raise AutoModeError("INVALID_JOURNAL_PATH")
+    flags = os.O_CREAT | os.O_RDWR
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(lock_path, flags, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
 def append_transition(path: Path, transaction_id: str, target: str, *, token: str = "", operation_id: str = "") -> Transaction:
     path = Path(path)
     if path.is_symlink() or not path.parent.is_dir():
         raise AutoModeError("INVALID_JOURNAL_PATH")
-    records = _read(path)
-    current = replay(path, transaction_id)
-    updated = transition(current, target, token=token, operation_id=operation_id)
-    if updated == current:
-        return current
-    payload = {
-        "seq": len(records), "prev": records[-1]["hash"] if records else "0" * 64,
-        "tx": transaction_id, "target": target, "token": token, "operation_id": operation_id,
-    }
-    record = dict(payload, hash=_digest(payload))
-    encoded = _canonical(record) + b"\n"
-    existing = path.read_bytes() if path.exists() else b""
-    if len(existing) + len(encoded) > MAX_BYTES:
-        raise AutoModeError("JOURNAL_FULL")
-    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    fd = os.open(path, flags, 0o600)
-    try:
-        with os.fdopen(fd, "ab") as stream:
-            stream.write(encoded)
-            stream.flush()
-            os.fsync(stream.fileno())
-    finally:
-        pass
-    return updated
+    with _exclusive_journal_lock(path):
+        records = _read(path)
+        current = replay(path, transaction_id)
+        updated = transition(current, target, token=token, operation_id=operation_id)
+        if updated == current:
+            return current
+        payload = {
+            "seq": len(records), "prev": records[-1]["hash"] if records else "0" * 64,
+            "tx": transaction_id, "target": target, "token": token, "operation_id": operation_id,
+        }
+        record = dict(payload, hash=_digest(payload))
+        encoded = _canonical(record) + b"\n"
+        existing = path.read_bytes() if path.exists() else b""
+        if len(existing) + len(encoded) > MAX_BYTES:
+            raise AutoModeError("JOURNAL_FULL")
+        flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(path, flags, 0o600)
+        try:
+            with os.fdopen(fd, "ab") as stream:
+                stream.write(encoded)
+                stream.flush()
+                os.fsync(stream.fileno())
+        finally:
+            pass
+        return updated
