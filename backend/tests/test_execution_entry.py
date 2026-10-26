@@ -130,6 +130,7 @@ def test_p01_goal_ready_proceed_dispatches_exact_revision(cfg, conversation):
     run = get_run(decision["run_id"], cfg)
     assert run["options"]["execution_entry"]["revision"] == 1
     assert run["options"]["execution_entry"]["artifact_id"] == ready["artifact_id"]
+    assert run["options"]["execution_entry"]["artifact_sha256"] == ready["artifact_sha256"]
 
 
 # P02
@@ -219,6 +220,11 @@ def test_p08_localized_labels_preserve_action_semantics():
 def test_n01_stale_vector_revision_is_rejected(cfg, conversation):
     original = _artifact(cfg, conversation)
     _decide(cfg, original, "Adjust", "n01-adjust", changes={"prompt": "next"})
+    with pytest.raises(ExecutionEntryError) as approval_exc:
+        transition_entry_artifact(
+            original["artifact_id"], 1, expected_version=1, target_state="VECTOR_READY", actor="user", cfg=cfg
+        )
+    assert approval_exc.value.status == "ERROR_EXECUTION_ENTRY_STALE_REVISION"
     with pytest.raises(ExecutionEntryError) as exc:
         _decide(cfg, original, "Proceed", "n01-stale")
     assert exc.value.status == "ERROR_EXECUTION_ENTRY_STALE_REVISION"
