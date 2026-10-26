@@ -143,6 +143,11 @@ def test_p01_goal_ready_proceed_dispatches_exact_revision(cfg, conversation):
     decision = _decide(cfg, ready, "Proceed", "p01-proceed")
     assert decision["state"] == "DISPATCHED"
     assert decision["artifact_sha256"] == ready["artifact_sha256"]
+    assert decision["objective_id"] == ready["objective_id"]
+    assert decision["vector_id"] == ready["vector_id"]
+    assert decision["vector_revision"] == ready["vector_revision"] == 1
+    assert decision["expected_version"] == ready["version"]
+    assert decision["gate_evidence"] == ready["required_gates"]
     run = get_run(decision["run_id"], cfg)
     assert run["options"]["execution_entry"]["revision"] == 1
     assert run["options"]["execution_entry"]["artifact_id"] == ready["artifact_id"]
@@ -169,6 +174,9 @@ def test_p03_plan_approved_execute_dispatches_exact_revision(cfg, conversation):
     decision = _decide(cfg, ready, "Execute", "p03-execute")
     run = get_run(decision["run_id"], cfg)
     assert decision["state"] == "DISPATCHED"
+    assert decision["plan_id"] == ready["plan_id"]
+    assert decision["plan_revision"] == ready["plan_revision"] == 1
+    assert decision["expected_version"] == ready["version"]
     assert run["options"]["execution_entry"]["mode"] == "PLAN"
     assert run["options"]["execution_entry"]["revision"] == 1
 
@@ -257,6 +265,7 @@ def test_p07_completed_stage_keeps_verifiable_artifact_and_decision_receipts(cfg
     decision_receipt = get_entry_decision(decision["decision_id"], cfg)
     assert len(artifact_receipt["artifact_sha256"]) == 64
     assert decision_receipt["artifact_sha256"] == artifact_receipt["artifact_sha256"]
+    assert decision_receipt["gate_evidence"] == artifact_receipt["required_gates"]
     assert len(decision_receipt["receipt_sha256"]) == 64
     next_entry = _artifact(cfg, conversation, mode="PLAN", prompt="Prepare the next governed plan.")
     assert next_entry["mode"] == "PLAN"
