@@ -685,7 +685,12 @@ async function executionEntryScenario(browser, base, viewport, contextOptions, m
     await approvedCard.getByRole("button", { name: "Inspect" }).click();
     const receiptSheet = page.getByRole("dialog", { name: "Execution receipt" });
     await receiptSheet.waitFor();
-    check("Inspect exposes immutable entry receipt fields", viewport, await receiptSheet.getByText("Receipt SHA-256").isVisible());
+    const receiptIdentityVisible =
+      await receiptSheet.getByText("Artifact SHA-256").isVisible() &&
+      await receiptSheet.getByText("Receipt SHA-256").isVisible() &&
+      await receiptSheet.getByText(mode === "GOAL" ? "Vector" : "Plan", { exact: true }).isVisible() &&
+      await receiptSheet.getByText("Policy", { exact: true }).isVisible();
+    check("Inspect exposes immutable entry receipt fields", viewport, receiptIdentityVisible);
     await receiptSheet.getByRole("button", { name: "Close" }).click();
     await shot(page, viewport, "execution-entry-dispatched");
 
