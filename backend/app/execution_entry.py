@@ -5,6 +5,7 @@ import json
 import os
 import re
 import subprocess
+import uuid
 from typing import Any
 
 from .config import Settings, settings
@@ -184,7 +185,9 @@ def create_entry_artifact(
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_RUNTIME_MODE", runtime_mode)
     gates = _validate_gates(required_gates)
     now = utc_now()
-    artifact_id = stable_id("entry", mode, objective_id, conversation_id, source_commit, now, length=16)
+    artifact_id = stable_id(
+        "entry", mode, objective_id, conversation_id, source_commit, now, uuid.uuid4().hex, length=16
+    )
     payload: dict[str, Any] = {
         "schema_version": ENTRY_SCHEMA_VERSION,
         "artifact_id": artifact_id,
@@ -683,15 +686,22 @@ def resume_interrupted_entry_decision(
     artifact = get_entry_artifact(decision["artifact_id"], decision["revision"], cfg)
     if actor not in artifact.get("authorized_actors", []):
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_UNAUTHORIZED_ACTOR", actor)
+    idempotency_key = (idempotency_key or "").strip()
+    if len(idempotency_key) < 8:
+        raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_INPUT", "resume idempotency_key must be at least 8 characters")
+    if decision.get("resume_idempotency_key") == idempotency_key:
+        if decision.get("run_id"):
+            try:
+                decision["run"] = get_run(str(decision["run_id"]), cfg)
+            except RunError:
+                pass
+        return decision
     run_id = str(decision.get("run_id") or "")
     if not run_id:
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_RESUME_STATE", "decision has no dispatched run")
     run = get_run(run_id, cfg)
     if run["state"] != "INTERRUPTED":
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_RESUME_STATE", run["state"])
-    idempotency_key = (idempotency_key or "").strip()
-    if len(idempotency_key) < 8:
-        raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_INPUT", "resume idempotency_key must be at least 8 characters")
     result = submit_message(
         artifact["conversation_id"],
         artifact["prompt"],
