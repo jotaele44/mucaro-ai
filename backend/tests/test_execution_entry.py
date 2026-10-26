@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
 import pytest
 
@@ -179,7 +181,7 @@ def test_p05_same_key_same_request_returns_original_decision(cfg, conversation):
 
 
 # P06
-def test_p06_interrupted_run_resume_preserves_entry_revision(cfg, conversation):
+def test_p06_interrupted_run_resume_preserves_entry_revision(cfg, conversation, monkeypatch):
     ready = _ready(cfg, _artifact(cfg, conversation))
     first = _decide(cfg, ready, "Proceed", "p06-first")
     old_run = get_run(first["run_id"], cfg)
@@ -196,6 +198,40 @@ def test_p06_interrupted_run_resume_preserves_entry_revision(cfg, conversation):
     assert resumed["prior_run_ids"] == [old_run["run_id"]]
     assert new_run["options"]["execution_entry"]["revision"] == 1
     assert new_run["options"]["execution_entry"]["resume_of_run_id"] == old_run["run_id"]
+
+    # A separate interrupted decision must remain exactly-once even when two
+    # different client idempotency keys race before the decision receipt update.
+    race_ready = _ready(cfg, _artifact(cfg, conversation))
+    race_first = _decide(cfg, race_ready, "Proceed", "p06-race-first")
+    race_old_run = get_run(race_first["run_id"], cfg)
+    with get_connection(cfg.sqlite_path) as conn:
+        conn.execute("UPDATE work_runs SET state = 'INTERRUPTED' WHERE run_id = ?", (race_old_run["run_id"],))
+
+    actual_submit = execution_entry.submit_message
+    barrier = threading.Barrier(2)
+
+    def synchronized_submit(*args, **kwargs):
+        barrier.wait(timeout=5)
+        return actual_submit(*args, **kwargs)
+
+    monkeypatch.setattr(execution_entry, "submit_message", synchronized_submit)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [
+            pool.submit(
+                resume_interrupted_entry_decision,
+                race_first["decision_id"],
+                actor="user",
+                idempotency_key=key,
+                cfg=cfg,
+            )
+            for key in ("p06-race-a", "p06-race-b")
+        ]
+        raced = [future.result(timeout=10) for future in futures]
+
+    assert raced[0]["run_id"] == raced[1]["run_id"]
+    persisted = get_entry_decision(race_first["decision_id"], cfg)
+    assert persisted["resume_count"] == 1
+    assert persisted["prior_run_ids"] == [race_old_run["run_id"]]
 
 
 # P07
@@ -421,6 +457,19 @@ def test_n18_changed_source_commit_is_rejected(cfg, conversation, monkeypatch):
     with pytest.raises(ExecutionEntryError) as exc:
         _decide(cfg, ready, "Proceed", "n18-source", source_commit=OTHER_SHA)
     assert exc.value.status == "ERROR_EXECUTION_ENTRY_SOURCE_DRIFT"
+
+    candidate = _artifact(cfg, create_conversation("execution entry source drift", cfg)["conversation_id"])
+    with pytest.raises(ExecutionEntryError) as revision_exc:
+        _decide(
+            cfg,
+            candidate,
+            "Adjust",
+            "n18-revision-source",
+            changes={"source_commit": OTHER_SHA, "prompt": "must not persist false source identity"},
+        )
+    assert revision_exc.value.status == "ERROR_EXECUTION_ENTRY_SOURCE_DRIFT"
+    with pytest.raises(ExecutionEntryError):
+        get_entry_artifact(candidate["artifact_id"], 2, cfg)
 
     actual_dispatch = execution_entry.dispatch_entry_decision
     monkeypatch.setattr(
