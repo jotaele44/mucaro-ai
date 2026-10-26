@@ -137,6 +137,8 @@ def test_p01_goal_ready_proceed_dispatches_exact_revision(cfg, conversation):
 # P02
 def test_p02_goal_adjust_creates_revision_without_execution(cfg, conversation):
     original = _artifact(cfg, conversation)
+    second = _artifact(cfg, conversation)
+    assert second["artifact_id"] != original["artifact_id"]
     decision = _decide(cfg, original, "Adjust", "p02-adjust", changes={"prompt": "Adjusted objective."})
     revised = get_entry_artifact(original["artifact_id"], 2, cfg)
     assert decision["state"] == "REVISION_CREATED"
@@ -185,7 +187,11 @@ def test_p06_interrupted_run_resume_preserves_entry_revision(cfg, conversation):
     resumed = resume_interrupted_entry_decision(
         first["decision_id"], actor="user", idempotency_key="p06-resume", cfg=cfg
     )
+    replayed = resume_interrupted_entry_decision(
+        first["decision_id"], actor="user", idempotency_key="p06-resume", cfg=cfg
+    )
     new_run = get_run(resumed["run_id"], cfg)
+    assert replayed["run_id"] == resumed["run_id"]
     assert resumed["prior_run_ids"] == [old_run["run_id"]]
     assert new_run["options"]["execution_entry"]["revision"] == 1
     assert new_run["options"]["execution_entry"]["resume_of_run_id"] == old_run["run_id"]
