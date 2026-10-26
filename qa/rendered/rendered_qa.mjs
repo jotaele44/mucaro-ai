@@ -538,6 +538,7 @@ async function scenario(browser, base, viewport, contextOptions) {
 }
 
 async function executionEntryScenario(browser, base, viewport, contextOptions) {
+  const mobileEntry = Number(contextOptions?.viewport?.width || 0) < 700;
   const title = `Execution entry QA ${viewport}`;
   const createdConversation = await fetch(`${base}/conversations`, jsonPost({ title }));
   if (!createdConversation.ok) throw new Error(`entry conversation create failed: ${createdConversation.status}`);
@@ -579,7 +580,7 @@ async function executionEntryScenario(browser, base, viewport, contextOptions) {
 
   try {
     await page.goto("/");
-    if (viewport !== "desktop") await page.getByRole("button", { name: "Open navigation" }).click();
+    if (mobileEntry) await page.getByRole("button", { name: "Open navigation" }).click();
     await page.getByRole("list", { name: "Conversations" }).getByRole("button", { name: new RegExp(title) }).click();
     const card = page.locator(".execution-entry-card");
     await card.getByRole("heading", { name: `qa-goal-${viewport}` }).waitFor();
@@ -608,7 +609,13 @@ async function executionEntryScenario(browser, base, viewport, contextOptions) {
     const focusOrder = await card.getByRole("button").evaluateAll((buttons) =>
       buttons.map((button) => ({ name: button.textContent.trim(), disabled: button.disabled, height: Math.round(button.getBoundingClientRect().height) })),
     );
-    check("entry controls expose native button semantics and usable targets", viewport, focusOrder.every((row) => row.height >= 36), JSON.stringify(focusOrder));
+    const minEntryTarget = mobileEntry ? 44 : 36;
+    check(
+      "entry controls expose native button semantics and usable targets",
+      viewport,
+      focusOrder.every((row) => row.height >= minEntryTarget),
+      JSON.stringify(focusOrder),
+    );
     await shot(page, viewport, "execution-entry-candidate");
     const entryAxe = await axe(page, viewport, "execution entry candidate");
 
