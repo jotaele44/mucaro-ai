@@ -558,8 +558,6 @@ async function executionEntryScenario(browser, base, viewport, contextOptions) {
         { gate_id: "authorization", state: "PASS" },
         { gate_id: "dependencies", state: "PASS" },
       ],
-      actor: "user",
-      authorized_actors: ["user"],
     }),
   );
   if (!createdEntry.ok) throw new Error(`entry artifact create failed: ${createdEntry.status} ${await createdEntry.text()}`);
@@ -621,7 +619,7 @@ async function executionEntryScenario(browser, base, viewport, contextOptions) {
 
     const approved = await fetch(
       `${base}/execution-entry/artifacts/${entry.artifact_id}/1/state`,
-      jsonPost({ expected_version: 1, target_state: "VECTOR_READY", actor: "user" }),
+      jsonPost({ expected_version: 1, target_state: "VECTOR_READY" }),
     );
     if (!approved.ok) throw new Error(`entry approval failed: ${approved.status} ${await approved.text()}`);
 
