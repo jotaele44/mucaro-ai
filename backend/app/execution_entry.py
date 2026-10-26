@@ -454,14 +454,43 @@ def dispatch_entry_decision(decision_id: str, cfg: Settings = settings) -> dict[
     if decision["state"] != "CLAIMED":
         return decision
     artifact = get_entry_artifact(decision["artifact_id"], decision["revision"], cfg)
-    result = submit_message(
-        artifact["conversation_id"],
-        artifact["prompt"],
-        mode=artifact["runtime_mode"],
-        options=artifact["options"],
-        idempotency_key=f"entry:{decision_id}",
-        cfg=cfg,
-    )
+    try:
+        result = submit_message(
+            artifact["conversation_id"],
+            artifact["prompt"],
+            mode=artifact["runtime_mode"],
+            options=artifact["options"],
+            idempotency_key=f"entry:{decision_id}",
+            require_idle=True,
+            cfg=cfg,
+        )
+    except RunError as exc:
+        if exc.status != "ERROR_RUN_CONFLICTING_ACTIVE":
+            raise
+        conn = _tx(cfg)
+        try:
+            row = conn.execute(
+                "SELECT payload_json FROM execution_entry_decisions WHERE decision_id = ?",
+                (decision_id,),
+            ).fetchone()
+            if row is None:
+                raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_DECISION_NOT_FOUND", decision_id)
+            current = _row_payload(row)
+            current["state"] = "REJECTED_CONFLICT"
+            current["rejected_at"] = utc_now()
+            current["conflicting_run_id"] = exc.detail
+            current["receipt_sha256"] = _canonical_hash({k: v for k, v in current.items() if k != "receipt_sha256"})
+            conn.execute(
+                "UPDATE execution_entry_decisions SET state = 'REJECTED_CONFLICT', payload_json = ? WHERE decision_id = ?",
+                (json.dumps(current, ensure_ascii=False, sort_keys=True), decision_id),
+            )
+            conn.execute("COMMIT")
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
+        finally:
+            conn.close()
+        raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_CONFLICTING_RUN", exc.detail) from exc
     run = result["run"]
     conn = _tx(cfg)
     try:
