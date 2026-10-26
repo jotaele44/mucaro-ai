@@ -596,6 +596,17 @@ async function executionEntryScenario(browser, base, viewport, contextOptions, m
     await page.waitForTimeout(250);
     check("N19 keyboard activation of a disabled primary sends no decision", viewport, decisionPosts === 0, `decision POSTs=${decisionPosts}`);
 
+    const describedBy = await primary.getAttribute("aria-describedby");
+    const announcement = describedBy ? page.locator(`#${describedBy}`) : null;
+    const announcementRole = announcement ? await announcement.getAttribute("role").catch(() => null) : null;
+    const announcementText = announcement ? (await announcement.textContent().catch(() => ""))?.trim() : "";
+    check(
+      "disabled entry reason exposes screen-reader status semantics",
+      viewport,
+      Boolean(describedBy && announcementRole === "status" && announcementText),
+      JSON.stringify({ describedBy, role: announcementRole, text: announcementText }),
+    );
+
     await page.evaluate(() => {
       Object.defineProperty(navigator, "language", { value: "es-PR", configurable: true });
       window.dispatchEvent(new Event("languagechange"));
@@ -617,17 +628,6 @@ async function executionEntryScenario(browser, base, viewport, contextOptions, m
       viewport,
       focusOrder.every((row) => row.height >= minEntryTarget),
       JSON.stringify(focusOrder),
-    );
-
-    const describedBy = await primary.getAttribute("aria-describedby");
-    const announcement = describedBy ? page.locator(`#${describedBy}`) : null;
-    const announcementRole = announcement ? await announcement.getAttribute("role").catch(() => null) : null;
-    const announcementText = announcement ? (await announcement.textContent().catch(() => ""))?.trim() : "";
-    check(
-      "disabled entry reason exposes screen-reader status semantics",
-      viewport,
-      Boolean(describedBy && announcementRole === "status" && announcementText),
-      JSON.stringify({ describedBy, role: announcementRole, text: announcementText }),
     );
 
     if (viewport === "entry-desktop") {
