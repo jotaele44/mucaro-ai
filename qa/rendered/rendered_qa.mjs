@@ -618,6 +618,37 @@ async function executionEntryScenario(browser, base, viewport, contextOptions, m
       focusOrder.every((row) => row.height >= minEntryTarget),
       JSON.stringify(focusOrder),
     );
+
+    const describedBy = await primary.getAttribute("aria-describedby");
+    const announcement = describedBy ? page.locator(`#${describedBy}`) : null;
+    const announcementRole = announcement ? await announcement.getAttribute("role").catch(() => null) : null;
+    const announcementText = announcement ? (await announcement.textContent().catch(() => ""))?.trim() : "";
+    check(
+      "disabled entry reason exposes screen-reader status semantics",
+      viewport,
+      Boolean(describedBy && announcementRole === "status" && announcementText),
+      JSON.stringify({ describedBy, role: announcementRole, text: announcementText }),
+    );
+
+    if (viewport === "entry-desktop") {
+      await page.setViewportSize({ width: 720, height: 450 });
+      const zoomEquivalentOverflow = await page.evaluate(() => {
+        const cardNode = document.querySelector(".execution-entry-card");
+        const box = cardNode?.getBoundingClientRect();
+        return {
+          innerWidth: window.innerWidth,
+          page: document.documentElement.scrollWidth > window.innerWidth + 1,
+          card: !box || box.left < -1 || box.right > window.innerWidth + 1,
+        };
+      });
+      check(
+        "execution-entry reflows at 200% desktop zoom-equivalent width",
+        viewport,
+        zoomEquivalentOverflow.innerWidth === 720 && !zoomEquivalentOverflow.page && !zoomEquivalentOverflow.card,
+        JSON.stringify(zoomEquivalentOverflow),
+      );
+      await page.setViewportSize({ width: 1440, height: 900 });
+    }
     await shot(page, viewport, "execution-entry-candidate");
     const entryAxe = await axe(page, viewport, "execution entry candidate");
 
@@ -1636,6 +1667,8 @@ const receipt = {
     `Rendered in Playwright ${browserName}; this does not execute the packaged WKWebView window.`,
     "iPhone width is emulated on a desktop browser engine, not rendered by iOS Safari on a phone.",
     "Phone access is exercised through a non-loopback address of this machine, not from a physical phone on a real network.",
+    "Execution-entry screen-reader evidence validates programmatic role/status association; it does not execute VoiceOver, NVDA, or another physical assistive-technology session.",
+    "Execution-entry 200% evidence uses the 720-CSS-pixel effective layout width corresponding to a 1440px desktop at 200% zoom; it does not manipulate browser chrome zoom controls.",
     ...skippedNotes,
     ...(onlyNew ? ["Development run (--only-new): the base desktop and iPhone scenarios did not run, so this is not a complete receipt."] : []),
   ],
