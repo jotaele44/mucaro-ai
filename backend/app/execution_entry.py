@@ -304,25 +304,59 @@ def current_conversation_entry(conversation_id: str, cfg: Settings = settings) -
 
 
 def current_conversation_entry_context(conversation_id: str, cfg: Settings = settings) -> dict[str, Any]:
-    entry = current_conversation_entry(conversation_id, cfg)
-    if entry is None:
+    latest_entry = current_conversation_entry(conversation_id, cfg)
+    if latest_entry is None:
         return {"status": "EXECUTION_ENTRY_NONE", "entry": None, "decision": None}
-    with get_connection(cfg.sqlite_path) as conn:
-        row = conn.execute(
-            "SELECT payload_json FROM execution_entry_decisions "
-            "WHERE artifact_id = ? AND revision = ? ORDER BY rowid DESC LIMIT 1",
-            (entry["artifact_id"], entry["revision"]),
-        ).fetchone()
+
+    entry = latest_entry
     decision = None
     run = None
-    if row is not None:
-        decision = _row_payload(row)
-        _verify_hash(decision, "receipt_sha256", "ERROR_EXECUTION_ENTRY_RECEIPT_CORRUPT")
-        if decision.get("run_id"):
+    active_states = {"QUEUED", "RUNNING", "AWAITING_APPROVAL", "AWAITING_INPUT", "INTERRUPTED"}
+
+    with get_connection(cfg.sqlite_path) as conn:
+        rows = conn.execute(
+            "SELECT d.payload_json AS decision_json, a.payload_json AS artifact_json "
+            "FROM execution_entry_decisions d "
+            "JOIN execution_entry_artifacts a ON a.artifact_id = d.artifact_id AND a.revision = d.revision "
+            "WHERE a.conversation_id = ? AND d.state = 'DISPATCHED' "
+            "ORDER BY d.rowid DESC",
+            (conversation_id,),
+        ).fetchall()
+        for candidate_row in rows:
+            candidate_decision = json.loads(candidate_row["decision_json"])
+            _verify_hash(candidate_decision, "receipt_sha256", "ERROR_EXECUTION_ENTRY_RECEIPT_CORRUPT")
+            candidate_run_id = str(candidate_decision.get("run_id") or "")
+            if not candidate_run_id:
+                continue
             try:
-                run = get_run(str(decision["run_id"]), cfg)
+                candidate_run = get_run(candidate_run_id, cfg)
             except RunError:
-                run = None
+                continue
+            if candidate_run["state"] not in active_states:
+                continue
+            candidate_entry = json.loads(candidate_row["artifact_json"])
+            _verify_hash(candidate_entry, "artifact_sha256", "ERROR_EXECUTION_ENTRY_ARTIFACT_CORRUPT")
+            _validate_artifact_identity(candidate_entry)
+            entry = candidate_entry
+            decision = candidate_decision
+            run = candidate_run
+            break
+
+        if decision is None:
+            row = conn.execute(
+                "SELECT payload_json FROM execution_entry_decisions "
+                "WHERE artifact_id = ? AND revision = ? ORDER BY rowid DESC LIMIT 1",
+                (entry["artifact_id"], entry["revision"]),
+            ).fetchone()
+            if row is not None:
+                decision = _row_payload(row)
+                _verify_hash(decision, "receipt_sha256", "ERROR_EXECUTION_ENTRY_RECEIPT_CORRUPT")
+                if decision.get("run_id"):
+                    try:
+                        run = get_run(str(decision["run_id"]), cfg)
+                    except RunError:
+                        run = None
+
     runtime_source_commit = None
     source_identity_status = "SOURCE_IDENTITY_OK"
     try:
@@ -335,6 +369,7 @@ def current_conversation_entry_context(conversation_id: str, cfg: Settings = set
     return {
         "status": "EXECUTION_ENTRY_OK",
         "entry": entry,
+        "latest_entry": latest_entry,
         "decision": decision,
         "run": run,
         "runtime_source_commit": runtime_source_commit,
