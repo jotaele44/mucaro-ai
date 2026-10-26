@@ -199,22 +199,20 @@ def test_p07_completed_stage_keeps_verifiable_artifact_and_decision_receipts(cfg
 
 
 # P08
-@pytest.mark.parametrize(
-    ("locale", "mode", "primary", "secondary"),
-    [
+def test_p08_localized_labels_preserve_action_semantics():
+    cases = [
         ("en", "GOAL", "Proceed", "Adjust"),
         ("en-US", "PLAN", "Execute", "Revise"),
         ("es", "GOAL", "Proceder", "Ajustar"),
         ("es-PR", "PLAN", "Ejecutar", "Revisar"),
-    ],
-)
-def test_p08_localized_labels_preserve_action_semantics(locale, mode, primary, secondary):
-    assert entry_labels(locale, mode) == {
-        "locale": "es" if locale.startswith("es") else "en",
-        "mode": mode,
-        "primary": primary,
-        "secondary": secondary,
-    }
+    ]
+    for locale, mode, primary, secondary in cases:
+        assert entry_labels(locale, mode) == {
+            "locale": "es" if locale.startswith("es") else "en",
+            "mode": mode,
+            "primary": primary,
+            "secondary": secondary,
+        }
 
 
 # N01
