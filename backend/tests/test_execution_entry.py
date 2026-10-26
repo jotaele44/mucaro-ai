@@ -14,6 +14,7 @@ from backend.app.execution_entry import (
     ExecutionEntryError,
     _canonical_hash,
     create_entry_artifact,
+    current_conversation_entry_context,
     decide_entry,
     entry_labels,
     get_entry_artifact,
@@ -419,10 +420,26 @@ def test_n12_revise_never_modifies_approved_plan_in_place(cfg, conversation):
 def test_n13_running_decision_never_silently_migrates_to_new_revision(cfg, conversation):
     approved = _ready(cfg, _artifact(cfg, conversation, mode="PLAN"))
     executed = _decide(cfg, approved, "Execute", "n13-execute")
+    with get_connection(cfg.sqlite_path) as conn:
+        conn.execute("UPDATE work_runs SET state = 'RUNNING' WHERE run_id = ?", (executed["run_id"],))
+
     revised_decision = _decide(cfg, approved, "Revise", "n13-revise", changes={"prompt": "future revision"})
     assert get_entry_decision(executed["decision_id"], cfg)["revision"] == 1
     assert revised_decision["new_revision"] == 2
     assert get_entry_artifact(approved["artifact_id"], 2, cfg)["state"] == "PLAN_CANDIDATE"
+
+    active_context = current_conversation_entry_context(conversation, cfg)
+    assert active_context["entry"]["revision"] == 1
+    assert active_context["decision"]["decision_id"] == executed["decision_id"]
+    assert active_context["run"]["run_id"] == executed["run_id"]
+    assert active_context["run"]["state"] == "RUNNING"
+    assert active_context["latest_entry"]["revision"] == 2
+
+    with get_connection(cfg.sqlite_path) as conn:
+        conn.execute("UPDATE work_runs SET state = 'COMPLETED' WHERE run_id = ?", (executed["run_id"],))
+    settled_context = current_conversation_entry_context(conversation, cfg)
+    assert settled_context["entry"]["revision"] == 2
+    assert settled_context["latest_entry"]["revision"] == 2
 
 
 # N14
