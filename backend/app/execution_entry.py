@@ -434,6 +434,38 @@ def transition_entry_artifact(
         conn.close()
 
 
+def _decision_binding_fields(artifact: dict[str, Any], expected_version: int) -> dict[str, Any]:
+    identity = {
+        "objective_id": artifact["objective_id"],
+        "expected_version": expected_version,
+        "artifact_sha256": artifact["artifact_sha256"],
+        "gate_evidence": [
+            {
+                "gate_id": row["gate_id"],
+                "state": row["state"],
+                "evidence_ref": row["evidence_ref"],
+                "evidence_sha256": row["evidence_sha256"],
+            }
+            for row in artifact["required_gates"]
+        ],
+    }
+    if artifact["mode"] == "GOAL":
+        identity.update(
+            {
+                "vector_id": artifact["vector_id"],
+                "vector_revision": artifact["vector_revision"],
+            }
+        )
+    else:
+        identity.update(
+            {
+                "plan_id": artifact["plan_id"],
+                "plan_revision": artifact["plan_revision"],
+            }
+        )
+    return identity
+
+
 def _decision_request(
     *,
     artifact: dict[str, Any],
@@ -447,8 +479,8 @@ def _decision_request(
     return {
         "artifact_id": artifact["artifact_id"],
         "revision": artifact["revision"],
-        "artifact_sha256": artifact["artifact_sha256"],
         "mode": artifact["mode"],
+        **_decision_binding_fields(artifact, expected_version),
         "action": action,
         "expected_version": expected_version,
         "actor": actor,
@@ -596,6 +628,7 @@ def decide_entry(
 
         decision_id = stable_id("entrydec", artifact_id, str(revision), action, idempotency_key, length=18)
         now = utc_now()
+        decision_binding = _decision_binding_fields(artifact, expected_version)
         if action in {"Adjust", "Revise"}:
             revised = _create_revision_locked(
                 conn,
@@ -609,8 +642,8 @@ def decide_entry(
                 "decision_id": decision_id,
                 "artifact_id": artifact_id,
                 "revision": revision,
-                "artifact_sha256": artifact["artifact_sha256"],
                 "mode": artifact["mode"],
+                **decision_binding,
                 "action": action,
                 "actor": actor,
                 "policy_version": artifact["policy_version"],
@@ -641,8 +674,8 @@ def decide_entry(
                 "decision_id": decision_id,
                 "artifact_id": artifact_id,
                 "revision": revision,
-                "artifact_sha256": artifact["artifact_sha256"],
                 "mode": artifact["mode"],
+                **decision_binding,
                 "action": action,
                 "actor": actor,
                 "policy_version": artifact["policy_version"],
