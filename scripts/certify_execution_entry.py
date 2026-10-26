@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DENOMINATOR = ROOT / "_architecture" / "execution_entry_denominator_v1.json"
 TEST_FILE = ROOT / "backend" / "tests" / "test_execution_entry.py"
+API_TEST_FILE = ROOT / "backend" / "tests" / "test_execution_entry_api.py"
 CONTRACT = ROOT / "docs" / "GOAL_PLAN_EXECUTION_ENTRY_V1.md"
 STATUS_OK = "MUCARO_EXECUTION_ENTRY_BACKEND_CERT_OK"
 CASE_RE = re.compile(r"^test_([pn]\d{2})_", re.IGNORECASE)
@@ -62,6 +63,17 @@ def main() -> int:
     proc = subprocess.run(command, cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
     match = re.search(r"(\d+) passed", proc.stdout)
     passed = int(match.group(1)) if match else 0
+    api_command = ["python", "-m", "pytest", str(API_TEST_FILE.relative_to(ROOT)), "-q"]
+    api_proc = subprocess.run(
+        api_command,
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    api_match = re.search(r"(\d+) passed", api_proc.stdout)
+    api_passed = int(api_match.group(1)) if api_match else 0
     terminal_checks = {
         "head_matches": observed_head == expected_head,
         "denominator_declares_28": denominator.get("expected_count") == 28,
@@ -71,6 +83,8 @@ def main() -> int:
         "case_count_exact": len(observed_ids) == 28 == len(expected_ids),
         "pytest_exit_zero": proc.returncode == 0,
         "pytest_28_passed": passed == 28,
+        "api_integration_exit_zero": api_proc.returncode == 0,
+        "api_integration_3_passed": api_passed == 3,
     }
     status = STATUS_OK if all(terminal_checks.values()) else "MUCARO_EXECUTION_ENTRY_BACKEND_CERT_FAILED"
     receipt = {
@@ -81,6 +95,7 @@ def main() -> int:
         "denominator_sha256": sha256_file(DENOMINATOR),
         "contract_sha256": sha256_file(CONTRACT),
         "test_file_sha256": sha256_file(TEST_FILE),
+        "api_test_file_sha256": sha256_file(API_TEST_FILE),
         "expected_case_ids": expected_ids,
         "observed_case_ids": observed_ids,
         "arithmetic": {
@@ -89,10 +104,13 @@ def main() -> int:
             "positive": denominator.get("positive_count"),
             "negative": denominator.get("negative_count"),
             "pytest_passed": passed,
+            "api_integration_passed": api_passed,
         },
         "terminal_checks": terminal_checks,
         "pytest_command": command,
         "pytest_output": proc.stdout[-12000:],
+        "api_pytest_command": api_command,
+        "api_pytest_output": api_proc.stdout[-12000:],
         "limitations": [
             "This receipt certifies the backend entry controller denominator only.",
             "Rendered desktop/mobile, keyboard, screen-reader and locale-switch evidence remains a separate required gate.",
