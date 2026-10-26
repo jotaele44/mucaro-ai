@@ -409,11 +409,26 @@ def test_n17_corrupted_decision_receipt_hash_is_rejected(cfg, conversation):
 
 
 # N18
-def test_n18_changed_source_commit_is_rejected(cfg, conversation):
+def test_n18_changed_source_commit_is_rejected(cfg, conversation, monkeypatch):
     ready = _ready(cfg, _artifact(cfg, conversation))
     with pytest.raises(ExecutionEntryError) as exc:
         _decide(cfg, ready, "Proceed", "n18-source", source_commit=OTHER_SHA)
     assert exc.value.status == "ERROR_EXECUTION_ENTRY_SOURCE_DRIFT"
+
+    actual_dispatch = execution_entry.dispatch_entry_decision
+    monkeypatch.setattr(
+        execution_entry,
+        "dispatch_entry_decision",
+        lambda decision_id, cfg=cfg: get_entry_decision(decision_id, cfg),
+    )
+    claimed = _decide(cfg, ready, "Proceed", "n18-claimed")
+    assert claimed["state"] == "CLAIMED"
+    monkeypatch.setattr(execution_entry, "dispatch_entry_decision", actual_dispatch)
+    monkeypatch.setenv("MUCARO_SOURCE_HEAD", OTHER_SHA)
+    with pytest.raises(ExecutionEntryError) as recovery_exc:
+        resume_pending_entry_decisions(cfg)
+    assert recovery_exc.value.status == "ERROR_EXECUTION_ENTRY_SOURCE_DRIFT"
+    assert _run_count(cfg, conversation) == 0
 
 
 # N19
