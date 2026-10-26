@@ -269,6 +269,12 @@ def transition_entry_artifact(
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_UNAUTHORIZED_ACTOR", actor)
         if payload["version"] != expected_version:
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_VERSION_CONFLICT", f"expected={expected_version} actual={payload['version']}")
+        latest = conn.execute(
+            "SELECT MAX(revision) AS revision FROM execution_entry_artifacts WHERE artifact_id = ?",
+            (artifact_id,),
+        ).fetchone()
+        if latest is None or int(latest["revision"] or 0) != revision:
+            raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_STALE_REVISION", artifact_id)
         wanted = READY_STATE[payload["mode"]]
         if target_state != wanted:
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_STATE", f"only {wanted} is a valid approval target")
@@ -565,6 +571,7 @@ def dispatch_entry_decision(decision_id: str, cfg: Settings = settings) -> dict[
                     "revision": artifact["revision"],
                     "mode": artifact["mode"],
                     "source_commit": artifact["source_commit"],
+                    "artifact_sha256": artifact["artifact_sha256"],
                 },
             },
             idempotency_key=f"entry:{decision_id}",
