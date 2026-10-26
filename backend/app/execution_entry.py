@@ -65,6 +65,20 @@ def _require_mode(mode: str) -> str:
     return normalized
 
 
+def _validate_artifact_identity(payload: dict[str, Any]) -> None:
+    mode = _require_mode(str(payload.get("mode") or ""))
+    artifact_id = str(payload.get("artifact_id") or "")
+    revision = int(payload.get("revision") or 0)
+    if not artifact_id or revision < 1:
+        raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_IDENTITY", "artifact_id and revision are required")
+    if mode == "GOAL":
+        if payload.get("vector_id") != artifact_id or payload.get("vector_revision") != revision:
+            raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_IDENTITY", "GOAL vector identity does not match artifact revision")
+    else:
+        if payload.get("plan_id") != artifact_id or payload.get("plan_revision") != revision:
+            raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_IDENTITY", "PLAN identity does not match artifact revision")
+
+
 def _validate_gates(required_gates: list[dict[str, Any]]) -> list[dict[str, str]]:
     if not isinstance(required_gates, list) or not required_gates:
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_GATES", "required_gates must contain at least one mandatory gate")
@@ -188,6 +202,7 @@ def get_entry_artifact(artifact_id: str, revision: int | None = None, cfg: Setti
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_NOT_FOUND", artifact_id)
     payload = _row_payload(row)
     _verify_hash(payload, "artifact_sha256", "ERROR_EXECUTION_ENTRY_ARTIFACT_CORRUPT")
+    _validate_artifact_identity(payload)
     return payload
 
 
@@ -226,6 +241,7 @@ def transition_entry_artifact(
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_NOT_FOUND", artifact_id)
         payload = _row_payload(row)
         _verify_hash(payload, "artifact_sha256", "ERROR_EXECUTION_ENTRY_ARTIFACT_CORRUPT")
+        _validate_artifact_identity(payload)
         if actor not in payload.get("authorized_actors", []):
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_UNAUTHORIZED_ACTOR", actor)
         if payload["version"] != expected_version:
@@ -371,6 +387,7 @@ def decide_entry(
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_NOT_FOUND", artifact_id)
         artifact = _row_payload(row)
         _verify_hash(artifact, "artifact_sha256", "ERROR_EXECUTION_ENTRY_ARTIFACT_CORRUPT")
+        _validate_artifact_identity(artifact)
         if actor not in artifact.get("authorized_actors", []):
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_UNAUTHORIZED_ACTOR", actor)
         if action not in ENTRY_ACTIONS[artifact["mode"]]:
