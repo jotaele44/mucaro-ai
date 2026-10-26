@@ -2,15 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
-import subprocess
 import uuid
 from typing import Any
 
 from .config import Settings, settings
 from .conversations import get_conversation
 from .db import ensure_db, get_connection
+from .runtime_identity import current_git_head
 from .utils import stable_id, utc_now
 from .work_runs import RunError, get_run, submit_message
 
@@ -62,27 +61,13 @@ def _require_source_commit(value: str) -> str:
 
 
 def _runtime_source_commit(cfg: Settings) -> str:
-    configured = str(os.getenv("MUCARO_AI_SOURCE_COMMIT") or "").strip()
-    if configured:
-        return _require_source_commit(configured)
-    try:
-        proc = subprocess.run(
-            ["git", "-C", str(cfg.project_root), "rev-parse", "HEAD"],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            check=False,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_SOURCE_IDENTITY_UNAVAILABLE", str(exc)) from exc
-    observed = proc.stdout.strip() if proc.returncode == 0 else ""
-    if not SOURCE_COMMIT_RE.fullmatch(observed):
+    observed = current_git_head(cfg.project_root)
+    if observed is None:
         raise ExecutionEntryError(
             "ERROR_EXECUTION_ENTRY_SOURCE_IDENTITY_UNAVAILABLE",
-            "runtime has neither MUCARO_AI_SOURCE_COMMIT nor a readable Git HEAD",
+            "runtime source identity is unavailable from bound package identity or local Git metadata",
         )
-    return observed
+    return _require_source_commit(observed)
 
 
 def _assert_runtime_source(expected: str, cfg: Settings) -> str:
