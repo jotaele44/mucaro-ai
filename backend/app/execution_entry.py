@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from .config import Settings, settings
+from .conversations import get_conversation
 from .db import ensure_db, get_connection
 from .utils import stable_id, utc_now
 from .work_runs import RunError, get_run, submit_message
@@ -29,6 +30,26 @@ class ExecutionEntryError(RuntimeError):
 def _canonical_hash(payload: dict[str, Any]) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _verify_hash(payload: dict[str, Any], field: str, status: str) -> None:
+    expected = str(payload.get(field) or "")
+    material = {key: value for key, value in payload.items() if key != field}
+    actual = _canonical_hash(material)
+    if expected != actual:
+        raise ExecutionEntryError(status, f"expected={expected} observed={actual}")
+
+
+def entry_labels(locale: str, mode: str) -> dict[str, str]:
+    mode = _require_mode(mode)
+    language = "es" if str(locale or "").lower().startswith("es") else "en"
+    labels = {
+        ("en", "GOAL"): {"primary": "Proceed", "secondary": "Adjust"},
+        ("en", "PLAN"): {"primary": "Execute", "secondary": "Revise"},
+        ("es", "GOAL"): {"primary": "Proceder", "secondary": "Ajustar"},
+        ("es", "PLAN"): {"primary": "Ejecutar", "secondary": "Revisar"},
+    }
+    return {"locale": language, "mode": mode, **labels[(language, mode)]}
 
 
 def _require_source_commit(value: str) -> str:
@@ -92,6 +113,7 @@ def create_entry_artifact(
     source_commit: str,
     required_gates: list[dict[str, Any]],
     actor: str,
+    authorized_actors: list[str] | None = None,
     policy_version: str = "execution-entry-v1",
     cfg: Settings = settings,
 ) -> dict[str, Any]:
@@ -103,6 +125,12 @@ def create_entry_artifact(
     actor = (actor or "").strip()
     if not objective_id or not conversation_id or not prompt or not actor:
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_INPUT", "objective_id, conversation_id, prompt and actor are required")
+    if get_conversation(conversation_id, cfg) is None:
+        raise ExecutionEntryError("ERROR_CONVERSATION_NOT_FOUND", conversation_id)
+    authorized = sorted({str(value).strip() for value in (authorized_actors or [actor]) if str(value).strip()})
+    if actor not in authorized:
+        authorized.append(actor)
+        authorized.sort()
     source_commit = _require_source_commit(source_commit)
     if runtime_mode not in {"plan", "ask", "auto"}:
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_RUNTIME_MODE", runtime_mode)
@@ -127,6 +155,7 @@ def create_entry_artifact(
         "options": dict(options or {}),
         "required_gates": gates,
         "actor": actor,
+        "authorized_actors": authorized,
         "policy_version": policy_version,
         "source_commit": source_commit,
         "predecessor_revision": None,
@@ -157,7 +186,9 @@ def get_entry_artifact(artifact_id: str, revision: int | None = None, cfg: Setti
             ).fetchone()
     if row is None:
         raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_NOT_FOUND", artifact_id)
-    return _row_payload(row)
+    payload = _row_payload(row)
+    _verify_hash(payload, "artifact_sha256", "ERROR_EXECUTION_ENTRY_ARTIFACT_CORRUPT")
+    return payload
 
 
 def current_conversation_entry(conversation_id: str, cfg: Settings = settings) -> dict[str, Any] | None:
@@ -168,7 +199,11 @@ def current_conversation_entry(conversation_id: str, cfg: Settings = settings) -
             "ORDER BY rowid DESC LIMIT 1",
             (conversation_id,),
         ).fetchone()
-    return _row_payload(row) if row is not None else None
+    if row is None:
+        return None
+    payload = _row_payload(row)
+    _verify_hash(payload, "artifact_sha256", "ERROR_EXECUTION_ENTRY_ARTIFACT_CORRUPT")
+    return payload
 
 
 def transition_entry_artifact(
@@ -190,6 +225,9 @@ def transition_entry_artifact(
         if row is None:
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_NOT_FOUND", artifact_id)
         payload = _row_payload(row)
+        _verify_hash(payload, "artifact_sha256", "ERROR_EXECUTION_ENTRY_ARTIFACT_CORRUPT")
+        if actor not in payload.get("authorized_actors", []):
+            raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_UNAUTHORIZED_ACTOR", actor)
         if payload["version"] != expected_version:
             raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_VERSION_CONFLICT", f"expected={expected_version} actual={payload['version']}")
         wanted = READY_STATE[payload["mode"]]
