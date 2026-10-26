@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -27,10 +28,20 @@ from backend.tests.test_api import make_settings
 
 SHA = "a" * 40
 OTHER_SHA = "b" * 40
+def _gate(gate_id: str, state: str) -> dict[str, str]:
+    evidence = f"fixture://execution-entry/{gate_id}/{state.lower()}"
+    return {
+        "gate_id": gate_id,
+        "state": state,
+        "evidence_ref": evidence,
+        "evidence_sha256": hashlib.sha256(evidence.encode("utf-8")).hexdigest(),
+    }
+
+
 PASS_GATES = [
-    {"gate_id": "scope", "state": "PASS"},
-    {"gate_id": "authorization", "state": "PASS"},
-    {"gate_id": "dependencies", "state": "PASS"},
+    _gate("scope", "PASS"),
+    _gate("authorization", "PASS"),
+    _gate("dependencies", "PASS"),
 ]
 
 
@@ -317,7 +328,7 @@ def test_n05_execute_without_approval_is_rejected(cfg, conversation):
 
 # N06
 def test_n06_failed_dependency_gate_blocks_approval(cfg, conversation):
-    artifact = _artifact(cfg, conversation, gates=[{"gate_id": "dependency", "state": "FAIL"}])
+    artifact = _artifact(cfg, conversation, gates=[_gate("dependency", "FAIL")])
     with pytest.raises(ExecutionEntryError) as exc:
         _ready(cfg, artifact)
     assert exc.value.status == "ERROR_EXECUTION_ENTRY_NOT_READY"
@@ -325,10 +336,19 @@ def test_n06_failed_dependency_gate_blocks_approval(cfg, conversation):
 
 # N07
 def test_n07_unresolved_risk_gate_blocks_approval(cfg, conversation):
-    artifact = _artifact(cfg, conversation, gates=[{"gate_id": "risk", "state": "UNRESOLVED"}])
+    artifact = _artifact(cfg, conversation, gates=[_gate("risk", "UNRESOLVED")])
     with pytest.raises(ExecutionEntryError) as exc:
         _ready(cfg, artifact)
     assert exc.value.status == "ERROR_EXECUTION_ENTRY_NOT_READY"
+
+    missing_evidence = {"gate_id": "authorization", "state": "PASS"}
+    with pytest.raises(ExecutionEntryError) as evidence_exc:
+        _artifact(
+            cfg,
+            create_conversation("entry missing evidence", cfg)["conversation_id"],
+            gates=[missing_evidence],
+        )
+    assert evidence_exc.value.status == "ERROR_EXECUTION_ENTRY_GATES"
 
 
 # N08
