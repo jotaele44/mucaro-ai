@@ -137,26 +137,21 @@ class ExecutionEntryCreateRequest(BaseModel):
     options: dict = Field(default_factory=dict)
     source_commit: str = Field(pattern=r"^[0-9a-f]{40}$")
     required_gates: list[ExecutionEntryGateInput] = Field(min_length=1)
-    actor: str = Field(min_length=1, max_length=160)
-    authorized_actors: list[str] = Field(default_factory=list)
     policy_version: str = Field(default="execution-entry-v1", min_length=1, max_length=120)
 
 
 class ExecutionEntryStateRequest(BaseModel):
     expected_version: int = Field(ge=1)
     target_state: Literal["VECTOR_READY", "PLAN_APPROVED"]
-    actor: str = Field(min_length=1, max_length=160)
 
 
 class ExecutionEntryDecisionRequest(BaseModel):
     action: Literal["Proceed", "Adjust", "Execute", "Revise"]
     expected_version: int = Field(ge=1)
-    actor: str = Field(min_length=1, max_length=160)
     idempotency_key: str = Field(min_length=8, max_length=128)
     source_commit: str = Field(pattern=r"^[0-9a-f]{40}$")
     changes: dict = Field(default_factory=dict)
 
 
 class ExecutionEntryResumeRequest(BaseModel):
-    actor: str = Field(min_length=1, max_length=160)
     idempotency_key: str = Field(min_length=8, max_length=128)
