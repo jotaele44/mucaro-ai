@@ -350,6 +350,19 @@ def test_n07_unresolved_risk_gate_blocks_approval(cfg, conversation):
         )
     assert evidence_exc.value.status == "ERROR_EXECUTION_ENTRY_GATES"
 
+    legacy = _artifact(
+        cfg,
+        create_conversation("entry legacy missing evidence", cfg)["conversation_id"],
+    )
+    _tamper_artifact(
+        cfg,
+        legacy,
+        required_gates=[{"gate_id": "authorization", "state": "PASS"}],
+    )
+    with pytest.raises(ExecutionEntryError) as legacy_exc:
+        _ready(cfg, get_entry_artifact(legacy["artifact_id"], 1, cfg))
+    assert legacy_exc.value.status == "ERROR_EXECUTION_ENTRY_GATES"
+
 
 # N08
 def test_n08_unauthorized_actor_cannot_approve_or_decide(cfg, conversation):
