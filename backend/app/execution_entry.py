@@ -589,6 +589,79 @@ def dispatch_entry_decision(decision_id: str, cfg: Settings = settings) -> dict[
         conn.close()
 
 
+def resume_interrupted_entry_decision(
+    decision_id: str,
+    *,
+    actor: str,
+    idempotency_key: str,
+    cfg: Settings = settings,
+) -> dict[str, Any]:
+    decision = get_entry_decision(decision_id, cfg)
+    artifact = get_entry_artifact(decision["artifact_id"], decision["revision"], cfg)
+    if actor not in artifact.get("authorized_actors", []):
+        raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_UNAUTHORIZED_ACTOR", actor)
+    run_id = str(decision.get("run_id") or "")
+    if not run_id:
+        raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_RESUME_STATE", "decision has no dispatched run")
+    run = get_run(run_id, cfg)
+    if run["state"] != "INTERRUPTED":
+        raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_RESUME_STATE", run["state"])
+    idempotency_key = (idempotency_key or "").strip()
+    if len(idempotency_key) < 8:
+        raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_INPUT", "resume idempotency_key must be at least 8 characters")
+    result = submit_message(
+        artifact["conversation_id"],
+        artifact["prompt"],
+        mode=artifact["runtime_mode"],
+        options={
+            **artifact["options"],
+            "execution_entry": {
+                "decision_id": decision_id,
+                "artifact_id": artifact["artifact_id"],
+                "revision": artifact["revision"],
+                "mode": artifact["mode"],
+                "source_commit": artifact["source_commit"],
+                "resume_of_run_id": run_id,
+            },
+        },
+        idempotency_key=f"entry-resume:{decision_id}:{idempotency_key}",
+        require_idle=True,
+        cfg=cfg,
+    )
+    next_run = result["run"]
+    conn = _tx(cfg)
+    try:
+        row = conn.execute(
+            "SELECT payload_json FROM execution_entry_decisions WHERE decision_id = ?",
+            (decision_id,),
+        ).fetchone()
+        if row is None:
+            raise ExecutionEntryError("ERROR_EXECUTION_ENTRY_DECISION_NOT_FOUND", decision_id)
+        current = _row_payload(row)
+        _verify_hash(current, "receipt_sha256", "ERROR_EXECUTION_ENTRY_RECEIPT_CORRUPT")
+        prior = list(current.get("prior_run_ids") or [])
+        if run_id not in prior:
+            prior.append(run_id)
+        current["prior_run_ids"] = prior
+        current["run_id"] = next_run["run_id"]
+        current["resume_count"] = int(current.get("resume_count") or 0) + 1
+        current["resumed_at"] = utc_now()
+        current["resume_idempotency_key"] = idempotency_key
+        current["receipt_sha256"] = _canonical_hash({k: v for k, v in current.items() if k != "receipt_sha256"})
+        conn.execute(
+            "UPDATE execution_entry_decisions SET payload_json = ? WHERE decision_id = ?",
+            (json.dumps(current, ensure_ascii=False, sort_keys=True), decision_id),
+        )
+        conn.execute("COMMIT")
+        current["run"] = next_run
+        return current
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.close()
+
+
 def resume_pending_entry_decisions(cfg: Settings = settings) -> dict[str, Any]:
     ensure_db(cfg.sqlite_path)
     with get_connection(cfg.sqlite_path) as conn:
