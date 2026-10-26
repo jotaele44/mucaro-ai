@@ -752,8 +752,20 @@ def resume_pending_entry_decisions(cfg: Settings = settings) -> dict[str, Any]:
             "SELECT decision_id FROM execution_entry_decisions WHERE state = 'CLAIMED' ORDER BY rowid ASC"
         ).fetchall()
     dispatched: list[str] = []
+    rejected_conflicts: list[str] = []
     for row in rows:
-        result = dispatch_entry_decision(str(row["decision_id"]), cfg)
+        decision_id = str(row["decision_id"])
+        try:
+            result = dispatch_entry_decision(decision_id, cfg)
+        except ExecutionEntryError as exc:
+            if exc.status != "ERROR_EXECUTION_ENTRY_CONFLICTING_RUN":
+                raise
+            rejected_conflicts.append(decision_id)
+            continue
         if result.get("state") == "DISPATCHED":
-            dispatched.append(str(row["decision_id"]))
-    return {"status": "EXECUTION_ENTRY_RECOVERY_OK", "dispatched": dispatched}
+            dispatched.append(decision_id)
+    return {
+        "status": "EXECUTION_ENTRY_RECOVERY_OK" if not rejected_conflicts else "EXECUTION_ENTRY_RECOVERY_PARTIAL",
+        "dispatched": dispatched,
+        "rejected_conflicts": rejected_conflicts,
+    }
