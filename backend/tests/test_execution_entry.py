@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from concurrent.futures import ThreadPoolExecutor
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
