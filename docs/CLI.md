@@ -67,6 +67,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis reproject GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON between supported local CRS pairs and write a transformation receipt | 0 | 2 |
 | `mucaro gis reproject-crs GEOJSON_PATH --target-crs CRS [--transform-z]` | Reproject GeoJSON through pyproj/PROJ with explicit axis policy and frozen transformer identity; opt into audited 3D Z transformation when both CRS definitions expose a third axis | 0 | 2 |
 | `python3 scripts/certify_gis_datum_cli_parity.py` | Run the frozen Puerto Rico and Florida datum-grid controls through the PROJ `cct` executable and verify byte/hash/coordinate parity | 0 | 2 |
+| `python3 scripts/certify_gis_overlay_cli_parity.py` | Run frozen rectangle intersection/union/symmetric-difference controls through the GEOS `geosop` executable | 0 | 2 |
 | `mucaro gis csv-points CSV_PATH --lat-column LAT --lon-column LON` | Convert CSV coordinate rows into GeoJSON point features and write a row-accounted GIS receipt | 0 | 2 |
 | `mucaro gis filter-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Filter whole GeoJSON features by bbox extent and write retained/excluded accounting | 0 | 2 |
 | `mucaro gis clip-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Clip GeoJSON geometries to a bbox and write clipped/unchanged/excluded accounting | 0 | 2 |
@@ -221,6 +222,15 @@ while unsupported dimensional inputs remain unresolved residue. Broader
 clipping/overlay operation support, true dimension-preserving mutation for
 derived geometry outputs, and independent planar overlay validation remain
 future GIS work.
+
+`python3 scripts/certify_gis_overlay_cli_parity.py` runs the frozen
+`OVERLAY-CLI-001` rectangle fixture through the GEOS `geosop` executable and
+checks intersection, union, and symmetric-difference areas and result types
+against closed-form expectations. `GIS_OVERLAY_CLI_PARITY_OK` is executable
+parity evidence separate from the Mucaro/Shapely adapter; it does not certify
+an independent vendor, geodesic overlay, legal-boundary accuracy, or arbitrary
+3D/topology semantics. The report therefore preserves
+`independent_engine_certification=OPEN`.
 
 `mucaro gis measure GEOJSON_PATH` measures Point, MultiPoint, LineString,
 MultiLineString, Polygon, and MultiPolygon features. The default

@@ -250,11 +250,12 @@ def test_depression_nodata_adjacency_control_identifies_outlets_without_mucaro_e
 
 
 def test_control_manifest_has_no_unbounded_claims() -> None:
-    payload, _ = controls()
+    payload, rows = controls()
     assert "vertical CRS certification" in payload["explicit_nonclaims"]
     assert "time-dependent coordinate operation certification" in payload["explicit_nonclaims"]
     assert "independent-engine certification of the Puerto Rico datum-grid transformation" in payload["explicit_nonclaims"]
     assert "independent-engine certification of governed regional datum-grid transformations" in payload["explicit_nonclaims"]
     assert "unbounded antimeridian, polar, or large-geometry certification" in payload["explicit_nonclaims"]
     assert "unbounded depression conditioning, depression breaching, flat routing, watershed delineation, stream extraction, runoff, flood, groundwater, or hydraulic modeling" in payload["explicit_nonclaims"]
-    assert len(payload["controls"]) == 18
+    assert len(payload["controls"]) == 19
+    assert rows["OVERLAY-CLI-001"]["class"] == "OVERLAY_EXECUTABLE_PARITY"

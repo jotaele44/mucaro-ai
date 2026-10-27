@@ -287,6 +287,7 @@ def main() -> int:
         gate_command("retrieval_quality", [sys.executable, "scripts/certify_retrieval_quality.py"]),
         gate_command("gis_quality", [sys.executable, "scripts/certify_gis_quality.py"]),
         gate_command("gis_datum_cli_parity", [sys.executable, "scripts/certify_gis_datum_cli_parity.py"]),
+        gate_command("gis_overlay_cli_parity", [sys.executable, "scripts/certify_gis_overlay_cli_parity.py"]),
         gate_command("ocr_v1_runtime_boundary", [sys.executable, "scripts/certify_ocr_v1_runtime.py", "--receipt"]),
         gate_command(
             "retrieval_eval_large",
