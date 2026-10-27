@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api, authIssueOf, onAuthIssue } from "./api.js";
 import { ChatView } from "./components/ChatView.jsx";
 import { GoalWorkspace } from "./components/workspaces/GoalWorkspace.jsx";
+import { TasksWorkspace } from "./components/workspaces/TasksWorkspace.jsx";
 import { TasksDrawer } from "./components/TasksDrawer.jsx";
 import { SkillsWorkspace } from "./components/workspaces/SkillsWorkspace.jsx";
 import { TokenGate } from "./components/TokenGate.jsx";
@@ -14,6 +15,7 @@ import { SourcesWorkspace } from "./components/workspaces/SourcesWorkspace.jsx";
 const WORKSPACES = [
   { id: "chat", label: "Chat" },
   { id: "goals", label: "Goals" },
+  { id: "tasks", label: "Plan tasks" },
   { id: "skills", label: "Skills" },
   { id: "sources", label: "Sources" },
   { id: "memory", label: "Memory" },
@@ -274,6 +276,7 @@ export function App() {
           />
         )}
         {health.state === "ok" && view === "goals" && <GoalWorkspace announce={announce} />}
+        {health.state === "ok" && view === "tasks" && <TasksWorkspace announce={announce} />}
         {health.state === "ok" && view === "skills" && <SkillsWorkspace announce={announce} />}
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}
