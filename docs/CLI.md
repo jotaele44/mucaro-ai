@@ -214,9 +214,11 @@ intersection adapter. The command preserves CRS, writes a derived GeoJSON
 output, records per-feature `RETAINED_CLIPPED`, `RETAINED_UNCHANGED`,
 `EXCLUDED_OUTSIDE`, `EXCLUDED_NULL_EMPTY`, and `EXCLUDED_UNRESOLVED` states,
 records source/output coordinate counts, and closes retained/excluded/clipped
-accounting. Z and M dimensions are not flattened; they are recorded as
-unresolved residue until a dimension-preserving clipping adapter is added.
-Broader clipping/overlay operation support, dimension-preserving mutation for
+accounting. The explicit coordinate policy is
+`XY_ONLY_RETAIN_ZM_UNRESOLVED`: Z and M dimensions are not flattened; every
+receipt records source/output dimensions and retained dimensional preservation,
+while unsupported dimensional inputs remain unresolved residue. Broader
+clipping/overlay operation support, true dimension-preserving mutation for
 derived geometry outputs, and independent planar overlay validation remain
 future GIS work.
 

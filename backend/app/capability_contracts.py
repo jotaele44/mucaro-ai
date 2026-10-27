@@ -338,6 +338,7 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 ),
                 _contract_check("overlay.parameters.adapter", _dotted(report, "parameters.adapter") == "shapely_planar_overlay_v1", "overlay reports must name the Shapely planar overlay adapter"),
                 _contract_check("overlay.parameters.overlay_adapter", _dotted(report, "parameters.overlay_adapter") == "shapely_planar_overlay_v1", "overlay reports must record the explicit overlay adapter"),
+                _contract_check("overlay.parameters.coordinate_dimension_policy", _dotted(report, "parameters.coordinate_dimension_policy") == "XY_ONLY_RETAIN_ZM_UNRESOLVED", "overlay reports must record the explicit coordinate dimension policy"),
                 _contract_check("overlay.output_hash", bool(_dotted(report, "output.sha256")), "overlay reports must record derived output hash"),
                 _contract_check("overlay.output_feature_count_present", isinstance(output_feature_count, int), "output_feature_count must be recorded"),
                 _contract_check("overlay.emitted_feature_count_present", isinstance(emitted_feature_count, int), "emitted_feature_count must be recorded"),
@@ -346,6 +347,8 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 _contract_check("overlay.crs_match", _dotted(report, "invariants.crs_match") is True, "overlay reports must prove matching CRS"),
                 _contract_check("overlay.feature_key_accounting_closed", _dotted(report, "invariants.feature_key_accounting_closed") is True, "feature-key accounting must close"),
                 _contract_check("overlay.pair_accounting_closed", _dotted(report, "invariants.overlay_pair_accounting_closed") is True, "overlay pair accounting must close"),
+                _contract_check("overlay.coordinate_dimension_accounting_closed", _dotted(report, "invariants.coordinate_dimension_accounting_closed") is True, "overlay coordinate dimension accounting must close"),
+                _contract_check("overlay.emitted_dimension_preserved", _dotted(report, "invariants.emitted_dimension_preserved") is True, "emitted overlay dimensions must be preserved"),
                 _contract_check("overlay.result_area_total_numeric", _is_number(_dotted(report, "invariants.result_area_total")), "result_area_total must be numeric"),
                 _contract_check("overlay.result_length_total_numeric", _is_number(_dotted(report, "invariants.result_length_total")), "result_length_total must be numeric"),
             ]
@@ -371,6 +374,41 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                     "output feature count must match emitted overlay count",
                 )
             )
+            for index, feature in enumerate(features):
+                if not isinstance(feature, dict):
+                    continue
+                emitted = feature.get("overlay_state") == "EMITTED"
+                checks.extend(
+                    [
+                        _contract_check(
+                            f"overlay.features.{index}.left_dimension",
+                            isinstance(feature.get("left_coordinate_dimension"), str) and bool(feature.get("left_coordinate_dimension")),
+                            "overlay pair receipts must record the left coordinate dimension",
+                        ),
+                        _contract_check(
+                            f"overlay.features.{index}.right_dimension",
+                            isinstance(feature.get("right_coordinate_dimension"), str) and bool(feature.get("right_coordinate_dimension")),
+                            "overlay pair receipts must record the right coordinate dimension",
+                        ),
+                        _contract_check(
+                            f"overlay.features.{index}.result_dimension_key",
+                            "result_coordinate_dimension" in feature,
+                            "overlay pair receipts must record the result coordinate dimension key",
+                        ),
+                        _contract_check(
+                            f"overlay.features.{index}.emitted_dimension_consistent",
+                            (
+                                feature.get("dimension_conserved") is True
+                                and feature.get("result_coordinate_dimension") == "XY"
+                                and feature.get("left_coordinate_dimension") == "XY"
+                                and feature.get("right_coordinate_dimension") == "XY"
+                            )
+                            if emitted
+                            else True,
+                            "emitted overlay dimensions must prove XY input and XY output",
+                        ),
+                    ]
+                )
     elif operation == "compare_geojson_geometries":
         checks.extend(
             [
@@ -1137,6 +1175,7 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             [
                 _contract_check("clip.parameters.bbox", isinstance(_dotted(report, "parameters.bbox"), list) and len(_dotted(report, "parameters.bbox")) == 4, "clip reports must record four query bbox values"),
                 _contract_check("clip.parameters.adapter", _dotted(report, "parameters.adapter") == "shapely_bbox_intersection_v1", "clip reports must name the Shapely bbox intersection adapter"),
+                _contract_check("clip.parameters.coordinate_dimension_policy", _dotted(report, "parameters.coordinate_dimension_policy") == "XY_ONLY_RETAIN_ZM_UNRESOLVED", "clip reports must record the explicit coordinate dimension policy"),
                 _contract_check("clip.output_hash", bool(_dotted(report, "output.sha256")), "clip reports must record derived output hash"),
                 _contract_check("clip.retained_count_present", isinstance(_dotted(report, "invariants.retained_feature_count"), int), "retained_feature_count must be recorded"),
                 _contract_check("clip.clipped_count_present", isinstance(_dotted(report, "invariants.clipped_feature_count"), int), "clipped_feature_count must be recorded"),
@@ -1144,8 +1183,39 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 _contract_check("clip.excluded_count_present", isinstance(_dotted(report, "invariants.excluded_feature_count"), int), "excluded_feature_count must be recorded"),
                 _contract_check("clip.source_coordinate_count_present", isinstance(_dotted(report, "invariants.source_coordinate_count"), int), "source coordinate count must be recorded"),
                 _contract_check("clip.output_coordinate_count_present", isinstance(_dotted(report, "invariants.output_coordinate_count"), int), "output coordinate count must be recorded"),
+                _contract_check("clip.coordinate_dimension_accounting_closed", _dotted(report, "invariants.coordinate_dimension_accounting_closed") is True, "clip coordinate dimension accounting must close"),
+                _contract_check("clip.retained_dimension_preserved", _dotted(report, "invariants.retained_dimension_preserved") is True, "retained clip dimensions must be preserved"),
             ]
         )
+        if isinstance(report.get("features"), list):
+            for index, feature in enumerate(report["features"]):
+                if not isinstance(feature, dict):
+                    continue
+                retained = feature.get("clip_state") in {"RETAINED_UNCHANGED", "RETAINED_CLIPPED"}
+                checks.extend(
+                    [
+                        _contract_check(
+                            f"clip.features.{index}.source_dimension",
+                            isinstance(feature.get("coordinate_dimension"), str) and bool(feature.get("coordinate_dimension")),
+                            "clip feature receipts must record the source coordinate dimension",
+                        ),
+                        _contract_check(
+                            f"clip.features.{index}.output_dimension_key",
+                            "output_coordinate_dimension" in feature,
+                            "clip feature receipts must record the output coordinate dimension key",
+                        ),
+                        _contract_check(
+                            f"clip.features.{index}.retained_dimension_consistent",
+                            (
+                                feature.get("dimension_conserved") is True
+                                and feature.get("output_coordinate_dimension") == feature.get("coordinate_dimension")
+                            )
+                            if retained
+                            else True,
+                            "retained clip dimensions must match source dimensions",
+                        ),
+                    ]
+                )
 
     failed = [check for check in checks if check["status"] == "FAIL"]
     return {

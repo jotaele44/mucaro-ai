@@ -459,6 +459,7 @@ def test_validate_gis_report_contract_accepts_standalone_overlay_receipts():
             "match_on": "id",
             "adapter": "shapely_planar_overlay_v1",
             "overlay_adapter": "shapely_planar_overlay_v1",
+            "coordinate_dimension_policy": "XY_ONLY_RETAIN_ZM_UNRESOLVED",
             "supported_operations": ["difference", "intersection", "symmetric_difference", "union"],
             "supported_geometry_types": ["MultiPolygon", "Polygon"],
         },
@@ -488,6 +489,10 @@ def test_validate_gis_report_contract_accepts_standalone_overlay_receipts():
             {
                 "feature_key": "id:overlap",
                 "overlay_state": "EMITTED",
+                "left_coordinate_dimension": "XY",
+                "right_coordinate_dimension": "XY",
+                "result_coordinate_dimension": "XY",
+                "dimension_conserved": True,
                 "result_geometry_type": "Polygon",
                 "result_area": 4.0,
                 "result_length": 8.0,
@@ -519,6 +524,8 @@ def test_validate_gis_report_contract_accepts_standalone_overlay_receipts():
             "non_polygon_result_count": 0,
             "feature_key_accounting_closed": True,
             "overlay_pair_accounting_closed": True,
+            "coordinate_dimension_accounting_closed": True,
+            "emitted_dimension_preserved": True,
             "result_area_total": 4.0,
             "result_length_total": 8.0,
         },
@@ -531,6 +538,14 @@ def test_validate_gis_report_contract_accepts_standalone_overlay_receipts():
 
     assert result["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
     assert result["counts"]["fail"] == 0
+
+    report["features"][0]["dimension_conserved"] = False
+    tampered = validate_gis_report_contract(report)
+    assert tampered["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(
+        check["name"] == "overlay.features.0.emitted_dimension_consistent" and check["status"] == "FAIL"
+        for check in tampered["checks"]
+    )
 
 
 def test_validate_gis_report_contract_rejects_standalone_overlay_false_accounting():
@@ -594,6 +609,7 @@ def test_validate_gis_report_contract_accepts_bbox_clip_receipts():
         "parameters": {
             "bbox": [0.0, 0.0, 2.0, 2.0],
             "adapter": "shapely_bbox_intersection_v1",
+            "coordinate_dimension_policy": "XY_ONLY_RETAIN_ZM_UNRESOLVED",
             "supported_geometry_types": ["LineString", "Point", "Polygon"],
         },
         "source": {
@@ -627,6 +643,8 @@ def test_validate_gis_report_contract_accepts_bbox_clip_receipts():
             "excluded_feature_count": 3,
             "source_coordinate_count": 8,
             "output_coordinate_count": 6,
+            "coordinate_dimension_accounting_closed": True,
+            "retained_dimension_preserved": True,
         },
         "warnings": ["GIS_CLIP_BBOX_UNRESOLVED_EXCLUDED"],
         "limitations": ["local bbox clipping fixture"],

@@ -751,11 +751,15 @@ def clip_geojson_by_bbox(
             "source_coordinate_count": source_count,
             "output_coordinate_count": 0,
             "coordinate_dimension": dimensions["coordinate_dimension"],
+            "output_coordinate_dimension": None,
+            "dimension_conserved": None,
             "clip_state": "EXCLUDED_UNRESOLVED",
             "warnings": list(classification["warnings"]),
         }
         if classification["geometry_status"] == "NULL_EMPTY":
             row["clip_state"] = "EXCLUDED_NULL_EMPTY"
+            row["output_coordinate_dimension"] = "EMPTY"
+            row["dimension_conserved"] = True
             state_counts["EXCLUDED_NULL_EMPTY"] += 1
             feature_receipts.append(row)
             continue
@@ -802,6 +806,7 @@ def clip_geojson_by_bbox(
             continue
 
         output_geometry = _json_geometry(shapely_mapping(clipped))
+        output_dimensions = _coordinate_dimension_summary(output_geometry)
         output_count = len(_iter_positions(output_geometry.get("coordinates") if isinstance(output_geometry, dict) else None))
         output_coordinate_count += output_count
         output_bbox = _bbox_for_geometry(output_geometry) if isinstance(output_geometry, dict) else None
@@ -815,6 +820,8 @@ def clip_geojson_by_bbox(
                 "output_geometry_type": output_geometry.get("type") if isinstance(output_geometry, dict) else None,
                 "output_bbox": output_bbox,
                 "output_coordinate_count": output_count,
+                "output_coordinate_dimension": output_dimensions["coordinate_dimension"],
+                "dimension_conserved": dimensions["coordinate_dimension"] == output_dimensions["coordinate_dimension"],
                 "warnings": [],
             }
         )
@@ -854,6 +861,7 @@ def clip_geojson_by_bbox(
             "bbox": query_bbox,
             "adapter": "shapely_bbox_intersection_v1",
             "supported_geometry_types": sorted(SUPPORTED_CLIP_GEOMETRY_TYPES),
+            "coordinate_dimension_policy": "XY_ONLY_RETAIN_ZM_UNRESOLVED",
         },
         "source": {
             "path": str(path),
@@ -884,12 +892,27 @@ def clip_geojson_by_bbox(
             "row_accounting_closed": len(raw_features) == retained_count + state_counts["EXCLUDED_OUTSIDE"] + null_empty_count + unresolved_count,
             "source_coordinate_count": source_coordinate_count,
             "output_coordinate_count": output_coordinate_count,
+            "coordinate_dimension_accounting_closed": len(feature_receipts) == len(raw_features)
+            and all(
+                isinstance(row, dict)
+                and "coordinate_dimension" in row
+                and "output_coordinate_dimension" in row
+                for row in feature_receipts
+            ),
+            "retained_dimension_preserved": all(
+                row.get("dimension_conserved") is True
+                for row in feature_receipts
+                if row.get("clip_state") in {"RETAINED_UNCHANGED", "RETAINED_CLIPPED"}
+            ),
+            "unresolved_dimension_count": sum(
+                1 for row in feature_receipts if row.get("warnings") == ["GIS_CLIP_COORDINATE_DIMENSION_UNSUPPORTED"]
+            ),
             "crs_preserved": True,
         },
         "warnings": warnings,
         "limitations": [
             "bbox clipping uses a local Shapely intersection adapter against an axis-aligned bbox",
-            "Z and M coordinate dimensions are not clipped in this adapter and are recorded as unresolved residue",
+            "coordinate dimension policy is XY_ONLY_RETAIN_ZM_UNRESOLVED; Z and M coordinate dimensions are not clipped in this adapter",
             "this command does not reproject inputs, repair invalid topology, or perform non-bbox overlay analysis",
         ],
         "falsification_criteria": [
@@ -1887,6 +1910,8 @@ def overlay_geojson_collections(
             "right_geometry_status": right_classification["geometry_status"],
             "left_coordinate_dimension": left_dimensions["coordinate_dimension"],
             "right_coordinate_dimension": right_dimensions["coordinate_dimension"],
+            "result_coordinate_dimension": None,
+            "dimension_conserved": None,
             "overlay_state": None,
             "overlay_warning": None,
             "result_feature_id": None,
@@ -1973,6 +1998,7 @@ def overlay_geojson_collections(
 
         result_area = round(float(result_shape.area), 12)
         result_length = round(float(result_shape.length), 12)
+        result_coordinate_dimension = _coordinate_dimension_summary(result_geometry)["coordinate_dimension"]
         result_feature_id = stable_id("gisoverlay", normalized_operation, key, left_source.sha256, right_source.sha256)
         output_features.append(
             {
@@ -1996,6 +2022,10 @@ def overlay_geojson_collections(
                 "overlay_state": "EMITTED",
                 "result_feature_id": result_feature_id,
                 "result_geometry_type": result_geometry_type,
+                "result_coordinate_dimension": result_coordinate_dimension,
+                "dimension_conserved": result_coordinate_dimension == "XY"
+                and left_dimensions["coordinate_dimension"] == "XY"
+                and right_dimensions["coordinate_dimension"] == "XY",
                 "result_area": result_area,
                 "result_length": result_length,
             }
@@ -2053,6 +2083,7 @@ def overlay_geojson_collections(
             "match_on": match_on,
             "adapter": "shapely_planar_overlay_v1",
             "overlay_adapter": "shapely_planar_overlay_v1",
+            "coordinate_dimension_policy": "XY_ONLY_RETAIN_ZM_UNRESOLVED",
             "supported_operations": sorted(SUPPORTED_OVERLAY_OPERATIONS),
             "supported_geometry_types": sorted(SUPPORTED_OVERLAY_GEOMETRY_TYPES),
         },
@@ -2100,12 +2131,25 @@ def overlay_geojson_collections(
             "overlay_pair_accounting_closed": pair_state_count == len(shared_keys),
             "result_area_total": round(result_area_total, 12),
             "result_length_total": round(result_length_total, 12),
+            "coordinate_dimension_accounting_closed": len(feature_receipts) == len(shared_keys)
+            and all(
+                isinstance(row, dict)
+                and "left_coordinate_dimension" in row
+                and "right_coordinate_dimension" in row
+                and "result_coordinate_dimension" in row
+                for row in feature_receipts
+            ),
+            "emitted_dimension_preserved": all(
+                row.get("dimension_conserved") is True
+                for row in feature_receipts
+                if row.get("overlay_state") == "EMITTED"
+            ),
         },
         "warnings": warnings,
         "limitations": [
             "standalone overlay is limited to matched Polygon and MultiPolygon pairs",
             "overlay uses Shapely planar operations in the input CRS and does not transform CRS",
-            "Z and M coordinates remain unresolved instead of being flattened into XY output",
+            "coordinate dimension policy is XY_ONLY_RETAIN_ZM_UNRESOLVED; Z and M coordinates remain unresolved instead of being flattened into XY output",
             "lower-dimensional or geometry-collection overlay results are recorded as residue, not emitted",
         ],
         "falsification_criteria": [
