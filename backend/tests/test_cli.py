@@ -4997,6 +4997,8 @@ def test_cli_release_handoff_refreshes_certification_before_handoff_artifacts(tm
             calls.append("refresh:source_artifact")
             return subprocess.CompletedProcess(cmd, 0, stdout="SOURCE_ARTIFACT_CERT_OK\n")
         if "certify_fresh_clone.py" in command_text:
+            assert "--source" in cmd
+            assert cmd[cmd.index("--source") + 1] == str(tmp_path)
             assert cmd[-1] == head_sha
             calls.append("refresh:fresh_clone")
             return subprocess.CompletedProcess(cmd, 0, stdout="FRESH_CLONE_CERT_OK\n")

@@ -5964,7 +5964,14 @@ def run_release_handoff_certification_refresh(
         "local_release": [sys.executable, "scripts/certify_release.py"],
         "python_dist": [sys.executable, "scripts/certify_python_distribution.py"],
         "source_artifact": [sys.executable, "scripts/certify_source_artifact.py", str(source_manifest)],
-        "fresh_clone": [sys.executable, "scripts/certify_fresh_clone.py", "--ref", head_sha],
+        "fresh_clone": [
+            sys.executable,
+            "scripts/certify_fresh_clone.py",
+            "--source",
+            str(cfg.project_root),
+            "--ref",
+            head_sha,
+        ],
     }
     requested_steps = _selected_release_handoff_refresh_steps(refresh_steps)
     steps = []
