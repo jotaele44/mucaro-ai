@@ -112,6 +112,9 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
   const [runs, setRuns] = useState(new Map());
   const [summaries, setSummaries] = useState([]);
   const [mode, setMode] = useState("ask");
+  const [goalOptions, setGoalOptions] = useState([]);
+  const [taskOptions, setTaskOptions] = useState([]);
+  const [contextSelection, setContextSelection] = useState({ goal_id: "", task_id: "" });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [citation, setCitation] = useState(null);
@@ -124,6 +127,22 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
   const refreshRef = useRef(null);
   const feedRef = useRef(null);
   const stick = useRef(true);
+
+  useEffect(() => {
+    let live = true;
+    Promise.all([api.goals(), api.tasks()])
+      .then(([goalPayload, taskPayload]) => {
+        if (!live) return;
+        setGoalOptions(goalPayload.goals || []);
+        setTaskOptions(taskPayload.tasks || []);
+      })
+      .catch(() => {
+        // Context selection is an enhancement; chat remains usable if its catalog is temporarily unavailable.
+      });
+    return () => {
+      live = false;
+    };
+  }, [reconnect]);
 
   // Drops every open stream and pending retry. A page that was suspended keeps stream objects that are dead
   // but still registered, which would block a re-follow.
@@ -280,7 +299,12 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
       const creating = !id;
       if (creating) id = (await api.createConversation(prompt.slice(0, 60))).conversation_id;
       const key = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const result = await api.sendMessage(id, { prompt, mode, idempotency_key: key, options: defaultOptions });
+      const options = { ...(defaultOptions || {}) };
+      delete options.goal_id;
+      delete options.task_id;
+      if (contextSelection.goal_id) options.goal_id = contextSelection.goal_id;
+      if (contextSelection.task_id) options.task_id = contextSelection.task_id;
+      const result = await api.sendMessage(id, { prompt, mode, idempotency_key: key, options });
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
       if (creating) onConversationCreated(id);
       else {
@@ -424,6 +448,10 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
         modes={modes}
         mode={mode}
         onModeChange={setMode}
+        contextSelection={contextSelection}
+        goals={goalOptions}
+        tasks={taskOptions}
+        onContextChange={setContextSelection}
         onSend={send}
         onStop={stop}
         activeRun={Boolean(activeRun)}

@@ -53,7 +53,7 @@ function QueuedItem({ run, onCancel, onEdit }) {
   );
 }
 
-export function Composer({ conversationId, modes, mode, onModeChange, onSend, onStop, activeRun, queued, onCancelQueued, onEditQueued, disabled }) {
+export function Composer({ conversationId, modes, mode, onModeChange, contextSelection, goals, tasks, onContextChange, onSend, onStop, activeRun, queued, onCancelQueued, onEditQueued, disabled }) {
   const storageKey = `mucaro.draft.${conversationId || "new"}`;
   const [text, setText] = useState(() => {
     try {
@@ -117,6 +117,13 @@ export function Composer({ conversationId, modes, mode, onModeChange, onSend, on
 
   const touch = touchKeyboard();
   const empty = !text.trim();
+  const contextLabel = contextSelection?.task_id
+    ? "Task selected"
+    : contextSelection?.goal_id
+      ? "Goal selected"
+      : mode === "plan" || mode === "agent"
+        ? "Current goal auto"
+        : "None";
   return (
     <div className="composer">
       {queued.length > 0 && (
@@ -125,6 +132,28 @@ export function Composer({ conversationId, modes, mode, onModeChange, onSend, on
             <QueuedItem key={run.run_id} run={run} onCancel={onCancelQueued} onEdit={onEditQueued} />
           ))}
         </ul>
+      )}
+      {(goals?.length > 0 || tasks?.length > 0) && (
+        <details className="composer-context">
+          <summary>Context: {contextLabel}</summary>
+          <div className="inline-form context-fields">
+            <label className="field grow">
+              <span>Goal</span>
+              <select value={contextSelection?.goal_id || ""} onChange={(event) => onContextChange({ ...contextSelection, goal_id: event.target.value })}>
+                <option value="">Auto for Plan/Agent</option>
+                {(goals || []).map((goal) => <option key={goal.goal_id} value={goal.goal_id}>{goal.is_current ? "Current · " : ""}{goal.objective}</option>)}
+              </select>
+            </label>
+            <label className="field grow">
+              <span>Plan task</span>
+              <select value={contextSelection?.task_id || ""} onChange={(event) => onContextChange({ ...contextSelection, task_id: event.target.value })}>
+                <option value="">No explicit task</option>
+                {(tasks || []).map((task) => <option key={task.task_id} value={task.task_id}>{task.status} · {task.title}</option>)}
+              </select>
+            </label>
+          </div>
+          <p className="muted small">Explicit selections are recorded in the run. With no goal selected, Plan and Agent bind the current goal automatically; Ask and Auto stay unbound.</p>
+        </details>
       )}
       <div className="composer-box">
         <label htmlFor="composer-input" className="sr-only">
