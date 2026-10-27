@@ -11,6 +11,8 @@ export function SkillsWorkspace({ announce }) {
   const [mounts, setMounts] = useState([]);
   const [executions, setExecutions] = useState([]);
   const [argumentsText, setArgumentsText] = useState({});
+  const [allowedCapabilities, setAllowedCapabilities] = useState({});
+  const [policyIds, setPolicyIds] = useState({});
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState("");
 
@@ -53,6 +55,25 @@ export function SkillsWorkspace({ announce }) {
     await action(skillId, () => api.executeSkill(skillId, args), "Skill invoked; receipt recorded.");
   }
 
+  async function activate(skill) {
+    const selected = allowedCapabilities[skill.skill_id] || [];
+    const missing = (skill.capabilities || []).filter((capability) => !selected.includes(capability));
+    if (missing.length) {
+      setError({
+        status: "ERROR_SKILL_CAPABILITY_SELECTION_REQUIRED",
+        message: `Select every declared capability before activation: ${missing.join(", ")}`,
+        category: "PERMISSION",
+      });
+      return;
+    }
+    const fallbackPolicyId = `operator-skill-${skill.skill_id.replace(/[^a-zA-Z0-9]+/g, "-")}`;
+    await action(
+      skill.skill_id,
+      () => api.activateSkill(skill.skill_id, { allowed_capabilities: selected, policy_id: policyIds[skill.skill_id]?.trim() || fallbackPolicyId }),
+      "Skill authorized and activated.",
+    );
+  }
+
   return (
     <section className="workspace" aria-labelledby="skills-title">
       <header className="workspace-header">
@@ -83,7 +104,43 @@ export function SkillsWorkspace({ announce }) {
               </dl>
               <div className="workspace-actions">
                 {!mount && <button type="button" className="secondary-button" disabled={running} onClick={() => action(skill.skill_id, () => api.mountSkill(skill.skill_id), "Skill mounted.")}>Mount</button>}
-                {mount && !active && <button type="button" className="secondary-button" disabled={running} onClick={() => action(skill.skill_id, () => api.activateSkill(skill.skill_id), "Skill authorized and activated.")}>Authorize & activate</button>}
+                {mount && !active && (
+                  <div className="skill-authorization">
+                    <label className="field">
+                      <span>Policy ID</span>
+                      <input
+                        value={policyIds[skill.skill_id] || ""}
+                        placeholder={`operator-skill-${skill.skill_id.replace(/[^a-zA-Z0-9]+/g, "-")}`}
+                        onChange={(event) => setPolicyIds((old) => ({ ...old, [skill.skill_id]: event.target.value }))}
+                      />
+                    </label>
+                    {skill.capabilities?.length > 0 && (
+                      <fieldset className="capability-fieldset">
+                        <legend>Allow declared capabilities</legend>
+                        {skill.capabilities.map((capability) => {
+                          const checked = (allowedCapabilities[skill.skill_id] || []).includes(capability);
+                          return (
+                            <label key={capability} className="option compact-option">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(event) => setAllowedCapabilities((old) => ({
+                                  ...old,
+                                  [skill.skill_id]: event.target.checked
+                                    ? [...(old[skill.skill_id] || []), capability]
+                                    : (old[skill.skill_id] || []).filter((item) => item !== capability),
+                                }))}
+                              />
+                              <span className="mono">{capability}</span>
+                            </label>
+                          );
+                        })}
+                      </fieldset>
+                    )}
+                    <p className="muted small">The skill’s runtime capability is granted automatically; declared capabilities require your explicit selection.</p>
+                    <button type="button" className="secondary-button" disabled={running} onClick={() => activate(skill)}>Authorize & activate</button>
+                  </div>
+                )}
               </div>
               {active && (
                 <div className="skill-invoke">
