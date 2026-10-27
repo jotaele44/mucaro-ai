@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
 from .agent_workflow import AgentWorkflowError, normalize_agent_actions
 from .config import Settings, settings
+from .skill_runtime import SKILL_REGISTRY, list_skill_mounts
 
 AGENT_PLAN_SCHEMA = "mucaro-agent-plan/1.0"
 AGENT_PLANNER_ID = "mucaro-local-intent-v1"
@@ -28,6 +30,12 @@ _CODING_INTENT_TERMS = (
     "typecheck",
     "pytest",
     "coding task",
+)
+_SKILL_INTENT_RE = re.compile(
+    r"^(?:please\s+)?(?:run|invoke|execute|use)\s+(?:the\s+)?skill\s+"
+    r"(?P<skill_id>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)"
+    r"(?:\s+(?P<arguments>.+))?$",
+    re.IGNORECASE,
 )
 
 
@@ -63,6 +71,51 @@ def _has_coding_intent(lowered: str, paths: list[str]) -> bool:
     return bool(paths) or any(term in lowered for term in _CODING_INTENT_TERMS)
 
 
+def _skill_action_from_prompt(
+    text: str,
+    *,
+    cfg: Settings,
+) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
+    """Recognize one explicit skill request without granting activation or policy."""
+    match = _SKILL_INTENT_RE.fullmatch(text)
+    if match is None:
+        return None, None
+
+    skill_id = match.group("skill_id")
+    skill = SKILL_REGISTRY.get(skill_id)
+    if skill is None:
+        return None, {"status": "ERROR_SKILL_NOT_REGISTERED", "detail": skill_id}
+
+    encoded_arguments = match.group("arguments")
+    if encoded_arguments:
+        try:
+            arguments = json.loads(encoded_arguments)
+        except json.JSONDecodeError as exc:
+            return None, {"status": "ERROR_SKILL_ARGUMENTS_INVALID", "detail": f"{exc.msg} at position {exc.pos}"}
+        if not isinstance(arguments, dict):
+            return None, {"status": "ERROR_SKILL_ARGUMENTS_NOT_OBJECT", "detail": "Skill arguments must be a JSON object."}
+    else:
+        arguments = {}
+
+    mounts = list_skill_mounts(cfg).get("mounts", [])
+    mount = next((row for row in mounts if row.get("skill_id") == skill_id), None)
+    if not isinstance(mount, dict) or mount.get("state") != "ACTIVE":
+        return None, {"status": "ERROR_SKILL_NOT_ACTIVE", "detail": skill_id}
+    if mount.get("digest") != skill.digest:
+        return None, {"status": "ERROR_SKILL_DIGEST_MISMATCH", "detail": skill_id}
+
+    return (
+        _action(
+            "skill.execute",
+            {"skill_id": skill_id, "arguments": arguments},
+            "Execute the explicitly named active skill through the governed runtime.",
+            "HIGH",
+            step_id="skill-execute",
+        ),
+        None,
+    )
+
+
 def build_agent_plan(
     prompt: str,
     *,
@@ -80,6 +133,22 @@ def build_agent_plan(
     actions: list[dict[str, Any]] = []
     urls = _URL_RE.findall(text)
     repo_paths = _explicit_repo_paths(text)
+
+    skill_action, skill_error = _skill_action_from_prompt(text, cfg=cfg)
+    if skill_error:
+        return {
+            "schema_version": AGENT_PLAN_SCHEMA,
+            "planner": AGENT_PLANNER_ID,
+            "status": "AGENT_PLAN_BLOCKED",
+            "prompt": text,
+            "actions": [],
+            "context": context,
+            "counts": {"candidate_actions": 0, "selected_actions": 0, "max_actions": MAX_AGENT_ACTIONS},
+            "error": skill_error,
+            "invariants": {"planner_does_not_execute": True, "blocked_fail_closed": True, "skill_activation_is_not_implicit": True},
+        }
+    if skill_action is not None:
+        actions.append(skill_action)
 
     if any(term in lowered for term in ("source status", "source library", "ingested sources", "index status", "how many sources")):
         actions.append(_action("source_library.status", {}, "Inspect the local source library and index before answering.", "HIGH"))
@@ -163,6 +232,7 @@ def build_agent_plan(
         "prompt": text,
         "actions": bounded,
         "context": context,
+        "action_only": skill_action is not None,
         "counts": {"candidate_actions": len(deduplicated), "selected_actions": len(bounded), "max_actions": MAX_AGENT_ACTIONS},
         "invariants": {
             "planner_does_not_execute": True,
@@ -173,6 +243,7 @@ def build_agent_plan(
         },
         "limitations": [
             "This local planner recognizes only explicit, bounded intent patterns; it does not infer hidden permissions or autonomously broaden scope.",
+            "Explicit skill requests are proposed only for currently active, digest-matching mounts; the planner never mounts, activates, or grants capabilities.",
             "Coding intent adds read-only repository preflight, diff, and explicitly named file inspection only; it never proposes patch application or execution by itself.",
             "Every selected action still enters the existing approval-gated tool runtime.",
             "Model-native tool planning and durable multi-agent delegation remain separate future capabilities.",

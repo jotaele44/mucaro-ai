@@ -237,6 +237,24 @@ def test_agent_mode_builds_bounded_plan_and_keeps_inferred_actions_approval_gate
     assert get_run(run["run_id"], cfg)["state"] == "COMPLETED"
 
 
+def test_agent_mode_proposes_active_skill_through_normal_approval_boundary(cfg, conversation):
+    skill_id = "mucaro/intelligence-plane-health"
+    mount_skill(skill_id, cfg=cfg, mounted_by="test")
+    activate_skill(skill_id, cfg=cfg, activated_by="test")
+
+    run = _submit(conversation, f"Run skill {skill_id} {{\"probe\":\"local\"}}", cfg, mode="agent")
+    assert run["state"] == "AWAITING_APPROVAL"
+    request = next(event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "approval_request")
+    assert request["data"]["tool_name"] == "skill.execute"
+    call = next(call for call in list_tool_calls(cfg)["tool_calls"] if call["tool_call_id"] == request["data"]["tool_call_id"])
+    assert call["requested_by"] == "agent"
+    assert call["arguments"]["skill_id"] == skill_id
+
+    approve_tool_call(call["tool_call_id"], cfg=cfg, expected_arguments_sha256=call["arguments_sha256"])
+    resume_waiting_run(run["run_id"], cfg)
+    assert get_run(run["run_id"], cfg)["state"] == "COMPLETED"
+
+
 def test_agent_run_binds_current_goal_and_explicit_task_without_claiming_completion(cfg, conversation):
     goal = create_goal("Finish the governed agent workflow", active_vector="durable_orchestration", goal_id="goal-agent", cfg=cfg)["goal"]
     task = create_task("Bind an agent run", task_id="task-agent", cfg=cfg)

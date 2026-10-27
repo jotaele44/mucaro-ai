@@ -996,6 +996,11 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
             }
             for row in agent_plan["actions"]
         ]
+        if agent_plan.get("action_only"):
+            # Explicit action requests such as a skill invocation have no
+            # cited-answer question.  Completing from the action ledger keeps
+            # the run from fabricating a retrieval request after success.
+            question = ""
     steps = [
         {"step": f"{command['command']} -> {command['tool']}", "tool": command["tool"], "arguments": command["arguments"],
          "reason": command.get("reason"), "confidence": command.get("confidence"), "step_id": command.get("step_id"),
