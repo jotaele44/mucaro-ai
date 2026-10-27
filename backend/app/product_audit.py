@@ -82,9 +82,9 @@ def build_product_audit(cfg: Settings = settings) -> dict[str, Any]:
             "assistant_surface",
             "Operator can set, inspect, update, and resume a durable goal with an active vector and explicit gaps.",
             _status_from_files(cfg, [("backend", "app", "goals.py"), ("schemas", "goal.schema.json"), ("backend", "app", "cli.py")]),
-            "SQLite-backed goal contract with current-goal switching, legal state transitions, append-only events, CLI commands, and authenticated API routes",
+            "SQLite-backed goal contract with current-goal switching, legal state transitions, append-only events, CLI commands, authenticated API routes, and exact run-bound orchestration snapshots for current goals and explicit DAG tasks",
             "A goal is durable and auditable, but automatic promotion from goal state to completion still requires independent evidence gates.",
-            "Bind future plan/task/run workflows to the selected goal without allowing goal metadata to override evidence status.",
+            "Keep run bindings provenance-only: do not infer goal completion or task DONE from execution success; require independent evidence and explicit lifecycle transitions.",
         ),
         ProductRequirement(
             "installable_cli",
