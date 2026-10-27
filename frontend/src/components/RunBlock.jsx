@@ -189,6 +189,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolLabel = toolSummaryLabel(view.calls);
   const planSteps = view.plan?.steps || [];
+  const context = view.orchestration;
   const userMessageKey = `run:${view.runId}:user`;
   const assistantMessageKey = `run:${view.runId}:assistant`;
   const userEdit = messageEdits[userMessageKey];
@@ -233,6 +234,20 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
                   Model: {view.route.selected_provider || "none"} ({view.route.selection_reason || view.route.status})
                 </p>
               )}
+            </details>
+          )}
+          {context && (
+            <details className="plan-details context-details">
+              <summary>Execution context</summary>
+              <dl className="facts compact-facts">
+                {context.goal_id && <><dt>Goal</dt><dd className="mono">{context.goal_id}</dd></>}
+                {context.goal?.objective && <><dt>Goal objective</dt><dd>{context.goal.objective}</dd></>}
+                {context.goal?.active_vector && <><dt>Active vector</dt><dd className="mono">{context.goal.active_vector}</dd></>}
+                {context.task_id && <><dt>Task</dt><dd className="mono">{context.task_id}</dd></>}
+                {context.task?.title && <><dt>Task title</dt><dd>{context.task.title}</dd></>}
+                {context.resolution && <><dt>Binding</dt><dd>{context.resolution === "current_goal" ? "Current goal snapshot" : "Explicit orchestration reference"}</dd></>}
+              </dl>
+              <p className="muted small">This is a provenance snapshot. Run success does not complete the goal or task.</p>
             </details>
           )}
         </div>

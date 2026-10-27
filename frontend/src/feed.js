@@ -20,6 +20,7 @@ export function deriveRun(run, events) {
     runId: run.run_id,
     prompt: run.prompt,
     mode: run.mode,
+    orchestration: run.orchestration || null,
     state: run.state,
     version: run.version,
     createdAt: run.created_at,
@@ -45,6 +46,9 @@ export function deriveRun(run, events) {
     switch (event.type) {
       case "plan":
         view.plan = data;
+        break;
+      case "context_bound":
+        view.orchestration = data.orchestration || view.orchestration;
         break;
       case "route":
         view.route = data;
