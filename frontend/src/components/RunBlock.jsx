@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { api } from "../api.js";
 import { STATE_LABEL, TERMINAL_STATES, toolSummaryLabel } from "../feed.js";
-import { answerRecords } from "../files.js";
+import { answerRecords, fileBaseName, saveFile } from "../files.js";
 import { EditableMessage } from "./MessageActions.jsx";
 import { Sheet } from "./Sheet.jsx";
 
@@ -185,6 +185,76 @@ function Citations({ citations, onOpenCitation }) {
   );
 }
 
+function AnswerEvidence({ view, announce }) {
+  const trace = view.final?.answer_trace;
+  const records = answerRecords(view.artifacts);
+  const [loading, setLoading] = useState("");
+  const [error, setError] = useState("");
+  if (!trace) return null;
+
+  async function download(record) {
+    setLoading(record.kind);
+    setError("");
+    try {
+      saveFile(await api.exportFile(record.runId, record.kind), `${fileBaseName(view.prompt)}-${record.suffix}`);
+      announce?.(`Downloaded ${record.label}.`);
+    } catch (err) {
+      setError(`${err?.status || "ERROR"}: ${err?.message || "The evidence file could not be loaded."}`);
+    } finally {
+      setLoading("");
+    }
+  }
+
+  const flags = Array.isArray(trace.validation_flags) ? trace.validation_flags : [];
+  const sourceIds = Array.isArray(trace.source_ids) ? trace.source_ids : [];
+  return (
+    <details className="answer-evidence">
+      <summary>Answer evidence</summary>
+      <div className="answer-evidence-body">
+        <dl className="facts compact-facts">
+          <dt>Validation</dt>
+          <dd><span className={`status-chip status-${String(trace.citation_status || "unknown").toLowerCase()}`}>{trace.citation_status || "Unknown"}</span></dd>
+          <dt>Retrieval</dt>
+          <dd className="mono">{trace.retrieval_strategy || "—"}</dd>
+          <dt>Confidence</dt>
+          <dd>{trace.confidence == null ? "—" : Number(trace.confidence).toFixed(2)}</dd>
+          <dt>Model</dt>
+          <dd>{trace.model_provider || "—"}{trace.model_name ? ` / ${trace.model_name}` : ""}</dd>
+        </dl>
+        <div className="answer-evidence-section">
+          <strong>Source IDs</strong>
+          {sourceIds.length ? (
+            <ul className="evidence-id-list">
+              {sourceIds.map((sourceId) => <li key={sourceId}><code>{sourceId}</code></li>)}
+            </ul>
+          ) : <p className="muted small">No source IDs were recorded.</p>}
+        </div>
+        <div className="answer-evidence-section">
+          <strong>Validation flags</strong>
+          {flags.length ? (
+            <ul className="evidence-flag-list">
+              {flags.map((flag) => <li key={flag}><code>{flag}</code></li>)}
+            </ul>
+          ) : <p className="muted small">No validation flags.</p>}
+        </div>
+        {records.length > 0 && (
+          <div className="answer-evidence-section">
+            <strong>Exports</strong>
+            <div className="button-row evidence-export-row">
+              {records.map((record) => (
+                <button key={record.kind} type="button" className="secondary-button" disabled={Boolean(loading)} onClick={() => download(record)}>
+                  {loading === record.kind ? "Loading…" : record.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {error && <p className="error-text" role="alert">{error}</p>}
+      </div>
+    </details>
+  );
+}
+
 export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdits = {}, onEditMessage }) {
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolLabel = toolSummaryLabel(view.calls);
@@ -290,6 +360,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
           </div>
         )}
         <Citations citations={view.citations} onOpenCitation={onOpenCitation} />
+        <AnswerEvidence view={view} announce={announce} />
 
         {view.warnings.map((warning, index) => (
           <p key={index} className="notice" role="note">
