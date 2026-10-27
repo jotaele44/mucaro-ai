@@ -352,7 +352,10 @@ def _resolve_run_context(options: dict[str, Any], *, mode: str, cfg: Settings) -
         raise RunError("ERROR_RUN_TASK_ID_INVALID", "task_id must be a non-empty string")
 
     goal_id = requested_goal_id.strip() if isinstance(requested_goal_id, str) else None
-    if goal_id is None and mode == "agent":
+    # Planning and bounded agent runs are both goal-oriented surfaces. Bind the
+    # current goal automatically for those modes, while keeping ordinary ask
+    # and auto turns unbound unless the operator explicitly supplies a goal.
+    if goal_id is None and mode in {"plan", "agent"}:
         goal_id = list_goals(cfg).get("current_goal_id")
     goal = None
     task = None
@@ -387,7 +390,7 @@ def _resolve_run_context(options: dict[str, Any], *, mode: str, cfg: Settings) -
             "depends_on": list(task.get("depends_on") or []),
             "updated_at": task["updated_at"],
         } if task else None,
-        "resolution": "current_goal" if requested_goal_id is None and goal is not None and mode == "agent" else "explicit_orchestration_reference",
+        "resolution": "current_goal" if requested_goal_id is None and goal is not None and mode in {"plan", "agent"} else "explicit_orchestration_reference",
     }
 
 

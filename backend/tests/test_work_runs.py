@@ -11,7 +11,7 @@ from backend.app import work_runs
 from backend.app.agent_checkpoints import get_checkpoint
 from backend.app.agent_tasks import create_task, get_task
 from backend.app.conversations import create_conversation, get_conversation
-from backend.app.goals import create_goal
+from backend.app.goals import create_goal, get_goal
 from backend.app.ingestion import ingest_file
 from backend.app.main import create_app
 from backend.app.response_flow import get_interaction, get_pending_interaction
@@ -158,6 +158,18 @@ def test_plan_mode_executes_nothing(cfg, conversation):
     assert list_tool_calls(cfg)["tool_calls"] == []
     plan = next(event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "plan")
     assert plan["data"]["steps"][0].get("tool") == "source_library.status"
+
+
+def test_plan_mode_binds_current_goal_without_mutating_it(cfg, conversation):
+    goal = create_goal("Plan the next governed workflow", active_vector="planning_gate", goal_id="goal-plan", cfg=cfg)["goal"]
+    run = _submit(conversation, "Plan the next safe repository inspection.", cfg, mode="plan")
+
+    assert run["orchestration"]["goal_id"] == goal["goal_id"]
+    assert run["orchestration"]["resolution"] == "current_goal"
+    assert run["outcome"] == "PLAN_ONLY"
+    assert get_goal(goal["goal_id"], cfg)["status"] == "ACTIVE"
+    bound = next(event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "context_bound")
+    assert bound["data"]["orchestration"]["goal"]["active_vector"] == "planning_gate"
 
 
 def test_auto_mode_preapproves_only_local_read_only_tools(cfg, conversation):
