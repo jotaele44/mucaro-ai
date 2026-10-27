@@ -11,6 +11,7 @@ import hashlib
 import json
 from typing import Any
 
+from .skill_runtime import SKILL_REGISTRY
 from .tools import TOOL_REGISTRY
 
 MAX_PROVIDER_TOOL_PROPOSALS = 4
@@ -49,7 +50,7 @@ def provider_tool_schemas() -> list[dict[str, Any]]:
         {
             "name": tool.name,
             "description": tool.description,
-            "input_schema": {"type": "object", "additionalProperties": True},
+            "input_schema": _input_schema(tool.name),
         }
         for tool in TOOL_REGISTRY.values()
     ]
@@ -63,11 +64,36 @@ def openai_tool_schemas() -> list[dict[str, Any]]:
             "function": {
                 "name": tool.name,
                 "description": tool.description,
-                "parameters": {"type": "object", "additionalProperties": True},
+                "parameters": _input_schema(tool.name),
             },
         }
         for tool in TOOL_REGISTRY.values()
     ]
+
+
+def _input_schema(tool_name: str) -> dict[str, Any]:
+    if tool_name == "skill.execute":
+        return {
+            "type": "object",
+            "properties": {
+                "skill_id": {"type": "string", "minLength": 1},
+                "arguments": {"type": "object", "additionalProperties": True},
+            },
+            "required": ["skill_id"],
+            "additionalProperties": False,
+        }
+    return {"type": "object", "additionalProperties": True}
+
+
+def _validate_skill_proposal(arguments: dict[str, Any]) -> None:
+    skill_id = arguments.get("skill_id")
+    if not isinstance(skill_id, str) or not skill_id.strip():
+        raise AgentToolProposalError("ERROR_AGENT_SKILL_ID_INVALID", "skill.execute requires a non-empty skill_id.")
+    if skill_id not in SKILL_REGISTRY:
+        raise AgentToolProposalError("ERROR_AGENT_SKILL_NOT_REGISTERED", skill_id)
+    skill_arguments = arguments.get("arguments", {})
+    if not isinstance(skill_arguments, dict):
+        raise AgentToolProposalError("ERROR_AGENT_SKILL_ARGUMENTS_NOT_OBJECT", "skill.execute arguments must be a JSON object.")
 
 
 def _anthropic_candidates(payload: Any) -> list[dict[str, Any]]:
@@ -158,6 +184,8 @@ def validate_provider_tool_proposals(
             raise AgentToolProposalError("ERROR_AGENT_TOOL_NOT_ALLOWED", f"Provider proposed a tool outside the local allowlist: {tool_name!r}.")
         if not isinstance(arguments, dict):
             raise AgentToolProposalError("ERROR_AGENT_TOOL_ARGUMENTS_NOT_OBJECT", f"Arguments for {tool_name} must be a JSON object.")
+        if tool_name == "skill.execute":
+            _validate_skill_proposal(arguments)
         call_key = _canonical({"tool": tool_name, "arguments": arguments})
         if call_key in seen_calls:
             raise AgentToolProposalError("ERROR_AGENT_TOOL_PROPOSAL_DUPLICATE", f"Provider proposed the same call more than once: {tool_name}.")

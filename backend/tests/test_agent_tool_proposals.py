@@ -4,6 +4,7 @@ import pytest
 
 from backend.app.agent_tool_proposals import (
     AgentToolProposalError,
+    openai_tool_schemas,
     parse_provider_tool_proposals,
     provider_tool_schemas,
     validate_provider_tool_proposals,
@@ -59,3 +60,45 @@ def test_provider_tool_schemas_are_allowlist_derived() -> None:
     names = {row["name"] for row in provider_tool_schemas()}
     assert "source_library.status" in names
     assert "shell.exec" not in names
+
+
+def test_skill_tool_schemas_and_proposals_are_structured_and_registry_bound() -> None:
+    provider = next(row for row in provider_tool_schemas() if row["name"] == "skill.execute")
+    openai = next(row for row in openai_tool_schemas() if row["function"]["name"] == "skill.execute")
+    assert provider["input_schema"]["required"] == ["skill_id"]
+    assert provider["input_schema"]["additionalProperties"] is False
+    assert openai["function"]["parameters"] == provider["input_schema"]
+
+    parsed = parse_provider_tool_proposals(
+        "anthropic",
+        {
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "skill-1",
+                    "name": "skill.execute",
+                    "input": {"skill_id": "mucaro/intelligence-plane-health"},
+                }
+            ]
+        },
+        model="test",
+    )
+    assert parsed["proposals"][0]["tool"] == "skill.execute"
+
+
+@pytest.mark.parametrize(
+    ("arguments", "status"),
+    [
+        ({}, "ERROR_AGENT_SKILL_ID_INVALID"),
+        ({"skill_id": "mucaro/missing"}, "ERROR_AGENT_SKILL_NOT_REGISTERED"),
+        ({"skill_id": "mucaro/intelligence-plane-health", "arguments": []}, "ERROR_AGENT_SKILL_ARGUMENTS_NOT_OBJECT"),
+    ],
+)
+def test_provider_skill_proposals_fail_closed_before_approval(arguments: dict, status: str) -> None:
+    with pytest.raises(AgentToolProposalError) as exc:
+        parse_provider_tool_proposals(
+            "anthropic",
+            {"content": [{"type": "tool_use", "id": "skill-1", "name": "skill.execute", "input": arguments}]},
+            model="test",
+        )
+    assert exc.value.status == status
