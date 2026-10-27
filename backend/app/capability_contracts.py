@@ -427,6 +427,24 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
             isinstance(candidate, dict) and candidate.get("requires_network_download") is True
             for candidate in skipped_candidates
         )
+        transform_z_requested = _dotted(report, "parameters.transform_z") is True
+        feature_dimension_policy_closed = isinstance(features, list) and all(
+            isinstance(feature, dict)
+            and (
+                feature.get("transform_state") == "NULL_EMPTY"
+                or (
+                    feature.get("coordinate_policy") == (
+                        "Z_TRANSFORMED" if transform_z_requested else "Z_PASSTHROUGH"
+                        if feature.get("has_z")
+                        else "XY_ONLY"
+                    )
+                    and feature.get("input_coordinate_dimension") in {"XY", "XYZ"}
+                    and feature.get("output_coordinate_dimension") in {"XY", "XYZ"}
+                    and feature.get("z_transformed") is (transform_z_requested and bool(feature.get("has_z")))
+                )
+            )
+            for feature in features
+        )
         checks.extend(
             [
                 _contract_check("crs_engine.parameters.adapter", _dotted(report, "parameters.adapter") in CRS_ENGINE_ADAPTERS, "CRS engine reports must name a governed pyproj always-XY adapter"),
@@ -434,6 +452,10 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 _contract_check("crs_engine.parameters.target_crs", bool(_dotted(report, "parameters.target_crs")), "resolved target CRS is required"),
                 _contract_check("crs_engine.parameters.always_xy", _dotted(report, "parameters.always_xy") is True, "CRS axis order must be explicit"),
                 _contract_check("crs_engine.parameters.axis_order_policy", _dotted(report, "parameters.axis_order_policy") == "traditional_gis_xy", "traditional GIS XY policy must be recorded"),
+                _contract_check("crs_engine.parameters.transform_z", isinstance(_dotted(report, "parameters.transform_z"), bool), "Z transformation policy must be explicit"),
+                _contract_check("crs_engine.parameters.source_coordinate_dimension", isinstance(_dotted(report, "parameters.source_coordinate_dimension"), int) and _dotted(report, "parameters.source_coordinate_dimension") >= 2, "source CRS coordinate dimensionality must be recorded"),
+                _contract_check("crs_engine.parameters.target_coordinate_dimension", isinstance(_dotted(report, "parameters.target_coordinate_dimension"), int) and _dotted(report, "parameters.target_coordinate_dimension") >= 2, "target CRS coordinate dimensionality must be recorded"),
+                _contract_check("crs_engine.parameters.vertical_policy", _dotted(report, "parameters.vertical_policy") in {"TRANSFORM_Z_WITH_CRS_PIPELINE", "Z_PASSTHROUGH_UNTRANSFORMED"}, "vertical CRS policy must be explicit"),
                 _contract_check("crs_engine.parameters.network_policy", _dotted(report, "parameters.network_policy") == "offline_only", "CRS network policy must fail closed to offline-only"),
                 _contract_check("crs_engine.parameters.proj_network_enabled", isinstance(_dotted(report, "parameters.proj_network_enabled"), bool), "ambient PROJ network state must be recorded"),
                 _contract_check("crs_engine.parameters.pyproj_version", bool(_dotted(report, "parameters.pyproj_version")), "pyproj version is required"),
@@ -459,6 +481,9 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 _contract_check("crs_engine.output_hash", bool(_dotted(report, "output.sha256")), "transformed output hash is required"),
                 _contract_check("crs_engine.features_array", isinstance(features, list), "per-feature transform receipts are required"),
                 _contract_check("crs_engine.feature_conservation", _dotted(report, "invariants.feature_row_conservation") is True, "feature rows must be conserved"),
+                _contract_check("crs_engine.coordinate_dimension_policy", _dotted(report, "invariants.coordinate_dimension_policy_explicit") is True, "coordinate dimensionality policy must be explicit"),
+                _contract_check("crs_engine.z_transformation_closed", _dotted(report, "invariants.z_transformation_closed") is True, "requested Z transformations must close per-feature policy accounting"),
+                _contract_check("crs_engine.feature_dimension_policy", feature_dimension_policy_closed, "every non-empty feature must close its coordinate dimensionality and Z policy"),
                 _contract_check("crs_engine.offline_policy_satisfied", _dotted(report, "invariants.offline_policy_satisfied") is True, "offline-only selection invariant must pass"),
                 _contract_check("crs_engine.grid_inventory_complete", _dotted(report, "invariants.grid_inventory_complete") is True, "candidate grid metadata must be complete"),
             ]

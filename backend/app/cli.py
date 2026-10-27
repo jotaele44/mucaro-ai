@@ -648,6 +648,11 @@ def build_parser() -> argparse.ArgumentParser:
     gis_reproject_crs.add_argument("geojson_path", help="Path to a GeoJSON FeatureCollection.")
     gis_reproject_crs.add_argument("--target-crs", required=True, help="Any CRS identifier parseable by pyproj/PROJ.")
     gis_reproject_crs.add_argument("--source-crs", help="Optional operator override for the source CRS.")
+    gis_reproject_crs.add_argument(
+        "--transform-z",
+        action="store_true",
+        help="Explicitly transform numeric Z coordinates; requires 3D source and target CRS definitions.",
+    )
     gis_reproject_crs.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     gis_reproject_crs.set_defaults(handler=run_gis_reproject_crs)
 
@@ -3570,7 +3575,13 @@ def run_gis_reproject_crs(args: argparse.Namespace, cfg: Settings) -> int:
     path = _resolve_project_path(args.geojson_path, cfg)
     return _run_gis_report(
         args,
-        lambda: reproject_geojson_crs(path, target_crs=args.target_crs, cfg=cfg, source_crs=args.source_crs),
+        lambda: reproject_geojson_crs(
+            path,
+            target_crs=args.target_crs,
+            cfg=cfg,
+            source_crs=args.source_crs,
+            transform_z=args.transform_z,
+        ),
     )
 
 

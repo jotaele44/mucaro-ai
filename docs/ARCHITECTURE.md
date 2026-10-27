@@ -125,8 +125,8 @@ provenance through shared CLI, eval, and saved-report contract surfaces. Receipt
 under `data/exports/gis_reports` and preserve source/output hashes, CRS,
 dimensional and NODATA residue, per-feature states, and accounting invariants.
 
-This is not full advanced GIS certification. Broader CRS grids and vertical or
-time-dependent operations, dimension-preserving mutation, topology/overlay
+This is not full advanced GIS certification. Broader CRS grids, vertical-datum
+or time-dependent operations, independent-vendor validation, dimension-preserving mutation, topology/overlay
 policy, independent visual validation, larger real vector/raster corpora,
 remote sensing, terrain algorithms beyond bounded slope/aspect/hillshade,
 hydrology beyond bounded priority-flood conditioning and D8, bathymetry, and temporal GIS remain open product

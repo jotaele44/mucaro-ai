@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import hashlib
 import shutil
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from pyproj import Transformer
 
 from backend.app.capability_contracts import (
     CAPABILITY_OUTPUT_CONTRACT_FAILED,
@@ -346,6 +348,70 @@ def test_non_governed_crs_pair_retains_general_offline_policy(tmp_path: Path) ->
     assert report["parameters"]["adapter"] == "pyproj_transformer_group_always_xy_v1"
     assert report["parameters"]["governed_grid"] is None
     assert report["parameters"]["execution_pipeline_sha256"] is None
+
+
+def test_explicit_3d_transform_transforms_z_and_closes_dimension_receipts(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    source = write_fc(tmp_path / "geodetic-3d.geojson", "EPSG:4979", [-66.0, 18.2, 100.0])
+
+    report = reproject_geojson_crs(source, target_crs="EPSG:4978", cfg=cfg, transform_z=True)
+    output = json.loads(Path(report["output"]["path"]).read_text(encoding="utf-8"))
+    observed = output["features"][0]["geometry"]["coordinates"]
+    expected = Transformer.from_crs("EPSG:4979", "EPSG:4978", always_xy=True).transform(
+        -66.0,
+        18.2,
+        100.0,
+        errcheck=True,
+    )
+
+    assert report["status"] == "GIS_CRS_REPROJECT_OK"
+    assert report["warnings"] == []
+    assert report["parameters"]["transform_z"] is True
+    assert report["parameters"]["source_coordinate_dimension"] == 3
+    assert report["parameters"]["target_coordinate_dimension"] == 3
+    assert report["parameters"]["vertical_policy"] == "TRANSFORM_Z_WITH_CRS_PIPELINE"
+    assert report["invariants"]["coordinate_dimension_policy_explicit"] is True
+    assert report["invariants"]["z_transformation_closed"] is True
+    assert report["features"][0]["coordinate_policy"] == "Z_TRANSFORMED"
+    assert report["features"][0]["input_coordinate_dimension"] == "XYZ"
+    assert report["features"][0]["output_coordinate_dimension"] == "XYZ"
+    assert all(abs(observed[index] - expected[index]) <= 1e-9 for index in range(3))
+
+    contract = validate_gis_report_contract(report)
+    assert contract["status"] == CAPABILITY_OUTPUT_CONTRACT_OK
+
+    tampered = deepcopy(report)
+    tampered["features"][0]["coordinate_policy"] = "Z_PASSTHROUGH"
+    tampered["features"][0]["z_transformed"] = False
+    tampered["invariants"]["z_transformation_closed"] = True
+    tampered_contract = validate_gis_report_contract(tampered)
+    assert tampered_contract["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(
+        check["name"] == "crs_engine.feature_dimension_policy" and check["status"] == "FAIL"
+        for check in tampered_contract["checks"]
+    )
+
+
+def test_explicit_3d_transform_rejects_2d_crs_pair(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    source = write_fc(tmp_path / "2d.geojson", "EPSG:4326", [-66.0, 18.2])
+
+    with pytest.raises(GISProcessingError) as exc:
+        reproject_geojson_crs(source, target_crs="EPSG:3857", cfg=cfg, transform_z=True)
+
+    assert exc.value.status == "ERROR_GIS_CRS_VERTICAL_DIMENSION"
+    assert list(cfg.export_dir.iterdir()) == []
+
+
+def test_explicit_3d_transform_rejects_missing_feature_z(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    source = write_fc(tmp_path / "missing-z.geojson", "EPSG:4979", [-66.0, 18.2])
+
+    with pytest.raises(GISProcessingError) as exc:
+        reproject_geojson_crs(source, target_crs="EPSG:4978", cfg=cfg, transform_z=True)
+
+    assert exc.value.status == "ERROR_GIS_CRS_Z_REQUIRED"
+    assert list(cfg.export_dir.iterdir()) == []
 
 
 def test_m_coordinates_fail_closed(tmp_path: Path) -> None:

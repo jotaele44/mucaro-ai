@@ -136,6 +136,11 @@ def test_advanced_vector_cli_commands_emit_governed_receipts(tmp_path: Path, cap
         tmp_path / "point.geojson",
         [{"type": "Feature", "id": "point", "properties": {}, "geometry": {"type": "Point", "coordinates": [-66, 18.2]}}],
     )
+    point_3d = write_geojson(
+        tmp_path / "point-3d.geojson",
+        [{"type": "Feature", "id": "point-3d", "properties": {}, "geometry": {"type": "Point", "coordinates": [-66, 18.2, 100.0]}}],
+        crs="EPSG:4979",
+    )
     bowtie = write_geojson(
         tmp_path / "bowtie.geojson",
         [
@@ -158,6 +163,25 @@ def test_advanced_vector_cli_commands_emit_governed_receipts(tmp_path: Path, cap
     assert "adapter=pyproj_transformer_group_always_xy_v1" in output
     assert "axis_order_explicit=True" in output
     assert "transform_pipeline_frozen=True" in output
+
+    assert main(
+        [
+            "gis",
+            "reproject-crs",
+            str(point_3d),
+            "--target-crs",
+            "EPSG:4978",
+            "--transform-z",
+            "--format",
+            "json",
+        ],
+        cfg=cfg,
+    ) == 0
+    three_d_report = json.loads(capsys.readouterr().out)
+    assert three_d_report["parameters"]["transform_z"] is True
+    assert three_d_report["parameters"]["vertical_policy"] == "TRANSFORM_Z_WITH_CRS_PIPELINE"
+    assert three_d_report["features"][0]["coordinate_policy"] == "Z_TRANSFORMED"
+    assert three_d_report["invariants"]["z_transformation_closed"] is True
 
     assert main(["gis", "repair-topology", str(bowtie), "--format", "text"], cfg=cfg) == 0
     output = capsys.readouterr().out

@@ -319,12 +319,25 @@ def _unavailable_operation_receipt(index: int, operation: Any) -> dict[str, Any]
     }
 
 
-def _transform_coordinates(value: Any, transformer: Transformer) -> Any:
+def _transform_coordinates(value: Any, transformer: Transformer, *, transform_z: bool = False) -> Any:
     if isinstance(value, list) and len(value) >= 2 and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in value[:2]):
+        if transform_z:
+            if len(value) < 3 or not isinstance(value[2], (int, float)) or isinstance(value[2], bool):
+                raise GISProcessingError(
+                    "ERROR_GIS_CRS_Z_REQUIRED",
+                    "A 3D CRS transformation requires every position to include a numeric Z coordinate.",
+                )
+            x, y, z = transformer.transform(
+                float(value[0]),
+                float(value[1]),
+                float(value[2]),
+                errcheck=True,
+            )
+            return [x, y, z, *value[3:]]
         x, y = transformer.transform(float(value[0]), float(value[1]), errcheck=True)
         return [x, y, *value[2:]]
     if isinstance(value, list):
-        return [_transform_coordinates(item, transformer) for item in value]
+        return [_transform_coordinates(item, transformer, transform_z=transform_z) for item in value]
     raise GISProcessingError("ERROR_GIS_CRS_INVALID_COORDINATES", "Geometry contains a non-position coordinate value.")
 
 
@@ -334,6 +347,7 @@ def reproject_geojson_crs(
     target_crs: str,
     cfg: Settings = settings,
     source_crs: str | None = None,
+    transform_z: bool = False,
     _grid_root: Path | None = None,
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
@@ -342,6 +356,13 @@ def reproject_geojson_crs(
     try:
         source_obj = CRS.from_user_input(source_name)
         target_obj = CRS.from_user_input(target_crs)
+        source_coordinate_dimension = len(source_obj.axis_info)
+        target_coordinate_dimension = len(target_obj.axis_info)
+        if transform_z and (source_coordinate_dimension < 3 or target_coordinate_dimension < 3):
+            raise GISProcessingError(
+                "ERROR_GIS_CRS_VERTICAL_DIMENSION",
+                "--transform-z requires both source and target CRS definitions to expose a third coordinate axis.",
+            )
         governed = _load_governed_grid_transform(source_obj, target_obj, grid_root=_grid_root)
         if governed is not None:
             transformer = governed["transformer"]
@@ -426,19 +447,32 @@ def reproject_geojson_crs(
                 "ERROR_GIS_CRS_M_UNSUPPORTED",
                 "M coordinates require an explicit semantic transform policy.",
             )
+        if transform_z and not dims["has_z"]:
+            raise GISProcessingError(
+                "ERROR_GIS_CRS_Z_REQUIRED",
+                f"Feature {index} does not contain Z coordinates required by the explicit 3D transform policy.",
+            )
         transformed = deepcopy(feature)
         try:
-            transformed["geometry"]["coordinates"] = _transform_coordinates(geometry["coordinates"], transformer)
+            transformed["geometry"]["coordinates"] = _transform_coordinates(
+                geometry["coordinates"],
+                transformer,
+                transform_z=transform_z,
+            )
         except ProjError as exc:
             raise GISProcessingError("ERROR_GIS_CRS_TRANSFORM", str(exc)) from exc
         output_features.append(transformed)
+        output_dims = _coordinate_dimension_summary(transformed["geometry"])
         receipts.append(
             {
                 "feature_index": index,
                 "feature_id": _feature_id(feature, index),
                 "transform_state": "TRANSFORMED" if source_obj != target_obj else "NOOP",
-                "coordinate_dimension": dims["coordinate_dimension"],
+                "input_coordinate_dimension": dims["coordinate_dimension"],
+                "output_coordinate_dimension": output_dims["coordinate_dimension"],
                 "has_z": dims["has_z"],
+                "z_transformed": bool(transform_z and dims["has_z"]),
+                "coordinate_policy": "Z_TRANSFORMED" if transform_z else ("Z_PASSTHROUGH" if dims["has_z"] else "XY_ONLY"),
             }
         )
     created_at = utc_now()
@@ -464,7 +498,7 @@ def reproject_geojson_crs(
         for row in candidate_receipts[:selected_candidate_index]
     ):
         report_warnings.append("GIS_CRS_NETWORK_GRID_SKIPPED")
-    if any(row.get("has_z") for row in receipts):
+    if any(row.get("has_z") for row in receipts) and not transform_z:
         report_warnings.append("GIS_CRS_Z_PASSTHROUGH_UNTRANSFORMED")
     report = {
         "schema_version": GIS_REPORT_SCHEMA_VERSION,
@@ -478,6 +512,10 @@ def reproject_geojson_crs(
             "target_crs": target_obj.to_string(),
             "always_xy": True,
             "axis_order_policy": "traditional_gis_xy",
+            "transform_z": bool(transform_z),
+            "source_coordinate_dimension": source_coordinate_dimension,
+            "target_coordinate_dimension": target_coordinate_dimension,
+            "vertical_policy": "TRANSFORM_Z_WITH_CRS_PIPELINE" if transform_z else "Z_PASSTHROUGH_UNTRANSFORMED",
             "network_policy": CRS_NETWORK_POLICY,
             "proj_network_enabled": network.is_network_enabled(),
             "pyproj_version": pyproj_version,
@@ -521,6 +559,11 @@ def reproject_geojson_crs(
             "source_crs_parseable": True,
             "target_crs_parseable": True,
             "axis_order_explicit": True,
+            "coordinate_dimension_policy_explicit": True,
+            "z_transformation_closed": all(
+                (not row.get("z_transformed")) or row.get("coordinate_policy") == "Z_TRANSFORMED"
+                for row in receipts
+            ),
             "transform_pipeline_frozen": bool(pipeline) and not pipeline.lower().startswith("unavailable until"),
             "offline_policy_satisfied": candidate_receipts[selected_candidate_index]["offline_capable"],
             "grid_inventory_complete": all(row["grid_metadata_complete"] for row in candidate_receipts),
@@ -536,7 +579,8 @@ def reproject_geojson_crs(
         "warnings": report_warnings,
         "limitations": [
             "XY coordinates are transformed with pyproj/PROJ using always_xy=True",
-            "Z values are preserved but not vertically transformed",
+            "Z values are preserved but not vertically transformed unless transform_z is explicitly requested",
+            "explicit transform_z requires source and target CRS definitions with third axes and numeric Z on every feature",
             "M coordinates fail closed",
             "remote grid downloads are not permitted; a governed local grid is used only for an exact source-bound CRS pair, otherwise a lower-accuracy offline candidate may be selected",
             "local grid files are bound by path, byte count, and SHA-256 when selected",
@@ -546,6 +590,8 @@ def reproject_geojson_crs(
         "falsification_criteria": [
             "reject if feature_row_conservation is false",
             "reject broad CRS claims if transformer definition or axis-order policy is absent",
+            "reject a 3D transform if source/target CRS dimensions or per-feature Z coordinates are absent",
+            "reject a report if a requested Z transformation is not recorded as Z_TRANSFORMED for every transformed feature",
             "reject if the selected candidate requires an unfrozen network grid",
             "reject the governed-grid result if the manifest, grid bytes, authorized CRS pair, area of use, or canonical pipeline differs from the frozen receipt",
             "independently verify material transformations when local grid inventory or accuracy differs between runtimes",

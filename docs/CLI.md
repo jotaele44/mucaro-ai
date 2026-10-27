@@ -65,7 +65,7 @@ PYTHONPATH=.:backend python3 -m backend.app.cli --help
 | `mucaro gis compare LEFT_PATH RIGHT_PATH` | Compare GeoJSON geometries and write an equality/topology receipt | 0 | 2 |
 | `mucaro gis overlay LEFT_PATH RIGHT_PATH` | Overlay matched polygon GeoJSON features and write a derived-output receipt | 0 | 2 |
 | `mucaro gis reproject GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON between supported local CRS pairs and write a transformation receipt | 0 | 2 |
-| `mucaro gis reproject-crs GEOJSON_PATH --target-crs CRS` | Reproject GeoJSON through pyproj/PROJ with explicit axis policy and frozen transformer identity | 0 | 2 |
+| `mucaro gis reproject-crs GEOJSON_PATH --target-crs CRS [--transform-z]` | Reproject GeoJSON through pyproj/PROJ with explicit axis policy and frozen transformer identity; opt into audited 3D Z transformation when both CRS definitions expose a third axis | 0 | 2 |
 | `python3 scripts/certify_gis_datum_cli_parity.py` | Run the frozen Puerto Rico and Florida datum-grid controls through the PROJ `cct` executable and verify byte/hash/coordinate parity | 0 | 2 |
 | `mucaro gis csv-points CSV_PATH --lat-column LAT --lon-column LON` | Convert CSV coordinate rows into GeoJSON point features and write a row-accounted GIS receipt | 0 | 2 |
 | `mucaro gis filter-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y` | Filter whole GeoJSON features by bbox extent and write retained/excluded accounting | 0 | 2 |
@@ -247,11 +247,14 @@ output hash, and per-feature state. The default network policy is
 remote-only grids are skipped, and selected local grids are frozen by byte
 count and SHA-256. A lower-accuracy offline candidate therefore produces an
 explicit warning rather than silently downloading a grid. Z is passed through
-without vertical transformation and is warned; M fails closed. Frozen local
+without vertical transformation and is warned by default; `--transform-z`
+explicitly enables a third-axis CRS pipeline only when both CRS definitions
+expose a third axis and every position supplies numeric Z. The receipt records
+the dimensionality and per-feature `Z_TRANSFORMED` policy. M fails closed. Frozen local
 Puerto Rico and Florida datum-grid transformations are covered by source-bound
 manifests, and the separate `cct` control verifies executable parity for both
 frozen pipelines. This is not independent-vendor engine certification. Broader
-axis-order coverage and vertical or time-dependent CRS certification remain
+axis-order coverage and vertical-datum or time-dependent CRS certification remain
 outside the V1 claim.
 
 `inspect-vector`, `inspect-raster`, `sample-raster`,
@@ -563,6 +566,8 @@ approved and audited.
 | `ERROR_GIS_CRS_FEATURES` | pyproj/PROJ reprojection found malformed feature rows |
 | `ERROR_GIS_CRS_GEOMETRY` | pyproj/PROJ reprojection found an unsupported geometry object |
 | `ERROR_GIS_CRS_M_UNSUPPORTED` | pyproj/PROJ reprojection found M coordinates without an explicit semantic transformation policy |
+| `ERROR_GIS_CRS_VERTICAL_DIMENSION` | explicit Z transformation was requested but the source or target CRS does not expose a third coordinate axis |
+| `ERROR_GIS_CRS_Z_REQUIRED` | explicit Z transformation was requested but a feature position lacks a numeric Z coordinate |
 | `ERROR_GIS_CRS_TRANSFORM` | pyproj/PROJ failed while executing the selected transform |
 | `ERROR_GIS_REPAIR_FEATURES` | topology repair found malformed feature rows |
 | `ERROR_GIS_GEOD_CRS` | ellipsoidal measurement received a source CRS other than EPSG:4326 |
