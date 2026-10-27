@@ -94,6 +94,7 @@
     "permission.lease_create",
     "permission.lease_consume",
     "permission.lease_revoke",
-    "workspace_profiles.list"
+    "workspace_profiles.list",
+    "skill.execute"
   ]
 }

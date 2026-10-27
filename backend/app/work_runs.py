@@ -115,6 +115,7 @@ COMMANDS: dict[str, dict[str, Any]] = {
     "/fetch": {"tool": "web.fetch", "usage": "/fetch <url>", "arg": "url"},
     "/render": {"tool": "web.render", "usage": "/render <url>", "arg": "url", "extra": {"allow_rendered_browser": True}},
     "/search": {"tool": "web.search", "usage": "/search <query>", "arg": "query", "extra": {"allow_live_search": True}},
+    "/skill": {"tool": "skill.execute", "usage": "/skill <skill_id> [json]", "arg": None, "skill_command": True},
 }
 
 _EXECUTION_MODE = {"mode": "thread"}
@@ -331,7 +332,24 @@ def _parse_prompt(prompt: str) -> tuple[list[dict[str, Any]], str, list[str]]:
                 unknown.append(name)
                 continue
             arguments: dict[str, Any] = dict(spec.get("extra", {}))
-            if spec["arg"]:
+            if spec.get("skill_command"):
+                skill_id, _, encoded_arguments = rest.strip().partition(" ")
+                if not skill_id:
+                    unknown.append(f"{name} (missing skill_id)")
+                    continue
+                if encoded_arguments.strip():
+                    try:
+                        parsed_arguments = json.loads(encoded_arguments)
+                    except json.JSONDecodeError:
+                        unknown.append(f"{name} (arguments must be valid JSON object)")
+                        continue
+                    if not isinstance(parsed_arguments, dict):
+                        unknown.append(f"{name} (arguments must be a JSON object)")
+                        continue
+                else:
+                    parsed_arguments = {}
+                arguments.update({"skill_id": skill_id, "arguments": parsed_arguments})
+            elif spec["arg"]:
                 if not rest.strip():
                     unknown.append(f"{name} (missing {spec['arg']})")
                     continue

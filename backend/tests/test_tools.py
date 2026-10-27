@@ -5,6 +5,7 @@ import pytest
 from backend.app.config import Settings
 from backend.app.permission_leases import create_permission_lease
 from backend.app.permission_leases import list_permission_leases
+from backend.app.skill_runtime import activate_skill, mount_skill
 from backend.app.tools import (
     ToolRuntimeError,
     approve_tool_call,
@@ -44,6 +45,9 @@ def test_tool_runtime_lists_allowlisted_tools():
     assert by_name["web.fetch_session"]["mutates_state"] is True
     assert by_name["permission.lease_create"]["requires_approval"] is True
     assert by_name["permission.lease_revoke"]["mutates_state"] is True
+    assert by_name["skill.execute"]["requires_approval"] is True
+    assert by_name["skill.execute"]["mutates_state"] is True
+    assert by_name["skill.execute"]["offline_availability"] == "DEPENDS_ON_RUNTIME_POLICY"
 
 
 def test_permission_lease_tool_crosses_approval_and_audit_boundary(tmp_path: Path):
@@ -124,6 +128,29 @@ def test_tool_runtime_requires_approval_before_execution(tmp_path: Path):
     assert executed["status"] == "TOOL_CALL_EXECUTED"
     assert executed["result"]["status"] == "SOURCE_LIBRARY_STATUS_OK"
     assert executed["tool_call"]["status"] == "EXECUTED"
+
+
+def test_tool_runtime_executes_activated_skill_only_after_approval(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/intelligence-plane-health"
+    mount_skill(skill_id, cfg=cfg, mounted_by="test")
+    activate_skill(skill_id, cfg=cfg, activated_by="test")
+
+    requested = request_tool_call(
+        "skill.execute",
+        {"skill_id": skill_id, "arguments": {"probe": "local"}},
+        cfg=cfg,
+        requested_by="test",
+    )
+    call = requested["tool_call"]
+    with pytest.raises(ToolRuntimeError) as exc:
+        run_tool_call(call["tool_call_id"], cfg=cfg, executed_by="test")
+    assert exc.value.status == "ERROR_TOOL_APPROVAL_REQUIRED"
+
+    approve_tool_call(call["tool_call_id"], cfg=cfg, approved_by="test", expected_arguments_sha256=call["arguments_sha256"])
+    executed = run_tool_call(call["tool_call_id"], cfg=cfg, executed_by="test")
+    assert executed["result"]["status"] == "SKILL_EXECUTED"
+    assert executed["result"]["result"]["status"] == "INTELLIGENCE_PLANE_HEALTH_OK"
 
 
 def test_tool_runtime_denies_unknown_tools_and_audits_rejection(tmp_path: Path):

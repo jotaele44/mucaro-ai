@@ -15,6 +15,7 @@ from backend.app.goals import create_goal, get_goal
 from backend.app.ingestion import ingest_file
 from backend.app.main import create_app
 from backend.app.response_flow import get_interaction, get_pending_interaction
+from backend.app.skill_runtime import activate_skill, mount_skill
 from backend.app.tools import (
     TOOL_REGISTRY,
     ToolDefinition,
@@ -150,6 +151,41 @@ def test_ask_mode_waits_for_approval_then_resumes(cfg, conversation):
     assert run["state"] == "COMPLETED"
     assert run["outcome"] == "ACTIONS_COMPLETED"
     assert "tool_result" in _types(run["run_id"], cfg)
+
+
+def test_skill_slash_command_is_approval_gated_and_executes_runtime(cfg, conversation):
+    skill_id = "mucaro/intelligence-plane-health"
+    mount_skill(skill_id, cfg=cfg, mounted_by="test")
+    activate_skill(skill_id, cfg=cfg, activated_by="test")
+
+    run = _submit(conversation, f'/skill {skill_id} {{"probe":"local"}}', cfg)
+    assert run["state"] == "AWAITING_APPROVAL"
+    request = next(event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "approval_request")
+    assert request["data"]["tool_name"] == "skill.execute"
+    assert request["data"]["arguments"] == {"skill_id": skill_id, "arguments": {"probe": "local"}}
+    approve_tool_call(request["data"]["tool_call_id"], cfg=cfg, expected_arguments_sha256=request["data"]["arguments_sha256"])
+    resume_waiting_run(run["run_id"], cfg)
+
+    completed = get_run(run["run_id"], cfg)
+    assert completed["state"] == "COMPLETED"
+    result = next(event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "tool_result")
+    assert result["data"]["result"]["status"] == "SKILL_EXECUTED"
+
+
+@pytest.mark.parametrize(
+    "prompt,warning",
+    [
+        ("/skill", "missing skill_id"),
+        ("/skill mucaro/intelligence-plane-health not-json", "valid JSON object"),
+        ("/skill mucaro/intelligence-plane-health []", "JSON object"),
+    ],
+)
+def test_malformed_skill_slash_commands_never_create_tool_calls(cfg, conversation, prompt, warning):
+    run = _submit(conversation, prompt, cfg)
+    assert run["state"] == "COMPLETED"
+    assert list_tool_calls(cfg)["tool_calls"] == []
+    event = next(event for event in list_run_events(run["run_id"], cfg=cfg) if event["type"] == "warning")
+    assert warning in event["data"]["detail"]
 
 
 def test_plan_mode_executes_nothing(cfg, conversation):

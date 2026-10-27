@@ -26,6 +26,7 @@ from .permission_leases import (
     revoke_permission_lease,
 )
 from .product_audit import build_product_audit
+from .skill_runtime import SkillRuntimeError, execute_skill
 from .utils import canonical_sha256, read_json, stable_id, update_json, utc_now
 from .web_browsing import (
     WebBrowsingError,
@@ -60,7 +61,8 @@ class ToolDefinition:
     mutates_state: bool
     requires_approval: bool
     handler: Callable[[dict[str, Any], Settings], dict[str, Any]]
-    # "none": local only; "remote": contacts an external service (TGT-019 offline classification).
+    # "none": local only; "remote": contacts an external service; "dynamic":
+    # the mounted runtime determines whether remote access is needed.
     network: str = "none"
     timeout_seconds: float = DEFAULT_TOOL_TIMEOUT_SECONDS
     permission_capability: str | None = None
@@ -76,7 +78,13 @@ class ToolDefinition:
             "timeout_seconds": self.timeout_seconds,
             "permission_capability": self.permission_capability,
             "permission_target_field": self.permission_target_field,
-            "offline_availability": "AVAILABLE_LOCALLY" if self.network == "none" else "REQUIRES_REMOTE_SERVICE",
+            "offline_availability": (
+                "AVAILABLE_LOCALLY"
+                if self.network == "none"
+                else "DEPENDS_ON_RUNTIME_POLICY"
+                if self.network == "dynamic"
+                else "REQUIRES_REMOTE_SERVICE"
+            ),
         }
 
 
@@ -402,6 +410,19 @@ def _web_search(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
 
+def _skill_execute(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    skill_id = arguments.get("skill_id")
+    skill_arguments = arguments.get("arguments", {})
+    if not isinstance(skill_id, str) or not skill_id.strip():
+        raise ToolRuntimeError("ERROR_SKILL_ID_REQUIRED", "skill.execute requires a non-empty skill_id string.")
+    if not isinstance(skill_arguments, dict):
+        raise ToolRuntimeError("ERROR_SKILL_ARGUMENTS_NOT_OBJECT", "skill.execute arguments must be a JSON object.")
+    try:
+        return execute_skill(skill_id.strip(), skill_arguments, cfg=cfg, executed_by="tool")
+    except SkillRuntimeError as exc:
+        raise ToolRuntimeError(exc.status, exc.detail) from exc
+
+
 TOOL_REGISTRY: dict[str, ToolDefinition] = {
     "source_library.status": ToolDefinition(
         name="source_library.status",
@@ -582,6 +603,14 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         handler=_web_fetch_session,
         permission_capability="network.public_http",
         permission_target_field="urls",
+    ),
+    "skill.execute": ToolDefinition(
+        name="skill.execute",
+        description="Execute an activated, digest-pinned skill through its governed runtime and preserve execution/artifact lineage.",
+        mutates_state=True,
+        requires_approval=True,
+        network="dynamic",
+        handler=_skill_execute,
     ),
 }
 
