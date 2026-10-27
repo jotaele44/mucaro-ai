@@ -23,6 +23,21 @@ OVERLAY_POLICY: dict[str, Any] = {
     },
 }
 
+OVERLAY_POLICY_DECISIONS: dict[str, frozenset[str]] = {
+    "EMPTY_INPUT": frozenset({"EMPTY_INPUT_REJECTED"}),
+    "UNRESOLVED": frozenset(
+        {
+            "INVALID_INPUT_REJECTED",
+            "COORDINATE_DIMENSION_REJECTED",
+            "RUNTIME_UNRESOLVED",
+        }
+    ),
+    "UNSUPPORTED": frozenset({"INPUT_GEOMETRY_REJECTED"}),
+    "EMPTY_RESULT": frozenset({"EMPTY_RESULT_NOT_EMITTED"}),
+    "NON_POLYGON_RESULT": frozenset({"RESULT_GEOMETRY_REJECTED"}),
+    "EMITTED": frozenset({"POLYGONAL_RESULT_EMITTED"}),
+}
+
 OVERLAY_POLICY_SHA256 = hashlib.sha256(
     json.dumps(OVERLAY_POLICY, sort_keys=True, separators=(",", ":")).encode("utf-8")
 ).hexdigest()
@@ -33,3 +48,7 @@ def overlay_policy_receipt() -> dict[str, Any]:
         "policy_id": OVERLAY_POLICY_ID,
         "policy_sha256": OVERLAY_POLICY_SHA256,
     }
+
+
+def overlay_policy_decision_is_allowed(state: Any, decision: Any) -> bool:
+    return isinstance(state, str) and isinstance(decision, str) and decision in OVERLAY_POLICY_DECISIONS.get(state, frozenset())

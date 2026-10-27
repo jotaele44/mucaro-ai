@@ -552,6 +552,15 @@ def test_validate_gis_report_contract_accepts_standalone_overlay_receipts():
         for check in tampered["checks"]
     )
 
+    report["features"][0]["dimension_conserved"] = True
+    report["features"][0]["policy_decision"] = "EMPTY_RESULT_NOT_EMITTED"
+    contradictory = validate_gis_report_contract(report)
+    assert contradictory["status"] == CAPABILITY_OUTPUT_CONTRACT_FAILED
+    assert any(
+        check["name"] == "overlay.features.0.policy_decision" and check["status"] == "FAIL"
+        for check in contradictory["checks"]
+    )
+
 
 def test_validate_gis_report_contract_rejects_standalone_overlay_false_accounting():
     report = {

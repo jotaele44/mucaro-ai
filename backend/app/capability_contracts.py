@@ -11,7 +11,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .gis_render import GIS_RENDER_VALIDATION_SCHEMA_VERSION
-from .gis_overlay_policy import OVERLAY_POLICY_ID, OVERLAY_POLICY_SHA256
+from .gis_overlay_policy import OVERLAY_POLICY_ID, OVERLAY_POLICY_SHA256, overlay_policy_decision_is_allowed
 from .artifact_identity import ALLOWED_PARENT_TYPES, ARTIFACT_SCHEMA_VERSION
 from .web_browsing import WEB_SNAPSHOT_SCHEMA_VERSION
 
@@ -401,8 +401,8 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                         ),
                         _contract_check(
                             f"overlay.features.{index}.policy_decision",
-                            isinstance(feature.get("policy_decision"), str) and bool(feature.get("policy_decision")),
-                            "overlay pair receipts must record the policy decision",
+                            overlay_policy_decision_is_allowed(feature.get("overlay_state"), feature.get("policy_decision")),
+                            "overlay pair receipts must record a policy decision allowed for their overlay state",
                         ),
                         _contract_check(
                             f"overlay.features.{index}.emitted_dimension_consistent",
