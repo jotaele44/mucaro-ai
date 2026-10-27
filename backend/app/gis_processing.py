@@ -15,6 +15,7 @@ from shapely.geometry import mapping as shapely_mapping
 from shapely.geometry import shape as shapely_shape
 
 from .config import Settings, settings
+from .gis_overlay_policy import OVERLAY_POLICY_ID, OVERLAY_POLICY_SHA256
 from .utils import stable_id, utc_now, write_json
 
 GIS_REPORT_SCHEMA_VERSION = "mucaro_gis_report_v1"
@@ -1912,6 +1913,7 @@ def overlay_geojson_collections(
             "right_coordinate_dimension": right_dimensions["coordinate_dimension"],
             "result_coordinate_dimension": None,
             "dimension_conserved": None,
+            "policy_decision": None,
             "overlay_state": None,
             "overlay_warning": None,
             "result_feature_id": None,
@@ -1925,6 +1927,7 @@ def overlay_geojson_collections(
             row["overlay_state"] = "EMPTY_INPUT"
             row["overlay_warning"] = "GIS_OVERLAY_NULL_EMPTY_INPUT"
             row["warnings"] = ["GIS_OVERLAY_NULL_EMPTY_INPUT"]
+            row["policy_decision"] = "EMPTY_INPUT_REJECTED"
             state_counts["EMPTY_INPUT"] += 1
             feature_receipts.append(row)
             continue
@@ -1932,6 +1935,7 @@ def overlay_geojson_collections(
             row["overlay_state"] = "UNRESOLVED"
             row["overlay_warning"] = "GIS_OVERLAY_INVALID_INPUT_GEOMETRY"
             row["warnings"] = [*left_classification["warnings"], *right_classification["warnings"], "GIS_OVERLAY_INVALID_INPUT_GEOMETRY"]
+            row["policy_decision"] = "INVALID_INPUT_REJECTED"
             state_counts["UNRESOLVED"] += 1
             feature_receipts.append(row)
             continue
@@ -1941,6 +1945,7 @@ def overlay_geojson_collections(
             row["overlay_state"] = "UNSUPPORTED"
             row["overlay_warning"] = "GIS_OVERLAY_UNSUPPORTED_GEOMETRY"
             row["warnings"] = ["GIS_OVERLAY_UNSUPPORTED_GEOMETRY"]
+            row["policy_decision"] = "INPUT_GEOMETRY_REJECTED"
             state_counts["UNSUPPORTED"] += 1
             feature_receipts.append(row)
             continue
@@ -1948,6 +1953,7 @@ def overlay_geojson_collections(
             row["overlay_state"] = "UNRESOLVED"
             row["overlay_warning"] = "GIS_OVERLAY_COORDINATE_DIMENSION_UNSUPPORTED"
             row["warnings"] = ["GIS_OVERLAY_COORDINATE_DIMENSION_UNSUPPORTED"]
+            row["policy_decision"] = "COORDINATE_DIMENSION_REJECTED"
             state_counts["UNRESOLVED"] += 1
             feature_receipts.append(row)
             continue
@@ -1968,6 +1974,7 @@ def overlay_geojson_collections(
             row["overlay_state"] = "UNRESOLVED"
             row["overlay_warning"] = exc.status
             row["warnings"] = [exc.status]
+            row["policy_decision"] = "RUNTIME_UNRESOLVED"
             state_counts["UNRESOLVED"] += 1
             feature_receipts.append(row)
             continue
@@ -1976,12 +1983,14 @@ def overlay_geojson_collections(
             row["overlay_warning"] = "ERROR_GIS_OVERLAY_RUNTIME"
             row["warnings"] = ["ERROR_GIS_OVERLAY_RUNTIME"]
             row["error_detail"] = str(exc)
+            row["policy_decision"] = "RUNTIME_UNRESOLVED"
             state_counts["UNRESOLVED"] += 1
             feature_receipts.append(row)
             continue
 
         if result_shape.is_empty:
             row["overlay_state"] = "EMPTY_RESULT"
+            row["policy_decision"] = "EMPTY_RESULT_NOT_EMITTED"
             state_counts["EMPTY_RESULT"] += 1
             feature_receipts.append(row)
             continue
@@ -1992,6 +2001,7 @@ def overlay_geojson_collections(
             row["overlay_warning"] = f"GIS_OVERLAY_NON_POLYGON_RESULT:{result_geometry_type}"
             row["warnings"] = [str(row["overlay_warning"])]
             row["result_geometry_type"] = result_geometry_type
+            row["policy_decision"] = "RESULT_GEOMETRY_REJECTED"
             state_counts["NON_POLYGON_RESULT"] += 1
             feature_receipts.append(row)
             continue
@@ -2026,6 +2036,7 @@ def overlay_geojson_collections(
                 "dimension_conserved": result_coordinate_dimension == "XY"
                 and left_dimensions["coordinate_dimension"] == "XY"
                 and right_dimensions["coordinate_dimension"] == "XY",
+                "policy_decision": "POLYGONAL_RESULT_EMITTED",
                 "result_area": result_area,
                 "result_length": result_length,
             }
@@ -2083,6 +2094,8 @@ def overlay_geojson_collections(
             "match_on": match_on,
             "adapter": "shapely_planar_overlay_v1",
             "overlay_adapter": "shapely_planar_overlay_v1",
+            "overlay_policy_id": OVERLAY_POLICY_ID,
+            "overlay_policy_sha256": OVERLAY_POLICY_SHA256,
             "coordinate_dimension_policy": "XY_ONLY_RETAIN_ZM_UNRESOLVED",
             "supported_operations": sorted(SUPPORTED_OVERLAY_OPERATIONS),
             "supported_geometry_types": sorted(SUPPORTED_OVERLAY_GEOMETRY_TYPES),
@@ -2144,6 +2157,8 @@ def overlay_geojson_collections(
                 for row in feature_receipts
                 if row.get("overlay_state") == "EMITTED"
             ),
+            "policy_accounting_closed": len(feature_receipts) == len(shared_keys)
+            and all(isinstance(row, dict) and isinstance(row.get("policy_decision"), str) and bool(row["policy_decision"]) for row in feature_receipts),
         },
         "warnings": warnings,
         "limitations": [

@@ -15,6 +15,7 @@ from backend.app.capability_contracts import (
     validate_retrieval_output_contract,
     validate_web_snapshot_contract,
 )
+from backend.app.gis_overlay_policy import OVERLAY_POLICY_ID, OVERLAY_POLICY_SHA256
 
 
 def test_capability_contracts_cover_expanded_scope_without_overclaiming():
@@ -459,6 +460,8 @@ def test_validate_gis_report_contract_accepts_standalone_overlay_receipts():
             "match_on": "id",
             "adapter": "shapely_planar_overlay_v1",
             "overlay_adapter": "shapely_planar_overlay_v1",
+            "overlay_policy_id": OVERLAY_POLICY_ID,
+            "overlay_policy_sha256": OVERLAY_POLICY_SHA256,
             "coordinate_dimension_policy": "XY_ONLY_RETAIN_ZM_UNRESOLVED",
             "supported_operations": ["difference", "intersection", "symmetric_difference", "union"],
             "supported_geometry_types": ["MultiPolygon", "Polygon"],
@@ -494,6 +497,7 @@ def test_validate_gis_report_contract_accepts_standalone_overlay_receipts():
                 "result_coordinate_dimension": "XY",
                 "dimension_conserved": True,
                 "result_geometry_type": "Polygon",
+                "policy_decision": "POLYGONAL_RESULT_EMITTED",
                 "result_area": 4.0,
                 "result_length": 8.0,
             }
@@ -526,6 +530,7 @@ def test_validate_gis_report_contract_accepts_standalone_overlay_receipts():
             "overlay_pair_accounting_closed": True,
             "coordinate_dimension_accounting_closed": True,
             "emitted_dimension_preserved": True,
+            "policy_accounting_closed": True,
             "result_area_total": 4.0,
             "result_length_total": 8.0,
         },

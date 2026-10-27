@@ -11,6 +11,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .gis_render import GIS_RENDER_VALIDATION_SCHEMA_VERSION
+from .gis_overlay_policy import OVERLAY_POLICY_ID, OVERLAY_POLICY_SHA256
 from .artifact_identity import ALLOWED_PARENT_TYPES, ARTIFACT_SCHEMA_VERSION
 from .web_browsing import WEB_SNAPSHOT_SCHEMA_VERSION
 
@@ -338,6 +339,8 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 ),
                 _contract_check("overlay.parameters.adapter", _dotted(report, "parameters.adapter") == "shapely_planar_overlay_v1", "overlay reports must name the Shapely planar overlay adapter"),
                 _contract_check("overlay.parameters.overlay_adapter", _dotted(report, "parameters.overlay_adapter") == "shapely_planar_overlay_v1", "overlay reports must record the explicit overlay adapter"),
+                _contract_check("overlay.parameters.overlay_policy_id", _dotted(report, "parameters.overlay_policy_id") == OVERLAY_POLICY_ID, "overlay reports must bind the explicit overlay policy"),
+                _contract_check("overlay.parameters.overlay_policy_sha256", _dotted(report, "parameters.overlay_policy_sha256") == OVERLAY_POLICY_SHA256, "overlay reports must bind the exact overlay policy hash"),
                 _contract_check("overlay.parameters.coordinate_dimension_policy", _dotted(report, "parameters.coordinate_dimension_policy") == "XY_ONLY_RETAIN_ZM_UNRESOLVED", "overlay reports must record the explicit coordinate dimension policy"),
                 _contract_check("overlay.output_hash", bool(_dotted(report, "output.sha256")), "overlay reports must record derived output hash"),
                 _contract_check("overlay.output_feature_count_present", isinstance(output_feature_count, int), "output_feature_count must be recorded"),
@@ -349,6 +352,7 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                 _contract_check("overlay.pair_accounting_closed", _dotted(report, "invariants.overlay_pair_accounting_closed") is True, "overlay pair accounting must close"),
                 _contract_check("overlay.coordinate_dimension_accounting_closed", _dotted(report, "invariants.coordinate_dimension_accounting_closed") is True, "overlay coordinate dimension accounting must close"),
                 _contract_check("overlay.emitted_dimension_preserved", _dotted(report, "invariants.emitted_dimension_preserved") is True, "emitted overlay dimensions must be preserved"),
+                _contract_check("overlay.policy_accounting_closed", _dotted(report, "invariants.policy_accounting_closed") is True, "overlay policy decisions must cover every matched pair"),
                 _contract_check("overlay.result_area_total_numeric", _is_number(_dotted(report, "invariants.result_area_total")), "result_area_total must be numeric"),
                 _contract_check("overlay.result_length_total_numeric", _is_number(_dotted(report, "invariants.result_length_total")), "result_length_total must be numeric"),
             ]
@@ -394,6 +398,11 @@ def validate_gis_report_contract(report: dict[str, Any], *, report_path: str | N
                             f"overlay.features.{index}.result_dimension_key",
                             "result_coordinate_dimension" in feature,
                             "overlay pair receipts must record the result coordinate dimension key",
+                        ),
+                        _contract_check(
+                            f"overlay.features.{index}.policy_decision",
+                            isinstance(feature.get("policy_decision"), str) and bool(feature.get("policy_decision")),
+                            "overlay pair receipts must record the policy decision",
                         ),
                         _contract_check(
                             f"overlay.features.{index}.emitted_dimension_consistent",

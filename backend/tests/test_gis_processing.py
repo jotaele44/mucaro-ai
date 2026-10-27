@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from backend.app.config import Settings
+from backend.app.gis_overlay_policy import OVERLAY_POLICY_ID, OVERLAY_POLICY_SHA256
 from backend.app.gis_processing import (
     GISProcessingError,
     clip_geojson_by_bbox,
@@ -829,6 +830,8 @@ def test_overlay_geojson_collections_writes_intersection_output_and_receipt(tmp_
     assert result["parameters"]["overlay_operation"] == "intersection"
     assert result["parameters"]["adapter"] == "shapely_planar_overlay_v1"
     assert result["parameters"]["overlay_adapter"] == "shapely_planar_overlay_v1"
+    assert result["parameters"]["overlay_policy_id"] == OVERLAY_POLICY_ID
+    assert result["parameters"]["overlay_policy_sha256"] == OVERLAY_POLICY_SHA256
     assert result["output"]["feature_count"] == 1
     assert result["output"]["sha256"]
     assert result["output"]["crs"] == "EPSG:4326"
@@ -845,6 +848,7 @@ def test_overlay_geojson_collections_writes_intersection_output_and_receipt(tmp_
     }
     assert result["invariants"]["feature_key_accounting_closed"] is True
     assert result["invariants"]["overlay_pair_accounting_closed"] is True
+    assert result["invariants"]["policy_accounting_closed"] is True
     assert result["invariants"]["shared_feature_key_count"] == 1
     assert result["invariants"]["output_feature_count"] == 1
     assert result["invariants"]["emitted_feature_count"] == 1
@@ -852,6 +856,7 @@ def test_overlay_geojson_collections_writes_intersection_output_and_receipt(tmp_
     row = result["features"][0]
     assert row["feature_key"] == "id:overlap"
     assert row["overlay_state"] == "EMITTED"
+    assert row["policy_decision"] == "POLYGONAL_RESULT_EMITTED"
     assert row["result_geometry_type"] == "Polygon"
     assert row["result_area"] == 4.0
     output = json.loads(Path(result["output"]["path"]).read_text(encoding="utf-8"))
@@ -913,6 +918,10 @@ def test_overlay_geojson_collections_records_unmatched_empty_and_dimension_resid
     assert result["invariants"]["right_only_count"] == 1
     by_key = {row["feature_key"]: row for row in result["features"]}
     assert by_key["id:overlap"]["overlay_state"] == "EMPTY_RESULT"
+    assert by_key["id:overlap"]["policy_decision"] == "EMPTY_RESULT_NOT_EMITTED"
+    assert by_key["id:z_polygon"]["policy_decision"] == "COORDINATE_DIMENSION_REJECTED"
+    assert by_key["id:line"]["policy_decision"] == "INPUT_GEOMETRY_REJECTED"
+    assert result["invariants"]["policy_accounting_closed"] is True
     assert by_key["id:z_polygon"]["overlay_state"] == "UNRESOLVED"
     assert by_key["id:z_polygon"]["overlay_warning"] == "GIS_OVERLAY_COORDINATE_DIMENSION_UNSUPPORTED"
     assert by_key["id:line"]["overlay_state"] == "UNSUPPORTED"

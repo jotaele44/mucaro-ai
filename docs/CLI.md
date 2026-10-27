@@ -205,8 +205,10 @@ mismatches fail closed. The command preserves both input hashes, writes a
 derived GeoJSON output hash, records the overlay adapter, separates emitted
 features from empty results, unsupported geometry, Z/M dimensional residue,
 unmatched feature keys, invalid topology, and lower-dimensional overlay results,
-and closes feature-key and pair-state accounting. This is a narrow local
-matched-polygon overlay boundary, not a full GIS-engine overlay certification.
+and closes feature-key and pair-state accounting. Each receipt binds the
+`mucaro_overlay_planar_policy_v1` policy ID and SHA-256 and records the policy
+decision for every matched pair. This is a narrow local matched-polygon
+overlay boundary, not a full GIS-engine overlay certification.
 
 `mucaro gis clip-bbox GEOJSON_PATH --min-x X --min-y Y --max-x X --max-y Y`
 clips Point, MultiPoint, LineString, MultiLineString, Polygon, and MultiPolygon
