@@ -11,6 +11,8 @@ import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace
 import { ReadinessWorkspace } from "./components/workspaces/ReadinessWorkspace.jsx";
 import { SettingsWorkspace } from "./components/workspaces/SettingsWorkspace.jsx";
 import { SourcesWorkspace } from "./components/workspaces/SourcesWorkspace.jsx";
+import { OCRWorkspace } from "./components/workspaces/OCRWorkspace.jsx";
+import { SpecializedWorkspace } from "./components/workspaces/SpecializedWorkspace.jsx";
 
 const WORKSPACES = [
   { id: "chat", label: "Chat" },
@@ -18,6 +20,10 @@ const WORKSPACES = [
   { id: "tasks", label: "Plan tasks" },
   { id: "skills", label: "Skills" },
   { id: "sources", label: "Sources" },
+  { id: "ocr", label: "OCR / page review" },
+  { id: "gis", label: "GIS" },
+  { id: "code", label: "Code" },
+  { id: "artifacts", label: "Artifacts" },
   { id: "memory", label: "Memory" },
   { id: "provenance", label: "Provenance" },
   { id: "readiness", label: "Readiness" },
@@ -279,6 +285,10 @@ export function App() {
         {health.state === "ok" && view === "tasks" && <TasksWorkspace announce={announce} />}
         {health.state === "ok" && view === "skills" && <SkillsWorkspace announce={announce} />}
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
+        {health.state === "ok" && view === "ocr" && <OCRWorkspace announce={announce} />}
+        {health.state === "ok" && view === "gis" && <SpecializedWorkspace kind="gis" />}
+        {health.state === "ok" && view === "code" && <SpecializedWorkspace kind="code" />}
+        {health.state === "ok" && view === "artifacts" && <SpecializedWorkspace kind="artifacts" />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}
         {health.state === "ok" && view === "provenance" && <ProvenanceWorkspace />}
         {health.state === "ok" && view === "readiness" && <ReadinessWorkspace />}

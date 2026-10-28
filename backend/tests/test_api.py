@@ -109,6 +109,45 @@ def test_api_intelligence_plane_reports_declared_capability_states(tmp_path: Pat
     assert "agent_runtime" in payload["descriptor"]["capabilities"]
 
 
+def test_api_ocr_analyze_returns_structured_report(tmp_path: Path, monkeypatch):
+    client = make_client(tmp_path)
+
+    def fake_analyze(path: Path, *, cfg):
+        assert path.suffix == ".png"
+        assert path.exists()
+        return {
+            "schema_version": "mucaro_ocr_report_v1",
+            "report_id": "ocrreport_api_fixture",
+            "status": "OCR_ANALYSIS_OK",
+            "operation": "image_ocr",
+            "source": {"sha256": "a" * 64, "mime_type": "image/png"},
+            "engine": {"name": "tesseract", "version": "tesseract fixture", "language": "eng", "layout_mode": "auto"},
+            "text": {"raw": "Mucaro", "normalized": "Mucaro", "canonical": "mucaro"},
+            "spans": [],
+            "warnings": [],
+            "report_path": str(cfg.export_dir / "ocr_reports" / "ocrreport_api_fixture.json"),
+        }
+
+    monkeypatch.setattr(main_module, "analyze_image_ocr", fake_analyze)
+
+    response = client.post("/ocr/analyze", files={"upload": ("scan.png", minimal_png(), "image/png")})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "OCR_API_OK"
+    assert payload["report"]["report_id"] == "ocrreport_api_fixture"
+    assert payload["report"]["text"]["canonical"] == "mucaro"
+
+
+def test_api_ocr_analyze_rejects_non_image_and_non_pdf(tmp_path: Path):
+    client = make_client(tmp_path)
+
+    response = client.post("/ocr/analyze", files={"upload": ("notes.md", b"not OCR input", "text/markdown")})
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["status"] == "ERROR_OCR_UNSUPPORTED_INPUT"
+
+
 def test_api_coding_readiness_exposes_non_executing_runtime_boundary(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
         main_module,

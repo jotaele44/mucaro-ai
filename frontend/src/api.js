@@ -295,6 +295,11 @@ export const api = {
     form.append("upload", file);
     return request("/ingest", { method: "POST", body: form, timeoutMs: UPLOAD_TIMEOUT_MS });
   },
+  ocrAnalyze: (file) => {
+    const form = new FormData();
+    form.append("upload", file);
+    return request("/ocr/analyze", { method: "POST", body: form, timeoutMs: UPLOAD_TIMEOUT_MS });
+  },
   directoryPermissions: () => request("/permissions/directories"),
   checkDirectoryPermission: (payload) => request("/permissions/directories/check", json("POST", payload)),
   grantDirectoryPermission: (payload) => request("/permissions/directories/grant", json("POST", payload)),

@@ -1156,6 +1156,65 @@ details summary {
   margin-top: 2px;
 }
 
+.ocr-text-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ocr-text-grid h3,
+.panel > h2,
+.panel > h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.text-preview {
+  margin: 6px 0 0;
+  min-height: 72px;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px;
+  background: var(--surface-2);
+  font: 12.5px/1.45 var(--mono);
+}
+
+.ocr-page-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.ocr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ocr-table th,
+.ocr-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ocr-table th {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .event-list li {
   display: flex;
   justify-content: space-between;
@@ -1318,6 +1377,14 @@ details summary {
   .workspace {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .ocr-text-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ocr-table {
+    min-width: 620px;
   }
 
   .composer {

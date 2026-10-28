@@ -87,6 +87,8 @@ from .models import (
 )
 from .model_router import list_model_providers
 from .offline import build_offline_manifest
+from .ocr_analysis import OCRAnalysisError, analyze_image_ocr
+from .ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
 from .memory import (
     MemoryError,
     delete_memory_item,
@@ -152,9 +154,10 @@ from .work_runs import (
     submit_message,
 )
 from .workspaces import list_workspace_profiles, upsert_workspace_profile
-from .utils import stable_id, utc_now
+from .utils import read_json, stable_id, utc_now
 
 SUPPORTED_UPLOAD_SUFFIXES = FOLDER_SUPPORTED_SUFFIXES
+OCR_UPLOAD_SUFFIXES = {".gif", ".jpeg", ".jpg", ".pdf", ".png", ".webp"}
 GENERATED_NAME_PATTERN = re.compile(r"^(src_|run_|chunk_)", re.IGNORECASE)
 
 
@@ -274,6 +277,23 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         not_found = exc.status in {"ERROR_RUN_NOT_FOUND", "ERROR_CONVERSATION_NOT_FOUND"}
         conflict = exc.status in {"ERROR_RUN_VERSION_CONFLICT", "ERROR_RUN_NOT_QUEUED", "ERROR_RUN_ALREADY_FINISHED"}
         return api_error(exc.status, exc.detail, status_code=404 if not_found else 409 if conflict else 400)
+
+    def with_ocr_page_previews(report: dict) -> dict:
+        pages = []
+        for page in report.get("pages", []):
+            preview = dict(page)
+            report_path = page.get("ocr_report_path") if isinstance(page, dict) else None
+            page_report = {}
+            if isinstance(report_path, str):
+                candidate = Path(report_path).expanduser().resolve()
+                export_root = cfg.export_dir.expanduser().resolve()
+                if candidate.is_relative_to(export_root):
+                    page_report = read_json(candidate, {})
+                else:
+                    preview["preview_warning"] = "OCR_REPORT_PATH_OUTSIDE_EXPORT"
+            preview["text"] = page_report.get("text", {}) if isinstance(page_report, dict) else {}
+            pages.append(preview)
+        return {**report, "pages": pages}
 
     def require_auth(
         authorization: str | None = Header(default=None),
@@ -459,6 +479,29 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             raise api_error(exc.status, str(exc), status_code=422, filename=safe_name) from exc
         except Exception as exc:
             raise api_error("ERROR_INGEST_FAILED", type(exc).__name__, filename=safe_name) from exc
+
+    @app.post("/ocr/analyze")
+    async def ocr_analyze(upload: UploadFile = File(...), _auth: dict = Depends(require_auth)) -> dict:
+        safe_name = sanitize_upload_filename(upload.filename)
+        suffix = Path(safe_name).suffix.lower()
+        if suffix not in OCR_UPLOAD_SUFFIXES:
+            raise api_error("ERROR_OCR_UNSUPPORTED_INPUT", "OCR analysis accepts image or PDF files only.", filename=safe_name)
+        content = await read_limited_upload(upload, cfg.max_upload_bytes)
+        target = cfg.input_dir / f"{stable_id('ocr_input', safe_name, utc_now())}_{safe_name}"
+        target.write_bytes(content)
+        try:
+            if suffix == ".pdf":
+                report = analyze_pdf_ocr(target, cfg=cfg)
+            else:
+                report = analyze_image_ocr(target, cfg=cfg)
+            return {"status": "OCR_API_OK", "report": with_ocr_page_previews(report)}
+        except (OCRAnalysisError, PDFOCRAnalysisError) as exc:
+            target.unlink(missing_ok=True)
+            unavailable = exc.status in {"ERROR_OCR_ENGINE_UNAVAILABLE", "ERROR_OCR_PDF_RENDERER_UNAVAILABLE"}
+            raise api_error(exc.status, exc.detail, status_code=503 if unavailable else 422, filename=safe_name) from exc
+        except Exception as exc:
+            target.unlink(missing_ok=True)
+            raise api_error("ERROR_OCR_ANALYZE_FAILED", type(exc).__name__, status_code=422, filename=safe_name) from exc
 
     @app.post("/ingest-path")
     def ingest_path(req: IngestPathRequest, _auth: dict = Depends(require_auth)) -> dict:

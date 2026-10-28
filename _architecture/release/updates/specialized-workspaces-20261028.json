@@ -1,0 +1,51 @@
+{
+  "rows": {
+    "TGT-003": {
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "frontend/src/App.jsx",
+        "frontend/src/components/workspaces/OCRWorkspace.jsx",
+        "frontend/src/components/workspaces/SpecializedWorkspace.jsx",
+        "frontend/src/components/workspaces/SourcesWorkspace.jsx",
+        "frontend/src/components/workspaces/ProvenanceWorkspace.jsx",
+        "frontend/src/components/workspaces/MemoryWorkspace.jsx",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "backend/app/main.py"
+      ],
+      "positive_gate": "backend/tests/test_api.py::test_api_ocr_analyze_returns_structured_report",
+      "negative_gate": "backend/tests/test_api.py::test_api_ocr_analyze_rejects_non_image_and_non_pdf",
+      "evidence_refs": [
+        "backend/tests/test_api.py::test_api_ocr_analyze_returns_structured_report",
+        "backend/tests/test_api.py::test_api_ocr_analyze_rejects_non_image_and_non_pdf",
+        "frontend/src/components/workspaces/OCRWorkspace.jsx",
+        "frontend/src/components/workspaces/SpecializedWorkspace.jsx"
+      ],
+      "state": "PROVISIONAL",
+      "notes": "The GUI now has dedicated OCR/page-review, GIS capability/offline-state, Code readiness, and Artifacts surfaces alongside existing Sources, Provenance, Memory, and Settings workspaces. OCR is connected to a tested authenticated API boundary and preserves text tiers, page warnings, confidence, and report hashes. GIS and Code views remain diagnostic/readiness surfaces; full execution, rendered desktop/390px QA, physical iPhone evidence, and specialized end-to-end workflow coverage remain open."
+    },
+    "TGT-030": {
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "frontend/src/components/workspaces/SourcesWorkspace.jsx",
+        "frontend/src/components/workspaces/OCRWorkspace.jsx",
+        "backend/app/main.py"
+      ],
+      "positive_gate": "backend/tests/test_api.py::test_api_ocr_analyze_returns_structured_report",
+      "negative_gate": "backend/tests/test_api.py::test_api_ocr_analyze_rejects_non_image_and_non_pdf",
+      "evidence_refs": [
+        "backend/tests/test_api.py::test_api_happy_path_covers_operator_routes",
+        "backend/tests/test_api.py::test_api_ocr_analyze_returns_structured_report",
+        "frontend/src/components/workspaces/SourcesWorkspace.jsx",
+        "frontend/src/components/workspaces/OCRWorkspace.jsx"
+      ],
+      "state": "PROVISIONAL",
+      "notes": "Source inspection already exposes source identity, parser metadata, warnings and chunks; OCR page review now exposes report-bound page/text/confidence evidence without silently adding it to retrieval. Rendered interaction and broader evidence-granularity audit remain open."
+    }
+  },
+  "dag": {
+    "N17": {
+      "state": "PROVISIONAL",
+      "notes": "Dedicated specialized workspace homes now exist for OCR/page review, GIS capability state, Code readiness, and Artifacts, complementing Sources, Provenance, Memory, Settings, Goals, Tasks, and Skills. N17 remains provisional pending rendered desktop/narrow-screen verification, physical phone evidence, and complete specialized end-to-end workflow coverage."
+    }
+  }
+}

@@ -41,6 +41,7 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 - Tool runtime records: `data/processed/tool_calls.json` stores current tool-call state; `data/processed/tool_audit_log.json` stores request, approval, denial, and execution audit events.
 - Source library controls: operators can reindex all chunks, inspect persisted index status, and delete managed sources while rebuilding the index from both the API/browser surface and the installed CLI.
 - Run history: `/runs`, `/runs/summary`, and `/runs/{run_id}` provide scan-friendly history plus full trace retrieval.
+- OCR review boundary: authenticated `POST /ocr/analyze` accepts only local image/PDF uploads under the shared upload ceiling, retains successful source bytes for report lineage, and returns report-bound text/page previews. The browser OCR workspace is review-only; it does not silently ingest OCR text into retrieval.
 - Parser evidence: source manifests include byte counts, parser warnings, parse status, and format metadata such as CSV delimiter/header/row counts. The ingestion evidence contract keeps raw byte identity separate from normalized retrieval text and canonical comparison text. CSV parsing is positional rather than dictionary-based, records preamble/header location and duplicate-header labels, and persists whole-row raw/normalized/canonical digests with closed input/retained/excluded accounting. A truncation or malformed-row warning remains visible; it is never converted into an unqualified parse success.
 - Multimodal metadata boundary: image/audio/video ingestion records local media
   metadata and warnings as cited source chunks; semantic media understanding is
@@ -52,7 +53,8 @@ The API is local-first and loopback-oriented by default. If `MUCARO_AI_OPERATOR_
 
 Read-only inspection routes expose health, config, security, sources, chunks,
 conversations, runs, memory, workspace profiles, tools, tool audit events, and
-exports. Mutating routes include planning/approval writes, upload/path
+exports, plus intelligence-plane, coding-readiness, offline-capability, and OCR
+review surfaces. Mutating routes include planning/approval writes, upload/path
 ingestion, directory grant changes, source deletion/reindexing, chat
 creation/asking, explicit memory changes, workspace profile saves, and
 tool-call request/approval/execution.
@@ -132,6 +134,13 @@ policy, independent visual validation, larger real vector/raster corpora,
 remote sensing, terrain algorithms beyond bounded slope/aspect/hillshade,
 hydrology beyond bounded priority-flood conditioning and D8, bathymetry, and temporal GIS remain open product
 requirements.
+
+The GUI keeps the conversation as the orchestration plane and exposes dedicated
+specialized surfaces where the evidence is easier to inspect outside a
+transcript: GIS capability/offline state, OCR/page review, coding readiness, and
+run-bound artifacts. These surfaces preserve candidate, partial, blocked, and
+not-executed states; a diagnostic view is not a substitute for the corresponding
+execution or representative-corpus certification.
 
 ## Packaging layer
 
