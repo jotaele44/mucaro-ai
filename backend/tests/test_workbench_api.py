@@ -19,8 +19,6 @@ def _payload(**overrides):
         "source_commit": "A" * 40,
         "features": ["GIS", "OCR", "GIS"],
         "inputs_available": ["operator_ui"],
-        "approval_state": "NOT_REQUESTED",
-        "operator_approval_recorded": False,
         "profile": "maximum",
         "network": "isolated",
         "hardware": "unavailable",
@@ -87,18 +85,15 @@ def test_workbench_plan_binds_existing_gate_and_never_executes(tmp_path):
     assert runs.json()["runs"] == []
 
 
-def test_recorded_operator_approval_is_not_execution_authority(tmp_path):
-    response = _client(tmp_path).post(
-        "/workbench/plan",
-        json=_payload(operator_approval_recorded=True, approval_state="APPROVED"),
-    )
-    assert response.status_code == 200
-    body = response.json()
-    assert body["workbench_plan"]["operator_approval_recorded"] is True
-    assert body["workbench_plan"]["execution_authorized"] is False
-    assert body["authority"]["execution_authorized"] is False
-    assert body["execution_plan"]["state"] == "PLAN_ONLY"
-    assert body["gate"]["state"] != "EXECUTING"
+def test_client_cannot_forge_approval_metadata(tmp_path):
+    client = _client(tmp_path)
+    for forged in (
+        {"operator_approval_recorded": True},
+        {"approval_state": "APPROVED"},
+    ):
+        response = client.post("/workbench/plan", json=_payload(**forged))
+        assert response.status_code == 422
+    assert client.get("/work-runs?limit=20").json()["runs"] == []
 
 
 def test_workbench_rejects_invalid_feature_and_duplicate_platforms(tmp_path):
