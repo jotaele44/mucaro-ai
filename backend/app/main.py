@@ -23,7 +23,9 @@ from .conversations import (
     rename_conversation,
 )
 from .db import init_db, list_payloads, upsert_payload
+from .development_workbench import WorkbenchPlanError, compile_plan as compile_workbench_plan
 from .execution_gate import analyze_task, approve_execution
+from .execution_workbench import create_plan as create_workbench_execution_plan
 from .exports import EXPORT_FILES, export_file_path
 from .ingestion import (
     FOLDER_SUPPORTED_SUFFIXES,
@@ -53,6 +55,7 @@ from .models import (
     MessageRequest,
     RunEditRequest,
     PlanRequest,
+    WorkbenchPlanRequest,
     ToolCallRequest,
     ToolDecisionRequest,
     WorkspaceProfileRequest,
@@ -282,6 +285,56 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         gate = analyze_task(req.user_request, inputs_available=req.inputs_available, approval_state=req.approval_state)
         upsert_payload("execution_gates", "task_id", gate, cfg.sqlite_path)
         return gate
+
+    @app.post("/workbench/plan")
+    def workbench_plan(req: WorkbenchPlanRequest, _auth: dict = Depends(require_auth)) -> dict:
+        """Compile a user-visible workbench plan without granting execution authority."""
+        try:
+            compiled = compile_workbench_plan(
+                req.user_request,
+                source_commit=req.source_commit,
+                features=req.features,
+                approval=req.operator_approval_recorded,
+            )
+            execution_plan = create_workbench_execution_plan(
+                req.profile,
+                req.network,
+                req.hardware,
+                req.platforms,
+            )
+        except (WorkbenchPlanError, ValueError) as exc:
+            raise api_error("ERROR_WORKBENCH_PLAN_INVALID", str(exc), status_code=422) from exc
+
+        gate = analyze_task(
+            req.user_request,
+            inputs_available=req.inputs_available,
+            approval_state=req.approval_state,
+        )
+        upsert_payload("execution_gates", "task_id", gate, cfg.sqlite_path)
+        return {
+            "status": "WORKBENCH_PLAN_READY",
+            "authority": {
+                "planning_compiler": "development_workbench",
+                "execution_gate": "execution_gate",
+                "run_runtime": "work_runs",
+                "plan_only": True,
+                "execution_authorized": False,
+            },
+            "gate": gate,
+            "workbench_plan": compiled,
+            "execution_plan": {
+                "profile": execution_plan.profile,
+                "network": execution_plan.network,
+                "hardware": execution_plan.hardware,
+                "platforms": list(execution_plan.platforms),
+                "lanes": list(execution_plan.lanes),
+                "model_lanes": list(execution_plan.model_lanes),
+                "blocked_lanes": list(execution_plan.blocked_lanes),
+                "lane_status": [list(row) for row in execution_plan.lane_status],
+                "state": execution_plan.state,
+                "certification": execution_plan.certification,
+            },
+        }
 
     @app.post("/approve")
     def approve(req: ApprovalRequest, _auth: dict = Depends(require_auth)) -> dict:
