@@ -1,0 +1,51 @@
+{
+  "rows": {
+    "TGT-005": {
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/ocr_analysis.py",
+        "backend/app/ocr_pdf.py",
+        "backend/app/ocr_structure.py",
+        "scripts/certify_ocr08_structure_live.py",
+        "_architecture/ocr08_structure_benchmark_v1.json"
+      ],
+      "positive_gate": "scripts/certify_ocr08_structure_live.py",
+      "negative_gate": "backend/tests/test_ocr_structure.py::test_duplicate_form_label_is_unresolved",
+      "benchmark": "_architecture/release/evidence/ocr08-structure-live-77b2972353af.json",
+      "evidence_refs": [
+        "_architecture/ocr08_structure_benchmark_v1.json",
+        "_architecture/release/evidence/ocr08-structure-live-77b2972353af.json",
+        "backend/tests/test_ocr08_structure_live_cert.py::test_ocr08_fixture_generator_resolves_a_supported_deterministic_font"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N08",
+      "notes": "Bounded printed multi-column, rectangular-table, and colon-form reconstruction passes live Tesseract with exact span accounting and fail-closed negative cases. The receipt is exact-head bound; broader real-document breadth, handwriting/difficult scans, and semantic document intelligence remain outside scope."
+    },
+    "MATRIX-006": {
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "_architecture/ocr08_structure_benchmark_v1.json",
+        "scripts/certify_ocr08_structure_live.py"
+      ],
+      "positive_gate": "_architecture/release/evidence/ocr08-structure-live-77b2972353af.json",
+      "negative_gate": "backend/tests/test_ocr_structure.py::test_single_column_does_not_synthesize_multicolumn",
+      "benchmark": "_architecture/release/evidence/ocr08-structure-live-77b2972353af.json",
+      "evidence_refs": [
+        "_architecture/ocr08_structure_benchmark_v1.json",
+        "_architecture/release/evidence/ocr08-structure-live-77b2972353af.json",
+        "backend/tests/test_ocr_structure.py::test_duplicate_form_label_is_unresolved"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N08",
+      "notes": "Six-case OCR08 denominator closes at 1.0 positive rate, 1.0 negative fail-closed rate, and 1.0 span-accounting rate. This is a bounded synthetic structure benchmark, not a universal OCR/document-intelligence claim."
+    }
+  },
+  "dag": {
+    "N08": {
+      "state": "PROVISIONAL",
+      "notes": "OCR08 exact-head live receipt closes the bounded structure benchmark while preserving broader OCR-09/OCR-10 limitations."
+    }
+  }
+}
