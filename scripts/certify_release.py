@@ -299,6 +299,15 @@ def main() -> int:
         gate_command("gis_overlay_cli_parity", [sys.executable, "scripts/certify_gis_overlay_cli_parity.py"]),
         gate_command("ocr_v1_runtime_boundary", [sys.executable, "scripts/certify_ocr_v1_runtime.py", "--receipt"]),
         gate_command(
+            "ocr08_structure_live",
+            [
+                sys.executable,
+                "scripts/certify_ocr08_structure_live.py",
+                "--output",
+                f"data/exports/release_receipts/ocr08-structure-{head_sha[:12]}.json",
+            ],
+        ),
+        gate_command(
             "matrix010_ingestion",
             [
                 sys.executable,

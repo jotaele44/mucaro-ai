@@ -208,7 +208,7 @@
       "dependencies": [
         "N07"
       ],
-      "state": "OPEN",
+      "state": "PROVISIONAL",
       "risk": "MEDIUM",
       "user_value": "HIGH",
       "downstream_unlock_value": "LOW",
@@ -217,7 +217,7 @@
         "frozen OCR corpus metrics"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "Bounded OCR08 structure benchmark now passes 6/6 live-Tesseract cases with positive reconstruction, negative fail-closed controls, exact span accounting, and exact-head receipts. N08 remains provisional because representative real-document breadth, handwriting/difficult scans, and broader document intelligence remain outside the frozen bounded scope."
     },
     {
       "node_id": "N09",

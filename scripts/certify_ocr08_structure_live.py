@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -15,6 +17,14 @@ ROOT = Path(__file__).resolve().parents[1]
 BENCHMARK = ROOT / "_architecture" / "ocr08_structure_benchmark_v1.json"
 STATUS_OK = "OCR08_STRUCTURE_LIVE_CERT_OK"
 STATUS_FAILED = "OCR08_STRUCTURE_LIVE_CERT_FAILED"
+
+
+def _head_sha() -> str:
+    candidate = (os.environ.get("HEAD_SHA") or os.environ.get("GITHUB_SHA") or "").strip()
+    if len(candidate) == 40:
+        return candidate
+    proc = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True, check=False)
+    return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
 def _settings(root: Path) -> Settings:
@@ -37,6 +47,9 @@ def _font(size: int) -> Any:
     from PIL import ImageFont
 
     candidates = [
+        Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+        Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
+        Path("/System/Library/Fonts/Geneva.ttf"),
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
         Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"),
     ]
@@ -258,6 +271,7 @@ def main() -> int:
         result = {
             "schema_version": "mucaro-ocr08-structure-live-cert/1.0",
             "status": STATUS_OK if all(invariants.values()) else STATUS_FAILED,
+            "head_sha": _head_sha(),
             "scope": "OCR08_BOUNDED_PRINTED_STRUCTURE_RUNTIME",
             "benchmark": {
                 "path": str(BENCHMARK.relative_to(ROOT)),
@@ -301,6 +315,9 @@ def main() -> int:
                 "Handwriting and difficult scans remain OCR-09; representative real-world breadth remains OCR-10.",
             ],
         }
+        result["receipt_sha256"] = hashlib.sha256(
+            json.dumps(result, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
         print(result["status"])

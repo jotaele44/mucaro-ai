@@ -1051,17 +1051,25 @@
       "implementation_state": "PARTIAL",
       "implementation_refs": [
         "backend/app/ocr_analysis.py",
-        "backend/app/ocr_pdf.py"
+        "backend/app/ocr_pdf.py",
+        "backend/app/ocr_structure.py",
+        "scripts/certify_ocr08_structure_live.py",
+        "_architecture/ocr08_structure_benchmark_v1.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "positive_gate": "backend/tests/test_ocr08_structure_live_cert.py::test_ocr08_fixture_generator_resolves_a_supported_deterministic_font",
+      "negative_gate": "backend/tests/test_ocr_structure.py::test_duplicate_form_label_is_unresolved",
+      "benchmark": "scripts/certify_ocr08_structure_live.py --output data/exports/release_receipts/ocr08-structure-HEAD.json",
+      "evidence_refs": [
+        "_architecture/ocr08_structure_benchmark_v1.json",
+        "scripts/certify_ocr08_structure_live.py",
+        "backend/tests/test_ocr08_structure_live_cert.py",
+        "backend/tests/test_ocr_structure.py::test_duplicate_form_label_is_unresolved"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N08",
-      "notes": "Tables/forms absent; OCR not wired into ingestion."
+      "notes": "Bounded printed multi-column, rectangular-table, and colon-form reconstruction now passes a six-case live-Tesseract gate with exact span accounting and negative fail-closed cases. Broader real-document breadth, handwriting/difficult scans, merged or rotated layouts, and semantic document intelligence remain open; PDF OCR fallback remains explicitly opt-in."
     },
     {
       "requirement_id": "TGT-006",
@@ -1956,17 +1964,24 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "_architecture/ocr_v1_corpus_manifest.json"
+        "_architecture/ocr_v1_corpus_manifest.json",
+        "_architecture/ocr08_structure_benchmark_v1.json",
+        "scripts/certify_ocr08_structure_live.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "positive_gate": "scripts/certify_ocr08_structure_live.py",
+      "negative_gate": "backend/tests/test_ocr_structure.py::test_single_column_does_not_synthesize_multicolumn",
+      "benchmark": "scripts/certify_ocr08_structure_live.py --output data/exports/release_receipts/ocr08-structure-HEAD.json",
+      "evidence_refs": [
+        "_architecture/ocr08_structure_benchmark_v1.json",
+        "scripts/certify_ocr08_structure_live.py",
+        "backend/tests/test_ocr08_structure_live_cert.py::test_ocr08_live_markers_are_fail_closed",
+        "backend/tests/test_ocr_structure.py::test_single_column_does_not_synthesize_multicolumn"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N08",
-      "notes": ""
+      "notes": "OCR08 bounded structure benchmark executes all six frozen cases with real Tesseract: positive multi-column/table/form reconstruction, negative single-column/ambiguous-table/duplicate-form fail-closed cases, 1.0 positive and negative rates, and closed span accounting. The benchmark is synthetic and bounded; OCR-09/OCR-10 breadth remains outside claim."
     },
     {
       "requirement_id": "MATRIX-007",
