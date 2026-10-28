@@ -12,7 +12,8 @@ from .artifact_identity import ArtifactIdentityError, create_artifact_record
 from .db import delete_chunks_for_source, delete_payload, init_db, upsert_payload
 from .format_registry import SUPPORTED_INGEST_SUFFIXES
 from .injection_guard import scan_text
-from .parser import ParseError, detect_mime, parse_file
+from .ocr_pdf import PDFOCRAnalysisError, analyze_pdf_ocr
+from .parser import ParseError, _with_representation_evidence, detect_mime, parse_file
 from .provenance import build_provenance_record
 from .semantic_store import build_semantic_store, get_semantic_store_status
 from .utils import read_json, sha256_file, stable_id, utc_now, write_json
@@ -53,6 +54,94 @@ def _store_source_payload(source_payload: dict[str, Any], chunks: list[dict[str,
     }
 
 
+def _load_pdf_ocr_text(report: dict[str, Any]) -> tuple[str, int, int, int]:
+    """Load only report-bound OCR text; page reports remain the authoritative spans."""
+    page_text: list[str] = []
+    span_count = 0
+    no_text_pages = 0
+    missing_report_count = 0
+    for page in report.get("pages", []):
+        report_path = page.get("ocr_report_path") if isinstance(page, dict) else None
+        page_number = page.get("page_number") if isinstance(page, dict) else None
+        if not isinstance(report_path, str) or not isinstance(page_number, int):
+            missing_report_count += 1
+            continue
+        page_report_path = Path(report_path)
+        if not page_report_path.exists() or not page_report_path.is_file():
+            missing_report_count += 1
+            continue
+        page_report = read_json(page_report_path, {})
+        text = page_report.get("text", {}) if isinstance(page_report, dict) else {}
+        raw_text = text.get("raw", "") if isinstance(text, dict) else ""
+        if not isinstance(page_report, dict) or not isinstance(text, dict) or "raw" not in text:
+            missing_report_count += 1
+            continue
+        if isinstance(raw_text, str) and raw_text.strip():
+            page_text.append(f"[PAGE {page_number}]\n{raw_text}")
+        else:
+            no_text_pages += 1
+        if isinstance(page, dict) and isinstance(page.get("span_count"), int):
+            span_count += page["span_count"]
+    return "\n\n".join(page_text), span_count, no_text_pages, missing_report_count
+
+
+def _apply_pdf_ocr_fallback(parse_result: dict[str, Any], path: Path, cfg: Settings) -> dict[str, Any]:
+    if path.suffix.lower() != ".pdf" or not cfg.pdf_ocr_fallback:
+        return parse_result
+    if int(parse_result.get("native_text_page_count", 0) or 0) > 0:
+        parse_result["ocr_fallback"] = {"status": "NOT_NEEDED_NATIVE_TEXT_PRESENT"}
+        return parse_result
+
+    warnings = list(parse_result.get("warnings", []))
+    warnings.append("PDF_NATIVE_TEXT_EMPTY_OCR_FALLBACK_REQUESTED")
+    try:
+        report = analyze_pdf_ocr(
+            path,
+            cfg=cfg,
+            language=cfg.pdf_ocr_language,
+            layout_mode=cfg.pdf_ocr_layout_mode,
+            dpi=cfg.pdf_ocr_dpi,
+        )
+    except PDFOCRAnalysisError as exc:
+        warnings.append(f"PDF_OCR_FALLBACK_FAILED:{exc.status}")
+        parse_result["warnings"] = warnings
+        parse_result["parser_warnings"] = warnings
+        parse_result["ocr_fallback"] = {
+            "status": "FAILED",
+            "error_status": exc.status,
+            "text_promoted": False,
+        }
+        return _with_representation_evidence(path, parse_result)
+
+    text, span_count, no_text_pages, missing_report_count = _load_pdf_ocr_text(report)
+    warnings.extend(f"PDF_OCR_WARNING:{warning}" for warning in report.get("warnings", []))
+    if missing_report_count:
+        warnings.append(f"PDF_OCR_FALLBACK_REPORT_MISSING:{missing_report_count}")
+    if text:
+        parse_result["text"] = text
+        parse_result["parser"] = "pypdf+pdf_ocr_fallback_v1"
+        warnings.append("PDF_OCR_FALLBACK_USED")
+    else:
+        warnings.append("PDF_OCR_FALLBACK_NO_TEXT")
+    parse_result["warnings"] = warnings
+    parse_result["parser_warnings"] = warnings
+    parse_result["parse_status"] = "OK" if text and no_text_pages == 0 else "PARTIAL"
+    parse_result["ocr_fallback"] = {
+        "status": report.get("status", "UNKNOWN"),
+        "report_id": report.get("report_id"),
+        "report_path": report.get("report_path"),
+        "report_sha256": report.get("report_sha256"),
+        "source_sha256": report.get("source", {}).get("sha256"),
+        "page_count": report.get("source", {}).get("page_count"),
+        "span_count": span_count,
+        "no_text_page_count": no_text_pages,
+        "missing_report_count": missing_report_count,
+        "text_promoted": bool(text),
+        "text_source": "OCR_PAGE_RAW" if text else None,
+    }
+    return _with_representation_evidence(path, parse_result)
+
+
 def ingest_file(path: Path, cfg: Settings = settings, *, source_kind: str = "LOCAL_FILE") -> dict[str, Any]:
     cfg.ensure_dirs()
     init_db(cfg.sqlite_path)
@@ -66,7 +155,7 @@ def ingest_file(path: Path, cfg: Settings = settings, *, source_kind: str = "LOC
     target = cfg.input_dir / f"{source_id}_{path.name}"
     if path.resolve() != target.resolve():
         shutil.copy2(path, target)
-    parse_result = parse_file(target)
+    parse_result = _apply_pdf_ocr_fallback(parse_file(target), target, cfg)
     validate_contract("ingestion_evidence", parse_result["ingestion_evidence"])
     warnings = list(parse_result.get("warnings", []))
     text = str(parse_result.get("text", ""))

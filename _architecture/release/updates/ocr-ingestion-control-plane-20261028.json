@@ -1,0 +1,47 @@
+{
+  "rows": {
+    "TGT-005": {
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/config.py",
+        "backend/app/parser.py",
+        "backend/app/ingestion.py",
+        "backend/app/ocr_analysis.py",
+        "backend/app/ocr_pdf.py"
+      ],
+      "positive_gate": "backend/tests/test_parser.py::test_pdf_ingestion_promotes_report_bound_ocr_text_when_opted_in",
+      "negative_gate": "backend/tests/test_parser.py::test_pdf_ingestion_records_ocr_failure_without_synthesizing_text",
+      "evidence_refs": [
+        "backend/tests/test_parser.py::test_pdf_ingestion_promotes_report_bound_ocr_text_when_opted_in",
+        "backend/tests/test_parser.py::test_pdf_ingestion_records_ocr_failure_without_synthesizing_text",
+        "backend/tests/test_ocr_pdf.py::test_pdf_ocr_preserves_page_lineage_and_no_text_residue",
+        "backend/app/capability_contracts.py::validate_ocr_report_file"
+      ],
+      "state": "PROVISIONAL",
+      "notes": "PDF ingestion now has an explicit opt-in OCR fallback. It runs only when native PDF text is absent, preserves the original PDF byte identity, promotes only report-bound page OCR raw text, and records report identity, page/span accounting, and structured failure residue. Representative document accuracy, independent confidence calibration, handwriting, broad table/form semantics, provider privacy policy, and hosted/current-head evidence remain open."
+    },
+    "MATRIX-006": {
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/tests/test_parser.py",
+        "backend/tests/test_ocr_pdf.py",
+        "_architecture/ocr_v1_corpus_manifest.json"
+      ],
+      "positive_gate": "backend/tests/test_parser.py::test_pdf_ingestion_promotes_report_bound_ocr_text_when_opted_in",
+      "negative_gate": "backend/tests/test_parser.py::test_pdf_ingestion_records_ocr_failure_without_synthesizing_text",
+      "evidence_refs": [
+        "backend/tests/test_parser.py::test_pdf_ingestion_promotes_report_bound_ocr_text_when_opted_in",
+        "backend/tests/test_ocr_pdf.py::test_pdf_ocr_fails_closed_on_rendered_page_count_mismatch",
+        "backend/tests/test_ocr_v1_corpus_manifest.py::test_ocr_v1_corpus_is_frozen_and_unique"
+      ],
+      "state": "PROVISIONAL",
+      "notes": "The local ingestion boundary now has positive and negative OCR integration gates in addition to the synthetic OCR runtime and PDF page-lineage receipts. This does not close the broader OCR/document benchmark: independently authored representative labels, real-document breadth, and mismatch adjudication remain unresolved."
+    }
+  },
+  "dag": {
+    "N08": {
+      "state": "PROVISIONAL",
+      "notes": "N08 advanced from OPEN to PROVISIONAL for the bounded local ingestion boundary. OCR is now explicitly wired into scanned-PDF ingestion behind a runtime setting with report-bound text promotion and fail-closed errors. Broad document-intelligence and frozen representative-corpus evidence remain open."
+    }
+  }
+}

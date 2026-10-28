@@ -8,6 +8,7 @@ DEFAULT_CORS_ORIGINS = ("http://127.0.0.1:5173", "http://localhost:5173")
 DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 DEFAULT_MAX_INGEST_BYTES = 200 * 1024 * 1024
 DEFAULT_DISTRIBUTION_CHANNEL = "local"
+DEFAULT_PDF_OCR_DPI = 200
 
 
 def parse_positive_int(value: str | None, default: int) -> int:
@@ -75,6 +76,10 @@ class Settings:
     allow_public_bind: bool = False
     distribution_channel: str = DEFAULT_DISTRIBUTION_CHANNEL
     max_ingest_bytes: int = DEFAULT_MAX_INGEST_BYTES
+    pdf_ocr_fallback: bool = False
+    pdf_ocr_language: str = "eng"
+    pdf_ocr_layout_mode: str = "auto"
+    pdf_ocr_dpi: int = DEFAULT_PDF_OCR_DPI
 
     @classmethod
     def load(cls) -> "Settings":
@@ -111,6 +116,10 @@ class Settings:
             deployment_profile=os.getenv("MUCARO_AI_DEPLOYMENT_PROFILE", "local").strip().lower() or "local",
             allow_public_bind=parse_bool(os.getenv("MUCARO_AI_ALLOW_PUBLIC_BIND"), False),
             distribution_channel=distribution_channel,
+            pdf_ocr_fallback=parse_bool(os.getenv("MUCARO_AI_PDF_OCR_FALLBACK"), False),
+            pdf_ocr_language=os.getenv("MUCARO_AI_PDF_OCR_LANGUAGE", "eng").strip() or "eng",
+            pdf_ocr_layout_mode=os.getenv("MUCARO_AI_PDF_OCR_LAYOUT", "auto").strip() or "auto",
+            pdf_ocr_dpi=parse_positive_int(os.getenv("MUCARO_AI_PDF_OCR_DPI"), DEFAULT_PDF_OCR_DPI),
         )
 
     def ensure_dirs(self) -> None:

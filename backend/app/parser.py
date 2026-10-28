@@ -759,11 +759,16 @@ def _parse_pdf(path: Path) -> dict[str, Any]:
     reader = PdfReader(str(path))
     pages = []
     warnings: list[str] = []
+    native_text_page_count = 0
+    native_text_chars = 0
     for idx, page in enumerate(reader.pages):
         try:
             text = page.extract_text() or ""
             if not text.strip():
                 warnings.append(f"PDF_PAGE_EMPTY:{idx + 1}")
+            else:
+                native_text_page_count += 1
+                native_text_chars += len(text)
             pages.append(f"[PAGE {idx + 1}]\n" + text)
         except Exception as exc:
             warnings.append(f"PDF_PAGE_PARSE_FAILED:{idx + 1}")
@@ -778,5 +783,8 @@ def _parse_pdf(path: Path) -> dict[str, Any]:
             mime_type="application/pdf",
             warnings=warnings,
             page_count=len(reader.pages),
+            native_text_page_count=native_text_page_count,
+            native_text_empty_page_count=max(len(reader.pages) - native_text_page_count, 0),
+            native_text_chars=native_text_chars,
         ),
     }

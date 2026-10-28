@@ -376,11 +376,13 @@ Observed success markers:
   source-image hashes, Tesseract engine identity, raw/normalized/canonical text,
   confidence states, source-coordinate spans, no-text states, limitations, and
   falsification criteria. `mucaro capabilities validate-ocr-report` checks saved
-  image OCR reports for source-image metadata, engine identity, confidence
-  scale, text tiers, warning consistency, and span/confidence accounting;
-  PDF/page rendering, calibrated layout reconstruction, representative document
-  fixtures, table/form/handwriting coverage, optional provider policy, and
-  confidence thresholds remain open. Governed web browsing
+  image and PDF/page OCR reports for source-image/PDF metadata, engine identity,
+  confidence scale, text tiers, warning consistency, page/span accounting, and
+  report hashes. An explicit opt-in scanned-PDF ingestion fallback now promotes
+  only report-bound OCR text and preserves engine failure/no-text residue;
+  calibrated layout reconstruction, representative document fixtures,
+  table/form/handwriting coverage, optional provider policy, and confidence
+  thresholds remain open. Governed web browsing
   has candidate `web.fetch` snapshot,
   ledger, operator-supplied multi-page session receipts, robots/cache metadata,
   redirect-target robots evidence, HTML body/structure traces, PDF/non-text

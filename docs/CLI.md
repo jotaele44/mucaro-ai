@@ -328,8 +328,9 @@ transparent pixel accounting, and contains nonuniform visible content. Use
 `GIS_MAP_EXPORT_MANIFEST_OK` receipt. This does not prove layer semantics,
 projection correctness, label legibility, or cartographic accessibility.
 
-OCR analysis is intentionally separate from ingestion. `mucaro ocr analyze
-INPUT_PATH` auto-detects a local image or `.pdf`. Image inputs run a local
+OCR analysis is available as a standalone command and as an explicit PDF
+ingestion fallback. `mucaro ocr analyze INPUT_PATH` auto-detects a local image
+or `.pdf`. Image inputs run a local
 Tesseract engine and preserve the source image SHA-256, engine path/version,
 language, layout mode, raw text, normalized text, canonical text, per-span
 confidence state, source-coordinate bounding boxes, warnings, and a JSON
@@ -342,6 +343,16 @@ it is ignored for image inputs. The implementation remains a bounded local
 receipt candidate: calibrated document layout, handwriting, difficult scans,
 and optional external OCR providers remain future governed-document-intelligence
 work.
+
+Normal source ingestion preserves native PDF text by default. To opt into OCR
+for scanned PDFs, set `MUCARO_AI_PDF_OCR_FALLBACK=1` (or construct
+`Settings(pdf_ocr_fallback=True)`). The fallback runs only when native PDF text
+is absent, records the PDF OCR report ID/path/SHA-256, page and span counts, and
+promotes only the raw text saved by the page OCR reports. Missing engines,
+render failures, and no-text pages remain explicit warnings; they never cause
+synthetic text to be inserted. `MUCARO_AI_PDF_OCR_LANGUAGE`,
+`MUCARO_AI_PDF_OCR_LAYOUT`, and `MUCARO_AI_PDF_OCR_DPI` bound the local OCR
+configuration.
 
 Use `mucaro capabilities validate-ocr-report REPORT_PATH` to check a saved image
 or PDF OCR receipt against the executable OCR output contract. Image reports are

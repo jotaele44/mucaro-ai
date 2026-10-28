@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import builtins
+import hashlib
+import json
 import wave
 import zipfile
 from pathlib import Path
 
 import pytest
+from pypdf import PdfWriter
 
+import backend.app.ingestion as ingestion_module
 from backend.app.ingestion import ingest_file
 from backend.app.config import Settings
 from backend.app.contracts import validate_contract
+from backend.app.ocr_pdf import PDFOCRAnalysisError
 from backend.app.parser import ParseError, _parse_pdf, parse_file
 
 
@@ -453,6 +458,118 @@ def test_pdf_parser_unavailable_reports_warning(tmp_path: Path, monkeypatch):
     assert result["parse_status"] == "PARTIAL"
     assert result["parser"] == "pdf_unavailable"
     assert "PDF_PARSER_UNAVAILABLE_INSTALL_PYPDF" in result["warnings"]
+
+
+def _blank_pdf(path: Path, pages: int = 1) -> Path:
+    writer = PdfWriter()
+    for _ in range(pages):
+        writer.add_blank_page(width=612, height=792)
+    with path.open("wb") as handle:
+        writer.write(handle)
+    return path
+
+
+def test_pdf_ingestion_promotes_report_bound_ocr_text_when_opted_in(tmp_path: Path, monkeypatch):
+    root = tmp_path / "proj"
+    cfg = make_settings(root)
+    cfg = Settings(**{**cfg.__dict__, "pdf_ocr_fallback": True})
+    source = _blank_pdf(tmp_path / "scan.pdf")
+
+    def fake_pdf_ocr(path: Path, *, cfg: Settings, **kwargs):
+        del kwargs
+        report_dir = cfg.export_dir / "ocr_reports"
+        report_dir.mkdir(parents=True, exist_ok=True)
+        page_report = report_dir / "page-1.json"
+        page_payload = {
+            "schema_version": "mucaro_ocr_report_v1",
+            "text": {"raw": "Recovered scan text", "normalized": "Recovered scan text", "canonical": "recovered scan text"},
+        }
+        page_report.write_text(json.dumps(page_payload), encoding="utf-8")
+        return {
+            "schema_version": "mucaro_pdf_ocr_report_v1",
+            "report_id": "ocrpdf_fixture",
+            "report_path": str(cfg.export_dir / "ocr_reports" / "ocrpdf_fixture.json"),
+            "report_sha256": "a" * 64,
+            "source": {
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "page_count": 1,
+            },
+            "status": "OCR_PDF_OK",
+            "warnings": [],
+            "pages": [
+                {
+                    "page_number": 1,
+                    "ocr_report_path": str(page_report),
+                    "span_count": 2,
+                }
+            ],
+        }
+
+    monkeypatch.setattr(ingestion_module, "analyze_pdf_ocr", fake_pdf_ocr)
+
+    result = ingest_file(source, cfg)
+    manifest = result["source"]
+
+    assert manifest["parser"] == "pypdf+pdf_ocr_fallback_v1"
+    assert manifest["parser_metadata"]["ocr_fallback"]["report_id"] == "ocrpdf_fixture"
+    assert manifest["parser_metadata"]["ocr_fallback"]["text_promoted"] is True
+    assert "PDF_OCR_FALLBACK_USED" in manifest["parser_warnings"]
+    assert result["chunks_added"] >= 1
+
+
+def test_pdf_ingestion_records_ocr_failure_without_synthesizing_text(tmp_path: Path, monkeypatch):
+    root = tmp_path / "proj"
+    cfg = make_settings(root)
+    cfg = Settings(**{**cfg.__dict__, "pdf_ocr_fallback": True})
+    source = _blank_pdf(tmp_path / "scan.pdf")
+
+    def failing_pdf_ocr(*args, **kwargs):
+        del args, kwargs
+        raise PDFOCRAnalysisError("ERROR_OCR_ENGINE_UNAVAILABLE", "host detail must not be persisted")
+
+    monkeypatch.setattr(ingestion_module, "analyze_pdf_ocr", failing_pdf_ocr)
+
+    result = ingest_file(source, cfg)
+    manifest = result["source"]
+
+    assert manifest["parser"] == "pypdf"
+    assert manifest["parser_metadata"]["ocr_fallback"] == {
+        "status": "FAILED",
+        "error_status": "ERROR_OCR_ENGINE_UNAVAILABLE",
+        "text_promoted": False,
+    }
+    assert "PDF_OCR_FALLBACK_FAILED:ERROR_OCR_ENGINE_UNAVAILABLE" in manifest["parser_warnings"]
+    assert "host detail must not be persisted" not in json.dumps(manifest)
+
+
+def test_pdf_ingestion_does_not_promote_missing_ocr_page_receipts(tmp_path: Path, monkeypatch):
+    root = tmp_path / "proj"
+    cfg = make_settings(root)
+    cfg = Settings(**{**cfg.__dict__, "pdf_ocr_fallback": True})
+    source = _blank_pdf(tmp_path / "scan.pdf")
+
+    def fake_pdf_ocr(*args, **kwargs):
+        del args, kwargs
+        return {
+            "schema_version": "mucaro_pdf_ocr_report_v1",
+            "report_id": "ocrpdf_missing_page_fixture",
+            "report_path": str(cfg.export_dir / "ocr_reports" / "missing.json"),
+            "report_sha256": "b" * 64,
+            "source": {"sha256": hashlib.sha256(source.read_bytes()).hexdigest(), "page_count": 1},
+            "status": "OCR_PDF_OK",
+            "warnings": [],
+            "pages": [{"page_number": 1, "ocr_report_path": str(tmp_path / "does-not-exist.json"), "span_count": 1}],
+        }
+
+    monkeypatch.setattr(ingestion_module, "analyze_pdf_ocr", fake_pdf_ocr)
+
+    result = ingest_file(source, cfg)
+    manifest = result["source"]
+
+    assert manifest["parser"] == "pypdf"
+    assert manifest["parser_metadata"]["ocr_fallback"]["text_promoted"] is False
+    assert manifest["parser_metadata"]["ocr_fallback"]["missing_report_count"] == 1
+    assert "PDF_OCR_FALLBACK_REPORT_MISSING:1" in manifest["parser_warnings"]
 
 
 def test_png_parser_records_metadata_text_and_dimensions(tmp_path: Path):
