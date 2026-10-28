@@ -12,7 +12,12 @@ import re
 from pathlib import Path
 from collections.abc import Iterable
 
-TEXT_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".json", ".toml", ".sh", ".ps1", ".cmd", ".yml", ".yaml"}
+TEXT_SUFFIXES = {
+    ".py", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
+    ".json", ".toml", ".lock", ".in", ".txt", ".env",
+    ".sh", ".ps1", ".cmd", ".bat", ".command",
+    ".yml", ".yaml", ".dockerfile",
+}
 SKIP_DIRS = {".git", "node_modules", ".venv", "dist", "build", "__pycache__", ".mucaro-runtime", ".pytest_cache"}
 PATTERNS = {
     "external_url": re.compile(r"https?://[^\s<>]+"),
