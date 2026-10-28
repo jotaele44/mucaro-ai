@@ -1,0 +1,48 @@
+{
+  "rows": {
+    "TGT-012": {
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/parser.py",
+        "backend/app/multimodal.py",
+        "backend/app/format_registry.py",
+        "_architecture/ingest_format_registry_v1.json",
+        "backend/app/ingestion_benchmark.py",
+        "backend/tests/test_format_registry.py",
+        "backend/tests/test_matrix010_ingestion_benchmark.py",
+        "scripts/certify_matrix010_ingestion.py",
+        ".github/workflows/matrix010-ingestion-cert.yml",
+        "scripts/certify_release.py"
+      ],
+      "positive_gate": ".github/workflows/matrix010-ingestion-cert.yml",
+      "negative_gate": "backend/tests/test_matrix010_ingestion_benchmark.py",
+      "benchmark": "_architecture/ingestion_benchmark_v1.json",
+      "evidence_refs": [
+        "data/exports/matrix010/matrix010-ingestion-receipt.json",
+        "data/exports/release_receipts/local_release-074b90751b5f.json"
+      ],
+      "state": "PROVISIONAL",
+      "notes": "PROVISIONAL: exact-head local certification at 074b90751b5fdcac1215dfaecb3818144115c756 reports MATRIX010_INGESTION_CERT_OK with 22/22 declared formats PASS, 8/8 adversarial cases PASS, zero failures, and both arithmetic checks closed. Hosted workflow execution and uploaded artifact proof are not current for this head; semantic multimodal understanding remains governed separately."
+    },
+    "MATRIX-010": {
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/ingestion_benchmark.py",
+        "_architecture/ingestion_benchmark_v1.json",
+        "backend/tests/test_matrix010_ingestion_benchmark.py",
+        "scripts/certify_matrix010_ingestion.py",
+        ".github/workflows/matrix010-ingestion-cert.yml",
+        "scripts/certify_release.py"
+      ],
+      "positive_gate": ".github/workflows/matrix010-ingestion-cert.yml",
+      "negative_gate": "backend/tests/test_matrix010_ingestion_benchmark.py",
+      "benchmark": "_architecture/ingestion_benchmark_v1.json",
+      "evidence_refs": [
+        "data/exports/matrix010/matrix010-ingestion-receipt.json",
+        "data/exports/release_receipts/local_release-074b90751b5f.json"
+      ],
+      "state": "PROVISIONAL",
+      "notes": "PROVISIONAL: exact-head local certification at 074b90751b5fdcac1215dfaecb3818144115c756 reports MATRIX010_INGESTION_CERT_OK with format 22/22 PASS, adversarial 8/8 PASS, zero failures, and arithmetic closure. Hosted workflow execution and artifact retrieval for this head remain unverified."
+    }
+  }
+}

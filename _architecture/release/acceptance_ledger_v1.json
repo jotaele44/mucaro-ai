@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-02T15:01:08Z",
+  "updated_utc": "2026-10-28T13:35:09Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1160,20 +1160,31 @@
       "requirement_id": "TGT-012",
       "requirement_text": "Multimodal file handling",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/parser.py",
-        "backend/app/multimodal.py"
+        "backend/app/multimodal.py",
+        "backend/app/format_registry.py",
+        "_architecture/ingest_format_registry_v1.json",
+        "backend/app/ingestion_benchmark.py",
+        "backend/tests/test_format_registry.py",
+        "backend/tests/test_matrix010_ingestion_benchmark.py",
+        "scripts/certify_matrix010_ingestion.py",
+        ".github/workflows/matrix010-ingestion-cert.yml",
+        "scripts/certify_release.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "positive_gate": ".github/workflows/matrix010-ingestion-cert.yml",
+      "negative_gate": "backend/tests/test_matrix010_ingestion_benchmark.py",
+      "benchmark": "_architecture/ingestion_benchmark_v1.json",
+      "evidence_refs": [
+        "data/exports/matrix010/matrix010-ingestion-receipt.json",
+        "data/exports/release_receipts/local_release-074b90751b5f.json"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": "No declared format registry artifact."
+      "notes": "PROVISIONAL: exact-head local certification at 074b90751b5fdcac1215dfaecb3818144115c756 reports MATRIX010_INGESTION_CERT_OK with 22/22 declared formats PASS, 8/8 adversarial cases PASS, zero failures, and both arithmetic checks closed. Hosted workflow execution and uploaded artifact proof are not current for this head; semantic multimodal understanding remains governed separately."
     },
     {
       "requirement_id": "TGT-013",
@@ -1954,23 +1965,27 @@
       "requirement_id": "MATRIX-010",
       "requirement_text": "File-ingestion benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/tests/test_ingestion_safety.py",
-        "backend/tests/test_parser.py"
+        "backend/app/ingestion_benchmark.py",
+        "_architecture/ingestion_benchmark_v1.json",
+        "backend/tests/test_matrix010_ingestion_benchmark.py",
+        "scripts/certify_matrix010_ingestion.py",
+        ".github/workflows/matrix010-ingestion-cert.yml",
+        "scripts/certify_release.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
+      "positive_gate": ".github/workflows/matrix010-ingestion-cert.yml",
+      "negative_gate": "backend/tests/test_matrix010_ingestion_benchmark.py",
+      "benchmark": "_architecture/ingestion_benchmark_v1.json",
       "evidence_refs": [
-        "backend/tests/test_ingestion_safety.py",
-        "backend/tests/test_parser.py"
+        "data/exports/matrix010/matrix010-ingestion-receipt.json",
+        "data/exports/release_receipts/local_release-074b90751b5f.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": "Malformed, mislabeled, empty, truncated, encrypted, oversized, archive-attack and unsupported cases are covered; a declared format registry and a frozen benchmark receipt remain OPEN (TGT-012)."
+      "notes": "PROVISIONAL: exact-head local certification at 074b90751b5fdcac1215dfaecb3818144115c756 reports MATRIX010_INGESTION_CERT_OK with format 22/22 PASS, adversarial 8/8 PASS, zero failures, and arithmetic closure. Hosted workflow execution and artifact retrieval for this head remain unverified."
     },
     {
       "requirement_id": "MATRIX-011",
