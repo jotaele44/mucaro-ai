@@ -4,9 +4,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.config import Settings
+from backend.app.artifact_identity import create_artifact_record, list_artifacts
 from backend.app.exports import EXPORT_FILES, export_answer_trace, export_file_path
 from backend.app.main import create_app
 from backend.tests.test_api import make_settings
+from backend.app.utils import write_json
 
 TRACE = {
     "run_id": "run_deadbeef",
@@ -55,6 +57,33 @@ def test_export_answer_trace(tmp_path: Path):
     assert Path(paths["json"]).exists()
     assert Path(paths["markdown"]).exists()
     assert Path(paths["csv"]).exists()
+
+
+def test_export_answer_trace_registers_derived_and_export_artifacts(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    cfg.ensure_dirs()
+    source = create_artifact_record(
+        processed_dir=cfg.processed_dir,
+        artifact_type="SOURCE",
+        payload=b"source bytes",
+        logical_identity="source:src_a",
+        producer="test",
+        producer_version="1",
+    )
+    write_json(
+        cfg.processed_dir / "source_manifest.json",
+        [{"source_id": "src_a", "artifact_id": source.artifact_id}],
+    )
+
+    trace = dict(TRACE)
+    paths = export_answer_trace(trace, cfg)
+
+    assert trace["artifact_lineage"]["status"] == "VALID"
+    assert trace["artifact_lineage"]["source_artifact_ids"] == [source.artifact_id]
+    records = list_artifacts(cfg.processed_dir)
+    assert sum(record["artifact_type"] == "DERIVED" for record in records) == 1
+    assert sum(record["artifact_type"] == "EXPORT" for record in records) == 3
+    assert all(Path(path).exists() for path in paths.values())
 
 
 def test_export_files_download_with_their_type_and_name(tmp_path: Path):

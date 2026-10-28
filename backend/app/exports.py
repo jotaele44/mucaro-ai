@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import csv
+import json
 import re
 from pathlib import Path
 from typing import Any
 
+from .artifact_identity import ArtifactIdentityError, create_artifact_record
 from .config import Settings, settings
 from .contracts import validate_contract
-from .utils import write_json
+from .utils import read_json, write_json
 
 # Every answer is exported as these files, named <run_id>.<suffix>; the keys are the kinds the API serves.
 EXPORT_FILES: dict[str, tuple[str, str]] = {
@@ -37,6 +39,9 @@ def export_answer_trace(answer_trace: dict[str, Any], cfg: Settings = settings) 
     json_path = cfg.export_dir / f"{run_id}.{EXPORT_FILES['json'][0]}"
     md_path = cfg.export_dir / f"{run_id}.{EXPORT_FILES['markdown'][0]}"
     csv_path = cfg.export_dir / f"{run_id}.{EXPORT_FILES['csv'][0]}"
+
+    lineage = _register_trace_lineage(answer_trace, cfg)
+    answer_trace["artifact_lineage"] = lineage
     write_json(json_path, answer_trace)
     md_path.write_text(_to_markdown(answer_trace), encoding="utf-8")
     with csv_path.open("w", encoding="utf-8", newline="") as f:
@@ -81,7 +86,106 @@ def export_answer_trace(answer_trace: dict[str, Any], cfg: Settings = settings) 
                     "text_snippet": record.get("text_snippet"),
                 }
             )
+    export_errors = _register_export_artifacts(
+        answer_trace=answer_trace,
+        files={
+            "json": json_path,
+            "markdown": md_path,
+            "csv": csv_path,
+        },
+        cfg=cfg,
+    )
+    if export_errors:
+        answer_trace["artifact_lineage"]["status"] = "PARTIAL"
+        answer_trace["artifact_lineage"]["export_registration_errors"] = export_errors
+        write_json(json_path, answer_trace)
     return {"json": str(json_path), "markdown": str(md_path), "csv": str(csv_path)}
+
+
+def _register_trace_lineage(answer_trace: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    """Bind a trace to ingested source artifacts when the source manifests provide handles."""
+    manifests = read_json(cfg.processed_dir / "source_manifest.json", [])
+    by_source = {
+        str(row.get("source_id")): row
+        for row in manifests
+        if isinstance(row, dict) and row.get("source_id")
+    }
+    source_ids = [str(source_id) for source_id in answer_trace.get("source_ids", [])]
+    parent_ids = [
+        str(by_source[source_id]["artifact_id"])
+        for source_id in source_ids
+        if isinstance(by_source.get(source_id), dict) and by_source[source_id].get("artifact_id")
+    ]
+    unresolved = [
+        source_id
+        for source_id in source_ids
+        if not isinstance(by_source.get(source_id), dict) or not by_source[source_id].get("artifact_id")
+    ]
+    if not parent_ids:
+        return {
+            "status": "NO_SOURCE_PARENTS",
+            "source_ids": source_ids,
+            "source_artifact_ids": [],
+            "unresolved_source_ids": unresolved or source_ids,
+        }
+    try:
+        trace_artifact = create_artifact_record(
+            processed_dir=cfg.processed_dir,
+            artifact_type="DERIVED",
+            payload=_trace_payload(answer_trace),
+            logical_identity=f"answer_trace:{answer_trace['run_id']}",
+            producer="answer_service",
+            producer_version="1.0.0",
+            parent_artifact_ids=parent_ids,
+            provenance_parameters={"source_ids": source_ids},
+        )
+    except ArtifactIdentityError as exc:
+        return {
+            "status": "LINEAGE_REGISTRATION_FAILED",
+            "detail": str(exc),
+            "source_ids": source_ids,
+            "source_artifact_ids": parent_ids,
+            "unresolved_source_ids": unresolved,
+        }
+    return {
+        "status": "VALID",
+        "trace_artifact_id": trace_artifact.artifact_id,
+        "source_ids": source_ids,
+        "source_artifact_ids": parent_ids,
+        "unresolved_source_ids": unresolved,
+    }
+
+
+def _trace_payload(answer_trace: dict[str, Any]) -> bytes:
+    payload = {
+        key: value
+        for key, value in answer_trace.items()
+        if key not in {"export_paths", "artifact_lineage"}
+    }
+    return (json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+
+
+def _register_export_artifacts(*, answer_trace: dict[str, Any], files: dict[str, Path], cfg: Settings) -> list[dict[str, str]]:
+    trace_artifact_id = (answer_trace.get("artifact_lineage") or {}).get("trace_artifact_id")
+    if not isinstance(trace_artifact_id, str) or not trace_artifact_id:
+        return []
+    errors: list[dict[str, str]] = []
+    for kind, path in files.items():
+        try:
+            create_artifact_record(
+                processed_dir=cfg.processed_dir,
+                artifact_type="EXPORT",
+                payload=path.read_bytes(),
+                logical_identity=f"answer_export:{answer_trace['run_id']}:{kind}",
+                producer="answer_export",
+                producer_version="1.0.0",
+                parent_artifact_ids=[trace_artifact_id],
+                source_path_or_uri=str(path),
+                provenance_parameters={"export_kind": kind, "run_id": answer_trace["run_id"]},
+            )
+        except ArtifactIdentityError:
+            errors.append({"kind": kind, "path": str(path), "status": "ERROR_EXPORT_ARTIFACT_LINEAGE"})
+    return errors
 
 
 def _to_markdown(answer_trace: dict[str, Any]) -> str:

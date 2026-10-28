@@ -10,6 +10,7 @@ from .contracts import ContractViolation, validate_contract
 from .utils import read_json, stable_id, utc_now, write_json
 
 ARTIFACT_SCHEMA_VERSION = "mucaro-artifact/1.0"
+ARTIFACT_PROVENANCE_SCHEMA_VERSION = "mucaro-artifact-provenance/1.0"
 ARTIFACT_STORE_NAME = "artifact_lineage.json"
 ARTIFACT_TYPES = {"SOURCE", "PARSED", "INTERMEDIATE", "DERIVED", "EXPORT", "RECEIPT"}
 ALLOWED_PARENT_TYPES = {
@@ -39,6 +40,7 @@ class ArtifactRecord:
     parent_artifact_ids: tuple[str, ...]
     schema_id: str | None = None
     source_path_or_uri: str | None = None
+    provenance: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -54,6 +56,7 @@ class ArtifactRecord:
             "parent_artifact_ids": list(self.parent_artifact_ids),
             "schema_id": self.schema_id,
             "source_path_or_uri": self.source_path_or_uri,
+            "provenance": self.provenance,
         }
 
 
@@ -88,6 +91,30 @@ def _load_records(processed_dir: Path) -> list[dict[str, Any]]:
         if not isinstance(record, dict):
             raise ArtifactIdentityError("artifact lineage store contains a non-object record")
         _validate_record(record)
+    index = _index_records(records)
+    for record in records:
+        provenance = record.get("provenance")
+        if not isinstance(provenance, dict):
+            continue
+        if provenance.get("artifact_sha256") != record.get("sha256"):
+            raise ArtifactIdentityError(f"artifact provenance digest mismatch: {record.get('artifact_id')}")
+        expected_parents = [
+            {
+                "artifact_id": parent_id,
+                "artifact_type": str(index[parent_id].get("artifact_type")),
+                "sha256": str(index[parent_id].get("sha256")),
+            }
+            for parent_id in record.get("parent_artifact_ids", [])
+            if parent_id in index
+        ]
+        if provenance.get("parent_artifacts") != expected_parents:
+            raise ArtifactIdentityError(f"artifact provenance parent mismatch: {record.get('artifact_id')}")
+        artifact_id = str(record.get("artifact_id"))
+        expected_roots = [artifact_id] if record.get("artifact_type") == "SOURCE" else [
+            root for parent_id in record.get("parent_artifact_ids", []) for root in _source_artifact_ids(index, parent_id)
+        ]
+        if provenance.get("source_artifact_ids") != list(dict.fromkeys(expected_roots)):
+            raise ArtifactIdentityError(f"artifact provenance source-root mismatch: {artifact_id}")
     return records
 
 
@@ -107,6 +134,60 @@ def _index_records(records: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any
     return index
 
 
+def _source_artifact_ids(index: dict[str, dict[str, Any]], artifact_id: str) -> list[str]:
+    """Return stable source roots without trusting a copied provenance field."""
+    record = index[artifact_id]
+    if record.get("artifact_type") == "SOURCE":
+        return [artifact_id]
+    roots: list[str] = []
+    for parent_id in record.get("parent_artifact_ids", []):
+        if parent_id in index:
+            roots.extend(_source_artifact_ids(index, parent_id))
+    return list(dict.fromkeys(roots))
+
+
+def _build_provenance(
+    *,
+    index: dict[str, dict[str, Any]],
+    artifact_id: str,
+    artifact_type: str,
+    digest: str,
+    logical_identity: str,
+    producer: str,
+    producer_version: str,
+    created_utc: str,
+    parent_artifact_ids: tuple[str, ...],
+    parameters: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    parent_artifacts = [
+        {
+            "artifact_id": parent_id,
+            "artifact_type": str(index[parent_id].get("artifact_type")),
+            "sha256": str(index[parent_id].get("sha256")),
+        }
+        for parent_id in parent_artifact_ids
+    ]
+    roots = [artifact_id] if artifact_type == "SOURCE" else [
+        root for parent_id in parent_artifact_ids for root in _source_artifact_ids(index, parent_id)
+    ]
+    provenance: dict[str, Any] = {
+        "schema_version": ARTIFACT_PROVENANCE_SCHEMA_VERSION,
+        "lineage_kind": "SOURCE_MANIFESTATION" if artifact_type == "SOURCE" else "DERIVATION",
+        "source_artifact_ids": list(dict.fromkeys(roots)),
+        "parent_artifacts": parent_artifacts,
+        "transformation": {
+            "logical_identity": logical_identity,
+            "producer": producer,
+            "producer_version": producer_version,
+        },
+        "artifact_sha256": digest,
+        "created_utc": created_utc,
+    }
+    if parameters:
+        provenance["parameters"] = parameters
+    return provenance
+
+
 def create_artifact_record(
     *,
     processed_dir: Path,
@@ -118,6 +199,7 @@ def create_artifact_record(
     parent_artifact_ids: Iterable[str] = (),
     schema_id: str | None = None,
     source_path_or_uri: str | None = None,
+    provenance_parameters: dict[str, Any] | None = None,
 ) -> ArtifactRecord:
     if artifact_type not in ARTIFACT_TYPES:
         raise ArtifactIdentityError(f"unsupported artifact_type: {artifact_type}")
@@ -162,7 +244,23 @@ def create_artifact_record(
         json.dumps(sorted(parents)),
     )
     existing = index.get(artifact_id)
+    candidate_created_utc = str(existing.get("created_utc") or created_utc) if existing is not None else created_utc
+    candidate_provenance = _build_provenance(
+        index=index,
+        artifact_id=artifact_id,
+        artifact_type=artifact_type,
+        digest=digest,
+        logical_identity=logical_identity,
+        producer=producer,
+        producer_version=producer_version,
+        created_utc=candidate_created_utc,
+        parent_artifact_ids=parents,
+        parameters=provenance_parameters,
+    )
     if existing is not None:
+        if "provenance" not in existing:
+            existing["provenance"] = candidate_provenance
+            write_json(artifact_store_path(processed_dir), records)
         canonical_existing = {key: value for key, value in existing.items() if key != "created_utc"}
         candidate = ArtifactRecord(
             artifact_id=artifact_id,
@@ -172,10 +270,11 @@ def create_artifact_record(
             logical_identity=logical_identity,
             producer=producer,
             producer_version=producer_version,
-            created_utc=str(existing.get("created_utc") or created_utc),
+            created_utc=candidate_created_utc,
             parent_artifact_ids=parents,
             schema_id=schema_id,
             source_path_or_uri=source_path_or_uri,
+            provenance=existing.get("provenance") or candidate_provenance,
         )
         canonical_candidate = {key: value for key, value in candidate.as_dict().items() if key not in {"created_utc", "schema_version"}}
         canonical_existing.pop("schema_version", None)
@@ -196,6 +295,7 @@ def create_artifact_record(
         parent_artifact_ids=parents,
         schema_id=schema_id,
         source_path_or_uri=source_path_or_uri,
+        provenance=candidate_provenance,
     )
     _validate_record(record.as_dict())
     records.append(record.as_dict())

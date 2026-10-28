@@ -156,6 +156,7 @@ from .packaging import (
     build_macos_app_bundle,
     build_package_status,
     build_release_artifacts,
+    compare_archives,
     verify_distribution_manifest,
     verify_macos_app_bundle,
     verify_release_artifact,
@@ -1437,6 +1438,15 @@ def build_parser() -> argparse.ArgumentParser:
     package_verify.add_argument("--require-current-head", action="store_true", help="Require manifest head_sha to match current Git HEAD.")
     package_verify.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     package_verify.set_defaults(handler=run_package_verify)
+
+    package_compare = package_subcommands.add_parser(
+        "compare-archives",
+        help="Compare two archives by outer bytes, path-aware members, and payload multiset.",
+    )
+    package_compare.add_argument("left", type=Path, help="First archive path.")
+    package_compare.add_argument("right", type=Path, help="Second archive path.")
+    package_compare.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    package_compare.set_defaults(handler=run_package_compare_archives)
 
     package_macos_app = package_subcommands.add_parser(
         "macos-app",
@@ -4129,6 +4139,13 @@ def run_package_verify(args: argparse.Namespace, cfg: Settings) -> int:
     report = verify_release_artifact(args.manifest, root=cfg.project_root, require_current_head=args.require_current_head)
     emit_payload(report, args.format)
     return 0 if report["status"] == "PACKAGE_ARTIFACT_VERIFIED" else 2
+
+
+def run_package_compare_archives(args: argparse.Namespace, cfg: Settings) -> int:
+    del cfg
+    report = compare_archives(args.left, args.right)
+    emit_payload(report, args.format)
+    return 0 if report["status"] == "ARCHIVE_COMPARISON_OK" else 2
 
 
 def run_package_macos_app(args: argparse.Namespace, cfg: Settings) -> int:

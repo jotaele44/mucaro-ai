@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-10-28T14:19:21Z",
+  "updated_utc": "2026-10-28T14:49:00Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -114,7 +114,7 @@
       "dependencies": [
         "N03"
       ],
-      "state": "OPEN",
+      "state": "PROVISIONAL",
       "risk": "MEDIUM",
       "user_value": "MEDIUM",
       "downstream_unlock_value": "HIGH",
@@ -123,7 +123,7 @@
         "artifact lineage on every derivation"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "Source manifestations, derived answer traces, and exports now carry validated artifact lineage; archive comparison is available through the CLI. Full node promotion remains gated on broader producer coverage and release-wide evidence."
     },
     {
       "node_id": "N05",

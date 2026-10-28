@@ -1,0 +1,62 @@
+{
+  "rows": {
+    "TGT-015": {
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/artifact_identity.py",
+        "backend/app/exports.py",
+        "backend/app/ingestion.py",
+        "schemas/artifact_identity.schema.json",
+        "schemas/source_manifest.schema.json"
+      ],
+      "positive_gate": "backend/tests/test_artifact_identity.py::test_source_to_export_lineage_closes_with_stable_byte_identity",
+      "negative_gate": "backend/tests/test_artifact_identity.py::test_tampered_parent_provenance_fails_closed",
+      "evidence_refs": [
+        "backend/tests/test_artifact_identity.py::test_source_to_export_lineage_closes_with_stable_byte_identity",
+        "backend/tests/test_exports.py::test_export_answer_trace",
+        "backend/tests/test_ingestion.py::test_ingest_file_tmp"
+      ],
+      "state": "PROVISIONAL",
+      "notes": "Artifact lineage now covers ingested source manifestations, derived answer traces, and physical exports with validated source roots and direct parent byte hashes. Legacy/source-less traces remain explicitly partial rather than receiving fabricated parents."
+    },
+    "INV-018": {
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/provenance.py",
+        "backend/app/ingestion.py",
+        "backend/app/artifact_identity.py",
+        "backend/app/exports.py",
+        "schemas/artifact_identity.schema.json"
+      ],
+      "positive_gate": "backend/tests/test_contracts.py::test_real_producer_payloads_satisfy_contracts",
+      "negative_gate": "backend/tests/test_artifact_identity.py::test_tampered_parent_provenance_fails_closed",
+      "evidence_refs": [
+        "backend/tests/test_contracts.py::test_real_producer_payloads_satisfy_contracts",
+        "backend/tests/test_artifact_identity.py::test_tampered_parent_provenance_fails_closed"
+      ],
+      "state": "PROVISIONAL",
+      "notes": "Source provenance remains contract-validated; derived artifact provenance now records source roots, direct parent SHA-256 values, and transformation identity, with semantic cross-record verification at load time."
+    },
+    "INV-019": {
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/packaging.py",
+        "backend/app/cli.py"
+      ],
+      "positive_gate": "backend/tests/test_archive_comparison.py::test_archive_comparison_classifies_byte_identity",
+      "negative_gate": "backend/tests/test_archive_comparison.py::test_archive_comparison_reports_distinct_payloads",
+      "evidence_refs": [
+        "backend/tests/test_archive_comparison.py::test_archive_comparison_distinguishes_recompression_and_path_changes",
+        "backend/tests/test_archive_comparison.py::test_archive_comparison_reports_distinct_payloads"
+      ],
+      "state": "PROVISIONAL",
+      "notes": "Read-only package compare-archives reports BYTE_IDENTICAL, PURE_RECOMPRESSION, SAME_PAYLOADS_DIFFERENT_PATHS, DISTINCT_PAYLOADS, or UNRESOLVED using outer SHA, path-aware member identity, and payload multiset evidence."
+    }
+  },
+  "dag": {
+    "N04": {
+      "state": "PROVISIONAL",
+      "notes": "Source manifestations, derived answer traces, and exports now carry validated artifact lineage; archive comparison is available through the CLI. Full node promotion remains gated on broader producer coverage and release-wide evidence."
+    }
+  }
+}

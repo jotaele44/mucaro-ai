@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-28T14:19:21Z",
+  "updated_utc": "2026-10-28T14:49:00Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -800,41 +800,48 @@
       "requirement_id": "INV-018",
       "requirement_text": "Provenance",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/provenance.py",
-        "backend/app/ingestion.py"
+        "backend/app/ingestion.py",
+        "backend/app/artifact_identity.py",
+        "backend/app/exports.py",
+        "schemas/artifact_identity.schema.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_contracts.py::test_real_producer_payloads_satisfy_contracts",
+      "negative_gate": "backend/tests/test_artifact_identity.py::test_tampered_parent_provenance_fails_closed",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_contracts.py::test_real_producer_payloads_satisfy_contracts",
-        "backend/tests/test_contracts.py::test_web_snapshot_with_a_non_hash_content_digest_is_refused"
+        "backend/tests/test_artifact_identity.py::test_tampered_parent_provenance_fails_closed"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N04",
-      "notes": "Provenance records attached to every ingested file and web snapshot; derived artifacts do not yet carry them (N04)."
+      "notes": "Source provenance remains contract-validated; derived artifact provenance now records source roots, direct parent SHA-256 values, and transformation identity, with semantic cross-record verification at load time."
     },
     {
       "requirement_id": "INV-019",
       "requirement_text": "Archive comparison",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/packaging.py"
+        "backend/app/packaging.py",
+        "backend/app/cli.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_archive_comparison.py::test_archive_comparison_classifies_byte_identity",
+      "negative_gate": "backend/tests/test_archive_comparison.py::test_archive_comparison_reports_distinct_payloads",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_archive_comparison.py::test_archive_comparison_distinguishes_recompression_and_path_changes",
+        "backend/tests/test_archive_comparison.py::test_archive_comparison_reports_distinct_payloads"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N04",
-      "notes": ""
+      "notes": "Read-only package compare-archives reports BYTE_IDENTICAL, PURE_RECOMPRESSION, SAME_PAYLOADS_DIFFERENT_PATHS, DISTINCT_PAYLOADS, or UNRESOLVED using outer SHA, path-aware member identity, and payload multiset evidence."
     },
     {
       "requirement_id": "INV-020",
@@ -1232,20 +1239,27 @@
       "requirement_id": "TGT-015",
       "requirement_text": "Artifact generation",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/artifact_identity.py",
-        "backend/app/exports.py"
+        "backend/app/exports.py",
+        "backend/app/ingestion.py",
+        "schemas/artifact_identity.schema.json",
+        "schemas/source_manifest.schema.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_artifact_identity.py::test_source_to_export_lineage_closes_with_stable_byte_identity",
+      "negative_gate": "backend/tests/test_artifact_identity.py::test_tampered_parent_provenance_fails_closed",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_artifact_identity.py::test_source_to_export_lineage_closes_with_stable_byte_identity",
+        "backend/tests/test_exports.py::test_export_answer_trace",
+        "backend/tests/test_ingestion.py::test_ingest_file_tmp"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N04",
-      "notes": ""
+      "notes": "Artifact lineage now covers ingested source manifestations, derived answer traces, and physical exports with validated source roots and direct parent byte hashes. Legacy/source-less traces remain explicitly partial rather than receiving fabricated parents."
     },
     {
       "requirement_id": "TGT-016",

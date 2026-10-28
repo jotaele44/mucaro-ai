@@ -8,6 +8,7 @@ from typing import Any
 from .chunker import chunk_text
 from .config import Settings, settings
 from .contracts import validate_contract
+from .artifact_identity import ArtifactIdentityError, create_artifact_record
 from .db import delete_chunks_for_source, delete_payload, init_db, upsert_payload
 from .format_registry import SUPPORTED_INGEST_SUFFIXES
 from .injection_guard import scan_text
@@ -75,8 +76,22 @@ def ingest_file(path: Path, cfg: Settings = settings, *, source_kind: str = "LOC
     lineage_status = "VALID" if chunks else "PARTIAL"
     if not chunks:
         warnings.append("NO_TEXT_CHUNKS_EXTRACTED")
+    try:
+        source_artifact = create_artifact_record(
+            processed_dir=cfg.processed_dir,
+            artifact_type="SOURCE",
+            payload=target.read_bytes(),
+            logical_identity=f"source:{source_id}",
+            producer="ingestion",
+            producer_version="1.0.0",
+            source_path_or_uri=_source_path_string(target, cfg),
+            provenance_parameters={"source_kind": source_kind, "source_id": source_id},
+        )
+    except ArtifactIdentityError as exc:
+        raise ParseError(f"ERROR_SOURCE_ARTIFACT_LINEAGE:{exc}") from exc
     source_payload = {
         "source_id": source_id,
+        "artifact_id": source_artifact.artifact_id,
         "source_path": _source_path_string(target, cfg),
         "source_sha256": file_sha,
         "bytes": parse_result.get("bytes", path.stat().st_size),
@@ -169,8 +184,27 @@ def ingest_web_snapshot(snapshot_path: Path, cfg: Settings = settings) -> dict[s
                 "trust": "UNTRUSTED_CONTENT",
             }
         )
+    try:
+        source_artifact = create_artifact_record(
+            processed_dir=cfg.processed_dir,
+            artifact_type="SOURCE",
+            payload=snapshot_path.read_bytes(),
+            logical_identity=f"source:{source_id}",
+            producer="web_snapshot_ingestion",
+            producer_version="1.0.0",
+            source_path_or_uri=_source_path_string(snapshot_path, cfg),
+            provenance_parameters={"source_kind": "WEB_SNAPSHOT", "source_id": source_id, "snapshot_id": snapshot_id},
+        )
+    except ArtifactIdentityError as exc:
+        return {
+            "status": "ERROR_SOURCE_ARTIFACT_LINEAGE",
+            "detail": str(exc),
+            "snapshot_id": snapshot_id,
+            "snapshot_path": str(snapshot_path),
+        }
     source_payload = {
         "source_id": source_id,
+        "artifact_id": source_artifact.artifact_id,
         "source_path": _source_path_string(snapshot_path, cfg),
         "source_sha256": snapshot_file_sha,
         "bytes": snapshot_path.stat().st_size,

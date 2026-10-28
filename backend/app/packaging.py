@@ -6,6 +6,7 @@ import os
 import plistlib
 import shlex
 import subprocess
+import tarfile
 import tomllib
 import zipfile
 from collections import Counter
@@ -118,6 +119,80 @@ def _write_executable(path: Path, text: str) -> None:
 
 def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _archive_members(path: Path) -> tuple[str, list[dict[str, Any]]]:
+    """Read regular archive members into a deterministic identity manifest."""
+    if zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as archive:
+            members = []
+            for info in archive.infolist():
+                if info.is_dir():
+                    continue
+                data = archive.read(info)
+                members.append({"path": info.filename, "size_bytes": len(data), "sha256": _sha256_bytes(data)})
+        return "zip", sorted(members, key=lambda item: item["path"])
+    if tarfile.is_tarfile(path):
+        with tarfile.open(path, mode="r:*") as archive:
+            members = []
+            for info in archive.getmembers():
+                if not info.isfile():
+                    continue
+                handle = archive.extractfile(info)
+                if handle is None:
+                    raise ValueError(f"archive member has no readable payload: {info.name}")
+                data = handle.read()
+                members.append({"path": info.name, "size_bytes": len(data), "sha256": _sha256_bytes(data)})
+        return "tar", sorted(members, key=lambda item: item["path"])
+    raise ValueError(f"unsupported archive format: {path}")
+
+
+def compare_archives(left: Path, right: Path) -> dict[str, Any]:
+    """Classify two archives without collapsing path and payload identity."""
+    left = Path(left)
+    right = Path(right)
+    result: dict[str, Any] = {
+        "status": "ARCHIVE_COMPARISON_OK",
+        "left": {"path": str(left), "exists": left.is_file()},
+        "right": {"path": str(right), "exists": right.is_file()},
+    }
+    if not left.is_file() or not right.is_file():
+        result.update({"status": "ARCHIVE_COMPARISON_UNRESOLVED", "classification": "UNRESOLVED", "detail": "both archive paths must be regular files"})
+        return result
+    left_outer = {"sha256": _sha256_file(left), "size_bytes": left.stat().st_size}
+    right_outer = {"sha256": _sha256_file(right), "size_bytes": right.stat().st_size}
+    result["left"].update(left_outer)
+    result["right"].update(right_outer)
+    if left_outer["sha256"] == right_outer["sha256"]:
+        result.update({"classification": "BYTE_IDENTICAL", "archive_formats": None, "left_members": [], "right_members": [], "payload_multiset_equal": True})
+        return result
+    try:
+        left_format, left_members = _archive_members(left)
+        right_format, right_members = _archive_members(right)
+    except (OSError, ValueError, tarfile.TarError, zipfile.BadZipFile) as exc:
+        result.update({"status": "ARCHIVE_COMPARISON_UNRESOLVED", "classification": "UNRESOLVED", "detail": str(exc)})
+        return result
+    left_payloads = sorted((item["size_bytes"], item["sha256"]) for item in left_members)
+    right_payloads = sorted((item["size_bytes"], item["sha256"]) for item in right_members)
+    paths_equal = left_members == right_members
+    payloads_equal = left_payloads == right_payloads
+    if paths_equal and payloads_equal:
+        classification = "PURE_RECOMPRESSION"
+    elif payloads_equal:
+        classification = "SAME_PAYLOADS_DIFFERENT_PATHS"
+    else:
+        classification = "DISTINCT_PAYLOADS"
+    result.update(
+        {
+            "classification": classification,
+            "archive_formats": {"left": left_format, "right": right_format},
+            "left_members": left_members,
+            "right_members": right_members,
+            "payload_multiset_equal": payloads_equal,
+            "path_aware_members_equal": paths_equal,
+        }
+    )
+    return result
 
 
 def _utc_now() -> str:

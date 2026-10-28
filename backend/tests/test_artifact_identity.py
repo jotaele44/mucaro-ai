@@ -62,6 +62,12 @@ def test_source_to_export_lineage_closes_with_stable_byte_identity(tmp_path: Pat
     )
 
     assert source.sha256 == sha256_bytes(b"raw-source")
+    assert source.provenance is not None
+    assert source.provenance["lineage_kind"] == "SOURCE_MANIFESTATION"
+    assert source.provenance["source_artifact_ids"] == [source.artifact_id]
+    assert parsed.provenance is not None
+    assert parsed.provenance["source_artifact_ids"] == [source.artifact_id]
+    assert parsed.provenance["parent_artifacts"][0]["sha256"] == source.sha256
     assert export.byte_size == len(b"export")
     ancestors = trace_ancestors(processed, export.artifact_id)
     assert [item["artifact_id"] for item in ancestors] == [
@@ -159,4 +165,33 @@ def test_tampered_artifact_store_is_rejected_by_the_shared_contract(tmp_path: Pa
     (processed / "artifact_lineage.json").write_text(json.dumps(records), encoding="utf-8")
 
     with pytest.raises(ArtifactIdentityError, match="artifact contract violation"):
+        list_artifacts(processed)
+
+
+def test_tampered_parent_provenance_fails_closed(tmp_path: Path) -> None:
+    import json
+
+    processed = tmp_path / "processed"
+    source = create_artifact_record(
+        processed_dir=processed,
+        artifact_type="SOURCE",
+        payload=b"source",
+        logical_identity="source:provenance-tamper",
+        producer="test",
+        producer_version="1",
+    )
+    create_artifact_record(
+        processed_dir=processed,
+        artifact_type="DERIVED",
+        payload=b"derived",
+        logical_identity="derived:provenance-tamper",
+        producer="test",
+        producer_version="1",
+        parent_artifact_ids=[source.artifact_id],
+    )
+    records = json.loads((processed / "artifact_lineage.json").read_text(encoding="utf-8"))
+    records[1]["provenance"]["parent_artifacts"][0]["sha256"] = "0" * 64
+    (processed / "artifact_lineage.json").write_text(json.dumps(records), encoding="utf-8")
+
+    with pytest.raises(ArtifactIdentityError, match="artifact provenance parent mismatch|artifact identity collision|artifact contract violation"):
         list_artifacts(processed)
