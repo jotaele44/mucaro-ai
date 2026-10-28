@@ -514,7 +514,9 @@ async function scenario(browser, base, viewport, contextOptions) {
     "workbench exposes certification residue instead of false readiness",
     viewport,
     (await page.getByText("BLOCKED", { exact: true }).count()) >= 1 &&
-      (await page.getByText(/Missing certification evidence/).count()) === 1,
+      (await page.getByText(/Missing certification evidence/).count()) === 1 &&
+      (await page.getByText("UNBOUND", { exact: true }).count()) === 1 &&
+      (await page.getByText("20 / 20", { exact: true }).count()) === 1,
   );
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "16b-workbench");
