@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-10-28T14:49:00Z",
+  "updated_utc": "2026-10-28T19:16:11Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -138,7 +138,7 @@
         "N02",
         "N03"
       ],
-      "state": "OPEN",
+      "state": "PROVISIONAL",
       "risk": "HIGH",
       "user_value": "HIGH",
       "downstream_unlock_value": "HIGH",
@@ -147,7 +147,7 @@
         "tool-governance benchmark"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "Permission-aware tool runtime and provider-native proposal routing are unified; run-feed events bind to the hash-chained tool audit ledger. Full node promotion remains gated on broader benchmark/evidence closure."
     },
     {
       "node_id": "N06",

@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-28T14:49:00Z",
+  "updated_utc": "2026-10-28T19:16:11Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1218,22 +1218,26 @@
       "requirement_id": "TGT-014",
       "requirement_text": "Governed tool execution",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/tools.py"
+        "backend/app/tools.py",
+        "backend/app/work_runs.py",
+        "backend/app/agent_tool_proposals.py",
+        "backend/app/model_router.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_tool_feed_events_bind_to_the_hash_chained_audit_ledger",
+      "negative_gate": "backend/tests/test_tools.py::test_tool_runtime_requires_approval_before_execution",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_contracts.py::test_api_cancel_and_summary_routes",
-        "backend/tests/test_contracts.py::test_summary_counts_close_arithmetically"
+        "backend/tests/test_work_runs.py::test_tool_feed_events_bind_to_the_hash_chained_audit_ledger",
+        "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering",
+        "backend/tests/test_agent_tool_proposals.py::test_anthropic_tool_use_is_normalized_with_provenance"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "Permission-aware, audited (hash chain), attributable, cancellable before start, failure-aware. OPEN: feed-level observability (M3/M6) and model-initiated calls through the same gate."
+      "notes": "Tool calls, provider-native proposals, approvals, starts, results, retries, and failures use the same allowlist/approval/audit runtime. Run-feed views now carry bounded audit chain status, latest event ID, and latest event SHA-256. Broader governance-node and hosted evidence remain open."
     },
     {
       "requirement_id": "TGT-015",

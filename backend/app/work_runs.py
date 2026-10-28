@@ -83,9 +83,11 @@ from .tools import (
     approve_tool_call,
     cancel_tool_call,
     list_tool_calls,
+    list_tool_audit_events,
     request_tool_call,
     run_tool_call,
     summarize_tool_calls,
+    verify_tool_audit_chain,
 )
 from .utils import stable_id, utc_now
 
@@ -1142,7 +1144,7 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
         call_ids.append(call["tool_call_id"])
         if checkpoint_id:
             call_step_ids[call["tool_call_id"]] = checkpoint_steps[index]
-        events.append(("tool_call", _call_view(call)))
+        events.append(("tool_call", _call_view(call, cfg)))
 
     def change(current: dict[str, Any]) -> None:
         current["tool_call_ids"] = call_ids
@@ -1164,8 +1166,8 @@ def _phase_start(run: dict[str, Any], cfg: Settings) -> None:
     _update(run_id, cfg, change, events)
 
 
-def _call_view(call: dict[str, Any]) -> dict[str, Any]:
-    return {
+def _call_view(call: dict[str, Any], cfg: Settings | None = None) -> dict[str, Any]:
+    view = {
         "tool_call_id": call["tool_call_id"],
         "tool_name": call["tool_name"],
         "arguments": call.get("arguments", {}),
@@ -1175,12 +1177,27 @@ def _call_view(call: dict[str, Any]) -> dict[str, Any]:
         "retry_of": call.get("retry_of"),
         "provenance": call.get("provenance", {}),
     }
+    if cfg is not None:
+        events = [
+            event
+            for event in list_tool_audit_events(cfg)["events"]
+            if event.get("tool_call_id") == call.get("tool_call_id")
+        ]
+        latest = events[-1] if events else None
+        chain = verify_tool_audit_chain(cfg)
+        view["audit_binding"] = {
+            "chain_status": chain["status"],
+            "event_count": len(events),
+            "latest_event_id": latest.get("event_id") if latest else None,
+            "latest_event_sha256": latest.get("event_sha256") if latest else None,
+        }
+    return view
 
 
-def _result_view(call: dict[str, Any]) -> dict[str, Any]:
+def _result_view(call: dict[str, Any], cfg: Settings | None = None) -> dict[str, Any]:
     result = call.get("result") or {}
     status = call["status"]
-    view = {**_call_view(call), "result_status": result.get("status")}
+    view = {**_call_view(call, cfg), "result_status": result.get("status")}
     if status in {"FAILED", "INTERRUPTED"}:
         view["error"] = {"status": result.get("status"), "category": classify_error(result.get("status")), "detail": result.get("detail")}
     elif status in {"DENIED", "CANCELLED"}:
@@ -1227,7 +1244,7 @@ def _execute_tool_batch(
             cfg=cfg,
         )
     for call in batch:
-        _emit_only(run_id, cfg, "tool_started", _call_view(call))
+        _emit_only(run_id, cfg, "tool_started", _call_view(call, cfg))
     _emit_only(
         run_id,
         cfg,
@@ -1380,7 +1397,7 @@ def _advance_provider_loop(run: dict[str, Any], round_calls: list[dict[str, Any]
         new_ids.append(call["tool_call_id"])
         step_map[call["tool_call_id"]] = step_id
         new_steps.append({"id": step_id, "tool": call["tool_name"], "status": "PENDING_APPROVAL", "depends_on": []})
-        events.append(("tool_call", _call_view(call)))
+        events.append(("tool_call", _call_view(call, cfg)))
 
     if checkpoint_id and new_steps:
         try:
@@ -1429,7 +1446,7 @@ def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
             current["state"] = "AWAITING_APPROVAL"
             current["approval_requested_ids"] = sorted(set(current["approval_requested_ids"]) | {call["tool_call_id"] for call in new_requests})
 
-        _update(run_id, cfg, change, [("approval_request", _call_view(call)) for call in new_requests])
+        _update(run_id, cfg, change, [("approval_request", _call_view(call, cfg)) for call in new_requests])
         return False
     if run["state"] != "RUNNING":
         _update(run_id, cfg, lambda current: current.__setitem__("state", "RUNNING"))
@@ -1498,7 +1515,7 @@ def _phase_tools(run: dict[str, Any], cfg: Settings) -> bool:
     round_ids = set(get_run(run_id, cfg).get("round_call_ids") or [call["tool_call_id"] for call in calls])
     round_calls = [call for call in calls if call["tool_call_id"] in round_ids]
     failed = [call for call in round_calls if call["status"] in {"FAILED", "INTERRUPTED"}]
-    events = [("tool_result", _result_view(call)) for call in unreported]
+    events = [("tool_result", _result_view(call, cfg)) for call in unreported]
     events.append(("tool_summary", {"round": run["round"], **summarize_tool_calls(calls)}))
 
     def record_round(current: dict[str, Any]) -> None:
@@ -1594,7 +1611,7 @@ def _phase_tools_decision(run: dict[str, Any], cfg: Settings) -> bool:
             if run["mode"] == "auto" and _auto_approvable(retry["tool_name"]):
                 retry = approve_tool_call(retry["tool_call_id"], cfg=cfg, approved_by="policy:auto-local-read-only", expected_arguments_sha256=retry["arguments_sha256"])["tool_call"]
             new_ids.append(retry["tool_call_id"])
-            events.append(("retry_requested", _call_view(retry)))
+            events.append(("retry_requested", _call_view(retry, cfg)))
 
         def change(current: dict[str, Any]) -> None:
             current["tool_call_ids"] = current["tool_call_ids"] + new_ids

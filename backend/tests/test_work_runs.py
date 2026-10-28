@@ -120,6 +120,29 @@ def test_run_manifest_contract_tracks_approval_and_interruption_states(cfg, conv
     assert stopped["run_manifest"]["state"] == "INTERRUPTED"
 
 
+def test_tool_feed_events_bind_to_the_hash_chained_audit_ledger(cfg, conversation):
+    run = _submit(conversation, "/status", cfg)
+    calls = list_tool_calls(cfg)["tool_calls"]
+    call = next(row for row in calls if row["run_id"] == run["run_id"])
+    before = list_run_events(run["run_id"], cfg=cfg)
+    before_views = [
+        event["data"]
+        for event in before
+        if event["type"] in {"tool_call", "approval_request"}
+    ]
+    assert before_views
+    assert all(view["audit_binding"]["chain_status"] == "TOOL_AUDIT_CHAIN_OK" for view in before_views)
+    assert all(view["audit_binding"]["latest_event_sha256"] for view in before_views)
+
+    approve_tool_call(call["tool_call_id"], cfg=cfg, expected_arguments_sha256=call["arguments_sha256"])
+    resume_waiting_run(run["run_id"], cfg)
+    after = list_run_events(run["run_id"], cfg=cfg)
+    result_views = [event["data"] for event in after if event["type"] == "tool_result"]
+    assert result_views
+    assert result_views[-1]["audit_binding"]["chain_status"] == "TOOL_AUDIT_CHAIN_OK"
+    assert result_views[-1]["audit_binding"]["latest_event_sha256"]
+
+
 def test_idempotent_resubmission_returns_the_original_run(cfg, conversation):
     first = submit_message(conversation, "How does source lineage work?", idempotency_key="client-key-0001", cfg=cfg)
     again = submit_message(conversation, "How does source lineage work?", idempotency_key="client-key-0001", cfg=cfg)

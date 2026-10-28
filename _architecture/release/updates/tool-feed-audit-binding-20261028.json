@@ -1,0 +1,28 @@
+{
+  "rows": {
+    "TGT-014": {
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/tools.py",
+        "backend/app/work_runs.py",
+        "backend/app/agent_tool_proposals.py",
+        "backend/app/model_router.py"
+      ],
+      "positive_gate": "backend/tests/test_work_runs.py::test_tool_feed_events_bind_to_the_hash_chained_audit_ledger",
+      "negative_gate": "backend/tests/test_tools.py::test_tool_runtime_requires_approval_before_execution",
+      "evidence_refs": [
+        "backend/tests/test_work_runs.py::test_tool_feed_events_bind_to_the_hash_chained_audit_ledger",
+        "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering",
+        "backend/tests/test_agent_tool_proposals.py::test_anthropic_tool_use_is_normalized_with_provenance"
+      ],
+      "state": "PROVISIONAL",
+      "notes": "Tool calls, provider-native proposals, approvals, starts, results, retries, and failures use the same allowlist/approval/audit runtime. Run-feed views now carry bounded audit chain status, latest event ID, and latest event SHA-256. Broader governance-node and hosted evidence remain open."
+    }
+  },
+  "dag": {
+    "N05": {
+      "state": "PROVISIONAL",
+      "notes": "Permission-aware tool runtime and provider-native proposal routing are unified; run-feed events bind to the hash-chained tool audit ledger. Full node promotion remains gated on broader benchmark/evidence closure."
+    }
+  }
+}
