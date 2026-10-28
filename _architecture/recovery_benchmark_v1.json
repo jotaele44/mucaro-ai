@@ -1,0 +1,44 @@
+{
+  "schema_version": "MUCARO_MATRIX016_RECOVERY/1.0",
+  "benchmark_id": "mucaro-matrix016-recovery-v1",
+  "purpose": "Bounded local recovery and offline-transition benchmark for the persisted conversation work-run state machine.",
+  "scenarios": [
+    {
+      "id": "process_restart",
+      "description": "A persisted RUNNING run is reconciled after executor loss and becomes INTERRUPTED exactly once."
+    },
+    {
+      "id": "waiting_resume",
+      "description": "A run waiting for approval survives reconciliation and completes after an explicit approval and resume."
+    },
+    {
+      "id": "fifo_idempotency",
+      "description": "Queued messages complete in queue order and a repeated idempotency key returns the original run."
+    },
+    {
+      "id": "partial_failure_retry",
+      "description": "A failed tool action creates a user decision and retry executes only the failed target once."
+    },
+    {
+      "id": "offline_transition",
+      "description": "Offline state blocks remote routing while retaining the deterministic local route."
+    }
+  ],
+  "thresholds": {
+    "min_pass_rate": 1.0,
+    "max_failed_scenarios": 0
+  },
+  "measurement": {
+    "store": "isolated temporary SQLite database",
+    "execution_mode": "inline deterministic work-run executor",
+    "clock": "application persistence timestamps",
+    "physical_restart": false
+  },
+  "claim_boundary": [
+    "This benchmark certifies the bounded local persistence and policy state machine only.",
+    "The process_restart case simulates lost executor state by changing the persisted RUNNING marker; it is not physical packaged-app restart evidence.",
+    "The offline_transition case uses explicit routing and capability policy; it does not certify a network firewall or a live remote-provider outage.",
+    "No hosted CI, production deployment, signing, notarization, native-device, or live-model claim is made by this receipt.",
+    "Threshold changes require a versioned benchmark revision and justification."
+  ]
+}

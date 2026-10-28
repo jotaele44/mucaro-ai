@@ -952,6 +952,21 @@ Provider selection, live-mode opt-in, offline routing, and mock fallback remain
 explicit CLI flags. Fleet execution does not bypass permissions or turn model
 output into implicit approval.
 
+### Recovery benchmark
+
+Run the frozen bounded local recovery/offline-transition benchmark with:
+
+```bash
+python3 scripts/certify_recovery.py \
+  --output data/exports/release_receipts/matrix016-recovery-HEAD.json
+```
+
+The receipt covers persisted process-restart reconciliation, waiting-run resume,
+FIFO/idempotent submission, targeted retry after a partial tool failure, and the
+offline provider-routing boundary. It is bound to the exact source head and is
+provisional evidence: physical packaged-app restart, real network interruption,
+and native-device recovery require separate runtime receipts.
+
 The equivalent read-only CLI surfaces are:
 
 ```bash

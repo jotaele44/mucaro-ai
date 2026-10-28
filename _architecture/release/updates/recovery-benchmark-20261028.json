@@ -1,0 +1,52 @@
+{
+  "rows": {
+    "MATRIX-016": {
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "_architecture/recovery_benchmark_v1.json",
+        "backend/app/recovery_benchmark.py",
+        "scripts/certify_recovery.py"
+      ],
+      "positive_gate": "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_passes_in_isolated_store",
+      "negative_gate": "backend/tests/test_recovery_benchmark.py::test_recovery_certification_fails_closed_on_missing_scenario",
+      "benchmark": "scripts/certify_recovery.py --output data/exports/release_receipts/matrix016-recovery-463a174ca8e1.json",
+      "evidence_refs": [
+        "_architecture/recovery_benchmark_v1.json",
+        "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_fixture_is_frozen_and_ordered",
+        "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_passes_in_isolated_store",
+        "backend/tests/test_agent_checkpoint_process_recovery.py",
+        "scripts/certify_recovery.py"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N21",
+      "notes": "Bounded local receipt passes 5/5 scenarios at source head 463a174ca8e1807f16d4136554f9d7d615c990db: process-restart reconciliation, waiting-run resume, FIFO/idempotency, partial-failure targeted retry, and offline routing transition. Physical packaged-app restart, real network interruption, and native/device recovery remain outside this receipt and keep MATRIX-016 provisional."
+    },
+    "TGT-019": {
+      "implementation_state": "PARTIAL",
+      "implementation_refs": [
+        "backend/app/offline.py",
+        "backend/app/model_routing_policy.py",
+        "backend/app/recovery_benchmark.py"
+      ],
+      "positive_gate": "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_passes_in_isolated_store",
+      "negative_gate": "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+      "benchmark": "scripts/certify_recovery.py --output data/exports/release_receipts/matrix016-recovery-463a174ca8e1.json",
+      "evidence_refs": [
+        "backend/tests/test_local_model.py::test_offline_manifest_classifies_every_capability_and_closes",
+        "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
+        "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_passes_in_isolated_store"
+      ],
+      "state": "PROVISIONAL",
+      "blocker_id": null,
+      "dag_node": "N21",
+      "notes": "Offline capability classification and explicit route transition now have a deterministic recovery-benchmark gate. Optional local-dependency absence remains separately classified; firewall-level network interruption and full UI/runtime offline transition evidence remain open."
+    }
+  },
+  "dag": {
+    "N21": {
+      "state": "PROVISIONAL",
+      "notes": "MATRIX-016 now has a frozen, isolated local recovery benchmark with a 5/5 receipt and positive/negative regression gates. N21 remains provisional because physical packaged-app restart, real network interruption, and broader offline/native evidence are not established by the local benchmark."
+    }
+  }
+}
