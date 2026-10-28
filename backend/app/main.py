@@ -313,7 +313,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 req.user_request,
                 source_commit=claimed_source_head,
                 features=req.features,
-                approval=req.operator_approval_recorded,
+                approval=False,
             )
             execution_plan = create_workbench_execution_plan(
                 req.profile,
@@ -327,7 +327,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         gate = analyze_task(
             req.user_request,
             inputs_available=req.inputs_available,
-            approval_state=req.approval_state,
+            approval_state="NOT_REQUESTED",
         )
         upsert_payload("execution_gates", "task_id", gate, cfg.sqlite_path)
 
