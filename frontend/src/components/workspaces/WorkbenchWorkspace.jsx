@@ -35,8 +35,6 @@ export function WorkbenchWorkspace({ announce }) {
           .map((item) => item.trim())
           .filter(Boolean),
         inputs_available: ["operator_ui"],
-        approval_state: "NOT_REQUESTED",
-        operator_approval_recorded: false,
         profile,
         network,
         hardware,
