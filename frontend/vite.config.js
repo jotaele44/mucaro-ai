@@ -6,7 +6,7 @@ import react from "@vitejs/plugin-react";
 const apiPaths = [
   "/health", "/config", "/security", "/models", "/offline-manifest", "/conversations", "/work-runs", "/interactions",
   "/tools", "/sources", "/chunks", "/ingest", "/ingest-path", "/permissions", "/memory", "/runs", "/exports",
-  "/workspaces", "/validate", "/plan", "/approve", "/ask",
+  "/workspaces", "/workbench", "/validate", "/plan", "/approve", "/ask",
 ];
 
 export default defineConfig({
