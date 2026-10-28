@@ -902,6 +902,7 @@ def _phase_answer(run: dict[str, Any], cfg: Settings) -> None:
             allow_live=bool(options.get("allow_live")),
             require_offline=bool(options.get("require_offline")),
             conversation_context=build_conversation_context(conversation),
+            conversation_scope_id=run["conversation_id"],
             cfg=cfg,
             on_text_delta=stream_delta,
         )

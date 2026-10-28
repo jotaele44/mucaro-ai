@@ -1204,12 +1204,18 @@ source evidence.
 
 ```bash
 mucaro memory remember "Prefer concise technical answers" --kind preference
+mucaro memory remember "Use this only in the current workspace" --kind instruction --scope workspace
+mucaro memory remember "Conversation-specific note" --kind fact --scope conversation --scope-id conv_abc123
 mucaro memory list --active-only --format text
 mucaro memory disable MEMORY_ID
 mucaro memory enable MEMORY_ID
 mucaro memory export --format json
 mucaro memory delete MEMORY_ID
 ```
+
+Memory scope is explicit at creation: `global` applies everywhere, `workspace` binds to the active stable `workspace_*` identifier when `--scope-id` is omitted, and `conversation` requires an explicit stable `conv_*` identifier. Scope is immutable after save; delete and recreate an item to retarget it. Legacy rows that predate scope are exposed as `global` without rewriting their frozen bytes until the row is later mutated.
+
+
 
 ## Security Profile
 

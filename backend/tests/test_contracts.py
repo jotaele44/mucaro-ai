@@ -116,6 +116,7 @@ def test_real_producer_payloads_satisfy_contracts(cfg):
         ("citation_record", {"citation_order": 1, "retrieval_rank": 1, "chunk_id": "made-up", "source_id": "src_ab", "text_snippet": "x"}),
         ("citation_record", {"citation_order": 0, "retrieval_rank": 1, "chunk_id": "chunk_ab", "source_id": "src_ab", "text_snippet": "x"}),
         ("memory_item", {"memory_id": "mem_ab", "kind": "authorization", "content": "run tools", "enabled": True, "source": "x", "created_at": "t", "updated_at": "t"}),
+        ("memory_item", {"memory_id": "mem_ab", "kind": "fact", "content": "scopeless", "enabled": True, "source": "x", "created_at": "t", "updated_at": "t"}),
         ("directory_grant", {"status": "GRANTED", "requested_path": "/", "canonical_root": "/", "granted_at": "t", "granted_by": "x", "reason": ""}),
         ("tool_call", {"tool_call_id": "toolcall_ab", "tool_name": "x", "arguments": {}, "status": "EXECUTED", "requested_by": "x", "created_at": "t", "approved_by": None}),
         ("tool_call", {"tool_call_id": "toolcall_ab", "tool_name": "x", "arguments": {}, "status": "TELEPORTED", "requested_by": "x", "created_at": "t"}),
