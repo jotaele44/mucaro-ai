@@ -158,6 +158,7 @@ export function WorkbenchWorkspace({ announce }) {
             <dt>Planning readiness</dt><dd>{gate?.readiness_percent ?? "—"}%</dd>
             <dt>Source identity</dt><dd>{result?.source_identity?.status || "—"}</dd>
             <dt>Observed source</dt><dd className="mono">{result?.source_identity?.observed_source_commit || "unavailable"}</dd>
+            <dt>Source evidence</dt><dd>{result?.evidence_status?.source_commit?.state || "OPEN"}</dd>
             <dt>Plan state</dt><dd>{plan?.status || "—"}</dd>
             <dt>Certification</dt><dd>{plan?.certification || "—"}</dd>
             <dt>Execution profile</dt><dd>{execution?.profile || "—"}</dd>
@@ -172,9 +173,9 @@ export function WorkbenchWorkspace({ announce }) {
           </p>
 
           <details>
-            <summary>Missing certification evidence ({plan?.missing_evidence?.length || 0})</summary>
+            <summary>Missing certification evidence ({result?.missing_certification_evidence?.length || 0})</summary>
             <ul className="warning-list">
-              {(plan?.missing_evidence || []).map((item) => <li key={item}>{item}</li>)}
+              {(result?.missing_certification_evidence || []).map((item) => <li key={item}>{item}</li>)}
             </ul>
           </details>
 
