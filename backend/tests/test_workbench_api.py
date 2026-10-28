@@ -6,7 +6,10 @@ from backend.app.main import create_app
 from backend.tests.test_api import make_settings
 
 
-def _client(tmp_path):
+def _client(tmp_path, *, source_head: str = "a" * 40):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir(exist_ok=True)
+    (git_dir / "HEAD").write_text(source_head + "\n", encoding="utf-8")
     return TestClient(create_app(make_settings(tmp_path)))
 
 
@@ -48,6 +51,11 @@ def test_workbench_plan_binds_existing_gate_and_never_executes(tmp_path):
     assert plan["features"] == ["GIS", "OCR"]
     assert plan["feature_count"] == 2
     assert plan["source_commit"] == "a" * 40
+    assert body["source_identity"] == {
+        "claimed_source_commit": "a" * 40,
+        "observed_source_commit": "a" * 40,
+        "status": "VERIFIED_MATCH",
+    }
     assert plan["status"] == "CANDIDATE_NOT_EXECUTION"
     assert plan["certification"] == "BLOCKED"
     assert plan["execution_authorized"] is False
@@ -101,3 +109,22 @@ def test_workbench_missing_source_identity_remains_explicit_residue(tmp_path):
     assert plan["source_commit"] is None
     assert "source_commit" in plan["missing_evidence"]
     assert plan["certification"] == "BLOCKED"
+
+
+def test_workbench_rejects_source_identity_mismatch(tmp_path):
+    response = _client(tmp_path).post(
+        "/workbench/plan",
+        json=_payload(source_commit="b" * 40),
+    )
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["status"] == "ERROR_WORKBENCH_SOURCE_IDENTITY_MISMATCH"
+    assert detail["claimed_source_commit"] == "b" * 40
+    assert detail["observed_source_commit"] == "a" * 40
+
+
+def test_workbench_rejects_claim_when_runtime_source_identity_is_unavailable(tmp_path):
+    client = TestClient(create_app(make_settings(tmp_path)))
+    response = client.post("/workbench/plan", json=_payload())
+    assert response.status_code == 422
+    assert response.json()["detail"]["status"] == "ERROR_WORKBENCH_SOURCE_IDENTITY_UNAVAILABLE"
