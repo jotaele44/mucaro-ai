@@ -290,6 +290,17 @@ def main() -> int:
         gate_command("gis_overlay_cli_parity", [sys.executable, "scripts/certify_gis_overlay_cli_parity.py"]),
         gate_command("ocr_v1_runtime_boundary", [sys.executable, "scripts/certify_ocr_v1_runtime.py", "--receipt"]),
         gate_command(
+            "matrix010_ingestion",
+            [
+                sys.executable,
+                "scripts/certify_matrix010_ingestion.py",
+                "--head-sha",
+                head_sha,
+                "--output-dir",
+                "data/exports/matrix010",
+            ],
+        ),
+        gate_command(
             "retrieval_eval_large",
             [
                 sys.executable,
