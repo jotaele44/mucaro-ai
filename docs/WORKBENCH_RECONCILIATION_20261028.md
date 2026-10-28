@@ -35,6 +35,7 @@ State: PROVISIONAL / AUDIT_ONLY. Never infer release or feature certification.
 - Imported workbench compilers remain PLAN_ONLY.
 - Runtime API and GUI consumer integration now exist, but they provide planning only: `/workbench/plan` cannot approve actions, enqueue a work run, execute tools, deploy, certify, or promote a skill.
 - Existing work_runs.py, execution_gate.py and model_router.py remain canonical. The adapter persists the existing execution-gate record and creates no parallel state authority.
+- The T00–T19 labels are not bound to an authoritative repository test catalog on this branch. The execution-plan adapter therefore marks the catalog `UNBOUND`, classifies every selected lane `UNRESOLVED_CATALOG`, and blocks all selected lanes rather than guessing model/test semantics.
 - No mandatory external provider is introduced by the imported Python modules.
 - Static inventory is AUDIT_ONLY, not proof of outbound-denial policy.
 - Full current-head CI, backend tests, Chromium/WebKit rendered QA and independent review remain OPEN until the exact new head passes; source presence is not certification.
