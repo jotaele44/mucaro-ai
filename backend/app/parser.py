@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import csv
+import hashlib
+import io
 import json
 import re
+import unicodedata
 import zipfile
 from email import policy
 from email.message import Message
@@ -166,7 +169,53 @@ def _base_result(path: Path, *, parser: str, mime_type: str, warnings: list[str]
     }
 
 
-def parse_file(path: Path) -> dict[str, Any]:
+def _canonical_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", text.replace("\r\n", "\n").replace("\r", "\n"))
+    return "\n".join(" ".join(line.split()) for line in normalized.split("\n")).strip()
+
+
+def _representation_evidence(path: Path, normalized_text: str) -> dict[str, Any]:
+    raw_bytes = path.read_bytes()
+    raw_text = raw_bytes.decode("utf-8", errors="replace")
+    canonical_text = _canonical_text(normalized_text)
+    return {
+        "raw": {
+            "sha256": hashlib.sha256(raw_bytes).hexdigest(),
+            "bytes": len(raw_bytes),
+            "decoded_utf8_sha256": hashlib.sha256(raw_text.encode("utf-8")).hexdigest(),
+        },
+        "normalized": {
+            "sha256": hashlib.sha256(normalized_text.encode("utf-8")).hexdigest(),
+            "chars": len(normalized_text),
+        },
+        "canonical": {
+            "sha256": hashlib.sha256(canonical_text.encode("utf-8")).hexdigest(),
+            "chars": len(canonical_text),
+        },
+        "canonicalization": "unicode_nfkc_line_endings_whitespace_v1",
+        "raw_byte_identity_preserved": True,
+        "raw_normalized_canonical_separated": True,
+        "utf8_replacement_count": raw_text.count("\ufffd"),
+    }
+
+
+def _with_representation_evidence(path: Path, result: dict[str, Any]) -> dict[str, Any]:
+    text = str(result.get("text") or "")
+    representation = _representation_evidence(path, text)
+    result["representation_evidence"] = representation
+    result["ingestion_evidence"] = {
+        "schema_version": "mucaro-ingestion-evidence/1.0",
+        "representation": representation,
+        "record_conservation": result.get(
+            "record_conservation",
+            {"mode": "NOT_APPLICABLE", "row_accounting_closed": True},
+        ),
+        "record_integrity": result.get("record_integrity", []),
+    }
+    return result
+
+
+def _parse_file_unannotated(path: Path) -> dict[str, Any]:
     mime = detect_mime(path)
     suffix = path.suffix.lower()
     try:
@@ -210,33 +259,107 @@ def parse_file(path: Path) -> dict[str, Any]:
         raise ParseError(f"PARSE_FAILED:{path.name}:{exc}") from exc
 
 
+def parse_file(path: Path) -> dict[str, Any]:
+    return _with_representation_evidence(path, _parse_file_unannotated(path))
+
+
 def _parse_csv(path: Path) -> dict[str, Any]:
-    sample = path.read_text(encoding="utf-8", errors="replace")[:8192]
+    raw_text = path.read_text(encoding="utf-8", errors="replace")
+    sample = raw_text[:8192]
     warnings: list[str] = []
     try:
         dialect = csv.Sniffer().sniff(sample) if sample else csv.excel
     except csv.Error:
         dialect = csv.excel
         warnings.append("CSV_DIALECT_SNIFF_FAILED")
-    rows: list[dict[str, str]] = []
-    with path.open("r", encoding="utf-8", errors="replace", newline="") as f:
-        reader = csv.DictReader(f, dialect=dialect)
-        headers = [str(header) for header in (reader.fieldnames or [])]
-        duplicate_headers = sorted({header for header in headers if headers.count(header) > 1})
-        if duplicate_headers:
-            warnings.append(f"CSV_DUPLICATE_HEADERS:{','.join(duplicate_headers)}")
-        for idx, row in enumerate(reader):
-            rows.append({str(k): "" if v is None else str(v) for k, v in row.items()})
-            if idx + 1 >= 5000:
-                warnings.append("CSV_ROWS_TRUNCATED:limit=5000")
-                break
-    if rows:
-        lines = [" | ".join(row.keys())]
-        for row in rows:
-            lines.append(" | ".join(f"{k}: {v}" for k, v in row.items()))
-        text = "\n".join(lines)
-    else:
-        text = path.read_text(encoding="utf-8", errors="replace")
+    all_rows: list[list[str]] = list(csv.reader(io.StringIO(raw_text), dialect=dialect))
+    input_row_count = len(all_rows)
+    rows = all_rows
+    truncated = input_row_count > 5000
+    if truncated:
+        rows = rows[:5000]
+        warnings.append("CSV_ROWS_TRUNCATED:limit=5000")
+    if not rows:
+        warnings.append("CSV_EMPTY_FILE_NO_ROWS")
+
+    def header_candidate(index: int) -> bool:
+        row = rows[index]
+        if len(row) < 2 or sum(bool(cell.strip()) for cell in row) < 2:
+            return False
+        if index + 1 >= len(rows):
+            return False
+        next_row = rows[index + 1]
+        if len(next_row) != len(row):
+            return False
+        return any(any(character.isalpha() for character in cell) for cell in row)
+
+    header_index = next((index for index in range(min(len(rows), 50)) if header_candidate(index)), None)
+    if header_index is None:
+        nonempty_index = next((index for index, row in enumerate(rows) if any(cell.strip() for cell in row)), None)
+        header_index = nonempty_index if nonempty_index is not None else 0
+        if rows:
+            warnings.append("CSV_HEADER_INFERRED_FIRST_NONEMPTY_ROW")
+    if header_index > 0:
+        warnings.append(f"CSV_PREAMBLE_DETECTED:rows={header_index}")
+
+    headers = [str(header) for header in (rows[header_index] if rows and header_index < len(rows) else [])]
+    data_rows = rows[header_index + 1 :] if rows and header_index < len(rows) else []
+    duplicate_headers = sorted({header for header in headers if headers.count(header) > 1})
+    if duplicate_headers:
+        warnings.append(f"CSV_DUPLICATE_HEADERS:{','.join(duplicate_headers)}")
+
+    normalized_headers = [unicodedata.normalize("NFC", header).strip() for header in headers]
+    canonical_headers = [_canonical_text(header).casefold() for header in normalized_headers]
+    duplicate_header_set = set(duplicate_headers)
+    display_headers: list[str] = []
+    header_occurrences: dict[str, int] = {}
+    for index, header in enumerate(headers):
+        base = header or f"column_{index + 1}"
+        header_occurrences[base] = header_occurrences.get(base, 0) + 1
+        suffix = f"__{header_occurrences[base]}" if header in duplicate_header_set else ""
+        display_headers.append(f"{base}{suffix}")
+
+    record_integrity: list[dict[str, Any]] = []
+    text_rows: list[str] = []
+    if headers:
+        text_rows.append(" | ".join(display_headers))
+    for offset, raw_row in enumerate(data_rows):
+        if len(raw_row) != len(headers):
+            warnings.append(f"CSV_RAGGED_ROW:row={header_index + offset + 2}:cells={len(raw_row)}:headers={len(headers)}")
+        padded = list(raw_row[: len(headers)]) + [""] * max(0, len(headers) - len(raw_row))
+        extras = list(raw_row[len(headers) :]) if len(raw_row) > len(headers) else []
+        normalized_row = [unicodedata.normalize("NFC", value).replace("\r\n", "\n").replace("\r", "\n") for value in padded]
+        canonical_row = [_canonical_text(value).casefold() for value in normalized_row]
+        raw_serialized = json.dumps(raw_row, ensure_ascii=False, separators=(",", ":"))
+        normalized_serialized = json.dumps(normalized_row, ensure_ascii=False, separators=(",", ":"))
+        canonical_serialized = json.dumps(canonical_row, ensure_ascii=False, separators=(",", ":"))
+        record_integrity.append(
+            {
+                "row_index": header_index + offset + 2,
+                "raw_cell_count": len(raw_row),
+                "normalized_cell_count": len(normalized_row),
+                "extra_cells": extras,
+                "raw_sha256": hashlib.sha256(raw_serialized.encode("utf-8")).hexdigest(),
+                "normalized_sha256": hashlib.sha256(normalized_serialized.encode("utf-8")).hexdigest(),
+                "canonical_sha256": hashlib.sha256(canonical_serialized.encode("utf-8")).hexdigest(),
+            }
+        )
+        text_rows.append(" | ".join(f"{display_headers[index]}: {value}" for index, value in enumerate(padded)))
+        if extras:
+            text_rows[-1] += " | " + " | ".join(f"__extra_{index + 1}: {value}" for index, value in enumerate(extras))
+    text = "\n".join(text_rows) if text_rows else raw_text
+    row_count = len(data_rows)
+    record_conservation = {
+        "mode": "TABULAR",
+        "input_row_count": input_row_count,
+        "header_row_index": header_index + 1 if rows else None,
+        "preamble_row_count": header_index if rows else 0,
+        "data_row_count": row_count,
+        "retained_row_count": row_count,
+        "excluded_row_count": max(0, input_row_count - len(rows)),
+        "truncated": truncated,
+        "row_accounting_closed": input_row_count == (header_index + 1 + row_count + max(0, input_row_count - len(rows))) if rows else input_row_count == 0,
+    }
     return {
         "text": text,
         **_base_result(
@@ -246,7 +369,13 @@ def _parse_csv(path: Path) -> dict[str, Any]:
             warnings=warnings,
             delimiter=getattr(dialect, "delimiter", ","),
             headers=headers,
-            row_count=len(rows),
+            normalized_headers=normalized_headers,
+            canonical_headers=canonical_headers,
+            header_row_index=header_index + 1 if rows else None,
+            preamble_row_count=header_index if rows else 0,
+            row_count=row_count,
+            record_conservation=record_conservation,
+            record_integrity=record_integrity,
         ),
     }
 

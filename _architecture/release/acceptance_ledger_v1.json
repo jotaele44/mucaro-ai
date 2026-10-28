@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-28T19:35:53Z",
+  "updated_utc": "2026-10-28T19:42:42Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -592,20 +592,25 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/file_signatures.py",
-        "backend/app/parser.py"
+        "backend/app/parser.py",
+        "backend/app/ingestion.py",
+        "backend/app/contracts.py",
+        "schemas/ingestion_evidence.schema.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_parser.py::test_csv_parser_detects_preamble_and_keeps_representation_evidence",
+      "negative_gate": "backend/tests/test_contracts.py::test_ingestion_evidence_rejects_tampered_row_accounting",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_ingestion_safety.py::test_mislabeled_and_executable_payloads_fail_closed"
+        "backend/tests/test_parser.py::test_csv_parser_records_delimiter_row_count_and_duplicate_headers",
+        "backend/tests/test_parser.py::test_csv_parser_detects_preamble_and_keeps_representation_evidence",
+        "backend/tests/test_ingestion_safety.py::test_mislabeled_and_executable_payloads_fail_closed",
+        "backend/tests/test_contracts.py::test_ingestion_evidence_rejects_tampered_row_accounting"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": "Container/signature/extension/MIME checks enforced; CSV header-location and preamble detection still assume the sniffed header row."
+      "notes": "CSV ingestion now records encoding-adjacent decode evidence, delimiter, preamble/header location, duplicate headers, ragged rows, row counts, and bounded conservation before source persistence. Archive/signature/MIME safety remains covered separately. Full schema/update-metadata and format-specific structural inspection across all supported formats remain open."
     },
     {
       "requirement_id": "INV-008",
@@ -613,17 +618,24 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/capability_contracts.py"
+        "backend/app/parser.py",
+        "backend/app/ingestion.py",
+        "backend/app/contracts.py",
+        "schemas/ingestion_evidence.schema.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_parser.py::test_csv_parser_detects_preamble_and_keeps_representation_evidence",
+      "negative_gate": "backend/tests/test_contracts.py::test_ingestion_evidence_rejects_tampered_row_accounting",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_parser.py::test_csv_parser_detects_preamble_and_keeps_representation_evidence",
+        "backend/tests/test_parser.py::test_ingest_source_manifest_includes_parser_evidence",
+        "backend/tests/test_contracts.py::test_ingestion_evidence_rejects_tampered_row_accounting"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": ""
+      "notes": "Every parsed file now carries raw byte identity, normalized text identity, canonical comparison identity, and an explicit canonicalization algorithm; CSV records additionally carry positional raw/normalized/canonical row digests. The raw source artifact remains authoritative. Full structured raw/normalized/canonical contracts for every supported format remain open."
     },
     {
       "requirement_id": "INV-009",
@@ -649,33 +661,46 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/gis_processing.py"
+        "backend/app/parser.py",
+        "backend/app/ingestion.py",
+        "schemas/ingestion_evidence.schema.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_parser.py::test_csv_parser_records_delimiter_row_count_and_duplicate_headers",
+      "negative_gate": "backend/tests/test_contracts.py::test_ingestion_evidence_rejects_tampered_row_accounting",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_parser.py::test_csv_parser_records_delimiter_row_count_and_duplicate_headers",
+        "backend/tests/test_parser.py::test_empty_csv_records_partial_parse_evidence",
+        "backend/tests/test_contracts.py::test_ingestion_evidence_rejects_tampered_row_accounting"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": ""
+      "notes": "CSV input, header, retained data, and truncated/excluded data counts close arithmetically. Empty files and truncation remain explicit partial states. This is bounded CSV evidence, not universal conservation proof for every parser or downstream transform."
     },
     {
       "requirement_id": "INV-011",
       "requirement_text": "Whole-record integrity",
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
-      "implementation_refs": [],
+      "implementation_refs": [
+        "backend/app/parser.py",
+        "backend/app/ingestion.py",
+        "schemas/ingestion_evidence.schema.json"
+      ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_parser.py::test_csv_parser_records_delimiter_row_count_and_duplicate_headers",
+      "negative_gate": "backend/tests/test_contracts.py::test_ingestion_evidence_rejects_tampered_row_accounting",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_parser.py::test_csv_parser_records_delimiter_row_count_and_duplicate_headers",
+        "backend/tests/test_parser.py::test_csv_parser_detects_preamble_and_keeps_representation_evidence"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": ""
+      "notes": "CSV records are retained positionally, duplicate headers receive deterministic occurrence labels, ragged rows preserve extra cells, and whole-row raw/normalized/canonical digests are emitted. Whole-record integrity remains format- and transform-specific beyond this CSV boundary."
     },
     {
       "requirement_id": "INV-012",
@@ -2013,27 +2038,28 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/ingestion_benchmark.py",
-        "_architecture/ingestion_benchmark_v1.json",
-        "backend/tests/test_matrix010_ingestion_benchmark.py",
-        "scripts/certify_matrix010_ingestion.py",
-        ".github/workflows/matrix010-ingestion-cert.yml",
-        "scripts/certify_release.py"
+        "backend/app/parser.py",
+        "backend/app/ingestion.py",
+        "backend/app/contracts.py",
+        "schemas/ingestion_evidence.schema.json",
+        "backend/tests/test_parser.py",
+        "backend/tests/test_ingestion.py",
+        "backend/tests/test_ingestion_safety.py"
       ],
       "dependencies": [],
-      "positive_gate": ".github/workflows/matrix010-ingestion-cert.yml",
-      "negative_gate": "backend/tests/test_matrix010_ingestion_benchmark.py",
+      "positive_gate": "backend/tests/test_parser.py::test_csv_parser_detects_preamble_and_keeps_representation_evidence",
+      "negative_gate": "backend/tests/test_parser.py::test_empty_csv_records_partial_parse_evidence",
       "benchmark": "_architecture/ingestion_benchmark_v1.json",
       "evidence_refs": [
-        "backend/tests/test_matrix010_ingestion_benchmark.py",
-        "scripts/certify_matrix010_ingestion.py",
-        ".github/workflows/matrix010-ingestion-cert.yml",
-        "scripts/certify_release.py"
+        "backend/tests/test_parser.py::test_csv_parser_records_delimiter_row_count_and_duplicate_headers",
+        "backend/tests/test_parser.py::test_csv_parser_detects_preamble_and_keeps_representation_evidence",
+        "backend/tests/test_parser.py::test_empty_csv_records_partial_parse_evidence",
+        "backend/tests/test_contracts.py::test_ingestion_evidence_rejects_tampered_row_accounting"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": "PROVISIONAL: committed benchmark, deterministic certifier, regression tests, and hosted workflow are present. Exact-head local receipts remain handoff artifacts outside the source package; hosted workflow execution and artifact retrieval for this head remain unverified."
+      "notes": "Local parser and ingestion evidence gates now include preamble/header, duplicate, empty, ragged, truncation, raw-byte, and contract-tamper cases. The committed benchmark and hosted workflow remain separate; current-head hosted artifact evidence is not available."
     },
     {
       "requirement_id": "MATRIX-011",

@@ -41,7 +41,7 @@ The Execution Gate is the workflow controller. It prevents premature execution b
 - Tool runtime records: `data/processed/tool_calls.json` stores current tool-call state; `data/processed/tool_audit_log.json` stores request, approval, denial, and execution audit events.
 - Source library controls: operators can reindex all chunks, inspect persisted index status, and delete managed sources while rebuilding the index from both the API/browser surface and the installed CLI.
 - Run history: `/runs`, `/runs/summary`, and `/runs/{run_id}` provide scan-friendly history plus full trace retrieval.
-- Parser evidence: source manifests include byte counts, parser warnings, parse status, and format metadata such as CSV delimiter/header/row counts.
+- Parser evidence: source manifests include byte counts, parser warnings, parse status, and format metadata such as CSV delimiter/header/row counts. The ingestion evidence contract keeps raw byte identity separate from normalized retrieval text and canonical comparison text. CSV parsing is positional rather than dictionary-based, records preamble/header location and duplicate-header labels, and persists whole-row raw/normalized/canonical digests with closed input/retained/excluded accounting. A truncation or malformed-row warning remains visible; it is never converted into an unqualified parse success.
 - Multimodal metadata boundary: image/audio/video ingestion records local media
   metadata and warnings as cited source chunks; semantic media understanding is
   deferred to a future model-backed adapter.

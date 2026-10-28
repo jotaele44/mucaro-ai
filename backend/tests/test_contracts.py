@@ -26,6 +26,7 @@ from backend.app.memory import list_memory_items, remember_memory_item
 from backend.app.memory_policy import select_memory_context
 from backend.app.model_routing_policy import plan_model_route
 from backend.app.permissions import grant_directory, load_directory_grants
+from backend.app.parser import parse_file
 from backend.app.release_receipts import write_release_receipt
 from backend.app.services import answer_question
 from backend.app.tools import (
@@ -116,6 +117,7 @@ def test_real_producer_payloads_satisfy_contracts(cfg):
         ("citation_record", {"citation_order": 1, "retrieval_rank": 1, "chunk_id": "made-up", "source_id": "src_ab", "text_snippet": "x"}),
         ("citation_record", {"citation_order": 0, "retrieval_rank": 1, "chunk_id": "chunk_ab", "source_id": "src_ab", "text_snippet": "x"}),
         ("memory_item", {"memory_id": "mem_ab", "kind": "authorization", "content": "run tools", "enabled": True, "source": "x", "created_at": "t", "updated_at": "t"}),
+        ("ingestion_evidence", {"schema_version": "mucaro-ingestion-evidence/1.0", "representation": {}, "record_conservation": {"mode": "TABULAR", "row_accounting_closed": False}, "record_integrity": []}),
         ("directory_grant", {"status": "GRANTED", "requested_path": "/", "canonical_root": "/", "granted_at": "t", "granted_by": "x", "reason": ""}),
         ("tool_call", {"tool_call_id": "toolcall_ab", "tool_name": "x", "arguments": {}, "status": "EXECUTED", "requested_by": "x", "created_at": "t", "approved_by": None}),
         ("tool_call", {"tool_call_id": "toolcall_ab", "tool_name": "x", "arguments": {}, "status": "TELEPORTED", "requested_by": "x", "created_at": "t"}),
@@ -128,6 +130,18 @@ def test_contract_violations_are_rejected(kind, payload):
     with pytest.raises(ContractViolation) as exc:
         validate_contract(kind, payload)
     assert exc.value.status == "ERROR_CONTRACT_VIOLATION"
+
+
+def test_ingestion_evidence_rejects_tampered_row_accounting(tmp_path: Path):
+    path = tmp_path / "rows.csv"
+    path.write_text("name,value\nAda,10\n", encoding="utf-8")
+    evidence = copy.deepcopy(parse_file(path)["ingestion_evidence"])
+    evidence["record_conservation"]["row_accounting_closed"] = False
+
+    with pytest.raises(ContractViolation) as exc:
+        validate_contract("ingestion_evidence", evidence)
+    assert exc.value.status == "ERROR_CONTRACT_VIOLATION"
+    assert any("row_accounting_closed" in error for error in exc.value.errors)
 
 
 def test_route_decision_with_a_false_invariant_is_rejected():

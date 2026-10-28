@@ -22,6 +22,7 @@ SCHEMA_DIR_NAME = "schemas"
 # record kind -> schema filename
 RECORD_SCHEMAS: dict[str, str] = {
     "source_manifest": "source_manifest.schema.json",
+    "ingestion_evidence": "ingestion_evidence.schema.json",
     "provenance_record": "provenance_record.schema.json",
     "directory_grant": "directory_grant.schema.json",
     "capability_policy": "capability_policy.schema.json",
@@ -48,7 +49,7 @@ RECORD_SCHEMAS: dict[str, str] = {
 
 # TGT-016 canonical contract family -> record kinds that implement it.
 CONTRACT_FAMILIES: dict[str, tuple[str, ...]] = {
-    "SOURCE": ("source_manifest",),
+    "SOURCE": ("source_manifest", "ingestion_evidence"),
     "PERMISSION": ("directory_grant", "capability_policy", "permission_decision", "permission_lease", "tool_call", "tool_audit_event"),
     "EXECUTION": ("execution_contract", "run_manifest", "agent_checkpoint", "tool_call"),
     "PROVENANCE": ("provenance_record", "runtime_identity"),

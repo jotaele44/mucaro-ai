@@ -67,6 +67,7 @@ def ingest_file(path: Path, cfg: Settings = settings, *, source_kind: str = "LOC
     if path.resolve() != target.resolve():
         shutil.copy2(path, target)
     parse_result = parse_file(target)
+    validate_contract("ingestion_evidence", parse_result["ingestion_evidence"])
     warnings = list(parse_result.get("warnings", []))
     text = str(parse_result.get("text", ""))
     injection_scan = scan_text(text)

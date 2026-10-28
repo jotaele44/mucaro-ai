@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mucaro-ai.local/schemas/ingestion_evidence.schema.json",
+  "title": "Mucaro Ingestion Evidence 1.0",
+  "description": "Bounded raw/normalized/canonical representation and record-accounting evidence emitted before a source manifest is persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "representation", "record_conservation", "record_integrity"],
+  "properties": {
+    "schema_version": {"const": "mucaro-ingestion-evidence/1.0"},
+    "representation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw", "normalized", "canonical", "canonicalization", "raw_byte_identity_preserved", "raw_normalized_canonical_separated"],
+      "properties": {
+        "raw": {
+          "type": "object",
+          "required": ["sha256", "bytes", "decoded_utf8_sha256"],
+          "properties": {
+            "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+            "bytes": {"type": "integer", "minimum": 0},
+            "decoded_utf8_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+          }
+        },
+        "normalized": {
+          "type": "object",
+          "required": ["sha256", "chars"],
+          "properties": {
+            "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+            "chars": {"type": "integer", "minimum": 0}
+          }
+        },
+        "canonical": {
+          "type": "object",
+          "required": ["sha256", "chars"],
+          "properties": {
+            "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+            "chars": {"type": "integer", "minimum": 0}
+          }
+        },
+        "canonicalization": {"type": "string", "minLength": 1},
+        "raw_byte_identity_preserved": {"const": true},
+        "raw_normalized_canonical_separated": {"const": true},
+        "utf8_replacement_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "record_conservation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["mode", "row_accounting_closed"],
+      "properties": {
+        "mode": {"enum": ["TABULAR", "NOT_APPLICABLE"]},
+        "row_accounting_closed": {"const": true},
+        "input_row_count": {"type": ["integer", "null"], "minimum": 0},
+        "header_row_index": {"type": ["integer", "null"], "minimum": 1},
+        "preamble_row_count": {"type": ["integer", "null"], "minimum": 0},
+        "data_row_count": {"type": ["integer", "null"], "minimum": 0},
+        "retained_row_count": {"type": ["integer", "null"], "minimum": 0},
+        "excluded_row_count": {"type": ["integer", "null"], "minimum": 0},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "record_integrity": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["row_index", "raw_cell_count", "normalized_cell_count", "extra_cells", "raw_sha256", "normalized_sha256", "canonical_sha256"],
+        "properties": {
+          "row_index": {"type": "integer", "minimum": 1},
+          "raw_cell_count": {"type": "integer", "minimum": 0},
+          "normalized_cell_count": {"type": "integer", "minimum": 0},
+          "extra_cells": {"type": "array", "items": {"type": "string"}},
+          "raw_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "normalized_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "canonical_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        }
+      }
+    }
+  }
+}

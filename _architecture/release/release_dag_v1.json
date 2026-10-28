@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-10-28T19:35:53Z",
+  "updated_utc": "2026-10-28T19:42:42Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -187,7 +187,7 @@
         "N02",
         "N03"
       ],
-      "state": "OPEN",
+      "state": "PROVISIONAL",
       "risk": "HIGH",
       "user_value": "HIGH",
       "downstream_unlock_value": "MEDIUM",
@@ -196,7 +196,7 @@
         "file-ingestion benchmark"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "Ingestion evidence control is implemented at the parser and source-persistence boundary for bounded CSV semantics, with raw/normalized/canonical representation hashes and closed row accounting. N07 remains provisional pending complete format-specific schema/update metadata, broader whole-record conservation, and current-head hosted evidence."
     },
     {
       "node_id": "N08",
