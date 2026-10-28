@@ -58,6 +58,10 @@ def test_workbench_plan_binds_existing_gate_and_never_executes(tmp_path):
     assert execution["certification"] == "BLOCKED"
     assert len(execution["lanes"]) == 20
     assert execution["platforms"] == ["linux", "macos"]
+    assert execution["catalog_status"] == "UNBOUND"
+    assert execution["catalog_ref"] is None
+    assert execution["blocked_lanes"] == execution["lanes"]
+    assert all(state == "UNRESOLVED_CATALOG" for _, state in execution["lane_status"])
 
     runs = client.get("/work-runs?limit=20")
     assert runs.status_code == 200
