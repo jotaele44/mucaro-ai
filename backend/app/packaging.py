@@ -651,7 +651,11 @@ def build_release_artifacts(
     output_dir: Path | None = None,
     allow_dirty: bool = False,
 ) -> dict[str, Any]:
-    output_dir = output_dir or root / "data" / "exports" / "packages"
+    root = root.resolve()
+    output_dir = Path(output_dir or root / "data" / "exports" / "packages").expanduser()
+    if not output_dir.is_absolute():
+        output_dir = root / output_dir
+    output_dir = output_dir.resolve()
     checks: list[dict[str, str]] = []
     package_status = build_package_status(root)
     failed_package_checks = [check for check in package_status["checks"] if check["status"] == "FAIL"]

@@ -2339,6 +2339,22 @@ def test_cli_package_build_writes_source_artifact_manifest(tmp_path: Path, capsy
     assert verify_checks["archive_member_hashes"]["status"] == "PASS"
 
 
+def test_cli_package_build_relative_output_is_verifiable(tmp_path: Path, monkeypatch, capsys):
+    cfg = make_settings(tmp_path)
+    write_package_fixture(tmp_path)
+    commit_fixture_repo(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["package", "build", "--output-dir", "relative-artifacts", "--format", "json"], cfg=cfg) == 0
+    payload = json.loads(capsys.readouterr().out)
+    manifest = Path(payload["manifest"]["path"])
+
+    assert manifest.is_absolute()
+    assert main(["package", "verify", str(manifest), "--require-current-head", "--format", "json"], cfg=cfg) == 0
+    verification = json.loads(capsys.readouterr().out)
+    assert verification["status"] == "PACKAGE_ARTIFACT_VERIFIED"
+
+
 def test_cli_package_distribution_manifest_builds_and_verifies_current_head_handoff(tmp_path: Path, capsys):
     cfg = make_settings(tmp_path)
     write_package_fixture(tmp_path)
