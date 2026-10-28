@@ -502,7 +502,13 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.getByLabel("Objective").fill("Reconcile a bounded local-first workbench");
   await page.getByLabel("Capability scope").fill("GIS, OCR, coding");
   await page.getByRole("button", { name: "Compile plan" }).click();
-  await page.getByText("WORKBENCH_PLAN_READY").waitFor();
+  const workbenchStatus = page.getByText("WORKBENCH_PLAN_READY", { exact: true });
+  await workbenchStatus.waitFor();
+  check(
+    "workbench plan-ready status is visually neutral, not a certification PASS",
+    viewport,
+    !(await workbenchStatus.getAttribute("class") || "").includes("status-completed"),
+  );
   check(
     "workbench compiles a plan without execution authority",
     viewport,
@@ -516,7 +522,8 @@ async function scenario(browser, base, viewport, contextOptions) {
     (await page.getByText("BLOCKED", { exact: true }).count()) >= 1 &&
       (await page.getByText(/Missing certification evidence/).count()) === 1 &&
       (await page.getByText("UNBOUND", { exact: true }).count()) === 1 &&
-      (await page.getByText("20 / 20", { exact: true }).count()) === 1,
+      (await page.getByText("20 / 20", { exact: true }).count()) === 1 &&
+      (await page.getByText("NOT_CLAIMED", { exact: true }).count()) === 1,
   );
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "16b-workbench");
