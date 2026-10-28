@@ -158,6 +158,8 @@ export function WorkbenchWorkspace({ announce }) {
             <dt>Plan state</dt><dd>{plan?.status || "—"}</dd>
             <dt>Certification</dt><dd>{plan?.certification || "—"}</dd>
             <dt>Execution profile</dt><dd>{execution?.profile || "—"}</dd>
+            <dt>Lane catalog</dt><dd>{execution?.catalog_status || "—"}</dd>
+            <dt>Blocked lanes</dt><dd>{execution?.blocked_lanes?.length ?? "—"} / {execution?.lanes?.length ?? "—"}</dd>
             <dt>Execution-plan state</dt><dd>{execution?.state || "—"}</dd>
             <dt>Plan SHA-256</dt><dd className="mono">{plan?.plan_sha256 || "—"}</dd>
           </dl>
@@ -188,7 +190,14 @@ export function WorkbenchWorkspace({ announce }) {
 
           <details>
             <summary>Execution lanes ({execution?.lanes?.length || 0})</summary>
-            <p className="mono small">{(execution?.lanes || []).join(" · ")}</p>
+            <p className="muted small">
+              {execution?.catalog_status === "UNBOUND"
+                ? "T00–T19 are planning labels only until an authoritative catalog is bound; no lane is executable from this Workbench."
+                : "Lane identities are bound to the declared catalog."}
+            </p>
+            <ul className="warning-list">
+              {(execution?.lane_status || []).map(([lane, state]) => <li key={lane}><span className="mono">{lane}</span> · {state}</li>)}
+            </ul>
           </details>
         </div>
       )}
