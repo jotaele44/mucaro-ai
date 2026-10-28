@@ -455,6 +455,30 @@ def test_api_memory_controls_are_explicit_and_user_managed(tmp_path: Path):
     assert deleted.json()["remaining_memories"] == 0
 
 
+def test_api_memory_scope_is_persisted_and_missing_scoped_id_is_rejected(tmp_path: Path):
+    client = make_client(tmp_path)
+
+    rejected = client.post(
+        "/memory",
+        json={"kind": "fact", "content": "Conversation-only context.", "scope": "conversation"},
+    )
+    assert rejected.status_code == 400
+    assert rejected.json()["detail"]["status"] == "ERROR_MEMORY_SCOPE_ID_REQUIRED"
+
+    saved = client.post(
+        "/memory",
+        json={
+            "kind": "fact",
+            "content": "Conversation-only context.",
+            "scope": "conversation",
+            "scope_id": "conversation-a",
+        },
+    )
+    assert saved.status_code == 200
+    assert saved.json()["memory"]["scope"] == "conversation"
+    assert saved.json()["memory"]["scope_id"] == "conversation-a"
+
+
 def test_api_memory_mutations_require_operator_auth_when_enabled(tmp_path: Path):
     client = make_client(tmp_path, operator_token="secret-token")
 
@@ -608,6 +632,44 @@ def test_api_conversation_persists_cited_chat_turns(tmp_path: Path):
     )
     assert missing.status_code == 404
     assert missing.json()["detail"]["status"] == "ERROR_CONVERSATION_NOT_FOUND"
+
+
+def test_api_conversation_ask_binds_memory_to_route_conversation(tmp_path: Path):
+    client = make_client(tmp_path)
+    ingest = client.post(
+        "/ingest",
+        files={"upload": ("source.md", b"Source lineage requires cited chunk IDs and source IDs.", "text/markdown")},
+    )
+    assert ingest.status_code == 200
+    first_id = client.post("/conversations", json={"title": "First"}).json()["conversation_id"]
+    second_id = client.post("/conversations", json={"title": "Second"}).json()["conversation_id"]
+
+    first_memory = client.post(
+        "/memory",
+        json={"kind": "fact", "content": "First conversation context.", "scope": "conversation", "scope_id": first_id},
+    )
+    second_memory = client.post(
+        "/memory",
+        json={"kind": "fact", "content": "Second conversation context.", "scope": "conversation", "scope_id": second_id},
+    )
+    assert first_memory.status_code == 200
+    assert second_memory.status_code == 200
+
+    ask = client.post(
+        f"/conversations/{first_id}/ask",
+        json={
+            "query": "What does source lineage require?",
+            "retrieval_strategy": "persistent",
+            "model_provider": "mock",
+            "memory_scope": "conversation",
+            "memory_scope_id": second_id,
+        },
+    )
+    assert ask.status_code == 200
+    answer = ask.json()["answer"]
+    assert answer["memory_context_count"] == 1
+    assert answer["memory_ids"] == [first_memory.json()["memory"]["memory_id"]]
+    assert second_memory.json()["memory"]["memory_id"] not in answer["memory_ids"]
 
 
 def test_api_conversation_rename_and_delete_preserve_runs(tmp_path: Path):

@@ -39,6 +39,8 @@ def answer_question(
     on_text_delta: Callable[[str], None] | None = None,
     checkpoint_id: str | None = None,
     failover_policy: FailoverPolicy | None = None,
+    memory_scope: str = "global",
+    memory_scope_id: str | None = None,
 ) -> dict[str, Any]:
     normalized_query = query.strip()
     if not normalized_query:
@@ -59,7 +61,12 @@ def answer_question(
         return retrieval
     retrieved = retrieval["retrieved_chunks"]
     try:
-        memory_selection = select_memory_context(cfg, items=memory_context)
+        memory_selection = select_memory_context(
+            cfg,
+            items=memory_context,
+            scope=memory_scope,
+            scope_id=memory_scope_id,
+        )
     except MemorySelectionError as exc:
         return {
             "status": exc.status,

@@ -327,6 +327,8 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("--allow-mock-fallback", action="store_true", help="Permit explicit offline mock fallback when the selected route is unavailable.")
     ask.add_argument("--allow-live", action="store_true", help="Explicitly allow a live model provider route.")
     ask.add_argument("--require-offline", action="store_true", help="Require an offline model route.")
+    ask.add_argument("--memory-scope", choices=["global", "workspace", "conversation"], default="global", help="Memory visibility scope.")
+    ask.add_argument("--memory-scope-id", help="Required for workspace or conversation memory scope.")
     ask.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     ask.add_argument("--no-persist", action="store_true", help="Do not write the run to SQLite.")
     ask.set_defaults(handler=run_ask)
@@ -1382,6 +1384,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="preference",
         help="Memory item type.",
     )
+    memory_remember.add_argument(
+        "--scope",
+        choices=["global", "workspace", "conversation"],
+        default="global",
+        help="Memory visibility scope.",
+    )
+    memory_remember.add_argument("--scope-id", help="Required for workspace or conversation scope.")
     memory_remember.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     memory_remember.set_defaults(handler=run_memory_remember)
 
@@ -3358,6 +3367,8 @@ def run_ask(args: argparse.Namespace, cfg: Settings) -> int:
         allow_mock_fallback=args.allow_mock_fallback,
         allow_live=args.allow_live,
         require_offline=args.require_offline,
+        memory_scope=args.memory_scope,
+        memory_scope_id=args.memory_scope_id,
         cfg=cfg,
         persist=not args.no_persist,
     )
@@ -8740,6 +8751,8 @@ def run_conversations_ask(args: argparse.Namespace, cfg: Settings) -> int:
         allow_mock_fallback=args.allow_mock_fallback,
         allow_live=args.allow_live,
         require_offline=args.require_offline,
+        memory_scope="conversation",
+        memory_scope_id=args.conversation_id,
         conversation_context=build_conversation_context(conversation),
         cfg=cfg,
     )
@@ -9233,7 +9246,14 @@ def run_memory_list(args: argparse.Namespace, cfg: Settings) -> int:
 
 def run_memory_remember(args: argparse.Namespace, cfg: Settings) -> int:
     try:
-        result = remember_memory_item(" ".join(args.content), cfg, kind=args.kind, source="cli")
+        result = remember_memory_item(
+            " ".join(args.content),
+            cfg,
+            kind=args.kind,
+            source="cli",
+            scope=args.scope,
+            scope_id=args.scope_id,
+        )
     except MemoryError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2

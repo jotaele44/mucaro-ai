@@ -64,3 +64,31 @@ def test_invalid_limits_and_kinds_fail_closed() -> None:
     with pytest.raises(MemorySelectionError) as kind:
         select_memory_context(items=rows(), allowed_kinds=["secret"])
     assert kind.value.status == "ERROR_MEMORY_SELECTION_KIND"
+
+
+def test_scope_selection_is_explicit_and_cross_scope_rows_are_excluded() -> None:
+    scoped_rows = [
+        {"memory_id": "global", "kind": "fact", "content": "Global context.", "enabled": True, "source": "test"},
+        {"memory_id": "conv-a", "kind": "fact", "content": "Conversation A context.", "enabled": True, "source": "test", "scope": "conversation", "scope_id": "a"},
+        {"memory_id": "conv-b", "kind": "fact", "content": "Conversation B context.", "enabled": True, "source": "test", "scope": "conversation", "scope_id": "b"},
+        {"memory_id": "workspace-a", "kind": "fact", "content": "Workspace A context.", "enabled": True, "source": "test", "scope": "workspace", "scope_id": "a"},
+    ]
+
+    global_report = select_memory_context(items=scoped_rows)
+    assert global_report["selected_memory_ids"] == ["global"]
+    assert {row["memory_id"] for row in global_report["excluded"] if row["reason"] == "SCOPE_NOT_ELIGIBLE"} == {
+        "conv-a",
+        "conv-b",
+        "workspace-a",
+    }
+
+    conversation_report = select_memory_context(items=scoped_rows, scope="conversation", scope_id="a")
+    assert conversation_report["selected_memory_ids"] == ["global", "conv-a"]
+    assert all(conversation_report["invariants"].values())
+    assert any(row["memory_id"] == "conv-b" and row["reason"] == "SCOPE_NOT_ELIGIBLE" for row in conversation_report["excluded"])
+
+
+def test_scoped_selection_requires_a_scope_id() -> None:
+    with pytest.raises(MemorySelectionError) as exc:
+        select_memory_context(items=rows(), scope="conversation")
+    assert exc.value.status == "ERROR_MEMORY_SCOPE_ID_REQUIRED"

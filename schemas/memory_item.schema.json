@@ -13,8 +13,13 @@
     "enabled": {"type": "boolean"},
     "source": {"type": "string", "minLength": 1},
     "scope": {"enum": ["global", "workspace", "conversation"]},
-    "scope_id": {"type": ["string", "null"]},
+    "scope_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 200},
     "created_at": {"type": "string", "minLength": 1},
     "updated_at": {"type": "string", "minLength": 1}
-  }
+  },
+  "allOf": [
+    {"if": {"required": ["scope"], "properties": {"scope": {"const": "workspace"}}}, "then": {"required": ["scope_id"]}},
+    {"if": {"required": ["scope"], "properties": {"scope": {"const": "conversation"}}}, "then": {"required": ["scope_id"]}},
+    {"if": {"required": ["scope"], "properties": {"scope": {"const": "global"}}}, "then": {"properties": {"scope_id": {"type": "null"}}}}
+  ]
 }

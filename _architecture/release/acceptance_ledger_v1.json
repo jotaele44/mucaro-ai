@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-28T19:16:11Z",
+  "updated_utc": "2026-10-28T19:35:53Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -869,19 +869,26 @@
       "requirement_id": "INV-021",
       "requirement_text": "Memory authority",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/app/memory.py"
+        "backend/app/memory.py",
+        "backend/app/memory_policy.py",
+        "backend/app/services.py",
+        "backend/app/main.py",
+        "schemas/memory_item.schema.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_memory_policy.py::test_scope_selection_is_explicit_and_cross_scope_rows_are_excluded",
+      "negative_gate": "backend/tests/test_memory_policy.py::test_scoped_selection_requires_a_scope_id",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_memory_policy.py::test_scope_selection_is_explicit_and_cross_scope_rows_are_excluded",
+        "backend/tests/test_api.py::test_api_memory_scope_is_persisted_and_missing_scoped_id_is_rejected"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N14",
-      "notes": ""
+      "notes": "Memory rows now persist explicit global, workspace, or conversation scope. Selection defaults to global-only, includes only the requested matching scope, preserves legacy rows as global, and accounts for excluded rows. Broader memory authority and hosted/current-head evidence remain open."
     },
     {
       "requirement_id": "INV-022",
@@ -1199,20 +1206,29 @@
       "requirement_id": "TGT-013",
       "requirement_text": "Explicit memory",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/memory.py",
-        "backend/app/memory_policy.py"
+        "backend/app/memory_policy.py",
+        "backend/app/models.py",
+        "backend/app/cli.py",
+        "backend/app/main.py",
+        "schemas/memory_item.schema.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_api.py::test_api_memory_scope_is_persisted_and_missing_scoped_id_is_rejected",
+      "negative_gate": "backend/tests/test_memory_policy.py::test_scope_selection_is_explicit_and_cross_scope_rows_are_excluded",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_api.py::test_api_memory_scope_is_persisted_and_missing_scoped_id_is_rejected",
+        "backend/tests/test_api.py::test_api_conversation_ask_binds_memory_to_route_conversation",
+        "backend/tests/test_memory_policy.py::test_scope_selection_is_explicit_and_cross_scope_rows_are_excluded",
+        "backend/tests/test_contracts.py::test_real_producer_payloads_satisfy_contracts"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N14",
-      "notes": "Memory has no scope."
+      "notes": "Explicit memory is now operator-controlled and scope-aware across persistence, API, CLI, generic ask, and conversation ask paths. Conversation routes bind selection to the route conversation ID. Full authority semantics and release-wide evidence remain open."
     },
     {
       "requirement_id": "TGT-014",
@@ -2076,19 +2092,24 @@
       "requirement_id": "MATRIX-013",
       "requirement_text": "Memory benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/tests/test_memory_policy.py"
+        "backend/tests/test_memory_policy.py",
+        "schemas/memory_selection.schema.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_memory_policy.py::test_scope_selection_is_explicit_and_cross_scope_rows_are_excluded",
+      "negative_gate": "backend/tests/test_memory_policy.py::test_scoped_selection_requires_a_scope_id",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "backend/tests/test_memory_policy.py::test_selection_excludes_disabled_and_duplicate_content",
+        "backend/tests/test_memory_policy.py::test_scope_selection_is_explicit_and_cross_scope_rows_are_excluded",
+        "backend/tests/test_memory_policy.py::test_scoped_selection_requires_a_scope_id"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N14",
-      "notes": ""
+      "notes": "The memory benchmark now covers deterministic bounds, deduplication, disabled rows, global-only defaults, matching conversation scope, cross-scope exclusion, and missing scope IDs. A broader benchmark and hosted/current-head evidence remain open."
     },
     {
       "requirement_id": "MATRIX-014",

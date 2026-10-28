@@ -14,6 +14,8 @@ class AskRequest(BaseModel):
     allow_mock_fallback: bool = False
     allow_live: bool = False
     require_offline: bool = False
+    memory_scope: Literal["global", "workspace", "conversation"] = "global"
+    memory_scope_id: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class ConversationCreateRequest(BaseModel):
@@ -40,6 +42,8 @@ class WorkspaceProfileRequest(BaseModel):
 class MemoryCreateRequest(BaseModel):
     content: str = Field(min_length=1, max_length=800)
     kind: Literal["preference", "profile", "instruction", "fact"] = "preference"
+    scope: Literal["global", "workspace", "conversation"] = "global"
+    scope_id: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class MemoryUpdateRequest(BaseModel):

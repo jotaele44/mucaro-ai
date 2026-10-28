@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-dag/1.0",
-  "updated_utc": "2026-10-28T19:16:11Z",
+  "updated_utc": "2026-10-28T19:35:53Z",
   "nodes": [
     {
       "node_id": "N00",
@@ -346,7 +346,7 @@
       "dependencies": [
         "N03"
       ],
-      "state": "OPEN",
+      "state": "PROVISIONAL",
       "risk": "MEDIUM",
       "user_value": "MEDIUM",
       "downstream_unlock_value": "LOW",
@@ -355,7 +355,7 @@
         "memory benchmark"
       ],
       "blocker": null,
-      "notes": ""
+      "notes": "Scope-aware memory persistence and selection are implemented with positive and negative local regression gates. N14 remains provisional pending broader memory-authority semantics, benchmark expansion, and release-wide evidence closure."
     },
     {
       "node_id": "N15",

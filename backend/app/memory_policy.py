@@ -4,7 +4,7 @@ import hashlib
 import json
 from typing import Any
 
-from .memory import MEMORY_KINDS, active_memory_context
+from .memory import MEMORY_KINDS, MemoryError, active_memory_context, normalize_memory_scope
 from .config import Settings, settings
 from .contracts import validate_contract
 
@@ -37,11 +37,17 @@ def select_memory_context(
     allowed_kinds: list[str] | None = None,
     max_items: int = DEFAULT_MAX_ITEMS,
     max_chars: int = DEFAULT_MAX_CHARS,
+    scope: str = "global",
+    scope_id: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(max_items, int) or isinstance(max_items, bool) or max_items <= 0:
         raise MemorySelectionError("ERROR_MEMORY_SELECTION_MAX_ITEMS", "max_items must be a positive integer")
     if not isinstance(max_chars, int) or isinstance(max_chars, bool) or max_chars <= 0:
         raise MemorySelectionError("ERROR_MEMORY_SELECTION_MAX_CHARS", "max_chars must be a positive integer")
+    try:
+        resolved_scope, resolved_scope_id = normalize_memory_scope(scope, scope_id)
+    except MemoryError as exc:
+        raise MemorySelectionError(exc.status, exc.detail) from exc
 
     if allowed_kinds is None:
         kinds = sorted(MEMORY_KINDS)
@@ -69,8 +75,16 @@ def select_memory_context(
         memory_id = row.get("memory_id")
         kind = str(row.get("kind") or "").strip().lower()
         content = _normalize_content(row.get("content"))
+        try:
+            row_scope, row_scope_id = normalize_memory_scope(row.get("scope"), row.get("scope_id"))
+        except MemoryError:
+            excluded.append({"memory_id": memory_id, "reason": "INVALID_SCOPE"})
+            continue
         if row.get("enabled") is not True:
             excluded.append({"memory_id": memory_id, "reason": "DISABLED"})
+            continue
+        if row_scope != "global" and (row_scope != resolved_scope or row_scope_id != resolved_scope_id):
+            excluded.append({"memory_id": memory_id, "reason": "SCOPE_NOT_ELIGIBLE", "scope": row_scope})
             continue
         if kind not in kinds:
             excluded.append({"memory_id": memory_id, "reason": "KIND_NOT_ALLOWED"})
@@ -97,6 +111,8 @@ def select_memory_context(
                 "kind": kind,
                 "content": content,
                 "source": row.get("source"),
+                "scope": row_scope,
+                "scope_id": row_scope_id,
                 "created_at": row.get("created_at"),
                 "updated_at": row.get("updated_at"),
                 "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
@@ -109,6 +125,8 @@ def select_memory_context(
         "allowed_kinds": kinds,
         "max_items": max_items,
         "max_chars": max_chars,
+        "scope": resolved_scope,
+        "scope_id": resolved_scope_id,
         "source_count": len(source_rows),
         "selected_count": len(accepted),
         "excluded_count": len(excluded),
@@ -122,6 +140,11 @@ def select_memory_context(
             "character_limit_honored": char_count <= max_chars,
             "all_selected_enabled": True,
             "all_selected_kinds_allowed": all(row["kind"] in kinds for row in accepted),
+            "all_selected_scope_eligible": all(
+                row["scope"] == "global"
+                or (row["scope"] == resolved_scope and row["scope_id"] == resolved_scope_id)
+                for row in accepted
+            ),
             "selected_content_unique_by_kind": len({(row["kind"], row["content"].casefold()) for row in accepted}) == len(accepted),
         },
         "limitations": [
@@ -134,6 +157,7 @@ def select_memory_context(
             "duplicate normalized content within the same kind is included at most once",
             "selected context never exceeds declared item or character ceilings",
             "memory context must not be promoted into cited source evidence",
+            "scoped memory must not cross workspace or conversation boundaries",
         ],
     }
     payload["selection_sha256"] = _stable_hash(payload)

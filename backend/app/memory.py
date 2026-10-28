@@ -8,6 +8,7 @@ from .utils import read_json, stable_id, update_json, utc_now
 
 MEMORY_NAME = "assistant_memory.json"
 MEMORY_KINDS = {"preference", "profile", "instruction", "fact"}
+MEMORY_SCOPES = {"global", "workspace", "conversation"}
 MAX_MEMORY_CONTENT_CHARS = 800
 
 
@@ -32,6 +33,22 @@ def _validate_kind(kind: str) -> str:
         allowed = ", ".join(sorted(MEMORY_KINDS))
         raise MemoryError("ERROR_MEMORY_KIND_UNSUPPORTED", f"Memory kind must be one of: {allowed}.")
     return normalized
+
+
+def normalize_memory_scope(scope: str | None, scope_id: str | None = None) -> tuple[str, str | None]:
+    """Normalize and validate the scope attached to a durable memory row."""
+    normalized = str(scope or "global").strip().lower()
+    if normalized not in MEMORY_SCOPES:
+        allowed = ", ".join(sorted(MEMORY_SCOPES))
+        raise MemoryError("ERROR_MEMORY_SCOPE_UNSUPPORTED", f"Memory scope must be one of: {allowed}.")
+    resolved_id = str(scope_id).strip() if scope_id is not None else None
+    if normalized == "global":
+        if resolved_id:
+            raise MemoryError("ERROR_MEMORY_SCOPE_ID_FORBIDDEN", "Global memory cannot have a scope_id.")
+        return normalized, None
+    if not resolved_id:
+        raise MemoryError("ERROR_MEMORY_SCOPE_ID_REQUIRED", f"{normalized} memory requires a scope_id.")
+    return normalized, resolved_id
 
 
 def _load_memory(cfg: Settings) -> list[dict[str, Any]]:
@@ -66,6 +83,8 @@ def remember_memory_item(
     *,
     kind: str = "preference",
     source: str = "operator",
+    scope: str = "global",
+    scope_id: str | None = None,
 ) -> dict[str, Any]:
     cfg.ensure_dirs()
     normalized = _normalize_content(content)
@@ -77,6 +96,7 @@ def remember_memory_item(
             f"Memory content exceeds {MAX_MEMORY_CONTENT_CHARS} characters.",
         )
     resolved_kind = _validate_kind(kind)
+    resolved_scope, resolved_scope_id = normalize_memory_scope(scope, scope_id)
     now = utc_now()
     row = {
         "memory_id": stable_id("mem", resolved_kind, normalized, now, length=12),
@@ -84,6 +104,8 @@ def remember_memory_item(
         "content": normalized,
         "enabled": True,
         "source": source,
+        "scope": resolved_scope,
+        "scope_id": resolved_scope_id,
         "created_at": now,
         "updated_at": now,
     }
