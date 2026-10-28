@@ -510,11 +510,19 @@ async function scenario(browser, base, viewport, contextOptions) {
     !(await workbenchStatus.getAttribute("class") || "").includes("status-completed"),
   );
   check(
-    "workbench compiles a plan without execution authority",
+    "workbench plan remains explicitly non-executing",
     viewport,
-    (await page.getByText("CANDIDATE_NOT_EXECUTION").count()) === 1 &&
-      (await page.getByText("Nothing was executed.").count()) === 1 &&
-      (await page.getByRole("button", { name: /^Execute$/ }).count()) === 0,
+    (await page.getByText("CANDIDATE_NOT_EXECUTION", { exact: true }).count()) === 1,
+  );
+  check(
+    "workbench reports exactly one visible no-execution outcome",
+    viewport,
+    (await page.getByText("Nothing was executed.", { exact: true }).count()) === 1,
+  );
+  check(
+    "workbench exposes no Execute control",
+    viewport,
+    (await page.getByRole("button", { name: /^Execute$/ }).count()) === 0,
   );
   check(
     "workbench exposes certification residue instead of false readiness",
