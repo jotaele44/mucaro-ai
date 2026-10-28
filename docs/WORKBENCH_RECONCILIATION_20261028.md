@@ -17,15 +17,27 @@ State: PROVISIONAL / AUDIT_ONLY. Never infer release or feature certification.
 - backend/tests/test_standalone_dependency_audit.py
 - docs/STANDALONE_INDEPENDENCE_EXECUTION.md
 
+## Current-main integration added on this reconciliation branch
+- backend/app/models.py — bounded Workbench request contract.
+- backend/app/main.py — authenticated `POST /workbench/plan` adapter that persists only the existing execution gate and does not create or execute a work run.
+- frontend/src/api.js — same-origin Workbench API client.
+- frontend/src/components/workspaces/WorkbenchWorkspace.jsx — native current-style Workbench surface.
+- frontend/src/App.jsx — Workbench navigation/consumer binding.
+- frontend/vite.config.js — local development proxy for the Workbench route.
+- backend/tests/test_workbench_api.py — positive and adversarial authority-boundary tests.
+- backend/tests/test_api_auth_boundary.py — operator-auth coverage for the Workbench route.
+- qa/rendered/rendered_qa.mjs — Chromium/WebKit desktop+iPhone checks proving the Workbench compiles a plan, reports blocked certification residue, exposes no Execute control, and preserves mobile navigation closure.
+
 ## Explicitly NOT ported
 - TERMINAL_READY.txt: path already exists on current main with a different canonical quick-start contract. Retain current main; reconcile needed commands into an additive document only after reviewing the native task files.
 
 ## Boundaries
-- Imported workbench compilers are PLAN_ONLY; they do not provide runtime API integration, UI parity, execution authorization, on-device model bundles or platform packaging.
-- Existing work_runs.py, execution_gate.py and model_router.py remain canonical. No parallel state authority or integration claim.
+- Imported workbench compilers remain PLAN_ONLY.
+- Runtime API and GUI consumer integration now exist, but they provide planning only: `/workbench/plan` cannot approve actions, enqueue a work run, execute tools, deploy, certify, or promote a skill.
+- Existing work_runs.py, execution_gate.py and model_router.py remain canonical. The adapter persists the existing execution-gate record and creates no parallel state authority.
 - No mandatory external provider is introduced by the imported Python modules.
 - Static inventory is AUDIT_ONLY, not proof of outbound-denial policy.
-- Full current-head CI, tests, independent review and GUI consumer contract remain OPEN.
+- Full current-head CI, backend tests, Chromium/WebKit rendered QA and independent review remain OPEN until the exact new head passes; source presence is not certification.
 - Offline clean-host macOS/Windows, mobile execution, rollback and signed binary artifact certification remain BLOCKED.
 - No skill/agent promotion or merge without full in-scope PASS and authorization.
 
