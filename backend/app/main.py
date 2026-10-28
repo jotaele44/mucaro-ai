@@ -331,6 +331,8 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 "model_lanes": list(execution_plan.model_lanes),
                 "blocked_lanes": list(execution_plan.blocked_lanes),
                 "lane_status": [list(row) for row in execution_plan.lane_status],
+                "catalog_status": execution_plan.catalog_status,
+                "catalog_ref": execution_plan.catalog_ref,
                 "state": execution_plan.state,
                 "certification": execution_plan.certification,
             },
