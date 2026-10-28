@@ -69,7 +69,16 @@ class ContractViolation(ValueError):
 
 
 def _schema_dir(root: Path | None = None) -> Path:
-    return (root or find_project_root()) / SCHEMA_DIR_NAME
+    candidate = (root or find_project_root()) / SCHEMA_DIR_NAME
+    if candidate.is_dir():
+        return candidate
+    # MUCARO_AI_ROOT may intentionally point at an isolated data/runtime
+    # directory. Schemas are application assets and must remain available in
+    # fresh processes, packaged installs, and clean-clone verification.
+    bundled = Path(__file__).resolve().parents[2] / SCHEMA_DIR_NAME
+    if bundled.is_dir():
+        return bundled
+    return candidate
 
 
 @cache
