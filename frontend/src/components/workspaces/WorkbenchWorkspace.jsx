@@ -84,6 +84,7 @@ export function WorkbenchWorkspace({ announce }) {
             value={features}
             onChange={(event) => setFeatures(event.target.value)}
             placeholder="GIS, OCR, coding (comma-separated)"
+            maxLength={4000}
           />
         </label>
 
@@ -149,12 +150,14 @@ export function WorkbenchWorkspace({ announce }) {
       {result && (
         <div className="panel" aria-live="polite">
           <div className="tool-row-head">
-            <span className="status-chip status-completed">{result.status}</span>
+            <span className="status-chip">{result.status}</span>
             <strong>Execution authority unchanged</strong>
           </div>
           <dl className="facts">
             <dt>Gate state</dt><dd>{gate?.state || "—"}</dd>
-            <dt>Readiness</dt><dd>{gate?.readiness_percent ?? "—"}%</dd>
+            <dt>Planning readiness</dt><dd>{gate?.readiness_percent ?? "—"}%</dd>
+            <dt>Source identity</dt><dd>{result?.source_identity?.status || "—"}</dd>
+            <dt>Observed source</dt><dd className="mono">{result?.source_identity?.observed_source_commit || "unavailable"}</dd>
             <dt>Plan state</dt><dd>{plan?.status || "—"}</dd>
             <dt>Certification</dt><dd>{plan?.certification || "—"}</dd>
             <dt>Execution profile</dt><dd>{execution?.profile || "—"}</dd>
