@@ -9,7 +9,7 @@
       ],
       "positive_gate": "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_passes_in_isolated_store",
       "negative_gate": "backend/tests/test_recovery_benchmark.py::test_recovery_certification_fails_closed_on_missing_scenario",
-      "benchmark": "scripts/certify_recovery.py --output data/exports/release_receipts/matrix016-recovery-463a174ca8e1.json",
+      "benchmark": "scripts/certify_recovery.py --output data/exports/release_receipts/matrix016-recovery-d7fc2005a269.json",
       "evidence_refs": [
         "_architecture/recovery_benchmark_v1.json",
         "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_fixture_is_frozen_and_ordered",
@@ -20,7 +20,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N21",
-      "notes": "Bounded local receipt passes 5/5 scenarios at source head 463a174ca8e1807f16d4136554f9d7d615c990db: process-restart reconciliation, waiting-run resume, FIFO/idempotency, partial-failure targeted retry, and offline routing transition. Physical packaged-app restart, real network interruption, and native/device recovery remain outside this receipt and keep MATRIX-016 provisional."
+      "notes": "Bounded local receipt passes 5/5 scenarios at source head d7fc2005a269d7073579f8cf5e9f4fba1e2e9735: process-restart reconciliation, waiting-run resume, FIFO/idempotency, partial-failure targeted retry, and offline routing transition. Physical packaged-app restart, real network interruption, and native/device recovery remain outside this receipt and keep MATRIX-016 provisional."
     },
     "TGT-019": {
       "implementation_state": "PARTIAL",
@@ -31,7 +31,7 @@
       ],
       "positive_gate": "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_passes_in_isolated_store",
       "negative_gate": "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
-      "benchmark": "scripts/certify_recovery.py --output data/exports/release_receipts/matrix016-recovery-463a174ca8e1.json",
+      "benchmark": "scripts/certify_recovery.py --output data/exports/release_receipts/matrix016-recovery-d7fc2005a269.json",
       "evidence_refs": [
         "backend/tests/test_local_model.py::test_offline_manifest_classifies_every_capability_and_closes",
         "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
