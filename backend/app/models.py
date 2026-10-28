@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AskRequest(BaseModel):
@@ -45,12 +45,12 @@ class PlanRequest(BaseModel):
 
 
 class WorkbenchPlanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     user_request: str = Field(min_length=1, max_length=20000)
     source_commit: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{40}$")
     features: list[str] = Field(default_factory=list, max_length=2000)
     inputs_available: list[str] = Field(default_factory=list, max_length=2000)
-    approval_state: str = Field(default="NOT_REQUESTED", max_length=80)
-    operator_approval_recorded: bool = False
     profile: Literal["blockers", "extended", "maximum"] = "maximum"
     network: Literal["isolated", "offline"] = "isolated"
     hardware: Literal["available", "unknown", "unavailable"] = "unknown"
