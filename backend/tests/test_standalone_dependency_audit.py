@@ -61,3 +61,27 @@ def test_output_receipt_is_excluded_from_repeated_inventory(tmp_path: Path) -> N
     assert output.read_bytes() == first_bytes
     assert "artifacts/standalone-dependencies.json" not in {row["path"] for row in second["files"]}
     assert all(row["path"] != "artifacts/standalone-dependencies.json" for row in second["sightings"])
+
+
+def test_dependency_bearing_lock_module_and_runtime_text_formats_are_inventoried(tmp_path: Path) -> None:
+    fixtures = {
+        "runtime.lock": "requests==2.0.0\n",
+        "rendered.mjs": "fetch('https://example.invalid')\n",
+        "requirements.txt": "httpx==1.0.0\n",
+        "build.in": "uvicorn==1.0.0\n",
+        "pins.env": "NODE_VERSION=22\n",
+        "launcher.command": "python3 app.py\n",
+        "container.Dockerfile": "RUN pip install example\n",
+    }
+    for relative, text in fixtures.items():
+        (tmp_path / relative).write_text(text, encoding="utf-8")
+
+    result = scan(tmp_path)
+    paths = {row["path"] for row in result["files"]}
+    assert set(fixtures) <= paths
+
+    sightings = {(row["path"], row["class"]) for row in result["sightings"]}
+    assert ("rendered.mjs", "external_url") in sightings
+    assert ("rendered.mjs", "network_client") in sightings
+    assert ("launcher.command", "host_binary") in sightings
+    assert ("container.Dockerfile", "package_acquisition") in sightings
