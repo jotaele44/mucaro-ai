@@ -106,6 +106,18 @@ def test_answer_run_streams_an_ordered_feed_and_persists_turns(cfg, conversation
     assert [turn["role"] for turn in turns] == ["user", "assistant"]
     assert turns[1]["content"] == answer
     assert {turn["work_run_id"] for turn in turns} == {run["run_id"]}
+    assert run["run_manifest"]["run_id"] == run["run_id"]
+    assert run["run_manifest"]["state"] == "COMPLETED"
+    assert run["run_manifest"]["inputs"] == ["How does source lineage work?"]
+
+
+def test_run_manifest_contract_tracks_approval_and_interruption_states(cfg, conversation):
+    run = _submit(conversation, "/status", cfg)
+    assert run["state"] == "AWAITING_APPROVAL"
+    assert run["run_manifest"]["state"] == "AWAITING_APPROVAL"
+    stopped = stop_run(run["run_id"], cfg=cfg)
+    assert stopped["state"] == "INTERRUPTED"
+    assert stopped["run_manifest"]["state"] == "INTERRUPTED"
 
 
 def test_idempotent_resubmission_returns_the_original_run(cfg, conversation):

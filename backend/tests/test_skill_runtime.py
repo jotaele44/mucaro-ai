@@ -73,6 +73,8 @@ def test_skill_must_mount_then_activate_before_execution(tmp_path: Path):
     executed = execute_skill(skill_id, cfg=cfg, executed_by="test")
     assert executed["status"] == "SKILL_EXECUTED"
     assert executed["execution"]["status"] == "PASS"
+    assert executed["execution"]["execution_contract"]["status"] == "PASS"
+    assert executed["execution"]["execution_contract"]["execution_id"] == executed["execution"]["execution_id"]
     assert executed["execution"]["policy_decision"]["status"] == "AUTHORIZED"
     assert executed["result"]["repo_id"] == "mucaro-ai"
     assert executed["result"]["membership_status"] == "PROVISIONAL"

@@ -265,6 +265,23 @@ def test_checkpoints_start_only_in_an_initial_state_and_are_validated_before_wri
         assert create_checkpoint(session_id="session-1", run_id="run-1", objective="Audit", source_sha=SHA, state=state, cfg=cfg)["state"] == state
 
 
+def test_checkpoint_contract_validation_is_shared_and_fails_closed_on_tamper(tmp_path: Path) -> None:
+    import json
+    import sqlite3
+
+    cfg = make_settings(tmp_path)
+    created = _executing(cfg)
+    payload = {**created, "state": "NOT_A_REAL_CHECKPOINT_STATE"}
+    with sqlite3.connect(cfg.sqlite_path) as conn:
+        conn.execute(
+            "UPDATE agent_checkpoints SET payload_json = ? WHERE checkpoint_id = ?",
+            (json.dumps(payload), created["checkpoint_id"]),
+        )
+    with pytest.raises(CheckpointError) as exc:
+        get_checkpoint(created["checkpoint_id"], cfg)
+    assert exc.value.status == "ERROR_CHECKPOINT_SCHEMA"
+
+
 def test_contradictions_change_only_through_adjudication(tmp_path: Path) -> None:
     from backend.app.agent_checkpoints import record_contradiction
 

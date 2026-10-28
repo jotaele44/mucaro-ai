@@ -140,3 +140,23 @@ def test_invalid_lineage_transition_fails_closed(tmp_path: Path) -> None:
             producer_version="1",
             parent_artifact_ids=[source.artifact_id],
         )
+
+
+def test_tampered_artifact_store_is_rejected_by_the_shared_contract(tmp_path: Path) -> None:
+    import json
+
+    processed = tmp_path / "processed"
+    create_artifact_record(
+        processed_dir=processed,
+        artifact_type="SOURCE",
+        payload=b"source",
+        logical_identity="source:tamper",
+        producer="test",
+        producer_version="1",
+    )
+    records = json.loads((processed / "artifact_lineage.json").read_text(encoding="utf-8"))
+    records[0]["sha256"] = "not-a-sha256"
+    (processed / "artifact_lineage.json").write_text(json.dumps(records), encoding="utf-8")
+
+    with pytest.raises(ArtifactIdentityError, match="artifact contract violation"):
+        list_artifacts(processed)

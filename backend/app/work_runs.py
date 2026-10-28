@@ -55,6 +55,7 @@ from .agent_tasks import TaskError, get_task
 from .agent_workflow import AgentWorkflowError, normalize_agent_actions, normalize_agent_parallelism, normalize_agent_turns
 from .config import Settings, settings
 from .conversations import append_turns, build_conversation_context, get_conversation
+from .contracts import ContractViolation, validate_contract
 from .db import ensure_db, get_connection
 from .error_categories import classify_error
 from .goals import GoalError, get_goal, list_goals
@@ -173,6 +174,7 @@ def _row_to_run(row: Any) -> dict[str, Any]:
     run["state"] = row["state"]
     run["version"] = row["version"]
     run["queue_seq"] = row["queue_seq"]
+    _sync_run_manifest(run)
     return run
 
 
@@ -185,6 +187,7 @@ def _load(conn: Any, run_id: str) -> dict[str, Any]:
 
 def _save(conn: Any, run: dict[str, Any]) -> dict[str, Any]:
     """Optimistic write: fails if another writer moved the run since it was loaded."""
+    _sync_run_manifest(run)
     run["updated_at"] = utc_now()
     body = {key: value for key, value in run.items() if key not in {"state", "version", "queue_seq"}}
     cursor = conn.execute(
@@ -195,6 +198,26 @@ def _save(conn: Any, run: dict[str, Any]) -> dict[str, Any]:
         raise RunError("ERROR_RUN_VERSION_CONFLICT", f"Run changed concurrently: {run['run_id']}")
     run["version"] += 1
     return run
+
+
+def _sync_run_manifest(run: dict[str, Any]) -> None:
+    orchestration = run.get("orchestration") or {}
+    error = run.get("error")
+    manifest = {
+        "run_id": run["run_id"],
+        "task_id": orchestration.get("task_id") or f"conversation:{run['conversation_id']}",
+        "state": run.get("state", "QUEUED"),
+        "inputs": [str(run.get("prompt", ""))],
+        "outputs": [str(value) for value in (run.get("output_artifacts") or [])],
+        "errors": [str(error)] if error else [],
+        "started_at": str(run.get("started_at") or run.get("created_at") or ""),
+        "completed_at": run.get("finished_at"),
+    }
+    try:
+        validate_contract("run_manifest", manifest)
+    except ContractViolation as exc:
+        raise RunError("ERROR_RUN_MANIFEST_CONTRACT", "; ".join(exc.errors)) from exc
+    run["run_manifest"] = manifest
 
 
 def _emit(conn: Any, run_id: str, event_type: str, data: dict[str, Any] | None = None) -> dict[str, Any]:

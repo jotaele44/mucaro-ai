@@ -9,6 +9,7 @@ from typing import Any, Callable
 from .artifact_identity import ArtifactIdentityError, ArtifactRecord, create_artifact_record
 from .capability_policy import RUNTIME_CAPABILITY, CapabilityPolicy, evaluate_capabilities
 from .config import Settings, settings
+from .contracts import ContractViolation, validate_contract
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
 from .execution_router import ExecutionRouterError, execute_routed, select_execution_route
 from .runtime_identity import build_runtime_identity
@@ -421,6 +422,30 @@ def execute_skill(
         except ArtifactIdentityError as artifact_exc:
             error["artifact_error"] = str(artifact_exc)
     finished_at = utc_now()
+    output_artifacts = [
+        artifact
+        for artifact in (artifact_lineage.get("output"), artifact_lineage.get("failure_receipt"))
+        if artifact is not None
+    ]
+    execution_contract = {
+        "schema": "execution-contract/1.0",
+        "execution_id": execution_id,
+        "skill_id": skill.skill_id,
+        "skill_version": skill.version,
+        "skill_digest": skill.digest,
+        "runtime": route,
+        "status": status,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "executed_by": executed_by,
+        "input_artifacts": [artifact_lineage["input"]],
+        "output_artifacts": output_artifacts,
+        "error": error,
+    }
+    try:
+        validate_contract("execution_contract", execution_contract)
+    except ContractViolation as exc:
+        raise SkillRuntimeError("ERROR_SKILL_EXECUTION_CONTRACT", "; ".join(exc.errors)) from exc
     event = {
         "execution_id": execution_id,
         "skill_id": skill_id,
@@ -437,6 +462,7 @@ def execute_skill(
         "arguments": arguments,
         "result": result,
         "error": error,
+        "execution_contract": execution_contract,
         "policy_decision": policy_decision,
         "artifact_lineage": artifact_lineage,
     }

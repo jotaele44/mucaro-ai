@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from .contracts import ContractViolation, validate_contract
 from .utils import read_json, stable_id, utc_now, write_json
 
 ARTIFACT_SCHEMA_VERSION = "mucaro-artifact/1.0"
@@ -72,10 +73,21 @@ def artifact_store_path(processed_dir: Path) -> Path:
     return processed_dir / ARTIFACT_STORE_NAME
 
 
+def _validate_record(record: dict[str, Any]) -> None:
+    try:
+        validate_contract("artifact_identity", record)
+    except ContractViolation as exc:
+        raise ArtifactIdentityError(f"artifact contract violation: {'; '.join(exc.errors)}") from exc
+
+
 def _load_records(processed_dir: Path) -> list[dict[str, Any]]:
     records = read_json(artifact_store_path(processed_dir), [])
     if not isinstance(records, list):
         raise ArtifactIdentityError("artifact lineage store must contain a list")
+    for record in records:
+        if not isinstance(record, dict):
+            raise ArtifactIdentityError("artifact lineage store contains a non-object record")
+        _validate_record(record)
     return records
 
 
@@ -169,6 +181,7 @@ def create_artifact_record(
         canonical_existing.pop("schema_version", None)
         if canonical_existing != canonical_candidate:
             raise ArtifactIdentityError(f"artifact identity collision: {artifact_id}")
+        _validate_record(candidate.as_dict())
         return candidate
 
     record = ArtifactRecord(
@@ -184,6 +197,7 @@ def create_artifact_record(
         schema_id=schema_id,
         source_path_or_uri=source_path_or_uri,
     )
+    _validate_record(record.as_dict())
     records.append(record.as_dict())
     write_json(artifact_store_path(processed_dir), records)
     return record

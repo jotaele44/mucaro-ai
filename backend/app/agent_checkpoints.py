@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import json
-from functools import lru_cache
-from pathlib import Path
 from typing import Any, Callable
 
-import jsonschema
-
 from .config import Settings, settings
+from .contracts import ContractViolation, validate_contract
 from .db import get_connection, init_db, upsert_payload
 from .utils import stable_id, utc_now
 
@@ -103,21 +100,13 @@ def create_checkpoint(
     return checkpoint
 
 
-@lru_cache(maxsize=1)
-def _schema() -> dict[str, Any]:
-    # Application code, not project data: resolve relative to this module, never cfg.project_root.
-    path = Path(__file__).resolve().parents[2] / "schemas" / "agent_checkpoint.schema.json"
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise CheckpointError("ERROR_CHECKPOINT_SCHEMA_UNAVAILABLE", f"{path}: {exc}") from exc
-
-
 def _validate_payload(checkpoint: dict[str, Any], cfg: Settings) -> None:
-    errors = sorted(jsonschema.Draft202012Validator(_schema()).iter_errors(checkpoint), key=lambda e: list(e.absolute_path))
-    if errors:
-        where = "/".join(str(part) for part in errors[0].absolute_path) or "<root>"
-        raise CheckpointError("ERROR_CHECKPOINT_SCHEMA", f"{where}: {errors[0].message}")
+    try:
+        # Schemas are application assets, while cfg.project_root may be an isolated
+        # user-data/test workspace. Let the shared registry resolve the source schema.
+        validate_contract("agent_checkpoint", checkpoint)
+    except ContractViolation as exc:
+        raise CheckpointError("ERROR_CHECKPOINT_SCHEMA", "; ".join(exc.errors)) from exc
 
 
 def _decode(raw: str, cfg: Settings) -> dict[str, Any]:
