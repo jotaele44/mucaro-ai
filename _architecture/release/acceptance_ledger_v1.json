@@ -1012,17 +1012,28 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "frontend/src/App.jsx"
+        "frontend/src/App.jsx",
+        "frontend/src/components/workspaces/OCRWorkspace.jsx",
+        "frontend/src/components/workspaces/SpecializedWorkspace.jsx",
+        "frontend/src/components/workspaces/SourcesWorkspace.jsx",
+        "frontend/src/components/workspaces/ProvenanceWorkspace.jsx",
+        "frontend/src/components/workspaces/MemoryWorkspace.jsx",
+        "frontend/src/components/workspaces/SettingsWorkspace.jsx",
+        "qa/rendered/rendered_qa.mjs"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_0c3ae85de5ef.json",
+        "backend/tests/test_api.py::test_api_ocr_analyze_returns_structured_report",
+        "backend/tests/test_api.py::test_api_ocr_analyze_rejects_non_image_and_non_pdf"
+      ],
+      "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "Sources/Memory/Settings exist; GIS/OCR/Code/Provenance/Artifacts surfaces absent."
+      "notes": "Dedicated Sources, Memory, Provenance, Settings, OCR/page-review, GIS capability/offline-state, Code readiness, and Artifacts surfaces are rendered and exercised. OCR upload/report rendering and backend capability/readiness/empty-artifact states pass in the exact-head Chromium receipt. Full specialized end-to-end execution, native WKWebView/macOS evidence, and physical-device evidence remain outside this receipt."
     },
     {
       "requirement_id": "TGT-004",
@@ -2193,12 +2204,13 @@
       "negative_gate": null,
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+        "_architecture/release/evidence/rendered_qa_0c3ae85de5ef.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N18",
-      "notes": "70 rendered checks pass (navigation, feed, progressive disclosure, settings, provenance, sources, error/loading/empty/offline-service states, keyboard). OPEN: GIS and OCR surfaces, and rendering on the supported macOS environment (WKWebView)."
+      "notes": "156 rendered checks pass at desktop 1440x900 and emulated iPhone 13 390x844 in Chromium, including navigation, feed, progressive disclosure, settings, provenance, sources, OCR upload/report, GIS capability evidence, Code readiness, Artifacts empty state, token-gate security, error/loading/empty/offline-service states, keyboard, touch-target, and no-overflow checks. Native WKWebView/macOS and physical-device evidence remain open."
     },
     {
       "requirement_id": "MATRIX-016",

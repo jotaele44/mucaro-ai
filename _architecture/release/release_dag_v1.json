@@ -451,7 +451,7 @@
         "phone access (SD-012): sign-in from a real iPhone over a real network"
       ],
       "blocker": null,
-      "notes": "Conversation-first GUI with Sources/Memory/Provenance/Settings; GIS/OCR/Code workspaces open. SD-012 (phone access) is implemented and PROVISIONAL until a physical iPhone session is observed."
+      "notes": "Conversation-first GUI with Sources/Memory/Provenance/Settings plus rendered OCR/page-review, GIS capability/offline-state, Code readiness, and Artifacts surfaces. Exact-head Chromium receipt 0c3ae85de5ef records 156/156 passing desktop and emulated iPhone checks, including the specialized workspace workflow. SD-012 remains PROVISIONAL until a physical iPhone session is observed; native WKWebView/macOS and complete specialized execution workflows remain open."
     },
     {
       "node_id": "N18",
@@ -471,7 +471,7 @@
         "Playwright screenshots + receipt"
       ],
       "blocker": null,
-      "notes": "70/70 rendered checks in Chromium; WKWebView/macOS pending."
+      "notes": "156/156 rendered checks in Chromium at desktop 1440x900 and emulated iPhone 13 390x844, bound to exact head 0c3ae85de5ef5fee5ba0deceb547a27c6a67f068; native WKWebView/macOS and physical-device verification remain pending."
     },
     {
       "node_id": "N19",
