@@ -28,7 +28,8 @@ def _payload(**overrides):
 
 
 def test_workbench_plan_binds_existing_gate_and_never_executes(tmp_path):
-    response = _client(tmp_path).post("/workbench/plan", json=_payload())
+    client = _client(tmp_path)
+    response = client.post("/workbench/plan", json=_payload())
     assert response.status_code == 200
     body = response.json()
 
@@ -57,6 +58,10 @@ def test_workbench_plan_binds_existing_gate_and_never_executes(tmp_path):
     assert execution["certification"] == "BLOCKED"
     assert len(execution["lanes"]) == 20
     assert execution["platforms"] == ["linux", "macos"]
+
+    runs = client.get("/work-runs?limit=20")
+    assert runs.status_code == 200
+    assert runs.json()["runs"] == []
 
 
 def test_recorded_operator_approval_is_not_execution_authority(tmp_path):
