@@ -537,6 +537,46 @@ async function scenario(browser, base, viewport, contextOptions) {
   return axeRuns;
 }
 
+async function specializedWorkspaceScenario(browser, base) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, baseURL: base });
+  const page = await context.newPage();
+  const nav = () => page.getByRole("navigation", { name: "Primary" });
+  const open = async (label, heading) => {
+    await nav().getByRole("button", { name: label, exact: true }).click();
+    await page.getByRole("heading", { name: heading, exact: true }).waitFor();
+  };
+  try {
+    await page.goto("/");
+    await page.getByRole("heading", { name: "What should Mucaro work on?" }).waitFor();
+
+    await open("OCR / page review", "OCR / page review");
+    check("OCR workspace is navigable and exposes its local upload action", "desktop", (await page.getByText("Choose a local image or PDF to begin a bounded OCR review.").count()) === 1 && (await page.getByText("Analyze image or PDF").count()) === 1);
+    const ocrInput = page.locator('input[type="file"]');
+    await ocrInput.setInputFiles(path.join(ROOT, "Mucaro AI Setup.app", "Contents", "Resources", "MucaroAI.png"));
+    const ocrReport = page.getByRole("heading", { name: "Evidence summary", exact: true });
+    await Promise.race([
+      ocrReport.waitFor({ timeout: 15000 }),
+      page.getByRole("alert").waitFor({ timeout: 15000 }),
+    ]).catch(() => {});
+    check("OCR workspace renders a structured report for a local image", "desktop", await ocrReport.isVisible().catch(() => false));
+
+    await open("GIS", "GIS workspace");
+    await page.getByRole("heading", { name: "Spatial engine", exact: true }).waitFor();
+    check("GIS workspace renders backend capability evidence", "desktop", (await page.getByText("Offline boundary", { exact: true }).count()) === 1 && (await page.locator(".status-chip").count()) > 0);
+
+    await open("Code", "Code workspace");
+    await page.getByRole("heading", { name: "Repository execution readiness", exact: true }).waitFor();
+    check("Code workspace states readiness without implying execution", "desktop", (await page.getByText(/No repository command, container run, image pull/).count()) === 1 && (await page.getByText("Source HEAD", { exact: true }).count()) === 1);
+
+    await open("Artifacts", "Artifacts");
+    const artifactEmpty = page.getByText("No persisted work-run artifacts yet.", { exact: true });
+    await artifactEmpty.waitFor();
+    check("Artifacts workspace distinguishes an empty work-run store", "desktop", await artifactEmpty.isVisible());
+  } finally {
+    await context.close();
+  }
+}
+
 async function offlineScenario(browser, base, viewport, contextOptions, stopBackend) {
   const context = await browser.newContext({ ...contextOptions, baseURL: base });
   const page = await context.newPage();
@@ -1056,6 +1096,7 @@ async function streamScenario(browser, backendBase, backendPort) {
 
 const gateHeading = (page) => page.getByRole("heading", { name: "Enter the access token" });
 const tokenField = (page) => page.locator("#gate-token"); // getByLabel also matches the section the heading labels
+const tokenGate = (page) => page.locator("section.gate").filter({ has: gateHeading(page) });
 const refusalAlert = (page) => page.getByRole("alert").filter({ hasText: "was not accepted" });
 const cleartextNotice = (page) => page.getByText("This connection is not encrypted");
 
@@ -1090,9 +1131,13 @@ async function tokenGateScenario(browser) {
 
         // A wrong token is refused with an explanation, and what was typed stays so a typo can be fixed.
         await field.fill("not-the-token");
-        await page.getByRole("button", { name: "Show" }).click();
+        const gate = tokenGate(page);
+        const showButton = gate.getByRole("button", { name: "Show", exact: true });
+        const hideButton = gate.getByRole("button", { name: "Hide", exact: true });
+        check("the token gate has exactly one visibility toggle despite global navigation controls (M7)", "iphone", (await showButton.count()) === 1, `show buttons in gate: ${await showButton.count()}`);
+        await showButton.click();
         const revealed = await field.evaluate((el) => el.type);
-        await page.getByRole("button", { name: "Hide" }).click();
+        await hideButton.click();
         await page.getByRole("button", { name: "Continue" }).click();
         const refused = await appears(refusalAlert(page));
         check("a wrong token is refused with an explanation, and Show reveals what was typed (M7)", "iphone", refused && revealed === "text" && (await field.inputValue()) === "not-the-token", `explained: ${refused}, revealed type: ${revealed}`);
@@ -1436,6 +1481,7 @@ try {
     axeResults.push(...(await scenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } })));
     const iphone = devices["iPhone 13"];
     axeResults.push(...(await scenario(browser, base, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
+    await specializedWorkspaceScenario(browser, base);
     await launchTokenScenario(browser, "desktop");
     const headers = (await fetch(`${base}/`)).headers;
     check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
