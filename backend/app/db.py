@@ -10,7 +10,7 @@ from typing import Any
 from .config import parse_bool, settings
 
 # Bump when tables change; init_db only ever moves the recorded version forward.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def get_connection(sqlite_path: Path | None = None) -> sqlite3.Connection:
@@ -80,6 +80,20 @@ _SCHEMA_SQL = """
                 event_type TEXT NOT NULL,
                 payload_json TEXT NOT NULL,
                 PRIMARY KEY (run_id, seq)
+            );
+            CREATE TABLE IF NOT EXISTS agent_messages (
+                conversation_id TEXT NOT NULL,
+                seq INTEGER NOT NULL,
+                run_id TEXT,
+                turn_id TEXT,
+                role TEXT NOT NULL,
+                content_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (conversation_id, seq)
+            );
+            CREATE TABLE IF NOT EXISTS agent_conversations (
+                conversation_id TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS schema_meta (
                 key TEXT PRIMARY KEY,
