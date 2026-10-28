@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-28T13:50:44Z",
+  "updated_utc": "2026-10-28T14:19:21Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1251,24 +1251,34 @@
       "requirement_id": "TGT-016",
       "requirement_text": "Common execution contracts",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/contracts.py",
-        "schemas/"
+        "backend/app/agent_checkpoints.py",
+        "backend/app/artifact_identity.py",
+        "backend/app/skill_runtime.py",
+        "backend/app/work_runs.py",
+        "schemas/agent_checkpoint.schema.json",
+        "schemas/artifact_identity.schema.json",
+        "schemas/execution_contract.schema.json",
+        "schemas/run_manifest.schema.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_work_runs.py::test_run_manifest_contract_tracks_approval_and_interruption_states",
+      "negative_gate": "backend/tests/test_agent_checkpoints.py::test_checkpoint_contract_validation_is_shared_and_fails_closed_on_tamper",
       "benchmark": null,
       "evidence_refs": [
-        "backend/tests/test_contracts.py::test_every_contract_family_has_present_valid_schemas",
-        "backend/tests/test_contracts.py::test_real_producer_payloads_satisfy_contracts",
+        "backend/tests/test_agent_checkpoints.py::test_checkpoint_contract_validation_is_shared_and_fails_closed_on_tamper",
+        "backend/tests/test_artifact_identity.py::test_tampered_artifact_store_is_rejected_by_the_shared_contract",
+        "backend/tests/test_skill_runtime.py::test_skill_must_mount_then_activate_before_execution",
+        "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
+        "backend/tests/test_work_runs.py::test_run_manifest_contract_tracks_approval_and_interruption_states",
         "backend/tests/test_contracts.py::test_contract_violations_are_rejected"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "All nine families have schemas and a registry; runtime enforcement at source, provenance, grant, tool call/audit, citation/answer trace, memory, routing and receipt boundaries. OPEN: runtime enforcement for execution_contract/run_manifest/agent_checkpoint/artifact_identity producers."
+      "notes": "PROVISIONAL: runtime enforcement is implemented at checkpoint create/read/update, artifact create/store-read, skill execution, and work-run persistence boundaries. Positive, negative, tamper, approval, interruption, and recovery-focused tests pass in the targeted contract suite. Broader cross-surface release certification and remaining architecture residue are still open."
     },
     {
       "requirement_id": "TGT-017",

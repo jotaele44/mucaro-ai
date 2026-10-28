@@ -1,0 +1,30 @@
+{
+  "rows": {
+    "TGT-016": {
+      "implementation_state": "IMPLEMENTED",
+      "implementation_refs": [
+        "backend/app/contracts.py",
+        "backend/app/agent_checkpoints.py",
+        "backend/app/artifact_identity.py",
+        "backend/app/skill_runtime.py",
+        "backend/app/work_runs.py",
+        "schemas/agent_checkpoint.schema.json",
+        "schemas/artifact_identity.schema.json",
+        "schemas/execution_contract.schema.json",
+        "schemas/run_manifest.schema.json"
+      ],
+      "positive_gate": "backend/tests/test_work_runs.py::test_run_manifest_contract_tracks_approval_and_interruption_states",
+      "negative_gate": "backend/tests/test_agent_checkpoints.py::test_checkpoint_contract_validation_is_shared_and_fails_closed_on_tamper",
+      "evidence_refs": [
+        "backend/tests/test_agent_checkpoints.py::test_checkpoint_contract_validation_is_shared_and_fails_closed_on_tamper",
+        "backend/tests/test_artifact_identity.py::test_tampered_artifact_store_is_rejected_by_the_shared_contract",
+        "backend/tests/test_skill_runtime.py::test_skill_must_mount_then_activate_before_execution",
+        "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
+        "backend/tests/test_work_runs.py::test_run_manifest_contract_tracks_approval_and_interruption_states",
+        "backend/tests/test_contracts.py::test_contract_violations_are_rejected"
+      ],
+      "state": "PROVISIONAL",
+      "notes": "PROVISIONAL: runtime enforcement is implemented at checkpoint create/read/update, artifact create/store-read, skill execution, and work-run persistence boundaries. Positive, negative, tamper, approval, interruption, and recovery-focused tests pass in the targeted contract suite. Broader cross-surface release certification and remaining architecture residue are still open."
+    }
+  }
+}
