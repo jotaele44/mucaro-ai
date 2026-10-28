@@ -78,6 +78,7 @@ from .permissions import (
     load_directory_grants,
     revoke_directory,
 )
+from .runtime_identity import current_git_head
 from .response_flow import (
     InteractionError,
     create_interaction,
@@ -289,10 +290,28 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.post("/workbench/plan")
     def workbench_plan(req: WorkbenchPlanRequest, _auth: dict = Depends(require_auth)) -> dict:
         """Compile a user-visible workbench plan without granting execution authority."""
+        observed_source_head = current_git_head(cfg.project_root)
+        claimed_source_head = req.source_commit.lower() if req.source_commit else None
+        if claimed_source_head is not None:
+            if observed_source_head is None:
+                raise api_error(
+                    "ERROR_WORKBENCH_SOURCE_IDENTITY_UNAVAILABLE",
+                    "A source commit was supplied but the running Mucaro source identity is unavailable.",
+                    status_code=422,
+                )
+            if claimed_source_head != observed_source_head.lower():
+                raise api_error(
+                    "ERROR_WORKBENCH_SOURCE_IDENTITY_MISMATCH",
+                    "The supplied source commit does not match the running Mucaro source identity.",
+                    status_code=409,
+                    claimed_source_commit=claimed_source_head,
+                    observed_source_commit=observed_source_head.lower(),
+                )
+
         try:
             compiled = compile_workbench_plan(
                 req.user_request,
-                source_commit=req.source_commit,
+                source_commit=claimed_source_head,
                 features=req.features,
                 approval=req.operator_approval_recorded,
             )
@@ -319,6 +338,11 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 "run_runtime": "work_runs",
                 "plan_only": True,
                 "execution_authorized": False,
+            },
+            "source_identity": {
+                "claimed_source_commit": claimed_source_head,
+                "observed_source_commit": observed_source_head.lower() if observed_source_head else None,
+                "status": "VERIFIED_MATCH" if claimed_source_head is not None else "NOT_CLAIMED",
             },
             "gate": gate,
             "workbench_plan": compiled,
