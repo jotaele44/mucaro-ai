@@ -9,7 +9,7 @@
       ],
       "positive_gate": "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_passes_in_isolated_store",
       "negative_gate": "backend/tests/test_recovery_benchmark.py::test_recovery_certification_fails_closed_on_missing_scenario",
-      "benchmark": "scripts/certify_recovery.py --output data/exports/release_receipts/matrix016-recovery-d7fc2005a269.json",
+      "benchmark": "scripts/certify_recovery.py --output data/exports/release_receipts/matrix016-recovery-51f238c873df.json",
       "evidence_refs": [
         "_architecture/recovery_benchmark_v1.json",
         "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_fixture_is_frozen_and_ordered",
@@ -31,7 +31,7 @@
       ],
       "positive_gate": "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_passes_in_isolated_store",
       "negative_gate": "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
-      "benchmark": "scripts/certify_recovery.py --output data/exports/release_receipts/matrix016-recovery-d7fc2005a269.json",
+      "benchmark": "scripts/certify_recovery.py --output data/exports/release_receipts/matrix016-recovery-51f238c873df.json",
       "evidence_refs": [
         "backend/tests/test_local_model.py::test_offline_manifest_classifies_every_capability_and_closes",
         "backend/tests/test_local_model.py::test_system_offline_makes_remote_providers_ineligible",
