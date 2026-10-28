@@ -214,7 +214,9 @@ def resample_raster(
                 out_shape=(dataset.count, height, width),
                 resampling=methods[normalized_method],
             )
-            output_transform = dataset.transform @ dataset.transform.scale(
+            # Affine multiplication composes transforms across rasterio/affine
+            # versions; matrix ``@`` is not supported by the certifier runtime.
+            output_transform = dataset.transform * dataset.transform.scale(
                 dataset.width / width,
                 dataset.height / height,
             )
