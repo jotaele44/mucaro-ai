@@ -330,6 +330,25 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             approval_state=req.approval_state,
         )
         upsert_payload("execution_gates", "task_id", gate, cfg.sqlite_path)
+
+        evidence_status = {
+            item: {
+                "state": (
+                    "PASS"
+                    if item == "source_commit" and claimed_source_head is not None
+                    else "OPEN"
+                ),
+                "evidence_ref": (
+                    observed_source_head.lower()
+                    if item == "source_commit" and claimed_source_head is not None and observed_source_head
+                    else None
+                ),
+            }
+            for item in compiled["missing_evidence"]
+        }
+        missing_certification_evidence = [
+            item for item, row in evidence_status.items() if row["state"] != "PASS"
+        ]
         return {
             "status": "WORKBENCH_PLAN_READY",
             "authority": {
@@ -344,6 +363,8 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 "observed_source_commit": observed_source_head.lower() if observed_source_head else None,
                 "status": "VERIFIED_MATCH" if claimed_source_head is not None else "NOT_CLAIMED",
             },
+            "evidence_status": evidence_status,
+            "missing_certification_evidence": missing_certification_evidence,
             "gate": gate,
             "workbench_plan": compiled,
             "execution_plan": {
