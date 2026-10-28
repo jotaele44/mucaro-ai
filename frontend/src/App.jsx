@@ -3,6 +3,7 @@ import { api, authIssueOf, onAuthIssue } from "./api.js";
 import { ChatView } from "./components/ChatView.jsx";
 import { TasksDrawer } from "./components/TasksDrawer.jsx";
 import { TokenGate } from "./components/TokenGate.jsx";
+import { LearningWorkspace } from "./components/workspaces/LearningWorkspace.jsx";
 import { MemoryWorkspace } from "./components/workspaces/MemoryWorkspace.jsx";
 import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace.jsx";
 import { SettingsWorkspace } from "./components/workspaces/SettingsWorkspace.jsx";
@@ -12,6 +13,7 @@ const WORKSPACES = [
   { id: "chat", label: "Chat" },
   { id: "sources", label: "Sources" },
   { id: "memory", label: "Memory" },
+  { id: "learning", label: "Learning" },
   { id: "provenance", label: "Provenance" },
   { id: "settings", label: "Settings" },
 ];
@@ -265,6 +267,7 @@ export function App() {
         )}
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}
+        {health.state === "ok" && view === "learning" && <LearningWorkspace announce={announce} />}
         {health.state === "ok" && view === "provenance" && <ProvenanceWorkspace />}
         {health.state === "ok" && view === "settings" && <SettingsWorkspace options={options} onOptionsChange={setOptions} announce={announce} />}
       </main>

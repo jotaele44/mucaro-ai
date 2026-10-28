@@ -1,0 +1,111 @@
+{
+  "schema": "mucaro-learning-checkpoint/1",
+  "base_head": "404cf0afe4001c0dc6352db690f09f48dca600ae",
+  "status": "PROVISIONAL",
+  "focused_tests": {
+    "passed": 20
+  },
+  "full_suite": {
+    "passed": 1281,
+    "skipped": 7,
+    "failed": 1
+  },
+  "baseline_failure_reproduced": true,
+  "files": [
+    {
+      "path": "backend/app/learning.py",
+      "bytes": 17332,
+      "sha256": "c1de57254a1e765ae873506be738bb085ab0c0c645807dc2f796c0ed925debc7"
+    },
+    {
+      "path": "backend/app/learning_api.py",
+      "bytes": 4118,
+      "sha256": "42b19a378835a32376ef49964d8c6f169bd1b2ddd2f1922eb4b1f9b1e182bd37"
+    },
+    {
+      "path": "backend/app/main.py",
+      "bytes": 35194,
+      "sha256": "e2ea5fb4e765438dd4302ac0b9d41371a8db58bb8190ef668ed8db2a4ae10d23"
+    },
+    {
+      "path": "backend/app/services.py",
+      "bytes": 9327,
+      "sha256": "80693cb786ac8419394f7983c908ac2e773153eed0267d7d90e4ceac8fe5c561"
+    },
+    {
+      "path": "backend/tests/test_learning.py",
+      "bytes": 13038,
+      "sha256": "8c69fc937664d8aabc4e8c18ce0aee321ab0f10d7964e83a35655cb81f3d6d49"
+    },
+    {
+      "path": "docs/GOVERNED_LEARNING.md",
+      "bytes": 6945,
+      "sha256": "9eed7cfcb938e89de2e032713e5fbb605376db837c74838653ff754d34eb0a56"
+    },
+    {
+      "path": "docs/evidence/governed-learning-2026-10-16/baseline-security.log",
+      "bytes": 1075,
+      "sha256": "bcbb60734f4b379e7bdad3c0c7933a684af5e5158d82e9469a24368ffe7c618a"
+    },
+    {
+      "path": "docs/evidence/governed-learning-2026-10-16/final-suite.log",
+      "bytes": 10296,
+      "sha256": "b1e6e5abc97b1194864432e0336cc77fcea9b69a41ca4248787ed2dc0bb78909"
+    },
+    {
+      "path": "docs/evidence/governed-learning-2026-10-16/focused-tests.log",
+      "bytes": 966,
+      "sha256": "01f55fb3cd3365cf7247f3f4faf154666d777621ad001bcd544492530e09363c"
+    },
+    {
+      "path": "docs/evidence/governed-learning-2026-10-16/initial-suite.log",
+      "bytes": 10296,
+      "sha256": "3006ca1e2692f869fd17356f00523b5aa064d2343c3b26a4060e91a46078a710"
+    },
+    {
+      "path": "docs/evidence/governed-learning-2026-10-16/learning-1440.png",
+      "bytes": 132915,
+      "sha256": "c16806cd6e085c3f2bd96c6fd26e564c8549929a1b3f0e3bddc761d6aad2556c"
+    },
+    {
+      "path": "docs/evidence/governed-learning-2026-10-16/learning-393.png",
+      "bytes": 72135,
+      "sha256": "7f19eb2c4c5170d25cb9f06a5b4207b69eaa61db7e9b5f9ca4966414cd9d054b"
+    },
+    {
+      "path": "docs/evidence/governed-learning-2026-10-16/learning-430.png",
+      "bytes": 71586,
+      "sha256": "8c7bd888639f0bf14e80582b8ba06818bcfaa682e9a9b26b5ceb69654c59c128"
+    },
+    {
+      "path": "docs/evidence/governed-learning-2026-10-16/rendered-receipt.json",
+      "bytes": 689,
+      "sha256": "050129cb39083caa44c4b0e7918f36089eda14fe610ddb81e9d54106d3a2ceec"
+    },
+    {
+      "path": "frontend/src/App.jsx",
+      "bytes": 11716,
+      "sha256": "996a0a05b25752ac4c442bea513bc5cbb9760a36297dec4f332409179579f226"
+    },
+    {
+      "path": "frontend/src/api.js",
+      "bytes": 14327,
+      "sha256": "4c8f596c9f356b727b88540e4aa664d52d78cd9cd35d21faa9a75330963fd686"
+    },
+    {
+      "path": "frontend/src/components/workspaces/LearningWorkspace.jsx",
+      "bytes": 10117,
+      "sha256": "90756ebb7200c4a3ee23e21bea7c84ed3c60647438421a0af61a427ff7822a9b"
+    },
+    {
+      "path": "frontend/src/styles.css",
+      "bytes": 20157,
+      "sha256": "ce6db2a181a67caef9ba231da57ca69664e0b6cd322a9f5ae1c3604fe8f2563f"
+    },
+    {
+      "path": "qa/rendered/learning_qa.mjs",
+      "bytes": 6865,
+      "sha256": "0172d0716885bb44e9d7c0e762c0cc0d5b4b0d7a0cd1e27c7cf3b63ef1a7e167"
+    }
+  ]
+}

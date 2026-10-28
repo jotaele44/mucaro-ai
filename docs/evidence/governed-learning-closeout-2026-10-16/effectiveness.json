@@ -1,0 +1,1068 @@
+{
+  "schema": "mucaro-learning-effectiveness/1",
+  "status": "PASS",
+  "scope": "synthetic exact-context reward-conditioned workflow selection with evaluation-only adapters",
+  "fixtures": [
+    {
+      "id": "identity-0",
+      "split": "train",
+      "context": "eval/identity",
+      "input": [
+        {
+          "record_id": "ID 0 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 0 B",
+          "name": "Same name",
+          "value": 0
+        }
+      ],
+      "expected": [
+        "ID 0 A",
+        "ID 0 B"
+      ]
+    },
+    {
+      "id": "conservation-0",
+      "split": "train",
+      "context": "eval/conservation",
+      "input": [
+        {
+          "record_id": "ID 0 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 0 B",
+          "name": "Same name",
+          "value": 0
+        }
+      ],
+      "expected": [
+        "ID 0 A",
+        "ID 0 B"
+      ]
+    },
+    {
+      "id": "ties-0",
+      "split": "train",
+      "context": "eval/ties",
+      "input": [
+        {
+          "id": "A0",
+          "score": 0
+        },
+        {
+          "id": "B0",
+          "score": 0
+        }
+      ],
+      "expected": {
+        "status": "UNRESOLVED",
+        "candidates": [
+          "A0",
+          "B0"
+        ]
+      }
+    },
+    {
+      "id": "identity-1",
+      "split": "train",
+      "context": "eval/identity",
+      "input": [
+        {
+          "record_id": "ID 1 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 1 B",
+          "name": "Same name",
+          "value": 1
+        }
+      ],
+      "expected": [
+        "ID 1 A",
+        "ID 1 B"
+      ]
+    },
+    {
+      "id": "conservation-1",
+      "split": "train",
+      "context": "eval/conservation",
+      "input": [
+        {
+          "record_id": "ID 1 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 1 B",
+          "name": "Same name",
+          "value": 1
+        }
+      ],
+      "expected": [
+        "ID 1 A",
+        "ID 1 B"
+      ]
+    },
+    {
+      "id": "ties-1",
+      "split": "train",
+      "context": "eval/ties",
+      "input": [
+        {
+          "id": "A1",
+          "score": 1
+        },
+        {
+          "id": "B1",
+          "score": 1
+        }
+      ],
+      "expected": {
+        "status": "UNRESOLVED",
+        "candidates": [
+          "A1",
+          "B1"
+        ]
+      }
+    },
+    {
+      "id": "identity-2",
+      "split": "train",
+      "context": "eval/identity",
+      "input": [
+        {
+          "record_id": "ID 2 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 2 B",
+          "name": "Same name",
+          "value": 2
+        }
+      ],
+      "expected": [
+        "ID 2 A",
+        "ID 2 B"
+      ]
+    },
+    {
+      "id": "conservation-2",
+      "split": "train",
+      "context": "eval/conservation",
+      "input": [
+        {
+          "record_id": "ID 2 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 2 B",
+          "name": "Same name",
+          "value": 2
+        }
+      ],
+      "expected": [
+        "ID 2 A",
+        "ID 2 B"
+      ]
+    },
+    {
+      "id": "ties-2",
+      "split": "train",
+      "context": "eval/ties",
+      "input": [
+        {
+          "id": "A2",
+          "score": 2
+        },
+        {
+          "id": "B2",
+          "score": 2
+        }
+      ],
+      "expected": {
+        "status": "UNRESOLVED",
+        "candidates": [
+          "A2",
+          "B2"
+        ]
+      }
+    },
+    {
+      "id": "identity-3",
+      "split": "train",
+      "context": "eval/identity",
+      "input": [
+        {
+          "record_id": "ID 3 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 3 B",
+          "name": "Same name",
+          "value": 3
+        }
+      ],
+      "expected": [
+        "ID 3 A",
+        "ID 3 B"
+      ]
+    },
+    {
+      "id": "conservation-3",
+      "split": "train",
+      "context": "eval/conservation",
+      "input": [
+        {
+          "record_id": "ID 3 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 3 B",
+          "name": "Same name",
+          "value": 3
+        }
+      ],
+      "expected": [
+        "ID 3 A",
+        "ID 3 B"
+      ]
+    },
+    {
+      "id": "ties-3",
+      "split": "train",
+      "context": "eval/ties",
+      "input": [
+        {
+          "id": "A3",
+          "score": 3
+        },
+        {
+          "id": "B3",
+          "score": 3
+        }
+      ],
+      "expected": {
+        "status": "UNRESOLVED",
+        "candidates": [
+          "A3",
+          "B3"
+        ]
+      }
+    },
+    {
+      "id": "identity-4",
+      "split": "held_out",
+      "context": "eval/identity",
+      "input": [
+        {
+          "record_id": "ID 4 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 4 B",
+          "name": "Same name",
+          "value": 4
+        }
+      ],
+      "expected": [
+        "ID 4 A",
+        "ID 4 B"
+      ]
+    },
+    {
+      "id": "conservation-4",
+      "split": "held_out",
+      "context": "eval/conservation",
+      "input": [
+        {
+          "record_id": "ID 4 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 4 B",
+          "name": "Same name",
+          "value": 4
+        }
+      ],
+      "expected": [
+        "ID 4 A",
+        "ID 4 B"
+      ]
+    },
+    {
+      "id": "ties-4",
+      "split": "held_out",
+      "context": "eval/ties",
+      "input": [
+        {
+          "id": "A4",
+          "score": 4
+        },
+        {
+          "id": "B4",
+          "score": 4
+        }
+      ],
+      "expected": {
+        "status": "UNRESOLVED",
+        "candidates": [
+          "A4",
+          "B4"
+        ]
+      }
+    },
+    {
+      "id": "identity-5",
+      "split": "held_out",
+      "context": "eval/identity",
+      "input": [
+        {
+          "record_id": "ID 5 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 5 B",
+          "name": "Same name",
+          "value": 5
+        }
+      ],
+      "expected": [
+        "ID 5 A",
+        "ID 5 B"
+      ]
+    },
+    {
+      "id": "conservation-5",
+      "split": "held_out",
+      "context": "eval/conservation",
+      "input": [
+        {
+          "record_id": "ID 5 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 5 B",
+          "name": "Same name",
+          "value": 5
+        }
+      ],
+      "expected": [
+        "ID 5 A",
+        "ID 5 B"
+      ]
+    },
+    {
+      "id": "ties-5",
+      "split": "held_out",
+      "context": "eval/ties",
+      "input": [
+        {
+          "id": "A5",
+          "score": 5
+        },
+        {
+          "id": "B5",
+          "score": 5
+        }
+      ],
+      "expected": {
+        "status": "UNRESOLVED",
+        "candidates": [
+          "A5",
+          "B5"
+        ]
+      }
+    },
+    {
+      "id": "identity-6",
+      "split": "held_out",
+      "context": "eval/identity",
+      "input": [
+        {
+          "record_id": "ID 6 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 6 B",
+          "name": "Same name",
+          "value": 6
+        }
+      ],
+      "expected": [
+        "ID 6 A",
+        "ID 6 B"
+      ]
+    },
+    {
+      "id": "conservation-6",
+      "split": "held_out",
+      "context": "eval/conservation",
+      "input": [
+        {
+          "record_id": "ID 6 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 6 B",
+          "name": "Same name",
+          "value": 6
+        }
+      ],
+      "expected": [
+        "ID 6 A",
+        "ID 6 B"
+      ]
+    },
+    {
+      "id": "ties-6",
+      "split": "held_out",
+      "context": "eval/ties",
+      "input": [
+        {
+          "id": "A6",
+          "score": 6
+        },
+        {
+          "id": "B6",
+          "score": 6
+        }
+      ],
+      "expected": {
+        "status": "UNRESOLVED",
+        "candidates": [
+          "A6",
+          "B6"
+        ]
+      }
+    },
+    {
+      "id": "identity-7",
+      "split": "held_out",
+      "context": "eval/identity",
+      "input": [
+        {
+          "record_id": "ID 7 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 7 B",
+          "name": "Same name",
+          "value": 7
+        }
+      ],
+      "expected": [
+        "ID 7 A",
+        "ID 7 B"
+      ]
+    },
+    {
+      "id": "conservation-7",
+      "split": "held_out",
+      "context": "eval/conservation",
+      "input": [
+        {
+          "record_id": "ID 7 A",
+          "name": "Same name",
+          "value": null
+        },
+        {
+          "record_id": "ID 7 B",
+          "name": "Same name",
+          "value": 7
+        }
+      ],
+      "expected": [
+        "ID 7 A",
+        "ID 7 B"
+      ]
+    },
+    {
+      "id": "ties-7",
+      "split": "held_out",
+      "context": "eval/ties",
+      "input": [
+        {
+          "id": "A7",
+          "score": 7
+        },
+        {
+          "id": "B7",
+          "score": 7
+        }
+      ],
+      "expected": {
+        "status": "UNRESOLVED",
+        "candidates": [
+          "A7",
+          "B7"
+        ]
+      }
+    }
+  ],
+  "fixtures_sha256": "7335eaedbb52187c15ee79ece69251f85c886a5ed443d272b4409279d433acc9",
+  "split_algebra": {
+    "intersection": [],
+    "train_only": [
+      "conservation-0",
+      "conservation-1",
+      "conservation-2",
+      "conservation-3",
+      "identity-0",
+      "identity-1",
+      "identity-2",
+      "identity-3",
+      "ties-0",
+      "ties-1",
+      "ties-2",
+      "ties-3"
+    ],
+    "held_out_only": [
+      "conservation-4",
+      "conservation-5",
+      "conservation-6",
+      "conservation-7",
+      "identity-4",
+      "identity-5",
+      "identity-6",
+      "identity-7",
+      "ties-4",
+      "ties-5",
+      "ties-6",
+      "ties-7"
+    ],
+    "union_count": 24,
+    "symmetric_difference_count": 24
+  },
+  "measured": {
+    "untrained_abstentions": 3,
+    "policies": {
+      "eval/conservation": {
+        "status": "RECOMMENDATION",
+        "context": "eval/conservation",
+        "options": [
+          {
+            "candidate_id": "learn_2e9e2ea8d2478528952d473ad8e4b4bf8c11e4bbe1dd98f7638168d4aeb8a782",
+            "artifact_sha256": "68cd5f37d2697670b297290167bedeb29191a1b2a4f84d32e9366596e0cd52df",
+            "episodes": 4,
+            "value": 0.8
+          },
+          {
+            "candidate_id": "learn_8101e2d23bc0b0a55c7d317aa2e35e34603c9a815b4624123de7c203d0db992f",
+            "artifact_sha256": "146e0ee7fe6273c310147f01925ee16e60a50efedee4951b224d57a3d0ba1266",
+            "episodes": 4,
+            "value": -0.8
+          }
+        ],
+        "top_candidates": [
+          "learn_2e9e2ea8d2478528952d473ad8e4b4bf8c11e4bbe1dd98f7638168d4aeb8a782"
+        ],
+        "policy_sha256": "94b9699607bd9d0931e9bed9b2370f9729d0b17e8abc691aac9396e87ab0932e",
+        "training_episodes": 8,
+        "execution_authorized": false,
+        "model_weights_trained": false,
+        "limitations": [
+          "Operator-attested rewards; no causal or held-out improvement claim.",
+          "No automatic execution or exploration; explicit skill selection remains required."
+        ]
+      },
+      "eval/identity": {
+        "status": "RECOMMENDATION",
+        "context": "eval/identity",
+        "options": [
+          {
+            "candidate_id": "learn_a6273156014e704717e8ab7eeda4a937a5c94c0d20089f0e53c6f93eb0a548a7",
+            "artifact_sha256": "1176200384bf6f4c115b7672c9f9c45923849694fc596f8d3751bc61ad0e4ad0",
+            "episodes": 4,
+            "value": 0.8
+          },
+          {
+            "candidate_id": "learn_bc2d3f1187ad7cdff14921f41df78d9004901b96e21c9ce417c347c2e2f9d335",
+            "artifact_sha256": "91994873eb5171a6dc46ffa88d876c6072a13a9f319c45421796778b1149c9ea",
+            "episodes": 4,
+            "value": -0.8
+          }
+        ],
+        "top_candidates": [
+          "learn_a6273156014e704717e8ab7eeda4a937a5c94c0d20089f0e53c6f93eb0a548a7"
+        ],
+        "policy_sha256": "f1f4fe0bcd49f26bde322bbc3824d3d279aaa0eb3c78dea8f863c607762adecb",
+        "training_episodes": 8,
+        "execution_authorized": false,
+        "model_weights_trained": false,
+        "limitations": [
+          "Operator-attested rewards; no causal or held-out improvement claim.",
+          "No automatic execution or exploration; explicit skill selection remains required."
+        ]
+      },
+      "eval/ties": {
+        "status": "RECOMMENDATION",
+        "context": "eval/ties",
+        "options": [
+          {
+            "candidate_id": "learn_fa43f24b29b1960d170a8ec7fce2bda3e14da06efcd85230edc0dee667fc1933",
+            "artifact_sha256": "f510f60a47f40cfd79e47a03faaa25fd5149572b000e86f3a36c6c4a8f190f88",
+            "episodes": 4,
+            "value": 0.8
+          },
+          {
+            "candidate_id": "learn_355ebe8dc15c4a97c545087af6410658315df9862dfaadd16dca6594f35d5e43",
+            "artifact_sha256": "c786b8567c0340d8d760a1d669dcf655afa86887453d85425c9bcc8696fcd75e",
+            "episodes": 4,
+            "value": -0.8
+          }
+        ],
+        "top_candidates": [
+          "learn_fa43f24b29b1960d170a8ec7fce2bda3e14da06efcd85230edc0dee667fc1933"
+        ],
+        "policy_sha256": "1c76240fa8acfdff62ecbe02066b9669a445fdac119dc629bb88598bb830d3a6",
+        "training_episodes": 8,
+        "execution_authorized": false,
+        "model_weights_trained": false,
+        "limitations": [
+          "Operator-attested rewards; no causal or held-out improvement claim.",
+          "No automatic execution or exploration; explicit skill selection remains required."
+        ]
+      }
+    },
+    "results": [
+      {
+        "fixture_id": "identity-4",
+        "selected": [
+          "learn_a6273156014e704717e8ab7eeda4a937a5c94c0d20089f0e53c6f93eb0a548a7"
+        ],
+        "observed": [
+          "ID 4 A",
+          "ID 4 B"
+        ],
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "conservation-4",
+        "selected": [
+          "learn_2e9e2ea8d2478528952d473ad8e4b4bf8c11e4bbe1dd98f7638168d4aeb8a782"
+        ],
+        "observed": [
+          "ID 4 A",
+          "ID 4 B"
+        ],
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "ties-4",
+        "selected": [
+          "learn_fa43f24b29b1960d170a8ec7fce2bda3e14da06efcd85230edc0dee667fc1933"
+        ],
+        "observed": {
+          "status": "UNRESOLVED",
+          "candidates": [
+            "A4",
+            "B4"
+          ]
+        },
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "identity-5",
+        "selected": [
+          "learn_a6273156014e704717e8ab7eeda4a937a5c94c0d20089f0e53c6f93eb0a548a7"
+        ],
+        "observed": [
+          "ID 5 A",
+          "ID 5 B"
+        ],
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "conservation-5",
+        "selected": [
+          "learn_2e9e2ea8d2478528952d473ad8e4b4bf8c11e4bbe1dd98f7638168d4aeb8a782"
+        ],
+        "observed": [
+          "ID 5 A",
+          "ID 5 B"
+        ],
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "ties-5",
+        "selected": [
+          "learn_fa43f24b29b1960d170a8ec7fce2bda3e14da06efcd85230edc0dee667fc1933"
+        ],
+        "observed": {
+          "status": "UNRESOLVED",
+          "candidates": [
+            "A5",
+            "B5"
+          ]
+        },
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "identity-6",
+        "selected": [
+          "learn_a6273156014e704717e8ab7eeda4a937a5c94c0d20089f0e53c6f93eb0a548a7"
+        ],
+        "observed": [
+          "ID 6 A",
+          "ID 6 B"
+        ],
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "conservation-6",
+        "selected": [
+          "learn_2e9e2ea8d2478528952d473ad8e4b4bf8c11e4bbe1dd98f7638168d4aeb8a782"
+        ],
+        "observed": [
+          "ID 6 A",
+          "ID 6 B"
+        ],
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "ties-6",
+        "selected": [
+          "learn_fa43f24b29b1960d170a8ec7fce2bda3e14da06efcd85230edc0dee667fc1933"
+        ],
+        "observed": {
+          "status": "UNRESOLVED",
+          "candidates": [
+            "A6",
+            "B6"
+          ]
+        },
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "identity-7",
+        "selected": [
+          "learn_a6273156014e704717e8ab7eeda4a937a5c94c0d20089f0e53c6f93eb0a548a7"
+        ],
+        "observed": [
+          "ID 7 A",
+          "ID 7 B"
+        ],
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "conservation-7",
+        "selected": [
+          "learn_2e9e2ea8d2478528952d473ad8e4b4bf8c11e4bbe1dd98f7638168d4aeb8a782"
+        ],
+        "observed": [
+          "ID 7 A",
+          "ID 7 B"
+        ],
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "ties-7",
+        "selected": [
+          "learn_fa43f24b29b1960d170a8ec7fce2bda3e14da06efcd85230edc0dee667fc1933"
+        ],
+        "observed": {
+          "status": "UNRESOLVED",
+          "candidates": [
+            "A7",
+            "B7"
+          ]
+        },
+        "pass": true,
+        "uniform_expected_accuracy": 0.5
+      }
+    ],
+    "held_out_passed": 12,
+    "held_out_total": 12,
+    "uniform_expected_accuracy": 0.5,
+    "reward_episodes": 24,
+    "training_feedback_sha256": "2ffbf3c46664a066f6203d27784792024a09734eed52aeb3388eec087934d79b",
+    "held_out_feedback_unchanged": true,
+    "unseen_context_status": "UNRESOLVED",
+    "receipt_chain": "PASS"
+  },
+  "inverted_reward_control": {
+    "untrained_abstentions": 3,
+    "policies": {
+      "eval/conservation": {
+        "status": "RECOMMENDATION",
+        "context": "eval/conservation",
+        "options": [
+          {
+            "candidate_id": "learn_2e9e2ea8d2478528952d473ad8e4b4bf8c11e4bbe1dd98f7638168d4aeb8a782",
+            "artifact_sha256": "68cd5f37d2697670b297290167bedeb29191a1b2a4f84d32e9366596e0cd52df",
+            "episodes": 4,
+            "value": -0.8
+          },
+          {
+            "candidate_id": "learn_8101e2d23bc0b0a55c7d317aa2e35e34603c9a815b4624123de7c203d0db992f",
+            "artifact_sha256": "146e0ee7fe6273c310147f01925ee16e60a50efedee4951b224d57a3d0ba1266",
+            "episodes": 4,
+            "value": 0.8
+          }
+        ],
+        "top_candidates": [
+          "learn_8101e2d23bc0b0a55c7d317aa2e35e34603c9a815b4624123de7c203d0db992f"
+        ],
+        "policy_sha256": "5648f1d9cfae84e4ac57f95e6755fd91abe653914e7fbd493586b16d14814fce",
+        "training_episodes": 8,
+        "execution_authorized": false,
+        "model_weights_trained": false,
+        "limitations": [
+          "Operator-attested rewards; no causal or held-out improvement claim.",
+          "No automatic execution or exploration; explicit skill selection remains required."
+        ]
+      },
+      "eval/identity": {
+        "status": "RECOMMENDATION",
+        "context": "eval/identity",
+        "options": [
+          {
+            "candidate_id": "learn_a6273156014e704717e8ab7eeda4a937a5c94c0d20089f0e53c6f93eb0a548a7",
+            "artifact_sha256": "1176200384bf6f4c115b7672c9f9c45923849694fc596f8d3751bc61ad0e4ad0",
+            "episodes": 4,
+            "value": -0.8
+          },
+          {
+            "candidate_id": "learn_bc2d3f1187ad7cdff14921f41df78d9004901b96e21c9ce417c347c2e2f9d335",
+            "artifact_sha256": "91994873eb5171a6dc46ffa88d876c6072a13a9f319c45421796778b1149c9ea",
+            "episodes": 4,
+            "value": 0.8
+          }
+        ],
+        "top_candidates": [
+          "learn_bc2d3f1187ad7cdff14921f41df78d9004901b96e21c9ce417c347c2e2f9d335"
+        ],
+        "policy_sha256": "eece09c0d14451337a091eee92bedf4659a2c20a640225ebdb32c82c9baaa841",
+        "training_episodes": 8,
+        "execution_authorized": false,
+        "model_weights_trained": false,
+        "limitations": [
+          "Operator-attested rewards; no causal or held-out improvement claim.",
+          "No automatic execution or exploration; explicit skill selection remains required."
+        ]
+      },
+      "eval/ties": {
+        "status": "RECOMMENDATION",
+        "context": "eval/ties",
+        "options": [
+          {
+            "candidate_id": "learn_fa43f24b29b1960d170a8ec7fce2bda3e14da06efcd85230edc0dee667fc1933",
+            "artifact_sha256": "f510f60a47f40cfd79e47a03faaa25fd5149572b000e86f3a36c6c4a8f190f88",
+            "episodes": 4,
+            "value": -0.8
+          },
+          {
+            "candidate_id": "learn_355ebe8dc15c4a97c545087af6410658315df9862dfaadd16dca6594f35d5e43",
+            "artifact_sha256": "c786b8567c0340d8d760a1d669dcf655afa86887453d85425c9bcc8696fcd75e",
+            "episodes": 4,
+            "value": 0.8
+          }
+        ],
+        "top_candidates": [
+          "learn_355ebe8dc15c4a97c545087af6410658315df9862dfaadd16dca6594f35d5e43"
+        ],
+        "policy_sha256": "0d4073f282afb8689859ae6c55a094220de31d74fe5169b3e553a02027b2a364",
+        "training_episodes": 8,
+        "execution_authorized": false,
+        "model_weights_trained": false,
+        "limitations": [
+          "Operator-attested rewards; no causal or held-out improvement claim.",
+          "No automatic execution or exploration; explicit skill selection remains required."
+        ]
+      }
+    },
+    "results": [
+      {
+        "fixture_id": "identity-4",
+        "selected": [
+          "learn_bc2d3f1187ad7cdff14921f41df78d9004901b96e21c9ce417c347c2e2f9d335"
+        ],
+        "observed": [
+          "same name"
+        ],
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "conservation-4",
+        "selected": [
+          "learn_8101e2d23bc0b0a55c7d317aa2e35e34603c9a815b4624123de7c203d0db992f"
+        ],
+        "observed": [
+          "ID 4 B"
+        ],
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "ties-4",
+        "selected": [
+          "learn_355ebe8dc15c4a97c545087af6410658315df9862dfaadd16dca6594f35d5e43"
+        ],
+        "observed": {
+          "status": "BOUND",
+          "candidates": [
+            "A4"
+          ]
+        },
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "identity-5",
+        "selected": [
+          "learn_bc2d3f1187ad7cdff14921f41df78d9004901b96e21c9ce417c347c2e2f9d335"
+        ],
+        "observed": [
+          "same name"
+        ],
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "conservation-5",
+        "selected": [
+          "learn_8101e2d23bc0b0a55c7d317aa2e35e34603c9a815b4624123de7c203d0db992f"
+        ],
+        "observed": [
+          "ID 5 B"
+        ],
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "ties-5",
+        "selected": [
+          "learn_355ebe8dc15c4a97c545087af6410658315df9862dfaadd16dca6594f35d5e43"
+        ],
+        "observed": {
+          "status": "BOUND",
+          "candidates": [
+            "A5"
+          ]
+        },
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "identity-6",
+        "selected": [
+          "learn_bc2d3f1187ad7cdff14921f41df78d9004901b96e21c9ce417c347c2e2f9d335"
+        ],
+        "observed": [
+          "same name"
+        ],
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "conservation-6",
+        "selected": [
+          "learn_8101e2d23bc0b0a55c7d317aa2e35e34603c9a815b4624123de7c203d0db992f"
+        ],
+        "observed": [
+          "ID 6 B"
+        ],
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "ties-6",
+        "selected": [
+          "learn_355ebe8dc15c4a97c545087af6410658315df9862dfaadd16dca6594f35d5e43"
+        ],
+        "observed": {
+          "status": "BOUND",
+          "candidates": [
+            "A6"
+          ]
+        },
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "identity-7",
+        "selected": [
+          "learn_bc2d3f1187ad7cdff14921f41df78d9004901b96e21c9ce417c347c2e2f9d335"
+        ],
+        "observed": [
+          "same name"
+        ],
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "conservation-7",
+        "selected": [
+          "learn_8101e2d23bc0b0a55c7d317aa2e35e34603c9a815b4624123de7c203d0db992f"
+        ],
+        "observed": [
+          "ID 7 B"
+        ],
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      },
+      {
+        "fixture_id": "ties-7",
+        "selected": [
+          "learn_355ebe8dc15c4a97c545087af6410658315df9862dfaadd16dca6594f35d5e43"
+        ],
+        "observed": {
+          "status": "BOUND",
+          "candidates": [
+            "A7"
+          ]
+        },
+        "pass": false,
+        "uniform_expected_accuracy": 0.5
+      }
+    ],
+    "held_out_passed": 0,
+    "held_out_total": 12,
+    "uniform_expected_accuracy": 0.5,
+    "reward_episodes": 24,
+    "training_feedback_sha256": "3d8abb528b1f1d000be4e3a4d8c19a7405fda9a437c16212fe0521673086eed3",
+    "held_out_feedback_unchanged": true,
+    "unseen_context_status": "UNRESOLVED",
+    "receipt_chain": "PASS"
+  },
+  "effectiveness": {
+    "trained_held_out_accuracy": 1.0,
+    "uniform_expected_accuracy": 0.5,
+    "difference_percentage_points": 50.0
+  },
+  "limitations": [
+    "Synthetic finite fixtures, not user-task or real-world transfer evidence.",
+    "The evaluator binds workflow functions; production artifacts do not become executable agents.",
+    "Reward inversion demonstrates susceptibility to incorrect feedback, not resistance to poisoning.",
+    "No model-weight training, unseen-context generalization, or causal real-world improvement claim."
+  ]
+}
