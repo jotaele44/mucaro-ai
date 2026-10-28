@@ -281,6 +281,15 @@ def main() -> int:
         gate_no_large_files(files),
         gate_no_generated_tracked(files),
         gate_command("python_tests", [sys.executable, "-m", "pytest", "backend/tests", "-q"]),
+        gate_command(
+            "matrix016_recovery",
+            [
+                sys.executable,
+                "scripts/certify_recovery.py",
+                "--output",
+                f"data/exports/release_receipts/matrix016-recovery-{head_sha[:12]}.json",
+            ],
+        ),
         gate_command("answer_trace_quality", [sys.executable, "scripts/certify_answer_trace_quality.py"]),
         gate_command("operator_workflow", [sys.executable, "scripts/certify_operator_workflow.py"]),
         gate_command("retrieval_eval", [sys.executable, "scripts/evaluate_retrieval.py"]),
