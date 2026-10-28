@@ -56,6 +56,17 @@ def test_workbench_plan_binds_existing_gate_and_never_executes(tmp_path):
         "observed_source_commit": "a" * 40,
         "status": "VERIFIED_MATCH",
     }
+    assert body["evidence_status"]["source_commit"] == {
+        "state": "PASS",
+        "evidence_ref": "a" * 40,
+    }
+    assert "source_commit" not in body["missing_certification_evidence"]
+    assert set(body["missing_certification_evidence"]) == {
+        "source_manifest_sha256",
+        "test_receipts",
+        "rollback_receipt",
+        "artifact_sha256",
+    }
     assert plan["status"] == "CANDIDATE_NOT_EXECUTION"
     assert plan["certification"] == "BLOCKED"
     assert plan["execution_authorized"] is False
@@ -108,6 +119,8 @@ def test_workbench_missing_source_identity_remains_explicit_residue(tmp_path):
     plan = response.json()["workbench_plan"]
     assert plan["source_commit"] is None
     assert "source_commit" in plan["missing_evidence"]
+    assert response.json()["evidence_status"]["source_commit"]["state"] == "OPEN"
+    assert "source_commit" in response.json()["missing_certification_evidence"]
     assert plan["certification"] == "BLOCKED"
 
 
