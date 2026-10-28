@@ -10,6 +10,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from collections.abc import Iterable
 
 TEXT_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".json", ".toml", ".sh", ".ps1", ".cmd", ".yml", ".yaml"}
 SKIP_DIRS = {".git", "node_modules", ".venv", "dist", "build", "__pycache__", ".mucaro-runtime", ".pytest_cache"}
@@ -23,12 +24,13 @@ PATTERNS = {
 }
 MANIFEST_PATHS = {"pyproject.toml", "frontend/package.json", "frontend/package-lock.json", "README.md"}
 
-def scan(root: Path) -> dict:
+def scan(root: Path, *, exclude_paths: Iterable[Path] = ()) -> dict:
     root = root.resolve()
+    excluded = {Path(path).resolve() for path in exclude_paths}
     files = []
     sightings = []
     for p in sorted(root.rglob("*")):
-        if not p.is_file() or any(part in SKIP_DIRS for part in p.relative_to(root).parts):
+        if not p.is_file() or p.resolve() in excluded or any(part in SKIP_DIRS for part in p.relative_to(root).parts):
             continue
         rel = p.relative_to(root).as_posix()
         if p.suffix.lower() not in TEXT_SUFFIXES and rel not in MANIFEST_PATHS:
@@ -61,10 +63,10 @@ def main() -> None:
     ap.add_argument("--root", default=".")
     ap.add_argument("--output")
     args = ap.parse_args()
-    result = scan(Path(args.root))
+    target = Path(args.output).resolve() if args.output else None
+    result = scan(Path(args.root), exclude_paths=(() if target is None else (target,)))
     serialized = json.dumps(result, sort_keys=True, ensure_ascii=False, indent=2) + "\n"
-    if args.output:
-        target = Path(args.output).resolve()
+    if target is not None:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(serialized, encoding="utf-8")
     else:
