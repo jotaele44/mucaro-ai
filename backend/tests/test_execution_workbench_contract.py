@@ -6,7 +6,13 @@ def test_maximum_plan_is_complete_and_nonexecuting():
     assert len(plan.lanes) == 20 and plan.lanes == LANES
     assert plan.state == "PLAN_ONLY"
     assert plan.certification == "BLOCKED"
-    assert '"certification": "BLOCKED"' in plan_json(plan)
+    assert plan.catalog_status == "UNBOUND"
+    assert plan.catalog_ref is None
+    assert plan.blocked_lanes == LANES
+    assert plan.lane_status == tuple((lane, "UNRESOLVED_CATALOG") for lane in LANES)
+    rendered = plan_json(plan)
+    assert '"certification": "BLOCKED"' in rendered
+    assert '"catalog_status": "UNBOUND"' in rendered
 
 def test_order_is_canonical():
     assert create_plan("maximum", "offline", "unknown", ["windows", "linux"]).platforms == ("linux", "windows")
