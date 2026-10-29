@@ -15,6 +15,7 @@ from .config import Settings, settings
 from .contracts import ContractViolation, validate_contract
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
 from .execution_router import ExecutionRouterError, execute_routed, select_execution_route
+from .gis_raster_skill import RASTER_ARGUMENTS_SCHEMA, RASTER_EXECUTION_POLICY, analyze_raster_data
 from .gis_skill import GIS_ARGUMENTS_SCHEMA, GIS_EXECUTION_POLICY, analyze_spatial_data
 from .ocr_skill import OCR_ARGUMENTS_SCHEMA, OCR_EXECUTION_POLICY, analyze_document
 from .runtime_identity import build_runtime_identity
@@ -119,6 +120,13 @@ def _local_worker_health_skill(arguments: dict[str, Any], cfg: Settings) -> dict
 
 
 SKILL_REGISTRY: dict[str, SkillDefinition] = {
+    "mucaro/gis-raster": SkillDefinition(
+        skill_id="mucaro/gis-raster", version="1.0.0",
+        description="Inspect, sample, clip, resample, derive terrain/hillshade, condition depressions, route D8 flow, and analyze vector zones over bounded local GeoTIFFs. Preserves NODATA, source bytes, unresolved states, and saved artifact lineage.",
+        runtime="IN_PROCESS", capabilities=("filesystem.read", "filesystem.write"),
+        input_schema="mucaro.gis-raster-input/1.0", output_schema="mucaro.gis-raster-result/1.0",
+        handler=analyze_raster_data, arguments_schema=RASTER_ARGUMENTS_SCHEMA, execution_policy=RASTER_EXECUTION_POLICY,
+    ),
     "mucaro/gis-analyze": SkillDefinition(
         skill_id="mucaro/gis-analyze", version="1.0.0",
         description="Inspect, measure, transform, repair, compare, overlay, or spatially join bounded local GeoJSON layers. Preserves input bytes, CRS, warnings, and artifact lineage; pair operations require unique explicit feature IDs.",
@@ -174,6 +182,10 @@ def validate_skill_arguments(skill_id: str, arguments: dict[str, Any]) -> None:
     if skill is None:
         raise SkillRuntimeError("ERROR_SKILL_NOT_REGISTERED", skill_id)
     _validate_definition(skill)
+    try:
+        json.dumps(arguments, allow_nan=False)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SkillRuntimeError("ERROR_SKILL_ARGUMENTS_INVALID", "Arguments must contain valid JSON values and finite numbers.") from exc
     if skill.arguments_schema is not None:
         errors = list(Draft202012Validator(skill.arguments_schema).iter_errors(arguments))
         if errors:

@@ -97,6 +97,24 @@ async function seed(base) {
   }
 }
 
+async function developmentProxyScenario(base) {
+  const port = await freePort();
+  const devBase = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [path.join(ROOT, "frontend", "node_modules", "vite", "bin", "vite.js"), "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
+    cwd: path.join(ROOT, "frontend"), env: { ...process.env, MUCARO_AI_DEV_API_TARGET: base }, stdio: ["ignore", "pipe", "pipe"],
+  });
+  try {
+    if (!(await waitForHealth(devBase))) throw new Error("development frontend proxy did not start");
+    const schema = await (await fetch(`${base}/openapi.json`)).json();
+    const roots = [...new Set(Object.keys(schema.paths).map((route) => `/${route.split("/")[1]}`))].sort();
+    const probes = await Promise.all(roots.map(async (root) => {
+      const response = await fetch(`${devBase}${root}/__proxy_probe__`);
+      return { root, status: response.status, json: (response.headers.get("content-type") || "").includes("application/json") };
+    }));
+    check("development frontend forwards every current API group instead of serving HTML", "all", probes.every((probe) => probe.json), JSON.stringify(probes));
+  } finally { child.kill("SIGTERM"); }
+}
+
 async function shot(page, viewport, name) {
   const file = path.join(outDir, `${viewport}-${name}.png`);
   await page.screenshot({ path: file, fullPage: false });
@@ -660,6 +678,56 @@ async function scenario(browser, base, viewport, contextOptions) {
     await gisSkill.getByLabel("Spatial operation", { exact: true }).selectOption("inspect");
     await shot(page, viewport, "16d-governed-gis");
     axeRuns.push(await axe(page, viewport, "governed GIS"));
+    const rasterSkill = page.locator("li.skill-card").filter({ has: page.getByRole("heading", { name: "Analyze raster and hydrology data", exact: true }) });
+    await rasterSkill.waitFor();
+    if (await rasterSkill.getByRole("button", { name: "Mount", exact: true }).count()) {
+      await rasterSkill.getByRole("button", { name: "Mount", exact: true }).click();
+      await rasterSkill.getByRole("checkbox", { name: "filesystem.read", exact: true }).check();
+      await rasterSkill.getByRole("checkbox", { name: "filesystem.write", exact: true }).check();
+      await rasterSkill.getByRole("button", { name: "Authorize & activate", exact: true }).click();
+    }
+    const rasterFixture = path.join(ROOT, "backend", "tests", "fixtures", "gis_corpus", "usgs_3dep_pr_elevation_utm20n_64x64.tif");
+    const sampleControl = JSON.parse(execFileSync(python, ["-c", "import json,sys,numpy as np,rasterio; ds=rasterio.open(sys.argv[1]); values=ds.read(1,masked=True); row,col=np.argwhere(~np.ma.getmaskarray(values))[0]; x,y=ds.xy(int(row),int(col)); print(json.dumps({'x':x,'y':y,'value':float(values[row,col]),'crs':ds.crs.to_string()})); ds.close()", rasterFixture], { cwd: ROOT }).toString());
+    if (!fixtures.some((fixture) => fixture.file === path.relative(ROOT, rasterFixture))) fixtures.push({ file: path.relative(ROOT, rasterFixture), sha256: createHash("sha256").update(readFileSync(rasterFixture)).digest("hex"), sample_control: sampleControl });
+    await rasterSkill.getByLabel("Input GeoTIFF path", { exact: true }).fill(rasterFixture);
+    const rasterResult = rasterSkill.getByRole("region", { name: "Spatial analysis result", exact: true });
+    async function invokeRaster() {
+      const summary = rasterSkill.locator("summary").filter({ hasText: /^Latest receipt:/ });
+      const previous = await summary.count() ? await summary.textContent() : null;
+      await rasterSkill.getByRole("button", { name: "Invoke skill", exact: true }).click();
+      await page.waitForFunction((old) => {
+        const card = [...document.querySelectorAll("li.skill-card")].find((node) => node.textContent.includes("mucaro/gis-raster"));
+        return [...card.querySelectorAll("summary")].find((node) => node.textContent.startsWith("Latest receipt:"))?.textContent !== old && card.querySelector(".skill-invoke > button")?.disabled === false;
+      }, previous, { timeout: 60000 });
+    }
+    await invokeRaster();
+    check("GIS workspace inspects a frozen real GeoTIFF with explicit band and NODATA counts", viewport, await rasterResult.getByText("64 × 64 cells · 1 band(s)", { exact: true }).isVisible() && await rasterResult.getByText("Valid / NODATA / zero cells", { exact: true }).isVisible());
+    await rasterSkill.getByLabel("Raster operation", { exact: true }).selectOption("sample");
+    await rasterSkill.getByLabel("Point 1 X", { exact: true }).fill(String(sampleControl.x));
+    await rasterSkill.getByLabel("Point 1 Y", { exact: true }).fill(String(sampleControl.y));
+    await rasterSkill.getByLabel("Coordinate CRS (for example EPSG:32620)", { exact: true }).fill(sampleControl.crs);
+    await rasterSkill.getByRole("button", { name: "Add sample point", exact: true }).click();
+    await rasterSkill.getByLabel("Point 2 X", { exact: true }).fill("0");
+    await rasterSkill.getByLabel("Point 2 Y", { exact: true }).fill("0");
+    axeRuns.push(await axe(page, viewport, "raster coordinate controls"));
+    await invokeRaster();
+    let rasterReceipt = JSON.parse(await rasterSkill.locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Latest receipt:/ }) }).locator("pre code").textContent());
+    check("raster coordinate rows sample the known cell and preserve an outside point", viewport, rasterReceipt.report.samples[0].values[0] === sampleControl.value && rasterReceipt.report.samples[1].state === "OUTSIDE" && await rasterResult.getByRole("table", { name: "Sample results (2)", exact: true }).isVisible());
+    await rasterSkill.getByRole("button", { name: "Remove point 2", exact: true }).click();
+    check("sample point removal preserves the first coordinate without invoking work", viewport, !(await rasterSkill.getByLabel("Point 2 X", { exact: true }).count()) && (await rasterSkill.getByLabel("Point 1 X", { exact: true }).inputValue()) === String(sampleControl.x));
+    await rasterSkill.getByLabel("Raster operation", { exact: true }).selectOption("d8_flow");
+    await invokeRaster();
+    rasterReceipt = JSON.parse(await rasterSkill.locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Latest receipt:/ }) }).locator("pre code").textContent());
+    check("governed D8 flow retains complete cell accounting and a derived raster", viewport, rasterReceipt.report.flow_accounting.total_cell_count === 4096 && Object.values(rasterReceipt.report.invariants).every((value) => value !== false) && rasterReceipt.output_grid.band_count > 1);
+    const rasterDownloadEvent = page.waitForEvent("download");
+    await rasterResult.getByRole("button", { name: "Download GeoTIFF", exact: true }).click();
+    const rasterDownload = await rasterDownloadEvent;
+    const downloadedRasterBytes = readFileSync(await rasterDownload.path());
+    check("derived GeoTIFF download matches the saved output artifact bytes", viewport, createHash("sha256").update(downloadedRasterBytes).digest("hex") === rasterReceipt.files.find((file) => file.role === "output").sha256 && downloadedRasterBytes.length > 0);
+    await page.waitForFunction(() => [...document.querySelectorAll("li.skill-card")].find((card) => card.textContent.includes("mucaro/gis-raster"))?.querySelector(".skill-invoke > button")?.disabled === false);
+    await rasterResult.scrollIntoViewIfNeeded();
+    await shot(page, viewport, "16e-governed-raster");
+    axeRuns.push(await axe(page, viewport, "raster results"));
     await openNav();
     await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Chat", exact: true }).click();
     await drawerClosed();
@@ -1691,6 +1759,7 @@ try {
   const expectedIndex = builtAssets.find((asset) => asset.file === "frontend/dist/index.html");
   check("backend serves the page built from the recorded frontend source", "all", servedIndex.ok && buildBinding.served_index_sha256 === expectedIndex?.sha256);
   await seed(base);
+  if (!onlyNew) await developmentProxyScenario(base);
   const browser = await browserType.launch();
   browserVersion = browser.version();
   if (!onlyNew) {

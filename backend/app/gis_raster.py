@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .gis_processing import GISProcessingError, GIS_REPORT_SCHEMA_VERSION
+from .spatial_reports import numeric_report_view
 from .utils import stable_id, utc_now, write_json
 
 try:
@@ -37,6 +38,9 @@ def _resolve_raster_source(path: Path) -> Path:
 
 
 def _write_report(cfg: Any, report: dict[str, Any]) -> dict[str, Any]:
+    report, special = numeric_report_view(report)
+    if special:
+        report["numeric_metadata_states"] = special
     path = cfg.export_dir / "gis_reports" / f"{report['report_id']}.json"
     write_json(path, report)
     return {**report, "report_path": str(path), "report_sha256": _sha256(path)}
@@ -96,17 +100,22 @@ def sample_raster(path: Path, points: list[tuple[float, float]], *, cfg: Any) ->
     try:
         with rasterio.open(source) as dataset:
             for index, (x, y) in enumerate(points):
-                if not (dataset.bounds.left <= x <= dataset.bounds.right and dataset.bounds.bottom <= y <= dataset.bounds.top):
+                column, row = (~dataset.transform) * (x, y)
+                if not (0 <= column < dataset.width and 0 <= row < dataset.height):
                     rows.append({"point_index": index, "x": x, "y": y, "state": "OUTSIDE", "values": None}); continue
                 values = next(dataset.sample([(x, y)], masked=True))
                 if getattr(values, "mask", False) is not False and bool(getattr(values, "mask").all()):
                     rows.append({"point_index": index, "x": x, "y": y, "state": "NODATA", "values": None}); continue
-                rows.append({"point_index": index, "x": x, "y": y, "state": "SAMPLED", "values": [float(v) for v in values]})
+                mask = np.ma.getmaskarray(values)
+                state = "PARTIAL_NODATA" if bool(mask.any()) else "SAMPLED"
+                rows.append({"point_index": index, "x": x, "y": y, "state": state, "values": [None if missing else float(value) for value, missing in zip(values, mask, strict=True)], "band_states": ["NODATA" if missing else "SAMPLED" for missing in mask]})
             crs = dataset.crs.to_string() if dataset.crs else None
     except Exception as exc:
         raise GISProcessingError("ERROR_GIS_RASTER_SAMPLE", f"Raster could not be sampled: {exc}") from exc
     created_at = utc_now(); report_id = stable_id("gisreport", "raster_sample", source_sha, str(points), created_at)
     counts = {state: sum(1 for row in rows if row["state"] == state) for state in ("SAMPLED", "NODATA", "OUTSIDE")}
+    if any(row["state"] == "PARTIAL_NODATA" for row in rows):
+        counts["PARTIAL_NODATA"] = sum(row["state"] == "PARTIAL_NODATA" for row in rows)
     return _write_report(cfg, {"schema_version": GIS_REPORT_SCHEMA_VERSION, "report_id": report_id, "status": "GIS_RASTER_SAMPLE_OK", "operation": "sample_raster", "created_at": created_at, "source": {"path": str(source), "sha256": source_sha, "crs": crs}, "samples": rows, "state_counts": counts, "invariants": {"point_accounting_closed": len(points) == sum(counts.values())}, "warnings": [], "limitations": ["Point coordinates must already be in the raster CRS; no implicit reprojection occurs."], "falsification_criteria": ["reject if point accounting fails", "reject samples when point CRS is not independently known to match raster CRS"]})
 
 
@@ -291,7 +300,7 @@ def resample_raster(
             "crs_preserved": output_crs == source_crs,
             "bounds_preserved": bounds_preserved,
             "band_count_preserved": output_count == source_count,
-            "nodata_definition_preserved": output_nodata == source_nodata,
+            "nodata_definition_preserved": all(left == right or (isinstance(left, float) and isinstance(right, float) and math.isnan(left) and math.isnan(right)) for left, right in zip(source_nodata, output_nodata, strict=True)),
             "nodata_accounting_recorded": all(
                 row["valid_cell_count"] + row["nodata_cell_count"] == output_width * output_height
                 and row["zero_cell_count"] <= row["valid_cell_count"]

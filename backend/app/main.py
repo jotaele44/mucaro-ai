@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import re
 from pathlib import Path, PurePath
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, resume_fleet_plan
+from .artifact_downloads import ArtifactDownloadError, read_artifact_download
 from .agent_tasks import TaskError, create_task, get_task, list_tasks, task_summary, update_task
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
@@ -438,6 +440,17 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/skills/executions")
     def skill_executions(_auth: dict = Depends(require_auth)) -> dict:
         return list_skill_executions(cfg)
+
+    @app.get("/artifacts/{artifact_id}/download")
+    def artifact_download(artifact_id: str, _auth: dict = Depends(require_auth)) -> Response:
+        try:
+            payload, filename, media_type, sha256 = read_artifact_download(artifact_id, cfg)
+        except ArtifactDownloadError as exc:
+            raise api_error(exc.status, exc.detail, status_code=exc.http_status) from exc
+        return Response(payload, media_type=media_type, headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename, safe='')}",
+            "X-Mucaro-Artifact-SHA256": sha256, "ETag": f'"{sha256}"', "Cache-Control": "no-store",
+        })
 
     @app.post("/skills/{skill_id:path}/mount")
     def mount_operator_skill(skill_id: str, _auth: dict = Depends(require_auth)) -> dict:

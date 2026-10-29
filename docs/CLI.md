@@ -1137,6 +1137,68 @@ exercise real vector engines, parallel report retention, permissions, malformed
 inputs, and all interface entry points. Raster/hydrology task integration and
 broader GIS release acceptance remain open under their existing requirements.
 
+### Governed raster and hydrology skill
+
+`mucaro/gis-raster` exposes local GeoTIFF operations in **GIS**, **Skills**, the
+skill API, CLI, and approved conversations. Mount it, select `filesystem.read`
+and `filesystem.write`, activate it, then choose the raster operation and file.
+The GUI provides numeric controls and editable coordinate rows instead of
+requiring JSON. Sample/clip coordinates need an explicit matching CRS. Terrain,
+hillshade, depression conditioning, and D8 require an explicit metre-elevation
+declaration; contradictory band units or scaled/offset elevation values are
+rejected until converted explicitly.
+
+```bash
+mucaro skills mount mucaro/gis-raster
+mucaro skills activate mucaro/gis-raster --allow-capability filesystem.read --allow-capability filesystem.write
+mucaro skills execute mucaro/gis-raster --arguments '{"operation":"inspect","path":"data/input/elevation.tif"}'
+mucaro skills execute mucaro/gis-raster --arguments '{"operation":"d8_flow","path":"data/input/elevation.tif","elevation_units":"meters","band":1}'
+mucaro skills execute mucaro/gis-raster --arguments '{"operation":"condition_depressions","path":"data/input/elevation.tif","elevation_units":"meters","maximum_fill_depth_m":2}'
+```
+
+Operations are `inspect`, `sample`, `clip`, `resample`, `terrain`, `hillshade`,
+`condition_depressions`, `d8_flow`, `vector_intersection`, and `zonal_statistics`.
+Zonal operations additionally accept `vector_path`, `band`, and an explicit
+`inclusion_rule` of `cell_center` or `fractional_coverage`. Overlapping zones
+retain independent feature rows; their aggregates are not a non-overlapping
+total. Fractional coverage requires projected coordinates and preserves its
+separate area-weighted statistics contract. D8 retains sinks, flats, and tied
+candidates without inventing a flow direction. Conditioning does not imply
+that these unresolved routing cases have been solved.
+
+Limits are 25 MiB per source, 250,000 raster cells, 1,000,000 values across up
+to eight bands, 32 MiB decoded numeric data, and 1,000,000 candidate cell/zone
+work units. Header limits are checked before decoding pixels. Only actual
+self-contained, single-grid TIFF/GeoTIFF is admitted; multi-grid TIFFs require
+explicit extraction so no grid is silently omitted. Virtual datasets, external sidecars,
+and network grid downloads are disabled. Valid pixels must be finite. NODATA,
+partially masked multiband values, outside-grid points, and numeric zero remain
+distinct. The JSON-safe result identifies non-finite metadata such as a NaN
+NODATA marker by JSON pointer; raw source/report bytes retain their own hashes.
+
+**Download GeoTIFF**, **Download GeoJSON**, and **Download raw engine report**
+retrieve recorded output artifacts through `GET /artifacts/{artifact_id}/download`.
+This authenticated endpoint accepts an artifact ID, verifies its lineage,
+confines access to the app's export directory, and reads a bounded buffer whose
+size/hash match the artifact before returning it. Changed or unavailable outputs
+fail with a recoverable error. **Save analysis JSON** instead saves the inspection
+envelope and its explicit numeric metadata states. It is a different representation
+from the original engine-report file.
+
+Engineering reuse: `spatial_reports.py` verifies invocation-local output bytes
+and admits source/intermediate/result parents for vector and raster tasks.
+Hillshade retains both the intermediate terrain raster and terrain report.
+The raster policy digest covers GDAL options, budgets, and schema rules; a policy
+change requires fresh skill activation. Test compressed inputs before pixel
+reads, multiband masks, exact pixel-grid boundaries, NaN NODATA, malformed
+coordinates, unit conflicts, source/output tampering, and concurrent reports.
+
+During frontend development, Vite proxies every current API group to
+`http://127.0.0.1:8000`. Set `MUCARO_AI_DEV_API_TARGET` for a different development
+backend. The rendered harness starts a real development server and probes the
+API groups derived from the backend OpenAPI document, preventing silent HTML
+fallback for newly added services.
+
 ### Governed OCR skill
 
 `mucaro/ocr-analyze` uses the same local image/PDF engines as `mucaro ocr

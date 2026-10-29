@@ -1464,3 +1464,10 @@ html {
     min-width: 44px;
   }
 }
+.coordinate-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}

@@ -23,6 +23,7 @@ from .gis_processing import (
 )
 from .gis_topology_repair import repair_geojson_topology
 from .local_inputs import snapshot_local_file
+from .spatial_reports import record_spatial_artifacts
 
 OPERATIONS = {
     "inspect": "Inspect geometry and topology",
@@ -230,22 +231,12 @@ def analyze_spatial_data(arguments: dict[str, Any], cfg: Settings) -> dict[str, 
     if any(value is False for name, value in invariants.items() if "accounting_closed" in name or "conservation" in name or name == "crs_match"):
         raise _fail("INVARIANT_FAILED", "Spatial row accounting or CRS compatibility failed. Review the retained reports.")
     source_ids = [artifact.artifact_id for _, _, artifact in sources]
-    artifact_ids = []
-    for role, item in (("output", report.get("output")), ("report", {"path": report["report_path"], "sha256": report["report_sha256"]})):
-        if not item:
-            continue
-        path = Path(item["path"])
-        if not path.is_relative_to(run_dir) or path.stat().st_size > GIS_EXECUTION_POLICY["max_report_bytes"]:
-            raise _fail("OUTPUT_LIMIT", "Spatial output exceeds the declared artifact budget or output boundary.")
-        raw = path.read_bytes()
-        if hashlib.sha256(raw).hexdigest() != item["sha256"]:
-            raise _fail("OUTPUT_HASH_MISMATCH", "Spatial output changed after the engine recorded it.")
-        artifact = create_artifact_record(
-            processed_dir=cfg.processed_dir, artifact_type="DERIVED", payload=raw,
-            logical_identity=f"gis_{role}:{path}", producer="gis_skill", producer_version="1.0.0",
-            parent_artifact_ids=[*source_ids, *binding_ids, *artifact_ids], source_path_or_uri=str(path),
-        )
-        artifact_ids.append(artifact.artifact_id)
+    downloads = []
+    artifact_ids = record_spatial_artifacts(
+        report, cfg=cfg, run_dir=run_dir, parent_ids=[*source_ids, *binding_ids], producer="gis_skill",
+        max_report_bytes=GIS_EXECUTION_POLICY["max_report_bytes"], max_output_bytes=GIS_EXECUTION_POLICY["max_report_bytes"],
+        downloads=downloads,
+    )
     parser_warnings = ["GIS_FEATURE_IDS_NOT_CANONICAL" for _, manifest, _ in sources if manifest["preflight"]["missing_id_indices"] or manifest["preflight"]["duplicate_ids"]]
     warnings = list(dict.fromkeys([*report.get("warnings", []), *parser_warnings]))
     return {
@@ -253,6 +244,7 @@ def analyze_spatial_data(arguments: dict[str, Any], cfg: Settings) -> dict[str, 
         "operation": operation, "operation_label": OPERATIONS[operation], "report": report,
         "source_manifests": [manifest for _, manifest, _ in sources], "source_artifact_ids": source_ids,
         "artifact_ids": artifact_ids, "warnings": warnings, "trust": "UNTRUSTED_CONTENT",
+        "files": downloads,
         "alignment": alignment,
         "coordinate_work": coordinate_work,
         "identity_state": "CANDIDATE_NOT_IDENTITY", "epistemic_classification": "COMPUTED",

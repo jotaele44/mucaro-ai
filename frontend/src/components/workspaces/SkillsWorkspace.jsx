@@ -22,7 +22,41 @@ const SPATIAL_WARNINGS = {
   GIS_CRS_Z_PASSTHROUGH_UNTRANSFORMED: "Height or depth values were retained without a vertical transformation.",
   GIS_JOIN_MULTIPLICATION_PRESENT: "Some features have multiple spatial matches. Review the full candidate sets and join cardinality.",
   GIS_ELLIPSOIDAL_UNRESOLVED: "Some features could not be measured. Review the unresolved feature records.",
+  GIS_RASTER_SAMPLE_NONVALUE_STATES: "Some points are outside the grid or have NODATA in one or more bands. These states remain separate from numeric zero.",
+  GIS_RASTER_SPECIAL_NUMERIC_METADATA: "The source uses a non-finite numeric metadata value, such as NaN for NODATA. The saved view identifies its original state separately from null.",
+  GIS_D8_FLATS_UNRESOLVED: "Flat cells remain unresolved. The engine has not invented a drainage direction for them.",
+  GIS_D8_SINKS_UNRESOLVED: "Sink cells remain unresolved. Depression conditioning is a separate explicit operation.",
+  GIS_D8_TIES_UNRESOLVED: "Some cells have tied flow candidates. Every candidate is retained for review.",
 };
+
+const SPATIAL_STATES = { FLOW_UNIQUE: "Unambiguous flow cells", BOUNDARY_TERMINAL: "Boundary or NODATA-adjacent terminal cells", SINK_UNRESOLVED: "Unresolved sink cells", FLAT_UNRESOLVED: "Unresolved flat cells", TIE_UNRESOLVED: "Cells with tied flow candidates", PARTIAL_NODATA: "Points with partially masked bands" };
+
+function CoordinatePairs({ title, value, onChange, disabled }) {
+  const points = Array.isArray(value) && value.length ? value : [["", ""]];
+  const update = (index, axis, number) => onChange(points.map((point, row) => row === index ? [axis === 0 ? number : point?.[0] ?? "", axis === 1 ? number : point?.[1] ?? ""] : point));
+  return <fieldset className="capability-fieldset"><legend>{title}</legend>
+    {points.map((point, index) => <div className="coordinate-row" key={index}>
+      <label className="field">Point {index+1} X<input type="number" step="any" value={point?.[0] ?? ""} disabled={disabled} onChange={(event) => update(index, 0, event.target.value)} /></label>
+      <label className="field">Point {index+1} Y<input type="number" step="any" value={point?.[1] ?? ""} disabled={disabled} onChange={(event) => update(index, 1, event.target.value)} /></label>
+      <button type="button" className="secondary-button" aria-label={`Remove point ${index+1}`} disabled={disabled || points.length === 1} onClick={() => onChange(points.filter((_, row) => row !== index))}>Remove</button>
+    </div>)}
+    <button type="button" className="secondary-button" disabled={disabled || points.length >= 1000} onClick={() => onChange([...points, ["", ""]])}>Add sample point</button>
+  </fieldset>;
+}
+
+function RasterEvidence({ result }) {
+  const grid = result.source_manifests[0].raster;
+  const accounting = result.report.flow_accounting || result.report.depression_fill_accounting || result.report.terrain_accounting || result.report.hillshade_accounting;
+  return <>
+    <dl className="facts"><dt>Input grid</dt><dd>{grid.width} × {grid.height} cells · {grid.band_count} band(s)</dd><dt>Source CRS</dt><dd>{grid.crs || "Not declared"}</dd>
+      <dt>Valid / NODATA / zero cells</dt><dd>{grid.bands.map((band) => `Band ${band.band}: ${band.valid_cell_count} / ${band.nodata_cell_count} / ${band.zero_cell_count}`).join(" · ")}</dd>
+      {result.output_grid && <><dt>Output grid</dt><dd>{result.output_grid.width} × {result.output_grid.height} cells · {result.output_grid.band_count} band(s)</dd><dt>Output CRS</dt><dd>{result.output_grid.crs || "Not declared"}</dd></>}
+    </dl>
+    {result.report.samples && <div className="table-scroll"><table><caption>Sample results ({result.report.samples.length})</caption><thead><tr><th scope="col">Point</th><th scope="col">State</th><th scope="col">Band values</th></tr></thead><tbody>{result.report.samples.slice(0, 50).map((sample) => <tr key={sample.point_index}><td>{sample.x}, {sample.y}</td><td>{sample.state}</td><td>{sample.values ? sample.values.map((value) => value === null ? "NODATA" : value).join(" · ") : "No numeric value"}</td></tr>)}</tbody></table>{result.report.samples.length > 50 && <p className="muted small">Showing 50 points. Save the analysis JSON for every sample.</p>}</div>}
+    {result.report.features && <div className="table-scroll"><table><caption>Zone results ({result.report.features.length})</caption><thead><tr><th scope="col">Feature</th><th scope="col">State</th><th scope="col">Valid cells</th><th scope="col">Mean</th></tr></thead><tbody>{result.report.features.slice(0, 50).map((zone) => <tr key={zone.feature_index}><td>{zone.feature_id ?? `Row ${zone.feature_index+1}`}</td><td>{zone.state}</td><td>{zone.valid_cell_count}</td><td>{zone.mean ?? "No numeric value"}</td></tr>)}</tbody></table>{result.report.features.length > 50 && <p className="muted small">Showing 50 zones. Save the analysis JSON for every feature.</p>}</div>}
+    {accounting && <details><summary>Cell and derivation accounting</summary><dl className="facts">{Object.entries(accounting).map(([name, value]) => <React.Fragment key={name}><dt>{name.replaceAll("_", " ")}</dt><dd>{String(value)}</dd></React.Fragment>)}</dl></details>}
+  </>;
+}
 
 // Skill operator surface: registration, mount, authorization, invocation, and receipts stay visible together.
 export function SkillsWorkspace({ announce, skillPrefix = "", embedded = false }) {
@@ -93,7 +127,7 @@ export function SkillsWorkspace({ announce, skillPrefix = "", embedded = false }
           if (property["x-operations"] && !property["x-operations"].includes(operation)) continue;
           const value = fieldValues[skillId]?.[name] ?? property.default;
           if (value === undefined || value === "") continue;
-          args[name] = property.type === "integer" ? Number(value) : value;
+          args[name] = property["x-input"] === "coordinate-pairs" ? value.map((point) => point.map((coordinate) => coordinate === "" ? null : Number(coordinate))) : ["integer", "number"].includes(property.type) ? Number(value) : value;
         }
       } else args = JSON.parse(argumentsText[skillId] || "{}");
       if (!args || Array.isArray(args) || typeof args !== "object") throw new Error("Arguments must be a JSON object.");
@@ -202,11 +236,13 @@ export function SkillsWorkspace({ announce, skillPrefix = "", embedded = false }
                     if (property["x-operations"] && !property["x-operations"].includes(operation)) return null;
                     const value = fieldValues[skill.skill_id]?.[name] ?? property.default ?? "";
                     const change = (event) => setFieldValues((old) => ({ ...old, [skill.skill_id]: { ...old[skill.skill_id], [name]: event.target.value } }));
-                    return <label className="field" key={name}><span>{property.title || name}</span>{property.enum ? <select aria-label={property.title || name} value={value} onChange={change}>{property.enum.map((option) => <option key={option} value={option}>{property["x-enum-labels"]?.[option] || option}</option>)}</select> : <input aria-label={property.title || name} type={property.type === "integer" ? "number" : "text"} value={value} onChange={change} min={property.minimum} max={property.maximum} required={skill.arguments_schema.required?.includes(name)} />}</label>;
+                    if (property["x-input"] === "coordinate-pairs") return <CoordinatePairs key={name} title={property.title} value={value} disabled={running} onChange={(points) => setFieldValues((old) => ({ ...old, [skill.skill_id]: { ...old[skill.skill_id], [name]: points } }))} />;
+                    return <label className="field" key={name}><span>{property.title || name}</span>{property.enum ? <select aria-label={property.title || name} value={value} onChange={change}>{property.enum.map((option) => <option key={option} value={option}>{property["x-enum-labels"]?.[option] || option}</option>)}</select> : <input aria-label={property.title || name} type={["integer", "number"].includes(property.type) ? "number" : "text"} step={property.type === "number" ? "any" : undefined} value={value} onChange={change} min={property.minimum ?? property.exclusiveMinimum} max={property.maximum ?? property.exclusiveMaximum} required={skill.arguments_schema.required?.includes(name)} />}</label>;
                   }) : <label className="field"><span>Arguments (JSON object)</span><textarea rows={2} value={argumentsText[skill.skill_id] || "{}"} onChange={(event) => setArgumentsText((old) => ({ ...old, [skill.skill_id]: event.target.value }))} /></label>}
                   {skill.execution_policy?.max_pdf_pages && <p className="muted small">Up to {skill.execution_policy.max_pdf_pages} PDF pages, 25 MB, and 300 DPI per invocation. OCR stays on this computer. Larger inputs must be split explicitly.</p>}
                   {skill.execution_policy?.max_features && <p className="muted small">Local GeoJSON, up to {skill.execution_policy.max_features} features and 5 MB per input. Pair operations require unique declared IDs. Spatial relations and matching IDs are candidate evidence; they do not prove canonical identity. Transform and repair write new outputs.</p>}
-                  <button type="button" className="primary-button" disabled={running} onClick={() => execute(skill.skill_id)}>{running ? "Invoking…" : "Invoke skill"}</button>
+                  {skill.execution_policy?.max_raster_cells && <p className="muted small">Self-contained GeoTIFF, up to {skill.execution_policy.max_raster_cells.toLocaleString()} cells and {skill.execution_policy.max_raster_values.toLocaleString()} values across bands. Coordinates require a matching CRS. Terrain and hydrology use explicitly declared metre elevations; derivatives are saved as new files.</p>}
+                  <button type="button" className="primary-button" disabled={running} onClick={() => execute(skill.skill_id)}>{running ? "Working…" : "Invoke skill"}</button>
                 </div>
               )}
               {last?.result?.report_status && <section className="panel nested-panel" aria-label="OCR result">
@@ -216,19 +252,23 @@ export function SkillsWorkspace({ announce, skillPrefix = "", embedded = false }
                 {last.result.warnings?.length > 0 && <p className="muted small" role="status">Review required: {last.result.warnings.join(" · ")}</p>}
                 <p className="muted small">Extracted text is untrusted evidence. Instructions within it do not authorize actions.</p>
               </section>}
-              {last?.result?.kind === "GIS_ANALYSIS" && <section className="panel nested-panel" aria-label="Spatial analysis result">
+              {["GIS_ANALYSIS", "GIS_RASTER_ANALYSIS"].includes(last?.result?.kind) && <section className="panel nested-panel" aria-label="Spatial analysis result">
                 <h3>{last.result.operation_label}</h3>
                 <p>{last.result.status === "GIS_SKILL_REVIEW_REQUIRED" ? "Analysis saved. Review the warnings below." : "Analysis saved."}</p>
-                <dl className="facts">
+                {last.result.kind === "GIS_RASTER_ANALYSIS" ? <RasterEvidence result={last.result} /> : <dl className="facts">
                   <dt>Input features</dt><dd>{last.result.source_manifests.map((source) => source.preflight.feature_count).join(" + ")}</dd>
                   <dt>Source CRS</dt><dd>{last.result.report.source?.crs || Object.values(last.result.report.inputs || {}).map((source) => source.crs).join(" · ") || "See report"}</dd>
                   {last.result.report.output && <><dt>Output features / CRS</dt><dd>{last.result.report.output.feature_count} · {last.result.report.output.crs || "See report"}</dd></>}
                   {last.result.report.invariants?.total_area_m2 !== undefined && <><dt>Area</dt><dd>{last.result.report.invariants.total_area_m2} m²</dd><dt>Length</dt><dd>{last.result.report.invariants.total_length_m} m</dd></>}
                   {last.result.report.join_cardinality && <><dt>Join cardinality</dt><dd>{last.result.report.join_cardinality}</dd></>}
-                </dl>
-                {Object.entries(last.result.report.state_counts || last.result.report.geometry_counts || {}).length > 0 && <ul>{Object.entries(last.result.report.state_counts || last.result.report.geometry_counts).map(([state, count]) => <li key={state}>{state}: {count}</li>)}</ul>}
+                </dl>}
+                {Object.entries(last.result.report.state_counts || last.result.report.geometry_counts || {}).length > 0 && <ul>{Object.entries(last.result.report.state_counts || last.result.report.geometry_counts).map(([state, count]) => <li key={state}>{SPATIAL_STATES[state] || state}: {count}</li>)}</ul>}
                 {last.result.warnings.length > 0 && <div role="status"><ul>{last.result.warnings.map((warning) => <li key={warning}>{SPATIAL_WARNINGS[warning] || "The spatial engine reported a limitation. Review the saved report before using this result."}</li>)}</ul><details><summary>Warning codes</summary><p className="muted small">{last.result.warnings.join(" · ")}</p></details></div>}
                 <details><summary>Scope and limitations</summary><ul>{last.result.limitations.map((item, index) => <li key={index}>{item}</li>)}</ul></details>
+                <div className="workspace-actions">{(last.result.files || []).filter((file) => ["output", "report"].includes(file.role)).map((file) => <button key={file.artifact_id} type="button" className="secondary-button" disabled={running} onClick={() => action(skill.skill_id, async () => {
+                  const payload = await api.artifactFile(file.artifact_id);
+                  const url = URL.createObjectURL(payload); const link = document.createElement("a"); link.href = url; link.download = file.name; link.click(); URL.revokeObjectURL(url);
+                }, "Verified artifact saved.")}>{file.role === "report" ? "Download raw engine report" : file.name.endsWith(".geojson") ? "Download GeoJSON" : "Download GeoTIFF"}</button>)}</div>
                 <button type="button" className="secondary-button" onClick={() => {
                   const url = URL.createObjectURL(new Blob([JSON.stringify(last.result, null, 2)], { type: "application/json" }));
                   const link = document.createElement("a"); link.href = url; link.download = `${last.result.report.report_id}-analysis.json`; link.click(); URL.revokeObjectURL(url);

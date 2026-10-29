@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .gis_processing import GIS_REPORT_SCHEMA_VERSION, GISProcessingError
+from .spatial_reports import numeric_report_view
 from .utils import stable_id, utc_now, write_json
 
 try:
@@ -58,6 +59,9 @@ def _resolve_source(path: Path) -> Path:
 
 
 def _write_report(cfg: Any, report: dict[str, Any]) -> dict[str, Any]:
+    report, special = numeric_report_view(report)
+    if special:
+        report["numeric_metadata_states"] = special
     path = cfg.export_dir / "gis_reports" / f"{report['report_id']}.json"
     write_json(path, report)
     return {**report, "report_path": str(path), "report_sha256": _sha256(path)}
