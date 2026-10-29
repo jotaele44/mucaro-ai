@@ -3,7 +3,7 @@
 This page records the keyboard and accessibility behaviour the release
 declares for TGT-036, and the rendered evidence behind it. The checks are
 concrete, not subjective. They are exercised by `qa/rendered/rendered_qa.mjs`
-at 1440×900 and 390×844.
+at desktop 1440×900, touch tablet 820×1180, and narrow mobile 390×844.
 
 | Behaviour | How it is verified |
 |---|---|
@@ -20,12 +20,23 @@ at 1440×900 and 390×844.
 | **Colour scheme.** Light and dark themes follow the system preference. | The `prefers-color-scheme` tokens in `styles.css`. |
 | **Phone widths.** Navigation opens off-canvas. Top and bottom safe-area insets are honoured; left and right insets are not yet, which matters in landscape on a notched iPhone (finding M9 in `docs/UX_SETUP_IOS_AUDIT.md`). Sheets open from the bottom. The page never overflows horizontally. | The rendered checks "no horizontal page overflow" and "iphone-12-nav-open". |
 | **Governed GIS.** Explicit capability choices authorize local vector tasks. Labeled controls reveal reference/CRS fields when relevant. Results show counts, CRS, readable warnings, optional diagnostic codes, and one-click JSON saving. | The 199-check receipt at `7c5df71c9231` inspects the frozen USGS layer at both widths, preserves its Z/planar-topology warning, and verifies downloaded source identity. Fourteen axe scans detect zero violations. The narrow result screen was visually inspected after wording corrections; other operations have separate real-engine tests. |
+| **Raster and hydrology.** Coordinate rows provide named X/Y fields, explicit CRS, and one-click add/remove actions. Numeric controls expose only relevant operation settings. Results distinguish valid values, NODATA, zero, outside points, and unresolved D8 states. Output downloads use recorded artifact IDs. | The 214-check desktop/mobile receipt at `385bc85f8caa` and scoped 78-check tablet receipt at `adbb1ca0576a` exercise real GeoTIFF inspection, known-cell sampling, preserved outside states, point removal, D8 accounting, and a byte-verified derived download. All three classes receive raster-control and raster-result axe scans. |
 
 Rendered receipts from `7c5df71c9231` onward build the frontend before testing,
 record input/asset hashes, compare served and built page bytes, and check
 source/asset stability at the end. A source commit alone does not establish
 which frontend bytes were rendered. Reuse earlier receipts only within their
 recorded scope and build evidence.
+
+The tablet replay is explicitly `RENDERED_QA_PARTIAL`: its ancillary network,
+streaming, sharing, launch, and specialized-workspace scenarios were not rerun.
+It supplements the complete desktop/mobile run only because all 347 backend/
+frontend Git entries, frontend input manifests, and built asset hashes match.
+These two receipts contain 27 automated scans with zero detected violations.
+The tablet and narrow raster result screens were visually reviewed for readable
+counts, warnings, controls, and overflow. This is bounded review evidence;
+native rendering, physical touch, software keyboards, assistive technology,
+and the complete application-wide design review remain open.
 
 ## Not yet verified
 

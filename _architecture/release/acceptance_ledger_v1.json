@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-29T13:25:02.065Z",
+  "updated_utc": "2026-10-29T21:04:58.149Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -39,7 +39,8 @@
         "frontend/src/components/workspaces/SkillsWorkspace.jsx",
         "backend/app/goals.py",
         "backend/app/agent_tasks.py",
-        "backend/app/skill_runtime.py"
+        "backend/app/skill_runtime.py",
+        "backend/app/gis_raster_skill.py"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -59,12 +60,15 @@
         "_architecture/release/evidence/rendered_qa_69db9b384074.json",
         "backend/tests/test_ocr_skill.py::test_ocr_skill_api_and_cli_use_the_shared_extraction",
         "_architecture/release/evidence/rendered_qa_7c5df71c9231.json",
-        "backend/tests/test_gis_skill.py::test_gis_api_cli_and_conversation_share_the_governed_runtime"
+        "backend/tests/test_gis_skill.py::test_gis_api_cli_and_conversation_share_the_governed_runtime",
+        "_architecture/release/evidence/rendered_qa_385bc85f8caa.json",
+        "_architecture/release/evidence/rendered_qa_tablet_adbb1ca0576a.json",
+        "backend/tests/test_gis_raster_skill.py::test_raster_cli_api_and_conversation_use_shared_runtime"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "Ask/plan/execute/stream/inspect/refine flows render. Goals, task dependencies, skill lifecycle, governed read-only coding inspections, and OCR/vector-GIS tasks reach shared services through GUI, CLI, API, and approved conversations. The 199-check Chromium receipt at 7c5df71c9231 covers real OCR, real-source GIS inspection with readable dimensionality limits and source-bound JSON saving, retained drafts, recovery, and duplicate-activation protection at desktop and emulated iPhone widths. It binds a fresh frontend build and served page bytes to source inputs and checks end-of-run stability. Native/device, hosted/provider, raster/hydrology task integration, coding execution, and complete product finishing evidence remain open."
+      "notes": "OCR, ten vector operations, ten raster/terrain/hydrology operations, goals/tasks, the skill lifecycle, and read-only coding inspection reach shared services through GUI/CLI/API and approved conversations. Raster controls use editable coordinate rows and explicit CRS/units; outputs and raw reports download through verified artifact IDs. Rendered evidence is 214/214 desktop/mobile checks at 385bc85f8caa plus a scoped 78/78 tablet replay at adbb1ca0576a. Their frontend/backend trees and built assets are identical. This proves bounded three-viewport operator journeys, not native/device, live-provider, complete design review, or full product closure."
     },
     {
       "requirement_id": "GOAL-003",
@@ -1074,7 +1078,9 @@
         "backend/app/gis_skill.py",
         "backend/app/local_inputs.py",
         "frontend/src/components/workspaces/SpecializedWorkspace.jsx",
-        "frontend/src/components/workspaces/SkillsWorkspace.jsx"
+        "frontend/src/components/workspaces/SkillsWorkspace.jsx",
+        "backend/app/gis_raster_skill.py",
+        "backend/app/spatial_reports.py"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -1082,12 +1088,15 @@
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_gis_skill.py",
-        "_architecture/release/evidence/rendered_qa_7c5df71c9231.json"
+        "_architecture/release/evidence/rendered_qa_7c5df71c9231.json",
+        "_architecture/release/evidence/rendered_qa_385bc85f8caa.json",
+        "_architecture/release/evidence/rendered_qa_tablet_adbb1ca0576a.json",
+        "backend/tests/test_gis_raster_skill.py"
       ],
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N10",
-      "notes": "Ten bounded vector operations now run through mucaro/gis-analyze in the GIS/Skills GUI, CLI, API, and approved conversations: inspection, WGS84 ellipsoidal measurement, offline CRS transform, explicit topology repair, comparison, four overlays, and point-in-polygon join. Inputs are permissioned frozen manifestations; explicit ID-property bindings create separate derived inputs while preserving original bytes and raw values. Real-engine tests cover every operation, a frozen Census/USGS join, malformed data, ambiguous IDs, CRS/row invariants, byte tampering, and parallel report retention. The 199-check source/build-bound browser receipt proves representative real-source inspection, readable Z/XY limits, conditional fields, and source-bound JSON saving. Raster/hydrology task integration, remote sensing, bathymetry, temporal GIS, and full GIS release evidence remain OPEN."
+      "notes": "Twenty bounded vector and raster operations now execute through governed GIS skills in GUI/CLI/API and approved conversations. Raster work includes inspection, sampling, clipping, explicit resampling, terrain, hillshade, depression conditioning, D8, vector-raster intersection, and zonal statistics under cell-center or projected fractional-coverage rules. GeoTIFF admission checks decoded size before pixels, rejects virtual/multi-grid inputs, checks finite valid values and explicit CRS/elevation units, preserves NODATA and partial masks, and retains unresolved flow states. Reports preserve source/intermediate/output hashes and cell accounting. Real-engine and frozen-corpus browser checks cover representative operation/results/downloads across desktop, tablet, and mobile. Remote sensing, bathymetry, temporal GIS, additional advanced tasks, and full independent GIS release evidence remain OPEN."
     },
     {
       "requirement_id": "TGT-005",
@@ -1358,7 +1367,9 @@
         "backend/app/exports.py",
         "backend/app/ingestion.py",
         "schemas/artifact_identity.schema.json",
-        "schemas/source_manifest.schema.json"
+        "schemas/source_manifest.schema.json",
+        "backend/app/spatial_reports.py",
+        "backend/app/artifact_downloads.py"
       ],
       "dependencies": [],
       "positive_gate": "backend/tests/test_artifact_identity.py::test_source_to_export_lineage_closes_with_stable_byte_identity",
@@ -1371,12 +1382,17 @@
         "backend/tests/test_ocr_skill.py::test_ocr_skill_freezes_bytes_and_links_extraction_to_execution",
         "backend/tests/test_ocr_skill.py::test_parallel_ocr_runs_retain_every_source_and_result_parent",
         "backend/tests/test_gis_skill.py::test_parallel_gis_invocations_keep_distinct_reports_and_all_parents",
-        "backend/tests/test_gis_skill.py::test_real_corpus_join_uses_explicit_property_ids_without_changing_raw_sources"
+        "backend/tests/test_gis_skill.py::test_real_corpus_join_uses_explicit_property_ids_without_changing_raw_sources",
+        "backend/tests/test_gis_raster_skill.py::test_raster_task_operations_use_real_engines_and_close_lineage",
+        "backend/tests/test_gis_raster_skill.py::test_raster_tampered_terrain_intermediate_cannot_enter_output_lineage",
+        "backend/tests/test_artifact_downloads.py",
+        "_architecture/release/evidence/rendered_qa_385bc85f8caa.json",
+        "_architecture/release/evidence/rendered_qa_tablet_adbb1ca0576a.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N04",
-      "notes": "Artifact lineage covers ingestion, answers, exports, governed OCR, and GIS raw sources, explicit ID-bound derived inputs, engine outputs, and reports. Shared artifact creation serializes complete store updates; parallel OCR/GIS regressions retain all parents. GIS invocations isolate report directories and verify source, engine-input, report, and output hashes. Raw strings remain in frozen sources; derived bindings do not establish canonical identity. Legacy/source-less traces remain explicitly partial."
+      "notes": "Artifact lineage covers ingested sources, answers, exports, OCR, vector/raster GIS, explicit ID-bound inputs, intermediate terrain files/reports, and derived outputs. Shared artifact writes are serialized and spatial outputs are byte-verified inside invocation-private directories. Authenticated artifact-ID downloads are confined to the export directory, verify byte count/hash, and return the checked buffer to avoid a post-check file replacement race. GUI GeoTIFF downloads match saved output hashes at all three emulated viewport classes. Legacy/source-less traces and broader distribution proof remain explicitly partial."
     },
     {
       "requirement_id": "TGT-016",
@@ -1392,7 +1408,9 @@
         "schemas/agent_checkpoint.schema.json",
         "schemas/artifact_identity.schema.json",
         "schemas/execution_contract.schema.json",
-        "schemas/run_manifest.schema.json"
+        "schemas/run_manifest.schema.json",
+        "backend/app/gis_raster_skill.py",
+        "backend/app/spatial_reports.py"
       ],
       "dependencies": [],
       "positive_gate": "backend/tests/test_work_runs.py::test_run_manifest_contract_tracks_approval_and_interruption_states",
@@ -1416,12 +1434,16 @@
         "_architecture/release/evidence/rendered_qa_69db9b384074.json",
         "backend/tests/test_gis_skill.py::test_gis_schema_refuses_ambiguous_or_bypassed_operation_settings",
         "backend/tests/test_gis_skill.py::test_gis_source_report_and_derived_output_tampering_are_detected",
-        "_architecture/release/evidence/rendered_qa_7c5df71c9231.json"
+        "_architecture/release/evidence/rendered_qa_7c5df71c9231.json",
+        "backend/tests/test_gis_raster_skill.py::test_gdal_policy_changes_invalidate_existing_raster_activation",
+        "backend/tests/test_gis_raster_skill.py::test_zonal_numeric_overflow_cannot_be_reported_as_a_valid_sum",
+        "_architecture/release/evidence/rendered_qa_385bc85f8caa.json",
+        "_architecture/release/evidence/rendered_qa_tablet_adbb1ca0576a.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "PROVISIONAL: shared contracts enforce checkpoints, artifacts, skills, work runs, and governed coding requests. Lifecycle/admission share a store lock; revocation fences new admissions while preserving prior receipts. Argument schemas and execution policies participate in skill identity. OCR/GIS share permissioned byte acquisition, validation, and artifact parents. GIS adds conditional arguments, explicit ID binding, bounded coordinate work, source/report integrity, and isolated report persistence. Broader release acceptance and remaining architecture residue remain open."
+      "notes": "PROVISIONAL: shared contracts enforce checkpoints, artifacts, skills, work runs, and governed coding requests. Lifecycle/admission share a lock; revocation fences new admissions and preserves prior receipts. Raster activation binds argument schema, GDAL options, budgets, and the borrowed vector-input policy; policy changes require reauthorization. All skill arguments reject non-JSON/non-finite values before acquisition. Spatial tasks share frozen inputs and artifact admission. NaN NODATA has explicit JSON metadata states, while arithmetic overflow/non-finite computed results fail closed. Broader release acceptance and architecture residue remain open."
     },
     {
       "requirement_id": "TGT-017",
@@ -1833,7 +1855,9 @@
         "backend/app/error_categories.py",
         "backend/app/work_runs.py",
         "backend/app/main.py",
-        "frontend/src/api.js"
+        "frontend/src/api.js",
+        "backend/app/artifact_downloads.py",
+        "backend/app/gis_raster_skill.py"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -1845,12 +1869,14 @@
         "backend/tests/test_api.py::test_api_upload_error_exposes_actionable_category",
         "backend/tests/test_api.py::test_api_conversation_persists_cited_chat_turns",
         "backend/tests/test_api.py::test_api_skill_deactivation_requires_auth_persists_and_preserves_receipts",
-        "_architecture/release/evidence/rendered_qa_f1b353b9b039.json"
+        "_architecture/release/evidence/rendered_qa_f1b353b9b039.json",
+        "backend/tests/test_artifact_downloads.py",
+        "backend/tests/test_gis_raster_skill.py"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Run errors, warnings, tool results, and plain API error payloads carry the canonical TGT-034 category. Skill revocation refusals are BLOCKED_ACTION, missing mounts are SOURCE_UNAVAILABLE, and denied skill policies are PERMISSION_DENIED. The frontend prefers the server category and retains HTTP fallback classification for non-Mucaro proxy/plain-text responses."
+      "notes": "Run errors, warnings, tool results, and API errors retain canonical categories and precise status identities. Artifact-boundary refusals are PERMISSION_DENIED; changed output bytes and invalid lineage are UNTRUSTED_CONTENT; absent outputs are SOURCE_UNAVAILABLE. Raster numeric overflow and malformed/unsupported inputs fail with actionable domain errors rather than valid-looking results. The frontend retains drafts/results and explicit recovery controls. Broader error-path release verification remains PROVISIONAL."
     },
     {
       "requirement_id": "TGT-035",
@@ -1889,12 +1915,14 @@
       "benchmark": null,
       "evidence_refs": [
         "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
-        "docs/release/UI_ACCESSIBILITY.md"
+        "docs/release/UI_ACCESSIBILITY.md",
+        "_architecture/release/evidence/rendered_qa_385bc85f8caa.json",
+        "_architecture/release/evidence/rendered_qa_tablet_adbb1ca0576a.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "Declared behaviours verified in Chromium with zero axe violations; VoiceOver/WKWebView on macOS pending (M7)."
+      "notes": "Declared Chromium journeys now cover desktop 1440x900, touch tablet 820x1180, and mobile 390x844 with 27 axe scans detecting zero violations across the source/asset-equivalent receipts. Tablet and mobile controls satisfy the measured touch-target and field-size checks; raster coordinate editing and output downloads are exercised. Tablet and narrow raster result screens were visually inspected. Full WCAG/manual assistive-technology review, VoiceOver/WKWebView, software keyboards, and physical-device behavior remain unverified."
     },
     {
       "requirement_id": "TGT-037",
@@ -1927,7 +1955,11 @@
         "backend/app/ocr_skill.py",
         "backend/app/gis_skill.py",
         "backend/app/local_inputs.py",
-        "frontend/src/components/workspaces/SpecializedWorkspace.jsx"
+        "frontend/src/components/workspaces/SpecializedWorkspace.jsx",
+        "backend/app/gis_raster_skill.py",
+        "backend/app/spatial_reports.py",
+        "backend/app/artifact_downloads.py",
+        "frontend/vite.config.js"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -1938,12 +1970,16 @@
         "backend/tests/test_ocr_skill.py::test_chat_ocr_requires_approval_and_extracted_instructions_cannot_authorize_actions",
         "_architecture/release/evidence/rendered_qa_69db9b384074.json",
         "backend/tests/test_gis_skill.py::test_gis_api_cli_and_conversation_share_the_governed_runtime",
-        "_architecture/release/evidence/rendered_qa_7c5df71c9231.json"
+        "_architecture/release/evidence/rendered_qa_7c5df71c9231.json",
+        "_architecture/release/evidence/rendered_qa_385bc85f8caa.json",
+        "_architecture/release/evidence/rendered_qa_tablet_adbb1ca0576a.json",
+        "backend/tests/test_gis_raster_skill.py",
+        "backend/tests/test_artifact_downloads.py"
       ],
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "Governed read-only coding tools, OCR, and ten vector-GIS operations reach shared services through GUI/API/CLI and conversations. OCR/GIS reuse domain engines, schemas, capability grants, approvals, frozen inputs, and artifact lineage. The GIS workspace now executes real tasks instead of displaying capability state alone. Raster/hydrology and other advanced extras still require governed task integration; broader architecture closure remains OPEN."
+      "notes": "Read-only coding tools, OCR, ten vector operations, and ten raster/terrain/hydrology tasks now use shared runtime services through GUI/API/CLI and conversations. Spatial tasks reuse domain engines, schema/capability enforcement, frozen inputs, verified output admission, and artifact-ID downloads. The development frontend proxy is checked live against every API group derived from backend OpenAPI, preventing HTML fallback for missing routes. Other advanced extras, coding mutation/container execution, and broader architecture closure remain OPEN."
     },
     {
       "requirement_id": "MATRIX-001",
@@ -2292,12 +2328,14 @@
         "_architecture/release/evidence/rendered_qa_f1b353b9b039.json",
         "_architecture/release/evidence/rendered_qa_b0c9c955a10f.json",
         "_architecture/release/evidence/rendered_qa_69db9b384074.json",
-        "_architecture/release/evidence/rendered_qa_7c5df71c9231.json"
+        "_architecture/release/evidence/rendered_qa_7c5df71c9231.json",
+        "_architecture/release/evidence/rendered_qa_385bc85f8caa.json",
+        "_architecture/release/evidence/rendered_qa_tablet_adbb1ca0576a.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N18",
-      "notes": "199 rendered checks pass at desktop 1440x900 and emulated iPhone 13 390x844 in Chromium at clean source 7c5df71c9231. Coverage includes real OCR, approved conversation OCR, retained drafts, safe recovery, real-source GIS with readable dimensionality limits, conditional fields, source-bound JSON downloads, Code inspections, task dependencies, and skill lifecycle/rapid-click protection. Fourteen axe scans detect zero violations. The receipt binds frontend inputs, a fresh production build, served index bytes, and unchanged end-of-run source/assets. The narrow GIS result screen was visually inspected after wording corrections. Native WKWebView/macOS, tablet, physical-device, and complete design/accessibility review remain open."
+      "notes": "214/214 full rendered checks pass for desktop/mobile at clean source 385bc85f8caa. A separate scoped tablet replay passes 78/78 at adbb1ca0576a; it remains RENDERED_QA_PARTIAL and does not rerun ancillary network/stream/recovery scenarios. Hard application identity is verified: 347 identical backend/frontend Git entries, zero one-sided/symmetric differences, identical frontend input manifests and built asset hashes. Together the receipts exercise three viewport classes with 27 zero-violation axe scans, real OCR/GIS/raster workflows, readable unresolved D8 states, editable coordinates, verified GeoTIFF downloads, and live development-proxy routing. Screens were visually reviewed at tablet/narrow widths. Native/device behavior and the complete design/accessibility review remain open."
     },
     {
       "requirement_id": "MATRIX-016",
