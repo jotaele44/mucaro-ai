@@ -399,6 +399,71 @@ button:disabled {
   margin: 0 14px 8px;
 }
 
+
+.execution-entry-card {
+  width: min(760px, 100%);
+  align-self: center;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+.execution-entry-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.execution-entry-copy h2,
+.execution-entry-copy p {
+  margin: 0;
+}
+
+.execution-entry-copy h2 {
+  font-size: 16px;
+}
+
+.execution-entry-card .eyebrow {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.execution-entry-actions {
+  margin-top: 14px;
+}
+
+.execution-entry-reason {
+  margin-top: 12px;
+}
+
+.execution-entry-card textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+  font-size: 16px;
+}
+
+.execution-entry-card button:focus-visible,
+.execution-entry-card textarea:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.execution-entry-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .menu {
   position: absolute;
   right: 0;
@@ -1183,6 +1248,20 @@ details summary {
 
   .chat-header {
     padding: 8px 14px;
+  }
+
+  .execution-entry-card {
+    width: 100%;
+    padding: 14px;
+  }
+
+  .execution-entry-actions {
+    justify-content: stretch;
+  }
+
+  .execution-entry-actions button {
+    flex: 1 1 140px;
+    min-height: 44px;
   }
 
   .feed,

@@ -24,6 +24,18 @@ from .conversations import (
 )
 from .db import init_db, list_payloads, upsert_payload
 from .development_workbench import WorkbenchPlanError, compile_plan as compile_workbench_plan
+from .execution_entry import (
+    ExecutionEntryError,
+    create_entry_artifact,
+    current_conversation_entry_context,
+    decide_entry,
+    get_entry_artifact,
+    entry_labels,
+    get_entry_decision,
+    resume_interrupted_entry_decision,
+    resume_pending_entry_decisions,
+    transition_entry_artifact,
+)
 from .execution_gate import analyze_task, approve_execution
 from .execution_workbench import create_plan as create_workbench_execution_plan
 from .exports import EXPORT_FILES, export_file_path
@@ -45,6 +57,10 @@ from .models import (
     ConversationCreateRequest,
     ConversationUpdateRequest,
     DirectoryPermissionRequest,
+    ExecutionEntryCreateRequest,
+    ExecutionEntryDecisionRequest,
+    ExecutionEntryResumeRequest,
+    ExecutionEntryStateRequest,
     IngestPathRequest,
     InteractionCreateRequest,
     InteractionDismissRequest,
@@ -226,6 +242,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     init_db(cfg.sqlite_path)
     reconcile_interrupted_tool_calls(cfg)
     reconcile_runs_on_startup(cfg)
+    resume_pending_entry_decisions(cfg)
 
     def resume_for_tool_call(result: dict) -> dict:
         run_id = (result.get("tool_call") or {}).get("run_id")
@@ -241,6 +258,20 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     def run_error(exc: RunError) -> HTTPException:
         not_found = exc.status in {"ERROR_RUN_NOT_FOUND", "ERROR_CONVERSATION_NOT_FOUND"}
         conflict = exc.status in {"ERROR_RUN_VERSION_CONFLICT", "ERROR_RUN_NOT_QUEUED", "ERROR_RUN_ALREADY_FINISHED"}
+        return api_error(exc.status, exc.detail, status_code=404 if not_found else 409 if conflict else 400)
+
+    def execution_entry_actor(auth: dict) -> str:
+        return "operator" if auth.get("status") == "AUTH_OK" else "local_operator"
+
+    def execution_entry_error(exc: ExecutionEntryError) -> HTTPException:
+        not_found = exc.status in {"ERROR_EXECUTION_ENTRY_NOT_FOUND", "ERROR_EXECUTION_ENTRY_DECISION_NOT_FOUND"}
+        conflict = exc.status in {
+            "ERROR_EXECUTION_ENTRY_VERSION_CONFLICT",
+            "ERROR_EXECUTION_ENTRY_STALE_REVISION",
+            "ERROR_EXECUTION_ENTRY_IDEMPOTENCY_CONFLICT",
+            "ERROR_EXECUTION_ENTRY_CONFLICTING_RUN",
+            "ERROR_EXECUTION_ENTRY_SOURCE_DRIFT",
+        }
         return api_error(exc.status, exc.detail, status_code=404 if not_found else 409 if conflict else 400)
 
     def require_auth(
@@ -280,6 +311,117 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/security")
     def security_status() -> dict:
         return build_security_report(cfg)
+
+    @app.post("/execution-entry/artifacts")
+    def create_execution_entry(req: ExecutionEntryCreateRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return create_entry_artifact(
+                mode=req.mode,
+                objective_id=req.objective_id,
+                conversation_id=req.conversation_id,
+                prompt=req.prompt,
+                runtime_mode=req.runtime_mode,
+                options=req.options,
+                source_commit=req.source_commit,
+                required_gates=[row.model_dump() for row in req.required_gates],
+                actor=execution_entry_actor(_auth),
+                authorized_actors=[execution_entry_actor(_auth)],
+                policy_version=req.policy_version,
+                cfg=cfg,
+            )
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
+
+    @app.get("/execution-entry/artifacts/{artifact_id}")
+    def execution_entry_artifact(artifact_id: str, revision: int | None = None) -> dict:
+        try:
+            return get_entry_artifact(artifact_id, revision, cfg)
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
+
+    @app.get("/conversations/{conversation_id}/execution-entry")
+    def conversation_execution_entry(conversation_id: str) -> dict:
+        if get_conversation(conversation_id, cfg) is None:
+            raise api_error("ERROR_CONVERSATION_NOT_FOUND", "Conversation not found.", status_code=404)
+        try:
+            return current_conversation_entry_context(conversation_id, cfg)
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
+
+    @app.post("/execution-entry/artifacts/{artifact_id}/{revision}/state")
+    def approve_execution_entry(
+        artifact_id: str,
+        revision: int,
+        req: ExecutionEntryStateRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return transition_entry_artifact(
+                artifact_id,
+                revision,
+                expected_version=req.expected_version,
+                target_state=req.target_state,
+                actor=execution_entry_actor(_auth),
+                cfg=cfg,
+            )
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
+
+    @app.post("/execution-entry/artifacts/{artifact_id}/{revision}/decisions")
+    def execution_entry_decision(
+        artifact_id: str,
+        revision: int,
+        req: ExecutionEntryDecisionRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return decide_entry(
+                artifact_id,
+                revision,
+                action=req.action,
+                expected_version=req.expected_version,
+                actor=execution_entry_actor(_auth),
+                idempotency_key=req.idempotency_key,
+                source_commit=req.source_commit,
+                changes=req.changes,
+                cfg=cfg,
+            )
+        except (ExecutionEntryError, RunError) as exc:
+            if isinstance(exc, ExecutionEntryError):
+                raise execution_entry_error(exc) from exc
+            raise run_error(exc) from exc
+
+    @app.get("/execution-entry/decisions/{decision_id}")
+    def execution_entry_decision_detail(decision_id: str) -> dict:
+        try:
+            return get_entry_decision(decision_id, cfg)
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
+
+    @app.post("/execution-entry/decisions/{decision_id}/resume")
+    def resume_execution_entry_decision(
+        decision_id: str,
+        req: ExecutionEntryResumeRequest,
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return resume_interrupted_entry_decision(
+                decision_id,
+                actor=execution_entry_actor(_auth),
+                idempotency_key=req.idempotency_key,
+                cfg=cfg,
+            )
+        except (ExecutionEntryError, RunError) as exc:
+            if isinstance(exc, ExecutionEntryError):
+                raise execution_entry_error(exc) from exc
+            raise run_error(exc) from exc
+
+    @app.get("/execution-entry/labels")
+    def execution_entry_labels(locale: str = "en", mode: str = "GOAL") -> dict:
+        try:
+            return entry_labels(locale, mode)
+        except ExecutionEntryError as exc:
+            raise execution_entry_error(exc) from exc
 
     @app.post("/plan")
     def plan(req: PlanRequest, _auth: dict = Depends(require_auth)) -> dict:

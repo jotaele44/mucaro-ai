@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 // The built UI is served same-origin by the Mucaro backend. In `npm run dev`, API paths are
 // proxied to the local backend so the browser never needs cross-origin access.
 const apiPaths = [
-  "/health", "/config", "/security", "/models", "/offline-manifest", "/conversations", "/work-runs", "/interactions",
+  "/health", "/config", "/security", "/models", "/offline-manifest", "/conversations", "/work-runs", "/interactions", "/execution-entry",
   "/tools", "/sources", "/chunks", "/ingest", "/ingest-path", "/permissions", "/memory", "/runs", "/exports",
   "/workspaces", "/workbench", "/validate", "/plan", "/approve", "/ask",
 ];
