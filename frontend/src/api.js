@@ -250,6 +250,7 @@ export const api = {
   models: () => request("/models"),
   offlineManifest: () => request("/offline-manifest"),
   modes: () => request("/work-runs/modes"),
+  workbenchPlan: (payload) => request("/workbench/plan", json("POST", payload)),
 
   conversations: () => request("/conversations"),
   createConversation: (title) => request("/conversations", json("POST", { title })),

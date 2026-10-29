@@ -497,6 +497,47 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "15-provenance");
 
   await openNav();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Workbench", exact: true }).click();
+  await page.getByRole("heading", { name: "Workbench" }).waitFor();
+  await page.getByLabel("Objective").fill("Reconcile a bounded local-first workbench");
+  await page.getByLabel("Capability scope").fill("GIS, OCR, coding");
+  await page.getByRole("button", { name: "Compile plan" }).click();
+  const workbenchStatus = page.getByText("WORKBENCH_PLAN_READY", { exact: true });
+  await workbenchStatus.waitFor();
+  check(
+    "workbench plan-ready status is visually neutral, not a certification PASS",
+    viewport,
+    !(await workbenchStatus.getAttribute("class") || "").includes("status-completed"),
+  );
+  check(
+    "workbench plan remains explicitly non-executing",
+    viewport,
+    (await page.getByText("CANDIDATE_NOT_EXECUTION", { exact: true }).count()) === 1,
+  );
+  check(
+    "workbench reports exactly one visible no-execution outcome",
+    viewport,
+    (await page.getByText("Nothing was executed.", { exact: true }).count()) === 1,
+  );
+  check(
+    "workbench exposes no Execute control",
+    viewport,
+    (await page.getByRole("button", { name: /^Execute$/ }).count()) === 0,
+  );
+  check(
+    "workbench exposes certification residue instead of false readiness",
+    viewport,
+    (await page.getByText("BLOCKED", { exact: true }).count()) >= 1 &&
+      (await page.getByText(/Missing certification evidence/).count()) === 1 &&
+      (await page.getByText("UNBOUND", { exact: true }).count()) === 1 &&
+      (await page.getByText("20 / 20", { exact: true }).count()) === 1 &&
+      (await page.getByText("NOT_CLAIMED", { exact: true }).count()) === 1,
+  );
+  drawerStates.push(await drawerClosed());
+  await shot(page, viewport, "16b-workbench");
+  axeRuns.push(await axe(page, viewport, "workbench"));
+
+  await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByText("What works offline").waitFor();
   check("settings shows model choice and offline capabilities", viewport, (await page.getByRole("radio", { name: /openai_compatible_local/ }).count()) === 1);
@@ -505,7 +546,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   axeRuns.push(await axe(page, viewport, "settings"));
 
   if (viewport === "iphone") {
-    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
+    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 5 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
     // iOS zooms into fields under 16px on focus; touch targets need 44px (Apple HIG).
     const touch = await page.evaluate(() => {
       const visible = (el) => {

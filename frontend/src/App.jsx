@@ -7,9 +7,11 @@ import { MemoryWorkspace } from "./components/workspaces/MemoryWorkspace.jsx";
 import { ProvenanceWorkspace } from "./components/workspaces/ProvenanceWorkspace.jsx";
 import { SettingsWorkspace } from "./components/workspaces/SettingsWorkspace.jsx";
 import { SourcesWorkspace } from "./components/workspaces/SourcesWorkspace.jsx";
+import { WorkbenchWorkspace } from "./components/workspaces/WorkbenchWorkspace.jsx";
 
 const WORKSPACES = [
   { id: "chat", label: "Chat" },
+  { id: "workbench", label: "Workbench" },
   { id: "sources", label: "Sources" },
   { id: "memory", label: "Memory" },
   { id: "provenance", label: "Provenance" },
@@ -263,6 +265,7 @@ export function App() {
             defaultOptions={options}
           />
         )}
+        {health.state === "ok" && view === "workbench" && <WorkbenchWorkspace announce={announce} />}
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}
         {health.state === "ok" && view === "provenance" && <ProvenanceWorkspace />}

@@ -328,6 +328,7 @@ button:disabled {
 
 .field input,
 .field select,
+.field textarea,
 .other-input {
   font-size: 15px;
   color: var(--text);
@@ -336,6 +337,11 @@ button:disabled {
   border-radius: 8px;
   padding: 8px 10px;
   min-height: 38px;
+}
+
+.field textarea {
+  width: 100%;
+  resize: vertical;
 }
 
 .field.compact input {
