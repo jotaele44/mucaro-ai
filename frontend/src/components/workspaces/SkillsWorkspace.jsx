@@ -2,7 +2,18 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api.js";
 
 function errorText(error) {
+  try {
+    const cause = JSON.parse(error.message);
+    if (cause?.detail) return `${error.category || "ERROR"} — ${cause.status || error.status}: ${cause.detail}`;
+  } catch { /* Plain messages already have a readable detail. */ }
   return `${error.category || "ERROR"} — ${error.status || "REQUEST_FAILED"}: ${error.message}`;
+}
+
+function readDrafts() {
+  try {
+    const value = JSON.parse(window.sessionStorage.getItem("mucaro.skillDrafts") || "{}");
+    return value && !Array.isArray(value) && typeof value === "object" ? value : {};
+  } catch { return {}; }
 }
 
 // Skill operator surface: registration, mount, authorization, invocation, and receipts stay visible together.
@@ -10,8 +21,8 @@ export function SkillsWorkspace({ announce }) {
   const [skills, setSkills] = useState([]);
   const [mounts, setMounts] = useState([]);
   const [executions, setExecutions] = useState([]);
-  const [argumentsText, setArgumentsText] = useState({});
-  const [fieldValues, setFieldValues] = useState({});
+  const [argumentsText, setArgumentsText] = useState(() => readDrafts().argumentsText || {});
+  const [fieldValues, setFieldValues] = useState(() => readDrafts().fieldValues || {});
   const [allowedCapabilities, setAllowedCapabilities] = useState({});
   const [policyIds, setPolicyIds] = useState({});
   const [error, setError] = useState(null);
@@ -31,6 +42,21 @@ export function SkillsWorkspace({ announce }) {
   }, []);
 
   useEffect(() => { load().catch(setError); }, [load]);
+  useEffect(() => {
+    try { window.sessionStorage.setItem("mucaro.skillDrafts", JSON.stringify({ argumentsText, fieldValues })); }
+    catch { /* A storage-restricted browser still supports the current view. */ }
+  }, [argumentsText, fieldValues]);
+
+  async function refresh() {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
+    setBusy("refresh");
+    setLoading(true);
+    setError(null);
+    try { await load(); }
+    catch (err) { setError(err); }
+    finally { actionInFlight.current = false; setBusy(""); }
+  }
 
   async function action(skillId, fn, message) {
     if (actionInFlight.current) return;
@@ -93,7 +119,7 @@ export function SkillsWorkspace({ announce }) {
         <h1 id="skills-title">Skills</h1>
         <p className="muted small">Mount and authorize skills, invoke them, or deactivate them. Previous results remain available.</p>
       </header>
-      {error && <p className="error-card" role="alert">{errorText(error)}</p>}
+      {error && <div className="error-card" role="alert"><p>{errorText(error)}</p><button type="button" className="secondary-button" disabled={Boolean(busy)} onClick={refresh}>Retry loading skills</button></div>}
       {loading && <p className="muted" role="status">Loading skills…</p>}
       {!loading && !error && !skills.length && <p className="empty-state muted">No registered skills.</p>}
       <ul className="skill-list">

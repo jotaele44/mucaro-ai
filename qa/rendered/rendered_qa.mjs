@@ -629,6 +629,25 @@ async function scenario(browser, base, viewport, contextOptions) {
     await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Skills", exact: true }).click();
     await ocrSkill.getByRole("region", { name: "OCR result", exact: true }).getByText(/APPLE/).waitFor();
     await drawerClosed();
+    check("OCR document settings survive workspace navigation", viewport, (await ocrSkill.getByLabel("Input file path", { exact: true }).inputValue()) === ocrFixture);
+    await openNav();
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Chat", exact: true }).click();
+    await drawerClosed();
+    expectedConsoleErrors.add("Failed to load resource: the server responded with a status of 503 (Service Unavailable)");
+    await page.route("**/skills", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: { status: "ERROR_SKILLS_TEMPORARILY_UNAVAILABLE", detail: "Temporary Skills load failure." } }) }), { times: 1 });
+    await openNav();
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Skills", exact: true }).click();
+    await drawerClosed();
+    await page.getByRole("alert").filter({ hasText: "Temporary Skills load failure." }).waitFor();
+    check("Skills load failure provides a visible recovery action", viewport, await page.getByRole("button", { name: "Retry loading skills", exact: true }).isVisible());
+    let unexpectedInvocations = 0;
+    const countRetryInvocation = (request) => { if (request.method() === "POST" && /\/skills\/.*\/execute$/.test(request.url())) unexpectedInvocations++; };
+    page.on("request", countRetryInvocation);
+    await page.getByRole("button", { name: "Retry loading skills", exact: true }).click();
+    await ocrSkill.getByLabel("Input file path", { exact: true }).waitFor();
+    page.off("request", countRetryInvocation);
+    check("Skills recovery preserves settings and never repeats OCR execution", viewport, unexpectedInvocations === 0 && (await ocrSkill.getByLabel("Input file path", { exact: true }).inputValue()) === ocrFixture);
+    expectedConsoleErrors.delete("Failed to load resource: the server responded with a status of 503 (Service Unavailable)");
   }
 
   if (viewport === "iphone") {

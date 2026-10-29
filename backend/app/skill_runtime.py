@@ -584,7 +584,8 @@ def execute_skill(
     }
     _append_execution(event, cfg)
     if status != "PASS":
-        raise SkillRuntimeError("ERROR_SKILL_EXECUTION_FAILED", json.dumps(error, sort_keys=True))
+        failure_status = error["status"] if error["status"] != "ERROR_SKILL_HANDLER_FAILED" else "ERROR_SKILL_EXECUTION_FAILED"
+        raise SkillRuntimeError(failure_status, json.dumps(error, sort_keys=True))
     return {"status": "SKILL_EXECUTED", "execution": event, "result": result}
 
 

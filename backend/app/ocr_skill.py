@@ -95,6 +95,7 @@ def _snapshot(requested: str, expected_sha256: str | None, cfg: Settings) -> tup
     frozen = snapshot_dir / f"input{source.suffix.lower()}"
     with frozen.open("xb") as output:
         output.write(raw)
+    frozen.chmod(0o400)
     manifest = {
         "requested_path_raw": requested, "resolved_path": str(source), "snapshot_path": str(frozen),
         "retrieval_utc": utc_now(), "bytes": len(raw), "sha256": digest,
@@ -152,6 +153,8 @@ def analyze_document(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]
     else:
         report = analyze_image_ocr(frozen, **options, timeout_seconds=OCR_EXECUTION_POLICY["image_timeout_seconds"])
         page_reports = [report]
+    if hashlib.sha256(frozen.read_bytes()).hexdigest() != manifest["sha256"]:
+        raise OCRSkillError("ERROR_OCR_SOURCE_CHANGED", "Frozen source bytes changed during OCR.")
     if report["source"]["sha256"] != manifest["sha256"]:
         raise OCRSkillError("ERROR_OCR_SOURCE_HASH_MISMATCH", "Engine source differs from the frozen source.")
     report_bytes = Path(report["report_path"]).read_bytes()

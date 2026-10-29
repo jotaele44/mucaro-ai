@@ -121,6 +121,21 @@ def test_ocr_rejects_stale_bytes_and_byte_limits_before_engine(setup_ocr):
     assert calls == []
 
 
+def test_ocr_rejects_snapshot_tampering_during_engine_execution(setup_ocr, monkeypatch):
+    cfg, image, _, _ = setup_ocr
+    analyzer = ocr_skill.analyze_image_ocr
+
+    def tamper(path, **kwargs):
+        result = analyzer(path, **kwargs)
+        path.chmod(0o600)
+        path.write_bytes(b"tampered snapshot")
+        return result
+
+    monkeypatch.setattr(ocr_skill, "analyze_image_ocr", tamper)
+    with pytest.raises(SkillRuntimeError, match="ERROR_OCR_SOURCE_CHANGED"):
+        execute_skill(SKILL, {"path": str(image)}, cfg=cfg)
+
+
 def test_ocr_rejects_page_and_pixel_bombs_before_renderer(setup_ocr):
     cfg, _, calls, _ = setup_ocr
     for name, count, width, error in (("too-many", 17, 100, "ERROR_OCR_PAGE_LIMIT"), ("huge", 1, 1_000_000, "ERROR_OCR_PIXEL_LIMIT")):

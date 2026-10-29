@@ -473,7 +473,8 @@ def create_app(cfg: Settings = settings) -> FastAPI:
         try:
             return execute_skill(skill_id, req.arguments, cfg=cfg, executed_by="api")
         except SkillRuntimeError as exc:
-            raise api_error(exc.status, exc.detail, status_code=409 if exc.status in {"ERROR_SKILL_NOT_ACTIVE", "ERROR_SKILL_DIGEST_MISMATCH"} else 400) from exc
+            code = 403 if "PERMISSION" in exc.status else 409 if exc.status in {"ERROR_SKILL_NOT_ACTIVE", "ERROR_SKILL_DIGEST_MISMATCH"} else 400
+            raise api_error(exc.status, exc.detail, status_code=code) from exc
 
     @app.post("/ingest")
     async def ingest(upload: UploadFile = File(...), _auth: dict = Depends(require_auth)) -> dict:
