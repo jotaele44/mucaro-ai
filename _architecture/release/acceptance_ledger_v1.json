@@ -350,11 +350,14 @@
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_b0c9c955a10f.json",
+        "_architecture/release/evidence/fresh_clone_29d27c7e6803.json"
+      ],
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N25",
-      "notes": "Conduct requirement; verified by audit of the execution record (commits, ledgers, receipts) at certification."
+      "notes": "Conduct requirement remains OPEN for the final complete-record audit. Supporting skill-lifecycle evidence includes 175 rendered checks and a fresh source clone/install/release-check/CLI/launcher pass at 29d27c7e6803a0a0044262cf8e984a7a8a28c660. Source installation does not establish native distribution, signing, hosted, or physical-device certification."
     },
     {
       "requirement_id": "KERNEL-016",
@@ -1813,12 +1816,13 @@
         "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped",
         "backend/tests/test_api.py::test_api_upload_error_exposes_actionable_category",
         "backend/tests/test_api.py::test_api_conversation_persists_cited_chat_turns",
+    "backend/tests/test_api.py::test_api_skill_deactivation_requires_auth_persists_and_preserves_receipts",
         "_architecture/release/evidence/rendered_qa_f1b353b9b039.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Run errors, warnings, tool results, and plain API error payloads carry the canonical TGT-034 category. The frontend prefers the server category and retains HTTP fallback classification only for non-Mucaro proxy/plain-text responses."
+      "notes": "Run errors, warnings, tool results, and plain API error payloads carry the canonical TGT-034 category. Skill revocation refusals are BLOCKED_ACTION, missing mounts are SOURCE_UNAVAILABLE, and denied skill policies are PERMISSION_DENIED. The frontend prefers the server category and retains HTTP fallback classification for non-Mucaro proxy/plain-text responses."
     },
     {
       "requirement_id": "TGT-035",

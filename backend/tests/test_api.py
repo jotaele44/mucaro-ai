@@ -361,6 +361,9 @@ def test_api_skill_deactivation_requires_auth_persists_and_preserves_receipts(tm
     for action, body in (("mount", {}), ("activate", {}), ("execute", {"arguments": {}})):
         assert client.post(f"/skills/{skill_id}/{action}", json=body, headers=headers).status_code == 200
     assert client.post(f"/skills/{skill_id}/deactivate").status_code == 401
+    denied = client.post(f"/skills/{skill_id}/activate", json={"denied_capabilities": ["runtime.in_process"]}, headers=headers)
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["category"] == "PERMISSION_DENIED"
     receipts = client.get("/skills/executions", headers=headers).json()
     revoked = client.post(f"/skills/{skill_id}/deactivate", headers=headers)
     assert revoked.status_code == 200
@@ -370,10 +373,12 @@ def test_api_skill_deactivation_requires_auth_persists_and_preserves_receipts(tm
     refused = restarted.post(f"/skills/{skill_id}/execute", json={"arguments": {}}, headers=headers)
     assert refused.status_code == 409
     assert refused.json()["detail"]["status"] == "ERROR_SKILL_NOT_ACTIVE"
+    assert refused.json()["detail"]["category"] == "BLOCKED_ACTION"
     assert restarted.get("/skills/executions", headers=headers).json() == receipts
     assert restarted.post(f"/skills/{skill_id}/activate", json={}, headers=headers).status_code == 200
     assert restarted.post(f"/skills/{skill_id}/execute", json={}, headers=headers).status_code == 200
     assert restarted.post("/skills/missing/deactivate", headers=headers).status_code == 404
+    assert restarted.post("/skills/missing/deactivate", headers=headers).json()["detail"]["category"] == "SOURCE_UNAVAILABLE"
 
 
 def test_api_permission_leases_are_run_scoped_and_atomic(tmp_path: Path):
