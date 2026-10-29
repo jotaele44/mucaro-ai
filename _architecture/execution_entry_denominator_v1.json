@@ -1,0 +1,149 @@
+{
+  "schema_version": "mucaro-execution-entry-denominator/1.0",
+  "contract": "docs/GOAL_PLAN_EXECUTION_ENTRY_V1.md",
+  "expected_count": 28,
+  "positive_count": 8,
+  "negative_count": 20,
+  "cases": [
+    {
+      "case_id": "P01",
+      "description": "GOAL ready Proceed dispatches exact revision",
+      "surface": "backend"
+    },
+    {
+      "case_id": "P02",
+      "description": "GOAL Adjust creates new revision and executes nothing",
+      "surface": "backend"
+    },
+    {
+      "case_id": "P03",
+      "description": "PLAN approved Execute dispatches exact revision",
+      "surface": "backend"
+    },
+    {
+      "case_id": "P04",
+      "description": "PLAN Revise creates new candidate and executes nothing",
+      "surface": "backend"
+    },
+    {
+      "case_id": "P05",
+      "description": "same-key identical replay returns original decision",
+      "surface": "backend"
+    },
+    {
+      "case_id": "P06",
+      "description": "interrupted run resume binds same entry revision",
+      "surface": "backend"
+    },
+    {
+      "case_id": "P07",
+      "description": "completed stage retains verifiable receipts",
+      "surface": "backend"
+    },
+    {
+      "case_id": "P08",
+      "description": "English and Spanish labels preserve action semantics",
+      "surface": "backend+rendered"
+    },
+    {
+      "case_id": "N01",
+      "description": "stale vector revision rejected",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N02",
+      "description": "stale plan revision rejected",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N03",
+      "description": "missing vector identity rejected",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N04",
+      "description": "missing plan identity rejected",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N05",
+      "description": "execution without approval rejected",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N06",
+      "description": "failed dependency blocks approval",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N07",
+      "description": "unresolved risk blocks approval",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N08",
+      "description": "unauthorized actor rejected",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N09",
+      "description": "entry cannot bypass tool-specific approval",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N10",
+      "description": "same idempotency key with different payload rejected",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N11",
+      "description": "competing claim rejected",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N12",
+      "description": "approved plan never revised in place",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N13",
+      "description": "running decision never silently migrates revision",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N14",
+      "description": "next vector is never auto-authorized",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N15",
+      "description": "double activation cannot create second run",
+      "surface": "backend+rendered"
+    },
+    {
+      "case_id": "N16",
+      "description": "restart between claim and dispatch recovers exactly once",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N17",
+      "description": "corrupted receipt hash rejected",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N18",
+      "description": "changed source commit rejected",
+      "surface": "backend"
+    },
+    {
+      "case_id": "N19",
+      "description": "disabled/not-ready activation rejected",
+      "surface": "backend+rendered"
+    },
+    {
+      "case_id": "N20",
+      "description": "locale switch is side-effect free",
+      "surface": "backend+rendered"
+    }
+  ]
+}

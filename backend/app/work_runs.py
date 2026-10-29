@@ -329,6 +329,7 @@ def submit_message(
     idempotency_key: str | None = None,
     interrupt: bool = False,
     dismiss_pending_question: bool = False,
+    require_idle: bool = False,
     cfg: Settings = settings,
 ) -> dict[str, Any]:
     ensure_db(cfg.sqlite_path)
@@ -357,6 +358,14 @@ def submit_message(
             if row is not None:
                 existing = _row_to_run(row)
                 return {"status": "RUN_DUPLICATE_RETURNED", "run": existing}
+        if require_idle:
+            active = conn.execute(
+                "SELECT run_id FROM work_runs WHERE conversation_id = ? "
+                "AND state IN ('QUEUED','RUNNING','AWAITING_APPROVAL','AWAITING_INPUT') LIMIT 1",
+                (conversation_id,),
+            ).fetchone()
+            if active is not None:
+                raise RunError("ERROR_RUN_CONFLICTING_ACTIVE", str(active["run_id"]))
         seq_row = conn.execute("SELECT COALESCE(MAX(queue_seq), 0) AS seq FROM work_runs").fetchone()
         queue_seq = int(seq_row["seq"]) + 1
         run_id = stable_id("wrun", conversation_id, text, now, str(queue_seq))
