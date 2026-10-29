@@ -15,6 +15,7 @@ from .config import Settings, settings
 from .contracts import ContractViolation, validate_contract
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
 from .execution_router import ExecutionRouterError, execute_routed, select_execution_route
+from .gis_skill import GIS_ARGUMENTS_SCHEMA, GIS_EXECUTION_POLICY, analyze_spatial_data
 from .ocr_skill import OCR_ARGUMENTS_SCHEMA, OCR_EXECUTION_POLICY, analyze_document
 from .runtime_identity import build_runtime_identity
 from .utils import file_lock, read_json, stable_id, update_json, utc_now, write_json
@@ -118,6 +119,13 @@ def _local_worker_health_skill(arguments: dict[str, Any], cfg: Settings) -> dict
 
 
 SKILL_REGISTRY: dict[str, SkillDefinition] = {
+    "mucaro/gis-analyze": SkillDefinition(
+        skill_id="mucaro/gis-analyze", version="1.0.0",
+        description="Inspect, measure, transform, repair, compare, overlay, or spatially join bounded local GeoJSON layers. Preserves input bytes, CRS, warnings, and artifact lineage; pair operations require unique explicit feature IDs.",
+        runtime="IN_PROCESS", capabilities=("filesystem.read", "filesystem.write"),
+        input_schema="mucaro.gis-skill-input/1.0", output_schema="mucaro.gis-skill-result/1.0",
+        handler=analyze_spatial_data, arguments_schema=GIS_ARGUMENTS_SCHEMA, execution_policy=GIS_EXECUTION_POLICY,
+    ),
     "mucaro/ocr-analyze": SkillDefinition(
         skill_id="mucaro/ocr-analyze", version="1.0.0",
         description="Extract text from a local image or PDF with source hashes, confidence warnings, page lineage, and saved reports. Requires directory access and local OCR engines.",

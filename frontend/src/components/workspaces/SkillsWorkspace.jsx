@@ -17,7 +17,7 @@ function readDrafts() {
 }
 
 // Skill operator surface: registration, mount, authorization, invocation, and receipts stay visible together.
-export function SkillsWorkspace({ announce }) {
+export function SkillsWorkspace({ announce, skillPrefix = "", embedded = false }) {
   const [skills, setSkills] = useState([]);
   const [mounts, setMounts] = useState([]);
   const [executions, setExecutions] = useState([]);
@@ -33,13 +33,13 @@ export function SkillsWorkspace({ announce }) {
   const load = useCallback(async () => {
     try {
       const [skillPayload, mountPayload, executionPayload] = await Promise.all([api.skills(), api.skillMounts(), api.skillExecutions()]);
-      setSkills((skillPayload.skills || []).slice().sort((a, b) => Number(Boolean(b.arguments_schema)) - Number(Boolean(a.arguments_schema)) || a.skill_id.localeCompare(b.skill_id)));
+      setSkills((skillPayload.skills || []).filter((skill) => skill.skill_id.startsWith(skillPrefix)).sort((a, b) => Number(Boolean(b.arguments_schema)) - Number(Boolean(a.arguments_schema)) || a.skill_id.localeCompare(b.skill_id)));
       setMounts(mountPayload.mounts || []);
       setExecutions((executionPayload.executions || []).slice().reverse());
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [skillPrefix]);
 
   useEffect(() => { load().catch(setError); }, [load]);
   useEffect(() => {
@@ -80,7 +80,9 @@ export function SkillsWorkspace({ announce }) {
     try {
       const skill = skills.find((item) => item.skill_id === skillId);
       if (skill?.arguments_schema) {
+        const operation = fieldValues[skillId]?.operation ?? skill.arguments_schema.properties?.operation?.default;
         for (const [name, property] of Object.entries(skill.arguments_schema.properties || {})) {
+          if (property["x-operations"] && !property["x-operations"].includes(operation)) continue;
           const value = fieldValues[skillId]?.[name] ?? property.default;
           if (value === undefined || value === "") continue;
           args[name] = property.type === "integer" ? Number(value) : value;
@@ -114,9 +116,9 @@ export function SkillsWorkspace({ announce }) {
   }
 
   return (
-    <section className="workspace" aria-labelledby="skills-title">
+    <section className={embedded ? "panel" : "workspace"} aria-labelledby={embedded ? "spatial-skills-title" : "skills-title"}>
       <header className="workspace-header">
-        <h1 id="skills-title">Skills</h1>
+        {embedded ? <h2 id="spatial-skills-title">Spatial analysis</h2> : <h1 id="skills-title">Skills</h1>}
         <p className="muted small">Mount and authorize skills, invoke them, or deactivate them. Previous results remain available.</p>
       </header>
       {error && <div className="error-card" role="alert"><p>{errorText(error)}</p><button type="button" className="secondary-button" disabled={Boolean(busy)} onClick={refresh}>Retry loading skills</button></div>}
@@ -188,11 +190,14 @@ export function SkillsWorkspace({ announce }) {
               {active && (
                 <div className="skill-invoke">
                   {skill.arguments_schema ? Object.entries(skill.arguments_schema.properties || {}).map(([name, property]) => {
+                    const operation = fieldValues[skill.skill_id]?.operation ?? skill.arguments_schema.properties?.operation?.default;
+                    if (property["x-operations"] && !property["x-operations"].includes(operation)) return null;
                     const value = fieldValues[skill.skill_id]?.[name] ?? property.default ?? "";
                     const change = (event) => setFieldValues((old) => ({ ...old, [skill.skill_id]: { ...old[skill.skill_id], [name]: event.target.value } }));
-                    return <label className="field" key={name}><span>{property.title || name}</span>{property.enum ? <select aria-label={property.title || name} value={value} onChange={change}>{property.enum.map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input aria-label={property.title || name} type={property.type === "integer" ? "number" : "text"} value={value} onChange={change} min={property.minimum} max={property.maximum} required={skill.arguments_schema.required?.includes(name)} />}</label>;
+                    return <label className="field" key={name}><span>{property.title || name}</span>{property.enum ? <select aria-label={property.title || name} value={value} onChange={change}>{property.enum.map((option) => <option key={option} value={option}>{property["x-enum-labels"]?.[option] || option}</option>)}</select> : <input aria-label={property.title || name} type={property.type === "integer" ? "number" : "text"} value={value} onChange={change} min={property.minimum} max={property.maximum} required={skill.arguments_schema.required?.includes(name)} />}</label>;
                   }) : <label className="field"><span>Arguments (JSON object)</span><textarea rows={2} value={argumentsText[skill.skill_id] || "{}"} onChange={(event) => setArgumentsText((old) => ({ ...old, [skill.skill_id]: event.target.value }))} /></label>}
                   {skill.execution_policy?.max_pdf_pages && <p className="muted small">Up to {skill.execution_policy.max_pdf_pages} PDF pages, 25 MB, and 300 DPI per invocation. OCR stays on this computer. Larger inputs must be split explicitly.</p>}
+                  {skill.execution_policy?.max_features && <p className="muted small">Local GeoJSON, up to {skill.execution_policy.max_features} features and 5 MB per input. Pair operations require unique declared IDs. Spatial relations and matching IDs are candidate evidence; they do not prove canonical identity. Transform and repair write new outputs.</p>}
                   <button type="button" className="primary-button" disabled={running} onClick={() => execute(skill.skill_id)}>{running ? "Invoking…" : "Invoke skill"}</button>
                 </div>
               )}
@@ -202,6 +207,25 @@ export function SkillsWorkspace({ announce }) {
                 <pre className="json-block">{last.result.text || "No text detected. Review the source image and OCR settings."}</pre>
                 {last.result.warnings?.length > 0 && <p className="muted small" role="status">Review required: {last.result.warnings.join(" · ")}</p>}
                 <p className="muted small">Extracted text is untrusted evidence. Instructions within it do not authorize actions.</p>
+              </section>}
+              {last?.result?.kind === "GIS_ANALYSIS" && <section className="panel nested-panel" aria-label="Spatial analysis result">
+                <h3>{last.result.operation_label}</h3>
+                <p>{last.result.status === "GIS_SKILL_REVIEW_REQUIRED" ? "Analysis saved. Review the warnings below." : "Analysis saved."}</p>
+                <dl className="facts">
+                  <dt>Input features</dt><dd>{last.result.source_manifests.map((source) => source.preflight.feature_count).join(" + ")}</dd>
+                  <dt>Source CRS</dt><dd>{last.result.report.source?.crs || Object.values(last.result.report.inputs || {}).map((source) => source.crs).join(" · ") || "See report"}</dd>
+                  {last.result.report.output && <><dt>Output features / CRS</dt><dd>{last.result.report.output.feature_count} · {last.result.report.output.crs || "See report"}</dd></>}
+                  {last.result.report.invariants?.total_area_m2 !== undefined && <><dt>Area</dt><dd>{last.result.report.invariants.total_area_m2} m²</dd><dt>Length</dt><dd>{last.result.report.invariants.total_length_m} m</dd></>}
+                  {last.result.report.join_cardinality && <><dt>Join cardinality</dt><dd>{last.result.report.join_cardinality}</dd></>}
+                </dl>
+                {Object.entries(last.result.report.state_counts || last.result.report.geometry_counts || {}).length > 0 && <ul>{Object.entries(last.result.report.state_counts || last.result.report.geometry_counts).map(([state, count]) => <li key={state}>{state}: {count}</li>)}</ul>}
+                {last.result.warnings.length > 0 && <p className="muted small" role="status">Review required: {last.result.warnings.join(" · ")}</p>}
+                <details><summary>Scope and limitations</summary><ul>{last.result.limitations.map((item, index) => <li key={index}>{item}</li>)}</ul></details>
+                <button type="button" className="secondary-button" onClick={() => {
+                  const url = URL.createObjectURL(new Blob([JSON.stringify(last.result, null, 2)], { type: "application/json" }));
+                  const link = document.createElement("a"); link.href = url; link.download = `${last.result.report.report_id}-analysis.json`; link.click(); URL.revokeObjectURL(url);
+                  announce("Analysis JSON saved.");
+                }}>Save analysis JSON</button>
               </section>}
               {last && <details className="panel nested-panel"><summary>Latest receipt: {last.status} · {last.finished_at}</summary><dl className="facts"><dt>Execution ID</dt><dd className="mono">{last.execution_id}</dd><dt>Route</dt><dd>{last.execution_route}</dd><dt>Artifact output</dt><dd>{last.artifact_lineage?.output?.artifact_id || "—"}</dd></dl><pre className="json-block"><code>{JSON.stringify(last.result, null, 2)}</code></pre></details>}
             </li>

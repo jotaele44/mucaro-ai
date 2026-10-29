@@ -4,9 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import os
-import stat
-import tempfile
 import warnings
 from pathlib import Path
 from typing import Any
@@ -18,8 +15,7 @@ from .artifact_identity import create_artifact_record
 from .config import Settings
 from .ocr_analysis import analyze_image_ocr
 from .ocr_pdf import analyze_pdf_ocr
-from .permissions import ensure_directory_permission, is_within_path
-from .utils import utc_now, write_json
+from .local_inputs import snapshot_local_file
 
 MAX_PDF_PAGES = 16
 MAX_PAGE_PIXELS = 25_000_000
@@ -57,56 +53,13 @@ class OCRSkillError(RuntimeError):
         self.status, self.detail = status, detail
 
 
-def _check_access(path: Path, cfg: Settings) -> None:
-    # App-managed uploads remain usable when user data lives outside the bundle.
-    if not is_within_path(path, cfg.input_dir.resolve()):
-        ensure_directory_permission(path, cfg)
-
-
 def _snapshot(requested: str, expected_sha256: str | None, cfg: Settings) -> tuple[Path, dict[str, Any], Any]:
-    selected = Path(requested).expanduser()
-    source = (selected if selected.is_absolute() else cfg.project_root / selected).resolve(strict=True)
-    _check_access(source, cfg)
-    if source.suffix.lower() not in {".gif", ".jpeg", ".jpg", ".png", ".webp", ".pdf"}:
-        raise OCRSkillError("ERROR_OCR_UNSUPPORTED_INPUT", "Choose an image or PDF.")
-    fd = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
-    max_bytes = min(cfg.max_upload_bytes, OCR_EXECUTION_POLICY["max_source_bytes"])
-    with os.fdopen(fd, "rb") as handle:
-        before = os.fstat(handle.fileno())
-        if not stat.S_ISREG(before.st_mode):
-            raise OCRSkillError("ERROR_OCR_INPUT_NOT_FILE", "OCR input must be a regular file.")
-        if before.st_size > max_bytes:
-            raise OCRSkillError("ERROR_OCR_INPUT_TOO_LARGE", f"Input exceeds {max_bytes} bytes.")
-        raw = handle.read(max_bytes + 1)
-        after = os.fstat(handle.fileno())
-    current = source.stat(follow_symlinks=False)
-    if source.resolve() != source or (after.st_dev, after.st_ino) != (current.st_dev, current.st_ino) or (
-        before.st_size, before.st_mtime_ns, before.st_ctime_ns
-    ) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
-        raise OCRSkillError("ERROR_OCR_SOURCE_CHANGED", "Input changed while being acquired; request OCR again.")
-    _check_access(source, cfg)
-    if not raw or len(raw) > max_bytes:
-        raise OCRSkillError("ERROR_OCR_INPUT_INVALID", "Input is empty or exceeds the byte limit.")
-    digest = hashlib.sha256(raw).hexdigest()
-    if expected_sha256 and digest != expected_sha256:
-        raise OCRSkillError("ERROR_OCR_SOURCE_CHANGED", "Input SHA-256 differs from the requested source identity.")
-    cfg.ensure_dirs()
-    snapshot_dir = Path(tempfile.mkdtemp(prefix="ocr-snapshot-", dir=cfg.input_dir))
-    frozen = snapshot_dir / f"input{source.suffix.lower()}"
-    with frozen.open("xb") as output:
-        output.write(raw)
-    frozen.chmod(0o400)
-    manifest = {
-        "requested_path_raw": requested, "resolved_path": str(source), "snapshot_path": str(frozen),
-        "retrieval_utc": utc_now(), "bytes": len(raw), "sha256": digest,
-    }
-    write_json(snapshot_dir / "source_manifest.json", manifest)
-    artifact = create_artifact_record(
-        processed_dir=cfg.processed_dir, artifact_type="SOURCE", payload=raw,
-        logical_identity=f"ocr_source:{frozen}", producer="ocr_skill", producer_version="1.0.0",
-        source_path_or_uri=str(frozen), provenance_parameters=manifest,
+    return snapshot_local_file(
+        requested, expected_sha256, cfg,
+        extensions={".gif", ".jpeg", ".jpg", ".png", ".webp", ".pdf"},
+        max_bytes=OCR_EXECUTION_POLICY["max_source_bytes"], namespace="OCR", producer="ocr_skill",
+        error_type=OCRSkillError,
     )
-    return frozen, manifest, artifact
 
 
 def _check_document_budget(path: Path, dpi: int) -> None:

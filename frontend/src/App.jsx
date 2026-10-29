@@ -286,7 +286,7 @@ export function App() {
         {health.state === "ok" && view === "skills" && <SkillsWorkspace announce={announce} />}
         {health.state === "ok" && view === "sources" && <SourcesWorkspace announce={announce} />}
         {health.state === "ok" && view === "ocr" && <OCRWorkspace announce={announce} />}
-        {health.state === "ok" && view === "gis" && <SpecializedWorkspace kind="gis" />}
+        {health.state === "ok" && view === "gis" && <SpecializedWorkspace kind="gis" announce={announce} />}
         {health.state === "ok" && view === "code" && <SpecializedWorkspace kind="code" />}
         {health.state === "ok" && view === "artifacts" && <SpecializedWorkspace kind="artifacts" />}
         {health.state === "ok" && view === "memory" && <MemoryWorkspace announce={announce} />}

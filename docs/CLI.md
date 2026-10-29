@@ -1086,6 +1086,57 @@ previous grants as history, without treating them as usable authorization.
 Regression checks cover restart persistence, missing/duplicate mounts, explicit
 reauthorization, concurrent updates, and receipt preservation after revocation.
 
+### Governed GIS skill
+
+`mucaro/gis-analyze` connects the shared vector engines to **GIS**, **Skills**,
+the skill API, and approved conversations. Mount the skill, explicitly allow
+`filesystem.read` and `filesystem.write`, and activate it. Choose the spatial
+operation and input GeoJSON path. Reference-layer and target-CRS fields appear
+only when the selected operation uses them. Results show feature counts, CRS,
+measurement units, warnings, and limitations. **Save analysis JSON** saves the
+result envelope; the original report and derived GeoJSON retain separate byte
+hashes and paths in its receipt.
+
+```bash
+mucaro skills mount mucaro/gis-analyze
+mucaro skills activate mucaro/gis-analyze --allow-capability filesystem.read --allow-capability filesystem.write
+mucaro skills execute mucaro/gis-analyze --arguments '{"operation":"inspect","path":"data/input/layer.geojson"}'
+mucaro skills execute mucaro/gis-analyze --arguments '{"operation":"reproject","path":"data/input/layer.geojson","target_crs":"EPSG:3857"}'
+```
+
+The operation names are `inspect`, `measure_wgs84`, `reproject`, `repair`,
+`compare`, `intersection`, `union`, `difference`, `symmetric_difference`, and
+`spatial_join`. Pair operations require `reference_path`; spatial joins use
+points as the input and polygons as the reference. Both layers must have unique
+explicit feature IDs. If IDs are stored in a property, select `id_property`
+and/or `reference_id_property` explicitly (for example `GEOID` for the committed
+Census municipio layer). A derived engine input receives those IDs with a
+recorded mapping and its own hash; the raw snapshot stays unchanged.
+Numeric/text ID collisions fail closed. Comparison and
+overlay align declared feature IDs as candidate keys; this does not establish
+canonical identity. Their results include the intersection, A-only, B-only,
+union, and symmetric difference of those keys.
+
+Use the same argument object in `POST /skills/mucaro/gis-analyze/execute` under
+`arguments`, or `/skill mucaro/gis-analyze {"operation":"inspect","path":"data/input/layer.geojson"}`
+in a conversation. Conversation execution requires the tool approval flow.
+Optional `expected_sha256` and `expected_reference_sha256` bind requested bytes.
+Directory access is rechecked while freezing each input. Limits are 5 MiB,
+1,000 features, 100,000 JSON nodes, depth 64, and 5,000,000 pair coordinate-work
+units. The pair budget counts matched coordinate products for comparisons and
+overlays, or point-count times reference vertices/candidates for spatial joins.
+Duplicate object keys, malformed feature rows, non-finite numbers,
+ambiguous IDs, incompatible CRS, and unexplained row loss fail closed. CRS
+transformation uses the offline PROJ policy; repair and transform create new
+outputs. Frozen sources and reports remain available for review.
+
+Engineering reuse: keep acquisition shared with OCR in `local_inputs.py`; bind
+schemas, budgets, and overlay policy to skill identity; isolate each invocation's
+report directory; and serialize shared artifact-store updates. Regression gates
+exercise real vector engines, parallel report retention, permissions, malformed
+inputs, and all interface entry points. Raster/hydrology task integration and
+broader GIS release acceptance remain open under their existing requirements.
+
 ### Governed OCR skill
 
 `mucaro/ocr-analyze` uses the same local image/PDF engines as `mucaro ocr

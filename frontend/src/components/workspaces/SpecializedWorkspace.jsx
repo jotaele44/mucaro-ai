@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../../api.js";
+import { SkillsWorkspace } from "./SkillsWorkspace.jsx";
 
 const COPY = {
   gis: {
     title: "GIS workspace",
-    description: "Inspect spatial capability state and offline dependencies. The conversation remains the orchestration plane for governed GIS work.",
+    description: "Analyze local spatial data with explicit permission, frozen inputs, and saved reports. Review capability and offline limits alongside the results.",
   },
   code: {
     title: "Code workspace",
@@ -42,7 +43,7 @@ function CapabilityRows({ rows }) {
   );
 }
 
-function GISView({ setError }) {
+function GISView({ setError, announce }) {
   const [payload, setPayload] = useState(null);
   useEffect(() => {
     Promise.all([api.intelligencePlane(), api.offlineManifest()])
@@ -54,6 +55,7 @@ function GISView({ setError }) {
   const offline = (payload.offline.capabilities || []).filter((row) => row.capability.startsWith("gis."));
   return (
     <>
+      <SkillsWorkspace announce={announce} skillPrefix="mucaro/gis-" embedded />
       <section className="panel">
         <div className="tool-row-head"><Status value={capability?.state} /><h2>Spatial engine</h2></div>
         <p>{capability?.notes}</p>
@@ -233,7 +235,7 @@ function ArtifactsView({ setError }) {
   );
 }
 
-export function SpecializedWorkspace({ kind }) {
+export function SpecializedWorkspace({ kind, announce }) {
   const [error, setError] = useState(null);
   const copy = COPY[kind];
   return (
@@ -243,7 +245,7 @@ export function SpecializedWorkspace({ kind }) {
         <p className="muted small">{copy.description}</p>
       </header>
       {error && <p className="error-card" role="alert">{error.status || "ERROR"} — {error.message || "The workspace could not load."}</p>}
-      {kind === "gis" && <GISView setError={setError} />}
+      {kind === "gis" && <GISView setError={setError} announce={announce} />}
       {kind === "code" && <CodeView setError={setError} />}
       {kind === "artifacts" && <ArtifactsView setError={setError} />}
     </section>
