@@ -1057,11 +1057,34 @@ mucaro skills executions --format text
 
 The API equivalents are `GET /skills`, `GET /skills/mounts`,
 `POST /skills/{skill_id}/mount`, `POST /skills/{skill_id}/activate`,
-`POST /skills/{skill_id}/execute`, and `GET /skills/executions`. Activation
+`POST /skills/{skill_id}/execute`, `POST /skills/{skill_id}/deactivate`,
+and `GET /skills/executions`. Activation
 records the policy decision; invocation rechecks the stored digest and policy,
 selects the permitted runtime, and writes input/output or failure artifact
 lineage. Unsupported runtimes, stale digests, missing mounts, denied
 capabilities, and failed handlers remain explicit errors.
+
+Deactivate an active skill from its card in **Skills**, or run:
+
+```bash
+mucaro skills deactivate mucaro/intelligence-plane-health --format text
+```
+
+Deactivation persists `INACTIVE`, clears its usable capability grant, and blocks
+new invocations, including after an application restart. Repeating it is
+idempotent. The mounted version, transition history, and execution receipts stay
+available. Use `skills activate` to authorize it again before invoking it.
+Work admitted before deactivation may still finish; deactivation is not a
+cancellation mechanism. Each new execution receipt records its mount ID,
+activation sequence, and admission time so this distinction can be inspected.
+
+Lifecycle implementation guidance: serialize mount, activation, and revocation
+updates through the shared store lock, and use that lock for execution admission.
+Release it before running a handler so revocation remains responsive. Never
+require the current definition or digest to revoke an obsolete mount. Preserve
+previous grants as history, without treating them as usable authorization.
+Regression checks cover restart persistence, missing/duplicate mounts, explicit
+reauthorization, concurrent updates, and receipt preservation after revocation.
 
 Run-scoped permission leases are available through the CLI:
 

@@ -106,6 +106,7 @@ from .skill_runtime import (
     SKILL_REGISTRY,
     SkillRuntimeError,
     activate_skill,
+    deactivate_skill,
     execute_skill,
     list_skill_executions,
     list_skill_mounts,
@@ -1171,6 +1172,11 @@ def build_parser() -> argparse.ArgumentParser:
     skills_activate.add_argument("--policy-id", default="operator-skill-activation", help="Policy identity recorded in the activation decision.")
     skills_activate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     skills_activate.set_defaults(handler=run_skills_activate)
+
+    skills_deactivate = skills_subcommands.add_parser("deactivate", help="Revoke future skill invocations while retaining receipts.")
+    skills_deactivate.add_argument("skill_id", help="Mounted skill identifier.")
+    skills_deactivate.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
+    skills_deactivate.set_defaults(handler=run_skills_deactivate)
 
     skills_execute = skills_subcommands.add_parser("execute", help="Invoke one active skill with JSON arguments.")
     skills_execute.add_argument("skill_id", help="Registered skill identifier.")
@@ -8925,6 +8931,16 @@ def run_skills_activate(args: argparse.Namespace, cfg: Settings) -> int:
             denied=set(args.deny_capability),
         )
         result = activate_skill(args.skill_id, policy=policy, cfg=cfg, activated_by="cli")
+    except SkillRuntimeError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
+    return 0
+
+
+def run_skills_deactivate(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = deactivate_skill(args.skill_id, cfg=cfg, deactivated_by="cli")
     except SkillRuntimeError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2

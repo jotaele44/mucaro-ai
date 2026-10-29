@@ -325,6 +325,7 @@ export const api = {
   skillExecutions: () => request("/skills/executions"),
   mountSkill: (id) => request(`/skills/${encodeURIComponent(id)}/mount`, { method: "POST" }),
   activateSkill: (id, payload = {}) => request(`/skills/${encodeURIComponent(id)}/activate`, json("POST", payload)),
+  deactivateSkill: (id) => request(`/skills/${encodeURIComponent(id)}/deactivate`, { method: "POST" }),
   executeSkill: (id, skillArguments = {}) => request(`/skills/${encodeURIComponent(id)}/execute`, json("POST", { arguments: skillArguments })),
   // One of the files saved with an answer: kind is "markdown", "json" or "csv".
   exportFile: (runId, kind) => request(`/exports/${encodeURIComponent(runId)}/files/${encodeURIComponent(kind)}`, { as: "blob" }),

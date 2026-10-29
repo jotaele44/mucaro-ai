@@ -353,6 +353,29 @@ def test_api_skill_mount_activation_invocation_and_receipt(tmp_path: Path):
     assert executions.json()["executions"][0]["policy_decision"]["policy_id"] == "api-skill-policy"
 
 
+def test_api_skill_deactivation_requires_auth_persists_and_preserves_receipts(tmp_path: Path):
+    cfg = make_settings(tmp_path, operator_token="skill-operator-token")
+    client = TestClient(create_app(cfg))
+    skill_id = "mucaro%2Fintelligence-plane-health"
+    headers = {"X-Mucaro-Token": "skill-operator-token"}
+    for action, body in (("mount", {}), ("activate", {}), ("execute", {"arguments": {}})):
+        assert client.post(f"/skills/{skill_id}/{action}", json=body, headers=headers).status_code == 200
+    assert client.post(f"/skills/{skill_id}/deactivate").status_code == 401
+    receipts = client.get("/skills/executions", headers=headers).json()
+    revoked = client.post(f"/skills/{skill_id}/deactivate", headers=headers)
+    assert revoked.status_code == 200
+    assert revoked.json()["mount"]["state"] == "INACTIVE"
+    assert client.post(f"/skills/{skill_id}/deactivate", headers=headers).json()["status"] == "SKILL_ALREADY_INACTIVE"
+    restarted = TestClient(create_app(cfg))
+    refused = restarted.post(f"/skills/{skill_id}/execute", json={"arguments": {}}, headers=headers)
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["status"] == "ERROR_SKILL_NOT_ACTIVE"
+    assert restarted.get("/skills/executions", headers=headers).json() == receipts
+    assert restarted.post(f"/skills/{skill_id}/activate", json={}, headers=headers).status_code == 200
+    assert restarted.post(f"/skills/{skill_id}/execute", json={}, headers=headers).status_code == 200
+    assert restarted.post("/skills/missing/deactivate", headers=headers).status_code == 404
+
+
 def test_api_permission_leases_are_run_scoped_and_atomic(tmp_path: Path):
     client = make_client(tmp_path)
     created = client.post(

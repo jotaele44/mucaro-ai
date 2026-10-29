@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from dataclasses import dataclass
+from functools import wraps
 from typing import Any, Callable
 
 from .artifact_identity import ArtifactIdentityError, ArtifactRecord, create_artifact_record
@@ -13,7 +14,7 @@ from .contracts import ContractViolation, validate_contract
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
 from .execution_router import ExecutionRouterError, execute_routed, select_execution_route
 from .runtime_identity import build_runtime_identity
-from .utils import read_json, stable_id, utc_now, write_json
+from .utils import file_lock, read_json, stable_id, update_json, utc_now, write_json
 
 SKILL_MOUNTS_NAME = "skill_mounts.json"
 SKILL_EXECUTIONS_NAME = "skill_execution_log.json"
@@ -156,10 +157,35 @@ def _load_executions(cfg: Settings) -> list[dict[str, Any]]:
 
 
 def _append_execution(event: dict[str, Any], cfg: Settings) -> dict[str, Any]:
-    events = _load_executions(cfg)
-    events.append(event)
-    write_json(_executions_path(cfg), events)
+    update_json(_executions_path(cfg), [], lambda events: events.append(event))
     return event
+
+
+def _serialize_mount_operation(operation: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+    @wraps(operation)
+    def locked(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        cfg = kwargs.get("cfg", settings)
+        with file_lock(_mounts_path(cfg)):
+            return operation(*args, **kwargs)
+    return locked
+
+
+def _matching_mounts(mounts: list[dict[str, Any]], skill_id: str) -> list[tuple[int, dict[str, Any]]]:
+    matches = [(index, mount) for index, mount in enumerate(mounts) if mount.get("skill_id") == skill_id]
+    if len(matches) > 1:
+        raise SkillRuntimeError("ERROR_SKILL_MOUNT_AMBIGUOUS", skill_id)
+    return matches
+
+
+def _lifecycle_event(mount: dict[str, Any], state: str, actor: str, at: str) -> dict[str, Any]:
+    return {
+        "sequence": int(mount.get("lifecycle_sequence", 0)) + 1,
+        "from_state": mount["state"],
+        "to_state": state,
+        "actor": actor,
+        "at": at,
+        "previous_policy_decision": mount.get("policy_decision"),
+    }
 
 
 def _canonical_payload(value: Any) -> bytes:
@@ -185,6 +211,7 @@ def list_skill_mounts(cfg: Settings = settings) -> dict[str, Any]:
     return {"status": "SKILL_MOUNTS_OK", "mounts": _load_mounts(cfg)}
 
 
+@_serialize_mount_operation
 def mount_skill(
     skill_id: str,
     *,
@@ -197,9 +224,9 @@ def mount_skill(
         raise SkillRuntimeError("ERROR_SKILL_NOT_REGISTERED", skill_id)
     _validate_definition(skill)
     mounts = _load_mounts(cfg)
-    existing = [item for item in mounts if item.get("skill_id") == skill_id]
+    existing = _matching_mounts(mounts, skill_id)
     if existing:
-        current = existing[0]
+        current = existing[0][1]
         if current.get("digest") == skill.digest:
             return {"status": "SKILL_ALREADY_MOUNTED", "mount": current}
         raise SkillRuntimeError("ERROR_SKILL_MOUNT_CONFLICT", skill_id)
@@ -217,12 +244,15 @@ def mount_skill(
         "activated_by": None,
         "activated_at": None,
         "policy_decision": None,
+        "lifecycle_sequence": 0,
+        "lifecycle_events": [],
     }
     mounts.append(mount)
     _write_mounts(mounts, cfg)
     return {"status": "SKILL_MOUNTED", "mount": mount}
 
 
+@_serialize_mount_operation
 def activate_skill(
     skill_id: str,
     *,
@@ -265,7 +295,7 @@ def activate_skill(
         raise SkillRuntimeError(exc.status, exc.detail) from exc
 
     mounts = _load_mounts(cfg)
-    matches = [(index, item) for index, item in enumerate(mounts) if item.get("skill_id") == skill_id]
+    matches = _matching_mounts(mounts, skill_id)
     if not matches:
         raise SkillRuntimeError("ERROR_SKILL_NOT_MOUNTED", skill_id)
     index, mount = matches[0]
@@ -278,12 +308,15 @@ def activate_skill(
 
     activated_at = utc_now()
     was_active = mount.get("state") == "ACTIVE"
+    event = _lifecycle_event(mount, "ACTIVE", activated_by, activated_at)
     updated = {
         **mount,
         "state": "ACTIVE",
         "activated_by": activated_by,
         "activated_at": activated_at,
         "policy_decision": decision_payload,
+        "lifecycle_sequence": event["sequence"],
+        "lifecycle_events": [*mount.get("lifecycle_events", []), event],
     }
     mounts[index] = updated
     _write_mounts(mounts, cfg)
@@ -294,6 +327,41 @@ def activate_skill(
     }
 
 
+@_serialize_mount_operation
+def deactivate_skill(
+    skill_id: str,
+    *,
+    cfg: Settings = settings,
+    deactivated_by: str = "operator",
+) -> dict[str, Any]:
+    """Revoke future admissions, retaining history and any already-admitted work.
+
+    Revocation deliberately does not require a current registry definition or digest:
+    an operator must also be able to revoke an obsolete or removed skill mount.
+    """
+    mounts = _load_mounts(cfg)
+    matches = _matching_mounts(mounts, skill_id)
+    if not matches:
+        raise SkillRuntimeError("ERROR_SKILL_NOT_MOUNTED", skill_id)
+    index, mount = matches[0]
+    if mount.get("state") == "INACTIVE" and mount.get("policy_decision") is None:
+        return {"status": "SKILL_ALREADY_INACTIVE", "mount": mount}
+    at = utc_now()
+    event = _lifecycle_event(mount, "INACTIVE", deactivated_by, at)
+    updated = {
+        **mount,
+        "state": "INACTIVE",
+        "policy_decision": None,
+        "deactivated_at": at,
+        "deactivated_by": deactivated_by,
+        "lifecycle_sequence": event["sequence"],
+        "lifecycle_events": [*mount.get("lifecycle_events", []), event],
+    }
+    mounts[index] = updated
+    _write_mounts(mounts, cfg)
+    return {"status": "SKILL_DEACTIVATED", "mount": updated}
+
+
 def execute_skill(
     skill_id: str,
     arguments: dict[str, Any] | None = None,
@@ -301,17 +369,20 @@ def execute_skill(
     cfg: Settings = settings,
     executed_by: str = "operator",
 ) -> dict[str, Any]:
-    arguments = arguments or {}
+    arguments = {} if arguments is None else arguments
     if not isinstance(arguments, dict):
         raise SkillRuntimeError("ERROR_SKILL_ARGUMENTS_NOT_OBJECT", "Skill arguments must be a JSON object.")
     skill = SKILL_REGISTRY.get(skill_id)
     if skill is None:
         raise SkillRuntimeError("ERROR_SKILL_NOT_REGISTERED", skill_id)
-    mounts = _load_mounts(cfg)
-    matches = [item for item in mounts if item.get("skill_id") == skill_id]
-    if not matches or matches[0].get("state") != "ACTIVE":
-        raise SkillRuntimeError("ERROR_SKILL_NOT_ACTIVE", skill_id)
-    mount = matches[0]
+    # This lock is the admission boundary shared with activation and revocation.
+    # The handler runs outside it so revocation can block later invocations promptly.
+    with file_lock(_mounts_path(cfg)):
+        matches = _matching_mounts(_load_mounts(cfg), skill_id)
+        if not matches or matches[0][1].get("state") != "ACTIVE":
+            raise SkillRuntimeError("ERROR_SKILL_NOT_ACTIVE", skill_id)
+        mount = matches[0][1]
+        admitted_at = utc_now()
     if mount.get("digest") != skill.digest:
         raise SkillRuntimeError("ERROR_SKILL_DIGEST_MISMATCH", skill_id)
     policy_decision = mount.get("policy_decision")
@@ -464,6 +535,11 @@ def execute_skill(
         "error": error,
         "execution_contract": execution_contract,
         "policy_decision": policy_decision,
+        "activation_binding": {
+            "mount_id": mount["mount_id"],
+            "lifecycle_sequence": mount.get("lifecycle_sequence", 0),
+            "admitted_at": admitted_at,
+        },
         "artifact_lineage": artifact_lineage,
     }
     _append_execution(event, cfg)

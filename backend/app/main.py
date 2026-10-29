@@ -36,6 +36,7 @@ from .skill_runtime import (
     SKILL_REGISTRY,
     SkillRuntimeError,
     activate_skill,
+    deactivate_skill,
     execute_skill,
     list_skill_executions,
     list_skill_mounts,
@@ -459,6 +460,13 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             return activate_skill(skill_id, policy=policy, cfg=cfg, activated_by="api")
         except SkillRuntimeError as exc:
             raise api_error(exc.status, exc.detail, status_code=403 if "CAPABILITY" in exc.status or "POLICY" in exc.status else 400) from exc
+
+    @app.post("/skills/{skill_id:path}/deactivate")
+    def deactivate_operator_skill(skill_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return deactivate_skill(skill_id, cfg=cfg, deactivated_by="api")
+        except SkillRuntimeError as exc:
+            raise api_error(exc.status, exc.detail, status_code=404 if exc.status == "ERROR_SKILL_NOT_MOUNTED" else 409) from exc
 
     @app.post("/skills/{skill_id:path}/execute")
     def execute_operator_skill(skill_id: str, req: SkillExecuteRequest, _auth: dict = Depends(require_auth)) -> dict:

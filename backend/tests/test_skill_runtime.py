@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from backend.app.capability_policy import CapabilityPolicy
 from backend.app.artifact_identity import list_artifacts, trace_ancestors
 from backend.app.config import Settings
@@ -7,6 +9,7 @@ from backend.app.skill_runtime import (
     SkillDefinition,
     SkillRuntimeError,
     activate_skill,
+    deactivate_skill,
     execute_skill,
     list_skill_executions,
     list_skill_mounts,
@@ -93,6 +96,106 @@ def test_skill_must_mount_then_activate_before_execution(tmp_path: Path):
     assert len(executions) == 1
     assert executions[0]["skill_digest"] == mounts[0]["digest"]
     assert len(list_artifacts(cfg.processed_dir)) == 2
+
+
+def test_deactivation_revokes_persisted_grant_preserves_receipts_and_requires_reactivation(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/intelligence-plane-health"
+    mount = mount_skill(skill_id, cfg=cfg)["mount"]
+    activate_skill(skill_id, cfg=cfg)
+    previous = execute_skill(skill_id, cfg=cfg)["execution"]
+    revoked = deactivate_skill(skill_id, cfg=cfg, deactivated_by="test")
+    assert revoked["mount"]["mount_id"] == mount["mount_id"]
+    assert revoked["mount"]["state"] == "INACTIVE"
+    assert revoked["mount"]["policy_decision"] is None
+    assert revoked["mount"]["lifecycle_events"][-1]["previous_policy_decision"]["status"] == "AUTHORIZED"
+    assert previous["activation_binding"]["lifecycle_sequence"] < revoked["mount"]["lifecycle_sequence"]
+    assert deactivate_skill(skill_id, cfg=cfg)["mount"] == revoked["mount"]
+    # A new Settings instance reads the persisted revocation, not process-local state.
+    restarted = make_settings(tmp_path)
+    with pytest.raises(SkillRuntimeError, match=skill_id) as error:
+        execute_skill(skill_id, cfg=restarted)
+    assert error.value.status == "ERROR_SKILL_NOT_ACTIVE"
+    assert list_skill_executions(restarted)["executions"] == [previous]
+    activate_skill(skill_id, cfg=restarted)
+    current = execute_skill(skill_id, cfg=restarted)["execution"]
+    assert current["activation_binding"]["lifecycle_sequence"] > revoked["mount"]["lifecycle_sequence"]
+    assert len(list_skill_executions(restarted)["executions"]) == 2
+
+
+def test_revocation_remains_available_for_removed_skill_and_rejects_duplicate_mounts(monkeypatch, tmp_path: Path):
+    from backend.app import skill_runtime
+
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/intelligence-plane-health"
+    mount_skill(skill_id, cfg=cfg)
+    activate_skill(skill_id, cfg=cfg)
+    monkeypatch.delitem(skill_runtime.SKILL_REGISTRY, skill_id)
+    assert deactivate_skill(skill_id, cfg=cfg)["status"] == "SKILL_DEACTIVATED"
+    with pytest.raises(SkillRuntimeError) as missing:
+        deactivate_skill("missing/skill", cfg=cfg)
+    assert missing.value.status == "ERROR_SKILL_NOT_MOUNTED"
+    mounts = skill_runtime._load_mounts(cfg)
+    skill_runtime._write_mounts([*mounts, mounts[0]], cfg)
+    with pytest.raises(SkillRuntimeError) as ambiguous:
+        deactivate_skill(skill_id, cfg=cfg)
+    assert ambiguous.value.status == "ERROR_SKILL_MOUNT_AMBIGUOUS"
+
+
+def test_deactivation_does_not_erase_or_relabel_already_admitted_execution(monkeypatch, tmp_path: Path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from backend.app import skill_runtime
+
+    cfg = make_settings(tmp_path)
+    entered, release = Event(), Event()
+
+    def slow_handler(arguments, settings):
+        entered.set()
+        assert release.wait(5), "test handler was not released"
+        return {"status": "FINISHED_AFTER_REVOCATION"}
+
+    definition = SkillDefinition("test/inflight", "1", "Admission test", "IN_PROCESS", (), "test.in/1", "test.out/1", slow_handler)
+    monkeypatch.setitem(skill_runtime.SKILL_REGISTRY, definition.skill_id, definition)
+    mount_skill(definition.skill_id, cfg=cfg)
+    activate_skill(definition.skill_id, cfg=cfg)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(execute_skill, definition.skill_id, cfg=cfg)
+        try:
+            assert entered.wait(5)
+            revoked = deactivate_skill(definition.skill_id, cfg=cfg)["mount"]
+            with pytest.raises(SkillRuntimeError) as blocked:
+                execute_skill(definition.skill_id, cfg=cfg)
+            assert blocked.value.status == "ERROR_SKILL_NOT_ACTIVE"
+        finally:
+            release.set()
+        result = future.result(timeout=5)
+    assert result["result"]["status"] == "FINISHED_AFTER_REVOCATION"
+    assert result["execution"]["activation_binding"]["lifecycle_sequence"] < revoked["lifecycle_sequence"]
+    assert list_skill_mounts(cfg)["mounts"][0]["state"] == "INACTIVE"
+
+
+def test_concurrent_skill_mounts_and_lifecycle_updates_conserve_rows(tmp_path: Path):
+    from concurrent.futures import ThreadPoolExecutor
+
+    cfg = make_settings(tmp_path)
+    skill_ids = [row["skill_id"] for row in list_skills()["skills"]]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda sid: mount_skill(sid, cfg=cfg), skill_ids * 8))
+        list(pool.map(lambda sid: activate_skill(sid, cfg=cfg), skill_ids * 8))
+        list(pool.map(lambda sid: deactivate_skill(sid, cfg=cfg), skill_ids * 8))
+    mounts = list_skill_mounts(cfg)["mounts"]
+    assert len(mounts) == len(skill_ids)
+    assert {row["skill_id"] for row in mounts} == set(skill_ids)
+    assert all(row["state"] == "INACTIVE" and row["policy_decision"] is None for row in mounts)
+    assert all(row["lifecycle_sequence"] == 2 for row in mounts)
+
+
+@pytest.mark.parametrize("arguments", [[], "", False, 0])
+def test_skill_execution_rejects_falsey_non_object_arguments(tmp_path: Path, arguments):
+    with pytest.raises(SkillRuntimeError) as error:
+        execute_skill("mucaro/intelligence-plane-health", arguments, cfg=make_settings(tmp_path))
+    assert error.value.status == "ERROR_SKILL_ARGUMENTS_NOT_OBJECT"
 
 
 def test_failed_skill_execution_keeps_input_and_failure_receipt_lineage(monkeypatch, tmp_path: Path):

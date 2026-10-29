@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api.js";
 
 function errorText(error) {
@@ -15,6 +15,8 @@ export function SkillsWorkspace({ announce }) {
   const [policyIds, setPolicyIds] = useState({});
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState("");
+  const [loading, setLoading] = useState(true);
+  const actionInFlight = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -22,14 +24,16 @@ export function SkillsWorkspace({ announce }) {
       setSkills(skillPayload.skills || []);
       setMounts(mountPayload.mounts || []);
       setExecutions((executionPayload.executions || []).slice().reverse());
-    } catch (err) {
-      setError(err);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load().catch(setError); }, [load]);
 
   async function action(skillId, fn, message) {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setBusy(skillId);
     setError(null);
     try {
@@ -39,6 +43,7 @@ export function SkillsWorkspace({ announce }) {
     } catch (err) {
       setError(err);
     } finally {
+      actionInFlight.current = false;
       setBusy("");
     }
   }
@@ -78,21 +83,22 @@ export function SkillsWorkspace({ announce }) {
     <section className="workspace" aria-labelledby="skills-title">
       <header className="workspace-header">
         <h1 id="skills-title">Skills</h1>
-        <p className="muted small">Inspect registered skills, mount an immutable digest, authorize capabilities, then invoke with an auditable receipt.</p>
+        <p className="muted small">Mount and authorize skills, invoke them, or deactivate them. Previous results remain available.</p>
       </header>
       {error && <p className="error-card" role="alert">{errorText(error)}</p>}
-      {!skills.length && <p className="empty-state muted">No registered skills.</p>}
+      {loading && <p className="muted" role="status">Loading skills…</p>}
+      {!loading && !error && !skills.length && <p className="empty-state muted">No registered skills.</p>}
       <ul className="skill-list">
         {skills.map((skill) => {
           const mount = mounts.find((item) => item.skill_id === skill.skill_id);
           const last = executions.find((item) => item.skill_id === skill.skill_id);
           const active = mount?.state === "ACTIVE";
-          const running = busy === skill.skill_id;
+          const running = Boolean(busy);
           return (
             <li key={skill.skill_id} className="panel skill-card">
               <div className="goal-head">
                 <div className="grow">
-                  <div className="tool-row-head"><span className={`status-chip status-${active ? "completed" : mount ? "queued" : "pending"}`}>{active ? "ACTIVE" : mount ? "MOUNTED" : "REGISTERED"}</span><span className="muted small">{skill.runtime}</span></div>
+                  <div className="tool-row-head"><span className={`status-chip status-${active ? "completed" : mount ? "queued" : "pending"}`}>{mount?.state || "REGISTERED"}</span><span className="muted small">{skill.runtime}</span></div>
                   <h2>{skill.skill_id}</h2>
                   <p>{skill.description}</p>
                 </div>
@@ -104,6 +110,7 @@ export function SkillsWorkspace({ announce }) {
               </dl>
               <div className="workspace-actions">
                 {!mount && <button type="button" className="secondary-button" disabled={running} onClick={() => action(skill.skill_id, () => api.mountSkill(skill.skill_id), "Skill mounted.")}>Mount</button>}
+                {active && <button type="button" className="secondary-button" disabled={running} onClick={() => action(skill.skill_id, () => api.deactivateSkill(skill.skill_id), "Skill deactivated. New invocations are blocked; previous results are preserved.")}>Deactivate skill</button>}
                 {mount && !active && (
                   <div className="skill-authorization">
                     <label className="field">
@@ -142,6 +149,7 @@ export function SkillsWorkspace({ announce }) {
                   </div>
                 )}
               </div>
+              {mount?.state === "INACTIVE" && <p className="muted small" role="status">Inactive. Authorize again to invoke this skill. Work already started may finish; previous receipts are preserved.</p>}
               {active && (
                 <div className="skill-invoke">
                   <label className="field"><span>Arguments (JSON object)</span><textarea rows={2} value={argumentsText[skill.skill_id] || "{}"} onChange={(event) => setArgumentsText((old) => ({ ...old, [skill.skill_id]: event.target.value }))} /></label>

@@ -534,19 +534,56 @@ async function scenario(browser, base, viewport, contextOptions) {
     check("dependent task becomes startable after the prerequisite is done", viewport, (await dependentCard.getByText("In progress", { exact: true }).count()) === 1);
     expectedConsoleErrors.delete("Failed to load resource: the server responded with a status of 409 (Conflict)");
 
+  }
+
+  {
+    await openNav();
     await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Skills", exact: true }).click();
     await page.getByRole("heading", { name: "Skills", exact: true }).waitFor();
+    await drawerClosed();
     const healthSkill = page.locator("li.skill-card").filter({ hasText: "mucaro/intelligence-plane-health" });
     await healthSkill.waitFor();
     check("Skills workspace lists the governed health skill", viewport, (await healthSkill.count()) === 1);
-    await healthSkill.getByRole("button", { name: "Mount", exact: true }).click();
-    await healthSkill.getByRole("button", { name: "Authorize & activate", exact: true }).waitFor();
-    await healthSkill.getByRole("button", { name: "Authorize & activate", exact: true }).click();
+    const mountButton = healthSkill.getByRole("button", { name: "Mount", exact: true });
+    if (await mountButton.count()) {
+      await mountButton.click();
+      await healthSkill.getByRole("button", { name: "Authorize & activate", exact: true }).waitFor();
+    }
+    const activateButton = healthSkill.getByRole("button", { name: "Authorize & activate", exact: true });
+    if (await activateButton.count()) await activateButton.click();
     await healthSkill.getByText("ACTIVE", { exact: true }).waitFor();
     await healthSkill.getByRole("button", { name: "Invoke skill", exact: true }).click();
     await healthSkill.getByText(/Latest receipt:/).click();
     await healthSkill.getByText(/INTELLIGENCE_PLANE_HEALTH_OK/).waitFor();
-    check("Skills workspace mounts, activates, invokes, and displays the governed receipt", viewport, (await healthSkill.getByText(/INTELLIGENCE_PLANE_HEALTH_OK/).count()) === 1);
+    check("Skills workspace opens an authorized skill, invokes it, and displays its receipt", viewport, (await healthSkill.getByText(/INTELLIGENCE_PLANE_HEALTH_OK/).count()) === 1);
+    const oldReceipt = await healthSkill.locator("summary").innerText();
+    await healthSkill.getByRole("button", { name: "Deactivate skill", exact: true }).click();
+    await healthSkill.getByText("INACTIVE", { exact: true }).waitFor();
+    check("deactivating a skill removes invocation and retains its last receipt", viewport,
+      (await healthSkill.getByRole("button", { name: "Invoke skill", exact: true }).count()) === 0 &&
+      (await healthSkill.locator("summary").innerText()) === oldReceipt);
+    await page.reload();
+    if (viewport === "iphone") await page.getByRole("button", { name: "Open navigation", exact: true }).waitFor();
+    else await page.getByRole("navigation", { name: "Primary" }).waitFor();
+    await openNav();
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Skills", exact: true }).click();
+    await healthSkill.getByText("INACTIVE", { exact: true }).waitFor();
+    await drawerClosed();
+    check("skill revocation survives reload and offers explicit reauthorization", viewport,
+      await healthSkill.getByRole("button", { name: "Authorize & activate", exact: true }).isVisible());
+    await healthSkill.getByRole("button", { name: "Authorize & activate", exact: true }).click();
+    await healthSkill.getByText("ACTIVE", { exact: true }).waitFor();
+    let invocationRequests = 0;
+    const countInvocation = (request) => { if (request.method() === "POST" && /\/skills\/.*intelligence-plane-health\/execute$/.test(request.url())) invocationRequests++; };
+    page.on("request", countInvocation);
+    await healthSkill.getByRole("button", { name: "Invoke skill", exact: true }).dblclick();
+    await page.waitForFunction((previous) => {
+      const card = [...document.querySelectorAll("li.skill-card")].find((node) => node.textContent.includes("mucaro/intelligence-plane-health"));
+      return card?.querySelector("summary")?.textContent !== previous && [...card.querySelectorAll("button")].some((node) => node.textContent === "Invoke skill" && !node.disabled);
+    }, oldReceipt);
+    page.off("request", countInvocation);
+    check("reauthorized skill invokes once under a rapid double activation", viewport, invocationRequests === 1, `${invocationRequests} invocation request(s)`);
+    await shot(page, viewport, "16b-skills-reactivated");
     axeRuns.push(await axe(page, viewport, "skills"));
   }
 
