@@ -533,6 +533,21 @@ async function scenario(browser, base, viewport, contextOptions) {
     await dependentCard.getByText("In progress", { exact: true }).waitFor();
     check("dependent task becomes startable after the prerequisite is done", viewport, (await dependentCard.getByText("In progress", { exact: true }).count()) === 1);
     expectedConsoleErrors.delete("Failed to load resource: the server responded with a status of 409 (Conflict)");
+
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Skills", exact: true }).click();
+    await page.getByRole("heading", { name: "Skills", exact: true }).waitFor();
+    const healthSkill = page.locator("li.skill-card").filter({ hasText: "mucaro/intelligence-plane-health" });
+    await healthSkill.waitFor();
+    check("Skills workspace lists the governed health skill", viewport, (await healthSkill.count()) === 1);
+    await healthSkill.getByRole("button", { name: "Mount", exact: true }).click();
+    await healthSkill.getByRole("button", { name: "Authorize & activate", exact: true }).waitFor();
+    await healthSkill.getByRole("button", { name: "Authorize & activate", exact: true }).click();
+    await healthSkill.getByText("ACTIVE", { exact: true }).waitFor();
+    await healthSkill.getByRole("button", { name: "Invoke skill", exact: true }).click();
+    await healthSkill.getByText(/Latest receipt:/).click();
+    await healthSkill.getByText(/INTELLIGENCE_PLANE_HEALTH_OK/).waitFor();
+    check("Skills workspace mounts, activates, invokes, and displays the governed receipt", viewport, (await healthSkill.getByText(/INTELLIGENCE_PLANE_HEALTH_OK/).count()) === 1);
+    axeRuns.push(await axe(page, viewport, "skills"));
   }
 
   if (viewport === "iphone") {
