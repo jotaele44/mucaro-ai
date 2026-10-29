@@ -1,0 +1,1245 @@
+{
+  "schema_version": "mucaro-rendered-qa/1.0",
+  "status": "RENDERED_QA_PASS",
+  "head_sha": "f1b353b9b039c52e574faf92116c9529b9654207",
+  "worktree_clean": true,
+  "dirty_paths": [],
+  "created_utc": "2026-10-29T03:12:02.824Z",
+  "browser": "chromium 141.0.7390.37",
+  "viewports": {
+    "desktop": "1440x900",
+    "iphone": "390x844 (iPhone 13 profile, touch, DPR 3)"
+  },
+  "checks": [
+    {
+      "name": "loading state renders while the service starts",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty conversation state",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty send is disabled (F05)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe empty: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "answer completes with citations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "2 citations"
+    },
+    {
+      "name": "answer text rendered",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe answer: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "message text is selectable",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "{\"userSelect\":\"text\",\"webkitUserSelect\":\"text\",\"selectedText\":\"Mock cited answer for query: How does source lineage work?\\nConversation context turns used: 0\\nMemory items used: 0\\nEvidence summary:\\n[1] # Source Lineage Sample This sample explains that every answer must cite retrieved chunk IDs and source IDs. The Execution Gate enforces planning, readiness scoring, mode selection, approval lock,"
+    },
+    {
+      "name": "sent message exposes one Copy and one Edit action",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "received message exposes one Copy and one Edit action",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message actions are icons with a name and a tooltip",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "Copy message text(Copy) 30x28, Edit message(Edit) 30x28, Copy message text(Copy) 30x28, Edit message(Edit) 30x28, Read message aloud(Read aloud) 30x28, Save answer as a file(Save) 30x28, Share answer(Share) 30x28"
+    },
+    {
+      "name": "copy action reports success",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Copy shows a check mark after copying",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "only the received message offers Save and Share",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "the Save sheet offers the answer and the records saved with it",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "✕ | Markdown (.md) | Plain text (.txt) | Report with sources (.md) | Full answer record (.json) | Citations table (.csv)"
+    },
+    {
+      "name": "axe save sheet: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "Save as Markdown downloads the answer with its question and sources",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work.md: \"# How does source lineage work?\\n\\nMock cited answer for query: How does source li\""
+    },
+    {
+      "name": "the Save sheet closes after saving",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Save full answer record downloads the trace Mucaro saved with the answer",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work-record.json run_id=run_f22e89f73597"
+    },
+    {
+      "name": "sent message edit renders explicit provenance marker",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "received message edit renders explicit provenance marker",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "reload reproduces the transcript (F02)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message display revisions survive reload",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "citation opens exact source evidence",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Escape closes the sheet and returns focus",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "Open citation 1: src_bfbf9a5edb5c991d"
+    },
+    {
+      "name": "permission sheet shows the exact tool and arguments",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool summary counts from records",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool drawer lists the executed call",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "submit disabled until a choice is made (F11)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "options carry consequences (F10)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "retry asks for a fresh approval (F16)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "per-call outcomes stay distinct after retry (F08, F16)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "choice receipt persists in the feed (F13)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "plan mode shows the plan and executes nothing (F06)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message queued behind the active turn (F04)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "queued message editable before dispatch (F04)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "stop interrupts and the queued message then runs (F03)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Shift+Enter keeps composing (F05)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rename from the conversation menu (F17)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "delete confirms and states there is no archive (F17)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "background tasks list runs with metrics",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "sources workspace lists ingested sources",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe sources: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "memory add is visible with provenance",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "provenance shows a verified audit chain",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "settings shows model choice and offline capabilities",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe settings: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "task workspace offers the created prerequisite as a labeled dependency choice",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "task workspace persists a dependent task through the one-click picker",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "dependent task refuses to start before its prerequisite is done",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "dependent task becomes startable after the prerequisite is done",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Skills workspace lists the governed health skill",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Skills workspace mounts, activates, invokes, and displays the governed receipt",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe skills: no serious/critical WCAG violations",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "no horizontal page overflow",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no console errors",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "loading state renders while the service starts",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty conversation state",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "empty send is disabled (F05)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe empty: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "answer completes with citations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "2 citations"
+    },
+    {
+      "name": "answer text rendered",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe answer: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "message text is selectable",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "{\"userSelect\":\"text\",\"webkitUserSelect\":\"text\",\"selectedText\":\"Mock cited answer for query: How does source lineage work?\\nConversation context turns used: 0\\nMemory items used: 1\\nMemory context:\\n- preference: Prefer tables for comparisons\\nEvidence summary:\\n[1] # Source Lineage Sample This sample explains that every answer must cite retrieved chunk IDs and source IDs. The Execution Gate enforc"
+    },
+    {
+      "name": "sent message exposes one Copy and one Edit action",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "received message exposes one Copy and one Edit action",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message actions are icons with a name and a tooltip",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "Copy message text(Copy) 44x44, Edit message(Edit) 44x44, Copy message text(Copy) 44x44, Edit message(Edit) 44x44, Read message aloud(Read aloud) 44x44, Save answer as a file(Save) 44x44, Share answer(Share) 44x44"
+    },
+    {
+      "name": "copy action reports success",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Copy shows a check mark after copying",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "only the received message offers Save and Share",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "the Save sheet offers the answer and the records saved with it",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "✕ | Markdown (.md) | Plain text (.txt) | Report with sources (.md) | Full answer record (.json) | Citations table (.csv)"
+    },
+    {
+      "name": "axe save sheet: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "Save as Markdown downloads the answer with its question and sources",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work.md: \"# How does source lineage work?\\n\\nMock cited answer for query: How does source li\""
+    },
+    {
+      "name": "the Save sheet closes after saving",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Save full answer record downloads the trace Mucaro saved with the answer",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work-record.json run_id=run_d7bc73f108fa"
+    },
+    {
+      "name": "sent message edit renders explicit provenance marker",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "received message edit renders explicit provenance marker",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "reload reproduces the transcript (F02)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message display revisions survive reload",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "citation opens exact source evidence",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Escape closes the sheet and returns focus",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "Open citation 1: src_bfbf9a5edb5c991d"
+    },
+    {
+      "name": "permission sheet shows the exact tool and arguments",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool summary counts from records",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tool drawer lists the executed call",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "submit disabled until a choice is made (F11)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "options carry consequences (F10)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pending question survives a new message (F14)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "submit stays disabled for an empty Other answer (F11)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "freeform answer recorded as the choice (F12, F13)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "plan mode shows the plan and executes nothing (F06)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "message queued behind the active turn (F04)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "queued message editable before dispatch (F04)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "stop interrupts and the queued message then runs (F03)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Shift+Enter keeps composing (F05)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rename from the conversation menu (F17)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "delete confirms and states there is no archive (F17)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "background tasks list runs with metrics",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "sources workspace lists ingested sources",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe sources: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "memory add is visible with provenance",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "provenance shows a verified audit chain",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "settings shows model choice and offline capabilities",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "axe settings: no serious/critical WCAG violations",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "0 minor"
+    },
+    {
+      "name": "navigation drawer closes after choosing a workspace",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "[true,true,true,true]"
+    },
+    {
+      "name": "form fields are at least 16px (no iOS focus zoom)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "3 fields"
+    },
+    {
+      "name": "touch targets are at least 44px tall",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "23 targets"
+    },
+    {
+      "name": "no horizontal page overflow",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no console errors",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "OCR workspace is navigable and exposes its local upload action",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "OCR workspace renders a structured report for a local image",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "GIS workspace renders backend capability evidence",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Code workspace states readiness without implying execution",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Code workspace executes repository status only after explicit approval",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Code workspace exposes a terminal diff receipt",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Code workspace renders a bounded file-read receipt",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Artifacts workspace distinguishes an empty work-run store",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "launch token from the URL fragment authorizes the GUI",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "status 200"
+    },
+    {
+      "name": "launch token is removed from the address bar",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "http://127.0.0.1:56801/"
+    },
+    {
+      "name": "launch token kept for this window only (not localStorage)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "{\"session\":true,\"local\":false}"
+    },
+    {
+      "name": "reload keeps the launch session authorized",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Settings shows the launch token as app-managed (no token field)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a wrong launch token is refused",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "security headers served with the UI",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Rename opens with the cursor in the title field (M1)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Rename takes keystroke-by-keystroke typing and keeps focus (M1)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "value \"abc\", focus kept: true"
+    },
+    {
+      "name": "focus inside an open sheet is not reset in the background (M1)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "button -> button"
+    },
+    {
+      "name": "an idle, healthy app commits no renders (M2)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "0 commits in 9 s"
+    },
+    {
+      "name": "one failed health poll keeps the conversation and recovers by itself (M2)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "banner shown, runs on screen meanwhile: 1, recovered: true"
+    },
+    {
+      "name": "a plain-text 500 is reported readably (M6)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "INTERNAL_FAILURE — 500: Internal Server Error"
+    },
+    {
+      "name": "on a touch keyboard Return adds a line and sends nothing (M4)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "value \"line one\\n\", runs started by Return: 0"
+    },
+    {
+      "name": "the composer asks a touch keyboard for a Return key, not Send (M4)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "enterkeyhint=enter"
+    },
+    {
+      "name": "Ctrl+Enter still sends from a touch device (M4)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "with a hardware keyboard Return sends (M4)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "enterkeyhint=send"
+    },
+    {
+      "name": "a malformed token fragment does not blank the app (M21)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "loaded"
+    },
+    {
+      "name": "removing a source asks first: Keep it keeps it, confirming removes it (M5)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "asked: true, kept after Keep it: true, removed after confirming: true"
+    },
+    {
+      "name": "revoking folder access asks first: Keep it keeps it, confirming revokes (M5)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "asked: true, kept after Keep it: true, revoked after confirming: true"
+    },
+    {
+      "name": "deleting a memory asks first: Keep it keeps it, confirming deletes it (M5)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "asked: true, kept after Keep it: true, deleted after confirming: true"
+    },
+    {
+      "name": "a silent event stream is detected and the page catches up by itself (M3)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "caught up after 26.2 s"
+    },
+    {
+      "name": "a refused event stream is retried with backoff, not in a tight loop (M3b)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "5 stream attempts in about 10 s"
+    },
+    {
+      "name": "repeated stream failures pause live updates with a visible Resume (M3b)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "paused: true, 10 attempts before pausing"
+    },
+    {
+      "name": "Resume reconnects the stream once the service answers (M3b)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "notice cleared: true, stream requests after Resume: 1"
+    },
+    {
+      "name": "a token-protected service asks for the token instead of saying it is unreachable (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "gate shown: true, \"unreachable\" banner: false"
+    },
+    {
+      "name": "the token field is a password field iOS will not capitalize or correct, 16px+ and 44px tall (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "{\"type\":\"password\",\"capitalize\":\"none\",\"correct\":\"off\",\"spellcheck\":\"false\",\"fontSize\":16,\"height\":44}"
+    },
+    {
+      "name": "the token field has no cleartext warning on this computer's own address (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "the token gate has exactly one visibility toggle despite global navigation controls (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "show buttons in gate: 1"
+    },
+    {
+      "name": "a wrong token is refused with an explanation, and Show reveals what was typed (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "explained: true, revealed type: text"
+    },
+    {
+      "name": "the right token opens the app and is kept for this tab only (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "app opened: true, in session storage: true, in local storage: false"
+    },
+    {
+      "name": "reloading the tab keeps the session authorized (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a token that stops working sends the person back to the gate with an explanation (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "gate: true, explained: true"
+    },
+    {
+      "name": "entering the token again returns to where the person was (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "Remember on this device keeps the token for later visits (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "stored: true, second page opened without the gate: true"
+    },
+    {
+      "name": "a remote client is refused when no token is configured, for reads and writes (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "GET /conversations 403, POST /memory 403"
+    },
+    {
+      "name": "a remote client does not learn host paths from /health or /config (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "no host paths"
+    },
+    {
+      "name": "a phone sees why it was refused instead of a dead end (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "explained: true, retry offered: true"
+    },
+    {
+      "name": "over the network the token decides: none or wrong is 401, the right one is served (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "none 401, wrong 401, right 200"
+    },
+    {
+      "name": "the phone link with the token in its fragment opens the app (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "opened: true, address bar: http://10.0.0.63:56906/"
+    },
+    {
+      "name": "Settings says a network connection over http is not encrypted (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "the token gate warns that a network connection over http is not encrypted (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "a public bind with a short token refuses to start (M7)",
+      "viewport": "iphone",
+      "pass": true,
+      "detail": "exit code 1, answered requests: false"
+    },
+    {
+      "name": "Copy works where navigator.clipboard does not exist, as over http on a network (M25)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "\"Copied to clipboard.\", 1 copy event(s) of 824 characters"
+    },
+    {
+      "name": "a refused copy says why instead of blaming a permission (M25)",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "\"Copy failed: this browser copies only over a secure connection. Select the text and copy it by hand.\""
+    },
+    {
+      "name": "Share hands the answer to the system share sheet as a text file",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "\"Shared.\", 1 file(s): mucaro-how-does-source-lineage-work.txt text/plain;charset=utf-8 \"Question: How does source lineage work?\\n\\nMock cite\", 0 download(s)"
+    },
+    {
+      "name": "closing the share sheet saves nothing",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "\"Sharing cancelled.\", 0 download(s)"
+    },
+    {
+      "name": "Share saves the answer instead where no share sheet exists",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "mucaro-how-does-source-lineage-work.txt, \"This browser cannot share files, so mucaro-how-does-source-lineage-work.txt was saved instead.\""
+    },
+    {
+      "name": "over http on a network address, Share saves the file and says sharing needs https",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": "forced=true, \"Sharing needs a secure (https) connection, so mucaro-how-does-source-lineage-work.txt was saved instead.\""
+    },
+    {
+      "name": "service-unreachable error state",
+      "viewport": "desktop",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "passed": 166,
+  "failed": 0,
+  "axe": [
+    {
+      "view": "empty",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "answer",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "save sheet",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "sources",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "settings",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "skills",
+      "viewport": "desktop",
+      "violations": []
+    },
+    {
+      "view": "empty",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "answer",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "save sheet",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "sources",
+      "viewport": "iphone",
+      "violations": []
+    },
+    {
+      "view": "settings",
+      "viewport": "iphone",
+      "violations": []
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-00-loading.png",
+      "sha256": "8a3dd6989c215476490183c4bd9f09e02b565e9e9badcc5c6a0cac6c69990af1"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-01-empty.png",
+      "sha256": "1f3e8b028521265c75c3ac3371f2798e14a059617ec13897eca152cb5d84b894"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-02-answer.png",
+      "sha256": "8c9cc11c50cfdd0e215613de52917bffa7fff45025e72e92bf542d138d6a5598"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-02c-save-sheet.png",
+      "sha256": "cefd13f56cee299edb23f575f745865f7b78cf7d328d770cba74788e8f26c0e2"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-02b-message-actions.png",
+      "sha256": "614185636ba925a3555000a64a2670b6d0ff2f9211028a54ae19f05fe5fc34e7"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-03-evidence.png",
+      "sha256": "aed209fea04500e588bc67fffd6929deca0f2222b63700b1ad279d7e8f6148c8"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-04-approval.png",
+      "sha256": "4b126fee65f958212426c0cf3d8a9b75b30ae30adc35326cd9f1ba7f3e059c2e"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-05-tool-done.png",
+      "sha256": "279e8a5fa5d7f66f0de5cd72639023026f364ce8dae9eb5a218c070e8ac04739"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-06-tool-drawer.png",
+      "sha256": "eb45a19aa47e6b444393efe69b03410404ef5aa844ca196cbd83e0ed3bd4112d"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-07-question.png",
+      "sha256": "5b10134fa8d7f28d695048e5625b0f0f19a0e6b253f8e8c04bbdf506c0931981"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-08-receipt.png",
+      "sha256": "013e666209b4b6137d8cc099e2f2e57a7a3dc087cbbfc7363850c56626957ced"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-09-queue.png",
+      "sha256": "727d41e428c5394c90df1c50a2e35ba505fab89fccfe31798108cb8a0cbee60e"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-10-after-stop.png",
+      "sha256": "2fd83cd2c92aa8e631b21d36f43915eca2375a888a9034fa0810969d4eee323b"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-11-tasks.png",
+      "sha256": "75d0b8dc7a6288df2ade6415dccd1e8020d2d94fd03189b5c63e1035a2964099"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-13-sources.png",
+      "sha256": "42ade545106430d7f81ecc49139f35b878b69ce81290a7ea5977deec8e799ea7"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-14-memory.png",
+      "sha256": "86f06e7aba6044f990933c5bbbeb06d7af1844facb4d2b955164c728addc5538"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-15-provenance.png",
+      "sha256": "978d61141b713eacce54acfcdaa59747536a541c34811f8e28cd4da83b916484"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-16-settings.png",
+      "sha256": "4bd7fb0741b580c6e1265aeac4ba35cfb6e2e02835b65cc5cdd8b9db69317a61"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-00-loading.png",
+      "sha256": "eff34c0eaaca251ac0805a48f1220b798c2651539513641e4dcf101a8060303f"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-01-empty.png",
+      "sha256": "d129e996573881cce35f6307ba02326bdff035b35a108241209747ed1b97e7f7"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-02-answer.png",
+      "sha256": "d1cdcc57f1cb3f35140a02d0ac681f3928f2686aff291594399ae5506e059a29"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-02c-save-sheet.png",
+      "sha256": "22d6324ad08b65549083aa114da752c4fb3bd106d601fa8f2c7ec57079e37b9c"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-02b-message-actions.png",
+      "sha256": "a2d4198b694270e5c215906911b19fa592ba7ac7b0449e74c6f09bfad33fda19"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-03-evidence.png",
+      "sha256": "65f87ed316922cf9ef721ca3bb5d539697965d863434669b3fbe2d99574495c6"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-04-approval.png",
+      "sha256": "e87c718701471694221c3a9e32fcd2aea5a5381a1ba97e21226205b41904ada3"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-05-tool-done.png",
+      "sha256": "2624979e255939e6898889bba3d65d9fc2c6628b1f301d833c514a66c6073665"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-06-tool-drawer.png",
+      "sha256": "59ba2fa46cf1d215f4bdc0329610d32f69e47084ffc3b9733582d8a8166e88fb"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-07-question.png",
+      "sha256": "63f087e340b9f13e33bbd824412f9546c67e15e6f71f6d6530841f4b73c15656"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-08-receipt.png",
+      "sha256": "de406fec5c1597b46940281ead3f8f1662269a72d796a89fd491305e2ef98f70"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-09-queue.png",
+      "sha256": "a4091bad490bd36a94459a5dc73d15831da55274f003eacc2f8f4a286f78d20e"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-10-after-stop.png",
+      "sha256": "8b04f601946157b32ce96ae5da0c8c8b6ec19b3f012048332c64c027ac046c58"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-11-tasks.png",
+      "sha256": "e9270b4bf87f9b36dabff0f2df9777ad363f53fb805deb9da393fb2a0e252375"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-12-nav-open.png",
+      "sha256": "4239f19e12edb8c41c3dae25bb215cd2697093e74f4dfef1160b4907017c22e0"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-13-sources.png",
+      "sha256": "5e184ce78cf79efa000c0f5215decec3af1f55f7cdec73445ae0edbe39e20fa6"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-14-memory.png",
+      "sha256": "fa6360a3e1646034ba99acb2f0fb5bf57bfe0548bacb0abebf9ede7ae940515a"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-15-provenance.png",
+      "sha256": "ffec49990ffdaed0cf71d4f0765c3417cb0b3f09c0f8138096739403e318a805"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-16-settings.png",
+      "sha256": "b35e0da87d4a069838405fc36e60f027c8500844ddfa44859e6f8c15985db713"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-18-token-gate.png",
+      "sha256": "b9d0095d05bd4cbba308184c23a7741582949727fd64e9e8bfb8bcb7cebe8de9"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-19-token-refused.png",
+      "sha256": "39d6ce5ab3ae0f88654cffc294333a35ba19bf046d7143d76a50083ee6a90ed6"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-20-phone-access-off.png",
+      "sha256": "af3caad2bd39266b640aa1f327749ad95b850afd25470f72acd7cd690bb8de6d"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/iphone-21-cleartext-notice.png",
+      "sha256": "a5ea17180251655c5976f9fe48081a71a231663f7ddab427378ba31d2f314c5c"
+    },
+    {
+      "file": "data/exports/rendered_qa/20261029T031007Z-f1b353b9b039/desktop-17-service-unreachable.png",
+      "sha256": "3f613d5964ecb20b79bf993e12d4178277b61472dba8fd42ee1be49042de408e"
+    }
+  ],
+  "limitations": [
+    "Rendered in Playwright chromium; this does not execute the packaged WKWebView window.",
+    "iPhone width is emulated on a desktop browser engine, not rendered by iOS Safari on a phone.",
+    "Phone access is exercised through a non-loopback address of this machine, not from a physical phone on a real network."
+  ]
+}
