@@ -1086,6 +1086,56 @@ previous grants as history, without treating them as usable authorization.
 Regression checks cover restart persistence, missing/duplicate mounts, explicit
 reauthorization, concurrent updates, and receipt preservation after revocation.
 
+### Governed OCR skill
+
+`mucaro/ocr-analyze` uses the same local image/PDF engines as `mucaro ocr
+analyze`, with capability activation, execution receipts, frozen source bytes,
+and a source → OCR report → skill result artifact chain. In **Skills**, mount
+it, select its three declared capabilities, activate it, then enter the input
+file path and OCR settings in the labeled fields. Extracted text and warnings
+appear directly in the card; the detailed receipt remains available below.
+
+```bash
+mucaro skills mount mucaro/ocr-analyze
+mucaro skills activate mucaro/ocr-analyze --allow-capability filesystem.read --allow-capability filesystem.write --allow-capability subprocess.execute
+mucaro skills execute mucaro/ocr-analyze --arguments '{"path":"data/input/scan.pdf","language":"eng","layout_mode":"auto","dpi":200}'
+```
+
+The same invocation is available through `POST /skills/mucaro/ocr-analyze/execute`
+with `{"arguments":{"path":"data/input/scan.pdf"}}`, or in a conversation:
+
+```text
+/skill mucaro/ocr-analyze {"path":"data/input/scan.pdf"}
+```
+
+Conversation invocation always uses the governed tool approval flow. Neither
+activation nor text extracted from a document grants tool execution authority.
+External files require a current directory grant; see `DIRECTORY_PERMISSIONS.md`.
+Paths are resolved before that check, including symlinks. App-managed uploads
+remain accessible when the data directory is outside the application bundle.
+
+The declared per-invocation limits are 25 MB (or the configured smaller upload
+limit), 16 PDF pages, 72–300 DPI, 25 million pixels per page/image, and 100
+million rendered pixels per PDF. Oversized, encrypted, and multi-frame inputs
+are refused explicitly; no pages are silently skipped. Split larger documents
+explicitly. The bounded text view retains up to 200,000 characters, warns when
+truncated, and preserves complete page reports. Local `tesseract` is required;
+PDFs additionally require `pdftoppm`. Missing engines never trigger mock output.
+
+An optional `expected_sha256` rejects source-byte drift before OCR. The source
+manifest preserves the requested path, resolved path, snapshot, retrieval time,
+byte length, and SHA-256. Source hash equality establishes byte identity only.
+Warnings, blank pages, raw text, and uncertainty remain visible. OCR text is
+untrusted evidence and never becomes an executable instruction.
+
+Engineering guidance: hash argument schemas and declared execution limits into
+the skill identity; validate at proposal and execution boundaries; freeze bytes
+after rechecking directory access; use the shared engines; and link report
+artifacts to source bytes. Serialize artifact ledger read-modify-write updates:
+atomic file replacement alone cannot conserve parents across parallel runs.
+
+### Permission leases
+
 Run-scoped permission leases are available through the CLI:
 
 - `mucaro leases create RUN_ID CAPABILITY SUBJECT [--ttl-seconds N] [--max-uses N]`

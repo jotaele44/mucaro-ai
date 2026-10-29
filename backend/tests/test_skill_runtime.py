@@ -182,7 +182,7 @@ def test_concurrent_skill_mounts_and_lifecycle_updates_conserve_rows(tmp_path: P
     skill_ids = [row["skill_id"] for row in list_skills()["skills"]]
     with ThreadPoolExecutor(max_workers=8) as pool:
         list(pool.map(lambda sid: mount_skill(sid, cfg=cfg), skill_ids * 8))
-        list(pool.map(lambda sid: activate_skill(sid, cfg=cfg), skill_ids * 8))
+        list(pool.map(lambda sid: activate_skill(sid, cfg=cfg, allowed_capabilities=set(next(row["capabilities"] for row in list_skills()["skills"] if row["skill_id"] == sid))), skill_ids * 8))
         list(pool.map(lambda sid: deactivate_skill(sid, cfg=cfg), skill_ids * 8))
     mounts = list_skill_mounts(cfg)["mounts"]
     assert len(mounts) == len(skill_ids)

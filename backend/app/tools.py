@@ -611,6 +611,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
         requires_approval=True,
         network="dynamic",
         handler=_skill_execute,
+        timeout_seconds=600.0,
     ),
 }
 

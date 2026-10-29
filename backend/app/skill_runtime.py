@@ -7,12 +7,15 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import Any, Callable
 
+from jsonschema import Draft202012Validator, SchemaError
+
 from .artifact_identity import ArtifactIdentityError, ArtifactRecord, create_artifact_record
 from .capability_policy import RUNTIME_CAPABILITY, CapabilityPolicy, evaluate_capabilities
 from .config import Settings, settings
 from .contracts import ContractViolation, validate_contract
 from .distribution_policy import DistributionPolicyError, require_distribution_runtime_authorized
 from .execution_router import ExecutionRouterError, execute_routed, select_execution_route
+from .ocr_skill import OCR_ARGUMENTS_SCHEMA, OCR_EXECUTION_POLICY, analyze_document
 from .runtime_identity import build_runtime_identity
 from .utils import file_lock, read_json, stable_id, update_json, utc_now, write_json
 
@@ -48,11 +51,12 @@ class SkillDefinition:
     input_schema: str
     output_schema: str
     handler: Callable[[dict[str, Any], Settings], dict[str, Any]]
+    arguments_schema: dict[str, Any] | None = None
+    execution_policy: dict[str, Any] | None = None
 
     @property
     def digest(self) -> str:
-        canonical = json.dumps(
-            {
+        identity = {
                 "skill_id": self.skill_id,
                 "version": self.version,
                 "description": self.description,
@@ -60,7 +64,14 @@ class SkillDefinition:
                 "capabilities": sorted(self.capabilities),
                 "input_schema": self.input_schema,
                 "output_schema": self.output_schema,
-            },
+            }
+        # Omit absent extensions to conserve existing mounted skill identities.
+        if self.arguments_schema is not None:
+            identity["arguments_schema"] = self.arguments_schema
+        if self.execution_policy is not None:
+            identity["execution_policy"] = self.execution_policy
+        canonical = json.dumps(
+            identity,
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
@@ -76,6 +87,8 @@ class SkillDefinition:
             "input_schema": self.input_schema,
             "output_schema": self.output_schema,
             "digest": self.digest,
+            "arguments_schema": self.arguments_schema,
+            "execution_policy": self.execution_policy,
         }
 
 
@@ -105,6 +118,13 @@ def _local_worker_health_skill(arguments: dict[str, Any], cfg: Settings) -> dict
 
 
 SKILL_REGISTRY: dict[str, SkillDefinition] = {
+    "mucaro/ocr-analyze": SkillDefinition(
+        skill_id="mucaro/ocr-analyze", version="1.0.0",
+        description="Extract text from a local image or PDF with source hashes, confidence warnings, page lineage, and saved reports. Requires directory access and local OCR engines.",
+        runtime="IN_PROCESS", capabilities=("filesystem.read", "filesystem.write", "subprocess.execute"),
+        input_schema="mucaro.ocr-skill-input/1.0", output_schema="mucaro.ocr-skill-result/1.0",
+        handler=analyze_document, arguments_schema=OCR_ARGUMENTS_SCHEMA, execution_policy=OCR_EXECUTION_POLICY,
+    ),
     "mucaro/intelligence-plane-health": SkillDefinition(
         skill_id="mucaro/intelligence-plane-health",
         version="1.0.0",
@@ -134,6 +154,22 @@ def _validate_definition(skill: SkillDefinition) -> None:
     unknown = sorted(set(skill.capabilities) - ALLOWED_CAPABILITIES)
     if unknown:
         raise SkillRuntimeError("ERROR_SKILL_CAPABILITY_UNKNOWN", ",".join(unknown))
+    if skill.arguments_schema is not None:
+        try:
+            Draft202012Validator.check_schema(skill.arguments_schema)
+        except SchemaError as exc:
+            raise SkillRuntimeError("ERROR_SKILL_SCHEMA_INVALID", skill.skill_id) from exc
+
+
+def validate_skill_arguments(skill_id: str, arguments: dict[str, Any]) -> None:
+    skill = SKILL_REGISTRY.get(skill_id)
+    if skill is None:
+        raise SkillRuntimeError("ERROR_SKILL_NOT_REGISTERED", skill_id)
+    _validate_definition(skill)
+    if skill.arguments_schema is not None:
+        errors = list(Draft202012Validator(skill.arguments_schema).iter_errors(arguments))
+        if errors:
+            raise SkillRuntimeError("ERROR_SKILL_ARGUMENTS_INVALID", "; ".join(f"{error.json_path}: {error.message}" for error in errors[:5]))
 
 
 def _mounts_path(cfg: Settings) -> Any:
@@ -375,6 +411,7 @@ def execute_skill(
     skill = SKILL_REGISTRY.get(skill_id)
     if skill is None:
         raise SkillRuntimeError("ERROR_SKILL_NOT_REGISTERED", skill_id)
+    validate_skill_arguments(skill_id, arguments)
     # This lock is the admission boundary shared with activation and revocation.
     # The handler runs outside it so revocation can block later invocations promptly.
     with file_lock(_mounts_path(cfg)):
@@ -455,6 +492,9 @@ def execute_skill(
         )
         result = routed["result"]
         adapter_receipt = routed["adapter_receipt"]
+        artifact_ids = result.get("artifact_ids", [])
+        if not isinstance(artifact_ids, list) or len(artifact_ids) > 32 or any(not isinstance(item, str) for item in artifact_ids):
+            raise SkillRuntimeError("ERROR_SKILL_RESULT_ARTIFACTS_INVALID", "Result artifact references must be a bounded list of IDs.")
         try:
             output_artifact = create_artifact_record(
                 processed_dir=cfg.processed_dir,
@@ -463,7 +503,7 @@ def execute_skill(
                 logical_identity=f"skill_output:{skill_id}:{execution_id}",
                 producer="skill_runtime",
                 producer_version="1.0.0",
-                parent_artifact_ids=[input_artifact.artifact_id],
+                parent_artifact_ids=[input_artifact.artifact_id, *artifact_ids],
                 schema_id=skill.output_schema,
                 source_path_or_uri=f"skill://{skill_id}/output",
             )
@@ -476,7 +516,7 @@ def execute_skill(
         result = None
         adapter_receipt = None
         status = "FAIL"
-        error = {"type": type(exc).__name__, "detail": str(exc)}
+        error = {"status": getattr(exc, "status", "ERROR_SKILL_HANDLER_FAILED"), "type": type(exc).__name__, "detail": str(exc)}
         try:
             failure_artifact = create_artifact_record(
                 processed_dir=cfg.processed_dir,

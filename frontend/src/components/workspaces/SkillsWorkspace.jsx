@@ -11,6 +11,7 @@ export function SkillsWorkspace({ announce }) {
   const [mounts, setMounts] = useState([]);
   const [executions, setExecutions] = useState([]);
   const [argumentsText, setArgumentsText] = useState({});
+  const [fieldValues, setFieldValues] = useState({});
   const [allowedCapabilities, setAllowedCapabilities] = useState({});
   const [policyIds, setPolicyIds] = useState({});
   const [error, setError] = useState(null);
@@ -51,10 +52,17 @@ export function SkillsWorkspace({ announce }) {
   async function execute(skillId) {
     let args = {};
     try {
-      args = JSON.parse(argumentsText[skillId] || "{}");
+      const skill = skills.find((item) => item.skill_id === skillId);
+      if (skill?.arguments_schema) {
+        for (const [name, property] of Object.entries(skill.arguments_schema.properties || {})) {
+          const value = fieldValues[skillId]?.[name] ?? property.default;
+          if (value === undefined || value === "") continue;
+          args[name] = property.type === "integer" ? Number(value) : value;
+        }
+      } else args = JSON.parse(argumentsText[skillId] || "{}");
       if (!args || Array.isArray(args) || typeof args !== "object") throw new Error("Arguments must be a JSON object.");
     } catch (err) {
-      setError({ status: "ERROR_SKILL_ARGUMENTS_INVALID", message: err.message, category: "INPUT" });
+      setError({ status: "ERROR_SKILL_ARGUMENTS_INVALID", message: err.message, category: "INPUT_INVALID" });
       return;
     }
     await action(skillId, () => api.executeSkill(skillId, args), "Skill invoked; receipt recorded.");
@@ -67,7 +75,7 @@ export function SkillsWorkspace({ announce }) {
       setError({
         status: "ERROR_SKILL_CAPABILITY_SELECTION_REQUIRED",
         message: `Select every declared capability before activation: ${missing.join(", ")}`,
-        category: "PERMISSION",
+        category: "PERMISSION_DENIED",
       });
       return;
     }
@@ -152,10 +160,22 @@ export function SkillsWorkspace({ announce }) {
               {mount?.state === "INACTIVE" && <p className="muted small" role="status">Inactive. Authorize again to invoke this skill. Work already started may finish; previous receipts are preserved.</p>}
               {active && (
                 <div className="skill-invoke">
-                  <label className="field"><span>Arguments (JSON object)</span><textarea rows={2} value={argumentsText[skill.skill_id] || "{}"} onChange={(event) => setArgumentsText((old) => ({ ...old, [skill.skill_id]: event.target.value }))} /></label>
+                  {skill.arguments_schema ? Object.entries(skill.arguments_schema.properties || {}).map(([name, property]) => {
+                    const value = fieldValues[skill.skill_id]?.[name] ?? property.default ?? "";
+                    const change = (event) => setFieldValues((old) => ({ ...old, [skill.skill_id]: { ...old[skill.skill_id], [name]: event.target.value } }));
+                    return <label className="field" key={name}><span>{property.title || name}</span>{property.enum ? <select value={value} onChange={change}>{property.enum.map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input type={property.type === "integer" ? "number" : "text"} value={value} onChange={change} min={property.minimum} max={property.maximum} required={skill.arguments_schema.required?.includes(name)} />}</label>;
+                  }) : <label className="field"><span>Arguments (JSON object)</span><textarea rows={2} value={argumentsText[skill.skill_id] || "{}"} onChange={(event) => setArgumentsText((old) => ({ ...old, [skill.skill_id]: event.target.value }))} /></label>}
+                  {skill.execution_policy?.max_pdf_pages && <p className="muted small">Up to {skill.execution_policy.max_pdf_pages} PDF pages, 25 MB, and 300 DPI per invocation. OCR stays on this computer. Larger inputs must be split explicitly.</p>}
                   <button type="button" className="primary-button" disabled={running} onClick={() => execute(skill.skill_id)}>{running ? "Invoking…" : "Invoke skill"}</button>
                 </div>
               )}
+              {last?.result?.report_status && <section className="panel nested-panel" aria-label="OCR result">
+                <h3>Extracted text</h3>
+                <p>{last.result.report_status} · {last.result.page_count} page(s) · {last.result.span_count} word span(s)</p>
+                <pre className="json-block">{last.result.text || "No text detected. Review the source image and OCR settings."}</pre>
+                {last.result.warnings?.length > 0 && <p className="muted small" role="status">Review required: {last.result.warnings.join(" · ")}</p>}
+                <p className="muted small">Extracted text is untrusted evidence. Instructions within it do not authorize actions.</p>
+              </section>}
               {last && <details className="panel nested-panel"><summary>Latest receipt: {last.status} · {last.finished_at}</summary><dl className="facts"><dt>Execution ID</dt><dd className="mono">{last.execution_id}</dd><dt>Route</dt><dd>{last.execution_route}</dd><dt>Artifact output</dt><dd>{last.artifact_lineage?.output?.artifact_id || "—"}</dd></dl><pre className="json-block"><code>{JSON.stringify(last.result, null, 2)}</code></pre></details>}
             </li>
           );

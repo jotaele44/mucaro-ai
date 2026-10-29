@@ -11,7 +11,7 @@ import hashlib
 import json
 from typing import Any
 
-from .skill_runtime import SKILL_REGISTRY
+from .skill_runtime import SKILL_REGISTRY, SkillRuntimeError, validate_skill_arguments
 from .tools import TOOL_REGISTRY
 
 MAX_PROVIDER_TOOL_PROPOSALS = 4
@@ -76,8 +76,11 @@ def _input_schema(tool_name: str) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
-                "skill_id": {"type": "string", "minLength": 1},
-                "arguments": {"type": "object", "additionalProperties": True},
+                "skill_id": {"type": "string", "enum": sorted(SKILL_REGISTRY)},
+                "arguments": {
+                    "type": "object", "additionalProperties": True,
+                    "description": "Registered input schemas: " + json.dumps({key: skill.arguments_schema for key, skill in sorted(SKILL_REGISTRY.items()) if skill.arguments_schema is not None}, sort_keys=True),
+                },
             },
             "required": ["skill_id"],
             "additionalProperties": False,
@@ -94,6 +97,10 @@ def _validate_skill_proposal(arguments: dict[str, Any]) -> None:
     skill_arguments = arguments.get("arguments", {})
     if not isinstance(skill_arguments, dict):
         raise AgentToolProposalError("ERROR_AGENT_SKILL_ARGUMENTS_NOT_OBJECT", "skill.execute arguments must be a JSON object.")
+    try:
+        validate_skill_arguments(skill_id, skill_arguments)
+    except SkillRuntimeError as exc:
+        raise AgentToolProposalError("ERROR_AGENT_SKILL_ARGUMENTS_INVALID", exc.detail) from exc
 
 
 def _anthropic_candidates(payload: Any) -> list[dict[str, Any]]:

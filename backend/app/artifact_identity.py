@@ -3,11 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from functools import wraps
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from .contracts import ContractViolation, validate_contract
-from .utils import read_json, stable_id, utc_now, write_json
+from .utils import file_lock, read_json, stable_id, utc_now, write_json
 
 ARTIFACT_SCHEMA_VERSION = "mucaro-artifact/1.0"
 ARTIFACT_PROVENANCE_SCHEMA_VERSION = "mucaro-artifact-provenance/1.0"
@@ -188,6 +189,15 @@ def _build_provenance(
     return provenance
 
 
+def _serialize_artifact_creation(operation: Callable[..., ArtifactRecord]) -> Callable[..., ArtifactRecord]:
+    @wraps(operation)
+    def locked(*args: Any, **kwargs: Any) -> ArtifactRecord:
+        with file_lock(artifact_store_path(kwargs["processed_dir"])):
+            return operation(*args, **kwargs)
+    return locked
+
+
+@_serialize_artifact_creation
 def create_artifact_record(
     *,
     processed_dir: Path,

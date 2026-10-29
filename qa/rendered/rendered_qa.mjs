@@ -45,6 +45,7 @@ mkdirSync(outDir, { recursive: true });
 
 const checks = [];
 const shots = [];
+const fixtures = [];
 function check(name, viewport, pass, detail = "") {
   checks.push({ name, viewport, pass: Boolean(pass), detail: String(detail).slice(0, 400) });
   console.log(`${pass ? "PASS" : "FAIL"} [${viewport}] ${name}${detail ? ` — ${String(detail).slice(0, 160)}` : ""}`);
@@ -590,7 +591,44 @@ async function scenario(browser, base, viewport, contextOptions) {
     page.off("request", countInvocation);
     check("reauthorized skill invokes once under a rapid double activation", viewport, invocationRequests === 1, `${invocationRequests} invocation request(s)`);
     await shot(page, viewport, "16b-skills-reactivated");
+
+    const ocrFixture = path.join(outDir, "governed-ocr-table.png");
+    if (!existsSync(ocrFixture)) {
+      execFileSync(python, ["-c", "from pathlib import Path; import sys; from scripts.certify_ocr08_structure_live import _make_table; _make_table(Path(sys.argv[1]))", ocrFixture], { cwd: ROOT });
+      fixtures.push({ file: path.relative(ROOT, ocrFixture), sha256: createHash("sha256").update(readFileSync(ocrFixture)).digest("hex"), expected_text: "APPLE" });
+    }
+    const ocrSkill = page.locator("li.skill-card").filter({ has: page.getByRole("heading", { name: "mucaro/ocr-analyze", exact: true }) });
+    await ocrSkill.waitFor();
+    const ocrMount = ocrSkill.getByRole("button", { name: "Mount", exact: true });
+    if (await ocrMount.count()) {
+      await ocrMount.click();
+      await ocrSkill.getByRole("button", { name: "Authorize & activate", exact: true }).waitFor();
+      for (const capability of ["filesystem.read", "filesystem.write", "subprocess.execute"]) await ocrSkill.getByRole("checkbox", { name: capability, exact: true }).check();
+      await ocrSkill.getByRole("button", { name: "Authorize & activate", exact: true }).click();
+    }
+    await ocrSkill.getByLabel("Input file path", { exact: true }).fill(ocrFixture);
+    check("OCR skill exposes labeled document settings instead of requiring JSON", viewport, await ocrSkill.getByLabel("OCR language", { exact: true }).isVisible() && await ocrSkill.getByLabel("Page layout", { exact: true }).isVisible());
+    await ocrSkill.getByRole("button", { name: "Invoke skill", exact: true }).click();
+    const ocrResult = ocrSkill.getByRole("region", { name: "OCR result", exact: true });
+    await ocrResult.getByText(/APPLE/).waitFor({ timeout: 60000 });
+    check("governed OCR skill extracts known text with the real local engine", viewport, await ocrResult.getByText(/APPLE/).isVisible() && (await ocrResult.getByText(/1 page\(s\)/).count()) === 1);
+    await shot(page, viewport, "16c-governed-ocr");
     axeRuns.push(await axe(page, viewport, "skills"));
+
+    await openNav();
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Chat", exact: true }).click();
+    await drawerClosed();
+    await send(page, `/skill mucaro/ocr-analyze ${JSON.stringify({ path: ocrFixture })}`);
+    await waitRunState(page, "AWAITING_APPROVAL");
+    const ocrApproval = lastRun(page).getByRole("region", { name: "Permission request for skill.execute", exact: true });
+    check("conversation OCR waits for an explicit skill approval", viewport, await ocrApproval.isVisible());
+    await ocrApproval.getByRole("button", { name: "Allow once", exact: true }).click();
+    await waitRunState(page, "COMPLETED", 60000);
+    check("conversation OCR completes with a recorded tool outcome", viewport, (await lastRun(page).getByRole("button", { name: /Used 1 tool/ }).count()) === 1);
+    await openNav();
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Skills", exact: true }).click();
+    await ocrSkill.getByRole("region", { name: "OCR result", exact: true }).getByText(/APPLE/).waitFor();
+    await drawerClosed();
   }
 
   if (viewport === "iphone") {
@@ -1632,6 +1670,7 @@ const receipt = {
   failed: checks.filter((row) => !row.pass).length,
   axe: axeResults,
   screenshots: shots,
+  fixtures,
   limitations: [
     `Rendered in Playwright ${browserName}; this does not execute the packaged WKWebView window.`,
     "iPhone width is emulated on a desktop browser engine, not rendered by iOS Safari on a phone.",

@@ -6,7 +6,7 @@ from typing import Any
 
 from .agent_workflow import AgentWorkflowError, normalize_agent_actions
 from .config import Settings, settings
-from .skill_runtime import SKILL_REGISTRY, list_skill_mounts
+from .skill_runtime import SKILL_REGISTRY, SkillRuntimeError, list_skill_mounts, validate_skill_arguments
 
 AGENT_PLAN_SCHEMA = "mucaro-agent-plan/1.0"
 AGENT_PLANNER_ID = "mucaro-local-intent-v1"
@@ -97,6 +97,10 @@ def _skill_action_from_prompt(
     else:
         arguments = {}
 
+    try:
+        validate_skill_arguments(skill_id, arguments)
+    except SkillRuntimeError as exc:
+        return None, {"status": exc.status, "detail": exc.detail}
     mounts = list_skill_mounts(cfg).get("mounts", [])
     mount = next((row for row in mounts if row.get("skill_id") == skill_id), None)
     if not isinstance(mount, dict) or mount.get("state") != "ACTIVE":
