@@ -33,19 +33,26 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "frontend/src/App.jsx"
+        "frontend/src/App.jsx",
+        "frontend/src/components/workspaces/GoalWorkspace.jsx",
+        "frontend/src/components/workspaces/TasksWorkspace.jsx",
+        "backend/app/goals.py",
+        "backend/app/agent_tasks.py"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+        "_architecture/release/evidence/rendered_qa_ae8e92945bc7.json",
+        "backend/tests/test_api.py::test_api_tasks_expose_durable_dependency_dag",
+        "backend/tests/test_agent_tasks.py::test_task_dag_persists_and_computes_readiness"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "Ask/plan/execute/stream/inspect/refine flows render; export and GIS/OCR workspaces still open."
+      "notes": "Ask/plan/execute/stream/inspect/refine flows render. Goals and durable task dependencies are now exposed through the GUI and API: the rendered exact-head receipt creates a prerequisite, creates a dependent task with a labeled one-click picker, rejects early start, and permits start after the prerequisite reaches DONE. Native WKWebView/macOS, physical-device, and broader GIS/coding execution evidence remain open."
     },
     {
       "requirement_id": "GOAL-003",
@@ -999,12 +1006,14 @@
       "evidence_refs": [
         "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
         "backend/tests/test_work_runs.py::test_api_message_stream_replays_and_ends",
-        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+        "_architecture/release/evidence/rendered_qa_ae8e92945bc7.json",
+        "backend/tests/test_api.py::test_api_tasks_expose_durable_dependency_dag"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Feed renders plans, actions, approvals, results, text, citations, artifacts, warnings and outcomes. OPEN: maps, tables and code-execution output in the feed (GIS/coding workspaces)."
+      "notes": "Feed renders plans, actions, approvals, results, text, citations, artifacts, warnings and outcomes; goal/task context binds to runs. Durable task dependency creation, readiness rejection, completion, and start-after-prerequisite are covered by the exact-head GUI/API evidence. OPEN: maps, tables and code-execution output in the feed (GIS/coding workspaces)."
     },
     {
       "requirement_id": "TGT-003",
