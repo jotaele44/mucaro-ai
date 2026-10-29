@@ -497,6 +497,47 @@ async function scenario(browser, base, viewport, contextOptions) {
   await shot(page, viewport, "15-provenance");
 
   await openNav();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Workbench", exact: true }).click();
+  await page.getByRole("heading", { name: "Workbench" }).waitFor();
+  await page.getByLabel("Objective").fill("Reconcile a bounded local-first workbench");
+  await page.getByLabel("Capability scope").fill("GIS, OCR, coding");
+  await page.getByRole("button", { name: "Compile plan" }).click();
+  const workbenchStatus = page.getByText("WORKBENCH_PLAN_READY", { exact: true });
+  await workbenchStatus.waitFor();
+  check(
+    "workbench plan-ready status is visually neutral, not a certification PASS",
+    viewport,
+    !(await workbenchStatus.getAttribute("class") || "").includes("status-completed"),
+  );
+  check(
+    "workbench plan remains explicitly non-executing",
+    viewport,
+    (await page.getByText("CANDIDATE_NOT_EXECUTION", { exact: true }).count()) === 1,
+  );
+  check(
+    "workbench reports exactly one visible no-execution outcome",
+    viewport,
+    (await page.getByText("Nothing was executed.", { exact: true }).count()) === 1,
+  );
+  check(
+    "workbench exposes no Execute control",
+    viewport,
+    (await page.getByRole("button", { name: /^Execute$/ }).count()) === 0,
+  );
+  check(
+    "workbench exposes certification residue instead of false readiness",
+    viewport,
+    (await page.getByText("BLOCKED", { exact: true }).count()) >= 1 &&
+      (await page.getByText(/Missing certification evidence/).count()) === 1 &&
+      (await page.getByText("UNBOUND", { exact: true }).count()) === 1 &&
+      (await page.getByText("20 / 20", { exact: true }).count()) === 1 &&
+      (await page.getByText("NOT_CLAIMED", { exact: true }).count()) === 1,
+  );
+  drawerStates.push(await drawerClosed());
+  await shot(page, viewport, "16b-workbench");
+  axeRuns.push(await axe(page, viewport, "workbench"));
+
+  await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByText("What works offline").waitFor();
   check("settings shows model choice and offline capabilities", viewport, (await page.getByRole("radio", { name: /openai_compatible_local/ }).count()) === 1);
@@ -505,7 +546,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   axeRuns.push(await axe(page, viewport, "settings"));
 
   if (viewport === "iphone") {
-    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
+    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 5 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
     // iOS zooms into fields under 16px on focus; touch targets need 44px (Apple HIG).
     const touch = await page.evaluate(() => {
       const visible = (el) => {
@@ -535,6 +576,179 @@ async function scenario(browser, base, viewport, contextOptions) {
   check("no console errors", viewport, consoleErrors.length === 0, consoleErrors.join(" | "));
   await context.close();
   return axeRuns;
+}
+
+async function executionEntryScenario(browser, base, viewport, contextOptions, mode = "GOAL", activation = "double") {
+  const mobileEntry = Number(contextOptions?.viewport?.width || 0) < 700;
+  const title = `Execution entry QA ${mode} ${viewport}`;
+  const primaryEnglish = mode === "PLAN" ? "Execute" : "Proceed";
+  const secondaryEnglish = mode === "PLAN" ? "Revise" : "Adjust";
+  const primarySpanish = mode === "PLAN" ? "Ejecutar" : "Proceder";
+  const secondarySpanish = mode === "PLAN" ? "Revisar" : "Ajustar";
+  const createdConversation = await fetch(`${base}/conversations`, jsonPost({ title }));
+  if (!createdConversation.ok) throw new Error(`entry conversation create failed: ${createdConversation.status}`);
+  const conversation = await createdConversation.json();
+  const createdEntry = await fetch(
+    `${base}/execution-entry/artifacts`,
+    jsonPost({
+      mode,
+      objective_id: `qa-${mode.toLowerCase()}-${viewport}`,
+      conversation_id: conversation.conversation_id,
+      prompt: "Execute the approved Goal/Plan entry browser proof.",
+      runtime_mode: "plan",
+      options: { model_provider: "mock" },
+      source_commit: head,
+      required_gates: [
+        { gate_id: "scope", state: "PASS", evidence_ref: "qa://execution-entry/scope", evidence_sha256: "1".repeat(64) },
+        { gate_id: "authorization", state: "PASS", evidence_ref: "qa://execution-entry/authorization", evidence_sha256: "2".repeat(64) },
+        { gate_id: "dependencies", state: "PASS", evidence_ref: "qa://execution-entry/dependencies", evidence_sha256: "3".repeat(64) },
+      ],
+    }),
+  );
+  if (!createdEntry.ok) throw new Error(`entry artifact create failed: ${createdEntry.status} ${await createdEntry.text()}`);
+  const entry = await createdEntry.json();
+
+  const context = await browser.newContext({ ...contextOptions, baseURL: base });
+  const page = await context.newPage();
+  const consoleErrors = [];
+  let decisionPosts = 0;
+  page.on("console", (msg) => msg.type() === "error" && consoleErrors.push(msg.text()));
+  page.on("pageerror", (err) => consoleErrors.push(String(err)));
+  page.on("request", (req) => {
+    const pathname = new URL(req.url()).pathname;
+    if (req.method() === "POST" && /\/execution-entry\/artifacts\/[^/]+\/\d+\/decisions$/.test(pathname)) {
+      decisionPosts += 1;
+    }
+  });
+
+  try {
+    await page.goto("/");
+    if (mobileEntry) await page.getByRole("button", { name: "Open navigation" }).click();
+    await page.getByRole("list", { name: "Conversations" }).getByRole("button", { name: new RegExp(title) }).click();
+    const card = page.locator(".execution-entry-card");
+    await card.getByRole("heading", { name: `qa-${mode.toLowerCase()}-${viewport}` }).waitFor();
+
+    const primary = card.getByRole("button", { name: primaryEnglish });
+    const secondary = card.getByRole("button", { name: secondaryEnglish });
+    check("entry candidate renders exactly two pre-execution actions", viewport, (await card.getByRole("button").count()) === 2 && await secondary.isEnabled());
+    check("N19 not-ready primary action is natively disabled", viewport, await primary.isDisabled());
+    await primary.evaluate((node) => node.focus());
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(250);
+    check("N19 keyboard activation of a disabled primary sends no decision", viewport, decisionPosts === 0, `decision POSTs=${decisionPosts}`);
+
+    const describedBy = await primary.getAttribute("aria-describedby");
+    const announcement = describedBy ? page.locator(`#${describedBy}`) : null;
+    const announcementRole = announcement ? await announcement.getAttribute("role").catch(() => null) : null;
+    const announcementText = announcement ? (await announcement.textContent().catch(() => ""))?.trim() : "";
+    check(
+      "disabled entry reason exposes screen-reader status semantics",
+      viewport,
+      Boolean(describedBy && announcementRole === "status" && announcementText),
+      JSON.stringify({ describedBy, role: announcementRole, text: announcementText }),
+    );
+
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "language", { value: "es-PR", configurable: true });
+      window.dispatchEvent(new Event("languagechange"));
+    });
+    await card.getByRole("button", { name: secondarySpanish }).waitFor();
+    check(
+      "N20 locale switch changes labels without execution",
+      viewport,
+      (await card.getByRole("button", { name: primarySpanish }).count()) === 1 && decisionPosts === 0,
+      `decision POSTs=${decisionPosts}`,
+    );
+
+    const focusOrder = await card.getByRole("button").evaluateAll((buttons) =>
+      buttons.map((button) => ({ name: button.textContent.trim(), disabled: button.disabled, height: Math.round(button.getBoundingClientRect().height) })),
+    );
+    const minEntryTarget = mobileEntry ? 44 : 36;
+    check(
+      "entry controls expose native button semantics and usable targets",
+      viewport,
+      focusOrder.every((row) => row.height >= minEntryTarget),
+      JSON.stringify(focusOrder),
+    );
+
+    if (viewport === "entry-desktop") {
+      await page.setViewportSize({ width: 720, height: 450 });
+      const zoomEquivalentOverflow = await page.evaluate(() => {
+        const cardNode = document.querySelector(".execution-entry-card");
+        const box = cardNode?.getBoundingClientRect();
+        return {
+          innerWidth: window.innerWidth,
+          page: document.documentElement.scrollWidth > window.innerWidth + 1,
+          card: !box || box.left < -1 || box.right > window.innerWidth + 1,
+        };
+      });
+      check(
+        "execution-entry reflows at 200% desktop zoom-equivalent width",
+        viewport,
+        zoomEquivalentOverflow.innerWidth === 720 && !zoomEquivalentOverflow.page && !zoomEquivalentOverflow.card,
+        JSON.stringify(zoomEquivalentOverflow),
+      );
+      await page.setViewportSize({ width: 1440, height: 900 });
+    }
+    await shot(page, viewport, "execution-entry-candidate");
+    const entryAxe = await axe(page, viewport, "execution entry candidate");
+
+    const approved = await fetch(
+      `${base}/execution-entry/artifacts/${entry.artifact_id}/1/state`,
+      jsonPost({ expected_version: 1, target_state: mode === "PLAN" ? "PLAN_APPROVED" : "VECTOR_READY" }),
+    );
+    if (!approved.ok) throw new Error(`entry approval failed: ${approved.status} ${await approved.text()}`);
+
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "language", { value: "es-PR", configurable: true });
+    });
+    await page.reload();
+    const approvedCard = page.locator(".execution-entry-card");
+    const proceed = approvedCard.getByRole("button", { name: primarySpanish });
+    await proceed.waitFor();
+    check(`approved ${mode} renders enabled localized primary action`, viewport, await proceed.isEnabled());
+
+    if (activation === "keyboard") {
+      await proceed.focus();
+      await page.keyboard.press("Enter");
+      await approvedCard.getByRole("button", { name: "Inspect" }).waitFor({ timeout: 10000 });
+      check("enabled entry primary activates from keyboard exactly once", viewport, decisionPosts === 1, `decision POSTs=${decisionPosts}`);
+    } else {
+      await proceed.evaluate((node) => {
+        node.click();
+        node.click();
+      });
+      await approvedCard.getByRole("button", { name: "Inspect" }).waitFor({ timeout: 10000 });
+      check("N15 rapid double activation creates exactly one decision request", viewport, decisionPosts === 1, `decision POSTs=${decisionPosts}`);
+    }
+    check("entry actions are replaced after execution starts", viewport, (await approvedCard.getByRole("button", { name: primarySpanish }).count()) === 0);
+
+    await approvedCard.getByRole("button", { name: "Inspect" }).click();
+    const receiptSheet = page.getByRole("dialog", { name: "Execution receipt" });
+    await receiptSheet.waitFor();
+    const receiptIdentityVisible =
+      await receiptSheet.getByText("Artifact SHA-256").isVisible() &&
+      await receiptSheet.getByText("Receipt SHA-256").isVisible() &&
+      await receiptSheet.getByText(mode === "GOAL" ? "Vector" : "Plan", { exact: true }).isVisible() &&
+      await receiptSheet.getByText("Policy", { exact: true }).isVisible();
+    check("Inspect exposes immutable entry receipt fields", viewport, receiptIdentityVisible);
+    await receiptSheet.getByRole("button", { name: "Close" }).click();
+    await shot(page, viewport, "execution-entry-dispatched");
+
+    const overflow = await page.evaluate(() => {
+      const cardNode = document.querySelector(".execution-entry-card");
+      const box = cardNode?.getBoundingClientRect();
+      return {
+        page: document.documentElement.scrollWidth > window.innerWidth + 1,
+        card: !box || box.left < -1 || box.right > window.innerWidth + 1,
+      };
+    });
+    check("execution-entry card has no horizontal overflow", viewport, !overflow.page && !overflow.card, JSON.stringify(overflow));
+    check("execution-entry scenario has no console errors", viewport, consoleErrors.length === 0, consoleErrors.join(" | "));
+    return [entryAxe];
+  } finally {
+    await context.close();
+  }
 }
 
 async function offlineScenario(browser, base, viewport, contextOptions, stopBackend) {
@@ -1436,6 +1650,18 @@ try {
     axeResults.push(...(await scenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } })));
     const iphone = devices["iPhone 13"];
     axeResults.push(...(await scenario(browser, base, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
+    axeResults.push(...(await executionEntryScenario(browser, base, "entry-desktop", { viewport: { width: 1440, height: 900 } })));
+    axeResults.push(...(await executionEntryScenario(
+      browser,
+      base,
+      "entry-plan-desktop",
+      { viewport: { width: 1440, height: 900 } },
+      "PLAN",
+      "keyboard",
+    )));
+    const entryPhone = devices["iPhone 13"];
+    axeResults.push(...(await executionEntryScenario(browser, base, "entry-393", { ...entryPhone, viewport: { width: 393, height: 852 } })));
+    axeResults.push(...(await executionEntryScenario(browser, base, "entry-430", { ...entryPhone, viewport: { width: 430, height: 932 } })));
     await launchTokenScenario(browser, "desktop");
     const headers = (await fetch(`${base}/`)).headers;
     check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
@@ -1472,7 +1698,12 @@ const receipt = {
   dirty_paths: dirtyPaths,
   created_utc: new Date().toISOString(),
   browser: `${browserName} ${browserVersion}`,
-  viewports: { desktop: "1440x900", iphone: "390x844 (iPhone 13 profile, touch, DPR 3)" },
+  viewports: {
+    desktop: "1440x900",
+    iphone: "390x844 (iPhone 13 profile, touch, DPR 3)",
+    entry_393: "393x852 touch profile",
+    entry_430: "430x932 touch profile",
+  },
   checks,
   passed: checks.filter((row) => row.pass).length,
   failed: checks.filter((row) => !row.pass).length,
@@ -1482,6 +1713,8 @@ const receipt = {
     `Rendered in Playwright ${browserName}; this does not execute the packaged WKWebView window.`,
     "iPhone width is emulated on a desktop browser engine, not rendered by iOS Safari on a phone.",
     "Phone access is exercised through a non-loopback address of this machine, not from a physical phone on a real network.",
+    "Execution-entry screen-reader evidence validates programmatic role/status association; it does not execute VoiceOver, NVDA, or another physical assistive-technology session.",
+    "Execution-entry 200% evidence uses the 720-CSS-pixel effective layout width corresponding to a 1440px desktop at 200% zoom; it does not manipulate browser chrome zoom controls.",
     ...skippedNotes,
     ...(onlyNew ? ["Development run (--only-new): the base desktop and iPhone scenarios did not run, so this is not a complete receipt."] : []),
   ],

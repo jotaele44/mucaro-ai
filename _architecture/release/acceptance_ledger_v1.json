@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-02T15:01:08Z",
+  "updated_utc": "2026-10-25T18:51:00Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1170,20 +1170,25 @@
         "backend/app/file_signatures.py"
       ],
       "dependencies": [],
-      "positive_gate": "backend/tests/test_format_registry.py::test_declared_format_registry_projection_is_exact",
-      "negative_gate": null,
-      "benchmark": null,
+      "positive_gate": ".github/workflows/matrix010-ingestion-cert.yml",
+      "negative_gate": "backend/tests/test_matrix010_ingestion_benchmark.py::test_matrix010_full_benchmark_closes_22_plus_8_denominator",
+      "benchmark": "_architecture/ingestion_benchmark_v1.json",
       "evidence_refs": [
         "_architecture/ingest_format_registry_v1.json",
         "backend/tests/test_format_registry.py",
         "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764670",
         "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764464",
-        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764730"
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764730",
+        "backend/app/ingestion_benchmark.py",
+        "backend/tests/test_matrix010_ingestion_benchmark.py",
+        "scripts/certify_matrix010_ingestion.py",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39963895136",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39963895136/artifacts/12505044961"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": "PROVISIONAL: merged PR #287 establishes one canonical 22-format ingestion registry consumed by parser MIME detection, upload/folder suffix policy, multimodal classes and signature expectations. Exact head a48ef587e5fa4cae34531e4d64a2c91517e78bc1 passed CI, Chromium/WebKit rendered QA and macOS gates. The implementation gap is closed, but certification remains provisional until MATRIX-010 freezes and executes the declared file-ingestion benchmark across the claimed format denominator."
+      "notes": "PASS: canonical 22-format ingestion implementation from merged PR #290 is bound to exact head 2acf4e611981a78d194b0b111a82b47e432e5915. MATRIX-010 certification run 39963895136 reports MATRIX010_INGESTION_CERT_OK with 22/22 declared formats PASS, 8/8 adversarial cases PASS, zero failures, both arithmetic checks closed, zero failed terminal checks, receipt SHA-256 6a14d4dc45459a7a822384d384f075fdbb18312be19db24474016a5079aa8f91, and artifact 12505044961. This closes the benchmark residue previously keeping TGT-012 PROVISIONAL; semantic multimodal understanding remains governed by its separate requirements and is not implied here."
     },
     {
       "requirement_id": "TGT-013",
@@ -1977,29 +1982,32 @@
       "requirement_id": "MATRIX-010",
       "requirement_text": "File-ingestion benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/tests/test_ingestion_safety.py",
-        "backend/tests/test_parser.py",
-        "backend/app/format_registry.py",
+        "backend/app/ingestion_benchmark.py",
+        "_architecture/ingestion_benchmark_v1.json",
         "_architecture/ingest_format_registry_v1.json",
-        "backend/tests/test_format_registry.py"
+        "backend/tests/test_matrix010_ingestion_benchmark.py",
+        "scripts/certify_matrix010_ingestion.py",
+        ".github/workflows/matrix010-ingestion-cert.yml"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
+      "positive_gate": ".github/workflows/matrix010-ingestion-cert.yml",
+      "negative_gate": "backend/tests/test_matrix010_ingestion_benchmark.py",
+      "benchmark": "_architecture/ingestion_benchmark_v1.json",
       "evidence_refs": [
-        "backend/tests/test_ingestion_safety.py",
-        "backend/tests/test_parser.py",
+        "_architecture/ingestion_benchmark_v1.json",
         "_architecture/ingest_format_registry_v1.json",
-        "backend/tests/test_format_registry.py",
-        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764670"
+        "backend/app/ingestion_benchmark.py",
+        "backend/tests/test_matrix010_ingestion_benchmark.py",
+        "scripts/certify_matrix010_ingestion.py",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39963895136",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39963895136/artifacts/12505044961"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": "PROVISIONAL: malformed, mislabeled, empty, truncated, encrypted, oversized, archive-attack and unsupported cases are covered. The canonical 22-format registry and runtime-consumer parity are now merged and exact-head verified by PR #287. Remaining residue is a separately frozen and executed ingestion benchmark receipt across the declared format denominator."
+      "notes": "PASS: exact-head MATRIX-010 certification at 2acf4e611981a78d194b0b111a82b47e432e5915 executed the frozen 22-format denominator plus all 8 required adversarial classes. Run 39963895136 completed SUCCESS and emitted MATRIX010_INGESTION_CERT_OK: format 22/22 PASS, adversarial 8/8 PASS, zero failures, format/adversarial arithmetic closed, failed_terminal_checks=[], receipt SHA-256 6a14d4dc45459a7a822384d384f075fdbb18312be19db24474016a5079aa8f91. Uploaded artifact 12505044961 is 19,944 bytes with GitHub artifact digest sha256:9202b67f9fb66e814b3ca44a507bcef2899c410586230eb41cf15687a8d86494."
     },
     {
       "requirement_id": "MATRIX-011",
