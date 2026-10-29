@@ -49,13 +49,14 @@
         "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
         "_architecture/release/evidence/rendered_qa_ae8e92945bc7.json",
         "_architecture/release/evidence/rendered_qa_77fe7eb2a3de.json",
+    "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
         "backend/tests/test_api.py::test_api_tasks_expose_durable_dependency_dag",
         "backend/tests/test_agent_tasks.py::test_task_dag_persists_and_computes_readiness"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "Ask/plan/execute/stream/inspect/refine flows render. Goals, durable task dependencies, and the governed skill lifecycle are exposed through the GUI and API: exact-head rendered receipts create and sequence dependent tasks, then mount, activate, invoke, and inspect a skill receipt. Native WKWebView/macOS, physical-device, hosted/provider, and broader GIS/coding execution evidence remain open."
+  "notes": "Ask/plan/execute/stream/inspect/refine flows render. Goals, durable task dependencies, the governed skill lifecycle, and governed read-only coding inspection are exposed through the GUI and API: exact-head rendered receipts create and sequence dependent tasks, mount/activate/invoke a skill, and request/approve/execute repository status, diff, and bounded file reads. Native WKWebView/macOS, physical-device, hosted/provider, and broader GIS/coding execution evidence remain open."
     },
     {
       "requirement_id": "GOAL-003",
@@ -1011,12 +1012,13 @@
         "backend/tests/test_work_runs.py::test_api_message_stream_replays_and_ends",
         "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
         "_architecture/release/evidence/rendered_qa_ae8e92945bc7.json",
+    "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
         "backend/tests/test_api.py::test_api_tasks_expose_durable_dependency_dag"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Feed renders plans, actions, approvals, results, text, citations, artifacts, warnings and outcomes; goal/task context binds to runs. Durable task dependency creation, readiness rejection, completion, and start-after-prerequisite are covered by the exact-head GUI/API evidence. OPEN: maps, tables and code-execution output in the feed (GIS/coding workspaces)."
+  "notes": "Feed renders plans, actions, approvals, results, text, citations, artifacts, warnings and outcomes; goal/task context binds to runs. Durable task dependency creation, readiness rejection, completion, and start-after-prerequisite are covered by the exact-head GUI/API evidence. The Code workspace now exposes separately governed read-only receipts, while maps, tables, and coding execution output in the conversation feed remain OPEN."
     },
     {
       "requirement_id": "TGT-003",
@@ -1038,14 +1040,14 @@
       "negative_gate": null,
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/rendered_qa_0c3ae85de5ef.json",
+    "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
         "backend/tests/test_api.py::test_api_ocr_analyze_returns_structured_report",
         "backend/tests/test_api.py::test_api_ocr_analyze_rejects_non_image_and_non_pdf"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "Dedicated Sources, Memory, Provenance, Settings, OCR/page-review, GIS capability/offline-state, Code readiness, and Artifacts surfaces are rendered and exercised. OCR upload/report rendering and backend capability/readiness/empty-artifact states pass in the exact-head Chromium receipt. Full specialized end-to-end execution, native WKWebView/macOS evidence, and physical-device evidence remain outside this receipt."
+  "notes": "Dedicated Sources, Memory, Provenance, Settings, OCR/page-review, GIS capability/offline-state, Code readiness plus governed read-only repository inspection, and Artifacts surfaces are rendered and exercised. OCR upload/report rendering, backend capability/readiness/empty-artifact states, and Code request/approval/terminal receipts pass in the exact-head Chromium receipt. Full specialized end-to-end execution, live coding-container certification, native WKWebView/macOS evidence, and physical-device evidence remain outside this receipt."
     },
     {
       "requirement_id": "TGT-004",
@@ -1122,17 +1124,24 @@
       "implementation_refs": [
         "backend/app/coding_workspace.py",
         "backend/app/coding_mutation.py",
-        "backend/app/coding_container.py"
+    "backend/app/coding_container.py",
+    "frontend/src/components/workspaces/SpecializedWorkspace.jsx",
+    "frontend/src/api.js",
+    "qa/rendered/rendered_qa.mjs"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
+  "evidence_refs": [
+    "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
+    "backend/tests/test_coding_tools.py",
+    "backend/tests/test_coding_readiness.py"
+  ],
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N12",
-      "notes": ""
+  "notes": "The Code workspace now exercises governed read-only repository status, diff, and bounded file-read requests through explicit request, one-time approval, terminal execution, and receipt states. This is supporting UI/tool-surface evidence only: live pinned-image execution, mutation lifecycle certification, hosted/remote admission, and the full coding corpus remain OPEN."
     },
     {
       "requirement_id": "TGT-008",
@@ -1362,6 +1371,7 @@
         "backend/tests/test_artifact_identity.py::test_tampered_artifact_store_is_rejected_by_the_shared_contract",
         "backend/tests/test_skill_runtime.py::test_skill_must_mount_then_activate_before_execution",
         "_architecture/release/evidence/rendered_qa_77fe7eb2a3de.json",
+    "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
         "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
         "backend/tests/test_work_runs.py::test_run_manifest_contract_tracks_approval_and_interruption_states",
         "backend/tests/test_contracts.py::test_contract_violations_are_rejected"
@@ -1369,7 +1379,7 @@
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "PROVISIONAL: runtime enforcement is implemented at checkpoint create/read/update, artifact create/store-read, skill execution, and work-run persistence boundaries. Positive, negative, tamper, approval, interruption, and recovery-focused tests pass in the targeted contract suite. Broader cross-surface release certification and remaining architecture residue are still open."
+  "notes": "PROVISIONAL: runtime enforcement is implemented at checkpoint create/read/update, artifact create/store-read, skill execution, work-run persistence, and governed coding-tool request/approval/execution boundaries. Positive, negative, tamper, approval, interruption, recovery, and exact-head rendered workflow tests pass in the targeted contract suite. Broader cross-surface release certification and remaining architecture residue are still open."
     },
     {
       "requirement_id": "TGT-017",
@@ -2217,13 +2227,14 @@
       "negative_gate": null,
       "benchmark": null,
       "evidence_refs": [
-        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
-        "_architecture/release/evidence/rendered_qa_0c3ae85de5ef.json"
+    "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+    "_architecture/release/evidence/rendered_qa_0c3ae85de5ef.json",
+    "_architecture/release/evidence/rendered_qa_0c3bed745a16.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N18",
-      "notes": "156 rendered checks pass at desktop 1440x900 and emulated iPhone 13 390x844 in Chromium, including navigation, feed, progressive disclosure, settings, provenance, sources, OCR upload/report, GIS capability evidence, Code readiness, Artifacts empty state, token-gate security, error/loading/empty/offline-service states, keyboard, touch-target, and no-overflow checks. Native WKWebView/macOS and physical-device evidence remain open."
+  "notes": "166 rendered checks pass at desktop 1440x900 and emulated iPhone 13 390x844 in Chromium, including navigation, feed, progressive disclosure, settings, provenance, sources, OCR upload/report, GIS capability evidence, Code readiness plus approval-gated repository status/diff/file-read receipts, task and skill workflows, Artifacts empty state, token-gate security, error/loading/empty/offline-service states, keyboard, touch-target, and no-overflow checks. Native WKWebView/macOS and physical-device evidence remain open."
     },
     {
       "requirement_id": "MATRIX-016",
