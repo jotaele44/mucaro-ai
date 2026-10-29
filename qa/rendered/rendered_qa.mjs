@@ -138,7 +138,8 @@ async function scenario(browser, base, viewport, contextOptions) {
   const context = await browser.newContext({ ...contextOptions, baseURL: base });
   const page = await context.newPage();
   const consoleErrors = [];
-  page.on("console", (msg) => msg.type() === "error" && consoleErrors.push(msg.text()));
+  const expectedConsoleErrors = new Set();
+  page.on("console", (msg) => msg.type() === "error" && !expectedConsoleErrors.has(msg.text()) && consoleErrors.push(msg.text()));
   page.on("pageerror", (err) => consoleErrors.push(String(err)));
   const axeRuns = [];
 
@@ -503,6 +504,36 @@ async function scenario(browser, base, viewport, contextOptions) {
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "16-settings");
   axeRuns.push(await axe(page, viewport, "settings"));
+
+  if (viewport === "desktop") {
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Plan tasks", exact: true }).click();
+    await page.getByRole("heading", { name: "Plan tasks", exact: true }).waitFor();
+    await page.getByRole("textbox", { name: "Title", exact: true }).fill("Rendered prerequisite");
+    await page.getByRole("button", { name: "Add task", exact: true }).click();
+    await page.getByRole("heading", { name: "Rendered prerequisite", exact: true }).waitFor();
+    const prerequisiteCheckbox = page.getByRole("checkbox", { name: /Rendered prerequisite \(TODO\)/ });
+    check("task workspace offers the created prerequisite as a labeled dependency choice", viewport, (await prerequisiteCheckbox.count()) === 1);
+    await page.getByRole("textbox", { name: "Title", exact: true }).fill("Rendered dependent");
+    await prerequisiteCheckbox.check();
+    await page.getByRole("button", { name: "Add task", exact: true }).click();
+    const dependentCard = page.locator("li.goal-card").filter({ has: page.getByRole("heading", { name: "Rendered dependent", exact: true }) });
+    await dependentCard.waitFor();
+    check("task workspace persists a dependent task through the one-click picker", viewport, (await dependentCard.getByText(/depends on/).count()) === 1);
+    expectedConsoleErrors.add("Failed to load resource: the server responded with a status of 409 (Conflict)");
+    await dependentCard.getByRole("button", { name: "Start", exact: true }).click();
+    const dependencyError = page.getByRole("alert").filter({ hasText: "ERROR_TASK_DEPENDENCIES_NOT_READY" });
+    await dependencyError.waitFor();
+    check("dependent task refuses to start before its prerequisite is done", viewport, await dependencyError.isVisible());
+    const foundationCard = page.locator("li.goal-card").filter({ has: page.getByRole("heading", { name: "Rendered prerequisite", exact: true }) });
+    await foundationCard.getByRole("button", { name: "Start", exact: true }).click();
+    await foundationCard.getByText("In progress", { exact: true }).waitFor();
+    await foundationCard.getByRole("button", { name: "Mark done", exact: true }).click();
+    await foundationCard.getByText("Done", { exact: true }).waitFor();
+    await dependentCard.getByRole("button", { name: "Start", exact: true }).click();
+    await dependentCard.getByText("In progress", { exact: true }).waitFor();
+    check("dependent task becomes startable after the prerequisite is done", viewport, (await dependentCard.getByText("In progress", { exact: true }).count()) === 1);
+    expectedConsoleErrors.delete("Failed to load resource: the server responded with a status of 409 (Conflict)");
+  }
 
   if (viewport === "iphone") {
     check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));

@@ -223,6 +223,10 @@ def test_api_tasks_expose_durable_dependency_dag(tmp_path: Path):
     assert shown.status_code == 200
     assert shown.json()["task"]["depends_on"] == ["api-foundation"]
 
+    updated = client.patch("/tasks/api-dependent", json={"status": "TODO", "depends_on": []})
+    assert updated.status_code == 200
+    assert updated.json()["task"]["depends_on"] == []
+
 
 def test_api_message_persists_goal_and_task_orchestration_context(tmp_path: Path):
     client = make_client(tmp_path)

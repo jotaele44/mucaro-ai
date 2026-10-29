@@ -27,6 +27,7 @@ export function TasksWorkspace({ announce }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("normal");
+  const [dependsOn, setDependsOn] = useState([]);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -47,10 +48,11 @@ export function TasksWorkspace({ announce }) {
     setBusy(true);
     setError(null);
     try {
-      await api.createTask({ title: title.trim(), description: description.trim(), priority });
+      await api.createTask({ title: title.trim(), description: description.trim(), priority, depends_on: dependsOn });
       setTitle("");
       setDescription("");
       setPriority("normal");
+      setDependsOn([]);
       await load();
       announce("Plan task created.");
     } catch (err) {
@@ -75,6 +77,10 @@ export function TasksWorkspace({ announce }) {
   }
 
   const tasks = payload?.tasks || [];
+  const dependencyOptions = tasks.filter((task) => task.status !== "CANCELLED");
+  function toggleDependency(taskId) {
+    setDependsOn((current) => current.includes(taskId) ? current.filter((id) => id !== taskId) : [...current, taskId]);
+  }
   return (
     <section className="workspace" aria-labelledby="tasks-title">
       <header className="workspace-header">
@@ -86,6 +92,16 @@ export function TasksWorkspace({ announce }) {
         <div className="panel-heading"><strong>Add a plan task</strong><span className="muted small">Dependencies remain governed by the backend DAG.</span></div>
         <label className="field"><span>Title</span><input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={500} placeholder="Define the next executable step" /></label>
         <label className="field"><span>Description</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={10000} rows={2} placeholder="What evidence or outcome is required?" /></label>
+        <fieldset className="field dependency-picker">
+          <legend>Depends on <span className="muted small">Optional prerequisites</span></legend>
+          {!dependencyOptions.length && <p className="muted small">Create a prerequisite task first.</p>}
+          {dependencyOptions.map((task) => (
+            <label key={task.task_id} className="check-row">
+              <input type="checkbox" checked={dependsOn.includes(task.task_id)} onChange={() => toggleDependency(task.task_id)} />
+              <span>{task.title} <span className="muted small">({task.status})</span></span>
+            </label>
+          ))}
+        </fieldset>
         <div className="inline-form">
           <label className="field"><span>Priority</span><select value={priority} onChange={(event) => setPriority(event.target.value)}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></label>
           <button type="submit" className="primary-button" disabled={busy || !title.trim()}>{busy ? "Saving…" : "Add task"}</button>

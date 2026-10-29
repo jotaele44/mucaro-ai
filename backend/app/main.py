@@ -893,6 +893,7 @@ def create_app(cfg: Settings = settings) -> FastAPI:
                 task_id,
                 status=req.status,
                 blocked_reason=req.blocked_reason,
+                depends_on=req.depends_on,
                 expected_sequence=req.expected_sequence,
                 cfg=cfg,
             )

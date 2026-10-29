@@ -158,8 +158,9 @@ class TaskCreateRequest(BaseModel):
 
 
 class TaskUpdateRequest(BaseModel):
-    status: Literal["TODO", "IN_PROGRESS", "BLOCKED", "DONE", "FAILED", "CANCELLED"]
+    status: Literal["TODO", "IN_PROGRESS", "BLOCKED", "DONE", "FAILED", "CANCELLED"] | None = None
     blocked_reason: str | None = Field(default=None, max_length=2000)
+    depends_on: list[str] | None = Field(default=None, max_length=32)
     expected_sequence: int | None = Field(default=None, ge=0)
 
 
