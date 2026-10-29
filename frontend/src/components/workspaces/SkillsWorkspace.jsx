@@ -22,7 +22,7 @@ export function SkillsWorkspace({ announce }) {
   const load = useCallback(async () => {
     try {
       const [skillPayload, mountPayload, executionPayload] = await Promise.all([api.skills(), api.skillMounts(), api.skillExecutions()]);
-      setSkills(skillPayload.skills || []);
+      setSkills((skillPayload.skills || []).slice().sort((a, b) => Number(Boolean(b.arguments_schema)) - Number(Boolean(a.arguments_schema)) || a.skill_id.localeCompare(b.skill_id)));
       setMounts(mountPayload.mounts || []);
       setExecutions((executionPayload.executions || []).slice().reverse());
     } finally {
@@ -107,7 +107,8 @@ export function SkillsWorkspace({ announce }) {
               <div className="goal-head">
                 <div className="grow">
                   <div className="tool-row-head"><span className={`status-chip status-${active ? "completed" : mount ? "queued" : "pending"}`}>{mount?.state || "REGISTERED"}</span><span className="muted small">{skill.runtime}</span></div>
-                  <h2>{skill.skill_id}</h2>
+                  <h2>{skill.arguments_schema?.title || skill.skill_id}</h2>
+                  {skill.arguments_schema?.title && <p className="muted small mono">{skill.skill_id}</p>}
                   <p>{skill.description}</p>
                 </div>
               </div>
@@ -163,7 +164,7 @@ export function SkillsWorkspace({ announce }) {
                   {skill.arguments_schema ? Object.entries(skill.arguments_schema.properties || {}).map(([name, property]) => {
                     const value = fieldValues[skill.skill_id]?.[name] ?? property.default ?? "";
                     const change = (event) => setFieldValues((old) => ({ ...old, [skill.skill_id]: { ...old[skill.skill_id], [name]: event.target.value } }));
-                    return <label className="field" key={name}><span>{property.title || name}</span>{property.enum ? <select value={value} onChange={change}>{property.enum.map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input type={property.type === "integer" ? "number" : "text"} value={value} onChange={change} min={property.minimum} max={property.maximum} required={skill.arguments_schema.required?.includes(name)} />}</label>;
+                    return <label className="field" key={name}><span>{property.title || name}</span>{property.enum ? <select aria-label={property.title || name} value={value} onChange={change}>{property.enum.map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input aria-label={property.title || name} type={property.type === "integer" ? "number" : "text"} value={value} onChange={change} min={property.minimum} max={property.maximum} required={skill.arguments_schema.required?.includes(name)} />}</label>;
                   }) : <label className="field"><span>Arguments (JSON object)</span><textarea rows={2} value={argumentsText[skill.skill_id] || "{}"} onChange={(event) => setArgumentsText((old) => ({ ...old, [skill.skill_id]: event.target.value }))} /></label>}
                   {skill.execution_policy?.max_pdf_pages && <p className="muted small">Up to {skill.execution_policy.max_pdf_pages} PDF pages, 25 MB, and 300 DPI per invocation. OCR stays on this computer. Larger inputs must be split explicitly.</p>}
                   <button type="button" className="primary-button" disabled={running} onClick={() => execute(skill.skill_id)}>{running ? "Invoking…" : "Invoke skill"}</button>

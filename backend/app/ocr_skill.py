@@ -38,6 +38,7 @@ OCR_EXECUTION_POLICY = {
 }
 OCR_ARGUMENTS_SCHEMA = {
     "type": "object",
+    "title": "Read text from an image or PDF",
     "properties": {
         "path": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": r"\S", "title": "Input file path"},
         "language": {"type": "string", "pattern": r"^[A-Za-z0-9_]+(?:\+[A-Za-z0-9_]+)*$", "maxLength": 80, "default": "eng", "title": "OCR language"},

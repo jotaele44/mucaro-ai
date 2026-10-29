@@ -597,7 +597,7 @@ async function scenario(browser, base, viewport, contextOptions) {
       execFileSync(python, ["-c", "from pathlib import Path; import sys; from scripts.certify_ocr08_structure_live import _make_table; _make_table(Path(sys.argv[1]))", ocrFixture], { cwd: ROOT });
       fixtures.push({ file: path.relative(ROOT, ocrFixture), sha256: createHash("sha256").update(readFileSync(ocrFixture)).digest("hex"), expected_text: "APPLE" });
     }
-    const ocrSkill = page.locator("li.skill-card").filter({ has: page.getByRole("heading", { name: "mucaro/ocr-analyze", exact: true }) });
+    const ocrSkill = page.locator("li.skill-card").filter({ has: page.getByRole("heading", { name: "Read text from an image or PDF", exact: true }) });
     await ocrSkill.waitFor();
     const ocrMount = ocrSkill.getByRole("button", { name: "Mount", exact: true });
     if (await ocrMount.count()) {
