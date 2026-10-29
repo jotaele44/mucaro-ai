@@ -19,6 +19,13 @@ at 1440×900 and 390×844.
 | **Reduced motion.** Animations are disabled when the user asks for reduced motion. | The `prefers-reduced-motion` rule in `styles.css`. |
 | **Colour scheme.** Light and dark themes follow the system preference. | The `prefers-color-scheme` tokens in `styles.css`. |
 | **Phone widths.** Navigation opens off-canvas. Top and bottom safe-area insets are honoured; left and right insets are not yet, which matters in landscape on a notched iPhone (finding M9 in `docs/UX_SETUP_IOS_AUDIT.md`). Sheets open from the bottom. The page never overflows horizontally. | The rendered checks "no horizontal page overflow" and "iphone-12-nav-open". |
+| **Governed GIS.** Explicit capability choices authorize local vector tasks. Labeled controls reveal reference/CRS fields when relevant. Results show counts, CRS, readable warnings, optional diagnostic codes, and one-click JSON saving. | The 199-check receipt at `7c5df71c9231` inspects the frozen USGS layer at both widths, preserves its Z/planar-topology warning, and verifies downloaded source identity. Fourteen axe scans detect zero violations. The narrow result screen was visually inspected after wording corrections; other operations have separate real-engine tests. |
+
+Rendered receipts from `7c5df71c9231` onward build the frontend before testing,
+record input/asset hashes, compare served and built page bytes, and check
+source/asset stability at the end. A source commit alone does not establish
+which frontend bytes were rendered. Reuse earlier receipts only within their
+recorded scope and build evidence.
 
 ## Not yet verified
 
