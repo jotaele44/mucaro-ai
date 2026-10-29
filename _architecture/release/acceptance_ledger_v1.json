@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-28T19:42:42Z",
+  "updated_utc": "2026-10-29T13:02:25Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -49,18 +49,20 @@
         "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
         "_architecture/release/evidence/rendered_qa_ae8e92945bc7.json",
         "_architecture/release/evidence/rendered_qa_77fe7eb2a3de.json",
-    "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
-    "_architecture/release/evidence/rendered_qa_f1b353b9b039.json",
+        "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
+        "_architecture/release/evidence/rendered_qa_f1b353b9b039.json",
         "backend/tests/test_api.py::test_api_tasks_expose_durable_dependency_dag",
-    "backend/tests/test_agent_tasks.py::test_task_dag_persists_and_computes_readiness",
-    "_architecture/release/evidence/rendered_qa_b0c9c955a10f.json",
-    "backend/tests/test_api.py::test_api_skill_deactivation_requires_auth_persists_and_preserves_receipts",
-    "backend/tests/test_skill_operator.py::test_skill_cli_deactivation_revokes_and_can_be_explicitly_reauthorized"
+        "backend/tests/test_agent_tasks.py::test_task_dag_persists_and_computes_readiness",
+        "_architecture/release/evidence/rendered_qa_b0c9c955a10f.json",
+        "backend/tests/test_api.py::test_api_skill_deactivation_requires_auth_persists_and_preserves_receipts",
+        "backend/tests/test_skill_operator.py::test_skill_cli_deactivation_revokes_and_can_be_explicitly_reauthorized",
+        "_architecture/release/evidence/rendered_qa_69db9b384074.json",
+        "backend/tests/test_ocr_skill.py::test_ocr_skill_api_and_cli_use_the_shared_extraction"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-  "notes": "Ask/plan/execute/stream/inspect/refine flows render. Goals, durable task dependencies, the governed skill lifecycle, and governed read-only coding inspection are exposed through the GUI and API. Skill deactivation now persists revocation, retains receipts, and requires fresh authorization; the shared runtime serves GUI, CLI, API, and queued skill.execute tools. The 175-check Chromium receipt exercises deactivation/reload/reactivation and rapid-click protection at desktop and emulated iPhone widths. Native WKWebView/macOS, physical-device, hosted/provider, and broader GIS/coding execution evidence remain open."
+      "notes": "Ask/plan/execute/stream/inspect/refine flows render. Goals, durable task dependencies, the governed skill lifecycle, and governed read-only coding inspection are exposed through the GUI and API. OCR now runs through the same skill runtime in GUI, CLI, API, and approved conversations, with labeled settings, extracted text, source lineage, persistent drafts, and safe list-reload recovery. The 189-check Chromium receipt at 69db9b384074 exercises real local OCR, conversation approval, deactivation/reload/reactivation, and rapid-click protection at desktop and emulated iPhone widths. Native WKWebView/macOS, physical-device, hosted/provider, and broader GIS/coding execution evidence remain open."
     },
     {
       "requirement_id": "GOAL-003",
@@ -1019,7 +1021,7 @@
         "backend/tests/test_work_runs.py::test_api_message_stream_replays_and_ends",
         "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
         "_architecture/release/evidence/rendered_qa_ae8e92945bc7.json",
-    "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
+        "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
     "_architecture/release/evidence/rendered_qa_f1b353b9b039.json",
         "backend/tests/test_api.py::test_api_tasks_expose_durable_dependency_dag"
       ],
@@ -1088,7 +1090,10 @@
         "backend/app/ocr_pdf.py",
         "backend/app/ocr_structure.py",
         "scripts/certify_ocr08_structure_live.py",
-        "_architecture/ocr08_structure_benchmark_v1.json"
+        "_architecture/ocr08_structure_benchmark_v1.json",
+        "backend/app/ocr_skill.py",
+        "backend/app/skill_runtime.py",
+        "frontend/src/components/workspaces/SkillsWorkspace.jsx"
       ],
       "dependencies": [],
       "positive_gate": "backend/tests/test_ocr08_structure_live_cert.py::test_ocr08_fixture_generator_resolves_a_supported_deterministic_font",
@@ -1098,12 +1103,14 @@
         "_architecture/ocr08_structure_benchmark_v1.json",
         "scripts/certify_ocr08_structure_live.py",
         "backend/tests/test_ocr08_structure_live_cert.py",
-        "backend/tests/test_ocr_structure.py::test_duplicate_form_label_is_unresolved"
+        "backend/tests/test_ocr_structure.py::test_duplicate_form_label_is_unresolved",
+        "backend/tests/test_ocr_skill.py",
+        "_architecture/release/evidence/rendered_qa_69db9b384074.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N08",
-      "notes": "Bounded printed multi-column, rectangular-table, and colon-form reconstruction now passes a six-case live-Tesseract gate with exact span accounting and negative fail-closed cases. Broader real-document breadth, handwriting/difficult scans, merged or rotated layouts, and semantic document intelligence remain open; PDF OCR fallback remains explicitly opt-in."
+      "notes": "Bounded printed multi-column, rectangular-table, and colon-form reconstruction passes a six-case live-Tesseract gate with exact span accounting and negative fail-closed cases. The governed mucaro/ocr-analyze skill connects bounded image/PDF extraction to GUI, CLI, API, and approved conversations, preserving frozen source bytes and report/execution parents. Tests cover grants, symlink escape, stale bytes, pixel/page limits, schema/policy drift, concurrent artifact writes, and untrusted extracted instructions. The 189-check Chromium receipt proves representative real local image OCR and recovery at desktop and emulated iPhone widths. Broader real-document breadth, handwriting/difficult scans, merged or rotated layouts, and semantic document intelligence remain open; ingestion PDF OCR fallback remains explicitly opt-in."
     },
     {
       "requirement_id": "TGT-006",
@@ -1323,12 +1330,14 @@
         "backend/tests/test_work_runs.py::test_tool_feed_events_bind_to_the_hash_chained_audit_ledger",
         "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering",
         "backend/tests/test_agent_tool_proposals.py::test_anthropic_tool_use_is_normalized_with_provenance",
-        "backend/tests/test_skill_operator.py::test_previously_approved_tool_invocation_cannot_reuse_a_revoked_skill_grant"
+        "backend/tests/test_skill_operator.py::test_previously_approved_tool_invocation_cannot_reuse_a_revoked_skill_grant",
+        "backend/tests/test_ocr_skill.py::test_chat_ocr_requires_approval_and_extracted_instructions_cannot_authorize_actions",
+        "backend/tests/test_ocr_skill.py::test_provider_cannot_propose_ocr_engine_overrides"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "Tool calls, provider-native proposals, approvals, starts, results, retries, and failures use the same allowlist/approval/audit runtime. Previously approved skill.execute calls recheck persisted activation at admission and cannot reuse revoked grants. Run-feed views carry bounded audit chain status, latest event ID, and latest event SHA-256. Broader governance-node and hosted evidence remain open."
+      "notes": "Tool calls, provider-native proposals, approvals, starts, results, retries, and failures use the same allowlist/approval/audit runtime. Previously approved skill.execute calls recheck persisted activation at admission and cannot reuse revoked grants. OCR proposals validate the registered argument schema before approval; extracted document instructions remain untrusted evidence and cannot authorize other tools. Run-feed views carry bounded audit chain status, latest event ID, and latest event SHA-256. Broader governance-node and hosted evidence remain open."
     },
     {
       "requirement_id": "TGT-015",
@@ -1349,12 +1358,14 @@
       "evidence_refs": [
         "backend/tests/test_artifact_identity.py::test_source_to_export_lineage_closes_with_stable_byte_identity",
         "backend/tests/test_exports.py::test_export_answer_trace",
-        "backend/tests/test_ingestion.py::test_ingest_file_tmp"
+        "backend/tests/test_ingestion.py::test_ingest_file_tmp",
+        "backend/tests/test_ocr_skill.py::test_ocr_skill_freezes_bytes_and_links_extraction_to_execution",
+        "backend/tests/test_ocr_skill.py::test_parallel_ocr_runs_retain_every_source_and_result_parent"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N04",
-      "notes": "Artifact lineage now covers ingested source manifestations, derived answer traces, and physical exports with validated source roots and direct parent byte hashes. Legacy/source-less traces remain explicitly partial rather than receiving fabricated parents."
+      "notes": "Artifact lineage covers ingested source manifestations, derived answer traces, physical exports, and governed OCR source/report/execution chains with validated source roots and direct parent byte hashes. Artifact creation serializes the complete store read-modify-write; four parallel OCR executions conserve every parent and result. Frozen source and page/report hashes are checked before returning OCR output. Legacy/source-less traces remain explicitly partial rather than receiving fabricated parents."
     },
     {
       "requirement_id": "TGT-016",
@@ -1384,16 +1395,19 @@
     "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
         "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
         "backend/tests/test_work_runs.py::test_run_manifest_contract_tracks_approval_and_interruption_states",
-    "backend/tests/test_contracts.py::test_contract_violations_are_rejected",
-    "backend/tests/test_skill_runtime.py::test_deactivation_revokes_persisted_grant_preserves_receipts_and_requires_reactivation",
-    "backend/tests/test_skill_runtime.py::test_deactivation_does_not_erase_or_relabel_already_admitted_execution",
-    "backend/tests/test_skill_runtime.py::test_concurrent_skill_mounts_and_lifecycle_updates_conserve_rows",
-    "_architecture/release/evidence/rendered_qa_b0c9c955a10f.json"
+        "backend/tests/test_contracts.py::test_contract_violations_are_rejected",
+        "backend/tests/test_skill_runtime.py::test_deactivation_revokes_persisted_grant_preserves_receipts_and_requires_reactivation",
+        "backend/tests/test_skill_runtime.py::test_deactivation_does_not_erase_or_relabel_already_admitted_execution",
+        "backend/tests/test_skill_runtime.py::test_concurrent_skill_mounts_and_lifecycle_updates_conserve_rows",
+        "_architecture/release/evidence/rendered_qa_b0c9c955a10f.json",
+        "backend/tests/test_ocr_skill.py::test_ocr_policy_and_schema_drift_invalidate_activation",
+        "backend/tests/test_ocr_skill.py::test_ocr_schema_rejects_inputs_before_engine_or_artifact_creation",
+        "_architecture/release/evidence/rendered_qa_69db9b384074.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N03",
-  "notes": "PROVISIONAL: runtime enforcement covers checkpoints, artifacts, skill execution, work-run persistence, and governed coding-tool requests. Skill lifecycle updates and admission share the store lock; revocation prevents future admissions while prior admitted work retains its activation sequence and receipt. Tests cover persistence, obsolete/duplicate mounts, reauthorization, concurrent updates, and stale tool approval. Broader cross-surface release certification and remaining architecture residue are still open."
+      "notes": "PROVISIONAL: runtime enforcement covers checkpoints, artifacts, skill execution, work-run persistence, and governed coding-tool requests. Skill lifecycle updates and admission share the store lock; revocation prevents future admissions while prior admitted work retains its activation sequence and receipt. Registered task schemas and execution policy participate in skill identity, so semantic changes invalidate activation. OCR validates arguments before admission and links its report to the shared artifact contract. Tests cover persistence, obsolete/duplicate mounts, reauthorization, concurrent updates, and stale tool approval. Broader cross-surface release certification and remaining architecture residue are still open."
     },
     {
       "requirement_id": "TGT-017",
@@ -1900,11 +1914,15 @@
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
+      "evidence_refs": [
+        "backend/tests/test_ocr_skill.py::test_ocr_skill_api_and_cli_use_the_shared_extraction",
+        "backend/tests/test_ocr_skill.py::test_chat_ocr_requires_approval_and_extracted_instructions_cannot_authorize_actions",
+        "_architecture/release/evidence/rendered_qa_69db9b384074.json"
+      ],
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N03",
-      "notes": "GIS/OCR/coding extras are CLI-only, outside the governed tool registry."
+      "notes": "Governed read-only coding tools and the OCR task skill now reach the shared runtime, with GUI/API/CLI and conversation entry points. OCR reuses the existing extraction engines, schema enforcement, capability grants, approvals, and artifact lineage. GIS and other advanced extras still need equivalent governed task integration; broader architecture closure remains OPEN."
     },
     {
       "requirement_id": "MATRIX-001",
@@ -2247,16 +2265,17 @@
       "negative_gate": null,
       "benchmark": null,
       "evidence_refs": [
-    "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
-    "_architecture/release/evidence/rendered_qa_0c3ae85de5ef.json",
-    "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
-    "_architecture/release/evidence/rendered_qa_f1b353b9b039.json",
-    "_architecture/release/evidence/rendered_qa_b0c9c955a10f.json"
+        "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
+        "_architecture/release/evidence/rendered_qa_0c3ae85de5ef.json",
+        "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
+        "_architecture/release/evidence/rendered_qa_f1b353b9b039.json",
+        "_architecture/release/evidence/rendered_qa_b0c9c955a10f.json",
+        "_architecture/release/evidence/rendered_qa_69db9b384074.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N18",
-  "notes": "175 rendered checks pass at desktop 1440x900 and emulated iPhone 13 390x844 in Chromium. Coverage includes navigation, feed, settings, provenance, sources, OCR, GIS capability evidence, governed Code inspections, task dependencies, and the skill lifecycle including deactivation/reload/reactivation, preserved receipts, and one invocation under rapid double-click. Token-gate, error/loading/empty/offline-service, keyboard, touch-target, and no-overflow checks pass. The Skills screen was visually inspected at narrow width. Native WKWebView/macOS, tablet, physical-device, and the complete design/accessibility review remain open."
+      "notes": "189 rendered checks pass at desktop 1440x900 and emulated iPhone 13 390x844 in Chromium at clean source 69db9b384074. Coverage includes navigation, feed, settings, provenance, sources, real local OCR with labeled fields and extracted text, conversation approval, saved OCR drafts, recoverable list failure without replaying execution, GIS capability evidence, governed Code inspections, task dependencies, and skill deactivation/reload/reactivation with rapid-click protection. Twelve axe scans report zero detected violations. Token-gate, keyboard, touch-target, and no-overflow checks pass. The governed OCR screen was visually inspected at narrow width. Native WKWebView/macOS, tablet, physical-device, and the complete design/accessibility review remain open."
     },
     {
       "requirement_id": "MATRIX-016",
