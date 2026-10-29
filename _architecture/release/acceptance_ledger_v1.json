@@ -36,8 +36,10 @@
         "frontend/src/App.jsx",
         "frontend/src/components/workspaces/GoalWorkspace.jsx",
         "frontend/src/components/workspaces/TasksWorkspace.jsx",
+        "frontend/src/components/workspaces/SkillsWorkspace.jsx",
         "backend/app/goals.py",
-        "backend/app/agent_tasks.py"
+        "backend/app/agent_tasks.py",
+        "backend/app/skill_runtime.py"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -46,13 +48,14 @@
       "evidence_refs": [
         "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
         "_architecture/release/evidence/rendered_qa_ae8e92945bc7.json",
+        "_architecture/release/evidence/rendered_qa_77fe7eb2a3de.json",
         "backend/tests/test_api.py::test_api_tasks_expose_durable_dependency_dag",
         "backend/tests/test_agent_tasks.py::test_task_dag_persists_and_computes_readiness"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "Ask/plan/execute/stream/inspect/refine flows render. Goals and durable task dependencies are now exposed through the GUI and API: the rendered exact-head receipt creates a prerequisite, creates a dependent task with a labeled one-click picker, rejects early start, and permits start after the prerequisite reaches DONE. Native WKWebView/macOS, physical-device, and broader GIS/coding execution evidence remain open."
+      "notes": "Ask/plan/execute/stream/inspect/refine flows render. Goals, durable task dependencies, and the governed skill lifecycle are exposed through the GUI and API: exact-head rendered receipts create and sequence dependent tasks, then mount, activate, invoke, and inspect a skill receipt. Native WKWebView/macOS, physical-device, hosted/provider, and broader GIS/coding execution evidence remain open."
     },
     {
       "requirement_id": "GOAL-003",
@@ -1358,6 +1361,7 @@
         "backend/tests/test_agent_checkpoints.py::test_checkpoint_contract_validation_is_shared_and_fails_closed_on_tamper",
         "backend/tests/test_artifact_identity.py::test_tampered_artifact_store_is_rejected_by_the_shared_contract",
         "backend/tests/test_skill_runtime.py::test_skill_must_mount_then_activate_before_execution",
+        "_architecture/release/evidence/rendered_qa_77fe7eb2a3de.json",
         "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
         "backend/tests/test_work_runs.py::test_run_manifest_contract_tracks_approval_and_interruption_states",
         "backend/tests/test_contracts.py::test_contract_violations_are_rejected"
