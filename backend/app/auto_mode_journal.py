@@ -1,7 +1,7 @@
 """Offline append-only transaction journal with hash-chain integrity.
 
 The journal records state transitions only. It never performs or undoes side effects.
-Caller must serialize writers externally; concurrent writers are not supported.
+Writers cooperate through a POSIX advisory lock; this is not a full rollback engine.
 """
 from __future__ import annotations
 import hashlib
@@ -16,6 +16,13 @@ from backend.app.auto_mode_scheduler import AutoModeError
 from backend.app.auto_mode_transaction import Transaction, transition
 
 MAX_BYTES = 2_000_000
+
+def _token_ref(token: str, key: bytes) -> str:
+    if not isinstance(key, bytes) or len(key) < 32:
+        raise AutoModeError('JOURNAL_KEY_REQUIRED')
+    if not isinstance(token, str):
+        raise AutoModeError('INVALID_AUTHORIZATION_TOKEN')
+    return hmac.new(key, token.encode('utf-8'), hashlib.sha256).hexdigest() if token else ''
 
 def _canonical(value: object) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("ascii")
@@ -55,7 +62,8 @@ def _read(path: Path) -> list[dict]:
     except (ValueError, TypeError, UnicodeError, OverflowError, RecursionError) as exc:
         raise AutoModeError("INVALID_JOURNAL") from exc
 
-def replay(path: Path, transaction_id: str) -> Transaction:
+def replay(path: Path, transaction_id: str, *, key: bytes) -> Transaction:
+    _token_ref('', key)
     if not isinstance(transaction_id, str) or not transaction_id.strip():
         raise AutoModeError("INVALID_TRANSACTION")
     current = Transaction(transaction_id)
@@ -82,19 +90,20 @@ def _exclusive_journal_lock(path: Path):
         fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
 
-def append_transition(path: Path, transaction_id: str, target: str, *, token: str = "", operation_id: str = "") -> Transaction:
+def append_transition(path: Path, transaction_id: str, target: str, *, token: str = "", operation_id: str = "", key: bytes) -> Transaction:
+    token_reference = _token_ref(token, key)
     path = Path(path)
     if path.is_symlink() or not path.parent.is_dir():
         raise AutoModeError("INVALID_JOURNAL_PATH")
     with _exclusive_journal_lock(path):
         records = _read(path)
-        current = replay(path, transaction_id)
-        updated = transition(current, target, token=token, operation_id=operation_id)
+        current = replay(path, transaction_id, key=key)
+        updated = transition(current, target, token=token_reference, operation_id=operation_id)
         if updated == current:
             return current
         payload = {
             "seq": len(records), "prev": records[-1]["hash"] if records else "0" * 64,
-            "tx": transaction_id, "target": target, "token": token, "operation_id": operation_id,
+            "tx": transaction_id, "target": target, "token": token_reference, "operation_id": operation_id,
         }
         record = dict(payload, hash=_digest(payload))
         encoded = _canonical(record) + b"\n"
