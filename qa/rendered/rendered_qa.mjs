@@ -552,7 +552,13 @@ async function scenario(browser, base, viewport, contextOptions) {
     const activateButton = healthSkill.getByRole("button", { name: "Authorize & activate", exact: true });
     if (await activateButton.count()) await activateButton.click();
     await healthSkill.getByText("ACTIVE", { exact: true }).waitFor();
+    const precedingReceipt = await healthSkill.locator("summary").count() ? await healthSkill.locator("summary").innerText() : null;
     await healthSkill.getByRole("button", { name: "Invoke skill", exact: true }).click();
+    await page.waitForFunction((previous) => {
+      const card = [...document.querySelectorAll("li.skill-card")].find((node) => node.textContent.includes("mucaro/intelligence-plane-health"));
+      const summary = card?.querySelector("summary");
+      return summary && summary.textContent !== previous && [...card.querySelectorAll("button")].some((node) => node.textContent === "Invoke skill" && !node.disabled);
+    }, precedingReceipt);
     await healthSkill.getByText(/Latest receipt:/).click();
     await healthSkill.getByText(/INTELLIGENCE_PLANE_HEALTH_OK/).waitFor();
     check("Skills workspace opens an authorized skill, invokes it, and displays its receipt", viewport, (await healthSkill.getByText(/INTELLIGENCE_PLANE_HEALTH_OK/).count()) === 1);
