@@ -1199,6 +1199,13 @@ backend. The rendered harness starts a real development server and probes the
 API groups derived from the backend OpenAPI document, preventing silent HTML
 fallback for newly added services.
 
+The complete rendered gate now covers desktop 1440×900, touch tablet 820×1180,
+and narrow mobile 390×844. Use `node qa/rendered/rendered_qa.mjs --viewports tablet`
+for a source/build-bound tablet replay after an unchanged desktop/mobile run.
+Scoped replay always emits `RENDERED_QA_PARTIAL`; retain its viewport selection
+and combine evidence only after checking application-source and asset identity.
+Emulation does not prove physical-device or native desktop behavior.
+
 ### Governed OCR skill
 
 `mucaro/ocr-analyze` uses the same local image/PDF engines as `mucaro ocr

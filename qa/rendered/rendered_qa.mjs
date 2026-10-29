@@ -1,6 +1,6 @@
 // Rendered UI QA (MATRIX-015, MOB F01-F20): drives the real built UI against a real local
 // backend at desktop and iPhone widths, saves screenshots, runs axe, and writes a receipt.
-// Usage: node rendered_qa.mjs [--python PATH] [--out DIR] [--browser chromium|webkit] [--only-new] [--scenarios a,b]
+// Usage: node rendered_qa.mjs [--python PATH] [--out DIR] [--browser chromium|webkit] [--only-new] [--scenarios a,b] [--viewports desktop,tablet,iphone]
 // --only-new runs just the resilience, streams, gate, lan, clipboard and share scenarios; --scenarios picks some of them
 // (development aids: their receipts are marked partial).
 import AxeBuilder from "@axe-core/playwright";
@@ -20,7 +20,11 @@ const args = process.argv.slice(2);
 const argValue = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
 const scenarioFilter = argValue("--scenarios", "").split(",").filter(Boolean); // resilience,streams,gate,lan,clipboard,share
 const onlyNew = args.includes("--only-new") || scenarioFilter.length > 0;
-const wantScenario = (name) => scenarioFilter.length === 0 || scenarioFilter.includes(name);
+const viewportsOnly = args.includes("--viewports");
+const selectedViewports = argValue("--viewports", "desktop,tablet,iphone").split(",").filter(Boolean);
+if (!selectedViewports.length || selectedViewports.some((name) => !["desktop", "tablet", "iphone"].includes(name)) || new Set(selectedViewports).size !== selectedViewports.length) throw new Error("Choose distinct supported viewports: desktop,tablet,iphone");
+if (viewportsOnly && onlyNew) throw new Error("Use either viewport-only replay or scenario-only replay, not both.");
+const wantScenario = (name) => !viewportsOnly && (scenarioFilter.length === 0 || scenarioFilter.includes(name));
 const browserName = argValue("--browser", "chromium");
 if (!["chromium", "webkit"].includes(browserName)) throw new Error(`Unsupported browser: ${browserName}`);
 const browserType = browserName === "webkit" ? webkit : chromium;
@@ -154,6 +158,7 @@ async function axe(page, viewport, name) {
 }
 
 async function scenario(browser, base, viewport, contextOptions) {
+  const touchViewport = Boolean(contextOptions.hasTouch);
   const context = await browser.newContext({ ...contextOptions, baseURL: base });
   const page = await context.newPage();
   const consoleErrors = [];
@@ -246,7 +251,7 @@ async function scenario(browser, base, viewport, contextOptions) {
       };
     }),
   );
-  const minSide = viewport === "iphone" ? 44 : 24;
+  const minSide = touchViewport ? 44 : 24;
   check(
     "message actions are icons with a name and a tooltip",
     viewport,
@@ -476,20 +481,21 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.keyboard.press("Escape");
 
   // Workspaces (TGT-003, TGT-032, TGT-033).
+  const compactNavigation = await page.getByRole("button", { name: "Open navigation", exact: true }).isVisible();
   const openNav = async () => {
-    if (viewport === "iphone") await page.getByRole("button", { name: "Open navigation" }).click();
+    if (compactNavigation) await page.getByRole("button", { name: "Open navigation" }).click();
   };
   // The phone drawer slides out after a choice; wait for it to leave the screen before any
   // screenshot, and fail if it stays over the workspace.
   const drawerClosed = async () => {
-    if (viewport !== "iphone") return true;
+    if (!compactNavigation) return true;
     return page
       .waitForFunction(() => document.querySelector(".sidebar").getBoundingClientRect().right <= 0, null, { timeout: 5000 })
       .then(() => true, () => false);
   };
   const drawerStates = [];
   await openNav();
-  if (viewport === "iphone") await shot(page, viewport, "12-nav-open");
+  if (compactNavigation) await shot(page, viewport, "12-nav-open");
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources", exact: true }).click();
   await page.getByRole("heading", { name: "Sources" }).waitFor();
   await page.locator(".source-row").nth(1).waitFor();
@@ -588,7 +594,7 @@ async function scenario(browser, base, viewport, contextOptions) {
       (await healthSkill.getByRole("button", { name: "Invoke skill", exact: true }).count()) === 0 &&
       (await healthSkill.locator("summary").innerText()) === oldReceipt);
     await page.reload();
-    if (viewport === "iphone") await page.getByRole("button", { name: "Open navigation", exact: true }).waitFor();
+    if (compactNavigation) await page.getByRole("button", { name: "Open navigation", exact: true }).waitFor();
     else await page.getByRole("navigation", { name: "Primary" }).waitFor();
     await openNav();
     await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Skills", exact: true }).click();
@@ -748,8 +754,8 @@ async function scenario(browser, base, viewport, contextOptions) {
     expectedConsoleErrors.delete("Failed to load resource: the server responded with a status of 503 (Service Unavailable)");
   }
 
-  if (viewport === "iphone") {
-    check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
+  if (touchViewport) {
+    if (compactNavigation) check("navigation drawer closes after choosing a workspace", viewport, drawerStates.length === 4 && drawerStates.every(Boolean), JSON.stringify(drawerStates));
     // iOS zooms into fields under 16px on focus; touch targets need 44px (Apple HIG).
     const touch = await page.evaluate(() => {
       const visible = (el) => {
@@ -1763,13 +1769,14 @@ try {
   const browser = await browserType.launch();
   browserVersion = browser.version();
   if (!onlyNew) {
-    axeResults.push(...(await scenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } })));
-    const iphone = devices["iPhone 13"];
-    axeResults.push(...(await scenario(browser, base, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
-    await specializedWorkspaceScenario(browser, base);
-    await launchTokenScenario(browser, "desktop");
-    const headers = (await fetch(`${base}/`)).headers;
-    check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
+    const profiles = { desktop: { viewport: { width: 1440, height: 900 } }, tablet: { viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, iphone: { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } } };
+    for (const viewport of selectedViewports) axeResults.push(...(await scenario(browser, base, viewport, profiles[viewport])));
+    if (!viewportsOnly) {
+      await specializedWorkspaceScenario(browser, base);
+      await launchTokenScenario(browser, "desktop");
+      const headers = (await fetch(`${base}/`)).headers;
+      check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
+    }
   }
   if (wantScenario("resilience")) await resilienceScenario(browser, base);
   if (wantScenario("streams")) await streamScenario(browser, base, port);
@@ -1781,14 +1788,14 @@ try {
   }
   if (wantScenario("clipboard")) await clipboardScenario(browser, base);
   if (wantScenario("share")) await shareScenario(browser, base);
-  if (!onlyNew) {
+  if (!onlyNew && !viewportsOnly) {
     await offlineScenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } }, async () => {
       backend.kill("SIGTERM");
       await new Promise((r) => setTimeout(r, 800));
     });
   }
   await browser.close();
-  status = checks.every((row) => row.pass) ? (onlyNew ? "RENDERED_QA_PARTIAL" : "RENDERED_QA_PASS") : "RENDERED_QA_FAIL";
+  status = checks.every((row) => row.pass) ? (onlyNew || viewportsOnly ? "RENDERED_QA_PARTIAL" : "RENDERED_QA_PASS") : "RENDERED_QA_FAIL";
 } catch (err) {
   check("harness completed", "all", false, err.stack || String(err));
 } finally {
@@ -1808,7 +1815,8 @@ const receipt = {
   dirty_paths: dirtyPaths,
   created_utc: new Date().toISOString(),
   browser: `${browserName} ${browserVersion}`,
-  viewports: { desktop: "1440x900", iphone: "390x844 (iPhone 13 profile, touch, DPR 3)" },
+  viewports: { desktop: "1440x900", tablet: "820x1180 (touch emulation, DPR 2)", iphone: "390x844 (iPhone 13 profile, touch, DPR 3)" },
+  viewport_selection: onlyNew ? [] : selectedViewports,
   checks,
   passed: checks.filter((row) => row.pass).length,
   failed: checks.filter((row) => !row.pass).length,
@@ -1819,9 +1827,11 @@ const receipt = {
   limitations: [
     `Rendered in Playwright ${browserName}; this does not execute the packaged WKWebView window.`,
     "iPhone width is emulated on a desktop browser engine, not rendered by iOS Safari on a phone.",
+    "Tablet layout uses desktop-browser touch emulation, not a physical tablet or its software keyboard.",
     "Phone access is exercised through a non-loopback address of this machine, not from a physical phone on a real network.",
     ...skippedNotes,
-    ...(onlyNew ? ["Development run (--only-new): the base desktop and iPhone scenarios did not run, so this is not a complete receipt."] : []),
+    ...(onlyNew ? ["Development run (--only-new): the core viewport scenarios did not run, so this is not a complete receipt."] : []),
+    ...(viewportsOnly ? [`Scoped viewport replay (${selectedViewports.join(",")}): ancillary resilience, network, sharing, launch, and specialized-workspace scenarios did not run; this is not a complete receipt.`] : []),
   ],
 };
 writeFileSync(path.join(outDir, "receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`);
