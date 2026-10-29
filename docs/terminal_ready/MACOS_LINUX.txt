@@ -1,0 +1,40 @@
+MÚCARO AI — macOS / Linux terminal-ready commands
+=================================================
+
+RECOMMENDED ONE-CLICK SMOKE
+./"Mucaro AI.command" --smoke-test --no-browser
+
+EXPECTED MARKERS
+ONE_CLICK_SETUP_OK
+DESKTOP_SMOKE_OK
+DESKTOP_BACKEND_PORT_CLOSED
+
+MANUAL DEVELOPER SETUP
+bash scripts/bootstrap_macos.sh
+source .venv/bin/activate
+python scripts/preflight.py --strict-imports
+python scripts/mucaro.py doctor
+python scripts/launch_app.py
+
+MANUAL INSTALL WITHOUT BOOTSTRAP
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+(cd frontend && npm ci)
+python scripts/release_check.py
+python scripts/launch_app.py
+
+CERTIFY
+python scripts/certify_release.py
+python scripts/certify_security_gates.py
+python scripts/mucaro.py certify status --format text
+python scripts/mucaro.py release receipts --current-head --format text
+
+IDENTITY / HASH
+git rev-parse HEAD
+git status --short
+shasum -a 256 TERMINAL_READY.txt
+
+FAIL CLOSED
+Any unexpected tracked change, non-zero exit, missing PASS marker, security/audit finding, current-HEAD mismatch, or artifact hash mismatch blocks promotion.

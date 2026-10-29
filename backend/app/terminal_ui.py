@@ -18,6 +18,7 @@ from .autopilot_planner import (
     plan_autopilot_from_model,
     replan_autopilot_from_model,
 )
+from .autopilot_planner import AutopilotPlannerError, generate_autopilot_plan, replan_autopilot
 from .config import Settings, settings
 from .conversations import create_conversation, get_conversation
 from .permission_leases import (
@@ -488,6 +489,28 @@ class TerminalController:
                     context=context,
                     provider=self.cfg.default_model_provider,
                     model=self.cfg.default_model_name,
+            snapshot = self.snapshot()
+            repository_status = snapshot.get("repository_status")
+            repository_result = repository_status.get("result") if isinstance(repository_status, dict) else None
+            head_sha = repository_result.get("head_sha") if isinstance(repository_result, dict) else None
+            if (
+                not isinstance(head_sha, str)
+                or len(head_sha) != 40
+                or any(char not in "0123456789abcdef" for char in head_sha)
+            ):
+                raise TerminalUIError(
+                    "ERROR_TUI_AUTOPILOT_SOURCE_UNBOUND",
+                    "Autopilot planning requires an exact governed coding.repo_status HEAD receipt before model planning.",
+                )
+            try:
+                planned = generate_autopilot_plan(
+                    session_id=conversation_id,
+                    run_id=f"tui:{conversation_id}:autopilot",
+                    objective=stripped,
+                    source_sha=head_sha,
+                    budgets={"max_replans": 2},
+                    provider=getattr(self.cfg, "default_model_provider", None),
+                    model=getattr(self.cfg, "default_model_name", None),
                     cfg=self.cfg,
                 )
             except AutopilotPlannerError as exc:
@@ -495,6 +518,7 @@ class TerminalController:
             checkpoint = planned["checkpoint"]
             self.view = "current"
             self.notice = f"Plan Ready for Review: {checkpoint['checkpoint_id']} • authorize explicitly to execute"
+            self.notice = f"Plan ready: {checkpoint['checkpoint_id']} (authorization required)"
             return
         conversation_id = self.ensure_conversation()
         run_mode = MODE_MAP[self.mode]
@@ -581,6 +605,7 @@ class TerminalController:
             "arguments_sha256": None,
         }
         for option in option_tokens:
+        for option in tokens:
             if option == "network":
                 options["allow_network"] = True
             elif option == "mutating":
@@ -804,6 +829,8 @@ class TerminalController:
                 self.notice = "No active run to stop."
             return
         if name == "autopilot" and len(args) == 2 and args[0] in {"authorize", "run", "replan"}:
+        if name == "autopilot" and len(args) >= 2:
+            action = args[0]
             checkpoint_id = args[1]
             try:
                 checkpoint = get_checkpoint(checkpoint_id, self.cfg)
@@ -812,7 +839,7 @@ class TerminalController:
             if checkpoint is None:
                 raise TerminalUIError("ERROR_CHECKPOINT_NOT_FOUND", checkpoint_id)
             try:
-                if args[0] == "authorize":
+                if action == "authorize" and len(args) == 2:
                     result = authorize_autopilot(
                         checkpoint_id,
                         approved_by="terminal",
@@ -833,6 +860,25 @@ class TerminalController:
                         model=self.cfg.default_model_name,
                         cfg=self.cfg,
                     )
+                elif action == "run" and len(args) == 2:
+                    result = run_autopilot(checkpoint_id, cfg=self.cfg)
+                elif action == "replan" and len(args) == 3:
+                    try:
+                        trigger = json.loads(args[2])
+                    except json.JSONDecodeError as exc:
+                        raise TerminalUIError("ERROR_TUI_AUTOPILOT_REPLAN_JSON", str(exc)) from exc
+                    result = replan_autopilot(
+                        checkpoint_id,
+                        trigger=trigger,
+                        provider=getattr(self.cfg, "default_model_provider", None),
+                        model=getattr(self.cfg, "default_model_name", None),
+                        cfg=self.cfg,
+                    )
+                else:
+                    raise TerminalUIError(
+                        "ERROR_TUI_AUTOPILOT_COMMAND",
+                        "Use :autopilot authorize CHECKPOINT, :autopilot run CHECKPOINT, or :autopilot replan CHECKPOINT JSON_TRIGGER.",
+                    )
             except (AutopilotError, AutopilotPlannerError, CheckpointError) as exc:
                 raise TerminalUIError(exc.status, exc.detail) from exc
             if args[0] == "replan":
@@ -848,6 +894,7 @@ class TerminalController:
                 ":allow-run • :allow-tool TOOL [network] [mutating] [uses=N] [ttl=N] • "
                 ":approve [lease] • :deny • "
                 ":answer OPTION • :answer-text TEXT • :autopilot authorize|run|replan ID • :stop"
+                ":answer OPTION • :answer-text TEXT • :autopilot authorize|run CHECKPOINT • :autopilot replan CHECKPOINT JSON • :stop"
             )
             return
         raise TerminalUIError("ERROR_TUI_COMMAND", f"Unknown or invalid command: {command}")
@@ -919,6 +966,8 @@ class _WindowsInput(AbstractContextManager["_WindowsInput"]):
                 kernel32.SetConsoleMode(handle, mode.value | 0x0004)
         except (AttributeError, OSError, TypeError, ValueError):
             pass
+        except Exception:
+            return
 
     def read_key(self, timeout: float) -> str | None:
         import msvcrt

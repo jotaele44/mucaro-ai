@@ -34,5 +34,412 @@
     {"id":"VCP-025","implementation_state":"IMPLEMENTED","certification_state":"OPEN","evidence":["backend/app/model_routing_policy.py","backend/app/work_runs.py","backend/app/context_usage.py","backend/app/terminal_projection.py","backend/app/terminal_ui.py","backend/tests/test_terminal_ui.py"],"gap":"Terminal status bar binds active/configured model, execution mode, run/agent state, context status and governed repository branch/HEAD receipts; exact-head rendered runtime certification remains open."},
     {"id":"VCP-026","implementation_state":"IMPLEMENTED","certification_state":"OPEN","evidence":["backend/app/context_usage.py","schemas/context_usage.schema.json","backend/app/model_router.py","backend/app/services.py","backend/app/work_runs.py","backend/app/terminal_projection.py","backend/app/terminal_ui.py","backend/tests/test_context_usage.py","backend/tests/test_local_model.py","backend/tests/test_work_runs.py","backend/tests/test_terminal_ui.py"],"gap":"Canonical provenance-classified context/token status and terminal presentation are source-backed; missing provider token/cost telemetry remains explicitly UNKNOWN rather than fabricated, and executed live-provider parity certification remains open."},
     {"id":"VCP-027","implementation_state":"IMPLEMENTED","certification_state":"OPEN","evidence":["backend/app/terminal_projection.py","backend/app/terminal_ui.py","backend/app/cli.py","backend/tests/test_terminal_ui.py"],"gap":"Persistent stdlib full-screen terminal workspace, headless snapshot surface, Current/Sessions/Issues/Pull Requests/Gists views, command palette, prompt input and keyboard controls are source-backed; cross-platform PTY/rendered runtime certification remains open."}
+  "implementation_states": [
+    "IMPLEMENTED",
+    "PARTIAL",
+    "ABSENT",
+    "UNVERIFIED"
+  ],
+  "certification_states": [
+    "PASS",
+    "FAIL",
+    "OPEN",
+    "BLOCKED",
+    "PROVISIONAL",
+    "AUDIT_ONLY",
+    "NONCANONICAL",
+    "CANDIDATE_NOT_IDENTITY",
+    "UNRESOLVED",
+    "SUPERSEDED"
+  ],
+  "counts": {
+    "IMPLEMENTED": 27,
+    "PARTIAL": 0,
+    "ABSENT": 0,
+    "UNVERIFIED": 0,
+    "TOTAL": 27
+  },
+  "rows": [
+    {
+      "id": "VCP-001",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/conversations.py",
+        "backend/app/work_runs.py",
+        "backend/app/agent_checkpoints.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Durable conversation/run/checkpoint state is integrated into a persistent terminal-native session surface; exact-head interactive runtime certification remains open."
+    },
+    {
+      "id": "VCP-002",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/coding_workspace.py",
+        "backend/app/tools.py",
+        "backend/tests/test_coding_tools.py"
+      ],
+      "gap": "Parity-specific exact-head execution receipt remains to be produced."
+    },
+    {
+      "id": "VCP-003",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/coding_workspace.py",
+        "backend/app/tools.py",
+        "backend/tests/test_coding_tools.py"
+      ],
+      "gap": "Parity-specific exact-head execution receipt remains to be produced."
+    },
+    {
+      "id": "VCP-004",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/coding_patch.py",
+        "backend/app/coding_mutation.py",
+        "backend/app/coding_file_edit.py",
+        "backend/app/tools.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_coding_file_edit.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Generalized one-file CREATE/REPLACE/DELETE semantics are source-backed through the governed approval runtime with exact HEAD, preimage and content-hash binding, dirty-target rejection, path/symlink containment, postimage verification and rollback; exact-head runtime certification remains open."
+    },
+    {
+      "id": "VCP-005",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/coding_workspace.py",
+        "backend/app/tools.py",
+        "backend/tests/test_coding_tools.py"
+      ],
+      "gap": "Parity-specific exact-head execution receipt remains to be produced."
+    },
+    {
+      "id": "VCP-006",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "BLOCKED",
+      "evidence": [
+        "backend/app/coding_container.py",
+        "backend/app/coding_checks.py",
+        "backend/app/tools.py",
+        "backend/tests/test_coding_tools.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py",
+        "_architecture/video_cli_parity_execution_blocker_v1.json"
+      ],
+      "gap": "Governed isolated coding.exec and terminal request/approval integration are source-backed with immutable-image, network-disabled execution contracts; exact-head runtime certification is BLOCKED because hosted attempt 2 terminates before any job step or downloadable log."
+    },
+    {
+      "id": "VCP-007",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/response_flow.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py",
+        "docs/RESPONSE_FLOW.md"
+      ],
+      "gap": "Pending operator questions, option/freeform resolution and same-run resume are integrated into the terminal; exact-head execution certification remains open."
+    },
+    {
+      "id": "VCP-008",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/work_runs.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py",
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "gap": "Plan-only behavior and canonical work-plan terminal projection are source-backed; exact-head terminal execution certification remains open."
+    },
+    {
+      "id": "VCP-009",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/work_runs.py",
+        "backend/app/tools.py",
+        "backend/app/response_flow.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Terminal interactive mode now submits ask-mode runs, renders approvals/questions, resolves option/freeform interactions, and resumes canonical runs; exact-head interactive runtime certification remains open."
+    },
+    {
+      "id": "VCP-010",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/autopilot.py",
+        "backend/app/autopilot_planner.py",
+        "schemas/autopilot_state.schema.json",
+        "backend/app/agent_task_dag.py",
+        "backend/app/agent_checkpoints.py",
+        "backend/app/permission_leases.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_autopilot.py",
+        "backend/tests/test_autopilot_planner.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Model-driven task-DAG generation and trigger-bound bounded replanning are source-backed with exact source-SHA binding, allowlisted tool validation, canonical DAG validation, immutable plan/replan receipts, cumulative budget lineage, and explicit post-plan authorization; executed long-horizon runtime certification remains open."
+    },
+    {
+      "id": "VCP-011",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/agent_task_dag.py",
+        "backend/app/agent_checkpoints.py",
+        "schemas/agent_task_dag.schema.json",
+        "backend/app/autopilot.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_agent_task_dag.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Canonical persisted task/DAG construction, dependency transitions, evidence-gated terminal states, Autopilot orchestration, and terminal task presentation are source-backed; exact-head dynamic execution certification remains open."
+    },
+    {
+      "id": "VCP-012",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/tools.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_tools.py",
+        "backend/tests/test_terminal_ui.py",
+        "qa/rendered/rendered_qa.mjs"
+      ],
+      "gap": "Per-tool approve/deny is integrated into the terminal while retaining argument-digest binding and ordinary tool audit events; exact-head runtime certification remains open."
+    },
+    {
+      "id": "VCP-013",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/permission_leases.py",
+        "schemas/permission_lease.schema.json",
+        "backend/app/autopilot.py",
+        "backend/app/cli.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_permission_leases.py",
+        "backend/tests/test_autopilot.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Run-bound leases now have terminal-native bounded grant and consumption paths with exact tool/run scope, optional arguments/workspace bindings, independent authority, TTL/use ceilings, revocation and audit integrity; exact-head runtime certification remains open."
+    },
+    {
+      "id": "VCP-014",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/work_runs.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py",
+        "_architecture/release/acceptance_ledger_v1.json"
+      ],
+      "gap": "Terminal Ctrl-C is source-bound to canonical stop_run semantics with POSIX signal/flow-control hardening and Windows input handling; cross-platform PTY execution receipt remains open."
+    },
+    {
+      "id": "VCP-015",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/agent_checkpoints.py",
+        "backend/app/provider_recovery.py",
+        "_architecture/release/acceptance_ledger_v1.json"
+      ],
+      "gap": "Terminal/session recovery parity receipt remains open."
+    },
+    {
+      "id": "VCP-016",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/conversations.py",
+        "backend/app/work_runs.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Terminal Sessions view projects canonical conversation summaries and supports explicit session opening without a second state store; runtime certification remains open."
+    },
+    {
+      "id": "VCP-017",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/work_runs.py",
+        "backend/app/conversations.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Dedicated terminal Current view projects canonical conversation turns, current run, plan, task DAG, approvals and interaction state; runtime certification remains open."
+    },
+    {
+      "id": "VCP-018",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/github_resources.py",
+        "backend/app/tools.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_github_resources.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Governed bounded GitHub Issues provider and terminal Issues projection are source-backed with issue-vs-PR separation, retrieval UTC and explicit search ceilings; live remote execution certification remains open."
+    },
+    {
+      "id": "VCP-019",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/github_resources.py",
+        "backend/app/github_pull_requests.py",
+        "backend/app/tools.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_github_resources.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Governed bounded GitHub PR list/view and terminal Pull Requests projection are source-backed with exact head/base identity and retrieval UTC; branch-push orchestration belongs to VCP-024, while live remote surface certification remains open."
+    },
+    {
+      "id": "VCP-020",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/github_resources.py",
+        "backend/app/tools.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_github_resources.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Governed bounded GitHub Gists provider and terminal Gists projection are source-backed with exact gist identity, bounded content and retrieval UTC; live remote execution certification remains open."
+    },
+    {
+      "id": "VCP-021",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "BLOCKED",
+      "evidence": [
+        "backend/app/coding_lifecycle.py",
+        "backend/app/tools.py",
+        "backend/tests/test_coding_lifecycle.py",
+        "backend/tests/test_video_cli_governed_tools.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py",
+        "_architecture/video_cli_parity_execution_blocker_v1.json"
+      ],
+      "gap": "Guarded branch creation, exact candidate-set commit actions, and generic governed terminal invocation are source-backed; exact-head runtime certification is BLOCKED at the hosted startup layer."
+    },
+    {
+      "id": "VCP-022",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "BLOCKED",
+      "evidence": [
+        "backend/app/coding_checks.py",
+        "backend/app/coding_container.py",
+        "backend/app/tools.py",
+        "backend/tests/test_video_cli_governed_tools.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py",
+        "_architecture/video_cli_parity_execution_blocker_v1.json"
+      ],
+      "gap": "Governed isolated regression execution and terminal request/approval integration are source-backed; live pinned-image certification is BLOCKED because the hosted exact-head jobs terminate before step execution."
+    },
+    {
+      "id": "VCP-023",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "BLOCKED",
+      "evidence": [
+        "backend/app/cli.py",
+        "backend/app/github_ci.py",
+        "backend/app/tools.py",
+        "backend/tests/test_github_ci.py",
+        "backend/tests/test_video_cli_governed_tools.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py",
+        "_architecture/video_cli_parity_execution_blocker_v1.json"
+      ],
+      "gap": "Governed read-only CI status with exact-head binding and terminal invocation is source-backed; live exact-head certification is BLOCKED by the reproducible zero-step hosted startup failure."
+    },
+    {
+      "id": "VCP-024",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "BLOCKED",
+      "evidence": [
+        "backend/app/coding_lifecycle.py",
+        "backend/app/github_pull_requests.py",
+        "backend/app/tools.py",
+        "_architecture/mucaro_flagpole_tool_denominator_v1.json",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py",
+        "_architecture/video_cli_parity_execution_blocker_v1.json",
+        "backend/app/github_branch_push.py",
+        "backend/tests/test_github_branch_push.py",
+        "backend/tests/test_video_cli_governed_tools.py"
+      ],
+      "gap": "Exact local PR requests, non-force exact-request branch push, governed authenticated PR open/update, remote-head verification, and terminal invocation are source-backed; live remote certification remains BLOCKED by the exact-head hosted startup failure."
+    },
+    {
+      "id": "VCP-025",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/model_routing_policy.py",
+        "backend/app/work_runs.py",
+        "backend/app/context_usage.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Terminal status bar binds active/configured model, execution mode, run/agent state, context status and governed repository branch/HEAD receipts; exact-head rendered runtime certification remains open."
+    },
+    {
+      "id": "VCP-026",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/context_usage.py",
+        "schemas/context_usage.schema.json",
+        "backend/app/model_router.py",
+        "backend/app/services.py",
+        "backend/app/work_runs.py",
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/tests/test_context_usage.py",
+        "backend/tests/test_local_model.py",
+        "backend/tests/test_work_runs.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Canonical provenance-classified context/token status and terminal presentation are source-backed; missing provider token/cost telemetry remains explicitly UNKNOWN rather than fabricated, and executed live-provider parity certification remains open."
+    },
+    {
+      "id": "VCP-027",
+      "implementation_state": "IMPLEMENTED",
+      "certification_state": "OPEN",
+      "evidence": [
+        "backend/app/terminal_projection.py",
+        "backend/app/terminal_ui.py",
+        "backend/app/cli.py",
+        "backend/tests/test_terminal_ui.py"
+      ],
+      "gap": "Persistent stdlib full-screen terminal workspace, headless snapshot surface, Current/Sessions/Issues/Pull Requests/Gists views, command palette, prompt input and keyboard controls are source-backed; cross-platform PTY/rendered runtime certification remains open."
+    }
   ]
 }

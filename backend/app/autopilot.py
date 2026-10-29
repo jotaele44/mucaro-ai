@@ -306,26 +306,34 @@ def _autopilot_calls(checkpoint: dict[str, Any], cfg: Settings) -> list[dict[str
 
 def _usage(checkpoint: dict[str, Any], dag: dict[str, Any], cfg: Settings) -> dict[str, int | None]:
     calls = _autopilot_calls(checkpoint, cfg)
-    steps = sum(int(task.get("attempt_count", 0)) for task in dag["tasks"])
-    mutations = sum(
+    metadata = checkpoint.get("metadata") or {}
+    replan = metadata.get("autopilot_replan") if isinstance(metadata, dict) else None
+    offset = replan.get("usage_offset") if isinstance(replan, dict) else {}
+    if not isinstance(offset, dict):
+        offset = {}
+
+    steps = int(offset.get("steps") or 0) + sum(int(task.get("attempt_count", 0)) for task in dag["tasks"])
+    mutations = int(offset.get("mutations") or 0) + sum(
         1
         for call in calls
         if call.get("tool_name") in TOOL_REGISTRY and TOOL_REGISTRY[call["tool_name"]].mutates_state
     )
-    remote = sum(
+    remote = int(offset.get("remote_calls") or 0) + sum(
         1
         for call in calls
         if call.get("tool_name") in TOOL_REGISTRY and TOOL_REGISTRY[call["tool_name"]].network != "none"
     )
     state = _state_from_checkpoint(checkpoint)
+    model_tokens = offset.get("model_tokens")
+    cost_microunits = offset.get("cost_microunits")
     return {
         "steps": steps,
-        "tool_calls": len(calls),
+        "tool_calls": int(offset.get("tool_calls") or 0) + len(calls),
         "mutations": mutations,
         "remote_calls": remote,
         "replans": int(state["counters"].get("replans") or 0),
-        "model_tokens": None,
-        "cost_microunits": None,
+        "model_tokens": model_tokens if isinstance(model_tokens, int) else None,
+        "cost_microunits": cost_microunits if isinstance(cost_microunits, int) else None,
     }
 
 
