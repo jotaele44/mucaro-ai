@@ -612,7 +612,26 @@ async function specializedWorkspaceScenario(browser, base) {
 
     await open("Code", "Code workspace");
     await page.getByRole("heading", { name: "Repository execution readiness", exact: true }).waitFor();
-    check("Code workspace states readiness without implying execution", "desktop", (await page.getByText(/No repository command, container run, image pull/).count()) === 1 && (await page.getByText("Source HEAD", { exact: true }).count()) === 1);
+    check("Code workspace states readiness without implying execution", "desktop", (await page.getByText(/Readiness is a prerequisite diagnostic/).count()) === 1 && (await page.getByText("Source HEAD", { exact: true }).count()) === 1);
+    const repoInspection = page.locator('section[aria-label="Inspect repository control"]');
+    await repoInspection.getByRole("button", { name: "Request read-only inspection", exact: true }).click();
+    await repoInspection.getByRole("button", { name: "Allow once and run", exact: true }).waitFor();
+    await repoInspection.getByRole("button", { name: "Allow once and run", exact: true }).click();
+    await repoInspection.getByText("Receipt: EXECUTED", { exact: true }).waitFor();
+    check("Code workspace executes repository status only after explicit approval", "desktop", (await repoInspection.getByText(/head_sha/).count()) === 1);
+
+    const diffInspection = page.locator('section[aria-label="Inspect current diff control"]');
+    await diffInspection.getByRole("button", { name: "Request read-only inspection", exact: true }).click();
+    await diffInspection.getByRole("button", { name: "Allow once and run", exact: true }).click();
+    await diffInspection.getByText("Receipt: EXECUTED", { exact: true }).waitFor();
+    check("Code workspace exposes a terminal diff receipt", "desktop", (await diffInspection.getByText(/staged|unstaged|untracked/).count()) > 0);
+
+    const fileInspection = page.locator('section[aria-label="Read repository file control"]');
+    await fileInspection.getByLabel("Repository-relative path").fill("README.md");
+    await fileInspection.getByRole("button", { name: "Request file read", exact: true }).click();
+    await fileInspection.getByRole("button", { name: "Allow once and read", exact: true }).click();
+    await fileInspection.getByText("Receipt: EXECUTED", { exact: true }).waitFor();
+    check("Code workspace renders a bounded file-read receipt", "desktop", (await fileInspection.getByText(/sha256|byte_count|text/).count()) > 0);
 
     await open("Artifacts", "Artifacts");
     const artifactEmpty = page.getByText("No persisted work-run artifacts yet.", { exact: true });

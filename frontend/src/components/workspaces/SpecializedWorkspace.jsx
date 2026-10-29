@@ -66,12 +66,107 @@ function GISView({ setError }) {
 
 function CodeView({ setError }) {
   const [coding, setCoding] = useState(null);
+  const [filePath, setFilePath] = useState("README.md");
+  const [toolCalls, setToolCalls] = useState({});
+  const [busyTool, setBusyTool] = useState(null);
   useEffect(() => { api.codingReadiness().then(setCoding).catch(setError); }, [setError]);
   if (!coding) return <p className="muted">Loading coding readiness…</p>;
+
+  const repoRoot = coding.repo_root;
+  const readOnlyActions = [
+    {
+      tool: "coding.repo_status",
+      label: "Inspect repository",
+      description: "Read exact HEAD, branch, and dirty-state candidates.",
+      arguments: () => ({ repo_root: repoRoot }),
+    },
+    {
+      tool: "coding.diff",
+      label: "Inspect current diff",
+      description: "Read staged, unstaged, and untracked changes against HEAD.",
+      arguments: () => ({ repo_root: repoRoot, base: "HEAD" }),
+    },
+  ];
+
+  async function requestReadOnly(action) {
+    if (busyTool) return;
+    setBusyTool(action.tool);
+    setError(null);
+    try {
+      const response = await api.createToolRequest(action.tool, action.arguments(), `Code workspace read-only inspection: ${action.tool}`);
+      setToolCalls((current) => ({ ...current, [action.tool]: response.tool_call }));
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusyTool(null);
+    }
+  }
+
+  async function approveAndRun(action) {
+    const call = toolCalls[action.tool];
+    if (!call || busyTool) return;
+    setBusyTool(action.tool);
+    setError(null);
+    try {
+      await api.approveTool(call.tool_call_id, call.arguments_sha256);
+      const response = await api.runToolRequest(call.tool_call_id);
+      setToolCalls((current) => ({ ...current, [action.tool]: response.tool_call || { ...call, status: response.status, result: response.result } }));
+    } catch (err) {
+      setToolCalls((current) => ({ ...current, [action.tool]: { ...call, status: err.status || "FAILED", result: { status: err.status, detail: err.message } } }));
+      setError(err);
+    } finally {
+      setBusyTool(null);
+    }
+  }
+
+  async function deny(action) {
+    const call = toolCalls[action.tool];
+    if (!call || busyTool) return;
+    setBusyTool(action.tool);
+    setError(null);
+    try {
+      const response = await api.denyTool(call.tool_call_id, call.arguments_sha256);
+      setToolCalls((current) => ({ ...current, [action.tool]: response.tool_call }));
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusyTool(null);
+    }
+  }
+
+  async function requestFileRead() {
+    const path = filePath.trim();
+    if (!path || busyTool) return;
+    const action = { tool: "coding.read_file", arguments: () => ({ repo_root: repoRoot, path }) };
+    await requestReadOnly(action);
+  }
+
+  const actionCard = (action) => {
+    const call = toolCalls[action.tool];
+    const status = call?.status;
+    const pending = status === "PENDING_APPROVAL";
+    const terminal = status === "EXECUTED" || status === "DENIED" || status === "FAILED";
+    return (
+      <section key={action.tool} className="panel nested-panel" aria-label={`${action.label} control`}>
+        <div className="tool-row-head"><Status value={status || "READY"} /><strong>{action.label}</strong></div>
+        <p className="muted small">{action.description}</p>
+        {!call && <button type="button" className="secondary-button" disabled={!repoRoot || Boolean(busyTool)} onClick={() => requestReadOnly(action)}>Request read-only inspection</button>}
+        {pending && (
+          <div className="button-row">
+            <button type="button" className="secondary-button" disabled={busyTool === action.tool} onClick={() => deny(action)}>Deny</button>
+            <button type="button" className="primary-button" disabled={busyTool === action.tool} onClick={() => approveAndRun(action)}>{busyTool === action.tool ? "Running…" : "Allow once and run"}</button>
+          </div>
+        )}
+        {terminal && <details className="nested-panel" open={status === "EXECUTED"}><summary>Receipt: {status}</summary><pre className="json-block"><code>{JSON.stringify(call.result || {}, null, 2)}</code></pre><button type="button" className="secondary-button" disabled={Boolean(busyTool)} onClick={() => requestReadOnly(action)}>Request again</button></details>}
+      </section>
+    );
+  };
+
   return (
+    <>
     <section className="panel">
       <div className="tool-row-head"><Status value={coding.status} /><h2>Repository execution readiness</h2></div>
-      <p className="muted small">This is a prerequisite diagnostic. No repository command, container run, image pull, test, lint, build, or mutation was executed by this view.</p>
+      <p className="muted small">Readiness is a prerequisite diagnostic. The controls below are separately approval-gated, read-only inspections; they do not run tests, containers, image pulls, or mutations.</p>
       <dl className="facts">
         <dt>Execution state</dt><dd>{coding.execution_status}</dd>
         <dt>Source HEAD</dt><dd className="mono">{coding.source?.head_sha || "UNKNOWN"}</dd>
@@ -81,6 +176,20 @@ function CodeView({ setError }) {
       </dl>
       {coding.blockers?.length > 0 && <p className="error-card" role="status">Blocked prerequisites: {coding.blockers.join(", ")}</p>}
     </section>
+    <section className="panel" aria-labelledby="coding-inspection-title">
+      <h2 id="coding-inspection-title">Governed read-only inspection</h2>
+      <p className="muted small">Each request is recorded, bound to its exact arguments, and requires an explicit one-time approval before execution.</p>
+      <div className="readiness-list">{readOnlyActions.map(actionCard)}</div>
+      <section className="panel nested-panel" aria-label="Read repository file control">
+        <div className="tool-row-head"><Status value={toolCalls["coding.read_file"]?.status || "READY"} /><strong>Read one repository file</strong></div>
+        <p className="muted small">The path must be repository-relative and the response is byte-bounded with a SHA-256 receipt.</p>
+        <label className="field">Repository-relative path<input value={filePath} onChange={(event) => setFilePath(event.target.value)} placeholder="README.md" /></label>
+        {!toolCalls["coding.read_file"] && <button type="button" className="secondary-button" disabled={!repoRoot || !filePath.trim() || Boolean(busyTool)} onClick={requestFileRead}>Request file read</button>}
+        {toolCalls["coding.read_file"]?.status === "PENDING_APPROVAL" && <div className="button-row"><button type="button" className="secondary-button" disabled={busyTool === "coding.read_file"} onClick={() => deny({ tool: "coding.read_file" })}>Deny</button><button type="button" className="primary-button" disabled={busyTool === "coding.read_file"} onClick={() => approveAndRun({ tool: "coding.read_file" })}>{busyTool === "coding.read_file" ? "Reading…" : "Allow once and read"}</button></div>}
+        {toolCalls["coding.read_file"] && ["EXECUTED", "DENIED", "FAILED"].includes(toolCalls["coding.read_file"].status) && <details className="nested-panel" open={toolCalls["coding.read_file"].status === "EXECUTED"}><summary>Receipt: {toolCalls["coding.read_file"].status}</summary><pre className="json-block"><code>{JSON.stringify(toolCalls["coding.read_file"].result || {}, null, 2)}</code></pre><button type="button" className="secondary-button" disabled={Boolean(busyTool)} onClick={requestFileRead}>Request again</button></details>}
+      </section>
+    </section>
+    </>
   );
 }
 

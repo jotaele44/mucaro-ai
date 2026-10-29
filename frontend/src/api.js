@@ -282,6 +282,8 @@ export const api = {
 
   approveTool: (callId, argumentsSha256) => request(`/tools/requests/${callId}/approve`, json("POST", { arguments_sha256: argumentsSha256 })),
   denyTool: (callId, argumentsSha256) => request(`/tools/requests/${callId}/deny`, json("POST", { arguments_sha256: argumentsSha256 })),
+  createToolRequest: (toolName, arguments_, reason) => request("/tools/requests", json("POST", { tool_name: toolName, arguments: arguments_, reason })),
+  runToolRequest: (callId) => request(`/tools/requests/${callId}/run`, { method: "POST" }),
   toolSummary: () => request("/tools/summary"),
   toolCalls: () => request("/tools/requests"),
   resolveInteraction: (id, payload) => request(`/interactions/${id}/resolve`, json("POST", payload)),
