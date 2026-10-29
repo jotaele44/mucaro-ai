@@ -52,12 +52,15 @@
     "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
     "_architecture/release/evidence/rendered_qa_f1b353b9b039.json",
         "backend/tests/test_api.py::test_api_tasks_expose_durable_dependency_dag",
-        "backend/tests/test_agent_tasks.py::test_task_dag_persists_and_computes_readiness"
+    "backend/tests/test_agent_tasks.py::test_task_dag_persists_and_computes_readiness",
+    "_architecture/release/evidence/rendered_qa_b0c9c955a10f.json",
+    "backend/tests/test_api.py::test_api_skill_deactivation_requires_auth_persists_and_preserves_receipts",
+    "backend/tests/test_skill_operator.py::test_skill_cli_deactivation_revokes_and_can_be_explicitly_reauthorized"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-  "notes": "Ask/plan/execute/stream/inspect/refine flows render. Goals, durable task dependencies, the governed skill lifecycle, and governed read-only coding inspection are exposed through the GUI and API: exact-head rendered receipts create and sequence dependent tasks, mount/activate/invoke a skill, and request/approve/execute repository status, diff, and bounded file reads. Native WKWebView/macOS, physical-device, hosted/provider, and broader GIS/coding execution evidence remain open."
+  "notes": "Ask/plan/execute/stream/inspect/refine flows render. Goals, durable task dependencies, the governed skill lifecycle, and governed read-only coding inspection are exposed through the GUI and API. Skill deactivation now persists revocation, retains receipts, and requires fresh authorization; the shared runtime serves GUI, CLI, API, and queued skill.execute tools. The 175-check Chromium receipt exercises deactivation/reload/reactivation and rapid-click protection at desktop and emulated iPhone widths. Native WKWebView/macOS, physical-device, hosted/provider, and broader GIS/coding execution evidence remain open."
     },
     {
       "requirement_id": "GOAL-003",
@@ -1316,12 +1319,13 @@
       "evidence_refs": [
         "backend/tests/test_work_runs.py::test_tool_feed_events_bind_to_the_hash_chained_audit_ledger",
         "backend/tests/test_contracts.py::test_audit_chain_verifies_and_detects_tampering",
-        "backend/tests/test_agent_tool_proposals.py::test_anthropic_tool_use_is_normalized_with_provenance"
+        "backend/tests/test_agent_tool_proposals.py::test_anthropic_tool_use_is_normalized_with_provenance",
+        "backend/tests/test_skill_operator.py::test_previously_approved_tool_invocation_cannot_reuse_a_revoked_skill_grant"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N05",
-      "notes": "Tool calls, provider-native proposals, approvals, starts, results, retries, and failures use the same allowlist/approval/audit runtime. Run-feed views now carry bounded audit chain status, latest event ID, and latest event SHA-256. Broader governance-node and hosted evidence remain open."
+      "notes": "Tool calls, provider-native proposals, approvals, starts, results, retries, and failures use the same allowlist/approval/audit runtime. Previously approved skill.execute calls recheck persisted activation at admission and cannot reuse revoked grants. Run-feed views carry bounded audit chain status, latest event ID, and latest event SHA-256. Broader governance-node and hosted evidence remain open."
     },
     {
       "requirement_id": "TGT-015",
@@ -1377,12 +1381,16 @@
     "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
         "backend/tests/test_work_runs.py::test_answer_run_streams_an_ordered_feed_and_persists_turns",
         "backend/tests/test_work_runs.py::test_run_manifest_contract_tracks_approval_and_interruption_states",
-        "backend/tests/test_contracts.py::test_contract_violations_are_rejected"
+    "backend/tests/test_contracts.py::test_contract_violations_are_rejected",
+    "backend/tests/test_skill_runtime.py::test_deactivation_revokes_persisted_grant_preserves_receipts_and_requires_reactivation",
+    "backend/tests/test_skill_runtime.py::test_deactivation_does_not_erase_or_relabel_already_admitted_execution",
+    "backend/tests/test_skill_runtime.py::test_concurrent_skill_mounts_and_lifecycle_updates_conserve_rows",
+    "_architecture/release/evidence/rendered_qa_b0c9c955a10f.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N03",
-  "notes": "PROVISIONAL: runtime enforcement is implemented at checkpoint create/read/update, artifact create/store-read, skill execution, work-run persistence, and governed coding-tool request/approval/execution boundaries. Positive, negative, tamper, approval, interruption, recovery, and exact-head rendered workflow tests pass in the targeted contract suite. Broader cross-surface release certification and remaining architecture residue are still open."
+  "notes": "PROVISIONAL: runtime enforcement covers checkpoints, artifacts, skill execution, work-run persistence, and governed coding-tool requests. Skill lifecycle updates and admission share the store lock; revocation prevents future admissions while prior admitted work retains its activation sequence and receipt. Tests cover persistence, obsolete/duplicate mounts, reauthorization, concurrent updates, and stale tool approval. Broader cross-surface release certification and remaining architecture residue are still open."
     },
     {
       "requirement_id": "TGT-017",
@@ -2238,12 +2246,13 @@
     "_architecture/release/evidence/rendered_qa_a8515be3ce56.json",
     "_architecture/release/evidence/rendered_qa_0c3ae85de5ef.json",
     "_architecture/release/evidence/rendered_qa_0c3bed745a16.json",
-    "_architecture/release/evidence/rendered_qa_f1b353b9b039.json"
+    "_architecture/release/evidence/rendered_qa_f1b353b9b039.json",
+    "_architecture/release/evidence/rendered_qa_b0c9c955a10f.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N18",
-  "notes": "166 rendered checks pass at desktop 1440x900 and emulated iPhone 13 390x844 in Chromium, including navigation, feed, progressive disclosure, settings, provenance, sources, OCR upload/report, GIS capability evidence, Code readiness plus approval-gated repository status/diff/file-read receipts, task and skill workflows, Artifacts empty state, token-gate security, error/loading/empty/offline-service states, keyboard, touch-target, and no-overflow checks. Native WKWebView/macOS and physical-device evidence remain open."
+  "notes": "175 rendered checks pass at desktop 1440x900 and emulated iPhone 13 390x844 in Chromium. Coverage includes navigation, feed, settings, provenance, sources, OCR, GIS capability evidence, governed Code inspections, task dependencies, and the skill lifecycle including deactivation/reload/reactivation, preserved receipts, and one invocation under rapid double-click. Token-gate, error/loading/empty/offline-service, keyboard, touch-target, and no-overflow checks pass. The Skills screen was visually inspected at narrow width. Native WKWebView/macOS, tablet, physical-device, and the complete design/accessibility review remain open."
     },
     {
       "requirement_id": "MATRIX-016",
