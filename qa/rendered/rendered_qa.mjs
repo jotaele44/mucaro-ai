@@ -644,9 +644,9 @@ async function scenario(browser, base, viewport, contextOptions) {
     await gisSkill.getByLabel("Input GeoJSON path", { exact: true }).fill(gisFixture);
     await gisSkill.getByRole("button", { name: "Invoke skill", exact: true }).click();
     const gisResult = gisSkill.getByRole("region", { name: "Spatial analysis result", exact: true });
-    await gisResult.getByText("Analysis saved.", { exact: true }).waitFor();
+    await gisResult.getByText("Analysis saved. Review the warnings below.", { exact: true }).waitFor();
     await page.waitForFunction(() => [...document.querySelectorAll("li.skill-card")].find((card) => card.textContent.includes("mucaro/gis-analyze"))?.querySelector(".skill-invoke button")?.disabled === false);
-    check("GIS workspace inspects a frozen real-source layer through the governed runtime", viewport, await gisResult.getByText(/Point:/).isVisible() && await gisResult.getByText("EPSG:4326", { exact: true }).isVisible());
+    check("GIS workspace inspects a frozen real-source layer and preserves Z/topology warnings", viewport, await gisResult.getByText(/Point:/).isVisible() && await gisResult.getByText("EPSG:4326", { exact: true }).isVisible() && await gisResult.getByText(/GIS_TOPOLOGY_PLANAR_XY_ONLY_PRESENT/).isVisible());
     const savedAnalysis = page.waitForEvent("download");
     await gisResult.getByRole("button", { name: "Save analysis JSON", exact: true }).click();
     const analysisDownload = await savedAnalysis;
