@@ -1656,19 +1656,40 @@ async function shareScenario(browser, base) {
   });
 }
 
+function fileManifest(files) {
+  return files.slice().sort().map((file) => {
+    const bytes = readFileSync(file);
+    return { file: path.relative(ROOT, file), bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
+  });
+}
+
+function frontendInputManifest() {
+  const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "frontend"], { cwd: ROOT }).toString().split("\0").filter(Boolean);
+  return fileManifest(files.map((file) => path.join(ROOT, file)));
+}
+
+function builtAssetManifest(directory = path.join(ROOT, "frontend", "dist")) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? builtAssetManifest(path.join(directory, entry.name)) : fileManifest([path.join(directory, entry.name)])).sort((a, b) => a.file.localeCompare(b.file));
+}
+
+const frontendInputs = frontendInputManifest();
+console.log("BUILD frontend from current source before rendered verification");
+execFileSync("npm", ["run", "build"], { cwd: path.join(ROOT, "frontend"), stdio: "pipe" });
+const builtAssets = builtAssetManifest();
+const buildBinding = { command: "npm run build", source_head_sha: head, frontend_inputs: frontendInputs, assets: builtAssets, served_index_sha256: null };
 const dataDir = mkdtempSync(path.join(tmpdir(), "mucaro-qa-"));
 const port = await freePort();
 const base = `http://127.0.0.1:${port}`;
-if (!existsSync(path.join(ROOT, "frontend", "dist", "index.html"))) {
-  console.error("frontend/dist missing: run `npm run build` in frontend/ first");
-  process.exit(2);
-}
 const backend = await startBackend(dataDir, port);
 let status = "RENDERED_QA_FAIL";
 const axeResults = [];
 let browserVersion = null;
 try {
   if (!(await waitForHealth(base))) throw new Error(`backend did not start:\n${backend.log()}`);
+  const servedIndex = await fetch(`${base}/`);
+  buildBinding.served_index_sha256 = createHash("sha256").update(Buffer.from(await servedIndex.arrayBuffer())).digest("hex");
+  const expectedIndex = builtAssets.find((asset) => asset.file === "frontend/dist/index.html");
+  check("backend serves the page built from the recorded frontend source", "all", servedIndex.ok && buildBinding.served_index_sha256 === expectedIndex?.sha256);
   await seed(base);
   const browser = await browserType.launch();
   browserVersion = browser.version();
@@ -1705,6 +1726,11 @@ try {
   if (!backend.killed) backend.kill("SIGTERM");
 }
 
+const endingHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT }).toString().trim();
+const endingDirtyPaths = execFileSync("git", ["status", "--porcelain"], { cwd: ROOT }).toString().split("\n").filter(Boolean);
+check("source identity and built assets stay unchanged throughout rendered verification", "all", endingHead === head && JSON.stringify(endingDirtyPaths) === JSON.stringify(dirtyPaths) && JSON.stringify(frontendInputManifest()) === JSON.stringify(frontendInputs) && JSON.stringify(builtAssetManifest()) === JSON.stringify(builtAssets));
+if (checks.some((row) => !row.pass)) status = "RENDERED_QA_FAIL";
+
 const receipt = {
   schema_version: "mucaro-rendered-qa/1.0",
   status,
@@ -1720,6 +1746,7 @@ const receipt = {
   axe: axeResults,
   screenshots: shots,
   fixtures,
+  build_binding: buildBinding,
   limitations: [
     `Rendered in Playwright ${browserName}; this does not execute the packaged WKWebView window.`,
     "iPhone width is emulated on a desktop browser engine, not rendered by iOS Safari on a phone.",
