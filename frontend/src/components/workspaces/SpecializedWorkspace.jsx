@@ -59,7 +59,7 @@ function GISView({ setError, announce }) {
       <section className="panel">
         <div className="tool-row-head"><Status value={capability?.state} /><h2>Spatial engine</h2></div>
         <p>{capability?.notes}</p>
-        <dl className="facts"><dt>Contract</dt><dd className="mono">{capability?.contract || "—"}</dd><dt>Network</dt><dd>Local capability state only; execution remains governed by the conversation and tool permissions.</dd></dl>
+        <dl className="facts"><dt>Contract</dt><dd className="mono">{capability?.contract || "—"}</dd><dt>Execution</dt><dd>Vector tasks run locally through shared skill permissions. CRS transformations disable network grid downloads.</dd></dl>
       </section>
       <section className="panel"><h2>Offline boundary</h2><CapabilityRows rows={offline} /></section>
     </>

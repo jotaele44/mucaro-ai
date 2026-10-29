@@ -635,10 +635,13 @@ async function scenario(browser, base, viewport, contextOptions) {
     await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "GIS", exact: true }).click();
     await drawerClosed();
     const gisSkill = page.locator("li.skill-card").filter({ has: page.getByRole("heading", { name: "Analyze spatial data", exact: true }) });
-    await gisSkill.getByRole("button", { name: "Mount", exact: true }).click();
-    await gisSkill.getByRole("checkbox", { name: "filesystem.read", exact: true }).check();
-    await gisSkill.getByRole("checkbox", { name: "filesystem.write", exact: true }).check();
-    await gisSkill.getByRole("button", { name: "Authorize & activate", exact: true }).click();
+    await gisSkill.waitFor();
+    if (await gisSkill.getByRole("button", { name: "Mount", exact: true }).count()) {
+      await gisSkill.getByRole("button", { name: "Mount", exact: true }).click();
+      await gisSkill.getByRole("checkbox", { name: "filesystem.read", exact: true }).check();
+      await gisSkill.getByRole("checkbox", { name: "filesystem.write", exact: true }).check();
+      await gisSkill.getByRole("button", { name: "Authorize & activate", exact: true }).click();
+    }
     const gisFixture = path.join(ROOT, "backend", "tests", "fixtures", "gis_corpus", "usgs_pr_earthquakes_2020-01-06_2020-01-08.geojson");
     if (!fixtures.some((fixture) => fixture.file === path.relative(ROOT, gisFixture))) fixtures.push({ file: path.relative(ROOT, gisFixture), sha256: createHash("sha256").update(readFileSync(gisFixture)).digest("hex"), expected_feature_count: JSON.parse(readFileSync(gisFixture, "utf8")).features.length });
     await gisSkill.getByLabel("Input GeoJSON path", { exact: true }).fill(gisFixture);
@@ -646,11 +649,12 @@ async function scenario(browser, base, viewport, contextOptions) {
     const gisResult = gisSkill.getByRole("region", { name: "Spatial analysis result", exact: true });
     await gisResult.getByText("Analysis saved. Review the warnings below.", { exact: true }).waitFor();
     await page.waitForFunction(() => [...document.querySelectorAll("li.skill-card")].find((card) => card.textContent.includes("mucaro/gis-analyze"))?.querySelector(".skill-invoke button")?.disabled === false);
-    check("GIS workspace inspects a frozen real-source layer and preserves Z/topology warnings", viewport, await gisResult.getByText(/Point:/).isVisible() && await gisResult.getByText("EPSG:4326", { exact: true }).isVisible() && await gisResult.getByText(/GIS_TOPOLOGY_PLANAR_XY_ONLY_PRESENT/).isVisible());
+    check("GIS workspace inspects a frozen real-source layer and explains Z/topology limits", viewport, await gisResult.getByText(/Point:/).isVisible() && await gisResult.getByText("EPSG:4326", { exact: true }).isVisible() && await gisResult.getByText("This layer includes height or depth values. Topology checks cover horizontal coordinates only.", { exact: true }).isVisible());
     const savedAnalysis = page.waitForEvent("download");
     await gisResult.getByRole("button", { name: "Save analysis JSON", exact: true }).click();
     const analysisDownload = await savedAnalysis;
-    check("spatial results save through one explicit action", viewport, analysisDownload.suggestedFilename().endsWith("-analysis.json"));
+    const downloadedAnalysis = JSON.parse(readFileSync(await analysisDownload.path(), "utf8"));
+    check("spatial results save with matching source identity through one explicit action", viewport, analysisDownload.suggestedFilename().endsWith("-analysis.json") && downloadedAnalysis.identity_state === "CANDIDATE_NOT_IDENTITY" && downloadedAnalysis.source_manifests[0].sha256 === createHash("sha256").update(readFileSync(gisFixture)).digest("hex"));
     await gisSkill.getByLabel("Spatial operation", { exact: true }).selectOption("compare");
     check("spatial settings reveal reference inputs only for operations that use them", viewport, await gisSkill.getByLabel("Reference GeoJSON path", { exact: true }).isVisible() && !(await gisSkill.getByLabel("Target CRS (for example EPSG:3857)", { exact: true }).count()));
     await gisSkill.getByLabel("Spatial operation", { exact: true }).selectOption("inspect");

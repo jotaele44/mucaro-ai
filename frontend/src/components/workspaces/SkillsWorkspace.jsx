@@ -16,6 +16,14 @@ function readDrafts() {
   } catch { return {}; }
 }
 
+const SPATIAL_WARNINGS = {
+  GIS_TOPOLOGY_PLANAR_XY_ONLY_PRESENT: "This layer includes height or depth values. Topology checks cover horizontal coordinates only.",
+  GIS_FEATURE_IDS_NOT_CANONICAL: "Some features have missing or duplicate IDs. Resolve them before using an ID-based pair operation.",
+  GIS_CRS_Z_PASSTHROUGH_UNTRANSFORMED: "Height or depth values were retained without a vertical transformation.",
+  GIS_JOIN_MULTIPLICATION_PRESENT: "Some features have multiple spatial matches. Review the full candidate sets and join cardinality.",
+  GIS_ELLIPSOIDAL_UNRESOLVED: "Some features could not be measured. Review the unresolved feature records.",
+};
+
 // Skill operator surface: registration, mount, authorization, invocation, and receipts stay visible together.
 export function SkillsWorkspace({ announce, skillPrefix = "", embedded = false }) {
   const [skills, setSkills] = useState([]);
@@ -219,7 +227,7 @@ export function SkillsWorkspace({ announce, skillPrefix = "", embedded = false }
                   {last.result.report.join_cardinality && <><dt>Join cardinality</dt><dd>{last.result.report.join_cardinality}</dd></>}
                 </dl>
                 {Object.entries(last.result.report.state_counts || last.result.report.geometry_counts || {}).length > 0 && <ul>{Object.entries(last.result.report.state_counts || last.result.report.geometry_counts).map(([state, count]) => <li key={state}>{state}: {count}</li>)}</ul>}
-                {last.result.warnings.length > 0 && <p className="muted small" role="status">Review required: {last.result.warnings.join(" · ")}</p>}
+                {last.result.warnings.length > 0 && <div role="status"><ul>{last.result.warnings.map((warning) => <li key={warning}>{SPATIAL_WARNINGS[warning] || "The spatial engine reported a limitation. Review the saved report before using this result."}</li>)}</ul><details><summary>Warning codes</summary><p className="muted small">{last.result.warnings.join(" · ")}</p></details></div>}
                 <details><summary>Scope and limitations</summary><ul>{last.result.limitations.map((item, index) => <li key={index}>{item}</li>)}</ul></details>
                 <button type="button" className="secondary-button" onClick={() => {
                   const url = URL.createObjectURL(new Blob([JSON.stringify(last.result, null, 2)], { type: "application/json" }));
