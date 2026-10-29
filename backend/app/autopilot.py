@@ -137,9 +137,20 @@ def plan_autopilot(
     budgets: dict[str, Any] | None = None,
     provider: str | None = None,
     model: str | None = None,
+    initial_replans: int = 0,
     cfg: Settings = settings,
 ) -> dict[str, Any]:
     state = build_autopilot_state(budgets=budgets)
+    if not isinstance(initial_replans, int) or isinstance(initial_replans, bool) or initial_replans < 0:
+        raise AutopilotError("ERROR_AUTOPILOT_REPLAN_COUNT", "initial_replans must be a non-negative integer")
+    replan_budget = state["budgets"]["max_replans"]
+    if replan_budget is not None and initial_replans > replan_budget:
+        raise AutopilotError(
+            "ERROR_AUTOPILOT_REPLAN_BUDGET",
+            f"initial_replans {initial_replans} exceeds max_replans {replan_budget}",
+        )
+    state["counters"]["replans"] = initial_replans
+    state = _validate_state(state)
     try:
         dag = build_task_dag(task_definitions)
     except TaskDagError as exc:

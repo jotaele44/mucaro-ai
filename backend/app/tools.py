@@ -8,6 +8,7 @@ from typing import Any
 from .coding_container import CodingContainerError, build_coding_container_plan, run_coding_container_plan
 from .coding_lifecycle import CodingLifecycleError, build_pull_request_request, commit_approved_changes, create_work_branch_transaction
 from .coding_checks import CodingCheck, CodingCheckError, execute_coding_check_suite
+from .coding_mutation import CodingMutationError, apply_file_edit_transaction, apply_patch_transaction
 from .coding_mutation import CodingMutationError, apply_patch_transaction
 from .coding_file_edit import CodingFileEditError, edit_repository_file_transaction
 from .coding_patch import validate_patch_proposal
@@ -242,6 +243,58 @@ def _coding_file_edit(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any
     except CodingFileEditError as exc:
         raise ToolRuntimeError(exc.status, exc.detail) from exc
 
+
+
+def _coding_file_edit(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    repo_root = arguments.get("repo_root")
+    path = arguments.get("path")
+    operation = arguments.get("operation")
+    expected_head_sha = arguments.get("expected_head_sha")
+    expected_preimage = arguments.get("expected_preimage")
+    content = arguments.get("content")
+    expected_content_sha256 = arguments.get("expected_content_sha256")
+    max_bytes = arguments.get("max_bytes", 2 * 1024 * 1024)
+
+    if not isinstance(repo_root, str) or not repo_root.strip():
+        raise ToolRuntimeError("ERROR_CODING_REPO_ROOT_REQUIRED", "coding.file_edit requires a non-empty repo_root argument.")
+    if not isinstance(path, str) or not path:
+        raise ToolRuntimeError("ERROR_CODING_FILE_PATH_REQUIRED", "coding.file_edit requires a canonical repository-relative path.")
+    if operation not in {"CREATE", "REPLACE", "DELETE"}:
+        raise ToolRuntimeError("ERROR_CODING_FILE_EDIT_OPERATION", "coding.file_edit operation must be CREATE, REPLACE, or DELETE.")
+    if not isinstance(expected_head_sha, str) or not expected_head_sha:
+        raise ToolRuntimeError("ERROR_CODING_FILE_EDIT_HEAD_REQUIRED", "coding.file_edit requires expected_head_sha.")
+    if not isinstance(expected_preimage, dict):
+        raise ToolRuntimeError("ERROR_CODING_FILE_EDIT_PREIMAGE_REQUIRED", "coding.file_edit requires expected_preimage.")
+    if operation in {"CREATE", "REPLACE"}:
+        if not isinstance(content, str):
+            raise ToolRuntimeError("ERROR_CODING_FILE_EDIT_CONTENT_REQUIRED", f"{operation} requires string content.")
+        if not isinstance(expected_content_sha256, str) or len(expected_content_sha256) != 64:
+            raise ToolRuntimeError(
+                "ERROR_CODING_FILE_EDIT_CONTENT_HASH_REQUIRED",
+                "coding.file_edit requires expected_content_sha256 for CREATE and REPLACE.",
+            )
+    elif content is not None or expected_content_sha256 is not None:
+        raise ToolRuntimeError("ERROR_CODING_FILE_EDIT_DELETE_CONTENT", "DELETE must not include content or expected_content_sha256.")
+    if not isinstance(max_bytes, int) or isinstance(max_bytes, bool):
+        raise ToolRuntimeError("ERROR_CODING_FILE_EDIT_MAX_BYTES", "coding.file_edit max_bytes must be an integer.")
+
+    try:
+        return apply_file_edit_transaction(
+            repo_root,
+            path,
+            operation,
+            expected_head_sha=expected_head_sha,
+            expected_preimage=expected_preimage,
+            content=content,
+            expected_content_sha256=expected_content_sha256,
+            max_bytes=max_bytes,
+            cfg=cfg,
+        )
+    except CodingMutationError as exc:
+        detail = exc.detail
+        if exc.receipt is not None:
+            detail = f"{detail}; receipt_status={exc.receipt.get('status')}"
+        raise ToolRuntimeError(exc.status, detail) from exc
 
 
 def _coding_exec(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
@@ -729,6 +782,7 @@ TOOL_REGISTRY: dict[str, ToolDefinition] = {
     ),
     "coding.file_edit": ToolDefinition(
         name="coding.file_edit",
+        description="Create, replace, or delete exactly one approved UTF-8 repository file after exact HEAD, canonical-path, preimage, proposed-content hash, dirty-state, and postimage verification.",
         description="Create, replace, or delete exactly one approved repository-relative UTF-8 text file after exact HEAD, preimage, content-hash, path-boundary, symlink, dirty-target, and postimage checks.",
         mutates_state=True,
         requires_approval=True,

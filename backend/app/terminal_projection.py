@@ -134,6 +134,7 @@ def _checkpoint_projection(
         "contradictions": list(checkpoint.get("contradictions") or []),
         "task_dag": task_dag,
         "autopilot": dict((checkpoint.get("metadata") or {}).get("autopilot") or {}),
+        "autopilot_planning": dict((checkpoint.get("metadata") or {}).get("autopilot_planning") or {}),
         "updated_at": checkpoint.get("updated_at"),
     }
 
@@ -236,7 +237,7 @@ def build_terminal_snapshot(
             "provider": cfg.default_model_provider,
             "name": cfg.default_model_name,
         },
-        "repository_status": _latest_tool_result("coding.repo_status", calls),
+        "repository_status": _latest_tool_result("coding.repo_status", relevant_calls),
         "invariants": {
             "canonical_conversation_source": "backend.app.conversations",
             "canonical_run_source": "backend.app.work_runs",

@@ -136,12 +136,47 @@ def test_terminal_controller_exposes_sessions_and_plan_mode(cfg: Settings) -> No
     }
 
 
+def repo_status_tool() -> ToolDefinition:
+    return ToolDefinition(
+        name="coding.repo_status",
+        description="terminal repo status fixture",
+        mutates_state=False,
+        requires_approval=True,
+        handler=lambda arguments, cfg: {
+            "status": "CODING_REPOSITORY_STATUS_OK",
+            "repo_root": arguments["repo_root"],
+            "head_sha": "a" * 40,
+            "branch": "feature",
+            "head_state": "ATTACHED",
+            "dirty_status": "CLEAN",
+            "dirty_paths": [],
+        },
+        autopilot_success_statuses=("CODING_REPOSITORY_STATUS_OK",),
+    )
+
+
+def test_terminal_autopilot_requires_governed_repository_context(
+    cfg: Settings,
+) -> None:
 def test_terminal_autopilot_mode_requires_governed_source_identity(cfg: Settings) -> None:
     controller = TerminalController(cfg=cfg, mode="autopilot")
     controller.ensure_conversation()
 
     with pytest.raises(TerminalUIError) as exc:
         controller.submit("Implement the bounded objective")
+
+    assert exc.value.status == "ERROR_TUI_AUTOPILOT_REPOSITORY_REQUIRED"
+
+
+def test_terminal_autopilot_natural_language_creates_plan_for_review(
+    monkeypatch: pytest.MonkeyPatch,
+    cfg: Settings,
+) -> None:
+    monkeypatch.setitem(TOOL_REGISTRY, "coding.repo_status", repo_status_tool())
+    controller = TerminalController(cfg=cfg, mode="autopilot")
+    conversation_id = controller.ensure_conversation()
+    controller.request_governed_tool("coding.repo_status", {"repo_root": "/repo"})
+    controller.approve_latest()
 
     assert exc.value.status == "ERROR_TUI_AUTOPILOT_SOURCE_UNBOUND"
 
@@ -172,6 +207,40 @@ def test_terminal_autopilot_mode_generates_plan_without_auto_authorizing(
         return {
             "status": "AUTOPILOT_MODEL_PLAN_READY",
             "checkpoint": {
+                "checkpoint_id": "checkpoint_plan",
+                "run_id": kwargs["run_id"],
+                "state": "READY_FOR_APPROVAL",
+            },
+        }
+
+    monkeypatch.setattr("backend.app.terminal_ui.plan_autopilot_from_model", fake_plan)
+    controller.submit("Implement the bounded fix")
+
+    assert captured["session_id"] == conversation_id
+    assert captured["objective"] == "Implement the bounded fix"
+    assert captured["source_sha"] == "a" * 40
+    assert captured["context"]["repository"]["repo_root"] == "/repo"
+    assert controller.notice.startswith("Plan Ready for Review: checkpoint_plan")
+    assert "authorize explicitly" in controller.notice
+
+
+def test_repository_status_projection_is_scoped_to_terminal_session(
+    monkeypatch: pytest.MonkeyPatch,
+    cfg: Settings,
+) -> None:
+    monkeypatch.setitem(TOOL_REGISTRY, "coding.repo_status", repo_status_tool())
+    first = TerminalController(cfg=cfg)
+    second = TerminalController(cfg=cfg)
+    first.ensure_conversation()
+    second.ensure_conversation()
+
+    first.request_governed_tool("coding.repo_status", {"repo_root": "/one"})
+    first.approve_latest()
+    second.request_governed_tool("coding.repo_status", {"repo_root": "/two"})
+    second.approve_latest()
+
+    assert first.snapshot()["repository_status"]["result"]["repo_root"] == "/one"
+    assert second.snapshot()["repository_status"]["result"]["repo_root"] == "/two"
                 "checkpoint_id": "checkpoint-terminal-plan",
                 "metadata": {"autopilot": {"authorization_state": "PENDING"}},
             },

@@ -47,6 +47,7 @@ def test_report_fails_closed_until_every_required_row_is_implemented_and_pass() 
         "ABSENT": 0,
         "UNVERIFIED": 0,
     }
+    assert "VCP-004" in report["unresolved_capability_ids"]  # certification remains OPEN despite source closure
     assert "VCP-010" in report["unresolved_capability_ids"]
     assert "VCP-027" in report["unresolved_capability_ids"]
 
