@@ -1789,7 +1789,9 @@
       "implementation_state": "PARTIAL",
       "implementation_refs": [
         "backend/app/error_categories.py",
-        "backend/app/work_runs.py"
+        "backend/app/work_runs.py",
+        "backend/app/main.py",
+        "frontend/src/api.js"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -1797,12 +1799,14 @@
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_work_runs.py::test_crashing_step_ends_the_run_failed_with_a_category",
-        "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped"
+        "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped",
+        "backend/tests/test_api.py::test_api_upload_error_exposes_actionable_category",
+        "backend/tests/test_api.py::test_api_conversation_persists_cited_chat_turns"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Run errors, warnings and tool results carry TGT-034 categories; plain API error payloads do not yet include a category."
+      "notes": "Run errors, warnings, tool results, and plain API error payloads carry the canonical TGT-034 category. The frontend prefers the server category and retains HTTP fallback classification only for non-Mucaro proxy/plain-text responses."
     },
     {
       "requirement_id": "TGT-035",

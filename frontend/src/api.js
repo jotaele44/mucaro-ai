@@ -121,8 +121,8 @@ async function errorFrom(res) {
   } else {
     message = String(detail);
   }
-  const category =
-    res.status === 401 || res.status === 403 ? "PERMISSION_DENIED" : res.status === 404 ? "SOURCE_UNAVAILABLE" : res.status >= 500 ? "INTERNAL_FAILURE" : undefined;
+  const category = detail?.category ||
+    (res.status === 401 || res.status === 403 ? "PERMISSION_DENIED" : res.status === 404 ? "SOURCE_UNAVAILABLE" : res.status >= 500 ? "INTERNAL_FAILURE" : undefined);
   const error = new ApiError(status, message, category, payload, res.status);
   const issue = authIssueOf(error);
   if (issue) for (const listener of authListeners) listener(issue);

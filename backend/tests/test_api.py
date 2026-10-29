@@ -546,6 +546,16 @@ def test_api_ingest_rejects_empty_filename(tmp_path: Path):
     assert response.status_code == 422
 
 
+def test_api_upload_error_exposes_actionable_category(tmp_path: Path):
+    client = make_client(tmp_path)
+
+    response = client.post("/ingest", files={"upload": ("notes.exe", b"text", "application/octet-stream")})
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["status"] == "ERROR_UNSUPPORTED_FILE_TYPE"
+    assert response.json()["detail"]["category"] == "UNSUPPORTED_FORMAT"
+
+
 def test_upload_filename_sanitizer_rejects_empty_name():
     try:
         sanitize_upload_filename("")
@@ -675,6 +685,7 @@ def test_api_conversation_persists_cited_chat_turns(tmp_path: Path):
     )
     assert missing.status_code == 404
     assert missing.json()["detail"]["status"] == "ERROR_CONVERSATION_NOT_FOUND"
+    assert missing.json()["detail"]["category"] == "SOURCE_UNAVAILABLE"
 
 
 def test_api_conversation_ask_binds_memory_to_route_conversation(tmp_path: Path):

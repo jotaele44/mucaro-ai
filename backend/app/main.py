@@ -28,6 +28,7 @@ from .conversations import (
     rename_conversation,
 )
 from .db import init_db, list_payloads, upsert_payload
+from .error_categories import classify_error
 from .execution_gate import analyze_task, approve_execution
 from .exports import EXPORT_FILES, export_file_path
 from .goals import GoalError, create_goal, get_goal, list_goal_events, list_goals, update_goal
@@ -162,7 +163,7 @@ GENERATED_NAME_PATTERN = re.compile(r"^(src_|run_|chunk_)", re.IGNORECASE)
 
 
 def api_error(status: str, detail: str, *, status_code: int = 400, **extra: object) -> HTTPException:
-    payload = {"status": status, "detail": detail}
+    payload = {"status": status, "category": classify_error(status), "detail": detail}
     payload.update(extra)
     return HTTPException(status_code=status_code, detail=payload)
 
