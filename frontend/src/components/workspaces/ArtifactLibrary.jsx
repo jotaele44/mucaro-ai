@@ -62,7 +62,7 @@ export function ArtifactLibrary({ announce }) {
   }
 
   return (
-    <section aria-labelledby="saved-outputs-title">
+    <section aria-labelledby="saved-outputs-title" aria-busy={Boolean(busy)}>
       <h2 id="saved-outputs-title">Saved outputs</h2>
       <p className="muted small">Reopen OCR, GIS, and answer artifacts saved by the app. Downloads check the recorded size and SHA-256 before returning bytes.</p>
       <form className="panel" onSubmit={(event) => { event.preventDefault(); load(); }}>
@@ -74,6 +74,7 @@ export function ArtifactLibrary({ announce }) {
       </form>
       {error && <p className="error-card" role="alert">{error.message || "Saved outputs could not load. Refresh to try again."}{page && " The list below is the last loaded snapshot."}</p>}
       {busy === "list" && <p role="status">Loading saved outputs…</p>}
+      {busy?.startsWith("inspect:") && <p role="status">Loading artifact details…</p>}
       {page && <p className="muted small">Showing {page.artifacts.length} of {page.total} saved outputs{page.query ? ` matching “${page.query}”` : ""}. File integrity is checked on download.</p>}
       {page && !page.artifacts.length && <p className="empty-state muted">{page.query ? "No saved outputs match this filter. Change the filter and apply it again." : "No saved outputs yet. Run an OCR, GIS, or grounded-answer task to create one."}</p>}
       <ul className="tool-list" aria-label="Saved output artifacts">

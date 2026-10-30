@@ -199,9 +199,15 @@ function CodeView({ setError }) {
 
 function ArtifactsView({ setError, announce }) {
   const [runs, setRuns] = useState([]);
+  const [loadingRuns, setLoadingRuns] = useState(true);
   const [downloading, setDownloading] = useState(null);
   const downloadingRef = useRef(false);
-  useEffect(() => { api.workRuns().then((payload) => setRuns(payload.runs || [])).catch(setError); }, [setError]);
+  function loadRuns() {
+    setLoadingRuns(true);
+    setError(null);
+    return api.workRuns().then((payload) => setRuns(payload.runs || [])).catch(setError).finally(() => setLoadingRuns(false));
+  }
+  useEffect(() => { loadRuns(); }, [setError]);
 
   async function download(runId, kind) {
     if (downloadingRef.current) return;
@@ -224,7 +230,9 @@ function ArtifactsView({ setError, announce }) {
     <>
       <ArtifactLibrary announce={announce} />
       <h2>Conversation exports</h2>
-      {!runs.length && <p className="empty-state muted">No persisted work-run artifacts yet.</p>}
+      <button type="button" className="secondary-button" disabled={loadingRuns} onClick={loadRuns}>Refresh conversation exports</button>
+      {loadingRuns && <p role="status">Loading conversation exports…</p>}
+      {!loadingRuns && !runs.length && <p className="empty-state muted">No persisted work-run artifacts yet.</p>}
       <ul className="tool-list">
         {runs.map((run) => (
           <li key={run.run_id} className="tool-row">

@@ -744,6 +744,7 @@ async function scenario(browser, base, viewport, contextOptions) {
       await page.waitForFunction(() => [...document.querySelectorAll("button")].find((button) => button.textContent === "Apply filter")?.disabled === false);
       await page.getByLabel("Filter saved outputs", { exact: true }).fill(savedRaster.artifact_id);
       await page.getByRole("button", { name: "Apply filter", exact: true }).click();
+      await page.getByText(`Showing 1 of 1 saved outputs matching “${savedRaster.artifact_id}”. File integrity is checked on download.`, { exact: true }).waitFor();
       await page.getByRole("list", { name: "Saved output artifacts", exact: true }).getByText(savedRaster.artifact_id, { exact: true }).waitFor();
     }
     await openSavedOutputs();
@@ -787,6 +788,7 @@ async function scenario(browser, base, viewport, contextOptions) {
     check("an unmatched library filter has an actionable empty state", viewport, (await page.getByRole("list", { name: "Saved output artifacts", exact: true }).getByRole("listitem").count()) === 0);
     await page.getByLabel("Filter saved outputs", { exact: true }).fill(savedRaster.artifact_id);
     await page.getByRole("button", { name: "Apply filter", exact: true }).click();
+    await page.getByText(`Showing 1 of 1 saved outputs matching “${savedRaster.artifact_id}”. File integrity is checked on download.`, { exact: true }).waitFor();
     await page.getByRole("list", { name: "Saved output artifacts", exact: true }).getByText(savedRaster.artifact_id, { exact: true }).waitFor();
     await page.getByRole("heading", { name: "Saved outputs", exact: true }).scrollIntoViewIfNeeded();
     await shot(page, viewport, "16f-artifact-library");
