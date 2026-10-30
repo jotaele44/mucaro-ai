@@ -203,7 +203,12 @@ export function App() {
 
   const visible = conversations.filter((row) => row.title.toLowerCase().includes(filter.trim().toLowerCase()));
   return (
-    <div className={`app ${navOpen ? "nav-open" : ""}`}>
+    <div className={`app ${navOpen ? "nav-open" : ""}`} onClickCapture={(event) => {
+      // WebKit does not focus pointer-clicked buttons. Capture the real opener before a sheet mounts.
+      // Focusing never consumes the click or delays its primary action; keyboard activation keeps its focus.
+      const button = event.target.closest?.("button");
+      if (event.detail > 0 && button && !button.disabled && document.activeElement !== button) button.focus({ preventScroll: true });
+    }}>
       <a className="skip-link" href="#main">Skip to content</a>
       <nav className="sidebar" aria-label="Primary" inert={health.state === "locked"}>
         <div className="brand">

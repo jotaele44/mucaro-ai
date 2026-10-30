@@ -862,6 +862,19 @@ async function scenario(browser, base, viewport, contextOptions) {
   return axeRuns;
 }
 
+async function isolatedWorkspaceScenario(browser) {
+  const port = await freePort();
+  const base = `http://127.0.0.1:${port}`;
+  const data = mkdtempSync(path.join(tmpdir(), "mucaro-empty-workspace-"));
+  const child = await startBackend(data, port);
+  try {
+    if (!(await waitForHealth(base))) throw new Error("isolated workspace service did not start");
+    const initial = await (await fetch(`${base}/work-runs`)).json();
+    check("empty workspace fixture has no persisted work runs", "desktop", initial.runs?.length === 0);
+    await specializedWorkspaceScenario(browser, base);
+  } finally { child.kill("SIGTERM"); }
+}
+
 async function specializedWorkspaceScenario(browser, base) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, baseURL: base });
   const page = await context.newPage();
@@ -1847,7 +1860,7 @@ try {
     const profiles = { desktop: { viewport: { width: 1440, height: 900 } }, tablet: { viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, iphone: { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } } };
     for (const viewport of selectedViewports) axeResults.push(...(await scenario(browser, base, viewport, profiles[viewport])));
     if (!viewportsOnly) {
-      await specializedWorkspaceScenario(browser, base);
+      await isolatedWorkspaceScenario(browser);
       await launchTokenScenario(browser, "desktop");
       const headers = (await fetch(`${base}/`)).headers;
       check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
