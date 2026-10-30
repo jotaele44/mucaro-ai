@@ -5,8 +5,21 @@ declares for TGT-036, and the rendered evidence behind it. The checks are
 concrete, not subjective. They are exercised by `qa/rendered/rendered_qa.mjs`
 at desktop 1440×900, touch tablet 820×1180, and narrow mobile 390×844.
 
+The current full browser checkpoint is `622e9c48fb948bf816245203fb8316df3a90e83e`:
+321/321 checks pass independently in Chromium 141.0.7390.37 and WebKit 26.0.
+Each engine ran all three viewport classes and 30 axe scans with zero detected
+violations. The receipts are
+`_architecture/release/evidence/rendered_qa_chromium_622e9c48fb94.json` and
+`_architecture/release/evidence/rendered_qa_webkit_622e9c48fb94.json`. Earlier
+checkpoint references below retain their historical scope. Automated browser
+checks do not establish full WCAG conformance, native WKWebView, VoiceOver, or
+physical-device behavior.
+
 | Behaviour | How it is verified |
 |---|---|
+| **Recover saved outputs.** Filter, inspect direct parents, page, refresh, and download use labeled one-click controls. Pending operations refuse duplicate activation. A failed refresh retains the last snapshot and explains recovery; an unmatched filter has an actionable empty state. | Both full browser receipts exercise actual saved GeoTIFF downloads against the recorded artifact SHA, one request under a double-click, navigation away/back, refresh failure/retry and empty filtering at all three viewport classes. The library has an axe scan per profile. Representative WebKit tablet/mobile screenshots are retained alongside the receipts. |
+| **Conversation exports.** Cards show persisted states and expose existing answer formats. Downloads use the explicit answer identity; older runs are reachable through a paging button. | Both engines download and inspect an actual answer trace from the Artifacts screen at each viewport. Missing/absent answer exports have no download controls. `test_run_summaries_bind_export_controls_to_the_actual_answer_id` verifies the backend binding and removal of a missing format. |
+| **WebKit focus and touch controls.** Pointer activation focuses a button before a sheet mounts, preserving its opener without consuming the primary click. Touch select controls retain a themed dropdown affordance and measure at least 44px high. | Both full receipts pass first-click sheet opening, Escape focus return, field-size and touch-target checks; the old WebKit focus/size failures remain historical, superseded observations. |
 | **Send from the keyboard.** With a hardware keyboard, Enter sends and Shift+Enter inserts a new line. On a touch screen, whose keyboard has no Shift+Enter, Return inserts a new line and the Send button (or Ctrl/Cmd+Enter) sends. An IME composition never submits. | The rendered checks "Shift+Enter keeps composing", "with a hardware keyboard Return sends (M4)", "on a touch keyboard Return adds a line and sends nothing (M4)" and "Ctrl+Enter still sends from a touch device (M4)". IME behaviour is verified in code only (`isComposing`, keyCode 229). |
 | **No empty send.** Send stays disabled while the message is empty. | The rendered check "empty send is disabled". |
 | **Skill lifecycle.** Mount, authorize, invoke, and deactivate use explicit buttons with one-click primary actions. Inactive skills require reauthorization. Results remain inspectable. Pending actions disable duplicate activation. | Desktop and emulated iPhone rendered checks cover deactivation, reload persistence, reauthorization, receipt preservation, and one invocation request under a rapid double-click. Skills receives an axe scan at both widths. Physical touch and assistive-technology behavior remain unverified. |
@@ -44,7 +57,7 @@ These items remain PROVISIONAL.
 
 - **VoiceOver.** Behaviour with VoiceOver and native WKWebView rendering inside
   the packaged macOS app needs a macOS runner or device (see M7). The QA
-  renders in Chromium.
+  renders in Chromium and WebKit; it does not exercise the packaged native window.
 - **iOS keyboard.** Keyboard avoidance with the iOS software keyboard cannot be
   exercised in Chromium emulation.
 - **Phone access.** Signing in from a physical iPhone over a real network is not

@@ -68,6 +68,30 @@ IDs/hashes, or invent provenance to make validation pass. If no trustworthy back
 exists, preserve the data for inspection. Missing original output bytes cannot
 be reconstructed by the library.
 
+## Conversation export identity and browser behavior
+
+A work-run ID and an answer-trace ID identify different records. Run summaries
+carry the explicit `answer_run_id` and available `export_formats`; the GUI never
+guesses that relationship from a prefix, filename, count, or display label.
+Cards use the persisted `state` and `prompt_preview`, and hide formats whose
+export file is absent. A separate cursor loads older runs. Conversation exports
+still use the existing answer-export service; the catalogue's checked-buffer
+download guarantee applies to `/artifacts/{id}/download`.
+
+Full rendered checks at `622e9c48fb94` pass 321/321 independently in Chromium
+and WebKit across desktop, tablet and narrow mobile. Each engine includes 30
+axe scans without detected violations. Screenshot review found no clipping or
+hidden library action at the reviewed tablet/narrow widths. This is a bounded
+review, not complete product-wide accessibility or native-device certification.
+
+The WebKit run exposed pointer-focus and native-select sizing differences.
+Capture the actual clicked button's focus before opening a modal; do not consume
+or replay its click. Keep the native select's keyboard behavior while removing
+the popup appearance that ignored the 44px minimum, and preserve a visible
+themed dropdown affordance. Empty-state fixtures must use genuinely empty
+services; an early empty render before a request finishes is not proof of empty
+persistent state. Give independent viewport fixtures distinct stable test data.
+
 ## Reusable verification pattern
 
 Test record contracts and whole-graph invariants at the shared loader. Include
