@@ -62,9 +62,11 @@ silently resets, repairs, or overwrites a damaged store.
 
 Stop the app before recovery. Preserve a byte-for-byte copy of the damaged
 `processed/artifact_lineage.json` and its data directory before restoring a known
-backup of that directory. Retain the damaged copy as evidence. Use the supported
-backup/restore workflow in the CLI guide; do not delete parent rows, alter
-IDs/hashes, or invent provenance to make validation pass. If no trustworthy backup
+backup of that directory. Retain the damaged copy as evidence. Restore the
+complete data-directory backup while the service is stopped, including its
+database, source snapshots and outputs. There is no dedicated CLI command for
+restoring that whole directory. Do not delete parent rows, alter IDs/hashes, or
+invent provenance to make validation pass. If no trustworthy backup
 exists, preserve the data for inspection. Missing original output bytes cannot
 be reconstructed by the library.
 
@@ -93,6 +95,15 @@ services; an early empty render before a request finishes is not proof of empty
 persistent state. Give independent viewport fixtures distinct stable test data.
 
 ## Reusable verification pattern
+
+Run `node qa/rendered/artifact_touch_qa.mjs` after installing the pinned frontend
+and rendered-QA dependencies. `MUCARO_PYTHON` can select the Python runtime.
+The check rebuilds the frontend, records source/input/test-script identities,
+starts an isolated real service and sends actual emulated touch events at tablet
+and narrow-mobile widths in Chromium and WebKit. One tap opens the library and
+inspector; one download tap must return the fixture's recorded bytes with exactly
+one request. The authored fixture tests artifact access, not GIS correctness.
+Physical devices and native WKWebView remain separate evidence requirements.
 
 Test record contracts and whole-graph invariants at the shared loader. Include
 malformed bytes, legacy rows, cycles, deep DAGs, shared ancestors, changing page

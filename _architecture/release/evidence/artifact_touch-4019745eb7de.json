@@ -1,0 +1,65 @@
+{
+  "status": "ARTIFACT_TOUCH_QA_PASS",
+  "source_head_sha": "4019745eb7de83ab74cbffedab47c8cae54a6efa",
+  "created_utc": "2026-10-30T08:44:10.904Z",
+  "fixture": {
+    "artifact_id": "artifact_1895917423c348eb",
+    "sha256": "ed778c73ea51338d6576fb5992b189f2b94d9f3d5e199f46c1af520d6b0b3e6c",
+    "bytes": 42
+  },
+  "checks": [
+    {
+      "engine": "chromium",
+      "version": "141.0.7390.37",
+      "viewport": {
+        "width": 820,
+        "height": 1180
+      },
+      "touchStarts": 4,
+      "requests": 1,
+      "sha256": "ed778c73ea51338d6576fb5992b189f2b94d9f3d5e199f46c1af520d6b0b3e6c",
+      "pass": true
+    },
+    {
+      "engine": "chromium",
+      "version": "141.0.7390.37",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "touchStarts": 5,
+      "requests": 1,
+      "sha256": "ed778c73ea51338d6576fb5992b189f2b94d9f3d5e199f46c1af520d6b0b3e6c",
+      "pass": true
+    },
+    {
+      "engine": "webkit",
+      "version": "26.0",
+      "viewport": {
+        "width": 820,
+        "height": 1180
+      },
+      "touchStarts": 4,
+      "requests": 1,
+      "sha256": "ed778c73ea51338d6576fb5992b189f2b94d9f3d5e199f46c1af520d6b0b3e6c",
+      "pass": true
+    },
+    {
+      "engine": "webkit",
+      "version": "26.0",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "touchStarts": 5,
+      "requests": 1,
+      "sha256": "ed778c73ea51338d6576fb5992b189f2b94d9f3d5e199f46c1af520d6b0b3e6c",
+      "pass": true
+    }
+  ],
+  "limitations": [
+    "Emulated touch events, not physical-device or native-WKWebView proof.",
+    "Authored output fixture; this check does not assess GIS engine correctness or full accessibility."
+  ],
+  "served_index_sha256": "890da153b91cb13dbffcf2577abf31d6c90565a6557daac695a93ba1f3d66a95"
+}

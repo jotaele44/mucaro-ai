@@ -15,6 +15,18 @@ checkpoint references below retain their historical scope. Automated browser
 checks do not establish full WCAG conformance, native WKWebView, VoiceOver, or
 physical-device behavior.
 
+A separate check at `4019745eb7de` sends actual emulated touch events through
+the Artifacts library in Chromium and WebKit at tablet and narrow-mobile sizes.
+All four profiles pass, observe touch events, and return the recorded bytes with
+one download request per tap. Its receipt is
+`_architecture/release/evidence/artifact_touch-4019745eb7de.json`. Repeat it with
+`node qa/rendered/artifact_touch_qa.mjs`; it remains distinct from a physical
+device or native-window test. That checkpoint also passed 28 local release gates
+(1,704 tests passed, 8 skipped) and fresh-clone installation/CLI/launcher checks.
+Their exact-source receipts are retained alongside it. Later documentation and
+test-runner changes require an explicit application-byte comparison before this
+proof is reused.
+
 | Behaviour | How it is verified |
 |---|---|
 | **Recover saved outputs.** Filter, inspect direct parents, page, refresh, and download use labeled one-click controls. Pending operations refuse duplicate activation. A failed refresh retains the last snapshot and explains recovery; an unmatched filter has an actionable empty state. | Both full browser receipts exercise actual saved GeoTIFF downloads against the recorded artifact SHA, one request under a double-click, navigation away/back, refresh failure/retry and empty filtering at all three viewport classes. The library has an axe scan per profile. Representative WebKit tablet/mobile screenshots are retained alongside the receipts. |
