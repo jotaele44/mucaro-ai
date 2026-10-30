@@ -329,5 +329,7 @@ export const api = {
   executeSkill: (id, skillArguments = {}) => request(`/skills/${encodeURIComponent(id)}/execute`, { ...json("POST", { arguments: skillArguments }), timeoutMs: 600_000 }),
   // One of the files saved with an answer: kind is "markdown", "json" or "csv".
   exportFile: (runId, kind) => request(`/exports/${encodeURIComponent(runId)}/files/${encodeURIComponent(kind)}`, { as: "blob" }),
+  artifacts: (params = {}) => request(`/artifacts?${new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined)).toString()}`),
+  artifact: (artifactId) => request(`/artifacts/${encodeURIComponent(artifactId)}`),
   artifactFile: (artifactId) => request(`/artifacts/${encodeURIComponent(artifactId)}/download`, { as: "blob", timeoutMs: UPLOAD_TIMEOUT_MS }),
 };

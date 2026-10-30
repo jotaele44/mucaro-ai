@@ -19,6 +19,7 @@ from .agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, r
 from .agent_planner import build_agent_plan
 from .agent_tool_proposals import AgentToolProposalError, parse_provider_tool_proposals
 from .agent_tasks import TASK_PRIORITIES, TASK_STATES, TaskError, create_task, get_task, list_tasks, task_summary, update_task
+from .artifact_downloads import ArtifactDownloadError, inspect_output_artifact, list_output_artifacts, read_artifact_download
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -1187,6 +1188,22 @@ def build_parser() -> argparse.ArgumentParser:
     skills_executions = skills_subcommands.add_parser("executions", help="List skill execution receipts and artifact lineage.")
     skills_executions.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     skills_executions.set_defaults(handler=run_skills_executions)
+
+    artifacts = subcommands.add_parser("artifacts", help="Find saved outputs, inspect lineage, and save verified bytes.")
+    artifact_commands = artifacts.add_subparsers(dest="artifact_command", required=True)
+    artifact_list = artifact_commands.add_parser("list", help="Page saved output metadata; bytes are checked on download.")
+    artifact_list.add_argument("--limit", type=int, default=50)
+    artifact_list.add_argument("--offset", type=int, default=0)
+    artifact_list.add_argument("--revision", help="Logical store snapshot from a preceding page.")
+    artifact_list.add_argument("--query", default="", help="Discover by filename, producer, or artifact ID.")
+    artifact_inspect = artifact_commands.add_parser("inspect", help="Inspect an artifact and its direct parents.")
+    artifact_inspect.add_argument("artifact_id")
+    artifact_save = artifact_commands.add_parser("save", help="Save verified export bytes without overwriting an existing file.")
+    artifact_save.add_argument("artifact_id")
+    artifact_save.add_argument("--output", type=Path, required=True)
+    for command in (artifact_list, artifact_inspect, artifact_save):
+        command.add_argument("--format", choices=["json", "text"], default="json")
+        command.set_defaults(handler=run_artifacts)
 
     leases = subcommands.add_parser("leases", help="Manage bounded run-scoped permission leases.")
     leases_subcommands = leases.add_subparsers(dest="leases_command", required=True)
@@ -8972,6 +8989,33 @@ def run_skills_executions(args: argparse.Namespace, cfg: Settings) -> int:
     return 0
 
 
+def run_artifacts(args: argparse.Namespace, cfg: Settings) -> int:
+    if args.artifact_command == "list":
+        payload = list_output_artifacts(cfg, limit=args.limit, offset=args.offset, revision=args.revision, query=args.query)
+    elif args.artifact_command == "inspect":
+        payload = inspect_output_artifact(args.artifact_id, cfg)
+    else:
+        raw, _, _, digest = read_artifact_download(args.artifact_id, cfg)
+        destination = args.output.expanduser().absolute()
+        descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "wb") as output:
+            output.write(raw)
+            output.flush()
+            os.fsync(output.fileno())
+        payload = {"status": "ARTIFACT_SAVED", "artifact_id": args.artifact_id, "output": str(destination), "sha256": digest, "byte_size": len(raw)}
+    if args.format == "json":
+        emit_payload(payload, "json")
+    else:
+        print(payload["status"])
+        if "artifacts" in payload:
+            print(f"total={payload['total']} revision={payload['revision']} next_offset={payload['next_offset']}")
+            for row in payload["artifacts"]:
+                print(f"{row['artifact_id']} {row['filename'] or row['producer']} bytes={row['byte_size']} integrity={row['byte_verification']}")
+        else:
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+    return 0
+
+
 def run_leases_list(args: argparse.Namespace, cfg: Settings) -> int:
     try:
         result = {"status": "PERMISSION_LEASES_OK", "leases": list_permission_leases(cfg, run_id=args.run_id)}
@@ -9493,6 +9537,9 @@ def main(argv: Sequence[str] | None = None, cfg: Settings = settings) -> int:
     except MucaroCLIError as exc:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
         return exc.exit_code
+    except ArtifactDownloadError as exc:
+        emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
+        return 2
     except ModelProviderError as exc:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
         return 2

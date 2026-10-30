@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { api } from "../../api.js";
 import { SkillsWorkspace } from "./SkillsWorkspace.jsx";
+import { ArtifactLibrary } from "./ArtifactLibrary.jsx";
+import { saveFile } from "../../files.js";
 
 const COPY = {
   gis: {
@@ -13,7 +15,7 @@ const COPY = {
   },
   artifacts: {
     title: "Artifacts",
-    description: "Review outputs attached to persisted work runs and download only run-bound export formats.",
+    description: "Find saved outputs, inspect their lineage, and download verified files or conversation exports.",
   },
 };
 
@@ -195,30 +197,33 @@ function CodeView({ setError }) {
   );
 }
 
-function ArtifactsView({ setError }) {
+function ArtifactsView({ setError, announce }) {
   const [runs, setRuns] = useState([]);
   const [downloading, setDownloading] = useState(null);
+  const downloadingRef = useRef(false);
   useEffect(() => { api.workRuns().then((payload) => setRuns(payload.runs || [])).catch(setError); }, [setError]);
 
   async function download(runId, kind) {
+    if (downloadingRef.current) return;
+    downloadingRef.current = true;
     setDownloading(`${runId}:${kind}`);
+    setError(null);
     try {
       const blob = await api.exportFile(runId, kind);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${runId}.${kind}`;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveFile(blob, `${runId}.${kind}`);
+      announce?.(`Conversation export prepared: ${kind}.`);
     } catch (err) {
       setError(err);
     } finally {
+      downloadingRef.current = false;
       setDownloading(null);
     }
   }
 
   return (
     <>
+      <ArtifactLibrary announce={announce} />
+      <h2>Conversation exports</h2>
       {!runs.length && <p className="empty-state muted">No persisted work-run artifacts yet.</p>}
       <ul className="tool-list">
         {runs.map((run) => (
@@ -226,7 +231,7 @@ function ArtifactsView({ setError }) {
             <div className="tool-row-head"><Status value={run.status} /><strong>{run.run_id}</strong><span className="muted small">{run.created_at || ""}</span></div>
             <p className="muted small">{run.prompt || run.query || "Work run"}</p>
             <div className="workspace-actions">
-              {["markdown", "json", "csv"].map((kind) => <button key={kind} type="button" className="secondary-button" disabled={downloading === `${run.run_id}:${kind}`} onClick={() => download(run.run_id, kind)}>{downloading === `${run.run_id}:${kind}` ? "Preparing…" : `Download ${kind}`}</button>)}
+              {["markdown", "json", "csv"].map((kind) => <button key={kind} type="button" className="secondary-button" disabled={Boolean(downloading)} onClick={() => download(run.run_id, kind)}>{downloading === `${run.run_id}:${kind}` ? "Preparing…" : `Download ${kind}`}</button>)}
             </div>
           </li>
         ))}
@@ -247,7 +252,7 @@ export function SpecializedWorkspace({ kind, announce }) {
       {error && <p className="error-card" role="alert">{error.status || "ERROR"} — {error.message || "The workspace could not load."}</p>}
       {kind === "gis" && <GISView setError={setError} announce={announce} />}
       {kind === "code" && <CodeView setError={setError} />}
-      {kind === "artifacts" && <ArtifactsView setError={setError} />}
+      {kind === "artifacts" && <ArtifactsView setError={setError} announce={announce} />}
     </section>
   );
 }

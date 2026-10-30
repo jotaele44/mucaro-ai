@@ -4,13 +4,13 @@ import re
 from pathlib import Path, PurePath
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, resume_fleet_plan
-from .artifact_downloads import ArtifactDownloadError, read_artifact_download
+from .artifact_downloads import ArtifactDownloadError, inspect_output_artifact, list_output_artifacts, read_artifact_download
 from .agent_tasks import TaskError, create_task, get_task, list_tasks, task_summary, update_task
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
@@ -440,6 +440,24 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/skills/executions")
     def skill_executions(_auth: dict = Depends(require_auth)) -> dict:
         return list_skill_executions(cfg)
+
+    @app.get("/artifacts")
+    def artifact_library(
+        limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0),
+        revision: str | None = Query(None, pattern="^[0-9a-f]{64}$"), query: str = Query("", max_length=200),
+        _auth: dict = Depends(require_auth),
+    ) -> dict:
+        try:
+            return list_output_artifacts(cfg, limit=limit, offset=offset, revision=revision, query=query)
+        except ArtifactDownloadError as exc:
+            raise api_error(exc.status, exc.detail, status_code=exc.http_status) from exc
+
+    @app.get("/artifacts/{artifact_id}")
+    def artifact_detail(artifact_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return inspect_output_artifact(artifact_id, cfg)
+        except ArtifactDownloadError as exc:
+            raise api_error(exc.status, exc.detail, status_code=exc.http_status) from exc
 
     @app.get("/artifacts/{artifact_id}/download")
     def artifact_download(artifact_id: str, _auth: dict = Depends(require_auth)) -> Response:

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import stat
 from pathlib import Path
+from typing import Any
 
 from .artifact_identity import ArtifactIdentityError, list_artifacts
 from .config import Settings
@@ -19,21 +21,121 @@ class ArtifactDownloadError(RuntimeError):
         self.status, self.detail, self.http_status = status, detail, http_status
 
 
-def read_artifact_download(artifact_id: str, cfg: Settings) -> tuple[bytes, str, str, str]:
+def _records(cfg: Settings) -> list[dict[str, Any]]:
     try:
-        record = next((item for item in list_artifacts(cfg.processed_dir) if item["artifact_id"] == artifact_id), None)
+        return list_artifacts(cfg.processed_dir)
     except ArtifactIdentityError as exc:
         raise ArtifactDownloadError(
             "ERROR_ARTIFACT_STORE_INVALID",
             "Artifact lineage is invalid; restore or repair the store before downloading.",
             409,
         ) from exc
+
+
+def _output_path(record: dict[str, Any], cfg: Settings) -> Path | None:
+    if record["artifact_type"] not in {"DERIVED", "EXPORT"}:
+        return None
+    path = Path(record.get("source_path_or_uri") or "")
+    try:
+        if path.is_absolute() and not path.is_symlink() and path.resolve().is_relative_to(cfg.export_dir.resolve()):
+            return path
+    except (OSError, ValueError, RuntimeError):
+        pass
+    return None
+
+
+def _summary(record: dict[str, Any], cfg: Settings) -> dict[str, Any]:
+    path = _output_path(record, cfg)
+    return {
+        **{
+            key: record[key]
+            for key in (
+                "artifact_id",
+                "artifact_type",
+                "sha256",
+                "byte_size",
+                "producer",
+                "producer_version",
+                "created_utc",
+                "parent_artifact_ids",
+            )
+        },
+        "filename": path.name if path else None,
+        "download_available": path is not None,
+        "byte_verification": "CHECKED_ON_DOWNLOAD" if path else "NOT_DOWNLOADABLE",
+        "provenance_state": "RECORDED" if record.get("provenance") else "LEGACY_WITHOUT_PROVENANCE",
+    }
+
+
+def list_output_artifacts(
+    cfg: Settings,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    revision: str | None = None,
+    query: str = "",
+) -> dict[str, Any]:
+    """Page a validated logical store snapshot; filenames are discovery labels only."""
+    if not 1 <= limit <= 100 or offset < 0 or len(query) > 200:
+        raise ArtifactDownloadError(
+            "ERROR_ARTIFACT_QUERY_INVALID", "Choose a page size from 1 to 100 and a filter up to 200 characters.", 422
+        )
+    records = _records(cfg)
+    snapshot = hashlib.sha256(
+        json.dumps(records, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode()
+    ).hexdigest()
+    if revision is not None and revision != snapshot:
+        raise ArtifactDownloadError(
+            "ERROR_ARTIFACT_STORE_CHANGED",
+            "Saved outputs changed. Refresh the library before loading another page.",
+            409,
+        )
+    rows = [_summary(record, cfg) for record in records if record["artifact_type"] in {"DERIVED", "EXPORT"}]
+    needle = query.casefold().strip()
+    if needle:
+        rows = [
+            row
+            for row in rows
+            if needle in " ".join(str(row[key] or "") for key in ("artifact_id", "filename", "producer")).casefold()
+        ]
+    rows.sort(key=lambda row: (row["created_utc"], row["artifact_id"]), reverse=True)
+    end = offset + limit
+    return {
+        "status": "ARTIFACT_LIBRARY_OK",
+        "revision": snapshot,
+        "total": len(rows),
+        "offset": offset,
+        "next_offset": end if end < len(rows) else None,
+        "query": query,
+        "artifacts": rows[offset:end],
+        "limitations": [
+            "Byte integrity is checked when downloading, not by metadata listing.",
+            "Text filtering discovers labels; it does not establish identity or completeness outside this store.",
+        ],
+    }
+
+
+def inspect_output_artifact(artifact_id: str, cfg: Settings) -> dict[str, Any]:
+    records = _records(cfg)
+    index = {record["artifact_id"]: record for record in records}
+    record = index.get(artifact_id)
+    if record is None:
+        raise ArtifactDownloadError("ERROR_ARTIFACT_DOWNLOAD_NOT_FOUND", "The saved artifact was not found.", 404)
+    return {
+        "status": "ARTIFACT_DETAIL_OK",
+        "artifact": _summary(record, cfg),
+        "parents": [_summary(index[parent], cfg) for parent in record["parent_artifact_ids"]],
+    }
+
+
+def read_artifact_download(artifact_id: str, cfg: Settings) -> tuple[bytes, str, str, str]:
+    record = next((item for item in _records(cfg) if item["artifact_id"] == artifact_id), None)
     if record is None or record["artifact_type"] not in {"DERIVED", "EXPORT"}:
         raise ArtifactDownloadError(
             "ERROR_ARTIFACT_DOWNLOAD_NOT_FOUND", "This artifact has no downloadable output file.", 404
         )
-    path = Path(record.get("source_path_or_uri") or "")
-    if not path.is_absolute() or path.is_symlink() or not path.resolve().is_relative_to(cfg.export_dir.resolve()):
+    path = _output_path(record, cfg)
+    if path is None:
         raise ArtifactDownloadError(
             "ERROR_ARTIFACT_DOWNLOAD_BOUNDARY",
             "Only recorded files inside the app's export directory can be downloaded.",

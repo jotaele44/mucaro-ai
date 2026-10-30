@@ -3,6 +3,11 @@
 The `mucaro` CLI is the operator surface for local ingestion, retrieval-backed
 answers, Planning Gate analysis, validation, and local serving.
 
+Saved GIS, OCR, and answer outputs can be recovered through `mucaro artifacts
+list`, `mucaro artifacts inspect ID`, and `mucaro artifacts save ID --output PATH`.
+See [Saved outputs and artifact recovery](ARTIFACT_RECOVERY.md) for pagination,
+lineage, verified downloads, and damaged-store recovery.
+
 ## Install
 
 From the repo root:
