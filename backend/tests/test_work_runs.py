@@ -89,6 +89,22 @@ def flaky_tool(monkeypatch):
 # --- F02 / TGT-002: chronological, persisted work feed ---------------------------------
 
 
+def test_run_summaries_bind_export_controls_to_the_actual_answer_id(cfg, conversation):
+    run = _submit(conversation, "How does source lineage work?", cfg)
+    summary = list_runs(cfg=cfg)["runs"][0]
+    assert summary["run_id"] == run["run_id"]
+    assert summary["answer_run_id"].startswith("run_") and summary["answer_run_id"] != summary["run_id"]
+    assert set(summary["export_formats"]) == {"json", "markdown", "csv"}
+    client = TestClient(create_app(cfg))
+    for kind in summary["export_formats"]:
+        assert client.get(f"/exports/{summary['answer_run_id']}/files/{kind}").status_code == 200
+    assert client.get(f"/exports/{run['run_id']}/files/json").status_code == 404
+    (cfg.export_dir / f"{summary['answer_run_id']}.citations.csv").unlink()
+    assert "csv" not in list_runs(cfg=cfg)["runs"][0]["export_formats"]
+    without_answer = {**get_run(run["run_id"], cfg), "answer_run_id": None}
+    assert work_runs.summarize_run(without_answer, cfg)["export_formats"] == []
+
+
 def test_answer_run_streams_an_ordered_feed_and_persists_turns(cfg, conversation):
     run = _submit(conversation, "How does source lineage work?", cfg)
     run = get_run(run["run_id"], cfg)

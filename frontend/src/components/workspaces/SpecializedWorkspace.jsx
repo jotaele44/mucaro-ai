@@ -200,12 +200,19 @@ function CodeView({ setError }) {
 function ArtifactsView({ setError, announce }) {
   const [runs, setRuns] = useState([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
+  const [beforeSeq, setBeforeSeq] = useState(null);
   const [downloading, setDownloading] = useState(null);
   const downloadingRef = useRef(false);
-  function loadRuns() {
+  const loadingRunsRef = useRef(false);
+  function loadRuns(more = false) {
+    if (loadingRunsRef.current) return;
+    loadingRunsRef.current = true;
     setLoadingRuns(true);
     setError(null);
-    return api.workRuns().then((payload) => setRuns(payload.runs || [])).catch(setError).finally(() => setLoadingRuns(false));
+    return api.workRuns(more ? beforeSeq : undefined).then((payload) => {
+      setRuns((current) => more ? [...new Map([...current, ...(payload.runs || [])].map((run) => [run.run_id, run])).values()] : payload.runs || []);
+      setBeforeSeq(payload.next_before_seq ?? null);
+    }).catch(setError).finally(() => { loadingRunsRef.current = false; setLoadingRuns(false); });
   }
   useEffect(() => { loadRuns(); }, [setError]);
 
@@ -230,20 +237,22 @@ function ArtifactsView({ setError, announce }) {
     <>
       <ArtifactLibrary announce={announce} />
       <h2>Conversation exports</h2>
-      <button type="button" className="secondary-button" disabled={loadingRuns} onClick={loadRuns}>Refresh conversation exports</button>
+      <button type="button" className="secondary-button" disabled={loadingRuns} onClick={() => loadRuns()}>Refresh conversation exports</button>
       {loadingRuns && <p role="status">Loading conversation exports…</p>}
       {!loadingRuns && !runs.length && <p className="empty-state muted">No persisted work-run artifacts yet.</p>}
-      <ul className="tool-list">
+      <ul className="tool-list" aria-label="Conversation export runs">
         {runs.map((run) => (
           <li key={run.run_id} className="tool-row">
-            <div className="tool-row-head"><Status value={run.status} /><strong>{run.run_id}</strong><span className="muted small">{run.created_at || ""}</span></div>
-            <p className="muted small">{run.prompt || run.query || "Work run"}</p>
+            <div className="tool-row-head"><Status value={run.state} /><strong>{run.run_id}</strong><span className="muted small">{run.created_at || ""}</span></div>
+            <p>{run.prompt_preview || "Work run"}</p>
             <div className="workspace-actions">
-              {["markdown", "json", "csv"].map((kind) => <button key={kind} type="button" className="secondary-button" disabled={Boolean(downloading)} onClick={() => download(run.run_id, kind)}>{downloading === `${run.run_id}:${kind}` ? "Preparing…" : `Download ${kind}`}</button>)}
+              {(run.answer_run_id ? run.export_formats || [] : []).map((kind) => <button key={kind} type="button" className="secondary-button" disabled={Boolean(downloading)} onClick={() => download(run.answer_run_id, kind)}>{downloading === `${run.answer_run_id}:${kind}` ? "Preparing…" : `Download ${kind}`}</button>)}
+              {!run.export_formats?.length && <p className="muted small">This run has no saved answer exports.</p>}
             </div>
           </li>
         ))}
       </ul>
+      {beforeSeq != null && <button type="button" className="secondary-button" disabled={loadingRuns} onClick={() => loadRuns(true)}>Load older conversation exports</button>}
     </>
   );
 }

@@ -284,10 +284,15 @@ def _run_calls(run: dict[str, Any], cfg: Settings) -> list[dict[str, Any]]:
 def summarize_run(run: dict[str, Any], cfg: Settings = settings) -> dict[str, Any]:
     """Background-task view (F18): metrics come from receipts and the event log."""
     calls = _run_calls(run, cfg)
+    from .exports import EXPORT_FILES, export_file_path
+
+    answer_run_id = run.get("answer_run_id")
     with get_connection(cfg.sqlite_path) as conn:
         count = conn.execute("SELECT COUNT(*) AS n FROM run_events WHERE run_id = ?", (run["run_id"],)).fetchone()["n"]
     return {
         "run_id": run["run_id"],
+        "answer_run_id": answer_run_id,
+        "export_formats": [kind for kind in EXPORT_FILES if answer_run_id and export_file_path(answer_run_id, kind, cfg)],
         "conversation_id": run["conversation_id"],
         "state": run["state"],
         "version": run["version"],

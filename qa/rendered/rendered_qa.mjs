@@ -508,9 +508,10 @@ async function scenario(browser, base, viewport, contextOptions) {
 
   await openNav();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Memory", exact: true }).click();
-  await page.getByLabel("Remember").fill("Prefer tables for comparisons");
+  const rememberedPreference = `Prefer tables for comparisons (${viewport})`;
+  await page.getByLabel("Remember").fill(rememberedPreference);
   await page.getByRole("button", { name: "Save" }).click();
-  await page.getByText("Prefer tables for comparisons").waitFor();
+  await page.getByText(rememberedPreference, { exact: true }).waitFor();
   check("memory add is visible with provenance", viewport, (await page.getByText(/preference · from api/).count()) >= 1);
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "14-memory");
@@ -748,6 +749,21 @@ async function scenario(browser, base, viewport, contextOptions) {
       await page.getByRole("list", { name: "Saved output artifacts", exact: true }).getByText(savedRaster.artifact_id, { exact: true }).waitFor();
     }
     await openSavedOutputs();
+    const exportRuns = page.getByRole("list", { name: "Conversation export runs", exact: true });
+    await exportRuns.getByRole("button", { name: "Download json", exact: true }).first().waitFor();
+    const answerExportEvent = page.waitForEvent("download");
+    await exportRuns.getByRole("button", { name: "Download json", exact: true }).first().click();
+    const answerExport = await answerExportEvent;
+    const answerExportRecord = JSON.parse(readFileSync(await answerExport.path(), "utf8"));
+    check("conversation export follows the recorded answer ID and downloads its actual trace", viewport, /^run_/.test(answerExportRecord.run_id) && !/^wrun_/.test(answerExportRecord.run_id) && Boolean(answerExportRecord.answer));
+    check("conversation export cards show persisted states rather than an unknown field", viewport, !(await exportRuns.getByText("UNKNOWN", { exact: true }).count()));
+    const olderExports = page.getByRole("button", { name: "Load older conversation exports", exact: true });
+    if (await olderExports.count()) {
+      const previousRunCount = await exportRuns.getByRole("listitem").count();
+      await olderExports.click();
+      await page.waitForFunction((count) => document.querySelector('ul[aria-label="Conversation export runs"]')?.children.length > count, previousRunCount);
+      check("older conversation exports remain reachable through cursor pagination", viewport, (await exportRuns.getByRole("listitem").count()) > previousRunCount);
+    }
     let libraryRow = page.getByRole("list", { name: "Saved output artifacts", exact: true }).getByRole("listitem");
     check("Artifacts finds a persisted GIS output by stable artifact ID", viewport, await libraryRow.count() === 1 && await libraryRow.getByText(savedRaster.name, { exact: true }).isVisible());
     await libraryRow.getByRole("button", { name: "Inspect lineage", exact: true }).click();
