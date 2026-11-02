@@ -19,10 +19,13 @@ export function WebResearchResult({ result, onDownload, busy = false }) {
   const differences = result.comparison.groups.filter((group) => group.a_only_count || group.b_only_count);
   const passages = new Map(result.passages.map((row) => [row.chunk_id, row]));
   const rejected = result.synthesis.citation_status === "CITATION_ERROR";
+  const citationNumbers = new Map(result.citations.map((row, index) => [row.chunk_id, index + 1]));
+  const answer = result.synthesis.answer.replace(/\(chunk_id=([^\s()]+)\)/g, (reference, id) => citationNumbers.has(id) ? `[${citationNumbers.get(id)}]` : reference);
   return <section className="panel nested-panel" aria-label="Frozen source comparison result">
     <h3>Comparison and synthesis</h3>
     <p className="muted small">{result.synthesis.mode === "extractive" ? "Offline excerpts · no model invoked" : `${result.synthesis.mode} synthesis · review required`} · no URL fetched</p>
-    <div className="table-scroll"><table><caption>Passage accounting (duplicates retained)</caption><thead><tr><th scope="col">A</th><th scope="col">B</th><th scope="col">Shared</th><th scope="col">A only</th><th scope="col">B only</th><th scope="col">Union</th><th scope="col">Difference</th></tr></thead><tbody><tr>{[counts.a, counts.b, counts.intersection, counts.a_only, counts.b_only, counts.union, counts.symmetric_difference].map((count, index) => <td key={index}>{count}</td>)}</tr></tbody></table></div>
+    <p className="muted small">Passage accounting · duplicates retained</p>
+    <dl className="research-counts">{[["A passages", counts.a], ["B passages", counts.b], ["Shared", counts.intersection], ["A only", counts.a_only], ["B only", counts.b_only], ["Union", counts.union], ["Difference", counts.symmetric_difference]].map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{count}</dd></div>)}</dl>
     <p>{identity.http_content_equal ? "The saved HTTP content has identical bytes." : "The saved HTTP content has different bytes."} {identity.extracted_text_equal ? "Extracted text is identical." : "Extracted text differs."} Real-world identity and the truth of differing claims remain unresolved.</p>
     <details><summary>Differing passages ({differences.length} groups)</summary>
       {!differences.length && <p>No differing passages in the normalized comparison view.</p>}
@@ -32,12 +35,12 @@ export function WebResearchResult({ result, onDownload, busy = false }) {
     </details>
     <h4>{result.synthesis.status === "INSUFFICIENT_CONTEXT" ? "More context needed" : rejected ? "Citation validation failed" : "Source-grounded draft"}</h4>
     {rejected && <p className="error-card" role="alert">This model response has missing or invalid citation references. Review the source comparison; do not use this response as a grounded answer.</p>}
-    {rejected ? <details><summary>Rejected model response (unverified)</summary><pre className="json-block">{result.synthesis.answer}</pre></details> : <p className="research-answer">{result.synthesis.answer}</p>}
+    {rejected ? <details><summary>Rejected model response (unverified)</summary><pre className="json-block">{result.synthesis.answer}</pre></details> : <p className="research-answer">{answer}</p>}
     <h4>Exact cited passages</h4>
     {!result.citations.length && <p className="muted small">No verified passage citations for this response.</p>}
-    {result.citations.map((citation) => <details key={citation.chunk_id} className="panel nested-panel"><summary>Source {result.sources.find((source) => source.snapshot_id === citation.source_id)?.side} · {citation.chunk_id}</summary>
+    {result.citations.map((citation, index) => <details key={citation.chunk_id} className="panel nested-panel"><summary>Citation {index + 1} · Source {result.sources.find((source) => source.snapshot_id === citation.source_id)?.side}</summary>
       <blockquote className="research-quote">{citation.text}</blockquote>
-      <dl className="facts"><dt>Captured URL</dt><dd>{citation.source_url}</dd><dt>Retrieved</dt><dd>{citation.retrieval_utc}</dd><dt>Snapshot SHA-256</dt><dd className="mono">{citation.snapshot_sha256}</dd><dt>Extracted character offsets</dt><dd>{citation.start}–{citation.end} (Unicode, not HTML bytes)</dd></dl>
+      <dl className="facts"><dt>Passage ID</dt><dd className="mono">{citation.chunk_id}</dd><dt>Captured URL</dt><dd>{citation.source_url}</dd><dt>Retrieved</dt><dd>{citation.retrieval_utc}</dd><dt>Snapshot SHA-256</dt><dd className="mono">{citation.snapshot_sha256}</dd><dt>Extracted character offsets</dt><dd>{citation.start}–{citation.end} (Unicode, not HTML bytes)</dd></dl>
     </details>)}
     <details><summary>Scope, warnings, and selection limits</summary><p className="muted small">{result.warnings.join(" · ")}</p><ul>{result.limitations.map((item) => <li key={item}>{item}</li>)}</ul></details>
     {onDownload && <button type="button" className="secondary-button" disabled={busy} onClick={onDownload}>Download verified comparison report</button>}

@@ -1067,7 +1067,8 @@ print(json.dumps(rows))
         const differences = result().locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Differing passages \(/ }) });
         await activate(differences.locator("summary").first());
         check("research differences inspector exposes both conflicting values", viewport, (await differences.innerText()).includes("Budget 40") && (await differences.innerText()).includes("Budget 60"));
-        const cited = result().locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Source A · webpassage_/ }) });
+        check("research answer uses readable citation numbers with IDs in inspection", viewport, !(await result().locator(".research-answer").innerText()).includes("chunk_id=") && (await result().locator(".research-answer").innerText()).includes("[1]"));
+        const cited = result().locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Citation 1 · Source A$/ }) });
         await activate(cited.locator("summary"));
         check("first citation activation exposes exact excerpt and full hash", viewport, await cited.locator("blockquote").innerText() === "Budget 40" && (await cited.innerText()).includes(captures[0].sha256));
         const downloadEvent = page.waitForEvent("download");

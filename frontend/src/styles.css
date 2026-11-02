@@ -1484,3 +1484,7 @@ html {
 }
 .research-answer, .research-quote { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
 .research-quote { margin: 1rem 0; padding-inline-start: 1rem; border-inline-start: 3px solid var(--border); }
+.research-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 0.5rem; margin-block: 0.5rem 1rem; }
+.research-counts > div { padding: 0.6rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.research-counts dt { color: var(--muted); font-size: 0.8rem; }
+.research-counts dd { margin: 0.25rem 0 0; font-size: 1.3rem; font-weight: 600; }
