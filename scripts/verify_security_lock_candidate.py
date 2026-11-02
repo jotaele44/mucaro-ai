@@ -49,8 +49,12 @@ def verify(root: Path, expected_head: str) -> dict:
     if manifest.get("lock_count") != len(PATHS) or not isinstance(manifest.get("locks"), list):
         raise LockEvidenceError("seven-lock denominator mismatch")
     rows = manifest["locks"]
-    paths = [r.get("path") for r in rows if isinstance(r, dict)]
-    if len(rows) != len(paths) or len(paths) != len(set(paths)) or set(paths) != set(PATHS):
+    if any(not isinstance(r, dict) or set(r) != {"path", "bytes", "sha256"} for r in rows):
+        raise LockEvidenceError("malformed lock manifest row")
+    paths = [r["path"] for r in rows]
+    if any(not isinstance(p, str) for p in paths):
+        raise LockEvidenceError("non-string lock path")
+    if len(rows) != len(set(paths)) or set(paths) != set(PATHS):
         raise LockEvidenceError("missing, duplicate, or unexpected lock paths")
     for row in rows:
         name = row["path"]
