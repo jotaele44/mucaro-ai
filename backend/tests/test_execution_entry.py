@@ -1,4 +1,6 @@
 """Bounded entry-controller checks; does not certify UI, migration, or dispatch."""
+from __future__ import annotations
+
 from dataclasses import replace
 
 import pytest
@@ -98,8 +100,6 @@ def test_restart_retains_decision(tmp_path):
     two = EntryStore(path)
     two.initialize()
     assert two.decide(req, allowed=True, gates={"dependency": "PASS"}) == expected
-from __future__ import annotations
-
 import hashlib
 import json
 import threading
