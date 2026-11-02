@@ -898,11 +898,16 @@ async function captureRecoveryScenario(browser, base, captures) {
   ];
   const scans = [];
   {
-    const context = await browser.newContext({ baseURL: base, viewport: { width: 1440, height: 900 } });
+    const draftPort = await freePort();
+    const draftBase = `http://127.0.0.1:${draftPort}`;
+    const draftBackend = await startBackend(mkdtempSync(path.join(tmpdir(), "mucaro-draft-qa-")), draftPort);
+    const context = await browser.newContext({ baseURL: draftBase, viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     let release;
     const gate = new Promise((resolve) => { release = resolve; });
     try {
+      if (!(await waitForHealth(draftBase))) throw new Error("draft regression service did not start");
+      await seed(draftBase);
       await page.goto("/");
       await page.getByRole("heading", { name: "What should Mucaro work on?", exact: true }).waitFor();
       await send(page, "Initial draft preservation context.");
@@ -921,7 +926,7 @@ async function captureRecoveryScenario(browser, base, captures) {
       await page.waitForFunction(() => [...document.querySelectorAll("button")].some((button) => /^(Send|Queue) message$/.test(button.getAttribute("aria-label") || "") && !button.disabled));
       check("late send acknowledgement preserves a newer composer draft", "desktop", await input.inputValue() === "Next draft typed before acknowledgement.");
       await page.unrouteAll({ behavior: "wait" });
-    } finally { release?.(); await context.close(); }
+    } finally { release?.(); await context.close(); draftBackend.kill("SIGTERM"); }
   }
   for (const [index, [viewport, options]] of profiles.entries()) {
     const fixture = captures[index];
