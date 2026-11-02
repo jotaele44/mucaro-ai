@@ -245,7 +245,7 @@ export function App() {
           <button type="button" className="ghost-button archive-toggle" onClick={() => setShowArchived((value) => !value)} aria-pressed={showArchived}>
             {showArchived ? "Hide archived" : "Show archived"}
           </button>
-          <ul className="conversation-list" aria-label="Conversations">
+        <ul className="conversation-list" aria-label="Conversations" tabIndex={0}>
             {visible.map((row) => (
               <li key={row.conversation_id} className={row.archived ? "archived-row" : undefined}>
                 <button type="button" aria-current={row.conversation_id === activeId && view === "chat" ? "true" : undefined} onClick={() => openConversation(row.conversation_id)}>
