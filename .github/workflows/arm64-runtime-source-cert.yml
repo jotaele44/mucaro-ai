@@ -71,7 +71,8 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET: "14.0"
         run: |
           set -euo pipefail
-          uv pip compile pyproject.toml             --upgrade-package certifi==2026.10.19             --python-version 3.13             --python-platform aarch64-apple-darwin             --generate-hashes             --only-binary :all:             --output-file "$OUT/requirements-macos-arm64.lock"
+          source scripts/one_click_pins.env
+          uv pip compile pyproject.toml             --upgrade-package "certifi==$PY_SECURITY_CERTIFI_VERSION"             --exclude-newer "$PY_EXCLUDE_NEWER"             --exclude-newer-package "certifi=$PY_EXCLUDE_NEWER_CERTIFI"             --exclude-newer-package "pillow=$PY_EXCLUDE_NEWER_PILLOW"             --exclude-newer-package "pypdf=$PY_EXCLUDE_NEWER_PYPDF"             --exclude-newer-package "setuptools=$PY_EXCLUDE_NEWER_SETUPTOOLS"             --python-version 3.13             --python-platform aarch64-apple-darwin             --generate-hashes             --only-binary :all:             --output-file "$OUT/requirements-macos-arm64.lock"
           test -s "$OUT/requirements-macos-arm64.lock"
           sha256sum "$OUT/requirements-macos-arm64.lock"
           cat "$OUT/requirements-macos-arm64.lock"
