@@ -1,0 +1,92 @@
+name: Security lock regeneration candidate (audit only)
+on:
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "backend/requirements.txt"
+      - "packaging/macos/requirements-macos-arm64.in"
+      - "scripts/one_click_pins.env"
+      - ".github/workflows/security-lock-candidate.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regenerate-locks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install the project's pinned uv resolver
+        run: |
+          python -m pip install "uv==0.12.19" "pip-audit==2.10.1"
+          test "$(uv --version)" = "uv 0.12.19"
+      - name: Regenerate all four existing one-click locks
+        run: python scripts/lock_python_deps.py --uv "$(command -v uv)"
+      - name: Regenerate macOS runtime locks for both CPU architectures
+        run: |
+          uv pip compile pyproject.toml --python-version 3.13 --python-platform x86_64-apple-darwin --generate-hashes --only-binary :all: -o packaging/runtime/requirements-macos-x86_64.lock
+          uv pip compile pyproject.toml --python-version 3.13 --python-platform aarch64-apple-darwin --generate-hashes --only-binary :all: -o packaging/runtime/requirements-macos-arm64.lock
+      - name: Regenerate macOS ARM64 packaging lock
+        run: |
+          uv pip compile packaging/macos/requirements-macos-arm64.in --python-version 3.11 --python-platform aarch64-apple-darwin --generate-hashes -o packaging/macos/requirements-macos-arm64.lock
+      - name: Validate closed lock denominator and prepare immutable hashes
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+          paths = [
+              "packaging/one_click/requirements-aarch64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-apple-darwin.lock",
+              "packaging/one_click/requirements-x86_64-unknown-linux-gnu.lock",
+              "packaging/one_click/requirements-x86_64-pc-windows-msvc.lock",
+              "packaging/runtime/requirements-macos-x86_64.lock",
+              "packaging/runtime/requirements-macos-arm64.lock",
+              "packaging/macos/requirements-macos-arm64.lock",
+          ]
+          assert len(paths) == 7 and len(set(paths)) == 7
+          rows = []
+          for path in paths:
+              raw = Path(path).read_bytes()
+              txt = raw.decode("utf-8")
+              assert "pypdf==6.21.4" in txt, path
+              assert "pypdf==6.21.2" not in txt, path
+              assert "--hash=sha256:" in txt, path
+              rows.append({"path": path, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
+          head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          Path("lock-rebuild-manifest.json").write_text(json.dumps(
+              {"scope": "candidate-generated-only", "source_head": head,
+               "lock_count": len(rows), "locks": rows, "certification": "WITHHELD"}, indent=2, sort_keys=True) + "\n")
+          print("LOCK_COUNT_CLOSED", len(rows))
+          PY
+      - name: Audit every generated lock independently
+        run: |
+          set -eu
+          python -m pip_audit -r backend/requirements.txt --progress-spinner off
+          for file in \
+            packaging/one_click/requirements-aarch64-apple-darwin.lock \
+            packaging/one_click/requirements-x86_64-apple-darwin.lock \
+            packaging/one_click/requirements-x86_64-unknown-linux-gnu.lock \
+            packaging/one_click/requirements-x86_64-pc-windows-msvc.lock \
+            packaging/runtime/requirements-macos-x86_64.lock \
+            packaging/runtime/requirements-macos-arm64.lock \
+            packaging/macos/requirements-macos-arm64.lock; do
+            echo "AUDIT $file"
+            python -m pip_audit -r "$file" --no-deps --disable-pip --strict --progress-spinner off
+          done
+      - name: Upload generated locks and manifestation receipts for reviewed import
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: security-lock-candidate
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            packaging/one_click/requirements-*.lock
+            packaging/runtime/requirements-macos-*.lock
+            packaging/macos/requirements-macos-arm64.lock
+            lock-rebuild-manifest.json
