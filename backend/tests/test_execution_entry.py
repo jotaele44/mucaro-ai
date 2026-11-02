@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Bounded entry-controller checks; does not certify UI, migration, or dispatch."""
 from dataclasses import replace
 
@@ -98,7 +99,6 @@ def test_restart_retains_decision(tmp_path):
     two = EntryStore(path)
     two.initialize()
     assert two.decide(req, allowed=True, gates={"dependency": "PASS"}) == expected
-from __future__ import annotations
 
 import hashlib
 import json
