@@ -116,16 +116,22 @@ class EntryStore:
                     raise EntryError("ERROR_ENTRY_IDEMPOTENCY_CONFLICT")
                 conn.execute("COMMIT")
                 return json.loads(prior["receipt_json"])
+            # Validate request identity before looking up a source object.
+            if any(not isinstance(value, str) or not value for value in (
+                request.object_id, request.actor, request.policy_version,
+                request.source_commit, request.idempotency_key
+            )):
+                raise EntryError("ERROR_ENTRY_MISSING_IDENTITY")
             row = conn.execute(
                 "SELECT * FROM execution_entry_objects WHERE mode=? AND object_id=?",
                 (request.mode, request.object_id)
             ).fetchone()
             if row is None:
                 raise EntryError("ERROR_ENTRY_OBJECT_NOT_FOUND")
-            if row["version"] != request.expected_version or row["revision"] != request.revision:
-                raise EntryError("ERROR_ENTRY_STALE_REVISION")
             if row["active"]:
                 raise EntryError("ERROR_ENTRY_ALREADY_ACTIVE")
+            if row["version"] != request.expected_version or row["revision"] != request.revision:
+                raise EntryError("ERROR_ENTRY_STALE_REVISION")
             _check(request, state=row["state"], allowed=allowed, gates=gates)
             executing = request.action in _EXECUTE
             revision = request.revision if executing else request.revision + 1
