@@ -910,7 +910,7 @@ async function captureRecoveryScenario(browser, base, captures) {
       await seed(draftBase);
       await page.goto("/");
       await page.getByRole("heading", { name: "What should Mucaro work on?", exact: true }).waitFor();
-      await send(page, "Initial draft preservation context.");
+      await send(page, "How does source lineage work?");
       await waitRunState(page, "COMPLETED");
       await page.route("**/conversations/*/messages", async (route) => {
         if (route.request().method() !== "POST") return route.continue();
@@ -918,7 +918,7 @@ async function captureRecoveryScenario(browser, base, captures) {
       });
       const started = page.waitForRequest((request) => request.method() === "POST" && /\/conversations\/[^/]+\/messages$/.test(new URL(request.url()).pathname));
       const input = page.getByLabel("Message Mucaro", { exact: true });
-      await input.fill("Submitted while preserving the next draft.");
+      await input.fill("What is a stable chunk identifier?");
       await page.getByRole("button", { name: /^(Send|Queue) message$/ }).click();
       await started;
       await input.fill("Next draft typed before acknowledgement.");
