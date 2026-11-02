@@ -20,6 +20,7 @@ from .agent_planner import build_agent_plan
 from .agent_tool_proposals import AgentToolProposalError, parse_provider_tool_proposals
 from .agent_tasks import TASK_PRIORITIES, TASK_STATES, TaskError, create_task, get_task, list_tasks, task_summary, update_task
 from .artifact_downloads import ArtifactDownloadError, inspect_output_artifact, list_output_artifacts, read_artifact_download
+from .web_capture_store import WebCaptureStoreError, recover_web_snapshot
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -1188,6 +1189,14 @@ def build_parser() -> argparse.ArgumentParser:
     skills_executions = skills_subcommands.add_parser("executions", help="List skill execution receipts and artifact lineage.")
     skills_executions.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     skills_executions.set_defaults(handler=run_skills_executions)
+
+    captures = subcommands.add_parser("captures", help="Recover a frozen web capture without fetching its URL again.")
+    capture_commands = captures.add_subparsers(dest="capture_command", required=True)
+    capture_recover = capture_commands.add_parser("recover", help="Index the exact saved capture selected by ID and SHA-256.")
+    capture_recover.add_argument("snapshot_id")
+    capture_recover.add_argument("--sha256", required=True)
+    capture_recover.add_argument("--format", choices=["json", "text"], default="json")
+    capture_recover.set_defaults(handler=run_capture_recovery)
 
     artifacts = subcommands.add_parser("artifacts", help="Find saved outputs, inspect lineage, and save verified bytes.")
     artifact_commands = artifacts.add_subparsers(dest="artifact_command", required=True)
@@ -8989,6 +8998,11 @@ def run_skills_executions(args: argparse.Namespace, cfg: Settings) -> int:
     return 0
 
 
+def run_capture_recovery(args: argparse.Namespace, cfg: Settings) -> int:
+    emit_payload(recover_web_snapshot(args.snapshot_id, args.sha256, cfg), args.format)
+    return 0
+
+
 def run_artifacts(args: argparse.Namespace, cfg: Settings) -> int:
     if args.artifact_command == "list":
         payload = list_output_artifacts(cfg, limit=args.limit, offset=args.offset, revision=args.revision, query=args.query)
@@ -9537,7 +9551,7 @@ def main(argv: Sequence[str] | None = None, cfg: Settings = settings) -> int:
     except MucaroCLIError as exc:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
         return exc.exit_code
-    except ArtifactDownloadError as exc:
+    except (ArtifactDownloadError, WebCaptureStoreError) as exc:
         emit_error(exc.status, exc.detail, getattr(args, "format", "json"))
         return 2
     except ModelProviderError as exc:

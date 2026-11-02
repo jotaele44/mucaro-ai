@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { api } from "../../api.js";
 import { ConfirmSheet } from "../ConfirmSheet.jsx";
 import { DirectoryIntake } from "../DirectoryIntake.jsx";
+import { CaptureRecovery } from "./CaptureRecovery.jsx";
 
 // Source inspection (TGT-030): every ingested manifestation with identity, parser, warnings and provenance.
 export function SourcesWorkspace({ announce }) {
@@ -80,6 +81,7 @@ export function SourcesWorkspace({ announce }) {
         <DirectoryIntake onIngested={load} />
       </details>
       {!sources.length && <p className="empty-state muted">No sources yet. Add files or a folder; answers will cite them.</p>}
+      <CaptureRecovery announce={announce} />
       <ul className="source-list">
         {sources.map((source) => (
           <li key={source.source_id}>

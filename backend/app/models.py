@@ -39,6 +39,11 @@ class WorkspaceProfileRequest(BaseModel):
     notes: str = Field(default="", max_length=500)
 
 
+class CaptureRecoveryRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class MemoryCreateRequest(BaseModel):
     content: str = Field(min_length=1, max_length=800)
     kind: Literal["preference", "profile", "instruction", "fact"] = "preference"

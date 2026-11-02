@@ -8,6 +8,11 @@ list`, `mucaro artifacts inspect ID`, and `mucaro artifacts save ID --output PAT
 See [Saved outputs and artifact recovery](ARTIFACT_RECOVERY.md) for pagination,
 lineage, verified downloads, and damaged-store recovery.
 
+To recover a saved web capture after an index-write failure, use
+`mucaro captures recover ID --sha256 SHA256`. The capture ID and hash come from
+the failed capture receipt. Recovery reuses the exact saved file without fetching
+the URL again. See [Frozen web captures and recovery](WEB_CAPTURE_STORE.md).
+
 ## Install
 
 From the repo root:

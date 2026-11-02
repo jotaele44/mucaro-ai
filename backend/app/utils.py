@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import tempfile
 import threading
 from collections.abc import Callable, Iterator
@@ -101,14 +102,20 @@ def file_lock(path: Path) -> Iterator[None]:
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with _LOCKS_GUARD:
         thread_lock = _THREAD_LOCKS.setdefault(str(lock_path.resolve()), threading.Lock())
-    with thread_lock, lock_path.open("a+") as handle:
-        if fcntl is not None:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    with thread_lock:
+        descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0), 0o600)
         try:
-            yield
-        finally:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise OSError("Lock path must refer to a regular file")
             if fcntl is not None:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                fcntl.flock(descriptor, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                if fcntl is not None:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
 
 
 def update_json(path: Path, default: Any, mutate: Callable[[Any], T]) -> T:

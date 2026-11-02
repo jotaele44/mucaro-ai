@@ -18,7 +18,8 @@ from urllib.parse import urldefrag, urlparse
 
 from .config import Settings, settings
 from .permission_engine import PermissionEngineError, PermissionRequest, require
-from .utils import read_json, stable_id, utc_now, write_json
+from .utils import stable_id, utc_now, write_json
+from .web_capture_store import WebCaptureStoreError, persist_web_snapshot, preflight_capture_store
 
 WEB_SNAPSHOT_SCHEMA_VERSION = "mucaro_web_snapshot_v1"
 WEB_BROWSE_SESSION_SCHEMA_VERSION = "mucaro_web_browse_session_v1"
@@ -440,39 +441,6 @@ def _browse_session_path(cfg: Settings, session_id: str) -> Any:
     return cfg.export_dir / WEB_BROWSE_SESSION_DIR / f"{session_id}.json"
 
 
-def _append_snapshot_ledger_entry(cfg: Settings, snapshot: dict[str, Any], snapshot_path: str, snapshot_sha256: str) -> dict[str, Any]:
-    ledger_path = _snapshot_ledger_path(cfg)
-    ledger = read_json(
-        ledger_path,
-        {
-            "schema_version": "mucaro_web_snapshot_ledger_v1",
-            "entries": [],
-        },
-    )
-    entry = {
-        "snapshot_id": snapshot["snapshot_id"],
-        "snapshot_path": snapshot_path,
-        "snapshot_sha256": snapshot_sha256,
-        "requested_url": snapshot["requested_url"],
-        "final_url": snapshot["final_url"],
-        "retrieval_utc": snapshot["retrieval_utc"],
-        "http_status": snapshot["http_status"],
-        "content_type": snapshot["content_type"],
-        "content_sha256": snapshot["content_sha256"],
-        "content_size_bytes": snapshot["content_size_bytes"],
-    }
-    entries = list(ledger.get("entries") or [])
-    entries.append(entry)
-    ledger = {
-        "schema_version": "mucaro_web_snapshot_ledger_v1",
-        "entry_count": len(entries),
-        "updated_at": utc_now(),
-        "entries": entries,
-    }
-    write_json(ledger_path, ledger)
-    return {"path": str(ledger_path), "entry": entry, "entry_count": len(entries)}
-
-
 def _robots_url(fetch_url: str) -> str:
     parsed = urlparse(fetch_url)
     netloc = parsed.netloc
@@ -609,6 +577,10 @@ def fetch_web_snapshot(
     except PermissionEngineError as exc:
         raise WebBrowsingError(exc.status, exc.detail) from exc
     checked = validate_web_fetch_url(url, allow_private_hosts=policy.allow_private_hosts)
+    try:
+        preflight_capture_store(cfg)
+    except WebCaptureStoreError as exc:
+        raise WebBrowsingError(exc.status, exc.detail) from exc
     requested_at = utc_now()
     redirect_chain: list[dict[str, Any]] = []
     opener = _governed_opener(policy, _GovernedRedirectHandler(policy, redirect_chain))
@@ -690,17 +662,14 @@ def fetch_web_snapshot(
             "cache_mode": policy.cache_mode,
         },
     }
-    path = cfg.export_dir / WEB_SNAPSHOT_DIR / f"{snapshot_id}.json"
-    write_json(path, snapshot)
-    snapshot_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
-    ledger = _append_snapshot_ledger_entry(cfg, snapshot, str(path), snapshot_sha256)
+    try:
+        stored = persist_web_snapshot(snapshot, cfg)
+    except WebCaptureStoreError as exc:
+        raise WebBrowsingError(exc.status, exc.detail) from exc
     return {
         "status": "WEB_FETCH_SNAPSHOT_OK",
         "snapshot": snapshot,
-        "snapshot_path": str(path),
-        "snapshot_sha256": snapshot_sha256,
-        "ledger_path": ledger["path"],
-        "ledger_entry_count": ledger["entry_count"],
+        **stored,
     }
 
 

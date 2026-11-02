@@ -871,8 +871,86 @@ async function isolatedWorkspaceScenario(browser) {
     if (!(await waitForHealth(base))) throw new Error("isolated workspace service did not start");
     const initial = await (await fetch(`${base}/work-runs`)).json();
     check("empty workspace fixture has no persisted work runs", "desktop", initial.runs?.length === 0);
+    const recoveryFixtures = JSON.parse(execFileSync(python, ["-c", `
+import hashlib,json
+from backend.app.config import settings as cfg
+from backend.app.web_capture_store import _encoded,ledger_path
+from backend.tests.test_web_capture_store import observation
+folder=ledger_path(cfg).parent;folder.mkdir(parents=True,exist_ok=True)
+rows=[]
+for number in range(3):
+    snapshot=observation(number);raw=_encoded(snapshot);target=folder/(snapshot['snapshot_id']+'.json');target.write_bytes(raw)
+    rows.append({'snapshot_id':snapshot['snapshot_id'],'sha256':hashlib.sha256(raw).hexdigest(),'path':str(target),'ledger_path':str(ledger_path(cfg))})
+print(json.dumps(rows))
+`], { cwd: ROOT, env: { ...process.env, MUCARO_AI_DATA_DIR: data } }).toString());
+    fixtures.push({ kind: "AUTHORED_UNINDEXED_CAPTURES", snapshots: recoveryFixtures.map(({ snapshot_id, sha256 }) => ({ snapshot_id, sha256 })), limitation: "Tests offline indexing recovery, not web acquisition or search quality." });
+    const scans = await captureRecoveryScenario(browser, base, recoveryFixtures);
     await specializedWorkspaceScenario(browser, base);
+    return scans;
   } finally { child.kill("SIGTERM"); }
+}
+
+async function captureRecoveryScenario(browser, base, captures) {
+  const profiles = [
+    ["desktop", { viewport: { width: 1440, height: 900 } }],
+    ["tablet", { viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true }],
+    ["iphone", { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } }],
+  ];
+  const scans = [];
+  for (const [index, [viewport, options]] of profiles.entries()) {
+    const fixture = captures[index];
+    const context = await browser.newContext({ ...options, baseURL: base });
+    const page = await context.newPage();
+    const activate = async (target) => options.hasTouch ? target.tap() : target.click();
+    const open = async (name) => {
+      const menu = page.getByRole("button", { name: "Open navigation", exact: true });
+      if (await menu.isVisible()) await activate(menu);
+      await activate(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name, exact: true }));
+    };
+    const recovery = () => page.locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Recover a saved web capture$/ }) });
+    try {
+      await page.goto("/");
+      await page.getByRole("heading", { name: "What should Mucaro work on?", exact: true }).waitFor();
+      await open("Sources");
+      await activate(recovery().locator("summary"));
+      await page.getByLabel("Saved capture ID", { exact: true }).fill(fixture.snapshot_id);
+      await page.getByLabel("Saved capture SHA-256", { exact: true }).fill("0".repeat(64));
+      await activate(page.getByRole("button", { name: "Index saved capture", exact: true }));
+      await recovery().getByRole("alert").filter({ hasText: "differ from the selected SHA-256" }).waitFor();
+      check("capture recovery refuses a stale hash and retains source bytes", viewport, createHash("sha256").update(readFileSync(fixture.path)).digest("hex") === fixture.sha256);
+      await page.getByLabel("Saved capture SHA-256", { exact: true }).fill(fixture.sha256);
+      const routePattern = `**/web-captures/${fixture.snapshot_id}/recover`;
+      let requests = 0, release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      await page.route(routePattern, async (route) => { requests += 1; await gate; await route.continue(); });
+      const started = page.waitForRequest((request) => request.url().endsWith(`/web-captures/${fixture.snapshot_id}/recover`));
+      const submit = page.getByRole("button", { name: "Index saved capture", exact: true });
+      try {
+        if (options.hasTouch) {
+          await submit.scrollIntoViewIfNeeded(); const box = await submit.boundingBox();
+          await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+          await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+        } else await submit.dblclick();
+        await started;
+        check("pending capture recovery accepts one request under rapid activation", viewport, requests === 1 && await page.getByRole("button", { name: "Indexing saved capture…", exact: true }).isDisabled());
+      } finally { release(); }
+      await recovery().getByRole("status").filter({ hasText: "Original bytes retained; no URL was fetched" }).waitFor();
+      await page.unroute(routePattern);
+      const ledgerBytes = readFileSync(fixture.ledger_path);
+      const ledger = JSON.parse(ledgerBytes);
+      check("capture recovery indexes the exact saved observation once", viewport, ledger.entry_count === index + 1 && ledger.entries.filter((row) => row.snapshot_id === fixture.snapshot_id).length === 1 && createHash("sha256").update(readFileSync(fixture.path)).digest("hex") === fixture.sha256);
+      await open("Chat"); await open("Sources");
+      await activate(recovery().locator("summary"));
+      check("capture recovery references survive workspace navigation", viewport, await page.getByLabel("Saved capture ID", { exact: true }).inputValue() === fixture.snapshot_id && await page.getByLabel("Saved capture SHA-256", { exact: true }).inputValue() === fixture.sha256);
+      await activate(page.getByRole("button", { name: "Index saved capture", exact: true }));
+      await recovery().getByRole("status").filter({ hasText: "Original bytes retained; no URL was fetched" }).waitFor();
+      check("repeated recovery preserves the existing index bytes", viewport, ledgerBytes.equals(readFileSync(fixture.ledger_path)));
+      await recovery().scrollIntoViewIfNeeded();
+      await shot(page, viewport, "17-web-capture-recovery");
+      scans.push(await axe(page, viewport, "web capture recovery"));
+    } finally { await context.close(); }
+  }
+  return scans;
 }
 
 async function specializedWorkspaceScenario(browser, base) {
@@ -1860,7 +1938,7 @@ try {
     const profiles = { desktop: { viewport: { width: 1440, height: 900 } }, tablet: { viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, iphone: { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } } };
     for (const viewport of selectedViewports) axeResults.push(...(await scenario(browser, base, viewport, profiles[viewport])));
     if (!viewportsOnly) {
-      await isolatedWorkspaceScenario(browser);
+      axeResults.push(...await isolatedWorkspaceScenario(browser));
       await launchTokenScenario(browser, "desktop");
       const headers = (await fetch(`${base}/`)).headers;
       check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));

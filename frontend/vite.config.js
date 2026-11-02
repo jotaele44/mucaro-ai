@@ -7,7 +7,7 @@ const apiPaths = [
   "/health", "/config", "/security", "/models", "/offline-manifest", "/conversations", "/work-runs", "/interactions",
   "/tools", "/sources", "/chunks", "/ingest", "/ingest-path", "/permissions", "/memory", "/runs", "/exports",
   "/workspaces", "/validate", "/plan", "/approve", "/ask", "/agent", "/artifacts", "/coding",
-  "/goals", "/intelligence-plane", "/ocr", "/skills", "/tasks",
+  "/goals", "/intelligence-plane", "/ocr", "/skills", "/tasks", "/web-captures",
 ];
 
 export default defineConfig({

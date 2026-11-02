@@ -332,4 +332,5 @@ export const api = {
   artifacts: (params = {}) => request(`/artifacts?${new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined)).toString()}`),
   artifact: (artifactId) => request(`/artifacts/${encodeURIComponent(artifactId)}`),
   artifactFile: (artifactId) => request(`/artifacts/${encodeURIComponent(artifactId)}/download`, { as: "blob", timeoutMs: UPLOAD_TIMEOUT_MS }),
+  recoverCapture: (snapshotId, sha256) => request(`/web-captures/${encodeURIComponent(snapshotId)}/recover`, json("POST", { sha256 })),
 };

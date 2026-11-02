@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .agent_fleet import FleetError, execute_fleet_plan, normalize_fleet_plan, resume_fleet_plan
 from .artifact_downloads import ArtifactDownloadError, inspect_output_artifact, list_output_artifacts, read_artifact_download
+from .web_capture_store import WebCaptureStoreError, recover_web_snapshot
 from .agent_tasks import TaskError, create_task, get_task, list_tasks, task_summary, update_task
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
@@ -66,6 +67,7 @@ from .models import (
     ConversationArchiveRequest,
     ConversationBranchRequest,
     ConversationUpdateRequest,
+    CaptureRecoveryRequest,
     DirectoryPermissionRequest,
     GoalCreateRequest,
     GoalUpdateRequest,
@@ -440,6 +442,13 @@ def create_app(cfg: Settings = settings) -> FastAPI:
     @app.get("/skills/executions")
     def skill_executions(_auth: dict = Depends(require_auth)) -> dict:
         return list_skill_executions(cfg)
+
+    @app.post("/web-captures/{snapshot_id}/recover")
+    def recover_capture(snapshot_id: str, req: CaptureRecoveryRequest, _auth: dict = Depends(require_auth)) -> dict:
+        try:
+            return recover_web_snapshot(snapshot_id, req.sha256, cfg)
+        except WebCaptureStoreError as exc:
+            raise api_error(exc.status, exc.detail, status_code=exc.http_status) from exc
 
     @app.get("/artifacts")
     def artifact_library(
