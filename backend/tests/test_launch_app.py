@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import plistlib
 import subprocess
 import sys
 import tarfile
@@ -97,7 +98,7 @@ def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     result = build_macos_app_bundle(tmp_path, output_dir=tmp_path / "apps", python_executable=sys.executable)
 
     assert result["status"] == "MACOS_APP_BUNDLE_READY"
-    app_path = tmp_path / "apps" / "Mucaro AI.app"
+    app_path = tmp_path / "apps" / "Mucaro AI Setup.app"
     executable = app_path / "Contents" / "MacOS" / "mucaro-ai"
     receipt = app_path / "Contents" / "Resources" / "mucaro-app-receipt.json"
     assert app_path.is_dir()
@@ -106,9 +107,70 @@ def test_build_macos_app_bundle_creates_double_clickable_wrapper(tmp_path):
     assert "scripts/native_start.sh" in executable.read_text(encoding="utf-8")
     assert '"$@"' in executable.read_text(encoding="utf-8")
     assert json.loads(receipt.read_text(encoding="utf-8"))["scope"] == "source_bound_local_macos_app_wrapper"
+    info = plistlib.loads((app_path / "Contents" / "Info.plist").read_bytes())
+    assert info["CFBundleName"] == "Mucaro AI Setup"
+    assert info["CFBundleDisplayName"] == "Mucaro AI Setup"
+    assert info["CFBundleIdentifier"] == "ai.mucaro.source-launcher"
 
     verification = verify_macos_app_bundle(app_path, root=tmp_path)
     assert verification["status"] == "MACOS_APP_BUNDLE_VERIFIED"
+
+
+def _build_source_wrapper_fixture(tmp_path: Path) -> Path:
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "frontend" / "dist").mkdir(parents=True)
+    for name in ("native_start.sh", "one_click.sh", "one_click.py"):
+        (tmp_path / "scripts" / name).write_text("# launcher\n", encoding="utf-8")
+    (tmp_path / "frontend" / "dist" / "index.html").write_text("<div>Mucaro</div>\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "mucaro-ai"\nversion = "0.1.23"\n',
+        encoding="utf-8",
+    )
+    result = build_macos_app_bundle(tmp_path, output_dir=tmp_path / "apps")
+    assert result["status"] == "MACOS_APP_BUNDLE_READY"
+    return Path(result["app_path"])
+
+
+def test_verify_source_wrapper_rejects_release_filename_even_with_source_plist(tmp_path: Path) -> None:
+    app_path = _build_source_wrapper_fixture(tmp_path)
+    release_named = app_path.with_name("Mucaro AI.app")
+    app_path.rename(release_named)
+
+    verification = verify_macos_app_bundle(release_named, root=tmp_path)
+
+    assert verification["status"] == "MACOS_APP_BUNDLE_VERIFY_FAILED"
+    failed = {row["name"] for row in verification["checks"] if row["status"] == "FAIL"}
+    assert "source_bundle_filename" in failed
+    assert "receipt_app_path" in failed
+
+
+def test_verify_source_wrapper_rejects_partial_display_name_collision(tmp_path: Path) -> None:
+    app_path = _build_source_wrapper_fixture(tmp_path)
+    plist_path = app_path / "Contents" / "Info.plist"
+    plist = plistlib.loads(plist_path.read_bytes())
+    assert plist["CFBundleName"] == "Mucaro AI Setup"
+    plist["CFBundleDisplayName"] = "Mucaro AI"
+    plist_path.write_bytes(plistlib.dumps(plist))
+
+    verification = verify_macos_app_bundle(app_path, root=tmp_path)
+
+    assert verification["status"] == "MACOS_APP_BUNDLE_VERIFY_FAILED"
+    failed = {row["name"] for row in verification["checks"] if row["status"] == "FAIL"}
+    assert "plist_source_name" in failed
+
+
+def test_verify_source_wrapper_rejects_release_bundle_identifier(tmp_path: Path) -> None:
+    app_path = _build_source_wrapper_fixture(tmp_path)
+    plist_path = app_path / "Contents" / "Info.plist"
+    plist = plistlib.loads(plist_path.read_bytes())
+    plist["CFBundleIdentifier"] = "ai.mucaro.app"
+    plist_path.write_bytes(plistlib.dumps(plist))
+
+    verification = verify_macos_app_bundle(app_path, root=tmp_path)
+
+    assert verification["status"] == "MACOS_APP_BUNDLE_VERIFY_FAILED"
+    failed = {row["name"] for row in verification["checks"] if row["status"] == "FAIL"}
+    assert "plist_source_bundle_id" in failed
 
 
 def test_verify_macos_app_bundle_rejects_missing_bundle(tmp_path):
@@ -122,7 +184,7 @@ def test_verify_macos_app_bundle_rejects_missing_bundle(tmp_path):
 
 def test_certify_release_large_file_allowlist_is_path_specific_and_bounded(monkeypatch, tmp_path):
     monkeypatch.setattr(certify_release, "ROOT", tmp_path)
-    icon = tmp_path / "Mucaro AI.app" / "Contents" / "Resources" / "MucaroAI.icns"
+    icon = tmp_path / "Mucaro AI Setup.app" / "Contents" / "Resources" / "MucaroAI.icns"
     icon.parent.mkdir(parents=True)
     icon.write_bytes(b"x" * 2_500_000)
 
@@ -132,7 +194,7 @@ def test_certify_release_large_file_allowlist_is_path_specific_and_bounded(monke
     icon.write_bytes(b"x" * 3_000_001)
     gate = certify_release.gate_no_large_files([icon])
     assert gate.status == "FAIL"
-    assert "Mucaro AI.app/Contents/Resources/MucaroAI.icns:3000001" in gate.detail
+    assert "Mucaro AI Setup.app/Contents/Resources/MucaroAI.icns:3000001" in gate.detail
 
     unrelated = tmp_path / "unexpected.bin"
     unrelated.write_bytes(b"x" * 1_000_001)
@@ -387,6 +449,24 @@ def test_source_artifact_extracts_expected_archive_root(tmp_path):
 
     assert source_dir == tmp_path / "extract" / "mucaro-ai-0.1.23"
     assert (source_dir / "README.md").read_text(encoding="utf-8") == "# Mucaro AI\n"
+
+
+def test_source_artifact_restores_unix_executable_mode(tmp_path):
+    archive_path = tmp_path / "source.zip"
+    info = certify_source_artifact.zipfile.ZipInfo("mucaro-ai-0.1.23/scripts/native_start.sh")
+    info.create_system = 3
+    info.external_attr = 0o755 << 16
+    with certify_source_artifact.zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(info, "#!/bin/bash\n")
+    manifest = {
+        "package_name": "mucaro-ai",
+        "version": "0.1.23",
+        "archive_path": str(archive_path),
+    }
+
+    source_dir = certify_source_artifact.extract_source_archive(manifest, tmp_path / "extract")
+
+    assert (source_dir / "scripts/native_start.sh").stat().st_mode & 0o111
 
 
 def test_source_artifact_rejects_unexpected_archive_root(tmp_path):

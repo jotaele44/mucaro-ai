@@ -255,6 +255,7 @@ export const api = {
   saveClaudeKey: (apiKey) => request("/settings/claude/key", json("PUT", { api_key: apiKey })),
   removeClaudeKey: () => request("/settings/claude/key", { method: "DELETE" }),
   testClaude: () => request("/settings/claude/test", { method: "POST" }),
+  workbenchPlan: (payload) => request("/workbench/plan", json("POST", payload)),
 
   conversations: () => request("/conversations"),
   createConversation: (title) => request("/conversations", json("POST", { title })),
@@ -262,6 +263,13 @@ export const api = {
   renameConversation: (id, title) => request(`/conversations/${id}`, json("PATCH", { title })),
   deleteConversation: (id) => request(`/conversations/${id}`, { method: "DELETE" }),
   conversationRuns: (id) => request(`/conversations/${id}/runs?limit=100`),
+  executionEntry: (id) => request(`/conversations/${id}/execution-entry`),
+  executionEntryLabels: (locale, mode) =>
+    request(`/execution-entry/labels?locale=${encodeURIComponent(locale)}&mode=${encodeURIComponent(mode)}`),
+  decideExecutionEntry: (artifactId, revision, payload) =>
+    request(`/execution-entry/artifacts/${encodeURIComponent(artifactId)}/${revision}/decisions`, json("POST", payload)),
+  resumeExecutionEntry: (decisionId, payload) =>
+    request(`/execution-entry/decisions/${encodeURIComponent(decisionId)}/resume`, json("POST", payload)),
 
   sendMessage: (conversationId, payload) => request(`/conversations/${conversationId}/messages`, json("POST", payload)),
   editConversationMessage: (conversationId, messageKey, content, expectedRevision) =>

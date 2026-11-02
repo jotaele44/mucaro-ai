@@ -34,7 +34,7 @@ if str(ROOT) not in sys.path:
 
 from scripts import launch_app, lock_python_deps  # noqa: E402
 
-# desktop (pywebview) draws the native window that Mucaro AI.app (macOS) and Mucaro AI.exe (Windows) open.
+# desktop (pywebview) draws the native window that Mucaro AI Setup.app (macOS) and Mucaro AI.exe (Windows) open.
 NATIVE_WINDOW_PLATFORMS = ("darwin", "win32")
 NATIVE_WINDOW_MODULES = {
     "darwin": ("webview", "AppKit", "Foundation", "WebKit"),
@@ -297,12 +297,12 @@ class OneClickSetup:
 
     def check_stage0(self) -> None:
         if sys.prefix == sys.base_prefix:
-            raise SetupError("ERROR_NOT_IN_VENV", "start Mucaro AI by double-clicking Mucaro AI.app (macOS) or Mucaro AI.exe (Windows)")
+            raise SetupError("ERROR_NOT_IN_VENV", "start Mucaro AI by double-clicking Mucaro AI Setup.app (macOS) or Mucaro AI.exe (Windows)")
         for label, path in (("uv", self.uv), ("node", self.node), ("npm", self.npm_cli)):
             if not path.is_file():
                 raise SetupError(
                     "ERROR_STAGE0_MISSING",
-                    f"{label} not found at {path}; start Mucaro AI by double-clicking Mucaro AI.app (macOS) or Mucaro AI.exe (Windows)",
+                    f"{label} not found at {path}; start Mucaro AI by double-clicking Mucaro AI Setup.app (macOS) or Mucaro AI.exe (Windows)",
                 )
 
     def python_deps(self) -> None:

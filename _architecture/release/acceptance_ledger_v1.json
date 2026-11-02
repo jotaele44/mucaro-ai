@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-02T15:01:08Z",
+  "updated_utc": "2026-10-25T18:51:00Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -107,19 +107,27 @@
       "requirement_id": "KERNEL-003",
       "requirement_text": "Binding specification discovery",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
+        "docs/release/MUCARO_RELEASE_ENGINEERING_CONTRACT_V1.md",
+        "docs/release/MUCARO_WORKBENCH_SPEC_BINDING_V1.md",
         "_architecture/release/release_scope_manifest_v1.json"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+      "negative_gate": "backend/tests/test_release_scope.py::test_spec_hash_mismatch_is_detected",
       "benchmark": null,
-      "evidence_refs": [],
-      "state": "BLOCKED",
-      "blocker_id": "BLK-SPEC-001",
+      "evidence_refs": [
+        "docs/release/MUCARO_RELEASE_ENGINEERING_CONTRACT_V1.md",
+        "docs/release/MUCARO_WORKBENCH_SPEC_BINDING_V1.md",
+        "_architecture/release/release_scope_manifest_v1.json",
+        "backend/tests/test_release_scope.py::test_committed_release_scope_is_valid",
+        "backend/tests/test_release_scope.py::test_spec_hash_mismatch_is_detected"
+      ],
+      "state": "PASS",
+      "blocker_id": null,
       "dag_node": "N26",
-      "notes": "Contract and mobile brief are bound by hash; the separate Workbench Specification is missing (SPECIFICATION_BINDING=OPEN)."
+      "notes": "Canonical specification identity is resolved by the 2026-10-20 binding decision: MUCARO_RELEASE_ENGINEERING_CONTRACT_V1 is the Release-Grade Workbench Specification for the existing denominator. Hash binding and negative hash-drift regression remain authoritative."
     },
     {
       "requirement_id": "KERNEL-004",
@@ -1152,20 +1160,35 @@
       "requirement_id": "TGT-012",
       "requirement_text": "Multimodal file handling",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
+        "backend/app/format_registry.py",
+        "_architecture/ingest_format_registry_v1.json",
         "backend/app/parser.py",
-        "backend/app/multimodal.py"
+        "backend/app/ingestion.py",
+        "backend/app/multimodal.py",
+        "backend/app/file_signatures.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
-      "evidence_refs": [],
-      "state": "OPEN",
+      "positive_gate": ".github/workflows/matrix010-ingestion-cert.yml",
+      "negative_gate": "backend/tests/test_matrix010_ingestion_benchmark.py::test_matrix010_full_benchmark_closes_22_plus_8_denominator",
+      "benchmark": "_architecture/ingestion_benchmark_v1.json",
+      "evidence_refs": [
+        "_architecture/ingest_format_registry_v1.json",
+        "backend/tests/test_format_registry.py",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764670",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764464",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917764730",
+        "backend/app/ingestion_benchmark.py",
+        "backend/tests/test_matrix010_ingestion_benchmark.py",
+        "scripts/certify_matrix010_ingestion.py",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39963895136",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39963895136/artifacts/12505044961"
+      ],
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": "No declared format registry artifact."
+      "notes": "PASS: canonical 22-format ingestion implementation from merged PR #290 is bound to exact head 2acf4e611981a78d194b0b111a82b47e432e5915. MATRIX-010 certification run 39963895136 reports MATRIX010_INGESTION_CERT_OK with 22/22 declared formats PASS, 8/8 adversarial cases PASS, zero failures, both arithmetic checks closed, zero failed terminal checks, receipt SHA-256 6a14d4dc45459a7a822384d384f075fdbb18312be19db24474016a5079aa8f91, and artifact 12505044961. This closes the benchmark residue previously keeping TGT-012 PROVISIONAL; semantic multimodal understanding remains governed by its separate requirements and is not implied here."
     },
     {
       "requirement_id": "TGT-013",
@@ -1491,12 +1514,16 @@
         "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
         "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
         "backend/tests/test_macos_packaging.py::test_lock_is_fully_hash_pinned_and_covers_every_input",
-        "_architecture/release/evidence/arm64_runtime_source_20261016.json"
+        "_architecture/release/evidence/arm64_runtime_source_20261016.json",
+        "_architecture/release/evidence/arm64_runtime_source_20261023.json",
+        "_architecture/release/evidence/arm64_runtime_materialization_20261023.json",
+        "_architecture/release/evidence/arm64_portable_lifecycle_20261023.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917324456"
       ],
       "state": "BLOCKED",
       "blocker_id": "BLK-SIGN-001",
       "dag_node": "N20",
-      "notes": "Both release lanes are required (A7). Native app lane: all eight TGT-026 verifications pass on macOS; the artifact remains ad-hoc signed, so it is not yet distributable under the declared Developer ID release class (BLK-SIGN-001). Portable lane source boundary: independently retrieved CPython 3.13.15 arm64 bytes, observed archive geometry/logical identity, a dedicated Python 3.13 aarch64 wheel-only hash lock, and packaging/runtime/macos-arm64.json are now frozen by arm64_runtime_source_20261016.json. Portable runtime materialization and portable_install_reinstall_smoke still require exact-head Apple-Silicon execution; source/lock evidence alone does not close those runtime gates."
+      "notes": "Both release lanes are required (A7). Native app lane retains its existing macOS evidence. The native arm64 portable lane now has exact-main source/runtime/application lifecycle PASS at merge SHA 685a0866a3b70c719897e7dd06ca4413196a15f2 via run 39917324456: embedded runtime verified, install/launch/workflow/post-launch immutability/reinstall and distinct-version rollback all PASS. Remaining TGT-026 residue is Developer ID signing/notarization under BLK-SIGN-001; no clean-host or physical-input claim is inferred."
     },
     {
       "requirement_id": "TGT-027",
@@ -1550,7 +1577,7 @@
         "scripts/certify_release_grade.py"
       ],
       "dependencies": [],
-      "positive_gate": "backend/tests/test_db_upgrade.py",
+      "positive_gate": "_architecture/release/evidence/arm64_portable_lifecycle_20261023.json",
       "negative_gate": "backend/tests/test_clean_machine_macos.py::test_same_head_previous_version_is_rejected",
       "benchmark": null,
       "evidence_refs": [
@@ -1558,12 +1585,15 @@
         "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
         "docs/release/MACOS_APP.md",
         "backend/tests/test_clean_machine_macos.py::test_distinct_version_flow_emits_all_required_evidence",
-        "_architecture/release/evidence/arm64_runtime_source_20261016.json"
+        "_architecture/release/evidence/arm64_runtime_source_20261023.json",
+        "_architecture/release/evidence/arm64_runtime_materialization_20261023.json",
+        "_architecture/release/evidence/arm64_portable_lifecycle_20261023.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917324456"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N20",
-      "notes": "Both release lanes are required (A7). Native app upgrade/reinstall and database migration behavior are evidenced. The portable arm64 source/lock/manifest boundary is now independently frozen by arm64_runtime_source_20261016.json, removing the former source-input blocker. The distinct-version portable upgrade/rollback and clean-machine packaged lifecycle still have no native Apple-Silicon receipt from two distinct portable versions, so this row remains PROVISIONAL."
+      "notes": "PASS: native-app upgrade/reinstall and database migration evidence are retained, and the required native arm64 portable lane now has exact-main distinct-version lifecycle proof at merge SHA 685a0866a3b70c719897e7dd06ca4413196a15f2. Run 39917324456 certifies 0.1.23 -> 0.1.24 install, launch, representative workflow, post-launch bundle immutability, rollback and reinstall using the governed arm64 runtime. Clean-host, physical-input, Developer ID signing and notarization are separate requirements and are not claimed by this row."
     },
     {
       "requirement_id": "TGT-030",
@@ -1651,23 +1681,29 @@
       "requirement_id": "TGT-034",
       "requirement_text": "Error behavior",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
         "backend/app/error_categories.py",
-        "backend/app/work_runs.py"
+        "backend/app/work_runs.py",
+        "backend/app/main.py",
+        "backend/app/auth.py"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
+      "positive_gate": "backend/tests/test_api_error_categories.py::test_bad_request_api_error_includes_input_category",
+      "negative_gate": "backend/tests/test_api_error_categories.py::test_operator_auth_error_includes_permission_category",
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_work_runs.py::test_crashing_step_ends_the_run_failed_with_a_category",
-        "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped"
+        "backend/tests/test_work_runs.py::test_unknown_command_is_reported_not_silently_dropped",
+        "backend/tests/test_api_error_categories.py",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39885279614",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39885279596",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39885279593"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Run errors, warnings and tool results carry TGT-034 categories; plain API error payloads do not yet include a category."
+      "notes": "PASS: canonical error categories now cover run failures, warnings, tool results, Mucaro structured API errors, operator-auth failures and remote-access denial without changing existing HTTP or machine-readable status semantics. PR #268 exact head b51fc6696895051cd1827422bcd721883faff8b6 passed CI, Chromium/WebKit rendered QA and macOS build/install/open E2E."
     },
     {
       "requirement_id": "TGT-035",
@@ -1946,23 +1982,32 @@
       "requirement_id": "MATRIX-010",
       "requirement_text": "File-ingestion benchmark",
       "scope_state": "IN_SCOPE",
-      "implementation_state": "PARTIAL",
+      "implementation_state": "IMPLEMENTED",
       "implementation_refs": [
-        "backend/tests/test_ingestion_safety.py",
-        "backend/tests/test_parser.py"
+        "backend/app/ingestion_benchmark.py",
+        "_architecture/ingestion_benchmark_v1.json",
+        "_architecture/ingest_format_registry_v1.json",
+        "backend/tests/test_matrix010_ingestion_benchmark.py",
+        "scripts/certify_matrix010_ingestion.py",
+        ".github/workflows/matrix010-ingestion-cert.yml"
       ],
       "dependencies": [],
-      "positive_gate": null,
-      "negative_gate": null,
-      "benchmark": null,
+      "positive_gate": ".github/workflows/matrix010-ingestion-cert.yml",
+      "negative_gate": "backend/tests/test_matrix010_ingestion_benchmark.py",
+      "benchmark": "_architecture/ingestion_benchmark_v1.json",
       "evidence_refs": [
-        "backend/tests/test_ingestion_safety.py",
-        "backend/tests/test_parser.py"
+        "_architecture/ingestion_benchmark_v1.json",
+        "_architecture/ingest_format_registry_v1.json",
+        "backend/app/ingestion_benchmark.py",
+        "backend/tests/test_matrix010_ingestion_benchmark.py",
+        "scripts/certify_matrix010_ingestion.py",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39963895136",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39963895136/artifacts/12505044961"
       ],
-      "state": "PROVISIONAL",
+      "state": "PASS",
       "blocker_id": null,
       "dag_node": "N07",
-      "notes": "Malformed, mislabeled, empty, truncated, encrypted, oversized, archive-attack and unsupported cases are covered; a declared format registry and a frozen benchmark receipt remain OPEN (TGT-012)."
+      "notes": "PASS: exact-head MATRIX-010 certification at 2acf4e611981a78d194b0b111a82b47e432e5915 executed the frozen 22-format denominator plus all 8 required adversarial classes. Run 39963895136 completed SUCCESS and emitted MATRIX010_INGESTION_CERT_OK: format 22/22 PASS, adversarial 8/8 PASS, zero failures, format/adversarial arithmetic closed, failed_terminal_checks=[], receipt SHA-256 6a14d4dc45459a7a822384d384f075fdbb18312be19db24474016a5079aa8f91. Uploaded artifact 12505044961 is 19,944 bytes with GitHub artifact digest sha256:9202b67f9fb66e814b3ca44a507bcef2899c410586230eb41cf15687a8d86494."
     },
     {
       "requirement_id": "MATRIX-011",
@@ -2141,12 +2186,16 @@
         "_architecture/release/evidence/macos_app_0a806c1e8c98/e2e_receipt.json",
         "_architecture/release/evidence/macos_app_0a806c1e8c98/window.png",
         "_architecture/release/evidence/macos_app_0a806c1e8c98/build_receipt.json",
-        "_architecture/release/evidence/arm64_runtime_source_20261016.json"
+        "_architecture/release/evidence/arm64_runtime_source_20261016.json",
+        "_architecture/release/evidence/arm64_runtime_source_20261023.json",
+        "_architecture/release/evidence/arm64_runtime_materialization_20261023.json",
+        "_architecture/release/evidence/arm64_portable_lifecycle_20261023.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917324456"
       ],
       "state": "BLOCKED",
       "blocker_id": "BLK-PHYS-001",
       "dag_node": "N20",
-      "notes": "Both release lanes are required (A7). Native app build/install/LaunchServices/GUI/workflow/relaunch evidence is retained. The native arm64 portable source, archive identity and dependency lock are now governed by arm64_runtime_source_20261016.json and packaging/runtime/macos-arm64.json. The portable app benchmark has not yet been executed end to end on that materialized runtime. A literal double-click remains independently blocked by BLK-PHYS-001."
+      "notes": "Both release lanes are required (A7). Native app build/install/LaunchServices/GUI/workflow/relaunch evidence is retained. The native arm64 portable benchmark now has exact-main end-to-end install/launch/representative-workflow/post-launch immutability/reinstall and 0.1.23 -> 0.1.24 rollback evidence at merge SHA 685a0866a3b70c719897e7dd06ca4413196a15f2 via run 39917324456. The row remains BLOCKED solely on the independently declared literal physical double-click requirement BLK-PHYS-001."
     },
     {
       "requirement_id": "MATRIX-019",
@@ -2168,12 +2217,14 @@
         "backend/tests/test_release_grade_certification.py::test_clean_machine_receipt_must_prove_the_bundle_stayed_immutable",
         "_architecture/release/evidence/release_grade_0a806c1e8c98/release_grade_receipt.json",
         "_architecture/release/evidence/release_grade_0a806c1e8c98/provenance.json",
-        "_architecture/release/evidence/arm64_runtime_source_20261016.json"
+        "_architecture/release/evidence/arm64_runtime_source_20261016.json",
+        "_architecture/release/evidence/arm64_portable_lifecycle_20261023.json",
+        "https://github.com/jotaele44/mucaro-ai/actions/runs/39917324456"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N24",
-      "notes": "The release-grade sequence still requires both release lanes (A7). Native/common gates retain their prior evidence. The arm64 portable source/lock/manifest input boundary is now frozen and reproducible, but Apple-Silicon runtime materialization, portable install/reinstall, distinct-version rollback, and clean-host packaged lifecycle receipts remain OPEN; signing/notarization and release-scope residue remain independent. Therefore this row remains PROVISIONAL."
+      "notes": "The release-grade sequence still requires both release lanes (A7). Native/common evidence is retained, and the native arm64 portable source/runtime/application lifecycle is now proven on exact main at 685a0866a3b70c719897e7dd06ca4413196a15f2, including distinct-version rollback and reinstall. This does not establish that the hosted runner was a separately provisioned clean host; physical-input, Developer ID signing/notarization and remaining release-scope residue also remain independent. Therefore MATRIX-019 stays PROVISIONAL."
     },
     {
       "requirement_id": "MATRIX-020",

@@ -8,9 +8,12 @@
       "external_dependency": "User must supply the specification document.",
       "evidence": [
         "repository search 2026-09-24 for 'Workbench Specification'/'release-grade' found no specification file",
-        "Google Drive search 2026-09-24 (title/fullText 'Mucaro', 'Workbench', 'Release-Grade') returned no files"
+        "Google Drive search 2026-09-24 (title/fullText 'Mucaro', 'Workbench', 'Release-Grade') returned no files",
+        "docs/release/MUCARO_WORKBENCH_SPEC_BINDING_V1.md",
+        "docs/release/MUCARO_100_SCORE_CONTRACT_V1.md",
+        "_architecture/release/release_scope_manifest_v1.json"
       ],
-      "what_would_unblock": "Commit the specification under docs/release/, bind its hash in the manifest, and re-enumerate requirements (new IDs enter via scope delta).",
+      "what_would_unblock": "RESOLVED",
       "dependent_nodes": [
         "N25"
       ],
@@ -26,8 +29,8 @@
         "N17",
         "N19"
       ],
-      "status": "ACTIVE",
-      "resolution": null
+      "status": "RESOLVED",
+      "resolution": "Resolved by project-owner authority on 2026-10-20: the already hash-bound MUCARO_RELEASE_ENGINEERING_CONTRACT_V1 is the canonical Mucaro AI Release-Grade Workbench Specification. The binding decision is recorded in docs/release/MUCARO_WORKBENCH_SPEC_BINDING_V1.md. No requirement rows were added, deleted, or reclassified."
     },
     {
       "blocker_id": "BLK-SIGN-001",

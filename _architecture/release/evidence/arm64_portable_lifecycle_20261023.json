@@ -1,0 +1,72 @@
+{
+  "schema_version": "mucaro-arm64-portable-lifecycle-evidence/1.0",
+  "status": "PASS",
+  "observed_utc": "2026-10-23T07:24:33Z",
+  "repository": "jotaele44/mucaro-ai",
+  "canonical_head_sha": "685a0866a3b70c719897e7dd06ca4413196a15f2",
+  "source_pull_request": {
+    "number": 285,
+    "head_sha": "c2af5ae871cc21d48ffb0f0eab9afd12cd53229d",
+    "merge_commit_sha": "685a0866a3b70c719897e7dd06ca4413196a15f2"
+  },
+  "workflow": {
+    "name": "ARM64 Portable Application Lifecycle Certification",
+    "run_id": 39917324456,
+    "run_number": 8,
+    "event": "push",
+    "conclusion": "success",
+    "artifact_id": 12484709232,
+    "artifact_size_bytes": 165279322,
+    "artifact_digest": "sha256:0f36894064fdb998817c917cd96c6e663c591a863e5f0f9dd5a5e6b7a24929d9",
+    "independently_observed_artifact_sha256": "0f36894064fdb998817c917cd96c6e663c591a863e5f0f9dd5a5e6b7a24929d9"
+  },
+  "release_versions": {
+    "previous": "0.1.23",
+    "current": "0.1.24"
+  },
+  "previous_head_sha": "25b41e33b2d832e582fc2800d52bc07461ebc4ae",
+  "runtime": {
+    "architecture": "arm64",
+    "platform": "darwin",
+    "python_version": "3.13.15",
+    "manifest_path": "packaging/runtime/macos-arm64.json",
+    "manifest_sha256": "db164083c2831f15239ec34e45c90e21bd64f2f90486d3d6238af83d47f10b0c",
+    "dependency_lock_sha256": "0e1cc8681290c5b52250bea327ebd705ef1877f68ed5345e95d82d7e365192f2",
+    "runtime_tree": {
+      "member_count": 3909,
+      "total_bytes": 229533982,
+      "tree_sha256": "0e6eb72c768011acf053a774e86a1ee8ac66f6a0b580ce57d7f8c596fff3e41e"
+    },
+    "verification_status": "PORTABLE_RUNTIME_VERIFIED",
+    "user_site_present": false
+  },
+  "lifecycle": {
+    "status": "PORTABLE_RELEASE_LANE_VERIFIED",
+    "packaged_lifecycle_receipt_status": "PACKAGED_LIFECYCLE_VERIFIED",
+    "packaged_lifecycle_receipt_sha256": "ac0fd4041e2c5a784eb01ea86342a9792769acd11952f3ef56ccfe10ef9ce85f",
+    "checks": {
+      "portable_embedded_runtime": true,
+      "runtime_architecture": true,
+      "packaged_lifecycle_macos": true,
+      "portable_install_reinstall_smoke": true,
+      "distinct_version_upgrade_rollback": true,
+      "post_launch_bundle_immutable": true,
+      "representative_workflow": true
+    },
+    "current_app_manifest_sha256": "ad2cb0a910f0634b00c5f40eba78ead6b1227366c888ae25bffb485d0ca10e3c",
+    "previous_app_manifest_sha256": "6a48c7d5ddad5912b77c47ef0f255a9d5a34d63df54e4c47cfc0433f8a59cea1",
+    "current_app_zip_sha256": "a71e54be09499c7f5e3a24c7bd619d473667717cd83f299eaeafd25e6537ffdb",
+    "previous_app_zip_sha256": "946d55bf2684588b51b50b5489c53b466bf871a2bf67e5bdcd5a1dd5e3235a8c"
+  },
+  "boundaries": {
+    "clean_host_certified": false,
+    "physical_input_certified": false,
+    "signing_notarization_certified": false
+  },
+  "shadow_qa": {
+    "run_id": 39917324441,
+    "state": "PROVISIONAL",
+    "product_tests": "1456 passed, 1 skipped",
+    "reason": "Generic Shadow QA lacks checkpoint-specific evidence for 15 adversarial vectors; this is independent of the arm64 lifecycle PASS."
+  }
+}

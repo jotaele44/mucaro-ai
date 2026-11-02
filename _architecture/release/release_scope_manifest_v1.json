@@ -15,7 +15,7 @@
   "bound_specifications": [
     {
       "spec_id": "MUCARO_RELEASE_ENGINEERING_CONTRACT_V1",
-      "title": "Mucaro AI — Autonomous Release Engineering Contract",
+      "title": "Mucaro AI Release-Grade Workbench Specification (canonical MUCARO_RELEASE_ENGINEERING_CONTRACT_V1 binding)",
       "path": "docs/release/MUCARO_RELEASE_ENGINEERING_CONTRACT_V1.md",
       "version": null,
       "sha256": "5d031f20011bc04dae796ae9edda25bcf6e004e65f85124f0de99a0f4b079ad5",
@@ -36,7 +36,7 @@
         }
       ],
       "binding": "BOUND",
-      "provenance": "User-issued contract text, committed verbatim 2026-09-24."
+      "provenance": "User-issued contract text committed 2026-09-24; formally adopted by project owner on 2026-10-20 as the canonical Mucaro AI Release-Grade Workbench Specification without denominator expansion."
     },
     {
       "spec_id": "MOBILE_INTERACTION_EXTRACTION_V1",
@@ -51,17 +51,7 @@
       "provenance": "User-issued brief (source recording ZIP SHA-256 db2e4759...c469c4), committed verbatim 2026-09-24."
     }
   ],
-  "missing_specifications": [
-    {
-      "name": "Mucaro AI Release-Grade Workbench Specification",
-      "binding": "OPEN",
-      "blocker_id": "BLK-SPEC-001",
-      "search_record": [
-        "repository full-text search 2026-09-24: not found",
-        "Google Drive search 2026-09-24: not found"
-      ]
-    }
-  ],
+  "missing_specifications": [],
   "requirements": [
     {
       "requirement_id": "GOAL-001",

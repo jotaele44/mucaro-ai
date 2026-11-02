@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from backend.app.capability_policy import CapabilityPolicy
+from backend.app.artifact_identity import list_artifacts, trace_ancestors
 from backend.app.config import Settings
 from backend.app.skill_runtime import (
     SkillDefinition,
@@ -76,12 +77,53 @@ def test_skill_must_mount_then_activate_before_execution(tmp_path: Path):
     assert executed["result"]["repo_id"] == "mucaro-ai"
     assert executed["result"]["membership_status"] == "PROVISIONAL"
     assert executed["result"]["baseline_required"] is False
+    lineage = executed["execution"]["artifact_lineage"]
+    assert lineage["input"]["artifact_type"] == "SOURCE"
+    assert lineage["output"]["artifact_type"] == "DERIVED"
+    assert lineage["output"]["parent_artifact_ids"] == [lineage["input"]["artifact_id"]]
+    assert [row["artifact_id"] for row in trace_ancestors(cfg.processed_dir, lineage["output"]["artifact_id"])] == [
+        lineage["input"]["artifact_id"]
+    ]
 
     mounts = list_skill_mounts(cfg)["mounts"]
     executions = list_skill_executions(cfg)["executions"]
     assert len(mounts) == 1
     assert len(executions) == 1
     assert executions[0]["skill_digest"] == mounts[0]["digest"]
+    assert len(list_artifacts(cfg.processed_dir)) == 2
+
+
+def test_failed_skill_execution_keeps_input_and_failure_receipt_lineage(monkeypatch, tmp_path: Path):
+    from backend.app import skill_runtime
+
+    cfg = make_settings(tmp_path)
+    definition = SkillDefinition(
+        skill_id="test/failing-artifact-skill",
+        version="1.0.0",
+        description="Synthetic failure provenance test.",
+        runtime="IN_PROCESS",
+        capabilities=(),
+        input_schema="test.input/1",
+        output_schema="test.output/1",
+        handler=lambda arguments, settings: (_ for _ in ()).throw(RuntimeError("expected failure")),
+    )
+    monkeypatch.setitem(skill_runtime.SKILL_REGISTRY, definition.skill_id, definition)
+    mount_skill(definition.skill_id, cfg=cfg)
+    activate_skill(definition.skill_id, cfg=cfg)
+
+    try:
+        execute_skill(definition.skill_id, {"request": "failure"}, cfg=cfg)
+    except SkillRuntimeError as exc:
+        assert exc.status == "ERROR_SKILL_EXECUTION_FAILED"
+    else:
+        raise AssertionError("expected skill execution failure")
+
+    event = list_skill_executions(cfg)["executions"][0]
+    lineage = event["artifact_lineage"]
+    assert lineage["input"]["artifact_type"] == "SOURCE"
+    assert lineage["output"] is None
+    assert lineage["failure_receipt"]["artifact_type"] == "RECEIPT"
+    assert lineage["failure_receipt"]["parent_artifact_ids"] == [lineage["input"]["artifact_id"]]
 
 
 def test_app_store_channel_allows_only_reviewed_in_process_skill(monkeypatch, tmp_path: Path):
@@ -277,3 +319,129 @@ def test_execute_rejects_tampered_mount_grant(monkeypatch, tmp_path: Path):
         assert "network.public_http" in exc.detail
     else:
         raise AssertionError("expected tampered grant to be refused at execution")
+
+
+def _exact_head_arguments() -> dict:
+    candidate = "a155464486798b5e0bd6d6f623138b37982013c5"
+    return {
+        "baseline_sha": "916a4e3793550d0bf22e5be22a8c0bc0a7c17ffa",
+        "candidate_sha": candidate,
+        "observed_head_sha": candidate,
+        "observed_remote_sha": candidate,
+        "observed_pr_head_sha": candidate,
+        "worktree_clean": True,
+        "required_gates": ["CI", "SECURITY", "RUNTIME", "ADVERSARIAL"],
+        "passed_gates": ["ADVERSARIAL", "RUNTIME", "SECURITY", "CI"],
+        "unresolved_states": [],
+        "superseded_shas": ["f19646924fc057fd69834257e85e14f7a06dcd03"],
+        "manifest_sha256": "a" * 64,
+        "evidence_sha256": "b" * 64,
+    }
+
+
+def test_exact_head_certification_skill_passes_only_closed_exact_identity(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/exact-head-certification-audit"
+    mount_skill(skill_id, cfg=cfg)
+    activate_skill(skill_id, cfg=cfg)
+    result = execute_skill(skill_id, _exact_head_arguments(), cfg=cfg)["result"]
+
+    assert result["status"] == "EXACT_HEAD_CERTIFICATION_PASS"
+    assert result["certification_state"] == "PASS"
+    assert result["promotable"] is True
+    assert result["fail_closed"] is True
+    assert result["identity_match"] is True
+    assert result["missing_gates"] == []
+    assert result["unresolved_states"] == []
+    assert result["reasons"] == []
+
+
+def test_exact_head_certification_skill_fails_closed_on_sha_drift_and_gate_residue(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/exact-head-certification-audit"
+    mount_skill(skill_id, cfg=cfg)
+    activate_skill(skill_id, cfg=cfg)
+    arguments = _exact_head_arguments()
+    arguments["observed_remote_sha"] = "0" * 40
+    arguments["passed_gates"] = ["CI", "SECURITY"]
+    arguments["unresolved_states"] = ["RUNTIME_OPEN"]
+    result = execute_skill(skill_id, arguments, cfg=cfg)["result"]
+
+    assert result["status"] == "EXACT_HEAD_CERTIFICATION_OPEN"
+    assert result["certification_state"] == "OPEN"
+    assert result["promotable"] is False
+    assert result["identity_match"] is False
+    assert result["missing_gates"] == ["ADVERSARIAL", "RUNTIME"]
+    assert result["unresolved_states"] == ["RUNTIME_OPEN"]
+    assert any("candidate SHA mismatch: remote" in reason for reason in result["reasons"])
+    assert any("required gates not passed" in reason for reason in result["reasons"])
+    assert any("unresolved certification residue" in reason for reason in result["reasons"])
+
+
+def test_exact_head_certification_skill_rejects_superseded_candidate_and_bad_hashes(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/exact-head-certification-audit"
+    mount_skill(skill_id, cfg=cfg)
+    activate_skill(skill_id, cfg=cfg)
+    arguments = _exact_head_arguments()
+    arguments["superseded_shas"] = [arguments["candidate_sha"]]
+    arguments["manifest_sha256"] = "not-a-hash"
+    result = execute_skill(skill_id, arguments, cfg=cfg)["result"]
+
+    assert result["certification_state"] == "OPEN"
+    assert result["promotable"] is False
+    assert "candidate SHA is explicitly superseded" in result["reasons"]
+    assert any("manifest_sha256" in reason for reason in result["reasons"])
+
+
+
+def test_exact_head_certification_skill_rejects_null_empty_required_values(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/exact-head-certification-audit"
+    mount_skill(skill_id, cfg=cfg)
+    activate_skill(skill_id, cfg=cfg)
+    arguments = {
+        "baseline_sha": None,
+        "candidate_sha": None,
+        "observed_head_sha": None,
+        "observed_remote_sha": None,
+        "observed_pr_head_sha": None,
+        "worktree_clean": True,
+        "required_gates": [],
+        "passed_gates": [],
+        "manifest_sha256": None,
+        "evidence_sha256": None,
+        "unresolved_states": [],
+        "superseded_shas": [],
+    }
+    result = execute_skill(skill_id, arguments, cfg=cfg)["result"]
+
+    assert result["certification_state"] == "OPEN"
+    assert result["promotable"] is False
+    assert result["identity_match"] is False
+    assert "required_gates must be a nonempty string list" in result["reasons"]
+    assert any("baseline_sha" in reason for reason in result["reasons"])
+    assert any("candidate_sha" in reason for reason in result["reasons"])
+    assert any("manifest_sha256" in reason for reason in result["reasons"])
+    assert any("evidence_sha256" in reason for reason in result["reasons"])
+
+
+def test_exact_head_certification_skill_normalizes_sha_case_for_supersession(tmp_path: Path):
+    cfg = make_settings(tmp_path)
+    skill_id = "mucaro/exact-head-certification-audit"
+    mount_skill(skill_id, cfg=cfg)
+    activate_skill(skill_id, cfg=cfg)
+    arguments = _exact_head_arguments()
+    upper = arguments["candidate_sha"].upper()
+    arguments["candidate_sha"] = upper
+    arguments["observed_head_sha"] = upper
+    arguments["observed_remote_sha"] = upper
+    arguments["observed_pr_head_sha"] = upper
+    arguments["superseded_shas"] = [upper.lower()]
+    result = execute_skill(skill_id, arguments, cfg=cfg)["result"]
+
+    assert result["certification_state"] == "OPEN"
+    assert result["promotable"] is False
+    assert result["candidate_sha"] == upper.lower()
+    assert result["identity_match"] is True
+    assert "candidate SHA is explicitly superseded" in result["reasons"]

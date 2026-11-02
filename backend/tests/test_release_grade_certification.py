@@ -164,7 +164,7 @@ def test_final_release_manifest_names_every_missing_or_blocked_entry() -> None:
     else:
         assert record["source_tree_sha"]["state"] == "MISSING"
     assert all(row.get("verified") for row in record["specifications"] if "sha256" in row)
-    assert any(row.get("state") == "BLOCKED" for row in record["specifications"])  # BLK-SPEC-001
+    assert not any(row.get("state") == "BLOCKED" for row in record["specifications"])
     assert record["application_artifact"]["state"] == "MISSING"  # no macOS receipt supplied
     assert record["signing_receipt"]["state"] == record["notarization_receipt"]["state"] == "BLOCKED"
     assert "application_artifact" in record["missing_entries"] and record["complete_except_blocked"] is False

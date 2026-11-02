@@ -216,7 +216,7 @@ def test_blocked_state_requires_active_blocker(tmp_path):
     _save(root, "acceptance", ledger)
     blockers = _load(root, "blockers")
     for blocker in blockers["blockers"]:
-        if blocker["blocker_id"] == "BLK-SPEC-001":
+        if blocker["blocker_id"] == "BLK-SIGN-001":
             blocker["status"] = "RESOLVED"
             blocker["resolution"] = "test"
     _save(root, "blockers", blockers)
@@ -224,7 +224,7 @@ def test_blocked_state_requires_active_blocker(tmp_path):
     errors = report["errors"]
     assert {"code": "ERROR_BLOCKED_WITHOUT_BLOCKER", "detail": "TGT-008"} in errors
     assert {"code": "ERROR_UNKNOWN_BLOCKER", "detail": "TGT-009:BLK-NOPE-001"} in errors
-    assert {"code": "ERROR_BLOCKER_NOT_ACTIVE", "detail": "KERNEL-003:BLK-SPEC-001"} in errors
+    assert {"code": "ERROR_BLOCKER_NOT_ACTIVE", "detail": "TGT-028:BLK-SIGN-001"} in errors
 
 
 def test_scope_delta_defect_must_enter_denominator(tmp_path):
@@ -334,7 +334,7 @@ def test_release_status_is_provisional_with_residue():
     status = compute_release_status(REPO_ROOT)
     assert status["status"] == STATUS_PROVISIONAL
     assert status["release_status_line"] == "MUCARO AI RELEASE STATUS = PROVISIONAL"
-    assert status["conditions"]["bound_specification"] is False
+    assert status["conditions"]["bound_specification"] is True
     assert "TGT-027" in status["residue"]["externally_blocked"]
     ledger = json.loads((REPO_ROOT / "_architecture/release/contradiction_ledger_v1.json").read_text(encoding="utf-8"))
     expected = sorted(row["contradiction_id"] for row in ledger["contradictions"] if row["material"] and row["state"] == "UNRESOLVED")

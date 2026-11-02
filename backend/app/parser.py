@@ -14,7 +14,8 @@ from xml.etree import ElementTree
 
 from .archive_safety import ArchiveSafetyError, inspect_zip, read_member_limited
 from .file_signatures import SignatureError, check_signature
-from .multimodal import MULTIMODAL_SUFFIXES, parse_multimodal_metadata
+from .format_registry import MULTIMODAL_SUFFIXES, detect_mime_for_suffix
+from .multimodal import parse_multimodal_metadata
 
 
 class ParseError(RuntimeError):
@@ -149,31 +150,7 @@ class _HTMLTextExtractor(HTMLParser):
 
 
 def detect_mime(path: Path) -> str:
-    suffix = path.suffix.lower()
-    return {
-        ".txt": "text/plain",
-        ".md": "text/markdown",
-        ".html": "text/html",
-        ".htm": "text/html",
-        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ".eml": "message/rfc822",
-        ".msg": "application/vnd.ms-outlook",
-        ".csv": "text/csv",
-        ".json": "application/json",
-        ".pdf": "application/pdf",
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".gif": "image/gif",
-        ".webp": "image/webp",
-        ".wav": "audio/wav",
-        ".mp3": "audio/mpeg",
-        ".m4a": "audio/mp4",
-        ".mp4": "video/mp4",
-        ".mov": "video/quicktime",
-        ".webm": "video/webm",
-        ".zip": "application/zip",
-    }.get(suffix, "application/octet-stream")
+    return detect_mime_for_suffix(path.suffix)
 
 
 def _base_result(path: Path, *, parser: str, mime_type: str, warnings: list[str] | None = None, **metadata: Any) -> dict[str, Any]:

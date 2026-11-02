@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "f70ebd8e815bd4f4044b67455c8a33c7ef05789b",
+  "audit_head": "39b5cc7f938e6db023162952d0779518ed887e88",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -340,6 +340,54 @@
         "certification report sha256=0249b023d286c9e6332fbd98e633b49797cd98e631c0efcad34c123f0fb3fe6e"
       ],
       "reason": "The frozen real-world corpus gate authorizes at most RT-09 OPEN→PROVISIONAL. A 24-document authoritative IETF/W3C/NIST corpus was acquired, hash-frozen, parsed across TXT/HTML/PDF, evaluated against 24 exact source-bound queries with 100% top-5 hit rate, and bound to exact manifest/source/query denominators. RT-10 production-scale stress remains independently unresolved, so PASS is not authorized."
+    },
+    {
+      "event_id": "evt-bc09-container-runtime-pass-20261022",
+      "requirement_id": "BC-09",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "MERGED_DETERMINISTIC_CONTAINER_ROUTER_WITH_TRUSTED_LIVE_EXECUTION",
+      "evidence": [
+        "main@39b5cc7f938e6db023162952d0779518ed887e88",
+        "evt-code06-live-mutation-pass",
+        "evt-code07-full-profile-pass",
+        "GitHub Actions CI run 35431347821 conclusion=success",
+        "GitHub Actions CI run 35430951380 conclusion=success",
+        "network-disabled non-root isolated container execution + deterministic routing + host-source conservation"
+      ],
+      "reason": "BC-09 remained PROVISIONAL only because the container/router boundary lacked trusted live runtime execution. Later frozen CODE-06 and CODE-07 evidence executed governed mutation plus the complete test/lint/type/build profile in the pinned, non-root, network-disabled isolated container while preserving host source bytes. The deterministic routing/container boundary is merged on current main, so the original execution residue is closed."
+    },
+    {
+      "event_id": "evt-rt10-scale-pass-20261022",
+      "requirement_id": "RT-10",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "EXECUTED_PRODUCTION_SCALE_RETRIEVAL_STRESS_CERTIFICATION",
+      "evidence": [
+        "main@39b5cc7f938e6db023162952d0779518ed887e88",
+        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+        "GitHub Actions run 36643492834 job 117130186355 conclusion=success",
+        "artifact#12066717067 sha256:4af2ed16aecd44e9403bcfd6e673b20682632cd37d37601aef2bdc038fa3b08b",
+        "10,000 chunks / 80 queries / 72 expected bindings / 0 threshold failures",
+        "expected_source_hit_rate=1.0 expected_binding_recall=1.0 negative_query_accuracy=1.0"
+      ],
+      "reason": "The declared RT-10 production-scale local-workstation proxy was executed under hosted CI with exact source-tree equivalence, 10,000 chunks, 80 queries, perfect declared retrieval/citation quality metrics, bounded memory/latency evidence, and zero threshold failures. The frozen evidence explicitly limits the claim to the deterministic local hybrid retrieval path."
+    },
+    {
+      "event_id": "evt-rt09-real-world-corpus-pass-20261022",
+      "requirement_id": "RT-09",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "FROZEN_REAL_WORLD_CORPUS_PLUS_INDEPENDENT_SCALE_CLOSURE",
+      "evidence": [
+        "evt-rt09-real-world-corpus-provisional",
+        "GitHub Actions RT09 Real World Retrieval Certification run 36382763249 conclusion=success",
+        "artifact#10952734875 sha256:1eb4198e783fbaa84ae60610c7048d6e889c077aaf59aa70c7db29cebd4badac",
+        "24 authoritative IETF/W3C/NIST sources / 24 queries / 3 formats / 8,277,197 source bytes / 4,933 chunks",
+        "_architecture/release/evidence/rt10_matrix007_execution_20261016.json",
+        "evt-rt10-scale-pass-20261022"
+      ],
+      "reason": "RT-09's frozen representative real-world corpus was already fully source-bound and executed with 100% top-5 expected-source hit rate; its prior event explicitly withheld PASS only because RT-10 production-scale stress remained unresolved. RT-10 is now independently PASS with executed scale evidence, so the stated RT-09 residue is closed without changing the frozen corpus."
     }
   ]
 }

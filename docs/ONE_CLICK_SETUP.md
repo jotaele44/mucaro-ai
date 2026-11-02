@@ -1,6 +1,6 @@
 # Double-Click Setup
 
-Double-click `Mucaro AI.app` (macOS) or `Mucaro AI.exe` (Windows) beside `pyproject.toml`.
+Double-click `Mucaro AI Setup.app` (macOS) or `Mucaro AI.exe` (Windows) beside `pyproject.toml`.
 The app provisions private runtimes and builds the UI quietly, then opens its native window. No
 Terminal, console or browser launches. First setup requires internet access; completed steps
 are cached. Errors appear in a dialog with the startup log path. Keep the whole checkout together

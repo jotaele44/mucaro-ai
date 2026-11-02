@@ -1,0 +1,25 @@
+MÚCARO AI — RELEASE WORKFLOW
+Artifact execution: NOT_APPLICABLE
+
+Local/current-head gates
+python3 scripts/certify_release.py
+python3 scripts/certify_fresh_clone.py
+python3 scripts/mucaro.py release scope status --format text
+python3 scripts/certify_mucaro_100.py --strict --format text
+
+Windows PowerShell equivalents
+py -3.12 scripts/certify_release.py
+py -3.12 scripts/certify_fresh_clone.py
+py -3.12 scripts/mucaro.py release scope status --format text
+py -3.12 scripts/certify_mucaro_100.py --strict --format text
+
+Handoff
+python3 scripts/mucaro.py release handoff --refresh-certification --format text
+py -3.12 scripts/mucaro.py release handoff --refresh-certification --format text
+
+Artifact verification
+Use the exact artifact and manifest paths emitted by the release commands.
+macOS/Linux: shasum -a 256 <artifact-path>
+Windows PowerShell: certutil -hashfile <artifact-path> SHA256
+
+Release is blocked unless the final source HEAD, generated artifact identities, hashes, platform evidence, installation lifecycle, and both MUCARO_100 denominators agree.

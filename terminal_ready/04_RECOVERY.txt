@@ -1,0 +1,29 @@
+MÚCARO AI — FAILURE / RECOVERY WORKFLOW
+Artifact execution: NOT_APPLICABLE
+
+Inspect before changing state
+git status --short
+git rev-parse HEAD
+git diff --stat
+git diff
+
+Rules
+Do not reset or discard unrelated user changes.
+Do not overwrite historical evidence.
+Do not redownload mutable evidence merely because a downstream gate failed.
+Reuse passed artifacts unless their input identity or a concrete falsifier changed.
+Classify partial writes, failed migrations, missing dependencies, network denial, stale evidence, and checksum mismatch separately.
+
+Recovery verification
+python3 scripts/preflight.py --strict-imports
+python3 -m pytest backend/tests -q
+python3 scripts/validate_json.py
+python3 scripts/certify_mucaro_100.py --format text
+
+Windows PowerShell
+py -3.12 scripts/preflight.py --strict-imports
+py -3.12 -m pytest backend/tests -q
+py -3.12 scripts/validate_json.py
+py -3.12 scripts/certify_mucaro_100.py --format text
+
+A recovered runtime is not automatically a recovered release. Re-run every downstream gate whose inputs changed.
