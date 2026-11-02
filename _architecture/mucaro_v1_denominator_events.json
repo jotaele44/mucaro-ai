@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "39b5cc7f938e6db023162952d0779518ed887e88",
+  "audit_head": "f8709cc9f8299ca7f9827dd204693912b1cb7511",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -388,6 +388,60 @@
         "evt-rt10-scale-pass-20261022"
       ],
       "reason": "RT-09's frozen representative real-world corpus was already fully source-bound and executed with 100% top-5 expected-source hit rate; its prior event explicitly withheld PASS only because RT-10 production-scale stress remained unresolved. RT-10 is now independently PASS with executed scale evidence, so the stated RT-09 residue is closed without changing the frozen corpus."
+    },
+    {
+      "event_id": "evt-code03-repo-read-pass-20261102",
+      "requirement_id": "CODE-03",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "EXACT_HOSTED_REGRESSION_CORPUS_WITH_CURRENT_MAIN_BYTE_IDENTITY",
+      "evidence": [
+        "PR#248",
+        "certified head@cf45bffd0fea84dec7129a42eee17c984077a01f",
+        "GitHub Actions CI run 39507986092 conclusion=success",
+        "GitHub Actions Coding Regression Certification run 39507986085 conclusion=success",
+        "artifact#12303638881 mucaro-coding-full-profile.json",
+        "artifact#12304168137 coding-regression-cert-cf45bffd0fea84dec7129a42eee17c984077a01f",
+        "CODE-R01 through CODE-R04 = PASS",
+        "current main@f8709cc9f8299ca7f9827dd204693912b1cb7511 coding_workspace.py and governing regression blobs byte-identical to certified head"
+      ],
+      "reason": "CODE-03 was provisional only because trusted hosted execution was absent. #248 executed the repository discovery/HEAD/branch/dirty-state, permission/path escape, UTF-8 byte/hash read, and binary/non-UTF8 negative regressions under the exact hosted coding corpus. The source and regression blobs governing this row are byte-identical on current main, so the historical execution residue is closed."
+    },
+    {
+      "event_id": "evt-code04-dirty-state-pass-20261102",
+      "requirement_id": "CODE-04",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "EXACT_HOSTED_DIRTY_STATE_AND_WORKSPACE_PROTECTION_WITH_CURRENT_MAIN_BYTE_IDENTITY",
+      "evidence": [
+        "PR#248",
+        "certified head@cf45bffd0fea84dec7129a42eee17c984077a01f",
+        "GitHub Actions CI run 39507986092 conclusion=success",
+        "GitHub Actions Coding Regression Certification run 39507986085 conclusion=success",
+        "artifact#12303638881 mucaro-coding-full-profile.json",
+        "artifact#12304168137 coding-regression-cert-cf45bffd0fea84dec7129a42eee17c984077a01f",
+        "CODING_LIFECYCLE_LIVE_CERT_OK with protected/stale/dirty/prestaged negatives and failed-commit rollback",
+        "current main@f8709cc9f8299ca7f9827dd204693912b1cb7511 coding_workspace.py, coding_lifecycle.py and governing regression blobs byte-identical to certified head"
+      ],
+      "reason": "CODE-04 required workspace and dirty-state protection, not remote Git authority. #248 executed exact dirty-set conservation and rejection paths, protected/stale/dirty/prestaged negatives, and rollback while preserving the source worktree. Those governing blobs remain byte-identical on current main. Remote push/PR authority is intentionally retained under CODE-09, not promoted here."
+    },
+    {
+      "event_id": "evt-code05-patch-receipts-pass-20261102",
+      "requirement_id": "CODE-05",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "EXACT_HOSTED_PATCH_DIFF_RECEIPT_REGRESSIONS_WITH_CURRENT_MAIN_BYTE_IDENTITY",
+      "evidence": [
+        "PR#248",
+        "certified head@cf45bffd0fea84dec7129a42eee17c984077a01f",
+        "GitHub Actions CI run 39507986092 conclusion=success",
+        "GitHub Actions Coding Regression Certification run 39507986085 conclusion=success",
+        "artifact#12303638881 mucaro-coding-full-profile.json",
+        "artifact#12304168137 coding-regression-cert-cf45bffd0fea84dec7129a42eee17c984077a01f",
+        "CODE-R05 through CODE-R08 = PASS",
+        "current main@f8709cc9f8299ca7f9827dd204693912b1cb7511 coding_patch.py and patch regression blobs byte-identical to certified head"
+      ],
+      "reason": "CODE-05 was provisional because the non-mutating patch/diff receipt plane lacked trusted execution. #248 executed candidate-set preservation, invalid-ref/oversize negatives, Git-parsed target/preimage receipts, and traversal/.git/ambiguous/oversized-patch rejection. Mutation authority remains separately governed by CODE-06, already PASS."
     }
   ]
 }
