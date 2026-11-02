@@ -1,0 +1,92 @@
+{
+  "schema": "mucaro-security-adjudication/1",
+  "code_head": "f0c18f390f8b457389575b1bac878ad0fc9d84eb",
+  "status": "BLOCKED",
+  "gates": [
+    {
+      "name": "secret_scan",
+      "status": "PASS",
+      "detail": "563 tracked files and 26 evidence files clean"
+    },
+    {
+      "name": "evidence_secret_fields",
+      "status": "PASS",
+      "detail": "no evidence value stored under a secret-like key"
+    },
+    {
+      "name": "static_security_triage",
+      "status": "PASS",
+      "detail": {
+        "findings": 116,
+        "by_classification": {
+          "LOW": 106,
+          "MEDIUM": 1,
+          "NOT_APPLICABLE": 9
+        },
+        "untriaged": [],
+        "stale_dispositions": [],
+        "shell_true_uses": []
+      }
+    },
+    {
+      "name": "python_audit_snapshot_reuse",
+      "status": "PASS",
+      "detail": {
+        "unresolved": [],
+        "packages": 45
+      }
+    },
+    {
+      "name": "npm_audit_snapshot_reuse",
+      "status": "PASS",
+      "detail": {
+        "unresolved": []
+      }
+    },
+    {
+      "name": "network_exposure",
+      "status": "FAIL",
+      "detail": {
+        "observation_status": "BLOCKED",
+        "requested_pid": 27,
+        "reason": "Cannot independently inspect the service process in this environment",
+        "error_type": "FileNotFoundError"
+      }
+    },
+    {
+      "name": "permission_boundaries",
+      "status": "PASS",
+      "detail": {
+        "tools": 13,
+        "remote_tools": [
+          "web.fetch",
+          "web.fetch_session",
+          "web.render",
+          "web.search"
+        ],
+        "remote_without_approval": [],
+        "mutating_without_approval": []
+      }
+    }
+  ],
+  "frozen_dependency_audits": [
+    {
+      "path": "data/exports/security/dcc837c47bd7/npm-audit-frontend.json",
+      "sha256": "c31170531ee0b68347f260ec731381546be3c38714ed84176a8bfd9c000401a4"
+    },
+    {
+      "path": "data/exports/security/dcc837c47bd7/pip-audit-macos-lock.json",
+      "sha256": "99ccadeb59d4ecfa85a94de0f9b1383c18aa8b566a680f95aa6b4a654ddc7480"
+    },
+    {
+      "path": "data/exports/security/dcc837c47bd7/sbom-gui.cdx.json",
+      "sha256": "d1407c4bf16a878b713df84ccb654268a9dffa6ed171b60273f6de34a908ceb6"
+    },
+    {
+      "path": "data/exports/security/dcc837c47bd7/sbom-python-macos-arm64.cdx.json",
+      "sha256": "e1c914a65be208a62830abc239cf54c48569b3ccfece2861829828b72a1ca5df"
+    }
+  ],
+  "dependency_inputs_identical_to": "dcc837c47bd7fd8841c0aa276770be4dc160fb5b",
+  "scope": "local source gates; frozen audit reuse; independently observed current service exposure"
+}

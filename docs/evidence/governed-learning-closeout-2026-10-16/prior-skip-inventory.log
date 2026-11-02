@@ -1,0 +1,5 @@
+.......s............ssssss............................................   [100%]
+=========================== short test summary info ============================
+SKIPPED [1] backend/tests/test_windows_launcher.py:101: PowerShell 7 not installed
+SKIPPED [6] backend/tests/test_one_click.py:160: PowerShell 7 not installed
+63 passed, 7 skipped in 4.25s

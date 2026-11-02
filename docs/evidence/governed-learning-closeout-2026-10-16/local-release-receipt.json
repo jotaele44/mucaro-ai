@@ -1,0 +1,163 @@
+{
+  "command": [
+    "/workspace/scratch/44be610f3be9/venv/bin/python",
+    "scripts/certify_release.py"
+  ],
+  "created_utc": "2026-10-16T12:50:29Z",
+  "head_sha": "f0c18f390f8b457389575b1bac878ad0fc9d84eb",
+  "payload": {
+    "failed_gates": [],
+    "gates": [
+      {
+        "detail": "clean",
+        "name": "worktree_clean",
+        "status": "PASS"
+      },
+      {
+        "detail": "none",
+        "name": "prior_name_residue",
+        "status": "PASS"
+      },
+      {
+        "detail": "none",
+        "name": "secret_pattern_scan",
+        "status": "PASS"
+      },
+      {
+        "detail": "<= 1000000 bytes except bounded allowlist",
+        "name": "large_file_scan",
+        "status": "PASS"
+      },
+      {
+        "detail": "none",
+        "name": "generated_artifact_scan",
+        "status": "PASS"
+      },
+      {
+        "detail": "1296 passed, 448 warnings in 83.13s (0:01:23)",
+        "name": "python_tests",
+        "status": "PASS"
+      },
+      {
+        "detail": "ANSWER_TRACE_QUALITY_CERT_OK",
+        "name": "answer_trace_quality",
+        "status": "PASS"
+      },
+      {
+        "detail": "PASS tool_approval_execution_audit events=TOOL_CALL_REQUESTED,TOOL_CALL_APPROVED,TOOL_CALL_STARTED,TOOL_CALL_EXECUTED",
+        "name": "operator_workflow",
+        "status": "PASS"
+      },
+      {
+        "detail": "RETRIEVAL_EVAL_OK",
+        "name": "retrieval_eval",
+        "status": "PASS"
+      },
+      {
+        "detail": "RETRIEVAL_QUALITY_CERT_OK",
+        "name": "retrieval_quality",
+        "status": "PASS"
+      },
+      {
+        "detail": "PASS raster_d8_flow raster_d8_missing_complete_neighborhood_fails_closed observed=ERROR_GIS_D8_NO_COMPLETE_NEIGHBORHOOD expected=ERROR_GIS_D8_NO_COMPLETE_NEIGHBORHOOD",
+        "name": "gis_quality",
+        "status": "PASS"
+      },
+      {
+        "detail": "RETRIEVAL_EVAL_OK",
+        "name": "retrieval_eval_large",
+        "status": "PASS"
+      },
+      {
+        "detail": "JSON_OK checked=38",
+        "name": "json_validation",
+        "status": "PASS"
+      },
+      {
+        "detail": "FLAGPOLE_INVENTORY_OK",
+        "name": "flagpole_inventory",
+        "status": "PASS"
+      },
+      {
+        "detail": "DESKTOP_PACKAGE_READY",
+        "name": "desktop_package_self_test",
+        "status": "PASS"
+      },
+      {
+        "detail": "manifest_member_count=563",
+        "name": "package_artifact",
+        "status": "PASS"
+      },
+      {
+        "detail": "manifest_member_count=563",
+        "name": "package_artifact_verify",
+        "status": "PASS"
+      },
+      {
+        "detail": "No known vulnerabilities found",
+        "name": "python_audit",
+        "status": "PASS"
+      },
+      {
+        "detail": "No known vulnerabilities found",
+        "name": "python_runtime_lock_audit",
+        "status": "PASS"
+      },
+      {
+        "detail": "found 0 vulnerabilities",
+        "name": "npm_audit",
+        "status": "PASS"
+      },
+      {
+        "detail": "\u2713 built in 1.30s",
+        "name": "frontend_build",
+        "status": "PASS"
+      }
+    ],
+    "package_artifact": {
+      "artifact": {
+        "path": "/workspace/scratch/44be610f3be9/mucaro-ai/data/exports/packages/mucaro-ai-0.1.23-f0c18f390f8b-source.zip",
+        "sha256": "49068aef029798762ed95cdda738a5f27fe73ed2e1ed833b282bb995415dd599",
+        "size_bytes": 5657412
+      },
+      "checks": [
+        {
+          "detail": "PACKAGE_WARN",
+          "name": "package_status",
+          "status": "PASS"
+        },
+        {
+          "detail": "f0c18f390f8b457389575b1bac878ad0fc9d84eb",
+          "name": "git_head",
+          "status": "PASS"
+        },
+        {
+          "detail": "clean",
+          "name": "worktree_clean",
+          "status": "PASS"
+        },
+        {
+          "detail": "count=563",
+          "name": "tracked_source_files",
+          "status": "PASS"
+        },
+        {
+          "detail": "name=mucaro-ai version=0.1.23",
+          "name": "artifact_identity",
+          "status": "PASS"
+        }
+      ],
+      "manifest": {
+        "member_count": 563,
+        "path": "/workspace/scratch/44be610f3be9/mucaro-ai/data/exports/packages/mucaro-ai-0.1.23-f0c18f390f8b-artifact-manifest.json",
+        "sha256": "26a5332cc774a4d12e24e5fbf34867bcd867cde653479b66d2197be1421e61f5"
+      },
+      "output_dir": "/workspace/scratch/44be610f3be9/mucaro-ai/data/exports/packages",
+      "project_root": "/workspace/scratch/44be610f3be9/mucaro-ai",
+      "status": "PACKAGE_ARTIFACT_READY"
+    }
+  },
+  "receipt_type": "local_release",
+  "schema_version": "mucaro_release_receipt_v1",
+  "status": "CERTIFY_RELEASE_OK"
+}

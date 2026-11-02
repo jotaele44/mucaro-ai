@@ -237,8 +237,11 @@ def shell_true_uses(root: Path, targets: list[str]) -> list[str]:
 
 
 def _linux_listening(pid: int) -> list[str]:
+    # /proc may be mounted from a different PID namespace. The kernel resolves
+    # self to this process; numeric IDs are retained for every other process.
+    process = Path("/proc/self") if pid == os.getpid() else Path(f"/proc/{pid}")
     inodes = set()
-    for fd in Path(f"/proc/{pid}/fd").iterdir():
+    for fd in (process / "fd").iterdir():
         try:
             target = os.readlink(fd)
         except OSError:
@@ -247,7 +250,7 @@ def _linux_listening(pid: int) -> list[str]:
             inodes.add(target[8:-1])
     addresses = []
     for table, width in (("tcp", 8), ("tcp6", 32)):
-        path = Path(f"/proc/{pid}/net/{table}")
+        path = process / "net" / table
         if not path.exists():
             continue
         for line in path.read_text(encoding="utf-8").splitlines()[1:]:

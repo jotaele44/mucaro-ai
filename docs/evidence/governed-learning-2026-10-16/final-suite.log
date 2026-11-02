@@ -1,0 +1,136 @@
+........................................................................ [  5%]
+........................................................................ [ 11%]
+........................................................................ [ 16%]
+........................................................................ [ 22%]
+........................................................................ [ 27%]
+........................................................................ [ 33%]
+........................................................................ [ 39%]
+........................................................................ [ 44%]
+........................................................................ [ 50%]
+........................................................................ [ 55%]
+........................................................................ [ 61%]
+..........ssssss........................................................ [ 67%]
+........................................................................ [ 72%]
+........................................................................ [ 78%]
+........................................................................ [ 83%]
+..............................F......................................... [ 89%]
+........................................................................ [ 94%]
+....................s............................................        [100%]
+=================================== FAILURES ===================================
+___________ test_listening_addresses_see_a_real_all_interfaces_bind ____________
+
+    @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="reads /proc")
+    def test_listening_addresses_see_a_real_all_interfaces_bind() -> None:
+        loopback = socket.socket()
+        public = socket.socket()
+        try:
+            loopback.bind(("127.0.0.1", 0))
+            loopback.listen()
+            public.bind(("0.0.0.0", 0))
+            public.listen()
+            addresses = sg.listening_addresses(os.getpid())
+>           assert f"127.0.0.1:{loopback.getsockname()[1]}" in addresses
+E           AssertionError: assert '127.0.0.1:47083' in []
+
+backend/tests/test_security_gates.py:112: AssertionError
+=============================== warnings summary ===============================
+../venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /workspace/scratch/44be610f3be9/venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+../venv/lib/python3.12/site-packages/starlette/testclient.py:53
+  /workspace/scratch/44be610f3be9/venv/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+backend/tests/test_cli.py: 108 warnings
+backend/tests/test_gis_advanced_cli_contracts.py: 6 warnings
+backend/tests/test_gis_eval.py: 54 warnings
+backend/tests/test_gis_hydrology.py: 23 warnings
+backend/tests/test_gis_raster.py: 28 warnings
+backend/tests/test_gis_vector_raster.py: 6 warnings
+  /workspace/scratch/44be610f3be9/venv/lib/python3.12/site-packages/rasterio/transform.py:178: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    return Affine.translation(west, north) * Affine.scale(xsize, -ysize)
+
+backend/tests/test_cli.py: 80 warnings
+backend/tests/test_gis_advanced_cli_contracts.py: 24 warnings
+backend/tests/test_gis_corpus.py: 3 warnings
+backend/tests/test_gis_eval.py: 40 warnings
+backend/tests/test_gis_hydrology.py: 18 warnings
+backend/tests/test_gis_raster.py: 25 warnings
+backend/tests/test_gis_vector_raster.py: 4 warnings
+  /workspace/scratch/44be610f3be9/venv/lib/python3.12/site-packages/numpy/ma/core.py:3524: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    super(MaskedArray, type(self)).shape.__set__(self, shape)
+
+backend/tests/test_cli.py::test_cli_eval_gis_reports_fixture_manifest_results
+backend/tests/test_cli.py::test_cli_eval_gis_reports_fixture_manifest_results
+backend/tests/test_cli.py::test_cli_certify_gis_quality_writes_exact_head_receipt
+backend/tests/test_cli.py::test_cli_certify_gis_quality_writes_exact_head_receipt
+backend/tests/test_gis_advanced_cli_contracts.py::test_advanced_raster_and_export_cli_commands_emit_governed_receipts
+backend/tests/test_gis_advanced_cli_contracts.py::test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
+backend/tests/test_gis_eval.py::test_gis_eval_default_fixture_covers_core_operations
+backend/tests/test_gis_eval.py::test_gis_eval_fails_when_expected_invariant_does_not_match
+backend/tests/test_gis_raster.py::test_clip_hashes_output_and_rejects_nonoverlap
+  /workspace/scratch/44be610f3be9/venv/lib/python3.12/site-packages/rasterio/windows.py:360: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    x, y = transform * (window.col_off or 0.0, window.row_off or 0.0)
+
+backend/tests/test_cli.py::test_cli_eval_gis_reports_fixture_manifest_results
+backend/tests/test_cli.py::test_cli_eval_gis_reports_fixture_manifest_results
+backend/tests/test_cli.py::test_cli_certify_gis_quality_writes_exact_head_receipt
+backend/tests/test_cli.py::test_cli_certify_gis_quality_writes_exact_head_receipt
+backend/tests/test_gis_advanced_cli_contracts.py::test_advanced_raster_and_export_cli_commands_emit_governed_receipts
+backend/tests/test_gis_advanced_cli_contracts.py::test_advanced_gis_contract_accepts_real_reports_and_rejects_false_accounting
+backend/tests/test_gis_eval.py::test_gis_eval_default_fixture_covers_core_operations
+backend/tests/test_gis_eval.py::test_gis_eval_fails_when_expected_invariant_does_not_match
+backend/tests/test_gis_raster.py::test_clip_hashes_output_and_rejects_nonoverlap
+  /workspace/scratch/44be610f3be9/venv/lib/python3.12/site-packages/rasterio/windows.py:361: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    return Affine.translation(
+
+backend/tests/test_cli.py::test_cli_package_verify_fails_on_duplicate_archive_members
+  /opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipfile/__init__.py:1625: UserWarning: Duplicate name: 'mucaro-ai-0.1.23/README.md'
+    return self._open_to_write(zinfo, force_zip64=force_zip64)
+
+backend/tests/test_gis_hydrology.py::test_priority_flood_fills_enclosed_bowl_and_closes_volume
+  /workspace/scratch/44be610f3be9/mucaro-ai/backend/tests/test_gis_hydrology.py:97: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    assert output.read(1)[2, 2] == 5.0
+
+backend/tests/test_gis_hydrology.py::test_priority_flood_fills_enclosed_bowl_and_closes_volume
+  /workspace/scratch/44be610f3be9/mucaro-ai/backend/tests/test_gis_hydrology.py:98: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    assert output.read(2)[2, 2] == 5.0
+
+backend/tests/test_gis_hydrology.py::test_priority_flood_fills_enclosed_bowl_and_closes_volume
+  /workspace/scratch/44be610f3be9/mucaro-ai/backend/tests/test_gis_hydrology.py:99: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    assert output.read(1)[2, 4] == 5.0
+
+backend/tests/test_gis_hydrology.py::test_priority_flood_fills_enclosed_bowl_and_closes_volume
+  /workspace/scratch/44be610f3be9/mucaro-ai/backend/tests/test_gis_hydrology.py:100: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    assert output.read(2)[2, 4] == 0.0
+
+backend/tests/test_gis_hydrology.py::test_priority_flood_treats_nodata_adjacency_as_outlet
+  /workspace/scratch/44be610f3be9/mucaro-ai/backend/tests/test_gis_hydrology.py:135: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    assert output.read(1)[2, 1] == 0.0
+
+backend/tests/test_gis_hydrology.py::test_d8_preserves_tied_candidates_and_unresolved_flats
+  /workspace/scratch/44be610f3be9/mucaro-ai/backend/tests/test_gis_hydrology.py:296: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    assert output.read(1)[1, 1] == D8_DIRECTION_CODEBOOK["E"] + D8_DIRECTION_CODEBOOK["S"]
+
+backend/tests/test_gis_hydrology.py::test_d8_preserves_tied_candidates_and_unresolved_flats
+  /workspace/scratch/44be610f3be9/mucaro-ai/backend/tests/test_gis_hydrology.py:297: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    assert output.read(4)[1, 1] == D8_STATE_CODEBOOK["TIE_UNRESOLVED"]
+
+backend/tests/test_gis_hydrology.py::test_d8_uses_true_diagonal_distance
+  /workspace/scratch/44be610f3be9/mucaro-ai/backend/tests/test_gis_hydrology.py:321: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    assert output.read(1)[1, 1] == D8_DIRECTION_CODEBOOK["SE"]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_security_gates.py::test_listening_addresses_see_a_real_all_interfaces_bind
+1 failed, 1281 passed, 7 skipped, 448 warnings in 75.55s (0:01:15)

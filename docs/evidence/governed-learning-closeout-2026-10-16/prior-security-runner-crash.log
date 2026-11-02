@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/44be610f3be9/mucaro-ai/scripts/certify_security_gates.py", line 247, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/workspace/scratch/44be610f3be9/mucaro-ai/scripts/certify_security_gates.py", line 219, in main
+    network_exposure_gate(),
+    ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/44be610f3be9/mucaro-ai/scripts/certify_security_gates.py", line 147, in network_exposure_gate
+    addresses = listening_addresses(proc.pid)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/44be610f3be9/mucaro-ai/backend/app/security_gates.py", line 285, in listening_addresses
+    return _darwin_listening(pid) if sys.platform == "darwin" else _linux_listening(pid)
+                                                                   ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/44be610f3be9/mucaro-ai/backend/app/security_gates.py", line 244, in _linux_listening
+    for fd in (process / "fd").iterdir():
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1056, in iterdir
+    for name in os.listdir(self):
+                ^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/proc/39/fd'

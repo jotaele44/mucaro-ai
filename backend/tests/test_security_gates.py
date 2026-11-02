@@ -119,3 +119,23 @@ def test_listening_addresses_see_a_real_all_interfaces_bind() -> None:
 
 def test_expat_refuses_amplification() -> None:
     assert sg.xml_amplification_protected()["ok"] is True
+
+
+def test_linux_self_lookup_never_substitutes_for_another_pid(tmp_path, monkeypatch):
+    own = tmp_path / "self"
+    other = tmp_path / "other"
+    for base, inode, port in [(own, "123", "1F40"), (other, "456", "1F41")]:
+        (base / "fd").mkdir(parents=True)
+        (base / "net").mkdir()
+        (base / "fd" / "3").symlink_to(f"socket:[{inode}]")
+        (base / "net" / "tcp").write_text(
+            "header\n" + f"0: 0100007F:{port} 00000000:0000 0A 0 0 0 0 0 {inode}\n"
+        )
+    seen = []
+    def proc_path(value):
+        seen.append(value)
+        return own if value == "/proc/self" else other
+    monkeypatch.setattr(sg, "Path", proc_path)
+    assert sg._linux_listening(os.getpid()) == ["127.0.0.1:8000"]
+    assert sg._linux_listening(os.getpid() + 10000) == ["127.0.0.1:8001"]
+    assert seen == ["/proc/self", f"/proc/{os.getpid() + 10000}"]
