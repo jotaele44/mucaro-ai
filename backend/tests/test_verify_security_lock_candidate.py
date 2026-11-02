@@ -88,3 +88,34 @@ def test_no_old_pypdf_pin_allowed(tmp_path):
     manifest_path.write_text(json.dumps(manifest))
     with pytest.raises(LockEvidenceError, match="invalid pypdf pin"):
         verify(root, HEAD)
+
+
+@pytest.mark.parametrize("bad_path", [[], {"unexpected": "object"}, None, 12])
+def test_unhashable_or_nonstring_path_fails_closed(tmp_path, bad_path):
+    root = fixture_root(tmp_path)
+    manifest_path = root / "lock-rebuild-manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["locks"][0]["path"] = bad_path
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(LockEvidenceError):
+        verify(root, HEAD)
+
+
+def test_unexpected_manifest_row_field_fails_closed(tmp_path):
+    root = fixture_root(tmp_path)
+    manifest_path = root / "lock-rebuild-manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["locks"][0]["unexpected"] = "ignore-me"
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(LockEvidenceError, match="malformed"):
+        verify(root, HEAD)
+
+
+def test_source_file_symlink_fails_closed(tmp_path):
+    root = fixture_root(tmp_path)
+    link = root / PATHS[0]
+    original = root / PATHS[1]
+    link.unlink()
+    link.symlink_to(original)
+    with pytest.raises(LockEvidenceError, match="linked"):
+        verify(root, HEAD)
