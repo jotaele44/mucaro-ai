@@ -501,7 +501,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   await page.locator(".source-row").nth(1).waitFor();
   check("sources workspace lists ingested sources", viewport, (await page.locator(".source-row").count()) >= 2);
   await page.locator(".source-row").first().click();
-  await page.getByText("SHA-256").first().waitFor();
+  await page.locator(".source-detail").getByText("SHA-256", { exact: true }).waitFor();
   drawerStates.push(await drawerClosed());
   await shot(page, viewport, "13-sources");
   axeRuns.push(await axe(page, viewport, "sources"));

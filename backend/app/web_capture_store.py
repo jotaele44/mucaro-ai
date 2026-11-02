@@ -144,6 +144,14 @@ def load_capture_ledger(cfg: Settings) -> dict[str, Any]:
         raise _invalid() from exc
     if not isinstance(payload, dict) or set(payload) - {"schema_version", "entries", "entry_count", "updated_at"}:
         raise _invalid()
+    if "updated_at" in payload:
+        try:
+            if not isinstance(payload["updated_at"], str) or datetime.fromisoformat(
+                payload["updated_at"].replace("Z", "+00:00")
+            ).utcoffset() != timedelta(0):
+                raise ValueError("index update time must be UTC")
+        except ValueError as exc:
+            raise _invalid() from exc
     entries = payload.get("entries")
     if (
         payload.get("schema_version") != STORE_SCHEMA

@@ -205,6 +205,20 @@ def test_index_write_failure_retains_an_orphan_that_can_be_committed_on_retry(tm
     assert orphan.read_bytes() == raw
 
 
+@pytest.mark.parametrize("stamp", [None, 1.1, "not-a-time", "2026-11-02T00:00:00"])
+def test_invalid_index_update_metadata_is_preserved(tmp_path, stamp):
+    cfg = make_settings(tmp_path)
+    store.persist_web_snapshot(observation(), cfg)
+    path = store.ledger_path(cfg)
+    ledger = json.loads(path.read_bytes())
+    ledger["updated_at"] = stamp
+    path.write_text(json.dumps(ledger))
+    before = path.read_bytes()
+    with pytest.raises(store.WebCaptureStoreError):
+        store.persist_web_snapshot(observation(1), cfg)
+    assert path.read_bytes() == before
+
+
 def saved_orphan(cfg):
     value = observation(12)
     path = store.ledger_path(cfg).parent / f"{value['snapshot_id']}.json"
