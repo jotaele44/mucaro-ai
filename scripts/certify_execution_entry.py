@@ -59,7 +59,18 @@ def main() -> int:
     expected_ids = sorted(row["case_id"] for row in denominator["cases"])
     observed_ids = test_case_ids()
 
-    command = ["python", "-m", "pytest", str(TEST_FILE.relative_to(ROOT)), "-q"]
+    # Select only exact contract cases. Legacy tests remain in full-suite CI.
+    tree = ast.parse(TEST_FILE.read_text(encoding="utf-8"), filename=str(TEST_FILE))
+    selected_nodes = [
+        node.name for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and CASE_RE.match(node.name)
+    ]
+    if len(selected_nodes) != 28 or len(set(selected_nodes)) != len(selected_nodes):
+        raise RuntimeError("EXECUTION_ENTRY_DENOMINATOR_NODE_MISMATCH")
+    command = ["python", "-m", "pytest", *[
+        f"{TEST_FILE.relative_to(ROOT)}::{name}" for name in sorted(selected_nodes)
+    ], "-q"]
     proc = subprocess.run(command, cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
     match = re.search(r"(\d+) passed", proc.stdout)
     passed = int(match.group(1)) if match else 0
