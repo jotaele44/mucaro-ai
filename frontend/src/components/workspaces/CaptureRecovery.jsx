@@ -37,8 +37,8 @@ export function CaptureRecovery({ announce }) {
       <summary>Recover a saved web capture</summary>
       <p className="muted small">Use this after a capture reports that its file was saved but could not be indexed. Copy the capture ID and SHA-256 from that failure receipt. Recovery retains the saved bytes and does not fetch the URL again.</p>
       <form onSubmit={recover} aria-busy={busy}>
-        <label className="field">Saved capture ID<input required pattern="websnap_[0-9a-f]{16}" maxLength={24} value={captureId} disabled={busy} onChange={(event) => setCaptureId(event.target.value)} placeholder="websnap_…" /></label>
-        <label className="field">Saved capture SHA-256<input required pattern="[0-9a-f]{64}" maxLength={64} value={sha256} disabled={busy} onChange={(event) => setSha256(event.target.value)} /></label>
+        <label className="field">Saved capture ID<input required autoCapitalize="off" autoCorrect="off" spellCheck={false} pattern="websnap_[0-9a-f]{16}" maxLength={24} value={captureId} disabled={busy} onChange={(event) => setCaptureId(event.target.value)} placeholder="websnap_…" /></label>
+        <label className="field">Saved capture SHA-256<input required autoCapitalize="off" autoCorrect="off" spellCheck={false} pattern="[0-9a-f]{64}" maxLength={64} value={sha256} disabled={busy} onChange={(event) => setSha256(event.target.value)} /></label>
         <button type="submit" className="secondary-button" disabled={busy || !captureId.trim() || !sha256.trim()}>{busy ? "Indexing saved capture…" : "Index saved capture"}</button>
       </form>
       {error && <p className="error-card" role="alert">{error.message || "The saved capture could not be indexed. Preserve the file and check its receipt."}</p>}
