@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .app_settings import AppSettingsError, claude_status, delete_api_key, get_api_key, save_app_settings, store_api_key
-from .attachments import AttachmentError, attachment_file, list_attachments, save_attachment
+from .attachments import AttachmentError, attachment_file, delete_attachment, list_attachments, save_attachment
 from .auth import auth_status, client_is_remote, is_public_api_path, require_operator_auth, require_remote_token
 from .config import Settings, settings
 from .conversations import (
@@ -106,6 +106,7 @@ from .tools import (
 from .validation import validate_project_json
 from .work_runs import (
     RunError,
+    attachment_in_use,
     available_modes,
     edit_queued_run,
     get_run,
@@ -651,6 +652,16 @@ def create_app(cfg: Settings = settings) -> FastAPI:
             return {"status": "ATTACHMENTS_OK", "attachments": list_attachments(conversation_id, cfg)}
         except AttachmentError as exc:
             raise attachment_error(exc) from exc
+
+    @app.delete("/conversations/{conversation_id}/attachments/{attachment_id}")
+    def remove_attachment(conversation_id: str, attachment_id: str, _auth: dict = Depends(require_auth)) -> dict:
+        if attachment_in_use(conversation_id, attachment_id, cfg):
+            raise api_error("ERROR_ATTACHMENT_IN_USE", "This file belongs to a sent message and stays with the conversation.", status_code=409)
+        try:
+            delete_attachment(conversation_id, attachment_id, cfg)
+        except AttachmentError as exc:
+            raise attachment_error(exc) from exc
+        return {"status": "ATTACHMENT_DELETED", "attachment_id": attachment_id}
 
     @app.get("/conversations/{conversation_id}/attachments/{attachment_id}/file")
     def attachment_download(conversation_id: str, attachment_id: str) -> FileResponse:

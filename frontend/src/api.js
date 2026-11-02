@@ -300,6 +300,16 @@ export const api = {
   updateMemory: (id, enabled) => request(`/memory/${id}`, json("PATCH", { enabled })),
   deleteMemory: (id) => request(`/memory/${id}`, { method: "DELETE" }),
   exportMemory: () => request("/memory/export"),
+  // A file attached to a chat message for Claude (image, PDF or document).
+  uploadAttachment: (conversationId, file) => {
+    const form = new FormData();
+    form.append("upload", file);
+    return request(`/conversations/${conversationId}/attachments`, { method: "POST", body: form, timeoutMs: UPLOAD_TIMEOUT_MS });
+  },
+  removeAttachment: (conversationId, attachmentId) =>
+    request(`/conversations/${encodeURIComponent(conversationId)}/attachments/${encodeURIComponent(attachmentId)}`, { method: "DELETE" }),
+  attachmentFile: (conversationId, attachmentId) =>
+    request(`/conversations/${encodeURIComponent(conversationId)}/attachments/${encodeURIComponent(attachmentId)}/file`, { as: "blob" }),
   // One of the files saved with an answer: kind is "markdown", "json" or "csv".
   exportFile: (runId, kind) => request(`/exports/${encodeURIComponent(runId)}/files/${encodeURIComponent(kind)}`, { as: "blob" }),
 };

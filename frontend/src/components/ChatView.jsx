@@ -92,6 +92,9 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
   const [loading, setLoading] = useState(false);
   const [citation, setCitation] = useState(null);
   const [paused, setPaused] = useState(false);
+  const [files, setFiles] = useState([]); // attachments waiting in the composer
+  // A chat that has files but no message yet exists on the server already; it opens once the first message is sent.
+  const draftConversation = useRef(null);
   const streams = useRef(new Map());
   const failures = useRef(new Map()); // runId -> consecutive stream failures
   const retryTimers = useRef(new Map());
@@ -249,14 +252,59 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
     if (node) stick.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80;
   }
 
+  useEffect(() => {
+    if (conversationId && conversationId === draftConversation.current) return;
+    draftConversation.current = null;
+    setFiles([]);
+  }, [conversationId]);
+
+  const canAttach = Boolean(claude?.ready) && mode !== "plan";
+  const attachHint = !claude?.ready ? "Connect Claude in Settings to attach files" : "Plan mode cannot read files";
+
+  async function attach(chosen) {
+    let id = conversationId || draftConversation.current;
+    const entries = chosen.map((file) => ({
+      localId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: file.name || "pasted image",
+      bytes: file.size,
+      status: "uploading",
+      file,
+    }));
+    setFiles((current) => [...current, ...entries]);
+    try {
+      if (!id) {
+        id = (await api.createConversation(null)).conversation_id;
+        draftConversation.current = id;
+      }
+    } catch (err) {
+      setFiles((current) => current.map((row) => (entries.includes(row) ? { ...row, status: "error", error: err.message } : row)));
+      return;
+    }
+    await Promise.all(
+      entries.map(async (entry) => {
+        let update;
+        try {
+          const saved = (await api.uploadAttachment(id, entry.file)).attachment;
+          update = { status: "ready", attachmentId: saved.attachment_id, name: saved.name, bytes: saved.bytes, kind: saved.kind };
+        } catch (err) {
+          update = { status: "error", error: err.message || "Upload failed." };
+        }
+        setFiles((current) => current.map((row) => (row.localId === entry.localId ? { ...row, ...update, file: undefined } : row)));
+      }),
+    );
+    announce(`${entries.length === 1 ? "File" : "Files"} attached.`);
+  }
+
   async function send(prompt) {
     setError(null);
     try {
-      let id = conversationId;
-      const creating = !id;
-      if (creating) id = (await api.createConversation(prompt.slice(0, 60))).conversation_id;
+      let id = conversationId || draftConversation.current;
+      const creating = !conversationId;
+      if (!id) id = (await api.createConversation(prompt.slice(0, 60))).conversation_id;
       const key = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const result = await api.sendMessage(id, { prompt, mode, idempotency_key: key, options: defaultOptions });
+      const attachmentIds = files.filter((row) => row.status === "ready").map((row) => row.attachmentId);
+      const result = await api.sendMessage(id, { prompt, mode, idempotency_key: key, options: defaultOptions, attachment_ids: attachmentIds });
+      setFiles([]);
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
       if (creating) onConversationCreated(id);
       else {
@@ -417,6 +465,15 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
           announce("Queued message updated.");
         }}
         disabled={false}
+        files={files}
+        onAttach={canAttach ? attach : null}
+        onRemoveFile={(localId) => {
+          const removed = files.find((row) => row.localId === localId);
+          setFiles((current) => current.filter((row) => row.localId !== localId));
+          const id = conversationId || draftConversation.current;
+          if (removed?.attachmentId && id) api.removeAttachment(id, removed.attachmentId).catch(() => {});
+        }}
+        attachHint={attachHint}
       />
       {citation && <EvidencePanel citation={citation} onClose={() => setCitation(null)} />}
     </section>

@@ -411,6 +411,18 @@ def submit_message(
     return {"status": "RUN_SUBMITTED", "run": get_run(run_id, cfg), "ahead": int(position)}
 
 
+def attachment_in_use(conversation_id: str, attachment_id: str, cfg: Settings = settings) -> bool:
+    """True when a message of this conversation (sent or queued) carries the attachment."""
+    ensure_db(cfg.sqlite_path)
+    with get_connection(cfg.sqlite_path) as conn:
+        rows = conn.execute("SELECT payload_json FROM work_runs WHERE conversation_id = ?", (conversation_id,)).fetchall()
+    return any(
+        row.get("attachment_id") == attachment_id
+        for payload in rows
+        for row in json.loads(payload["payload_json"]).get("attachments") or []
+    )
+
+
 def _checked_attachments(
     conversation_id: str, text: str, mode: str, options: dict[str, Any], attachment_ids: list[str], cfg: Settings
 ) -> list[dict[str, Any]]:

@@ -19,6 +19,8 @@ export function deriveRun(run, events) {
   const view = {
     runId: run.run_id,
     prompt: run.prompt,
+    conversationId: run.conversation_id,
+    attachments: run.attachments || [],
     mode: run.mode,
     state: run.state,
     version: run.version,

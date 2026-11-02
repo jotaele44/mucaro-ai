@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
+import { ATTACH_ACCEPT, PendingAttachments } from "./Attachments.jsx";
+import { PaperclipIcon } from "./Icons.jsx";
 
 const MODE_LABEL = { agent: "Auto (safe actions)", plan: "Plan", ask: "Ask first", auto: "Auto (local read-only)" };
 
@@ -53,7 +55,10 @@ function QueuedItem({ run, onCancel, onEdit }) {
   );
 }
 
-export function Composer({ conversationId, modes, mode, onModeChange, onSend, onStop, activeRun, queued, onCancelQueued, onEditQueued, disabled }) {
+export function Composer({
+  conversationId, modes, mode, onModeChange, onSend, onStop, activeRun, queued, onCancelQueued, onEditQueued, disabled,
+  files = [], onAttach = null, onRemoveFile = () => {}, attachHint = "",
+}) {
   const storageKey = `mucaro.draft.${conversationId || "new"}`;
   const [text, setText] = useState(() => {
     try {
@@ -64,7 +69,15 @@ export function Composer({ conversationId, modes, mode, onModeChange, onSend, on
   });
   const [menuOpen, setMenuOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const area = useRef(null);
+  const picker = useRef(null);
+  const uploading = files.some((file) => file.status === "uploading");
+
+  function attach(list) {
+    const chosen = [...(list || [])];
+    if (chosen.length && onAttach) onAttach(chosen);
+  }
 
   useEffect(() => {
     try {
@@ -92,7 +105,7 @@ export function Composer({ conversationId, modes, mode, onModeChange, onSend, on
 
   async function send() {
     const prompt = text.trim();
-    if (!prompt || sending || disabled) return;
+    if (!prompt || sending || disabled || uploading) return;
     setSending(true);
     try {
       await onSend(prompt);
@@ -126,7 +139,24 @@ export function Composer({ conversationId, modes, mode, onModeChange, onSend, on
           ))}
         </ul>
       )}
-      <div className="composer-box">
+      <div
+        className={`composer-box ${dragging ? "dragging" : ""}`}
+        onDragOver={(event) => {
+          if (!onAttach || ![...event.dataTransfer.types].includes("Files")) return;
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setDragging(false);
+        }}
+        onDrop={(event) => {
+          if (!onAttach || !event.dataTransfer.files.length) return;
+          event.preventDefault();
+          setDragging(false);
+          attach(event.dataTransfer.files);
+        }}
+      >
+        <PendingAttachments files={files} onRemove={onRemoveFile} />
         <label htmlFor="composer-input" className="sr-only">
           Message Mucaro
         </label>
@@ -139,9 +169,37 @@ export function Composer({ conversationId, modes, mode, onModeChange, onSend, on
           enterKeyHint={touch ? "enter" : "send"}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={onKeyDown}
+          onPaste={(event) => {
+            // Pasted images (screenshots) become attachments; pasted text stays text.
+            if (onAttach && event.clipboardData?.files?.length) {
+              event.preventDefault();
+              attach(event.clipboardData.files);
+            }
+          }}
           disabled={disabled}
         />
         <div className="composer-controls">
+          <input
+            ref={picker}
+            type="file"
+            multiple
+            accept={ATTACH_ACCEPT}
+            hidden
+            onChange={(event) => {
+              attach(event.target.files);
+              event.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            className="ghost-button icon-action attach-button"
+            onClick={() => picker.current?.click()}
+            disabled={!onAttach}
+            aria-label="Attach files"
+            title={onAttach ? "Attach images, PDFs or documents" : attachHint}
+          >
+            <PaperclipIcon />
+          </button>
           <div className="mode-picker">
             <button type="button" className="mode-chip" aria-haspopup="listbox" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
               Mode: {MODE_LABEL[mode] || mode}
@@ -173,7 +231,7 @@ export function Composer({ conversationId, modes, mode, onModeChange, onSend, on
               Stop
             </button>
           )}
-          <button type="button" className="primary-button" onClick={send} disabled={empty || sending || disabled} aria-label={activeRun ? "Queue message" : "Send message"}>
+          <button type="button" className="primary-button" onClick={send} disabled={empty || sending || disabled || uploading} aria-label={activeRun ? "Queue message" : "Send message"}>
             {activeRun ? "Queue" : "Send"}
           </button>
         </div>

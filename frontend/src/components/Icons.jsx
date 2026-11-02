@@ -71,3 +71,23 @@ export const ShareIcon = () => (
     <path d="M7 11H6a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1h-1" />
   </Icon>
 );
+
+export const PaperclipIcon = () => (
+  <Icon name="paperclip">
+    <path d="M20.5 11.5l-8.4 8.4a5 5 0 0 1-7.1-7.1l8.4-8.4a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" />
+  </Icon>
+);
+
+export const CloseIcon = () => (
+  <Icon name="close">
+    <path d="M6 6l12 12" />
+    <path d="M18 6L6 18" />
+  </Icon>
+);
+
+export const FileIcon = () => (
+  <Icon name="file">
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+    <path d="M14 3v5h5" />
+  </Icon>
+);

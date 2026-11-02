@@ -16,6 +16,29 @@ export function EvidencePanel({ citation, onClose }) {
       .catch((err) => setError(err));
   }, [citation.source_id]);
 
+  if (citation.kind === "attachment") {
+    return (
+      <Sheet title={`Source [${citation.citation_order}]`} onClose={onClose}>
+        <dl className="facts">
+          <dt>Attached file</dt>
+          <dd>{citation.title || "Attached file"}</dd>
+          {citation.pages && (
+            <>
+              <dt>{citation.pages.includes("–") ? "Pages" : "Page"}</dt>
+              <dd>{citation.pages}</dd>
+            </>
+          )}
+        </dl>
+        {citation.text_snippet && (
+          <>
+            <h3 className="section-title">Cited text</h3>
+            <blockquote className="evidence-text">{citation.text_snippet}</blockquote>
+          </>
+        )}
+      </Sheet>
+    );
+  }
+
   if (web) {
     // A web page Claude read: Anthropic fetched it, so there is no local copy to show, only what was cited.
     const href = /^https?:\/\//i.test(citation.source_url || "") ? citation.source_url : null;

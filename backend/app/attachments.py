@@ -183,6 +183,12 @@ def save_attachment(conversation_id: str, name: str | None, data: bytes, cfg: Se
         raise
 
 
+def delete_attachment(conversation_id: str, attachment_id: str, cfg: Settings = settings) -> None:
+    """Remove a file that was attached but never sent (the caller checks that no message uses it)."""
+    get_attachment(conversation_id, attachment_id, cfg)
+    shutil.rmtree(_folder(conversation_id, attachment_id, cfg), ignore_errors=True)
+
+
 def delete_conversation_attachments(conversation_id: str, cfg: Settings = settings) -> None:
     root = _root(conversation_id, cfg)
     if root.is_dir():

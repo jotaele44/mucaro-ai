@@ -1234,8 +1234,17 @@ html {
   }
 
   /* An icon has no text to widen its button, so it needs the 44px width explicitly. */
-  :root .message-actions .icon-action {
+  :root .message-actions .icon-action,
+  :root .attach-button,
+  :root .attachment-remove {
     min-width: 44px;
+  }
+
+  /* A citation mark sits inside a sentence: padding widens its touch area without changing the line height. */
+  :root .rich-text .cite-mark {
+    min-height: 0;
+    padding: 10px 4px;
+    margin: -10px 0;
   }
 }
 
@@ -1431,4 +1440,91 @@ html {
 
 .rich-text th {
   background: var(--surface-2);
+}
+
+/* --- Attachments ------------------------------------------------------------------------- */
+
+.attachment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 4px 6px 4px 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.attachment-chip.sent {
+  cursor: pointer;
+}
+
+.attachment-chip.sent.image {
+  padding: 2px;
+}
+
+.attachment-chip.status-error {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.attachment-thumb {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.attachment-full {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  margin: 0 auto;
+  border-radius: 8px;
+}
+
+.attachment-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  padding: 2px;
+  color: var(--muted);
+  cursor: pointer;
+  min-height: 24px;
+}
+
+.attach-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 30px;
+  padding: 2px 6px;
+}
+
+.composer-box.dragging {
+  border-color: var(--accent);
+  border-style: dashed;
+  background: var(--accent-soft);
 }

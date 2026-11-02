@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { STATE_LABEL, TERMINAL_STATES, toolSummaryLabel, workSummary } from "../feed.js";
 import { answerRecords } from "../files.js";
+import { SentAttachments } from "./Attachments.jsx";
 import { EditableMessage } from "./MessageActions.jsx";
 import { Sheet } from "./Sheet.jsx";
 
@@ -276,6 +277,7 @@ export function RunBlock({ view, onChanged, onOpenCitation, announce, messageEdi
   return (
     <article className="run" aria-busy={view.state === "RUNNING"} data-state={view.state}>
       <div className="bubble user-bubble">
+        <SentAttachments conversationId={view.conversationId} attachments={view.attachments} />
         <EditableMessage
           text={String(userEdit?.content ?? view.prompt ?? "")}
           revision={Number(userEdit?.revision || 0)}

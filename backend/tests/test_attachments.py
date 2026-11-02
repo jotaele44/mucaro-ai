@@ -138,3 +138,34 @@ def test_a_file_missing_at_replay_becomes_a_note(cfg, api, chat):
     submit_message(chat, "second", mode="agent", cfg=cfg)
     replayed = api.requests[1]["messages"][0]["content"][1]
     assert replayed == {"type": "text", "text": "[Attachment gone.png is no longer available.]"}
+
+
+def test_attachment_routes_require_the_operator_token(tmp_path, monkeypatch):
+    """The app-wide auth dependency covers every attachment route, reads included."""
+    from backend.tests.test_api import make_settings
+
+    monkeypatch.setattr("backend.app.app_settings.sdk_available", lambda: True)
+    token = "t" * 40
+    protected = make_settings(tmp_path, operator_token=token)
+    protected.ensure_dirs()
+    chat_id = create_conversation("Locked", protected)["conversation_id"]
+    image = save_attachment(chat_id, "a.png", PNG, protected)
+    client = TestClient(create_app(protected))
+    file_url = f"/conversations/{chat_id}/attachments/{image['attachment_id']}/file"
+    for method, url in [("get", f"/conversations/{chat_id}/attachments"), ("get", file_url), ("post", f"/conversations/{chat_id}/attachments")]:
+        assert getattr(client, method)(url).status_code == 401, url
+    allowed = client.get(file_url, headers={"Authorization": f"Bearer {token}"})
+    assert allowed.status_code == 200 and allowed.content == PNG
+
+
+def test_an_unsent_file_can_be_removed_but_a_sent_one_stays(cfg, api, chat):
+    client = TestClient(create_app(cfg))
+    unsent = save_attachment(chat, "draft.png", PNG, cfg)
+    sent = save_attachment(chat, "sent.png", PNG, cfg)
+    api.script = [message([text("ok")])]
+    submit_message(chat, "look", mode="agent", attachment_ids=[sent["attachment_id"]], cfg=cfg)
+
+    assert client.delete(f"/conversations/{chat}/attachments/{unsent['attachment_id']}").json()["status"] == "ATTACHMENT_DELETED"
+    kept = client.delete(f"/conversations/{chat}/attachments/{sent['attachment_id']}")
+    assert kept.status_code == 409 and kept.json()["detail"]["status"] == "ERROR_ATTACHMENT_IN_USE"
+    assert [row["name"] for row in client.get(f"/conversations/{chat}/attachments").json()["attachments"]] == ["sent.png"]
