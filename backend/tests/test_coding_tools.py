@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+import backend.app.tools as tools_module
+
 from backend.app.coding_patch import validate_patch_proposal
 from backend.app.config import Settings
 from backend.app.tools import (
@@ -151,3 +153,133 @@ def test_patch_apply_requires_approval_and_exact_proposal_receipt(tmp_path: Path
     assert executed["result"]["status"] == "CODING_MUTATION_APPLIED"
     assert executed["result"]["head_sha"] == head
     assert (repo / "tracked.txt").read_text(encoding="utf-8") == "beta\n"
+
+def test_coding_exec_requires_approval_and_preserves_isolated_execution_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    image = "sha256:" + ("a" * 64)
+    command = ["python", "-m", "pytest", "-q"]
+
+    tools = {tool["name"]: tool for tool in list_tools()["tools"]}
+    assert tools["coding.exec"]["requires_approval"] is True
+    assert tools["coding.exec"]["mutates_state"] is False
+    assert tools["coding.exec"]["network"] == "none"
+
+    captured: dict[str, object] = {}
+
+    def fake_build(repo_root, *, image, command, cfg, network_allowed, **options):
+        captured.update(
+            {
+                "repo_root": repo_root,
+                "image": image,
+                "command": list(command),
+                "network_allowed": network_allowed,
+                "options": dict(options),
+            }
+        )
+        return object()
+
+    def fake_run(plan, *, cfg):
+        del plan, cfg
+        return {
+            "status": "CODING_CONTAINER_EXECUTED_PASS",
+            "execution_status": "PASS",
+            "plan_sha256": "b" * 64,
+            "head_sha": git(repo, "rev-parse", "HEAD").strip(),
+            "command_argv": command,
+            "exit_code": 0,
+            "duration_ms": 12,
+            "stdout": {"byte_size": 3, "sha256": "c" * 64, "text": "ok\n"},
+            "stderr": {"byte_size": 0, "sha256": "d" * 64, "text": ""},
+            "source_mount_read_only": True,
+            "workspace_ephemeral": True,
+            "network_allowed": False,
+            "receipt_sha256": "e" * 64,
+        }
+
+    monkeypatch.setattr(tools_module, "build_coding_container_plan", fake_build)
+    monkeypatch.setattr(tools_module, "run_coding_container_plan", fake_run)
+
+    requested = request_tool_call(
+        "coding.exec",
+        {"repo_root": str(repo), "image": image, "command": command, "timeout_seconds": 45},
+        cfg=cfg,
+        requested_by="test",
+        reason="isolated command execution regression",
+    )
+    tool_call_id = requested["tool_call"]["tool_call_id"]
+
+    with pytest.raises(ToolRuntimeError) as blocked:
+        run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
+    assert blocked.value.status == "ERROR_TOOL_APPROVAL_REQUIRED"
+
+    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
+    executed = run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
+
+    assert executed["result"]["status"] == "CODING_EXEC_OK"
+    assert executed["result"]["execution_status"] == "PASS"
+    assert executed["result"]["container_receipt_sha256"] == "e" * 64
+    assert executed["result"]["source_mount_read_only"] is True
+    assert executed["result"]["workspace_ephemeral"] is True
+    assert executed["result"]["network_allowed"] is False
+    assert captured == {
+        "repo_root": str(repo),
+        "image": image,
+        "command": command,
+        "network_allowed": False,
+        "options": {"timeout_seconds": 45},
+    }
+
+
+def test_coding_exec_rejects_network_enablement(tmp_path: Path) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    requested = request_tool_call(
+        "coding.exec",
+        {
+            "repo_root": str(repo),
+            "image": "sha256:" + ("a" * 64),
+            "command": ["python", "-V"],
+            "network_allowed": True,
+        },
+        cfg=cfg,
+        requested_by="test",
+    )
+    tool_call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
+
+    with pytest.raises(ToolRuntimeError) as blocked:
+        run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
+    assert blocked.value.status == "ERROR_CODING_EXEC_NETWORK_POLICY"
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("timeout_seconds", 121),
+        ("max_output_bytes", 2 * 1024 * 1024 + 1),
+        ("memory_mb", 4097),
+        ("cpus", 4.25),
+        ("pids_limit", 513),
+        ("workspace_mb", 4097),
+    ],
+)
+def test_coding_exec_rejects_resource_ceiling_overrides(tmp_path: Path, field: str, value) -> None:
+    cfg = make_settings(tmp_path)
+    repo = make_repo(tmp_path)
+    arguments = {
+        "repo_root": str(repo),
+        "image": "sha256:" + ("a" * 64),
+        "command": ["python", "-V"],
+        field: value,
+    }
+    requested = request_tool_call("coding.exec", arguments, cfg=cfg, requested_by="test")
+    tool_call_id = requested["tool_call"]["tool_call_id"]
+    approve_tool_call(tool_call_id, cfg=cfg, approved_by="test")
+
+    with pytest.raises(ToolRuntimeError) as blocked:
+        run_tool_call(tool_call_id, cfg=cfg, executed_by="test")
+    assert blocked.value.status == "ERROR_CODING_EXEC_RESOURCE_LIMIT"
+
