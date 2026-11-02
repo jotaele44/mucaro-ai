@@ -1044,6 +1044,7 @@ print(json.dumps(rows))
         const gate = new Promise((resolve) => { release = resolve; });
         await page.route(routePattern, async (route) => { requests += 1; await gate; await route.continue(); });
         const started = page.waitForRequest((request) => request.method() === "POST" && decodeURIComponent(new URL(request.url()).pathname).endsWith("/skills/mucaro/web-research/execute"));
+        const completed = page.waitForResponse((response) => response.request().method() === "POST" && decodeURIComponent(new URL(response.url()).pathname).endsWith("/skills/mucaro/web-research/execute"));
         const submit = panel().getByRole("button", { name: "Compare and synthesize", exact: true });
         const before = (await (await fetch(`${base}/skills/executions`)).json()).executions.length;
         try {
@@ -1055,10 +1056,13 @@ print(json.dumps(rows))
           await started;
           check("rapid research activation sends one request while pending", viewport, requests === 1 && await panel().getByRole("button", { name: "Working on research…", exact: true }).isDisabled());
         } finally { release(); }
+        const accepted = await (await completed).json();
+        if (accepted.status !== "SKILL_EXECUTED") throw new Error(`Research request failed: ${JSON.stringify(accepted)}`);
+        await page.waitForFunction(() => [...document.querySelectorAll("button")].some((button) => button.textContent === "Compare and synthesize" && !button.disabled));
         await result().getByRole("heading", { name: "Source-grounded draft", exact: true }).waitFor();
         await page.unroute(routePattern);
         const executions = (await (await fetch(`${base}/skills/executions`)).json()).executions;
-        check("one research action persists one execution with both source parents", viewport, executions.length === before + 1 && executions.at(-1).result.source_artifact_ids.length === 2);
+        check("one research action persists one execution with both source parents", viewport, executions.length === before + 1 && executions.at(-1).execution_id === accepted.execution.execution_id && accepted.result.source_artifact_ids.length === 2, `before=${before} after=${executions.length} execution=${accepted.execution.execution_id}`);
         check("research preserves observed disagreement and instruction warning", viewport, (await result().innerText()).includes("Budget 40") && (await result().innerText()).includes("Budget 60") && (await result().textContent()).includes("INSTRUCTION_BEARING_SOURCE_CONTENT"));
         const cited = result().locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Source A · webpassage_/ }) });
         await activate(cited.locator("summary"));

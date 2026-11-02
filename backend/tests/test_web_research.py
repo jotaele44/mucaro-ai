@@ -315,6 +315,22 @@ def test_api_and_cli_share_real_capture_comparison_and_auth(ready, monkeypatch, 
     assert json.loads(capsys.readouterr().err)["status"] == "ERROR_WEB_CAPTURE_IDENTITY_CONFLICT"
 
 
+def test_model_context_and_output_boundaries_are_checked_before_provider_execution(ready, monkeypatch, tmp_path):
+    a, b = capture(ready, "Budget 40", 0), capture(ready, "Budget 60", 1)
+    monkeypatch.setattr(
+        research, "generate_answer", lambda *args, **kwargs: pytest.fail("preflight failure invoked model")
+    )
+    monkeypatch.setenv("MUCARO_AI_LOCAL_MODEL_CONTEXT", "128")
+    with pytest.raises(SkillRuntimeError, match="CONTEXT_TOO_LARGE"):
+        execute_skill(SKILL, arguments(a, b, synthesis="openai_compatible_local"), cfg=ready)
+    outside = tmp_path / "outside-output"
+    outside.mkdir()
+    (ready.export_dir / "web_research").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(SkillRuntimeError, match="RESEARCH_BOUNDARY"):
+        execute_skill(SKILL, arguments(a, b, synthesis="anthropic"), cfg=ready)
+    assert list(outside.iterdir()) == []
+
+
 def test_policy_changes_invalidate_the_registered_digest():
     definition = skill_runtime.SKILL_REGISTRY[SKILL]
     assert (

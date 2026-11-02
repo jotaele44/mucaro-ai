@@ -103,6 +103,11 @@ questions, and unknown modes are refused by the shared arguments schema.
   candidate IDs and boundary ties are recorded. A deterministic selection is not
   a relevance or identity proof. No lexical match is a bounded context result,
   not proof that no evidence exists anywhere.
+- Model prompts are checked against a conservative UTF-8 byte estimate plus the
+  provider's output reserve and protocol overhead. A context-budget failure
+  occurs before the provider request; selected excerpts are not silently
+  shortened to force a fit. The local server's configured context remains an
+  operator-supplied limit, not an independently measured model capacity.
 - Exact citation offsets refer to the extracted Unicode string, not HTML bytes,
   screen coordinates, or OCR spans. The report binds each citation to its
   snapshot/content hashes and observation time.

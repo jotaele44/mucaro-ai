@@ -35,6 +35,7 @@ RESEARCH_POLICY = {
     "citation_policy": "exact_selected_passage_ids_and_extraction_offsets_v1",
     "automatic_acquisition": False,
     "model_fallback": False,
+    "provider_prompt_budget": "UTF8_byte_upper_estimate_plus_output_and_512_overhead_v1",
     "accepted_http_statuses": "200-299",
     "accepted_mime_types": ["application/json", "application/xhtml+xml", "text/html", "text/markdown", "text/plain"],
     "accepted_encodings": ["utf-8", "utf-8-sig", "ascii", "iso8859-1", "cp1252", "utf-16", "utf-16-le", "utf-16-be"],
@@ -98,6 +99,31 @@ def generate_answer(*args: Any, **kwargs: Any) -> dict[str, Any]:
     from .model_router import generate_answer as provider_answer
 
     return provider_answer(*args, **kwargs)
+
+
+def _check_prompt_budget(query: str, selected: list[dict[str, Any]], mode: str) -> None:
+    if mode == "mock":
+        return
+    from .model_router import (
+        ANTHROPIC_MAX_OUTPUT_TOKENS,
+        MODEL_PROVIDER_SPECS,
+        build_grounded_prompt,
+        local_model_settings,
+    )
+
+    context = (
+        local_model_settings()["context_tokens"]
+        if mode == "openai_compatible_local"
+        else MODEL_PROVIDER_SPECS[mode].context_tokens
+    )
+    output_reserve = 900 if mode == "openai_compatible_local" else ANTHROPIC_MAX_OUTPUT_TOKENS
+    system, user = build_grounded_prompt(query, selected, [], [])
+    prompt_bytes = len((system + user).encode("utf-8"))
+    if prompt_bytes + output_reserve + 512 > context:
+        raise ResearchError(
+            "ERROR_RESEARCH_CONTEXT_TOO_LARGE",
+            "The selected excerpts exceed the provider's conservative context budget. Use smaller captures or increase the configured local context; no model request was sent.",
+        )
 
 
 class _VisibleHTML(HTMLParser):
@@ -334,9 +360,13 @@ def compare_captures(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]
             "model_invoked": False,
         }
     else:
-        generated = generate_answer(
+        synthesis_query = (
             question
-            + "\nCompare the observations, retain disagreements and uncertainty, and do not infer canonical identity. Every substantive source claim needs an exact (chunk_id=...) citation.",
+            + "\nCompare the observations, retain disagreements and uncertainty, and do not infer canonical identity. Every substantive source claim needs an exact (chunk_id=...) citation."
+        )
+        _check_prompt_budget(synthesis_query, selected, mode)
+        generated = generate_answer(
+            synthesis_query,
             selected,
             model_provider=mode,
             allow_mock_fallback=False,
