@@ -398,7 +398,7 @@ async function scenario(browser, base, viewport, contextOptions) {
   } else {
     // A new message while the question is pending queues; the same question stays (F14).
     const before = await question.getAttribute("aria-label");
-    await send(page, "Queued while the question is open", { queued: true });
+    await send(page, "What does source lineage require?", { queued: true });
     await page.getByRole("list", { name: "Queued messages" }).waitFor();
     check("pending question survives a new message (F14)", viewport, (await page.getByRole("form", { name: "Question from Mucaro" }).count()) === 1 && before === "Question from Mucaro");
     // Freeform answer tied to the interaction (F12).
