@@ -320,3 +320,49 @@ def recover_web_snapshot(snapshot_id: str, expected_sha256: str, cfg: Settings) 
         raise _invalid() from exc
     result = persist_web_snapshot(snapshot, cfg)
     return {"status": "WEB_CAPTURE_RECOVERED", "snapshot_id": snapshot_id, "acquisition_repeated": False, **result}
+
+
+def read_verified_capture(snapshot_id: str, expected_sha256: str, cfg: Settings) -> tuple[bytes, dict[str, Any], bytes]:
+    """Read an indexed observation by explicit byte binding, never by a client path."""
+    if not isinstance(snapshot_id, str) or re.fullmatch(r"websnap_[0-9a-f]{16}", snapshot_id) is None or not isinstance(expected_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None:
+        raise WebCaptureStoreError("ERROR_WEB_CAPTURE_ARGUMENTS_INVALID", "Select a capture ID and its complete SHA-256.")
+    entry = next((row for row in load_capture_ledger(cfg)["entries"] if row["snapshot_id"] == snapshot_id), None)
+    if entry is None:
+        raise WebCaptureStoreError("ERROR_WEB_CAPTURE_NOT_FOUND", "The selected capture is not indexed. Recover its saved bytes first.")
+    path = ledger_path(cfg).parent / f"{snapshot_id}.json"
+    if entry["snapshot_path"] != str(path):
+        raise WebCaptureStoreError("ERROR_WEB_CAPTURE_BOUNDARY", "The indexed capture path differs from this collection. Preserve and inspect the collection.")
+    try:
+        raw = _bytes(path, MAX_SNAPSHOT_BYTES)
+    except OSError as exc:
+        raise WebCaptureStoreError("ERROR_WEB_CAPTURE_BOUNDARY", "The selected capture is not an accessible regular file.") from exc
+    if entry["snapshot_sha256"] != expected_sha256 or hashlib.sha256(raw).hexdigest() != expected_sha256:
+        raise WebCaptureStoreError("ERROR_WEB_CAPTURE_IDENTITY_CONFLICT", "The selected capture or its index changed. Review its saved receipt before retrying.")
+    try:
+        snapshot = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_object, parse_constant=_json_constant)
+        if not isinstance(snapshot, dict) or _encoded(snapshot) != raw or snapshot.get("schema_version") != "mucaro_web_snapshot_v1":
+            raise _invalid()
+        if any(snapshot.get(key) != entry[key] for key in ENTRY_FIELDS if key not in {"snapshot_path", "snapshot_sha256"}):
+            raise _invalid()
+        content = base64.b64decode(snapshot["content_base64"], validate=True)
+        if len(content) != entry["content_size_bytes"] or hashlib.sha256(content).hexdigest() != entry["content_sha256"]:
+            raise _invalid()
+    except (KeyError, ValueError, TypeError, UnicodeError, RecursionError) as exc:
+        raise _invalid() from exc
+    return raw, snapshot, content
+
+
+def list_capture_page(cfg: Settings, *, limit: int = 50, offset: int = 0, revision: str | None = None) -> dict[str, Any]:
+    if type(limit) is not int or not 1 <= limit <= 100 or type(offset) is not int or offset < 0:
+        raise WebCaptureStoreError("ERROR_WEB_CAPTURE_ARGUMENTS_INVALID", "Use a page size of 1–100 and a nonnegative offset.")
+    ledger = load_capture_ledger(cfg)
+    digest = hashlib.sha256(_encoded(ledger)).hexdigest()
+    if revision is not None and revision != digest:
+        raise WebCaptureStoreError("ERROR_WEB_CAPTURE_LIST_CHANGED", "The collection changed. Refresh the capture list before loading more.")
+    entries = list(reversed(ledger["entries"]))
+    return {
+        "status": "WEB_CAPTURES_LISTED", "revision": digest, "total": len(entries),
+        "captures": [{key: value for key, value in row.items() if key != "snapshot_path"} for row in entries[offset:offset + limit]],
+        "next_offset": offset + limit if offset + limit < len(entries) else None,
+        "byte_verification": "INDEX_ONLY_VERIFY_ON_USE",
+    }

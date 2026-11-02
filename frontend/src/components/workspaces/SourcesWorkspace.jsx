@@ -3,6 +3,7 @@ import { api } from "../../api.js";
 import { ConfirmSheet } from "../ConfirmSheet.jsx";
 import { DirectoryIntake } from "../DirectoryIntake.jsx";
 import { CaptureRecovery } from "./CaptureRecovery.jsx";
+import { WebResearch } from "./WebResearch.jsx";
 
 // Source inspection (TGT-030): every ingested manifestation with identity, parser, warnings and provenance.
 export function SourcesWorkspace({ announce }) {
@@ -82,6 +83,7 @@ export function SourcesWorkspace({ announce }) {
       </details>
       {!sources.length && <p className="empty-state muted">No sources yet. Add files or a folder; answers will cite them.</p>}
       <CaptureRecovery announce={announce} />
+      <details className="panel"><summary>Compare frozen web sources</summary><WebResearch announce={announce} /></details>
       <ul className="source-list">
         {sources.map((source) => (
           <li key={source.source_id}>

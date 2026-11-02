@@ -1482,3 +1482,5 @@ html {
   gap: 0.5rem;
   margin-bottom: 0.75rem;
 }
+.research-answer, .research-quote { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.research-quote { margin: 1rem 0; padding-inline-start: 1rem; border-inline-start: 3px solid var(--border); }

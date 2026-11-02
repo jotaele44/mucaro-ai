@@ -18,6 +18,7 @@ from .execution_router import ExecutionRouterError, execute_routed, select_execu
 from .gis_raster_skill import RASTER_ARGUMENTS_SCHEMA, RASTER_EXECUTION_POLICY, analyze_raster_data
 from .gis_skill import GIS_ARGUMENTS_SCHEMA, GIS_EXECUTION_POLICY, analyze_spatial_data
 from .ocr_skill import OCR_ARGUMENTS_SCHEMA, OCR_EXECUTION_POLICY, analyze_document
+from .web_research import RESEARCH_ARGUMENTS_SCHEMA, RESEARCH_POLICY, compare_captures
 from .runtime_identity import build_runtime_identity
 from .utils import file_lock, read_json, stable_id, update_json, utc_now, write_json
 
@@ -120,6 +121,13 @@ def _local_worker_health_skill(arguments: dict[str, Any], cfg: Settings) -> dict
 
 
 SKILL_REGISTRY: dict[str, SkillDefinition] = {
+    "mucaro/web-research": SkillDefinition(
+        skill_id="mucaro/web-research", version="1.0.0",
+        description="Compare two explicit frozen web observations, inspect exact passage citations, and save a source-bound synthesis. Offline excerpts are the default; model synthesis is explicit and never falls back silently. No URLs are fetched.",
+        runtime="IN_PROCESS", capabilities=("filesystem.read", "filesystem.write", "model.invoke"),
+        input_schema="mucaro.web-research-input/1.0", output_schema="mucaro.web-research-result/1.0",
+        handler=compare_captures, arguments_schema=RESEARCH_ARGUMENTS_SCHEMA, execution_policy=RESEARCH_POLICY,
+    ),
     "mucaro/gis-raster": SkillDefinition(
         skill_id="mucaro/gis-raster", version="1.0.0",
         description="Inspect, sample, clip, resample, derive terrain/hillshade, condition depressions, route D8 flow, and analyze vector zones over bounded local GeoTIFFs. Preserves NODATA, source bytes, unresolved states, and saved artifact lineage.",

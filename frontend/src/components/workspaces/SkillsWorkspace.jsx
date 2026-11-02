@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api.js";
+import { WebResearchResult } from "./WebResearch.jsx";
 
 function errorText(error) {
   try {
@@ -275,6 +276,7 @@ export function SkillsWorkspace({ announce, skillPrefix = "", embedded = false }
                   announce("Analysis JSON saved.");
                 }}>Save analysis JSON</button>
               </section>}
+              {last?.result?.kind === "WEB_RESEARCH" && <WebResearchResult result={last.result} />}
               {last && <details className="panel nested-panel"><summary>Latest receipt: {last.status} · {last.finished_at}</summary><dl className="facts"><dt>Execution ID</dt><dd className="mono">{last.execution_id}</dd><dt>Route</dt><dd>{last.execution_route}</dd><dt>Artifact output</dt><dd>{last.artifact_lineage?.output?.artifact_id || "—"}</dd></dl><pre className="json-block"><code>{JSON.stringify(last.result, null, 2)}</code></pre></details>}
             </li>
           );

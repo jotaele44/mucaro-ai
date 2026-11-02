@@ -293,6 +293,7 @@ def main() -> int:
         gate_command("answer_trace_quality", [sys.executable, "scripts/certify_answer_trace_quality.py"]),
         gate_command("operator_workflow", [sys.executable, "scripts/certify_operator_workflow.py"]),
         gate_command("retrieval_eval", [sys.executable, "scripts/evaluate_retrieval.py"]),
+        gate_command("web_research_eval", [sys.executable, "scripts/evaluate_web_research.py"]),
         gate_command("retrieval_quality", [sys.executable, "scripts/certify_retrieval_quality.py"]),
         gate_command("gis_quality", [sys.executable, "scripts/certify_gis_quality.py"]),
         gate_command("gis_datum_cli_parity", [sys.executable, "scripts/certify_gis_datum_cli_parity.py"]),

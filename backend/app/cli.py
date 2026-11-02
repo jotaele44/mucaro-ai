@@ -20,7 +20,7 @@ from .agent_planner import build_agent_plan
 from .agent_tool_proposals import AgentToolProposalError, parse_provider_tool_proposals
 from .agent_tasks import TASK_PRIORITIES, TASK_STATES, TaskError, create_task, get_task, list_tasks, task_summary, update_task
 from .artifact_downloads import ArtifactDownloadError, inspect_output_artifact, list_output_artifacts, read_artifact_download
-from .web_capture_store import WebCaptureStoreError, recover_web_snapshot
+from .web_capture_store import WebCaptureStoreError, list_capture_page, recover_web_snapshot
 from .answer_trace_eval import (
     ANSWER_TRACE_EVAL_OK,
     ANSWER_TRACE_QUALITY_OK,
@@ -1190,8 +1190,23 @@ def build_parser() -> argparse.ArgumentParser:
     skills_executions.add_argument("--format", choices=["json", "text"], default="json", help="Output format.")
     skills_executions.set_defaults(handler=run_skills_executions)
 
-    captures = subcommands.add_parser("captures", help="Recover a frozen web capture without fetching its URL again.")
+    captures = subcommands.add_parser("captures", help="List, recover, and compare frozen web observations.")
     capture_commands = captures.add_subparsers(dest="capture_command", required=True)
+    capture_list = capture_commands.add_parser("list", help="Page indexed observation metadata; bytes are verified on comparison.")
+    capture_list.add_argument("--limit", type=int, default=50)
+    capture_list.add_argument("--offset", type=int, default=0)
+    capture_list.add_argument("--revision")
+    capture_list.add_argument("--format", choices=["json", "text"], default="json")
+    capture_list.set_defaults(handler=run_capture_list)
+    capture_compare = capture_commands.add_parser("compare", help="Invoke the active mucaro/web-research skill on two ID/SHA bindings.")
+    capture_compare.add_argument("a_id")
+    capture_compare.add_argument("b_id")
+    capture_compare.add_argument("--a-sha256", required=True)
+    capture_compare.add_argument("--b-sha256", required=True)
+    capture_compare.add_argument("--question", default="Compare these sources.")
+    capture_compare.add_argument("--synthesis", choices=["extractive", "mock", "openai_compatible_local", "anthropic"], default="extractive")
+    capture_compare.add_argument("--format", choices=["json", "text"], default="json")
+    capture_compare.set_defaults(handler=run_capture_compare)
     capture_recover = capture_commands.add_parser("recover", help="Index the exact saved capture selected by ID and SHA-256.")
     capture_recover.add_argument("snapshot_id")
     capture_recover.add_argument("--sha256", required=True)
@@ -9000,6 +9015,21 @@ def run_skills_executions(args: argparse.Namespace, cfg: Settings) -> int:
 
 def run_capture_recovery(args: argparse.Namespace, cfg: Settings) -> int:
     emit_payload(recover_web_snapshot(args.snapshot_id, args.sha256, cfg), args.format)
+    return 0
+
+
+def run_capture_list(args: argparse.Namespace, cfg: Settings) -> int:
+    emit_payload(list_capture_page(cfg, limit=args.limit, offset=args.offset, revision=args.revision), args.format)
+    return 0
+
+
+def run_capture_compare(args: argparse.Namespace, cfg: Settings) -> int:
+    try:
+        result = execute_skill("mucaro/web-research", {key: getattr(args, key) for key in ("a_id", "b_id", "a_sha256", "b_sha256", "question", "synthesis")}, cfg=cfg, executed_by="cli")
+    except SkillRuntimeError as exc:
+        emit_error(exc.status, exc.detail, args.format)
+        return 2
+    emit_payload(result, args.format)
     return 0
 
 
