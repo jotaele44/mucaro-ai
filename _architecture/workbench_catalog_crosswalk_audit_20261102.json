@@ -1,0 +1,170 @@
+{
+  "schema_version": "mucaro-workbench-catalog-crosswalk/1.0",
+  "snapshot_source_commit": "f8709cc9f8299ca7f9827dd204693912b1cb7511",
+  "state": "AUDIT_ONLY",
+  "catalog_status": "UNBOUND",
+  "scope": "T00-T19 workbench labels versus independently defined Goal/Plan entry denominator",
+  "workbench_source": "backend/app/execution_workbench.py",
+  "execution_entry_source": "_architecture/execution_entry_denominator_v1.json",
+  "execution_entry_contract": "docs/GOAL_PLAN_EXECUTION_ENTRY_V1.md",
+  "execution_entry_denominator": {
+    "expected": 28,
+    "positive": 8,
+    "negative": 20,
+    "prefixes": [
+      "P",
+      "N"
+    ],
+    "identity_relation_to_workbench_lanes": "UNRESOLVED_NOT_EQUIVALENT_BY_LABEL"
+  },
+  "lane_count": 20,
+  "lanes": [
+    {
+      "lane_id": "T00",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T01",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T02",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T03",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T04",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T05",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T06",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T07",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T08",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T09",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T10",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T11",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T12",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T13",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T14",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T15",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T16",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T17",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T18",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    },
+    {
+      "lane_id": "T19",
+      "status": "UNRESOLVED_CATALOG",
+      "executable_test_id": null,
+      "authoritative_catalog_ref": null,
+      "model_requirement": "UNKNOWN"
+    }
+  ],
+  "invariants": {
+    "all_lanes_unresolved": true,
+    "none_executable": true,
+    "distinct_catalog_denominators": true
+  },
+  "release_certification": "BLOCKED",
+  "next_evidence": "Acquire authoritative mapping of each T00-T19 label to exact test case selectors, expected semantics, required capability, source commit, and independent approval. Do not bind by ordinal or count."
+}
