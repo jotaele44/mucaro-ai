@@ -11,10 +11,10 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
     report = audit_current_denominator_state(PROJECT_ROOT)
     assert report["status"] == "MUCARO_V1_DENOMINATOR_AUDIT_OK"
     assert report["historical_baseline"] == {"raw_completion_percent": 61.5, "weighted_completion_percent": 62.6}
-    assert report["current_overlay"]["raw_completion_percent"] == 77.0
-    assert report["current_overlay"]["weighted_completion_percent"] == 78.4
-    assert report["current_overlay"]["per_track"]["CODING"]["score_percent"] == 70.0
-    assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"PASS": 4, "PROVISIONAL": 6}
+    assert report["current_overlay"]["raw_completion_percent"] == 78.5
+    assert report["current_overlay"]["weighted_completion_percent"] == 79.9
+    assert report["current_overlay"]["per_track"]["CODING"]["score_percent"] == 85.0
+    assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"PASS": 7, "PROVISIONAL": 3}
     assert report["current_overlay"]["per_track"]["GIS"]["score_percent"] == 75.0
     assert report["current_overlay"]["per_track"]["GIS"]["state_counts"] == {"PASS": 5, "PROVISIONAL": 5}
     assert report["current_overlay"]["per_track"]["OCR"]["score_percent"] == 50.0
@@ -23,13 +23,16 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
     assert report["current_overlay"]["per_track"]["BROWSING"]["state_counts"] == {"OPEN": 1, "PASS": 4, "PROVISIONAL": 5}
     assert report["current_overlay"]["per_track"]["RETRIEVAL"]["score_percent"] == 100.0
     assert report["current_overlay"]["per_track"]["RETRIEVAL"]["state_counts"] == {"PASS": 10}
-    assert report["current_overlay"]["state_counts"] == {"OPEN": 9, "PASS": 63, "PROVISIONAL": 28}
-    assert len(report["applied_events"]) == 27
+    assert report["current_overlay"]["state_counts"] == {"OPEN": 9, "PASS": 66, "PROVISIONAL": 25}
+    assert len(report["applied_events"]) == 30
     applied = {event["event_id"] for event in report["applied_events"]}
     assert {
         "evt-code03-repo-read-provisional",
         "evt-code04-dirty-state-provisional",
         "evt-code05-patch-receipts-provisional",
+        "evt-code03-repo-read-pass-20261102",
+        "evt-code04-dirty-state-pass-20261102",
+        "evt-code05-patch-receipts-pass-20261102",
         "evt-code06-mutation-runtime-provisional",
         "evt-code07-check-execution-provisional",
         "evt-code08-review-evidence-provisional",
