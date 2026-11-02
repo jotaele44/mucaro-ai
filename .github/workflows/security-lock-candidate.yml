@@ -66,6 +66,8 @@ jobs:
                "lock_count": len(rows), "locks": rows, "certification": "WITHHELD"}, indent=2, sort_keys=True) + "\n")
           print("LOCK_COUNT_CLOSED", len(rows))
           PY
+      - name: Verify seven-lock source and byte integrity
+        run: python scripts/verify_security_lock_candidate.py --source-head "$(git rev-parse HEAD)"
       - name: Audit every generated lock independently
         run: |
           set -eu
