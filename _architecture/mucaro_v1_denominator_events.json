@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "aa0cdf0213821079212c2bd417c6228bd68c8be3",
+  "audit_head": "5cf153dbb5e9b9698dc95e8c429755ff7f2e0465",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -461,6 +461,42 @@
         "portable runtime/source/install/certifier/manifest/arm64-lock/regression blobs byte-identical on current main@aa0cdf0213821079212c2bd417c6228bd68c8be3"
       ],
       "reason": "PKG-07 requires the portable embedded runtime itself. #309 independently certified the governed arm64 runtime source, materialized runtime, and packaged application lifecycle on Apple Silicon, including architecture/runtime identity and bundle-relative portable execution. The governing implementation, manifest, lock, and regression blobs are byte-identical on current main. This does not promote PKG-08 clean-machine evidence, PKG-09 signing/notarization, or PKG-10 upgrade/rollback guarantees beyond their separately governed requirements."
+    },
+    {
+      "event_id": "evt-gis06-horizontal-crs-pass-20261102",
+      "requirement_id": "GIS-06",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "FROZEN_INDEPENDENT_CONTROL_CORPUS_PLUS_EXACT_HEAD_EXECUTION",
+      "evidence": [
+        "PR#320 exact head@65905625e2e1b1900ae07b071a524f26529554a5",
+        "GitHub Actions CI run 41542355271 conclusion=success",
+        "python_tests 1630 passed / 1 skipped",
+        "certify_gis_quality.py => GIS_QUALITY_CERT_OK",
+        "_architecture/gis_v1_control_manifest.json CRS-001..CRS-005 with explicit tolerances",
+        "backend/tests/test_gis_v1_independent_controls.py CRS closed-form, axis-order, and governed-grid controls PASS under CI",
+        "backend/tests/test_gis_eval.py reproject/reproject_crs positive and negative cases PASS",
+        "merge main@5cf153dbb5e9b9698dc95e8c429755ff7f2e0465 has zero file differences from green PR tree"
+      ],
+      "reason": "GIS-06 is the bounded horizontal CRS transformation framework, not a claim of universal datum/vertical/time-dependent transformation. The frozen control corpus closes Web Mercator, UTM axis order, and two governed horizontal datum-grid cases with explicit tolerances; the 70-case GIS eval includes positive and fail-closed CRS transformations. Current source explicitly retains vertical/time-dependent CRS and independent-engine datum validation as nonclaims governed elsewhere, so those residues do not falsify this bounded GIS-06 PASS."
+    },
+    {
+      "event_id": "evt-gis07-measurement-pass-20261102",
+      "requirement_id": "GIS-07",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "INDEPENDENT_GEOGRAPHICLIB_CONTROL_CORPUS_PLUS_EXACT_HEAD_EXECUTION",
+      "evidence": [
+        "PR#320 exact head@65905625e2e1b1900ae07b071a524f26529554a5",
+        "GitHub Actions CI run 41542355271 conclusion=success",
+        "python_tests 1630 passed / 1 skipped",
+        "certify_gis_quality.py => GIS_QUALITY_CERT_OK",
+        "_architecture/gis_v1_control_manifest.json GEOD-001..GEOD-005 with explicit tolerances",
+        "backend/tests/test_gis_v1_independent_controls.py independent GeographicLib line/polygon controls PASS, including antimeridian and polar cases",
+        "backend/tests/test_gis_eval.py planar/geodesic/ellipsoidal positive and fail-closed measurement cases PASS",
+        "merge main@5cf153dbb5e9b9698dc95e8c429755ff7f2e0465 has zero file differences from green PR tree"
+      ],
+      "reason": "GIS-07's bounded planar and WGS84 ellipsoidal measurement claim closes under exact-head execution with independently computed GeographicLib line and polygon controls and explicit tolerances, including bounded antimeridian and polar edge cases. The support matrix still excludes unbounded large-geometry and additional ellipsoidal edge cases; those nonclaims do not broaden this PASS."
     }
   ]
 }

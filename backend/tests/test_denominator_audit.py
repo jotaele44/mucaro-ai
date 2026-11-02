@@ -11,12 +11,12 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
     report = audit_current_denominator_state(PROJECT_ROOT)
     assert report["status"] == "MUCARO_V1_DENOMINATOR_AUDIT_OK"
     assert report["historical_baseline"] == {"raw_completion_percent": 61.5, "weighted_completion_percent": 62.6}
-    assert report["current_overlay"]["raw_completion_percent"] == 79.0
-    assert report["current_overlay"]["weighted_completion_percent"] == 80.3
+    assert report["current_overlay"]["raw_completion_percent"] == 80.0
+    assert report["current_overlay"]["weighted_completion_percent"] == 81.5
     assert report["current_overlay"]["per_track"]["CODING"]["score_percent"] == 85.0
     assert report["current_overlay"]["per_track"]["CODING"]["state_counts"] == {"PASS": 7, "PROVISIONAL": 3}
-    assert report["current_overlay"]["per_track"]["GIS"]["score_percent"] == 75.0
-    assert report["current_overlay"]["per_track"]["GIS"]["state_counts"] == {"PASS": 5, "PROVISIONAL": 5}
+    assert report["current_overlay"]["per_track"]["GIS"]["score_percent"] == 85.0
+    assert report["current_overlay"]["per_track"]["GIS"]["state_counts"] == {"PASS": 7, "PROVISIONAL": 3}
     assert report["current_overlay"]["per_track"]["OCR"]["score_percent"] == 50.0
     assert report["current_overlay"]["per_track"]["OCR"]["state_counts"] == {"OPEN": 3, "PASS": 3, "PROVISIONAL": 4}
     assert report["current_overlay"]["per_track"]["BROWSING"]["score_percent"] == 65.0
@@ -25,8 +25,8 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
     assert report["current_overlay"]["per_track"]["RETRIEVAL"]["state_counts"] == {"PASS": 10}
     assert report["current_overlay"]["per_track"]["PACKAGING"]["score_percent"] == 75.0
     assert report["current_overlay"]["per_track"]["PACKAGING"]["state_counts"] == {"OPEN": 2, "PASS": 7, "PROVISIONAL": 1}
-    assert report["current_overlay"]["state_counts"] == {"OPEN": 9, "PASS": 67, "PROVISIONAL": 24}
-    assert len(report["applied_events"]) == 31
+    assert report["current_overlay"]["state_counts"] == {"OPEN": 9, "PASS": 69, "PROVISIONAL": 22}
+    assert len(report["applied_events"]) == 33
     applied = {event["event_id"] for event in report["applied_events"]}
     assert {
         "evt-code03-repo-read-provisional",
@@ -36,6 +36,8 @@ def test_current_denominator_overlay_applies_source_backed_events() -> None:
         "evt-code04-dirty-state-pass-20261102",
         "evt-code05-patch-receipts-pass-20261102",
         "evt-pkg07-portable-runtime-pass-20261102",
+        "evt-gis06-horizontal-crs-pass-20261102",
+        "evt-gis07-measurement-pass-20261102",
         "evt-code06-mutation-runtime-provisional",
         "evt-code07-check-execution-provisional",
         "evt-code08-review-evidence-provisional",
