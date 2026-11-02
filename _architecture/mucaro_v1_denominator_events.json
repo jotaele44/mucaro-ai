@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "5cf153dbb5e9b9698dc95e8c429755ff7f2e0465",
+  "audit_head": "306d18b8fe719942d8330f6e6b9b15cf37b9fc8e",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -497,6 +497,45 @@
         "merge main@5cf153dbb5e9b9698dc95e8c429755ff7f2e0465 has zero file differences from green PR tree"
       ],
       "reason": "GIS-07's bounded planar and WGS84 ellipsoidal measurement claim closes under exact-head execution with independently computed GeographicLib line and polygon controls and explicit tolerances, including bounded antimeridian and polar edge cases. The support matrix still excludes unbounded large-geometry and additional ellipsoidal edge cases; those nonclaims do not broaden this PASS."
+    },
+    {
+      "event_id": "evt-gis08-bounded-clip-filter-convert-pass-20261102",
+      "requirement_id": "GIS-08",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "EXACT_HEAD_70_CASE_GIS_EVAL_PLUS_FROZEN_CONTROL_CORPUS",
+      "evidence": [
+        "PR#321 exact head@88ce432475242ae3f95bf10de1df7a66cae8d19f",
+        "GitHub Actions CI run 41543280607 conclusion=success",
+        "python_tests 1630 passed / 1 skipped",
+        "certify_gis_quality.py => GIS_QUALITY_CERT_OK",
+        "backend/tests/test_gis_eval.py: 70/70 cases PASS across 26 operations",
+        "bbox_filter positive/residue/invalid-bbox cases PASS",
+        "clip_bbox positive/residue/invalid-bbox cases PASS",
+        "csv_points conversion with invalid-row accounting PASS",
+        "vector-format/raster-clip/resample positive and fail-closed cases PASS",
+        "_architecture/gis_v1_control_manifest.json frozen independent-control corpus closes with explicit tolerances",
+        "merge main@306d18b8fe719942d8330f6e6b9b15cf37b9fc8e has zero file differences from the green PR tree"
+      ],
+      "reason": "GIS-08 is certified only inside the frozen bounded V1 clipping/filtering/conversion support matrix. Exact-head execution covers bbox filtering, vector clipping, CSV point conversion, bounded vector-format manifests, raster clipping/resampling, null/unresolved accounting and negative inputs. Lossless cross-format semantic equivalence and unbounded format coverage remain explicit nonclaims."
+    },
+    {
+      "event_id": "evt-gis09-bounded-topology-vector-raster-pass-20261102",
+      "requirement_id": "GIS-09",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "INDEPENDENT_TOPOLOGY_RASTER_VECTOR_RASTER_CONTROLS_PLUS_70_CASE_EXECUTION",
+      "evidence": [
+        "PR#321 exact head@88ce432475242ae3f95bf10de1df7a66cae8d19f",
+        "GitHub Actions CI run 41543280607 conclusion=success",
+        "python_tests 1630 passed / 1 skipped",
+        "certify_gis_quality.py => GIS_QUALITY_CERT_OK",
+        "_architecture/gis_v1_control_manifest.json TOPO-001, RASTER-001, VECTOR_RASTER-001 and HYDRO-001..004 frozen controls",
+        "backend/tests/test_gis_v1_independent_controls.py independent topology/raster/hydrology arithmetic controls PASS",
+        "backend/tests/test_gis_eval.py topology repair, vector formats, raster inspect/sample/clip/resample/terrain/hillshade/hydrology, vector-raster and zonal-stat positive/negative cases PASS",
+        "merge main@306d18b8fe719942d8330f6e6b9b15cf37b9fc8e has zero file differences from the green PR tree"
+      ],
+      "reason": "GIS-09's 'broad' wording is bounded by the committed GIS_V1_SUPPORT_MATRIX rather than interpreted as universal GIS coverage. Within that bounded matrix, explicit topology repair and vector/raster operations close under frozen independent controls plus the 70-case positive/negative execution denominator. Remote sensing, broader formats, unbounded hydrology, bathymetry, temporal GIS and other listed nonclaims remain outside this PASS."
     }
   ]
 }
