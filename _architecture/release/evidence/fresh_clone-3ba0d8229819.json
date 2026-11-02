@@ -1,0 +1,30 @@
+{
+  "command": [
+    "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
+    "scripts/certify_fresh_clone.py",
+    "--ref",
+    "3ba0d8229819801756d9d4a6a3bfefe2ac877745"
+  ],
+  "created_utc": "2026-11-02T20:23:30Z",
+  "head_sha": "3ba0d8229819801756d9d4a6a3bfefe2ac877745",
+  "payload": {
+    "checks": [
+      "clone_ref",
+      "venv",
+      "pip_install",
+      "npm_ci",
+      "release_check",
+      "cli_help",
+      "launcher_self_test",
+      "launcher_smoke_test",
+      "clean_clone_worktree"
+    ],
+    "clone_dir": "/var/folders/0p/s67bd63s0cbdzz4rtd6_sm2m0000gn/T/mucaro-ai-fresh-clone-kp8_iur7/mucaro-ai",
+    "kept": true,
+    "ref": "3ba0d8229819801756d9d4a6a3bfefe2ac877745",
+    "source": "/Users/jotaele/Developer/mucaro-ai-agent-dag-cert"
+  },
+  "receipt_type": "fresh_clone",
+  "schema_version": "mucaro_release_receipt_v1",
+  "status": "FRESH_CLONE_CERT_OK"
+}

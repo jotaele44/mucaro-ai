@@ -5,6 +5,17 @@ declares for TGT-036, and the rendered evidence behind it. The checks are
 concrete, not subjective. They are exercised by `qa/rendered/rendered_qa.mjs`
 at desktop 1440×900, touch tablet 820×1180, and narrow mobile 390×844.
 
+Latest browser evidence (2026-11-02): Chromium passes 340/340 checks at
+`d53ae4815069` and WebKit passes 340/340 at `3ba0d8229819`, with 33 axe scans per
+engine and zero detected violations. The two sources have 353 identical
+backend/frontend Git entries, no one-sided entries, and matching frontend input,
+built-asset and served-index manifests. The sole runner change grounds a queued
+test query in its fixture sources. Receipts are
+`_architecture/release/evidence/rendered_qa_chromium_d53ae4815069.json` and
+`_architecture/release/evidence/rendered_qa_webkit_3ba0d8229819.json`.
+These supersede the prior browser checkpoint for this tested application scope;
+the native/device/full-manual-review boundaries below remain open.
+
 The current full browser checkpoint is `622e9c48fb948bf816245203fb8316df3a90e83e`:
 321/321 checks pass independently in Chromium 141.0.7390.37 and WebKit 26.0.
 Each engine ran all three viewport classes and 30 axe scans with zero detected
@@ -29,6 +40,9 @@ proof is reused.
 
 | Behaviour | How it is verified |
 |---|---|
+| **Capture recovery.** Sources offers an explicit ID/hash form, retains its draft references, rejects stale bytes and blocks duplicate pending activation. A successful result states that the saved observation was indexed without a new fetch. | Full browser runs use real API recovery with authored frozen files; all three viewport classes exercise wrong-hash refusal, one pending request, exact saved-file/index accounting, draft retention, and unchanged index bytes on replay. Tablet/mobile use actual emulated touch events. Each profile receives an axe scan. |
+| **Drafts during acknowledgement.** Typing the next draft while a previous send is pending must not lose edits. | A real delayed message response verifies that a later draft revision remains after acknowledgement in both browser engines. A synchronous in-flight guard also fences repeated sends before the next render. |
+| **Empty conversation scrolling.** The empty conversation list remains keyboard reachable even when its scroll geometry has no focusable rows. | The list has an explicit tab stop and the recovery/empty-library screens pass the formerly failing scrollable-region accessibility check. |
 | **Recover saved outputs.** Filter, inspect direct parents, page, refresh, and download use labeled one-click controls. Pending operations refuse duplicate activation. A failed refresh retains the last snapshot and explains recovery; an unmatched filter has an actionable empty state. | Both full browser receipts exercise actual saved GeoTIFF downloads against the recorded artifact SHA, one request under a double-click, navigation away/back, refresh failure/retry and empty filtering at all three viewport classes. The library has an axe scan per profile. Representative WebKit tablet/mobile screenshots are retained alongside the receipts. |
 | **Conversation exports.** Cards show persisted states and expose existing answer formats. Downloads use the explicit answer identity; older runs are reachable through a paging button. | Both engines download and inspect an actual answer trace from the Artifacts screen at each viewport. Missing/absent answer exports have no download controls. `test_run_summaries_bind_export_controls_to_the_actual_answer_id` verifies the backend binding and removal of a missing format. |
 | **WebKit focus and touch controls.** Pointer activation focuses a button before a sheet mounts, preserving its opener without consuming the primary click. Touch select controls retain a themed dropdown affordance and measure at least 44px high. | Both full receipts pass first-click sheet opening, Escape focus return, field-size and touch-target checks; the old WebKit focus/size failures remain historical, superseded observations. |

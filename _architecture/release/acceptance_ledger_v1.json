@@ -1,6 +1,6 @@
 {
   "schema_version": "mucaro-release-acceptance-ledger/1.0",
-  "updated_utc": "2026-10-30T08:38:38.560095Z",
+  "updated_utc": "2026-11-02T20:21:26.735896Z",
   "rows": [
     {
       "requirement_id": "GOAL-001",
@@ -1145,17 +1145,28 @@
       "implementation_refs": [
         "backend/app/web_browsing.py",
         "backend/app/web_search.py",
-        "backend/app/web_render.py"
+        "backend/app/web_render.py",
+        "backend/app/web_capture_store.py"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_chromium_d53ae4815069.json",
+        "_architecture/release/evidence/rendered_qa_webkit_3ba0d8229819.json",
+        "backend/tests/test_web_capture_store.py",
+        "backend/tests/test_file_lock.py",
+        "docs/WEB_CAPTURE_STORE.md",
+        "_architecture/release/evidence/local_release-3ba0d8229819.json",
+        "_architecture/release/evidence/fresh_clone-3ba0d8229819.json",
+        "_architecture/release/evidence/source_artifact-3ba0d8229819.json",
+        "_architecture/release/evidence/source_manifest-3ba0d8229819.json"
+      ],
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N11",
-      "notes": "Live search needs BLK-WEB-001; prompt-injection resistance absent."
+      "notes": "Live search needs BLK-WEB-001; prompt-injection resistance absent. UPDATE 2026-11-02: HTTP capture now serializes complete index updates across threads/processes and publishes frozen snapshot files exclusively. A reproduced two-writer lost-index-entry defect is repaired; 12 concurrent actual HTTP captures and eight separate-process captures retain all IDs and counts. ID+hash recovery is shared by GUI/API/CLI, performs no network request, and preserves earlier bytes. These changes strengthen CAPTURE/FREEZE recovery; live SEARCH, full COMPARE/SYNTHESIZE integration, and generalized prompt-injection evaluation remain OPEN. Verified checkpoint 3ba0d8229819: all 28 local release gates pass with 1735 tests passed and 8 skipped. Source fresh-clone and independently verified/extracted ZIP installation checks both pass; both installed environments report pypdf 6.21.4. These are source/host checks; no native, physical-device, hosted or full-product promotion is implied."
     },
     {
       "requirement_id": "TGT-007",
@@ -1566,17 +1577,29 @@
       "scope_state": "IN_SCOPE",
       "implementation_state": "PARTIAL",
       "implementation_refs": [
-        "backend/app/security.py"
+        "backend/app/security.py",
+        "backend/app/web_capture_store.py"
       ],
       "dependencies": [],
       "positive_gate": null,
       "negative_gate": null,
       "benchmark": null,
-      "evidence_refs": [],
+      "evidence_refs": [
+        "_architecture/release/evidence/rendered_qa_chromium_d53ae4815069.json",
+        "_architecture/release/evidence/rendered_qa_webkit_3ba0d8229819.json",
+        "backend/tests/test_web_capture_store.py",
+        "backend/tests/test_file_lock.py",
+        "docs/WEB_CAPTURE_STORE.md",
+        "docs/release/PDF_SECURITY_2026-11-02.md",
+        "_architecture/release/evidence/local_release-3ba0d8229819.json",
+        "_architecture/release/evidence/fresh_clone-3ba0d8229819.json",
+        "_architecture/release/evidence/source_artifact-3ba0d8229819.json",
+        "_architecture/release/evidence/source_manifest-3ba0d8229819.json"
+      ],
       "state": "OPEN",
       "blocker_id": null,
       "dag_node": "N02",
-      "notes": ""
+      "notes": " UPDATE 2026-11-02: A local advisory gate detected seven pypdf 6.21.2 advisories (CVE-2026-119203 through CVE-2026-119209). The targeted update pins pypdf 6.21.4 and publisher-verified wheel/sdist hashes in all seven governed packaging locks; all other package stanzas remain unchanged. Backend and both runtime-lock audits pass for this patch. Shared locks reject symlink/FIFO targets. Broader security acceptance remains OPEN. Verified checkpoint 3ba0d8229819: all 28 local release gates pass with 1735 tests passed and 8 skipped. Source fresh-clone and independently verified/extracted ZIP installation checks both pass; both installed environments report pypdf 6.21.4. These are source/host checks; no native, physical-device, hosted or full-product promotion is implied."
     },
     {
       "requirement_id": "TGT-022",
@@ -1876,7 +1899,8 @@
         "backend/app/artifact_downloads.py",
         "backend/app/gis_raster_skill.py",
         "backend/app/artifact_identity.py",
-        "frontend/src/components/workspaces/ArtifactLibrary.jsx"
+        "frontend/src/components/workspaces/ArtifactLibrary.jsx",
+        "backend/app/web_capture_store.py"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -1895,12 +1919,21 @@
         "_architecture/release/evidence/rendered_qa_webkit_622e9c48fb94.json",
         "backend/tests/test_artifact_recovery.py",
         "backend/tests/test_work_runs.py::test_run_summaries_bind_export_controls_to_the_actual_answer_id",
-        "docs/ARTIFACT_RECOVERY.md"
+        "docs/ARTIFACT_RECOVERY.md",
+        "_architecture/release/evidence/rendered_qa_chromium_d53ae4815069.json",
+        "_architecture/release/evidence/rendered_qa_webkit_3ba0d8229819.json",
+        "backend/tests/test_web_capture_store.py",
+        "backend/tests/test_file_lock.py",
+        "docs/WEB_CAPTURE_STORE.md",
+        "_architecture/release/evidence/local_release-3ba0d8229819.json",
+        "_architecture/release/evidence/fresh_clone-3ba0d8229819.json",
+        "_architecture/release/evidence/source_artifact-3ba0d8229819.json",
+        "_architecture/release/evidence/source_manifest-3ba0d8229819.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N15",
-      "notes": "Run errors, warnings, tool results, and API errors retain canonical categories and precise status identities. Artifact-boundary refusals are PERMISSION_DENIED; changed output bytes and invalid lineage are UNTRUSTED_CONTENT; absent outputs are SOURCE_UNAVAILABLE. Raster numeric overflow and malformed/unsupported inputs fail with actionable domain errors rather than valid-looking results. The frontend retains drafts/results and explicit recovery controls. Broader error-path release verification remains PROVISIONAL. UPDATE 2026-10-30: Artifact corruption now produces ERROR_ARTIFACT_STORE_INVALID through API and CLI. Changed page revisions require refresh; damaged bytes are preserved. GUI list errors retain and label the last snapshot, with explicit pending/retry controls. Missing answer files have no export button. Broader release error-path acceptance remains PROVISIONAL. Latest full browser evidence: clean source 622e9c48fb948bf816245203fb8316df3a90e83e, Chromium 141.0.7390.37 321/321 and WebKit 26.0 321/321, each at desktop 1440x900, touch tablet 820x1180, and mobile 390x844. Each engine records 30 axe scans with zero violations; this is bounded browser evidence, not full accessibility/native/device certification."
+      "notes": "Run errors, warnings, tool results, and API errors retain canonical categories and precise status identities. Artifact-boundary refusals are PERMISSION_DENIED; changed output bytes and invalid lineage are UNTRUSTED_CONTENT; absent outputs are SOURCE_UNAVAILABLE. Raster numeric overflow and malformed/unsupported inputs fail with actionable domain errors rather than valid-looking results. The frontend retains drafts/results and explicit recovery controls. Broader error-path release verification remains PROVISIONAL. UPDATE 2026-10-30: Artifact corruption now produces ERROR_ARTIFACT_STORE_INVALID through API and CLI. Changed page revisions require refresh; damaged bytes are preserved. GUI list errors retain and label the last snapshot, with explicit pending/retry controls. Missing answer files have no export button. Broader release error-path acceptance remains PROVISIONAL. Latest full browser evidence: clean source 622e9c48fb948bf816245203fb8316df3a90e83e, Chromium 141.0.7390.37 321/321 and WebKit 26.0 321/321, each at desktop 1440x900, touch tablet 820x1180, and mobile 390x844. Each engine records 30 axe scans with zero violations; this is bounded browser evidence, not full accessibility/native/device certification. UPDATE 2026-11-02: Damaged/oversized/ambiguous web indexes, invalid IDs/digests/counts/UTC, snapshot identity conflicts, and inaccessible stores fail with explicit domain categories without resetting history. An index-write failure retains the saved file ID/hash for explicit no-network recovery. GUI recovery refuses stale hashes, preserves entered references, reports checked completion, and blocks rapid duplicate submission. Verified checkpoint 3ba0d8229819: all 28 local release gates pass with 1735 tests passed and 8 skipped. Source fresh-clone and independently verified/extracted ZIP installation checks both pass; both installed environments report pypdf 6.21.4. These are source/host checks; no native, physical-device, hosted or full-product promotion is implied."
     },
     {
       "requirement_id": "TGT-035",
@@ -1932,7 +1965,9 @@
       "implementation_refs": [
         "frontend/src/components/Sheet.jsx",
         "frontend/src/App.jsx",
-        "frontend/src/styles.css"
+        "frontend/src/styles.css",
+        "frontend/src/components/Composer.jsx",
+        "frontend/src/components/workspaces/CaptureRecovery.jsx"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -1950,12 +1985,17 @@
         "docs/ARTIFACT_RECOVERY.md",
         "_architecture/release/evidence/artifact_touch-4019745eb7de.json",
         "_architecture/release/evidence/local_release-4019745eb7de.json",
-        "_architecture/release/evidence/fresh_clone-4019745eb7de.json"
+        "_architecture/release/evidence/fresh_clone-4019745eb7de.json",
+        "_architecture/release/evidence/rendered_qa_chromium_d53ae4815069.json",
+        "_architecture/release/evidence/rendered_qa_webkit_3ba0d8229819.json",
+        "backend/tests/test_web_capture_store.py",
+        "backend/tests/test_file_lock.py",
+        "docs/WEB_CAPTURE_STORE.md"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N17",
-      "notes": "Declared Chromium journeys now cover desktop 1440x900, touch tablet 820x1180, and mobile 390x844 with 27 axe scans detecting zero violations across the source/asset-equivalent receipts. Tablet and mobile controls satisfy the measured touch-target and field-size checks; raster coordinate editing and output downloads are exercised. Tablet and narrow raster result screens were visually inspected. Full WCAG/manual assistive-technology review, VoiceOver/WKWebView, software keyboards, and physical-device behavior remain unverified. UPDATE 2026-10-30: WebKit pointer clicks now focus the actual button before sheet mounting, so Escape restores its opener. Native touch selects use a visible themed chevron and render at least 44px high. Tablet/narrow screens were visually inspected; representative WebKit screenshots are retained. Full manual WCAG/assistive-technology, native WKWebView, physical devices, and complete design review remain unverified. Latest full browser evidence: clean source 622e9c48fb948bf816245203fb8316df3a90e83e, Chromium 141.0.7390.37 321/321 and WebKit 26.0 321/321, each at desktop 1440x900, touch tablet 820x1180, and mobile 390x844. Each engine records 30 axe scans with zero violations; this is bounded browser evidence, not full accessibility/native/device certification. Supplemental proof at 4019745eb7de: 4/4 actual emulated touch-event profiles pass in Chromium/WebKit at tablet and mobile sizes, with one matching-byte download request per tap. All 28 local release gates pass (1704 tests passed, 8 skipped), and source fresh-clone installation/CLI/launcher checks pass. Source installation and emulation do not establish native, physical-device or hosted release completion."
+      "notes": "Declared Chromium journeys now cover desktop 1440x900, touch tablet 820x1180, and mobile 390x844 with 27 axe scans detecting zero violations across the source/asset-equivalent receipts. Tablet and mobile controls satisfy the measured touch-target and field-size checks; raster coordinate editing and output downloads are exercised. Tablet and narrow raster result screens were visually inspected. Full WCAG/manual assistive-technology review, VoiceOver/WKWebView, software keyboards, and physical-device behavior remain unverified. UPDATE 2026-10-30: WebKit pointer clicks now focus the actual button before sheet mounting, so Escape restores its opener. Native touch selects use a visible themed chevron and render at least 44px high. Tablet/narrow screens were visually inspected; representative WebKit screenshots are retained. Full manual WCAG/assistive-technology, native WKWebView, physical devices, and complete design review remain unverified. Latest full browser evidence: clean source 622e9c48fb948bf816245203fb8316df3a90e83e, Chromium 141.0.7390.37 321/321 and WebKit 26.0 321/321, each at desktop 1440x900, touch tablet 820x1180, and mobile 390x844. Each engine records 30 axe scans with zero violations; this is bounded browser evidence, not full accessibility/native/device certification. Supplemental proof at 4019745eb7de: 4/4 actual emulated touch-event profiles pass in Chromium/WebKit at tablet and mobile sizes, with one matching-byte download request per tap. All 28 local release gates pass (1704 tests passed, 8 skipped), and source fresh-clone installation/CLI/launcher checks pass. Source installation and emulation do not establish native, physical-device or hosted release completion. UPDATE 2026-11-02: The full browser harness passes Chromium 340/340 at d53ae4815069 and WebKit 340/340 at 3ba0d8229819. Each engine covers desktop/tablet/narrow mobile and 33 axe scans with zero detected violations. Actual emulated touch activation covers recovery and duplicate refusal; the empty conversation scroll list is keyboard reachable. A delayed send acknowledgement preserves newer draft edits. App identities match across all 353 backend/frontend entries and all frontend input/build/index manifests. Physical-device/native/manual full-accessibility proof remains open."
     },
     {
       "requirement_id": "TGT-037",
@@ -2179,7 +2219,8 @@
       "implementation_state": "PARTIAL",
       "implementation_refs": [
         "backend/app/web_browsing.py",
-        "backend/app/injection_guard.py"
+        "backend/app/injection_guard.py",
+        "backend/app/web_capture_store.py"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -2187,12 +2228,21 @@
       "benchmark": null,
       "evidence_refs": [
         "backend/tests/test_prompt_injection.py::test_injected_web_snapshot_is_evidence_only",
-        "backend/tests/test_web_browsing.py"
+        "backend/tests/test_web_browsing.py",
+        "_architecture/release/evidence/rendered_qa_chromium_d53ae4815069.json",
+        "_architecture/release/evidence/rendered_qa_webkit_3ba0d8229819.json",
+        "backend/tests/test_web_capture_store.py",
+        "backend/tests/test_file_lock.py",
+        "docs/WEB_CAPTURE_STORE.md",
+        "_architecture/release/evidence/local_release-3ba0d8229819.json",
+        "_architecture/release/evidence/fresh_clone-3ba0d8229819.json",
+        "_architecture/release/evidence/source_artifact-3ba0d8229819.json",
+        "_architecture/release/evidence/source_manifest-3ba0d8229819.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N11",
-      "notes": "Instruction-bearing source content verified inert; OPEN/CAPTURE/FREEZE/CITE covered by existing web tests. SEARCH needs BLK-WEB-001; COMPARE/SYNTHESIZE workflow benchmark not yet frozen."
+      "notes": "Instruction-bearing source content verified inert; OPEN/CAPTURE/FREEZE/CITE covered by existing web tests. SEARCH needs BLK-WEB-001; COMPARE/SYNTHESIZE workflow benchmark not yet frozen. UPDATE 2026-11-02: CAPTURE/FREEZE persistence and recovery now include actual concurrent HTTP/server inputs, separate-process writers, byte-bound idempotency, malformed state, count/identity conflicts, capacity, interruption and authenticated recovery. Authored saved fixtures support browser recovery checks without network acquisition and do not claim live search, real-source comparison/synthesis or semantic research correctness. The broader benchmark remains PROVISIONAL. Verified checkpoint 3ba0d8229819: all 28 local release gates pass with 1735 tests passed and 8 skipped. Source fresh-clone and independently verified/extracted ZIP installation checks both pass; both installed environments report pypdf 6.21.4. These are source/host checks; no native, physical-device, hosted or full-product promotion is implied."
     },
     {
       "requirement_id": "MATRIX-009",
@@ -2348,7 +2398,9 @@
       "implementation_state": "PARTIAL",
       "implementation_refs": [
         "qa/rendered/rendered_qa.mjs",
-        ".github/workflows/rendered-qa.yml"
+        ".github/workflows/rendered-qa.yml",
+        "frontend/src/components/Composer.jsx",
+        "frontend/src/components/workspaces/CaptureRecovery.jsx"
       ],
       "dependencies": [],
       "positive_gate": null,
@@ -2371,12 +2423,21 @@
         "docs/ARTIFACT_RECOVERY.md",
         "_architecture/release/evidence/artifact_touch-4019745eb7de.json",
         "_architecture/release/evidence/local_release-4019745eb7de.json",
-        "_architecture/release/evidence/fresh_clone-4019745eb7de.json"
+        "_architecture/release/evidence/fresh_clone-4019745eb7de.json",
+        "_architecture/release/evidence/rendered_qa_chromium_d53ae4815069.json",
+        "_architecture/release/evidence/rendered_qa_webkit_3ba0d8229819.json",
+        "backend/tests/test_web_capture_store.py",
+        "backend/tests/test_file_lock.py",
+        "docs/WEB_CAPTURE_STORE.md",
+        "_architecture/release/evidence/local_release-3ba0d8229819.json",
+        "_architecture/release/evidence/fresh_clone-3ba0d8229819.json",
+        "_architecture/release/evidence/source_artifact-3ba0d8229819.json",
+        "_architecture/release/evidence/source_manifest-3ba0d8229819.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N18",
-      "notes": "214/214 full rendered checks pass for desktop/mobile at clean source 385bc85f8caa. A separate scoped tablet replay passes 78/78 at adbb1ca0576a; it remains RENDERED_QA_PARTIAL and does not rerun ancillary network/stream/recovery scenarios. Hard application identity is verified: 347 identical backend/frontend Git entries, zero one-sided/symmetric differences, identical frontend input manifests and built asset hashes. Together the receipts exercise three viewport classes with 27 zero-violation axe scans, real OCR/GIS/raster workflows, readable unresolved D8 states, editable coordinates, verified GeoTIFF downloads, and live development-proxy routing. Screens were visually reviewed at tablet/narrow widths. Native/device behavior and the complete design/accessibility review remain open. UPDATE 2026-10-30: The full default three-profile harness now passes in both engines, superseding earlier current-browser scope claims while retaining historical evidence. Checks include real OCR/vector/raster engines, output discovery and byte hashes, direct parents, correct answer-ID export binding, older-run paging, one download under a double-click, snapshot retention/retry, restored focus and 44px targets. Genuine empty-state checks use an isolated real service; memory fixtures are viewport-specific. Both receipts bind actual frontend input/assets and served index bytes and verify source/build stability. Native/device and complete manual design/accessibility review remain open. Latest full browser evidence: clean source 622e9c48fb948bf816245203fb8316df3a90e83e, Chromium 141.0.7390.37 321/321 and WebKit 26.0 321/321, each at desktop 1440x900, touch tablet 820x1180, and mobile 390x844. Each engine records 30 axe scans with zero violations; this is bounded browser evidence, not full accessibility/native/device certification. Supplemental proof at 4019745eb7de: 4/4 actual emulated touch-event profiles pass in Chromium/WebKit at tablet and mobile sizes, with one matching-byte download request per tap. All 28 local release gates pass (1704 tests passed, 8 skipped), and source fresh-clone installation/CLI/launcher checks pass. Source installation and emulation do not establish native, physical-device or hosted release completion."
+      "notes": "214/214 full rendered checks pass for desktop/mobile at clean source 385bc85f8caa. A separate scoped tablet replay passes 78/78 at adbb1ca0576a; it remains RENDERED_QA_PARTIAL and does not rerun ancillary network/stream/recovery scenarios. Hard application identity is verified: 347 identical backend/frontend Git entries, zero one-sided/symmetric differences, identical frontend input manifests and built asset hashes. Together the receipts exercise three viewport classes with 27 zero-violation axe scans, real OCR/GIS/raster workflows, readable unresolved D8 states, editable coordinates, verified GeoTIFF downloads, and live development-proxy routing. Screens were visually reviewed at tablet/narrow widths. Native/device behavior and the complete design/accessibility review remain open. UPDATE 2026-10-30: The full default three-profile harness now passes in both engines, superseding earlier current-browser scope claims while retaining historical evidence. Checks include real OCR/vector/raster engines, output discovery and byte hashes, direct parents, correct answer-ID export binding, older-run paging, one download under a double-click, snapshot retention/retry, restored focus and 44px targets. Genuine empty-state checks use an isolated real service; memory fixtures are viewport-specific. Both receipts bind actual frontend input/assets and served index bytes and verify source/build stability. Native/device and complete manual design/accessibility review remain open. Latest full browser evidence: clean source 622e9c48fb948bf816245203fb8316df3a90e83e, Chromium 141.0.7390.37 321/321 and WebKit 26.0 321/321, each at desktop 1440x900, touch tablet 820x1180, and mobile 390x844. Each engine records 30 axe scans with zero violations; this is bounded browser evidence, not full accessibility/native/device certification. Supplemental proof at 4019745eb7de: 4/4 actual emulated touch-event profiles pass in Chromium/WebKit at tablet and mobile sizes, with one matching-byte download request per tap. All 28 local release gates pass (1704 tests passed, 8 skipped), and source fresh-clone installation/CLI/launcher checks pass. Source installation and emulation do not establish native, physical-device or hosted release completion. UPDATE 2026-11-02: Full Chromium 340/340 and WebKit 340/340 runs cover three viewport classes, 66 zero-violation axe scans in total, actual touch recovery, wrong-hash refusal, preserved capture/index bytes on replay, retained references, one pending request under rapid activation, empty-state scrolling, and preservation of a newer composer draft under delayed acknowledgement. The Chromium runner changed only the queued fixture query to known source content; the app is byte-identical to WebKit source across 353 backend/frontend entries, and frontend inputs/assets/served-index hashes match. Scope remains bounded browser evidence; native/device and full manual design/accessibility review remain open. Verified checkpoint 3ba0d8229819: all 28 local release gates pass with 1735 tests passed and 8 skipped. Source fresh-clone and independently verified/extracted ZIP installation checks both pass; both installed environments report pypdf 6.21.4. These are source/host checks; no native, physical-device, hosted or full-product promotion is implied."
     },
     {
       "requirement_id": "MATRIX-016",
@@ -2387,7 +2448,8 @@
         "_architecture/recovery_benchmark_v1.json",
         "backend/app/recovery_benchmark.py",
         "scripts/certify_recovery.py",
-        "backend/tests/test_agent_checkpoint_process_recovery.py"
+        "backend/tests/test_agent_checkpoint_process_recovery.py",
+        "backend/app/web_capture_store.py"
       ],
       "dependencies": [],
       "positive_gate": "backend/tests/test_recovery_benchmark.py::test_recovery_benchmark_passes_in_isolated_store",
@@ -2402,12 +2464,21 @@
         "_architecture/release/evidence/rendered_qa_webkit_622e9c48fb94.json",
         "backend/tests/test_artifact_recovery.py",
         "backend/tests/test_work_runs.py::test_run_summaries_bind_export_controls_to_the_actual_answer_id",
-        "docs/ARTIFACT_RECOVERY.md"
+        "docs/ARTIFACT_RECOVERY.md",
+        "_architecture/release/evidence/rendered_qa_chromium_d53ae4815069.json",
+        "_architecture/release/evidence/rendered_qa_webkit_3ba0d8229819.json",
+        "backend/tests/test_web_capture_store.py",
+        "backend/tests/test_file_lock.py",
+        "docs/WEB_CAPTURE_STORE.md",
+        "_architecture/release/evidence/local_release-3ba0d8229819.json",
+        "_architecture/release/evidence/fresh_clone-3ba0d8229819.json",
+        "_architecture/release/evidence/source_artifact-3ba0d8229819.json",
+        "_architecture/release/evidence/source_manifest-3ba0d8229819.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N21",
-      "notes": "Bounded local receipt passes 5/5 scenarios at the exact certified source head: process-restart reconciliation, waiting-run resume, FIFO/idempotency, partial-failure targeted retry, and offline routing transition. Physical packaged-app restart, real network interruption, and native/device recovery remain outside this receipt and keep MATRIX-016 provisional. UPDATE 2026-10-30: Additional artifact recovery cases cover damaged JSON, legacy graph defects, cycles, deep/shared DAGs, preserved damaged bytes, changing page revisions, authentication and exclusive verified CLI saves. Browser snapshot retention and recovery run without replaying execution. Packaged physical restart and native/device recovery remain outside this bounded claim. Latest full browser evidence: clean source 622e9c48fb948bf816245203fb8316df3a90e83e, Chromium 141.0.7390.37 321/321 and WebKit 26.0 321/321, each at desktop 1440x900, touch tablet 820x1180, and mobile 390x844. Each engine records 30 axe scans with zero violations; this is bounded browser evidence, not full accessibility/native/device certification."
+      "notes": "Bounded local receipt passes 5/5 scenarios at the exact certified source head: process-restart reconciliation, waiting-run resume, FIFO/idempotency, partial-failure targeted retry, and offline routing transition. Physical packaged-app restart, real network interruption, and native/device recovery remain outside this receipt and keep MATRIX-016 provisional. UPDATE 2026-10-30: Additional artifact recovery cases cover damaged JSON, legacy graph defects, cycles, deep/shared DAGs, preserved damaged bytes, changing page revisions, authentication and exclusive verified CLI saves. Browser snapshot retention and recovery run without replaying execution. Packaged physical restart and native/device recovery remain outside this bounded claim. Latest full browser evidence: clean source 622e9c48fb948bf816245203fb8316df3a90e83e, Chromium 141.0.7390.37 321/321 and WebKit 26.0 321/321, each at desktop 1440x900, touch tablet 820x1180, and mobile 390x844. Each engine records 30 axe scans with zero violations; this is bounded browser evidence, not full accessibility/native/device certification. UPDATE 2026-11-02: The new recovery service preserves an unindexed capture after index-commit failure and indexes the exact selected bytes without fetching a mutable URL. Corrupt stores are not reset. Actual threaded/process writers and shared lock interruption/symlink/FIFO refusals are tested, alongside GUI/API/CLI recovery and draft preservation. Packaged physical restart, true network disruption and native/device proof remain open. Verified checkpoint 3ba0d8229819: all 28 local release gates pass with 1735 tests passed and 8 skipped. Source fresh-clone and independently verified/extracted ZIP installation checks both pass; both installed environments report pypdf 6.21.4. These are source/host checks; no native, physical-device, hosted or full-product promotion is implied."
     },
     {
       "requirement_id": "MATRIX-017",
@@ -2479,12 +2550,16 @@
         "backend/tests/test_release_grade_certification.py::test_clean_machine_receipt_must_prove_the_bundle_stayed_immutable",
         "_architecture/release/evidence/release_grade_0a806c1e8c98/release_grade_receipt.json",
         "_architecture/release/evidence/release_grade_0a806c1e8c98/provenance.json",
-        "_architecture/release/evidence/arm64_runtime_source_20261016.json"
+        "_architecture/release/evidence/arm64_runtime_source_20261016.json",
+        "_architecture/release/evidence/local_release-3ba0d8229819.json",
+        "_architecture/release/evidence/fresh_clone-3ba0d8229819.json",
+        "_architecture/release/evidence/source_artifact-3ba0d8229819.json",
+        "_architecture/release/evidence/source_manifest-3ba0d8229819.json"
       ],
       "state": "PROVISIONAL",
       "blocker_id": null,
       "dag_node": "N24",
-      "notes": "The release-grade sequence still requires both release lanes (A7). Native/common gates retain their prior evidence. The arm64 portable source/lock/manifest input boundary is now frozen and reproducible, but Apple-Silicon runtime materialization, portable install/reinstall, distinct-version rollback, and clean-host packaged lifecycle receipts remain OPEN; signing/notarization and release-scope residue remain independent. Therefore this row remains PROVISIONAL."
+      "notes": "The release-grade sequence still requires both release lanes (A7). Native/common gates retain their prior evidence. The arm64 portable source/lock/manifest input boundary is now frozen and reproducible, but Apple-Silicon runtime materialization, portable install/reinstall, distinct-version rollback, and clean-host packaged lifecycle receipts remain OPEN; signing/notarization and release-scope residue remain independent. Therefore this row remains PROVISIONAL. Verified checkpoint 3ba0d8229819: all 28 local release gates pass with 1735 tests passed and 8 skipped. Source fresh-clone and independently verified/extracted ZIP installation checks both pass; both installed environments report pypdf 6.21.4. These are source/host checks; no native, physical-device, hosted or full-product promotion is implied."
     },
     {
       "requirement_id": "MATRIX-020",

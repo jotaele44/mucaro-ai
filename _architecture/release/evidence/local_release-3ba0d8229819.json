@@ -1,0 +1,198 @@
+{
+  "command": [
+    "/Users/jotaele/Developer/worktrees/mucaro-pdf-security-20261102/.pdf-check-venv/bin/python",
+    "scripts/certify_release.py"
+  ],
+  "created_utc": "2026-11-02T20:22:23Z",
+  "head_sha": "3ba0d8229819801756d9d4a6a3bfefe2ac877745",
+  "payload": {
+    "failed_gates": [],
+    "gates": [
+      {
+        "detail": "clean",
+        "name": "worktree_clean",
+        "status": "PASS"
+      },
+      {
+        "detail": "none",
+        "name": "prior_name_residue",
+        "status": "PASS"
+      },
+      {
+        "detail": "none",
+        "name": "secret_pattern_scan",
+        "status": "PASS"
+      },
+      {
+        "detail": "<= 1000000 bytes except bounded allowlist",
+        "name": "large_file_scan",
+        "status": "PASS"
+      },
+      {
+        "detail": "none",
+        "name": "generated_artifact_scan",
+        "status": "PASS"
+      },
+      {
+        "detail": "1735 passed, 8 skipped, 697 warnings in 416.42s (0:06:56)",
+        "name": "python_tests",
+        "status": "PASS"
+      },
+      {
+        "detail": "threshold_failures=[]",
+        "name": "matrix016_recovery",
+        "status": "PASS"
+      },
+      {
+        "detail": "ANSWER_TRACE_QUALITY_CERT_OK",
+        "name": "answer_trace_quality",
+        "status": "PASS"
+      },
+      {
+        "detail": "PASS tool_approval_execution_audit events=TOOL_CALL_REQUESTED,TOOL_CALL_APPROVED,TOOL_CALL_STARTED,TOOL_CALL_EXECUTED",
+        "name": "operator_workflow",
+        "status": "PASS"
+      },
+      {
+        "detail": "RETRIEVAL_EVAL_OK",
+        "name": "retrieval_eval",
+        "status": "PASS"
+      },
+      {
+        "detail": "RETRIEVAL_QUALITY_CERT_OK",
+        "name": "retrieval_quality",
+        "status": "PASS"
+      },
+      {
+        "detail": "PASS raster_d8_flow raster_d8_missing_complete_neighborhood_fails_closed observed=ERROR_GIS_D8_NO_COMPLETE_NEIGHBORHOOD expected=ERROR_GIS_D8_NO_COMPLETE_NEIGHBORHOOD",
+        "name": "gis_quality",
+        "status": "PASS"
+      },
+      {
+        "detail": "independent_engine_certification=OPEN",
+        "name": "gis_datum_cli_parity",
+        "status": "PASS"
+      },
+      {
+        "detail": "independent_engine_certification=OPEN",
+        "name": "gis_overlay_cli_parity",
+        "status": "PASS"
+      },
+      {
+        "detail": "state_mismatches=0",
+        "name": "ocr_v1_runtime_boundary",
+        "status": "PASS"
+      },
+      {
+        "detail": "{\"benchmark\": {\"case_count\": 6, \"path\": \"_architecture/ocr08_structure_benchmark_v1.json\", \"sha256\": \"0d6f6f253948592f60d4a0e2fca1d5a1edf73916a3d989f11f2619356ea1d52e\", \"thresholds\": {\"negative_fail_closed_rate\": 1.0, \"positive_case_pass_rate\": 1.0, \"span_accounting_rate\": 1.0}}, \"case_matches\": {\"OCR08-01\": true, \"OCR08-02\": true, \"OCR08-03\": true, \"OCR08-N01\": true, \"OCR08-N02\": true, \"OCR08-N03\": true}, \"case_results\": [{\"id\": \"OCR08-01\", \"status\": \"OCR_MULTI_COLUMN_OK\"}, {\"id\": \"OCR08-02\", \"status\": \"OCR_TABLE_RECONSTRUCTION_OK\"}, {\"id\": \"OCR08-03\", \"status\": \"OCR_FORM_RECONSTRUCTION_OK\"}, {\"id\": \"OCR08-N01\", \"status\": \"OCR_STRUCTURE_UNRESOLVED\"}, {\"id\": \"OCR08-N02\", \"status\": \"OCR_STRUCTURE_UNRESOLVED\"}, {\"id\": \"OCR08-N03\", \"status\": \"OCR_STRUCTURE_UNRESOLVED\"}], \"engine\": {\"form\": {\"confidence_scale\": \"0-100\", \"language\": \"eng\", \"layout_mode\": \"auto\", \"name\": \"tesseract\", \"page_segmentation_mode\": \"3\", \"path\": \"/usr/local/bin/tesseract\", \"version\": \"tesseract 5.5.2\"}, \"multi\": {\"confidence_scale\": \"0-100\", \"language\": \"eng\", \"layout_mode\": \"auto\", \"name\": \"tesseract\", \"page_segmentation_mode\": \"3\", \"path\": \"/usr/local/bin/tesseract\", \"version\": \"tesseract 5.5.2\"}, \"table\": {\"confidence_scale\": \"0-100\", \"language\": \"eng\", \"layout_mode\": \"auto\", \"name\": \"tesseract\", \"page_segmentation_mode\": \"3\", \"path\": \"/usr/local/bin/tesseract\", \"version\": \"tesseract 5.5.2\"}}, \"fixtures\": {\"form_sha256\": \"6aa31b7acfc12a6a2072adfb4fd2d70787bd70b2d4d96c8cd41e9b1dd50cb25c\", \"multi_column_sha256\": \"a35e4d6ec48bba342c470bb6eeb8ce773e6d0ad1c89c1b03b239394219292eb3\", \"table_sha256\": \"bbee4ec103e16a66b26f772d38c2cf94a85b920366c4f42e960e96e5f66c47b5\"}, \"head_sha\": \"3ba0d8229819801756d9d4a6a3bfefe2ac877745\", \"invariants\": {\"all_six_expected_states_match\": true, \"case_denominator_closed\": true, \"form_field_count_exact\": true, \"form_ocr_ok\": true, \"form_span_accounting\": true, \"form_structure_ok\": true, \"form_values_exact\": true, \"multi_columns_exact\": true, \"multi_ocr_ok\": true, \"multi_span_accounting\": true, \"multi_structure_ok\": true, \"negative_cases_unresolved\": true, \"positive_structures_are_inference\": true, \"table_headers_exact\": true, \"table_ocr_ok\": true, \"table_records_exact\": true, \"table_shape_exact\": true, \"table_span_accounting\": true, \"table_structure_ok\": true, \"threshold_arithmetic_closed\": true}, \"limitations\": [\"Fixtures are deterministic synthetic printed documents used to prove engine-to-structure mechanics, not representative real-world breadth.\", \"Table support is bounded to rectangular, first-row-header geometry with unique x-anchor assignment.\", \"Form support is bounded to one colon-terminated label sequence and one value sequence per OCR line.\", \"Spanning headings, merged/headerless/rotated/nested tables and non-colon or multiline form semantics remain unresolved.\", \"Handwriting and difficult scans remain OCR-09; representative real-world breadth remains OCR-10.\"], \"metrics\": {\"negative_fail_closed_rate\": 1.0, \"positive_case_pass_rate\": 1.0, \"span_accounting_rate\": 1.0}, \"ocr_report_sha256\": {\"form\": \"2dc6064d00d6e7c3243f0f940246a2fe65e226a64ca6a972a0a86b70d1eb6c08\", \"multi\": \"cfc8c53e5e0ad0c03aa7f6d0db952724ea20dad51a284fa246de3a1a7f664f53\", \"table\": \"d27b5824ff356a0c4f6c4f6112599a5ede904f05b9d16ca0ed18a30b2bcf1a74\"}, \"receipt_sha256\": \"c46069f4f52fc2297a8fafd396e728f62448278788c2102231780573e1c8a1df\", \"schema_version\": \"mucaro-ocr08-structure-live-cert/1.0\", \"scope\": \"OCR08_BOUNDED_PRINTED_STRUCTURE_RUNTIME\", \"status\": \"OCR08_STRUCTURE_LIVE_CERT_OK\", \"structures\": {\"form\": {\"certification_state\": \"CANDIDATE_NOT_IDENTITY\", \"epistemic_classification\": \"INFERENCE\", \"field_count\": 3, \"fields\": [{\"bbox\": {\"height\": 37, \"width\": 272, \"x\": 124, \"y\": 161}, \"field_index\": 0, \"label_canonical_for_uniqueness_only\": \"name\", \"label_raw\": \"Name:\", \"label_span_indices\": [0], \"span_indices\": [0, 1], \"value_raw\": \"Alice\", \"value_span_indices\": [1]}, {\"bbox\": {\"height\": 48, \"width\": 261, \"x\": 123, \"y\": 350}, \"field_index\": 1, \"label_canonical_for_uniqueness_only\": \"city\", \"label_raw\": \"City:\", \"label_span_indices\": [2], \"span_indices\": [2, 3], \"value_raw\": \"Ponce\", \"value_span_indices\": [3]}, {\"bbox\": {\"height\": 39, \"width\": 311, \"x\": 122, \"y\": 540}, \"field_index\": 2, \"label_canonical_for_uniqueness_only\": \"status\", \"label_raw\": \"Status:\", \"label_span_indices\": [4], \"span_indices\": [4, 5], \"value_raw\": \"Active\", \"value_span_indices\": [5]}], \"invariants\": {\"all_input_spans_classified\": true, \"assigned_span_count\": 6, \"field_labels_unique\": true, \"input_span_count\": 6, \"semantic_structure_claimed\": true, \"span_assignment_unique\": true}, \"kind\": \"FORM\", \"limitations\": [\"This bounded form reconstruction requires exactly one colon-terminated label token sequence per OCR line.\", \"Checkbox semantics, radio groups, unlabeled fields, multiline values and spatial label/value pairing without a colon remain unresolved.\", \"Raw label and value strings are preserved; canonical labels are used only for duplicate detection.\"], \"page_index\": 0, \"schema_version\": \"mucaro-ocr-structure/1.0\", \"status\": \"OCR_FORM_RECONSTRUCTION_OK\"}, \"multi\": {\"certification_state\": \"CANDIDATE_NOT_IDENTITY\", \"column_count\": 2, \"columns\": [{\"bbox\": {\"height\": 358, \"width\": 320, \"x\": 124, \"y\": 151}, \"line_count\": 3, \"raw_lines\": [\"LEFTALPHA\", \"LEFTBETA\", \"LEFTGAMMA\"], \"span_indices\": [0, 2, 4]}, {\"bbox\": {\"height\": 359, \"width\": 355, \"x\": 1054, \"y\": 160}, \"line_count\": 3, \"raw_lines\": [\"RIGHTALPHA\", \"RIGHTBETA\", \"RIGHTGAMMA\"], \"span_indices\": [1, 3, 5]}], \"epistemic_classification\": \"INFERENCE\", \"invariants\": {\"all_input_spans_classified\": true, \"assigned_span_count\": 6, \"columns_disjoint\": true, \"input_span_count\": 6, \"semantic_structure_claimed\": true, \"span_assignment_unique\": true}, \"kind\": \"MULTI_COLUMN\", \"limitations\": [\"This bounded reconstruction assumes column lines have materially overlapping horizontal intervals within each column.\", \"OCR engine lines may be split only at a geometry-derived horizontal gap greater than four median text heights; this is inference, not source identity.\", \"Spanning headings, nested columns, rotated text and multi-page column continuity remain unresolved.\"], \"page_index\": 0, \"reading_order_span_indices\": [0, 2, 4, 1, 3, 5], \"schema_version\": \"mucaro-ocr-structure/1.0\", \"status\": \"OCR_MULTI_COLUMN_OK\"}, \"negative_form\": {\"certification_state\": \"UNRESOLVED\", \"epistemic_classification\": \"INFERENCE\", \"invariants\": {\"all_input_spans_classified\": false, \"semantic_structure_claimed\": false}, \"kind\": \"FORM\", \"residue\": [\"FORM_FIELD_COUNT_BELOW_MINIMUM\", \"FORM_LABEL_DUPLICATE:name\", \"SPAN_ACCOUNTING_MISMATCH\"], \"schema_version\": \"mucaro-ocr-structure/1.0\", \"span_count\": 4, \"status\": \"OCR_STRUCTURE_UNRESOLVED\"}, \"negative_multi\": {\"certification_state\": \"UNRESOLVED\", \"epistemic_classification\": \"INFERENCE\", \"invariants\": {\"all_input_spans_classified\": false, \"semantic_structure_claimed\": false}, \"kind\": \"MULTI_COLUMN\", \"residue\": [\"COLUMN_COUNT_BELOW_MINIMUM\"], \"schema_version\": \"mucaro-ocr-structure/1.0\", \"span_count\": 4, \"status\": \"OCR_STRUCTURE_UNRESOLVED\"}, \"negative_table\": {\"certification_state\": \"UNRESOLVED\", \"epistemic_classification\": \"INFERENCE\", \"invariants\": {\"all_input_spans_classified\": false, \"semantic_structure_claimed\": false}, \"kind\": \"TABLE\", \"residue\": [\"COLUMN_ASSIGNMENT_TIE:span=2\", \"EMPTY_CELL:row=1:column=0\", \"SPAN_ACCOUNTING_MISMATCH\"], \"schema_version\": \"mucaro-ocr-structure/1.0\", \"span_count\": 4, \"status\": \"OCR_STRUCTURE_UNRESOLVED\"}, \"table\": {\"cell_span_indices\": [[[0], [1], [2]], [[3], [4], [5]], [[6], [7], [8]]], \"certification_state\": \"CANDIDATE_NOT_IDENTITY\", \"column_count\": 3, \"epistemic_classification\": \"INFERENCE\", \"geometry\": {\"assignment_tolerance_px\": 46.25, \"header_x_anchors\": [125.0, 722.0, 1254.0]}, \"grid_raw\": [[\"ITEM\", \"QTY\", \"PRICE\"], [\"APPLE\", \"2\", \"5\"], [\"PEAR\", \"3\", \"4\"]], \"headers_raw\": [\"ITEM\", \"QTY\", \"PRICE\"], \"invariants\": {\"all_input_spans_classified\": true, \"assigned_span_count\": 9, \"header_identity_unique\": true, \"input_span_count\": 9, \"rectangular_grid\": true, \"semantic_structure_claimed\": true, \"span_assignment_unique\": true}, \"kind\": \"TABLE\", \"limitations\": [\"This is a bounded rectangular table reconstruction using first-row x anchors and OCR word boxes.\", \"Merged cells, nested tables, rotated tables, border-only empty cells and headerless tables remain unresolved.\", \"Raw cell strings are preserved; normalization is not used as identity proof.\"], \"page_index\": 0, \"records_raw\": [{\"ITEM\": \"APPLE\", \"PRICE\": \"5\", \"QTY\": \"2\"}, {\"ITEM\": \"PEAR\", \"PRICE\": \"4\", \"QTY\": \"3\"}], \"row_count\": 3, \"schema_version\": \"mucaro-ocr-structure/1.0\", \"status\": \"OCR_TABLE_RECONSTRUCTION_OK\"}}, \"threshold_failures\": []}",
+        "name": "ocr08_structure_live",
+        "status": "PASS"
+      },
+      {
+        "detail": "{\"arithmetic\": {\"adversarial_arithmetic_closes\": true, \"adversarial_count_expected\": 8, \"adversarial_count_observed\": 8, \"adversarial_fail\": 0, \"adversarial_pass\": 8, \"format_arithmetic_closes\": true, \"format_count_expected\": 22, \"format_count_observed\": 22, \"format_fail\": 0, \"format_pass\": 22}, \"failed_terminal_checks\": [], \"head_sha\": \"3ba0d8229819801756d9d4a6a3bfefe2ac877745\", \"receipt_sha256\": \"581f645ccfe9d74d0803b58da7674042d8f4e9836283f734e662760294f50217\"}",
+        "name": "matrix010_ingestion",
+        "status": "PASS"
+      },
+      {
+        "detail": "RETRIEVAL_EVAL_OK",
+        "name": "retrieval_eval_large",
+        "status": "PASS"
+      },
+      {
+        "detail": "JSON_OK checked=44",
+        "name": "json_validation",
+        "status": "PASS"
+      },
+      {
+        "detail": "FLAGPOLE_INVENTORY_OK",
+        "name": "flagpole_inventory",
+        "status": "PASS"
+      },
+      {
+        "detail": "DESKTOP_PACKAGE_READY",
+        "name": "desktop_package_self_test",
+        "status": "PASS"
+      },
+      {
+        "detail": "manifest_member_count=682",
+        "name": "package_artifact",
+        "status": "PASS"
+      },
+      {
+        "detail": "manifest_member_count=682",
+        "name": "package_artifact_verify",
+        "status": "PASS"
+      },
+      {
+        "detail": "No known vulnerabilities found",
+        "name": "python_audit",
+        "status": "PASS"
+      },
+      {
+        "detail": "No known vulnerabilities found",
+        "name": "python_runtime_lock_audit",
+        "status": "PASS"
+      },
+      {
+        "detail": "No known vulnerabilities found",
+        "name": "python_runtime_arm64_lock_audit",
+        "status": "PASS"
+      },
+      {
+        "detail": "found 0 vulnerabilities",
+        "name": "npm_audit",
+        "status": "PASS"
+      },
+      {
+        "detail": "\u2713 built in 2.60s",
+        "name": "frontend_build",
+        "status": "PASS"
+      }
+    ],
+    "package_artifact": {
+      "artifact": {
+        "path": "/Users/jotaele/Developer/mucaro-ai-agent-dag-cert/data/exports/packages/mucaro-ai-0.1.23-3ba0d8229819-source.zip",
+        "sha256": "80f848bd80da77d4e16cbf705c9be845707a824f3532f67a5e30e27912900323",
+        "size_bytes": 6524146
+      },
+      "checks": [
+        {
+          "detail": "PACKAGE_WARN",
+          "name": "package_status",
+          "status": "PASS"
+        },
+        {
+          "detail": "3ba0d8229819801756d9d4a6a3bfefe2ac877745",
+          "name": "git_head",
+          "status": "PASS"
+        },
+        {
+          "detail": "clean",
+          "name": "worktree_clean",
+          "status": "PASS"
+        },
+        {
+          "detail": "count=682",
+          "name": "tracked_source_files",
+          "status": "PASS"
+        },
+        {
+          "detail": "name=mucaro-ai version=0.1.23",
+          "name": "artifact_identity",
+          "status": "PASS"
+        }
+      ],
+      "manifest": {
+        "member_count": 682,
+        "path": "/Users/jotaele/Developer/mucaro-ai-agent-dag-cert/data/exports/packages/mucaro-ai-0.1.23-3ba0d8229819-artifact-manifest.json",
+        "sha256": "2f7678071fbf6482cab886ca1d6a8cf1d166b6a96eb86de5e15600f15ba0a720"
+      },
+      "output_dir": "/Users/jotaele/Developer/mucaro-ai-agent-dag-cert/data/exports/packages",
+      "project_root": "/Users/jotaele/Developer/mucaro-ai-agent-dag-cert",
+      "status": "PACKAGE_ARTIFACT_READY"
+    }
+  },
+  "receipt_type": "local_release",
+  "schema_version": "mucaro_release_receipt_v1",
+  "status": "CERTIFY_RELEASE_OK"
+}

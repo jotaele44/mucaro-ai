@@ -65,3 +65,37 @@ exercise stale-hash refusal, recovery, rapid activation, draft retention and
 byte-preserving replay in desktop/tablet/mobile layouts; those fixtures do not
 establish live search, research synthesis quality, physical devices or native
 desktop behavior.
+
+## Verified checkpoint, 2026-11-02
+
+At application source `3ba0d8229819801756d9d4a6a3bfefe2ac877745`, the full local
+release gate passes all 28 gates, including 1,735 backend tests with eight skips,
+the capture/lock regressions, OCR/GIS/retrieval/recovery checks, package
+verification, frontend build, and backend plus both macOS runtime-lock audits.
+The gate uses the isolated Python environment with the patched pypdf 6.21.4.
+Its receipt is `_architecture/release/evidence/local_release-3ba0d8229819.json`.
+The earlier seven-advisory failure at `b86335d77d07` remains historical evidence,
+superseded by the targeted package patch and rerun.
+
+Full WebKit checks pass 340/340 at that source; full Chromium checks pass 340/340
+at `d53ae4815069`. Across those two commits all 353 backend/frontend Git entries
+match, with zero one-sided or symmetric differences, and frontend input/assets
+and served-index manifests match. Each engine covers desktop/tablet/mobile and
+33 axe scans with zero detected violations. The Chromium runner changed only an
+unrelated queued fixture query to known source content. Representative narrow
+and tablet recovery screens were visually inspected and retained with the
+receipts. Earlier failures remain available as superseded observations.
+
+This is bounded local/browser evidence. Live search, representative comparison
+and synthesis, full manual accessibility, packaged/native/physical-device use,
+signing and hosted release obligations remain independently open.
+
+The same `3ba0d8229819` source also passed `FRESH_CLONE_CERT_OK` (installation,
+release checks, CLI help, launcher self-test/smoke test, clean clone) and
+`SOURCE_ARTIFACT_CERT_OK` (verified ZIP, extraction, installation, release checks,
+CLI and desktop-package self-test). Both installed environments were inspected
+and reported pypdf 6.21.4. Their terminal receipts and the verified source ZIP
+manifest are preserved under `_architecture/release/evidence/` as
+`fresh_clone-3ba0d8229819.json`, `source_artifact-3ba0d8229819.json`, and
+`source_manifest-3ba0d8229819.json`. These establish source installation on this
+host, not a clean physical host, native package signing, or deployment.
