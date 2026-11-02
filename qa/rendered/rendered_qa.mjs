@@ -926,6 +926,10 @@ async function captureRecoveryScenario(browser, base, captures) {
       await page.waitForFunction(() => [...document.querySelectorAll("button")].some((button) => /^(Send|Queue) message$/.test(button.getAttribute("aria-label") || "") && !button.disabled));
       check("late send acknowledgement preserves a newer composer draft", "desktop", await input.inputValue() === "Next draft typed before acknowledgement.");
       await page.unrouteAll({ behavior: "wait" });
+    } catch (error) {
+      console.log("DRAFT_REGRESSION_STATE", JSON.stringify(await page.locator("article.run").evaluateAll((nodes) => nodes.map((node) => ({ state: node.dataset.state, text: node.textContent.slice(-1200) })))));
+      console.log("DRAFT_REGRESSION_SERVICE", draftBackend.log().slice(-2000));
+      throw error;
     } finally { release?.(); await context.close(); draftBackend.kill("SIGTERM"); }
   }
   for (const [index, [viewport, options]] of profiles.entries()) {
