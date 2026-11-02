@@ -154,7 +154,7 @@ async function axe(page, viewport, name) {
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   const serious = result.violations.filter((v) => ["serious", "critical"].includes(v.impact));
   check(`axe ${name}: no serious/critical WCAG violations`, viewport, serious.length === 0, serious.map((v) => `${v.id}(${v.nodes.length})`).join(", ") || `${result.violations.length} minor`);
-  return { view: name, viewport, violations: result.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })) };
+  return { view: name, viewport, violations: result.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, targets: v.nodes.map((node) => ({ target: node.target, html: node.html, summary: node.failureSummary })) })) };
 }
 
 async function scenario(browser, base, viewport, contextOptions) {
@@ -897,6 +897,32 @@ async function captureRecoveryScenario(browser, base, captures) {
     ["iphone", { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } }],
   ];
   const scans = [];
+  {
+    const context = await browser.newContext({ baseURL: base, viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    try {
+      await page.goto("/");
+      await page.getByRole("heading", { name: "What should Mucaro work on?", exact: true }).waitFor();
+      await send(page, "Initial draft preservation context.");
+      await waitRunState(page, "COMPLETED");
+      await page.route("**/conversations/*/messages", async (route) => {
+        if (route.request().method() !== "POST") return route.continue();
+        const response = await route.fetch(); await gate; await route.fulfill({ response });
+      });
+      const started = page.waitForRequest((request) => request.method() === "POST" && /\/conversations\/[^/]+\/messages$/.test(new URL(request.url()).pathname));
+      const input = page.getByLabel("Message Mucaro", { exact: true });
+      await input.fill("Submitted while preserving the next draft.");
+      await page.getByRole("button", { name: /^(Send|Queue) message$/ }).click();
+      await started;
+      await input.fill("Next draft typed before acknowledgement.");
+      release();
+      await page.waitForFunction(() => [...document.querySelectorAll("button")].some((button) => /^(Send|Queue) message$/.test(button.getAttribute("aria-label") || "") && !button.disabled));
+      check("late send acknowledgement preserves a newer composer draft", "desktop", await input.inputValue() === "Next draft typed before acknowledgement.");
+      await page.unrouteAll({ behavior: "wait" });
+    } finally { release?.(); await context.close(); }
+  }
   for (const [index, [viewport, options]] of profiles.entries()) {
     const fixture = captures[index];
     const context = await browser.newContext({ ...options, baseURL: base });
@@ -1944,6 +1970,7 @@ try {
       check("security headers served with the UI", "desktop", headers.get("x-frame-options") === "DENY" && (headers.get("content-security-policy") || "").includes("frame-ancestors 'none'"));
     }
   }
+  if (onlyNew && scenarioFilter.includes("capture")) axeResults.push(...await isolatedWorkspaceScenario(browser));
   if (wantScenario("resilience")) await resilienceScenario(browser, base);
   if (wantScenario("streams")) await streamScenario(browser, base, port);
   if (wantScenario("gate")) await tokenGateScenario(browser);

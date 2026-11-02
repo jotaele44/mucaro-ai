@@ -64,6 +64,8 @@ export function Composer({ conversationId, modes, mode, onModeChange, contextSel
   });
   const [menuOpen, setMenuOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
+  const draftRevision = useRef(0);
   const area = useRef(null);
 
   useEffect(() => {
@@ -92,12 +94,15 @@ export function Composer({ conversationId, modes, mode, onModeChange, contextSel
 
   async function send() {
     const prompt = text.trim();
-    if (!prompt || sending || disabled) return;
+    if (!prompt || sendingRef.current || disabled) return;
+    const submittedRevision = draftRevision.current;
+    sendingRef.current = true;
     setSending(true);
     try {
       await onSend(prompt);
-      setText("");
+      if (draftRevision.current === submittedRevision) setText("");
     } finally {
+      sendingRef.current = false;
       setSending(false);
       area.current?.focus();
     }
@@ -166,7 +171,7 @@ export function Composer({ conversationId, modes, mode, onModeChange, contextSel
           value={text}
           placeholder={activeRun ? "Message will be queued until the current turn finishes" : touch ? "Ask a question or type a /command…" : "Ask a question, or type /status, /fetch <url>…"}
           enterKeyHint={touch ? "enter" : "send"}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => { draftRevision.current += 1; setText(event.target.value); }}
           onKeyDown={onKeyDown}
           disabled={disabled}
         />
