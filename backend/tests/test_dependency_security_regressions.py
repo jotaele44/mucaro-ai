@@ -40,8 +40,8 @@ def test_one_click_lock_generator_preserves_bounded_security_exceptions() -> Non
     assert "PY_EXCLUDE_NEWER=2026-09-25T00:00:00Z" in pins
     assert "PY_SECURITY_CERTIFI_VERSION=2026.10.19" in pins
     assert "PY_EXCLUDE_NEWER_CERTIFI=2026-10-21T00:00:00Z" in pins
-    assert "PY_SECURITY_PYPDF_VERSION=6.21.2" in pins
-    assert "PY_EXCLUDE_NEWER_PYPDF=2026-10-24T23:59:59Z" in pins
+    assert "PY_SECURITY_PYPDF_VERSION=6.21.4" in pins
+    assert "PY_EXCLUDE_NEWER_PYPDF=2026-10-29T23:59:59Z" in pins
     assert "PY_SECURITY_SETUPTOOLS_VERSION=84.1.0" in pins
     assert "PY_EXCLUDE_NEWER_SETUPTOOLS=2026-10-20T00:00:00Z" in pins
     assert '("certifi", "PY_SECURITY_CERTIFI_VERSION", "PY_EXCLUDE_NEWER_CERTIFI")' in generator
@@ -53,8 +53,8 @@ def test_one_click_lock_generator_preserves_bounded_security_exceptions() -> Non
 
 def test_pypdf_security_fix_is_pinned_and_hashed_in_all_governed_locks() -> None:
     expected_hashes = {
-        "1d44d1a3a200f25062adff0085b02040e4646431ac2ccac22e42679e91466084",
-        "0a3e1c5c886a1be03646c16a04827cc166c2a0575c971b26a4bf89686551c2d4",
+        "c8817e3f888d47a087872ded69812c1ef30cacb871d6e053e0c00bbaf0bc2163",
+        "33e4fb41ca352810eb4e9838aa0d82d6888a5f8bf682f43e99cce5faa666255c",
     }
     locks = sorted(PACKAGING.rglob("*.lock"))
     pypdf_locks = []
@@ -64,8 +64,8 @@ def test_pypdf_security_fix_is_pinned_and_hashed_in_all_governed_locks() -> None
             continue
         pypdf_locks.append(path.relative_to(ROOT).as_posix())
         assert "pypdf==6.19.0" not in text
-        assert "pypdf==6.21.2" in text
-        stanza = text.split("pypdf==6.21.2", 1)[1].split("\n", 4)[:3]
+        assert "pypdf==6.21.4" in text
+        stanza = text.split("pypdf==6.21.4", 1)[1].split("\n", 4)[:3]
         joined = "\n".join(stanza)
         for digest in expected_hashes:
             assert f"--hash=sha256:{digest}" in joined
