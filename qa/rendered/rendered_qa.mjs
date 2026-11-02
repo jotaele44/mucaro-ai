@@ -331,7 +331,11 @@ async function scenario(browser, base, viewport, contextOptions) {
   const focusedName = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") || "");
   check("Escape closes the sheet and returns focus", viewport, focusedName.startsWith("Open citation"), focusedName);
 
-  // Approval-bound action (F07) and tool summary / drawer (F08, F09).
+  // Approval-bound action (F07) and tool summary / drawer (F08, F09). The default mode, Auto (safe actions),
+  // runs local read-only commands such as /status without asking, so the approval checks use Ask first.
+  check("new conversations default to Auto (safe actions)", viewport, (await page.getByRole("button", { name: /^Mode: Auto \(safe actions\)/ }).count()) === 1);
+  await page.getByRole("button", { name: /^Mode:/ }).click();
+  await page.getByRole("option", { name: /^Ask first/ }).click();
   await send(page, "/status");
   await waitRunState(page, "AWAITING_APPROVAL");
   const approval = page.getByRole("region", { name: "Permission request for source_library.status" });

@@ -156,17 +156,21 @@ export function EditableMessage({
   announce,
   allowReadAloud = false,
   file = null,
+  onCite = null,
+  streaming = false,
   children,
 }) {
+  // Answers mark citations as ⟦n⟧; copies, read-aloud and edits use the plain [n] form.
+  const plain = String(text ?? "").replace(/⟦(\d+)⟧/g, "[$1]");
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(text);
+  const [draft, setDraft] = useState(plain);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const editorRef = useRef(null);
 
   useEffect(() => {
-    if (!editing) setDraft(text);
-  }, [text, editing]);
+    if (!editing) setDraft(plain);
+  }, [plain, editing]);
 
   useEffect(() => {
     if (editing) {
@@ -177,14 +181,14 @@ export function EditableMessage({
 
   function cancel() {
     if (busy) return;
-    setDraft(text);
+    setDraft(plain);
     setError("");
     setEditing(false);
   }
 
   async function save(event) {
     event.preventDefault();
-    if (busy || !draft.trim() || draft === text) return;
+    if (busy || !draft.trim() || draft === plain) return;
     setBusy(true);
     setError("");
     try {
@@ -226,7 +230,7 @@ export function EditableMessage({
           {error && <p className="error-text" role="alert">{error}</p>}
           <div className="message-editor-actions">
             <button type="button" className="ghost-button" onClick={cancel} disabled={busy}>Cancel</button>
-            <button type="submit" className="primary-button" disabled={busy || !draft.trim() || draft === text}>
+            <button type="submit" className="primary-button" disabled={busy || !draft.trim() || draft === plain}>
               {busy ? "Saving…" : "Save edit"}
             </button>
           </div>
@@ -234,8 +238,9 @@ export function EditableMessage({
         </form>
       ) : (
         <>
-          <RichText text={text} />
+          <RichText text={text} onCite={onCite} />
           {children}
+          {!streaming && (
           <div className="message-footer">
             {edited && (
               <span
@@ -246,10 +251,10 @@ export function EditableMessage({
               </span>
             )}
             <MessageActions
-              text={text}
+              text={plain}
               announce={announce}
               onEdit={() => {
-                setDraft(text);
+                setDraft(plain);
                 setError("");
                 setEditing(true);
               }}
@@ -257,6 +262,7 @@ export function EditableMessage({
               file={file}
             />
           </div>
+          )}
         </>
       )}
     </div>

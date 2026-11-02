@@ -78,9 +78,14 @@
     }
   ],
   "supporting_tools": [
+    "files.list_directory",
+    "files.read_file",
     "memory.list",
+    "memory.remember",
     "product.audit",
     "source_library.status",
+    "sources.read",
+    "sources.search",
     "web.fetch",
     "web.fetch_session",
     "web.render",

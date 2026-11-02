@@ -110,6 +110,20 @@ _SCHEMA_SQL = """
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS agent_messages (
+                conversation_id TEXT NOT NULL,
+                seq INTEGER NOT NULL,
+                run_id TEXT,
+                turn_id TEXT,
+                role TEXT NOT NULL,
+                content_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (conversation_id, seq)
+            );
+            CREATE TABLE IF NOT EXISTS agent_conversations (
+                conversation_id TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL
+            );
             """
 
 

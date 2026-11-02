@@ -251,7 +251,7 @@ def test_work_run_delivers_anthropic_tokens_live_instead_of_rechunking(fake_sdk,
     try:
         conversation = create_conversation("live", cfg)["conversation_id"]
         run = submit_message(
-            conversation, "How does source lineage work?", options={"model_provider": "anthropic", "allow_live": True}, cfg=cfg
+            conversation, "How does source lineage work?", options={"engine": "cited", "model_provider": "anthropic", "allow_live": True}, cfg=cfg
         )["run"]
     finally:
         work_runs.set_execution_mode("thread")
@@ -271,7 +271,7 @@ def test_failure_mid_stream_keeps_the_partial_text_and_fails_the_run(fake_sdk, c
     try:
         conversation = create_conversation("live", cfg)["conversation_id"]
         run = submit_message(
-            conversation, "How does source lineage work?", options={"model_provider": "anthropic", "allow_live": True}, cfg=cfg
+            conversation, "How does source lineage work?", options={"engine": "cited", "model_provider": "anthropic", "allow_live": True}, cfg=cfg
         )["run"]
     finally:
         work_runs.set_execution_mode("thread")
