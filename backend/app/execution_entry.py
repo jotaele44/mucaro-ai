@@ -102,6 +102,10 @@ class EntryStore:
 
     def decide(self, request: EntryRequest, *, allowed: bool,
                gates: dict[str, str]) -> dict:
+        # Preserve explicit missing-identity failure before a database lookup.
+        # This does not authorize the request or bypass _check below.
+        if not isinstance(request.object_id, str) or not request.object_id:
+            raise EntryError("ERROR_ENTRY_MISSING_IDENTITY")
         fingerprint = _digest(request)
         conn = sqlite3.connect(self.database, timeout=30, isolation_level=None)
         conn.row_factory = sqlite3.Row
@@ -122,10 +126,12 @@ class EntryStore:
             ).fetchone()
             if row is None:
                 raise EntryError("ERROR_ENTRY_OBJECT_NOT_FOUND")
-            if row["version"] != request.expected_version or row["revision"] != request.revision:
-                raise EntryError("ERROR_ENTRY_STALE_REVISION")
+            # A competing claim must be rejected explicitly, even when its
+            # version is also stale; active claims never grant execution.
             if row["active"]:
                 raise EntryError("ERROR_ENTRY_ALREADY_ACTIVE")
+            if row["version"] != request.expected_version or row["revision"] != request.revision:
+                raise EntryError("ERROR_ENTRY_STALE_REVISION")
             _check(request, state=row["state"], allowed=allowed, gates=gates)
             executing = request.action in _EXECUTE
             revision = request.revision if executing else request.revision + 1

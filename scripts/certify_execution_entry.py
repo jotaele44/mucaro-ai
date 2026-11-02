@@ -36,14 +36,15 @@ def git_head() -> str:
     return proc.stdout.strip()
 
 
-def test_case_ids() -> list[str]:
+def test_case_nodes() -> list[tuple[str, str]]:
+    """Return only named contract cases, preserving their exact pytest node IDs."""
     tree = ast.parse(TEST_FILE.read_text(encoding="utf-8"), filename=str(TEST_FILE))
-    result = []
+    result: list[tuple[str, str]] = []
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             match = CASE_RE.match(node.name)
             if match:
-                result.append(match.group(1).upper())
+                result.append((match.group(1).upper(), node.name))
     return sorted(result)
 
 
@@ -57,9 +58,15 @@ def main() -> int:
     expected_head = (args.head_sha or observed_head).strip()
     denominator = json.loads(DENOMINATOR.read_text(encoding="utf-8"))
     expected_ids = sorted(row["case_id"] for row in denominator["cases"])
-    observed_ids = test_case_ids()
-
-    command = ["python", "-m", "pytest", str(TEST_FILE.relative_to(ROOT)), "-q"]
+    case_nodes = test_case_nodes()
+    observed_ids = [case_id for case_id, _ in case_nodes]
+    test_file = str(TEST_FILE.relative_to(ROOT))
+    # The certification denominator covers ONLY these named cases. Whole-module
+    # regressions remain mandatory in ordinary CI, not silently certified here.
+    selectors = [f"{test_file}::{name}" for _, name in case_nodes]
+    command = ["python", "-m", "pytest", "-q", *selectors] if selectors else [
+        "python", "-m", "pytest", "-q", "--collect-only", test_file,
+    ]
     proc = subprocess.run(command, cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
     match = re.search(r"(\d+) passed", proc.stdout)
     passed = int(match.group(1)) if match else 0
@@ -108,6 +115,7 @@ def main() -> int:
         },
         "terminal_checks": terminal_checks,
         "pytest_command": command,
+        "selected_case_nodeids": selectors,
         "pytest_output": proc.stdout[-12000:],
         "api_pytest_command": api_command,
         "api_pytest_output": api_proc.stdout[-12000:],
