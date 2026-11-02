@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "f8709cc9f8299ca7f9827dd204693912b1cb7511",
+  "audit_head": "aa0cdf0213821079212c2bd417c6228bd68c8be3",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -442,6 +442,25 @@
         "current main@f8709cc9f8299ca7f9827dd204693912b1cb7511 coding_patch.py and patch regression blobs byte-identical to certified head"
       ],
       "reason": "CODE-05 was provisional because the non-mutating patch/diff receipt plane lacked trusted execution. #248 executed candidate-set preservation, invalid-ref/oversize negatives, Git-parsed target/preimage receipts, and traversal/.git/ambiguous/oversized-patch rejection. Mutation authority remains separately governed by CODE-06, already PASS."
+    },
+    {
+      "event_id": "evt-pkg07-portable-runtime-pass-20261102",
+      "requirement_id": "PKG-07",
+      "from_state": "PROVISIONAL",
+      "to_state": "PASS",
+      "evidence_type": "EXACT_HEAD_ARM64_RUNTIME_SOURCE_MATERIALIZATION_AND_PACKAGED_LIFECYCLE_WITH_CURRENT_MAIN_BYTE_IDENTITY",
+      "evidence": [
+        "PR#309",
+        "certified head@60da42b583d4b71e6547490a1133c23d33526acb",
+        "GitHub Actions ARM64 Portable Runtime Source Certification run 41527163107 conclusion=success",
+        "artifact#13179814736 arm64-runtime-source-60da42b583d4b71e6547490a1133c23d33526acb",
+        "GitHub Actions ARM64 Portable Runtime Materialization Certification run 41527163168 conclusion=success",
+        "artifact#13180028467 arm64-runtime-materialization-60da42b583d4b71e6547490a1133c23d33526acb",
+        "GitHub Actions ARM64 Portable Application Lifecycle Certification run 41527163102 conclusion=success",
+        "artifact#13180636676 arm64-portable-lifecycle-60da42b583d4b71e6547490a1133c23d33526acb",
+        "portable runtime/source/install/certifier/manifest/arm64-lock/regression blobs byte-identical on current main@aa0cdf0213821079212c2bd417c6228bd68c8be3"
+      ],
+      "reason": "PKG-07 requires the portable embedded runtime itself. #309 independently certified the governed arm64 runtime source, materialized runtime, and packaged application lifecycle on Apple Silicon, including architecture/runtime identity and bundle-relative portable execution. The governing implementation, manifest, lock, and regression blobs are byte-identical on current main. This does not promote PKG-08 clean-machine evidence, PKG-09 signing/notarization, or PKG-10 upgrade/rollback guarantees beyond their separately governed requirements."
     }
   ]
 }
