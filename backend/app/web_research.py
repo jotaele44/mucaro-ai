@@ -31,7 +31,7 @@ RESEARCH_POLICY = {
     "source_policy": "indexed_capture_id_and_full_sha256_v1",
     "parser": "strict_charset_visible_html_v1",
     "comparison": "whitespace_collapsed_passage_multiset_v1",
-    "retrieval": "lexical_overlap_all_ties_retained_v1",
+    "retrieval": "lexical_overlap_then_exclusive_then_multiplicity_then_source_order_all_primary_ties_retained_v1",
     "citation_policy": "exact_selected_passage_ids_and_extraction_offsets_v1",
     "automatic_acquisition": False,
     "model_fallback": False,
@@ -233,10 +233,13 @@ def _terms(text: str) -> set[str]:
     return {term for term in re.findall(r"[^\W_]+", text.casefold()) if term not in _STOP}
 
 
-def _select(passages: list[dict[str, Any]], question: str) -> dict[str, Any]:
+def _select(passages: list[dict[str, Any]], question: str, difference_priority: dict[str, int]) -> dict[str, Any]:
     terms = _terms(question)
     scored = [(len(terms & _terms(row["text"])), index, row) for index, row in enumerate(passages)]
-    candidates = sorted((row for row in scored if row[0] or not terms), key=lambda row: (-row[0], row[1]))
+    candidates = sorted(
+        (row for row in scored if row[0] or not terms),
+        key=lambda row: (-row[0], -difference_priority.get(row[2]["normalized"], 0), row[1]),
+    )
     chosen = candidates[:2]
     cutoff = chosen[-1][0] if chosen else None
     return {
@@ -244,7 +247,7 @@ def _select(passages: list[dict[str, Any]], question: str) -> dict[str, Any]:
         "candidate_ids": [row[2]["chunk_id"] for row in candidates],
         "boundary_tie_ids": [row[2]["chunk_id"] for row in candidates if row[0] == cutoff],
         "selection_truncated": len(candidates) > len(chosen),
-        "basis": "LEXICAL_DISCOVERY" if terms else "SOURCE_ORDER_OVERVIEW",
+        "basis": "LEXICAL_DISCOVERY_WITH_DIFFERENCE_TIEBREAK" if terms else "DIFFERENCE_THEN_SOURCE_ORDER_OVERVIEW",
     }
 
 
@@ -294,7 +297,6 @@ def compare_captures(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]
         raw, snapshot, content = read_verified_capture(arguments[f"{side}_id"], arguments[f"{side}_sha256"], cfg)
         text, mime, encoding = _extract(snapshot, content)
         passages = _passages(text, snapshot["snapshot_id"])
-        selection = _select(passages, question)
         sources.append(
             {
                 "side": side.upper(),
@@ -315,8 +317,16 @@ def compare_captures(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]
         )
         frozen.append(raw)
         all_passages.append(passages)
-        selections.append(selection)
     comparison = _comparison(*all_passages)
+    difference_priority = {
+        group["normalized"]: 2
+        if not group["a_occurrences"] or not group["b_occurrences"]
+        else 1
+        if group["a_only_count"] or group["b_only_count"]
+        else 0
+        for group in comparison["groups"]
+    }
+    selections = [_select(passages, question, difference_priority) for passages in all_passages]
     comparison["identity"] = {
         "snapshot_bytes_equal": frozen[0] == frozen[1],
         "http_content_equal": sources[0]["content_sha256"] == sources[1]["content_sha256"],

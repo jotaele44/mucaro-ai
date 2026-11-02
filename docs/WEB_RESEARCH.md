@@ -99,10 +99,18 @@ questions, and unknown modes are refused by the shared arguments schema.
   A_only`, `B = shared + B_only`, `union = shared + symmetric_difference`.
   Duplicate occurrences and every passage ID remain in the report. No
   whole-record synthesis fabricates an observation.
-- Lexical discovery selects at most two passages per source for synthesis. All
+- Lexical discovery selects at most two passages per source for synthesis. Ties
+  prefer passages exclusive to one observation, then multiplicity differences,
+  then source order. The default overview uses the same difference-first order.
+  This prevents a late relevant difference from being hidden by an unchanged
+  opening passage with the same lexical score. All
   candidate IDs and boundary ties are recorded. A deterministic selection is not
   a relevance or identity proof. No lexical match is a bounded context result,
   not proof that no evidence exists anywhere.
+- The differences inspector displays up to 20 normalized groups with expandable
+  raw excerpts; large duplicate groups show five raw occurrences. The report
+  retains every group and occurrence. This display limit does not truncate the
+  underlying comparison.
 - Model prompts are checked against a conservative UTF-8 byte estimate plus the
   provider's output reserve and protocol overhead. A context-budget failure
   occurs before the provider request; selected excerpts are not silently

@@ -1064,6 +1064,9 @@ print(json.dumps(rows))
         const executions = (await (await fetch(`${base}/skills/executions`)).json()).executions;
         check("one research action persists one execution with both source parents", viewport, executions.length === before + 1 && executions.at(-1).execution_id === accepted.execution.execution_id && accepted.result.source_artifact_ids.length === 2, `before=${before} after=${executions.length} execution=${accepted.execution.execution_id}`);
         check("research preserves observed disagreement and instruction warning", viewport, (await result().innerText()).includes("Budget 40") && (await result().innerText()).includes("Budget 60") && (await result().textContent()).includes("INSTRUCTION_BEARING_SOURCE_CONTENT"));
+        const differences = result().locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Differing passages \(/ }) });
+        await activate(differences.locator("summary").first());
+        check("research differences inspector exposes both conflicting values", viewport, (await differences.innerText()).includes("Budget 40") && (await differences.innerText()).includes("Budget 60"));
         const cited = result().locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Source A · webpassage_/ }) });
         await activate(cited.locator("summary"));
         check("first citation activation exposes exact excerpt and full hash", viewport, await cited.locator("blockquote").innerText() === "Budget 40" && (await cited.innerText()).includes(captures[0].sha256));

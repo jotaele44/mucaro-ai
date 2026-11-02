@@ -16,12 +16,20 @@ function message(error) {
 export function WebResearchResult({ result, onDownload, busy = false }) {
   const counts = result.comparison.counts;
   const identity = result.comparison.identity;
+  const differences = result.comparison.groups.filter((group) => group.a_only_count || group.b_only_count);
+  const passages = new Map(result.passages.map((row) => [row.chunk_id, row]));
   const rejected = result.synthesis.citation_status === "CITATION_ERROR";
   return <section className="panel nested-panel" aria-label="Frozen source comparison result">
     <h3>Comparison and synthesis</h3>
     <p className="muted small">{result.synthesis.mode === "extractive" ? "Offline excerpts · no model invoked" : `${result.synthesis.mode} synthesis · review required`} · no URL fetched</p>
     <div className="table-scroll"><table><caption>Passage accounting (duplicates retained)</caption><thead><tr><th scope="col">A</th><th scope="col">B</th><th scope="col">Shared</th><th scope="col">A only</th><th scope="col">B only</th><th scope="col">Union</th><th scope="col">Difference</th></tr></thead><tbody><tr>{[counts.a, counts.b, counts.intersection, counts.a_only, counts.b_only, counts.union, counts.symmetric_difference].map((count, index) => <td key={index}>{count}</td>)}</tr></tbody></table></div>
     <p>{identity.http_content_equal ? "The saved HTTP content has identical bytes." : "The saved HTTP content has different bytes."} {identity.extracted_text_equal ? "Extracted text is identical." : "Extracted text differs."} Real-world identity and the truth of differing claims remain unresolved.</p>
+    <details><summary>Differing passages ({differences.length} groups)</summary>
+      {!differences.length && <p>No differing passages in the normalized comparison view.</p>}
+      <p className="muted small">Whitespace is collapsed for comparison. Expand exact excerpts to inspect original spelling and spacing. Differences can be additions, omissions, repetition changes, or conflicting claims.</p>
+      <ol>{differences.slice(0, 20).map((group, index) => <li key={index}><p className="research-quote">{group.normalized}</p><p className="muted small">A: {group.a_occurrences.length} occurrence(s) · B: {group.b_occurrences.length} occurrence(s)</p><details><summary>Exact excerpts for difference {index + 1}</summary>{[...group.a_occurrences, ...group.b_occurrences].slice(0, 5).map((id) => <blockquote className="research-quote" key={id}>{passages.get(id)?.text}<footer className="mono small">{id}</footer></blockquote>)}{group.a_occurrences.length + group.b_occurrences.length > 5 && <p className="muted small">Showing five occurrences. The report retains every occurrence.</p>}</details></li>)}</ol>
+      {differences.length > 20 && <p className="muted small">Showing 20 differing groups. Download the report for all {differences.length} groups.</p>}
+    </details>
     <h4>{result.synthesis.status === "INSUFFICIENT_CONTEXT" ? "More context needed" : rejected ? "Citation validation failed" : "Source-grounded draft"}</h4>
     {rejected && <p className="error-card" role="alert">This model response has missing or invalid citation references. Review the source comparison; do not use this response as a grounded answer.</p>}
     {rejected ? <details><summary>Rejected model response (unverified)</summary><pre className="json-block">{result.synthesis.answer}</pre></details> : <p className="research-answer">{result.synthesis.answer}</p>}

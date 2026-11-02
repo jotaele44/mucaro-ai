@@ -337,3 +337,26 @@ def test_policy_changes_invalidate_the_registered_digest():
         replace(definition, execution_policy={**definition.execution_policy, "max_text_chars_per_source": 1}).digest
         != definition.digest
     )
+
+
+def test_late_difference_is_present_in_synthesis_without_discarding_tied_candidates(ready):
+    lines = [f"Entry {number:04d}: Budget 40 " + "x" * 168 for number in range(1000)]
+    changed = lines.copy()
+    changed[500] = changed[500].replace("Budget 40", "Budget 60")
+    a, b = capture(ready, "\n".join(lines), 0), capture(ready, "\n".join(changed), 1)
+    report = execute_skill(SKILL, arguments(a, b, question="Budget"), cfg=ready)["result"]
+    assert report["comparison"]["counts"] == {
+        "a": 1000,
+        "b": 1000,
+        "intersection": 999,
+        "a_only": 1,
+        "b_only": 1,
+        "union": 1001,
+        "symmetric_difference": 2,
+    }
+    assert "Entry 0500: Budget 60" in report["synthesis"]["answer"]
+    assert "Entry 0500: Budget 40" in report["synthesis"]["answer"]
+    assert all(
+        len(selection["candidate_ids"]) == len(selection["boundary_tie_ids"]) == 1000
+        for selection in report["selections"]
+    )
