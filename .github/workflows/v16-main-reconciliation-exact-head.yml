@@ -48,12 +48,12 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import re
-          assert '"pypdf==6.21.2"' in Path("pyproject.toml").read_text()
-          assert "pypdf==6.21.2" in Path("backend/requirements.txt").read_text()
-          assert "pypdf==6.21.1" not in Path("backend/requirements.txt").read_text()
-          assert "pypdf==6.21.2" in Path("packaging/macos/requirements-macos-arm64.in").read_text()
+          assert '"pypdf==6.21.4"' in Path("pyproject.toml").read_text()
+          assert "pypdf==6.21.4" in Path("backend/requirements.txt").read_text()
+          assert "pypdf==6.21.2" not in Path("backend/requirements.txt").read_text()
+          assert "pypdf==6.21.4" in Path("packaging/macos/requirements-macos-arm64.in").read_text()
           pins=Path("scripts/one_click_pins.env").read_text()
-          assert "PY_SECURITY_PYPDF_VERSION=6.21.2" in pins
+          assert "PY_SECURITY_PYPDF_VERSION=6.21.4" in pins
           names = [
               "packaging/one_click/requirements-aarch64-apple-darwin.lock",
               "packaging/one_click/requirements-x86_64-apple-darwin.lock",
@@ -65,10 +65,10 @@ jobs:
           ]
           for path in names:
               data=Path(path).read_text()
-              assert data.count("pypdf==6.21.2")==1, path
-              assert "pypdf==6.21.1" not in data, path
-              assert "sha256:1d44d1a3a200f25062adff0085b02040e4646431ac2ccac22e42679e91466084" in data, path
-              assert "sha256:0a3e1c5c886a1be03646c16a04827cc166c2a0575c971b26a4bf89686551c2d4" in data, path
+              assert data.count("pypdf==6.21.4")==1, path
+              assert "pypdf==6.21.2" not in data, path
+              assert "sha256:c8817e3f888d47a087872ded69812c1ef30cacb871d6e053e0c00bbaf0bc2163" in data, path
+              assert "sha256:33e4fb41ca352810eb4e9838aa0d82d6888a5f8bf682f43e99cce5faa666255c" in data, path
           governed = [
               "packaging/macos/requirements-macos-arm64.lock",
               "packaging/one_click/requirements-aarch64-apple-darwin.lock",
