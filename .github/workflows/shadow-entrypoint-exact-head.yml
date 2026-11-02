@@ -1,0 +1,38 @@
+name: Shadow Entrypoint Exact-Head
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/shadow-qa.yml"
+      - ".github/workflows/shadow-entrypoint-exact-head.yml"
+      - "scripts/shadow_qa.py"
+      - "scripts/shadow_evidence.py"
+      - "backend/tests/test_shadow_*.py"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-shadow-entrypoint:
+    runs-on: ubuntu-latest
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Confirm pinned head and import-safe entrypoint
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          grep -F 'python -m scripts.shadow_qa' .github/workflows/shadow-qa.yml
+          python -m scripts.shadow_qa --help > /dev/null
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Run Shadow regression tests on exact head
+        run: python -m pytest backend/tests/test_shadow_qa.py backend/tests/test_shadow_baseline.py backend/tests/test_shadow_evidence.py -q
+      - name: Assert head identity after tests
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
