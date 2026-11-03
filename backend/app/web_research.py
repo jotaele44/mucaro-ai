@@ -35,6 +35,7 @@ RESEARCH_POLICY = {
     "citation_policy": "exact_selected_passage_ids_and_extraction_offsets_v1",
     "automatic_acquisition": False,
     "model_fallback": False,
+    "accounting_enforcement": "explicit_nonnegative_integer_multiset_conservation_v1",
     "provider_prompt_budget": "UTF8_byte_upper_estimate_plus_output_and_512_overhead_v1",
     "accepted_http_statuses": "200-299",
     "accepted_mime_types": ["application/json", "application/xhtml+xml", "text/html", "text/markdown", "text/plain"],
@@ -251,6 +252,22 @@ def _select(passages: list[dict[str, Any]], question: str, difference_priority: 
     }
 
 
+def _validate_accounting(counts: dict[str, int]) -> None:
+    fields = {"a", "b", "intersection", "a_only", "b_only", "union", "symmetric_difference"}
+    if (
+        set(counts) != fields
+        or any(type(value) is not int or value < 0 for value in counts.values())
+        or counts["a"] != counts["intersection"] + counts["a_only"]
+        or counts["b"] != counts["intersection"] + counts["b_only"]
+        or counts["symmetric_difference"] != counts["a_only"] + counts["b_only"]
+        or counts["union"] != counts["intersection"] + counts["symmetric_difference"]
+    ):
+        raise ResearchError(
+            "ERROR_RESEARCH_ACCOUNTING_INVALID",
+            "Passage accounting does not conserve every occurrence. No synthesis was produced; preserve the selected observations for inspection.",
+        )
+
+
 def _comparison(a: list[dict[str, Any]], b: list[dict[str, Any]]) -> dict[str, Any]:
     ca, cb = Counter(row["normalized"] for row in a), Counter(row["normalized"] for row in b)
     common, a_only, b_only, union = ca & cb, ca - cb, cb - ca, ca | cb
@@ -263,9 +280,7 @@ def _comparison(a: list[dict[str, Any]], b: list[dict[str, Any]]) -> dict[str, A
         "union": sum(union.values()),
         "symmetric_difference": sum(a_only.values()) + sum(b_only.values()),
     }
-    assert counts["a"] == counts["intersection"] + counts["a_only"]
-    assert counts["b"] == counts["intersection"] + counts["b_only"]
-    assert counts["union"] == counts["intersection"] + counts["symmetric_difference"]
+    _validate_accounting(counts)
     return {
         "basis": RESEARCH_POLICY["comparison"],
         "counts": counts,

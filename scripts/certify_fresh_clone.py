@@ -178,6 +178,7 @@ def main() -> int:
                 "kept": args.keep,
                 "error_type": type(exc).__name__,
                 "error": str(exc),
+                "error_output_tail": str(getattr(exc, "output", "") or "")[-4000:],
             },
         )
         print(f"FRESH_CLONE_RECEIPT {receipt.relative_to(ROOT)}")

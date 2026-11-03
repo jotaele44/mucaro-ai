@@ -3,6 +3,8 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 
@@ -337,6 +339,41 @@ def test_policy_changes_invalidate_the_registered_digest():
         replace(definition, execution_policy={**definition.execution_policy, "max_text_chars_per_source": 1}).digest
         != definition.digest
     )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"a": 5},
+        {"b": 4},
+        {"intersection": 2},
+        {"union": 8},
+        {"symmetric_difference": 0},
+        {"a": True},
+        {"a_only": -1},
+        {"unexpected": 1},
+    ],
+)
+def test_invalid_accounting_is_refused_explicitly(change):
+    counts = {"a": 2, "b": 2, "intersection": 1, "a_only": 1, "b_only": 1, "union": 3, "symmetric_difference": 2}
+    research._validate_accounting(counts)
+    with pytest.raises(research.ResearchError) as refused:
+        research._validate_accounting({**counts, **change})
+    assert refused.value.status == "ERROR_RESEARCH_ACCOUNTING_INVALID"
+
+
+def test_accounting_enforcement_survives_optimized_python():
+    script = """
+from backend.app.web_research import _validate_accounting,ResearchError
+try:
+    _validate_accounting({'a':3,'b':2,'intersection':1,'a_only':1,'b_only':1,'union':3,'symmetric_difference':2})
+except ResearchError as error:
+    print(error.status)
+else:
+    raise SystemExit('invalid accounting accepted under optimized Python')
+"""
+    result = subprocess.run([sys.executable, "-O", "-c", script], capture_output=True, text=True, check=True)
+    assert result.stdout.strip() == "ERROR_RESEARCH_ACCOUNTING_INVALID"
 
 
 def test_late_difference_is_present_in_synthesis_without_discarding_tied_candidates(ready):

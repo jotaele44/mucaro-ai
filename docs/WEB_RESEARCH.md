@@ -159,5 +159,9 @@ and narrow mobile sizes. Scenario-only receipts remain marked partial.
 Engineering lesson: defer the provider adapter import until invocation, because
 provider-native tool planning itself imports the skill registry. Keep domain
 comparisons independent of provider loading, and verify stderr for CLI error
-contracts. This runbook and the regression corpus are reusable guidance; they do
+contracts. Required arithmetic checks must use explicit branches and structured
+errors; Python assertions can disappear under optimization. Certification must
+retain failing subprocess output, and browser checks must await the submitted
+execution ID instead of accepting a previously saved result as new completion.
+This runbook and the regression corpus are reusable guidance; they do
 not establish that a model or agent has been trained.

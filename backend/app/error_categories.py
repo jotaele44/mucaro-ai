@@ -23,6 +23,7 @@ ERROR_CATEGORIES = (
 
 # Ordered (substring, category) rules; the first match wins.
 _RULES: tuple[tuple[str, str], ...] = (
+    ("RESEARCH_ACCOUNTING_INVALID", "INTERNAL_FAILURE"),
     ("RESEARCH_BOUNDARY", "PERMISSION_DENIED"),
     ("RESEARCH_UNSUPPORTED_FORMAT", "UNSUPPORTED_FORMAT"),
     ("WEB_CAPTURE_LIST_CHANGED", "BLOCKED_ACTION"),
