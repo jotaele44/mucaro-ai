@@ -1690,6 +1690,29 @@ async function nextVectorScenario(browser, base, viewport, contextOptions) {
     await nextChooser.getByRole("button", { name: "Start selected vector" }).click();
     await page.waitForFunction((n) => document.querySelectorAll("article.run").length >= n, prior + 1, { timeout: 20000 });
     check("explicit retry submits after temporary failure", viewport, (await page.locator("article.run").count()) === prior + 1);
+    await waitRunState(page, "COMPLETED");
+    const ambiguousChooser = page.getByRole("form", { name: "Suggested next steps" });
+    await ambiguousChooser.waitFor();
+    const beforeAmbiguous = await page.locator("article.run").count();
+    // Commit the first POST on the server, then lose its acknowledgement.
+    // This is NOT equivalent to a pre-dispatch 503 injection.
+    let upstreamAccepted = false;
+    await page.route("**/conversations/*/messages", async (route) => {
+      const upstream = await route.fetch();
+      upstreamAccepted = upstream.ok();
+      await route.fulfill({
+        status: 503, contentType: "application/json",
+        body: JSON.stringify({ detail: { status: "ERROR_LOST_ACK", detail: "response lost after server accepted request" } }),
+      });
+    });
+    await ambiguousChooser.getByRole("button", { name: "Start selected vector" }).click();
+    await ambiguousChooser.getByRole("alert").waitFor();
+    await page.unroute("**/conversations/*/messages");
+    await ambiguousChooser.getByRole("button", { name: "Start selected vector" }).click();
+    await page.waitForFunction((count) => document.querySelectorAll("article.run").length >= count, beforeAmbiguous + 1, { timeout: 20000 });
+    await page.waitForTimeout(450);
+    check("accepted-but-unacknowledged retry remains exactly one run", viewport,
+      upstreamAccepted && (await page.locator("article.run").count()) === beforeAmbiguous + 1);
     await shot(page, viewport, "next-vector");
   } finally {
     await context.close();
