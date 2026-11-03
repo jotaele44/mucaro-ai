@@ -1630,6 +1630,68 @@ async function shareScenario(browser, base) {
   });
 }
 
+// Selector-specific rendered controls: selection is inert, submit is single-shot,
+// draft is preserved, failures retain the chooser, and all actions remain ask-first.
+async function nextVectorScenario(browser, base, viewport, contextOptions) {
+  const context = await browser.newContext({ ...contextOptions, baseURL: base });
+  const page = await context.newPage();
+  try {
+    await page.goto("/");
+    await page.getByLabel("Message Mucaro").waitFor();
+    await send(page, "How does source lineage work?");
+    await waitRunState(page, "COMPLETED");
+    const chooser = page.getByRole("form", { name: "Suggested next steps" });
+    await chooser.waitFor({ timeout: 15000 });
+    const before = await page.locator("article.run").count();
+    await chooser.getByRole("radio", { name: "Investigate unresolved gaps" }).check();
+    check("next-vector radio does not submit", viewport, await page.locator("article.run").count() === before);
+    const draft = "Unsent draft must survive the selected vector";
+    await page.getByLabel("Message Mucaro").fill(draft);
+    await chooser.getByRole("button", { name: "Preview exact prompt" }).click();
+    const preview = await chooser.locator(".next-vector-prompt").innerText();
+    check("next-vector exact prompt preview", viewport, preview.includes("Investigate unresolved gaps") && preview.includes("How does source lineage work?"));
+    check("next-vector preview preserves draft", viewport, await page.getByLabel("Message Mucaro").inputValue() === draft);
+    // Same JavaScript task, two clicks: second must be ignored by synchronous in-flight guard.
+    await chooser.getByRole("button", { name: "Start selected vector" }).evaluate((button) => {
+      button.click();
+      button.click();
+    });
+    await page.waitForFunction((count) => document.querySelectorAll("article.run").length >= count, before + 1, { timeout: 20000 });
+    await page.waitForTimeout(600);
+    const runs = page.locator("article.run");
+    check("rapid double click submits exactly one vector", viewport, await runs.count() === before + 1);
+    const last = runs.last();
+    const prompt = await last.locator(".user-bubble").innerText();
+    check("selected vector maps to correct prompt", viewport, prompt.includes("Investigate unresolved gaps") && prompt.includes("How does source lineage work?"));
+    check("selected vector runs in ask-first mode", viewport, (await last.locator(".mode-tag").count()) === 0);
+    const apiRuns = await page.evaluate(async () => {
+      const row = document.querySelectorAll("article.run");
+      return row.length;
+    });
+    check("vector visible in canonical run feed", viewport, apiRuns === before + 1);
+    check("vector preserves unsent composer draft", viewport, await page.getByLabel("Message Mucaro").inputValue() === draft);
+    await waitRunState(page, "COMPLETED");
+    const nextChooser = page.getByRole("form", { name: "Suggested next steps" });
+    await nextChooser.waitFor();
+    await page.route("**/conversations/*/messages", (route) => route.fulfill({
+      status: 503, contentType: "application/json",
+      body: JSON.stringify({ detail: { status: "ERROR_TEST_INJECTED", detail: "simulated submission failure" } }),
+    }));
+    await nextChooser.getByRole("button", { name: "Start selected vector" }).click();
+    await nextChooser.getByRole("alert").waitFor();
+    check("failed submission leaves chooser and draft for retry", viewport,
+      (await nextChooser.count()) === 1 && (await page.getByLabel("Message Mucaro").inputValue()) === draft);
+    await page.unroute("**/conversations/*/messages");
+    const prior = await page.locator("article.run").count();
+    await nextChooser.getByRole("button", { name: "Start selected vector" }).click();
+    await page.waitForFunction((n) => document.querySelectorAll("article.run").length >= n, prior + 1, { timeout: 20000 });
+    check("explicit retry submits after temporary failure", viewport, (await page.locator("article.run").count()) === prior + 1);
+    await shot(page, viewport, "next-vector");
+  } finally {
+    await context.close();
+  }
+}
+
 const dataDir = mkdtempSync(path.join(tmpdir(), "mucaro-qa-"));
 const port = await freePort();
 const base = `http://127.0.0.1:${port}`;
@@ -1650,6 +1712,8 @@ try {
     axeResults.push(...(await scenario(browser, base, "desktop", { viewport: { width: 1440, height: 900 } })));
     const iphone = devices["iPhone 13"];
     axeResults.push(...(await scenario(browser, base, "iphone", { ...iphone, viewport: { width: 390, height: 844 } })));
+    await nextVectorScenario(browser, base, "selector-desktop", { viewport: { width: 1440, height: 900 } });
+    await nextVectorScenario(browser, base, "selector-iphone", { ...iphone, viewport: { width: 390, height: 844 } });
     axeResults.push(...(await executionEntryScenario(browser, base, "entry-desktop", { viewport: { width: 1440, height: 900 } })));
     axeResults.push(...(await executionEntryScenario(
       browser,
