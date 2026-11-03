@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { nextVectorOptions } from "../nextVectorOptions.js";
 
 /**
@@ -9,10 +9,12 @@ export function NextVectorPicker({ request, onStart, disabled = false }) {
   const options = useMemo(() => nextVectorOptions(request), [request]);
   const [selected, setSelected] = useState("continue");
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     setSelected("continue");
+    submitting.current = false;
     setBusy(false);
     setError(null);
     setExpanded(false);
@@ -22,7 +24,8 @@ export function NextVectorPicker({ request, onStart, disabled = false }) {
   const option = options.find((item) => item.id === selected);
   async function start(event) {
     event.preventDefault();
-    if (!option || busy || disabled) return;
+    if (!option || busy || submitting.current || disabled) return;
+    submitting.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -31,6 +34,7 @@ export function NextVectorPicker({ request, onStart, disabled = false }) {
     } catch (err) {
       setError(err?.message || "The selected prompt could not be submitted.");
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
