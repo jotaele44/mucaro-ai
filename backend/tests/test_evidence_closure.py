@@ -76,3 +76,18 @@ def test_unrecognized_evidence_is_not_accepted():
 def test_unexpected_gate_cannot_silently_pass():
     x = certify(["CI"], {"CI": "PASS", "extra": "OPEN"})
     assert x["state"] == "WITHHELD" and x["unexpected_gates"] == ["extra"]
+
+
+def test_empty_source_universe_fails_closed():
+    with pytest.raises(EvidenceInvariantError, match="source universe cannot be empty"):
+        reconcile_source_rows([], [])
+
+
+def test_nonmapping_identity_candidate_fails_closed():
+    with pytest.raises(EvidenceInvariantError, match="candidate rows must be mappings"):
+        adjudicate_identity([None])
+
+
+def test_nonmapping_disposition_fails_closed():
+    with pytest.raises(EvidenceInvariantError, match="disposition rows must be mappings"):
+        reconcile_source_rows(["source:1"], [None])
