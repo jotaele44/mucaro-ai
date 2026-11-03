@@ -55,6 +55,30 @@ def test_non_bootstrap_runtime_change_cannot_silently_pass_adversarial_vectors()
     assert all("checkpoint-specific adversarial evidence" in result["reason"] for result in results.values())
 
 
+
+def test_overall_state_cannot_pass_when_rendered_evidence_is_blocked():
+    state = shadow_qa.overall_state_for_results(
+        failed_gates=[],
+        blocked_gates=[],
+        unresolved_vectors=[],
+        blocked_vectors=[],
+        rendered_state="BLOCKED",
+    )
+
+    assert state == "PROVISIONAL"
+
+
+def test_overall_state_passes_when_all_required_evidence_is_closed():
+    state = shadow_qa.overall_state_for_results(
+        failed_gates=[],
+        blocked_gates=[],
+        unresolved_vectors=[],
+        blocked_vectors=[],
+        rendered_state="AUDIT_ONLY",
+    )
+
+    assert state == "PASS"
+
 def test_shadow_exit_codes_distinguish_pass_fail_and_provisional():
     assert shadow_qa.exit_code_for_state("PASS") == 0
     assert shadow_qa.exit_code_for_state("FAIL") == 1
