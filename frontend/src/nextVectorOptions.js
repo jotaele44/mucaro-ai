@@ -53,7 +53,7 @@ export function contextualNextVectorOptions(request, suggestions = null) {
     if (typeof id !== "string" || !/^[a-z][a-z0-9_-]{0,39}$/.test(id) || ids.has(id)) return fallback;
     if (typeof label !== "string" || !label.trim() || label.length > 120) return fallback;
     if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 6000) return fallback;
-    if (/[\\u0000-\\u001f]/.test(label)) return fallback;
+    if (/[\u0000-\u001f]/.test(label)) return fallback;
     ids.add(id);
     // Deliberately discard all other fields (auto_execute, tool, permissions, etc.).
     result.push({ id, label: label.trim(), prompt: prompt.trim() });
