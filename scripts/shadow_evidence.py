@@ -40,7 +40,7 @@ def _git_show_text(checkpoint_sha: str, path: str) -> str:
     return completed.stdout
 
 
-def _load_execution_receipt(path: str, *, checkpoint_sha: str) -> None:
+def _load_execution_receipt(path: str, *, base_sha: str, checkpoint_sha: str) -> None:
     target = (ROOT / path).resolve()
     try:
         target.relative_to(ROOT)
@@ -52,6 +52,8 @@ def _load_execution_receipt(path: str, *, checkpoint_sha: str) -> None:
         raise ShadowEvidenceError(f"unable to read execution receipt {path}: {exc}") from exc
     if payload.get("schema_version") != EXECUTION_RECEIPT_SCHEMA_VERSION:
         raise ShadowEvidenceError(f"invalid execution receipt schema: {path}")
+    if _require_sha(payload.get("base_sha"), label="execution receipt base_sha") != base_sha:
+        raise ShadowEvidenceError(f"execution receipt base mismatch: {path}")
     if _require_sha(payload.get("checkpoint_sha"), label="execution receipt checkpoint_sha") != checkpoint_sha:
         raise ShadowEvidenceError(f"execution receipt checkpoint mismatch: {path}")
     if payload.get("status") != "PASS":
@@ -61,6 +63,7 @@ def _load_execution_receipt(path: str, *, checkpoint_sha: str) -> None:
 def _normalize_evidence(
     entry: object,
     *,
+    base_sha: str,
     checkpoint_sha: str,
     seen_ids: set[str],
 ) -> dict[str, str]:
@@ -78,7 +81,7 @@ def _normalize_evidence(
     if kind not in {"CHECKPOINT_FILE", "CHECKPOINT_TEST", "EXECUTION_RECEIPT"}:
         raise ShadowEvidenceError(f"unsupported evidence kind for {evidence_id}: {kind}")
     if kind == "EXECUTION_RECEIPT":
-        _load_execution_receipt(path, checkpoint_sha=checkpoint_sha)
+        _load_execution_receipt(path, base_sha=base_sha, checkpoint_sha=checkpoint_sha)
         text = ""
     else:
         text = _git_show_text(checkpoint_sha, path)
@@ -157,7 +160,12 @@ def validate_manifest(
         if not isinstance(evidence_rows, list):
             raise ShadowEvidenceError(f"evidence for {vector} must be a list")
         evidence = [
-            _normalize_evidence(item, checkpoint_sha=expected_checkpoint, seen_ids=seen_evidence_ids)
+            _normalize_evidence(
+                item,
+                base_sha=expected_base,
+                checkpoint_sha=expected_checkpoint,
+                seen_ids=seen_evidence_ids,
+            )
             for item in evidence_rows
         ]
 
