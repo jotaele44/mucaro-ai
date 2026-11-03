@@ -32,6 +32,8 @@ class WorkspaceProfileRequest(BaseModel):
 class MemoryCreateRequest(BaseModel):
     content: str = Field(min_length=1, max_length=800)
     kind: Literal["preference", "profile", "instruction", "fact"] = "preference"
+    scope: Literal["global", "workspace", "conversation"] = "global"
+    scope_id: str | None = Field(default=None, max_length=160)
 
 
 class MemoryUpdateRequest(BaseModel):

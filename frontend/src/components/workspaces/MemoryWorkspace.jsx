@@ -7,6 +7,8 @@ export function MemoryWorkspace({ announce }) {
   const [rows, setRows] = useState([]);
   const [content, setContent] = useState("");
   const [kind, setKind] = useState("preference");
+  const [scope, setScope] = useState("global");
+  const [scopeId, setScopeId] = useState("");
   const [error, setError] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
 
@@ -26,8 +28,9 @@ export function MemoryWorkspace({ announce }) {
     event.preventDefault();
     if (!content.trim()) return;
     try {
-      await api.remember(content.trim(), kind);
+      await api.remember(content.trim(), kind, scope, scope === "conversation" ? scopeId.trim() || null : null);
       setContent("");
+      if (scope === "conversation") setScopeId("");
       await load();
       announce("Saved to memory.");
     } catch (err) {
@@ -56,7 +59,33 @@ export function MemoryWorkspace({ announce }) {
             <option value="fact">Fact</option>
           </select>
         </label>
-        <button type="submit" className="primary-button" disabled={!content.trim()}>Save</button>
+        <label className="field">
+          <span>Scope</span>
+          <select value={scope} onChange={(event) => { setScope(event.target.value); setScopeId(""); }}>
+            <option value="global">Global</option>
+            <option value="workspace">Current workspace</option>
+            <option value="conversation">Conversation</option>
+          </select>
+        </label>
+        {scope === "conversation" && (
+          <label className="field">
+            <span>Conversation ID</span>
+            <input
+              value={scopeId}
+              onChange={(event) => setScopeId(event.target.value)}
+              placeholder="conv_…"
+              maxLength={160}
+              required
+            />
+          </label>
+        )}
+        <button
+          type="submit"
+          className="primary-button"
+          disabled={!content.trim() || (scope === "conversation" && !scopeId.trim())}
+        >
+          Save
+        </button>
       </form>
       {!rows.length && <p className="empty-state muted">Nothing remembered.</p>}
       <ul className="memory-list">
@@ -64,7 +93,12 @@ export function MemoryWorkspace({ announce }) {
           <li key={row.memory_id} className={row.enabled ? "" : "disabled-row"}>
             <div className="grow">
               <p>{row.content}</p>
-              <p className="muted small">{row.kind} · from {row.source} · {row.updated_at}</p>
+              <p className="muted small">
+                {row.kind} · {row.scope || "global"}
+                {row.scope_id ? ` · ${row.scope_id}` : ""}
+                {row.scope_migration ? " · legacy → global" : ""}
+                {` · from ${row.source} · ${row.updated_at}`}
+              </p>
             </div>
             <label className="switch">
               <input type="checkbox" checked={row.enabled} onChange={() => api.updateMemory(row.memory_id, !row.enabled).then(load)} />
