@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { nextVectorOptions } from "../src/nextVectorOptions.js";
+import { nextVectorOptions, contextualNextVectorOptions } from "../src/nextVectorOptions.js";
 
 test("empty context produces no options or implicit execution", () => {
   assert.deepEqual(nextVectorOptions(" "), []);
@@ -30,4 +30,33 @@ test("long context is bounded and remains plaintext rather than executable code"
 
 test("option generation is deterministic and free of network or persistence", () => {
   assert.deepEqual(nextVectorOptions("Check the evidence"), nextVectorOptions("Check the evidence"));
+});
+
+test("future suggested options retain text-only fields and deterministic order", () => {
+  const suggestions = [
+    { id: "check_sources", label: "Check sources", prompt: "Verify original documents", auto_execute: true, permission: "admin" },
+    { id: "compare_methods", label: "Compare methods", prompt: "Compare methods and risks", tool: "deploy" },
+  ];
+  assert.deepEqual(contextualNextVectorOptions("Research question", suggestions), [
+    { id: "check_sources", label: "Check sources", prompt: "Verify original documents" },
+    { id: "compare_methods", label: "Compare methods", prompt: "Compare methods and risks" },
+  ]);
+});
+
+test("malformed or conflicting dynamic options fail closed to four static choices", () => {
+  const fallback = nextVectorOptions("Research question");
+  const cases = [
+    [], [{}], [{ id: "x", label: "One", prompt: "a" }, { id: "x", label: "Two", prompt: "b" }],
+    [{ id: "X", label: "One", prompt: "a" }],
+    [{ id: "ok", label: "One", prompt: "" }],
+    [{ id: "ok", label: "One", prompt: "x".repeat(6001) }],
+    [{ id: "ok", label: "Bad\nlabel", prompt: "a" }],
+    Array.from({ length: 7 }, (_, n) => ({ id: "v" + n, label: "x", prompt: "x" })),
+    "not an array",
+  ];
+  for (const candidate of cases) assert.deepEqual(contextualNextVectorOptions("Research question", candidate), fallback);
+});
+
+test("no context never creates dynamic options", () => {
+  assert.deepEqual(contextualNextVectorOptions("", [{ id: "x", label: "x", prompt: "x" }]), []);
 });
