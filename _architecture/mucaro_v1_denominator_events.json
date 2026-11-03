@@ -2,7 +2,7 @@
   "schema_version": "MUCARO_V1_DENOMINATOR_EVENTS/1.0",
   "denominator_version": "MUCARO_V1_DENOMINATOR/1.0",
   "baseline_source_head": "9a06357afa9e34367776b1f46223a803ab23c958",
-  "audit_head": "306d18b8fe719942d8330f6e6b9b15cf37b9fc8e",
+  "audit_head": "4ca5106e5f008cc7f0fe7cc1827332e669fb4fdd",
   "events": [
     {
       "event_id": "evt-bc07-policy-pass",
@@ -536,6 +536,25 @@
         "merge main@306d18b8fe719942d8330f6e6b9b15cf37b9fc8e has zero file differences from the green PR tree"
       ],
       "reason": "GIS-09's 'broad' wording is bounded by the committed GIS_V1_SUPPORT_MATRIX rather than interpreted as universal GIS coverage. Within that bounded matrix, explicit topology repair and vector/raster operations close under frozen independent controls plus the 70-case positive/negative execution denominator. Remote sensing, broader formats, unbounded hydrology, bathymetry, temporal GIS and other listed nonclaims remain outside this PASS."
+    },
+    {
+      "event_id": "evt-ocr08-bounded-structure-pass-20261102",
+      "requirement_id": "OCR-08",
+      "from_state": "OPEN",
+      "to_state": "PASS",
+      "evidence_type": "CURRENT_MAIN_LIVE_TESSERACT_STRUCTURE_CERTIFICATION_WITH_FAIL_CLOSED_BOUNDED_DENOMINATOR",
+      "evidence": [
+        "PR#323 replay head@538370d97365a93c823c901560da9d48775d2254",
+        "GitHub Actions OCR08 Structure Certification run 41549693967 conclusion=success",
+        "artifact#13190287375 mucaro-ocr08-structure.json",
+        "GitHub Actions CI run 41549693969 conclusion=success",
+        "real Tesseract execution on deterministic printed multi-column, table, and form fixtures",
+        "OCR08-01/OCR08-02/OCR08-03 positive expected states matched",
+        "OCR08-N01/OCR08-N02/OCR08-N03 negative ambiguous structures fail closed as UNRESOLVED",
+        "all positive input spans classified; positive structures explicitly INFERENCE/CANDIDATE_NOT_IDENTITY",
+        "current permission-hardened live certifier uses canonical backend.app.ocr_analysis.analyze_image_ocr boundary"
+      ],
+      "reason": "OCR-08 is the bounded printed multi-column/table/form reconstruction requirement. The current permission-hardened mainline replay executed real Tesseract and all six frozen benchmark cases successfully, including explicit ambiguity negatives and complete span accounting. This PASS is limited to the frozen OCR08 printed-structure scope; handwriting/difficult scans remain OCR-09 and representative real-world breadth remains OCR-10. Spanning headings, merged/headerless/rotated/nested tables and non-colon or multiline form semantics remain explicit nonclaims."
     }
   ]
 }
