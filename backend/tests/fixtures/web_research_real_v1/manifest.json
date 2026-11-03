@@ -1,0 +1,46 @@
+{
+  "schema_version": "mucaro_web_research_real_manifest_v1",
+  "artifact_id": 10952734875,
+  "archive_sha256": "1eb4198e783fbaa84ae60610c7048d6e889c077aaf59aa70c7db29cebd4badac",
+  "corpus_manifest_sha256": "8b450c8f3a587d5c39ecc6a9e94480592d5ddb3565021c4373cc65587ae48fb5",
+  "acquisition_sha256": "800642a38efe0b40c1b3f3c2b578f853a3d567f608cc5798dd3a97d9af733b17",
+  "upstream_corpus_source_count": 24,
+  "included_source_count": 3,
+  "excluded_source_count": 21,
+  "included_sources": [
+    {
+      "byte_size": 28360,
+      "final_url": "https://www.rfc-editor.org/rfc/rfc8259.txt",
+      "http_status": 200,
+      "path": "rfc8259.txt",
+      "requested_url": "https://www.rfc-editor.org/rfc/rfc8259.txt",
+      "retrieved_utc": "2026-09-28T05:40:15.586904+00:00",
+      "sha256": "61a5378f4255c720beb2a4b4a63b29540147c140f36988bf086291989b4cd2d7",
+      "source_id": "rfc8259"
+    },
+    {
+      "byte_size": 63039,
+      "final_url": "https://www.rfc-editor.org/rfc/rfc7519.txt",
+      "http_status": 200,
+      "path": "rfc7519.txt",
+      "requested_url": "https://www.rfc-editor.org/rfc/rfc7519.txt",
+      "retrieved_utc": "2026-09-28T05:40:16.038203+00:00",
+      "sha256": "fecd930e9ccf2276b95c0017c6c4ff5d09352e4bc3c7629946447894e0f97248",
+      "source_id": "rfc7519"
+    },
+    {
+      "byte_size": 40977,
+      "final_url": "https://www.rfc-editor.org/rfc/rfc6531.txt",
+      "http_status": 200,
+      "path": "rfc6531.txt",
+      "requested_url": "https://www.rfc-editor.org/rfc/rfc6531.txt",
+      "retrieved_utc": "2026-09-28T05:40:17.874719+00:00",
+      "sha256": "4f48303f7b7659d0b3149730b51a03d59799a95b4d2ca7d913533f97b9db4b40",
+      "source_id": "rfc6531"
+    }
+  ],
+  "scope": "Three complete frozen RFC documents with original preambles and source bytes. Restored capture wrappers are new derived representations, not byte-identical original Mucaro snapshots. No upstream document reacquisition.",
+  "artifact_name": "rt09-real-world-corpus-4db5bc08965aaefa39e93db9f9c882d4ad911861",
+  "reported_workflow_head": "63eb60700ca89ae1d718a3960cf91f250e3d6e88",
+  "code_association": "UNRESOLVED_NAME_VS_RUN_HEAD; no remote code identity claim; artifact digest and corpus manifest independently match recorded evidence."
+}

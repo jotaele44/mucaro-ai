@@ -36,6 +36,7 @@ RESEARCH_POLICY = {
     "automatic_acquisition": False,
     "model_fallback": False,
     "accounting_enforcement": "explicit_nonnegative_integer_multiset_conservation_v1",
+    "passage_boundaries": "explicit_line_or_blank_line_paragraph_v1",
     "provider_prompt_budget": "UTF8_byte_upper_estimate_plus_output_and_512_overhead_v1",
     "accepted_http_statuses": "200-299",
     "accepted_mime_types": ["application/json", "application/xhtml+xml", "text/html", "text/markdown", "text/plain"],
@@ -73,6 +74,12 @@ RESEARCH_ARGUMENTS_SCHEMA = {
             "enum": ["extractive", "mock", "openai_compatible_local", "anthropic"],
             "default": "extractive",
             "title": "Synthesis mode",
+        },
+        "passage_mode": {
+            "type": "string",
+            "enum": ["line", "paragraph"],
+            "default": "line",
+            "title": "Passage boundaries",
         },
     },
     "required": ["a_id", "a_sha256", "b_id", "b_sha256"],
@@ -200,12 +207,20 @@ def _extract(snapshot: dict[str, Any], content: bytes) -> tuple[str, str, str]:
     return text, mime, codec.name
 
 
-def _passages(text: str, snapshot_id: str) -> list[dict[str, Any]]:
+def _passages(text: str, snapshot_id: str, mode: str = "line") -> list[dict[str, Any]]:
     result = []
+    if mode == "paragraph":
+        spans, start = [], 0
+        for separator in re.finditer(r"\r?\n[ \t]*\r?\n", text):
+            spans.append((start, separator.start()))
+            start = separator.end()
+        spans.append((start, len(text)))
+    else:
+        spans = [(match.start(), match.end()) for match in re.finditer(r"[^\r\n]+", text)]
     # Offsets refer to this exact extracted Unicode string, not HTML byte positions.
-    for match in re.finditer(r"[^\r\n]+", text):
-        for start in range(match.start(), match.end(), PASSAGE_CHARS):
-            end = min(start + PASSAGE_CHARS, match.end())
+    for block_start, block_end in spans:
+        for start in range(block_start, block_end, PASSAGE_CHARS):
+            end = min(start + PASSAGE_CHARS, block_end)
             raw = text[start:end]
             normalized = " ".join(raw.split())
             if not normalized:
@@ -302,6 +317,7 @@ def _comparison(a: list[dict[str, Any]], b: list[dict[str, Any]]) -> dict[str, A
 def compare_captures(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]:
     question = arguments.get("question", "Compare these sources.")
     mode = arguments.get("synthesis", "extractive")
+    passage_mode = arguments.get("passage_mode", "line")
     if arguments["a_id"] == arguments["b_id"]:
         raise ResearchError(
             "ERROR_RESEARCH_DUPLICATE_SOURCE",
@@ -311,7 +327,7 @@ def compare_captures(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]
     for side in ("a", "b"):
         raw, snapshot, content = read_verified_capture(arguments[f"{side}_id"], arguments[f"{side}_sha256"], cfg)
         text, mime, encoding = _extract(snapshot, content)
-        passages = _passages(text, snapshot["snapshot_id"])
+        passages = _passages(text, snapshot["snapshot_id"], passage_mode)
         sources.append(
             {
                 "side": side.upper(),
@@ -430,6 +446,7 @@ def compare_captures(arguments: dict[str, Any], cfg: Settings) -> dict[str, Any]
         "kind": "WEB_RESEARCH",
         "status": "RESEARCH_REVIEW_REQUIRED",
         "question": question,
+        "passage_mode": passage_mode,
         "sources": sources,
         "passages": [row for passages in all_passages for row in passages],
         "selections": selections,

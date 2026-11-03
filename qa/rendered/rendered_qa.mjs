@@ -1039,6 +1039,7 @@ print(json.dumps(rows))
         check("research refuses duplicate observations before invocation", viewport, await panel().getByRole("button", { name: "Compare and synthesize", exact: true }).isDisabled());
         await panel().getByRole("combobox", { name: "Source B", exact: true }).selectOption(captures[1].snapshot_id);
         await panel().getByRole("textbox", { name: "Research question", exact: true }).fill("Budget");
+        await panel().getByRole("combobox", { name: "Passage boundaries", exact: true }).selectOption("paragraph");
         const routePattern = /\/skills\/.*web-research\/execute$/;
         let requests = 0, release;
         const gate = new Promise((resolve) => { release = resolve; });
@@ -1058,6 +1059,7 @@ print(json.dumps(rows))
         } finally { release(); }
         const accepted = await (await completed).json();
         if (accepted.status !== "SKILL_EXECUTED") throw new Error(`Research request failed: ${JSON.stringify(accepted)}`);
+        check("research paragraph control reaches the governed backend", viewport, accepted.result.passage_mode === "paragraph");
         await page.waitForFunction(() => [...document.querySelectorAll("button")].some((button) => button.textContent === "Compare and synthesize" && !button.disabled));
         await result().getByRole("heading", { name: "Source-grounded draft", exact: true }).waitFor();
         await page.unroute(routePattern);
@@ -1078,16 +1080,20 @@ print(json.dumps(rows))
         const report = JSON.parse(reportBytes);
         check("research download matches saved report digest and complete accounting", viewport, createHash("sha256").update(reportBytes).digest("hex") === executions.at(-1).result.report_sha256 && report.comparison.counts.symmetric_difference === 3 && report.citations.length === 2);
         await panel().getByRole("textbox", { name: "Research question", exact: true }).fill("Quantum");
+        await panel().getByRole("combobox", { name: "Synthesis mode", exact: true }).selectOption("anthropic");
         await activate(panel().getByRole("button", { name: "Compare and synthesize", exact: true }));
         await result().getByRole("heading", { name: "More context needed", exact: true }).waitFor();
         check("research no-context feedback does not invent citations", viewport, (await result().innerText()).includes("No verified passage citations"));
+        check("research no-context model selection reports no invocation", viewport, (await result().innerText()).includes("No model invoked · matching context required"));
         await panel().getByRole("textbox", { name: "Research question", exact: true }).fill("Budget");
+        await panel().getByRole("combobox", { name: "Synthesis mode", exact: true }).selectOption("extractive");
         await activate(panel().getByRole("button", { name: "Compare and synthesize", exact: true }));
         await result().getByRole("heading", { name: "Source-grounded draft", exact: true }).waitFor();
         await open("Chat"); await open("Sources");
         await activate(page.locator("summary").filter({ hasText: /^Compare frozen web sources$/ }));
         await result().getByRole("heading", { name: "Source-grounded draft", exact: true }).waitFor();
         check("research selections draft and saved result survive navigation", viewport, await panel().getByRole("textbox", { name: "Research question", exact: true }).inputValue() === "Budget" && await panel().getByRole("combobox", { name: "Source A", exact: true }).inputValue() === captures[0].snapshot_id);
+        check("research passage mode survives navigation", viewport, await panel().getByRole("combobox", { name: "Passage boundaries", exact: true }).inputValue() === "paragraph" && (await result().innerText()).includes("Paragraph passage accounting"));
         const listPattern = /\/web-captures(?:\?.*)?$/;
         await page.route(listPattern, async (route) => { const response = await route.fetch(); const payload = await response.json(); payload.captures = payload.captures.map((row) => row.snapshot_id === captures[0].snapshot_id ? { ...row, snapshot_sha256: "0".repeat(64) } : row); await route.fulfill({ response, json: payload }); });
         await activate(panel().getByRole("button", { name: "Refresh saved captures", exact: true }));

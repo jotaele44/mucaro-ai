@@ -79,6 +79,26 @@ questions, and unknown modes are refused by the shared arguments schema.
 
 ## Evidence semantics and safeguards
 
+### Choosing passage boundaries
+
+Line mode is the default and preserves the existing comparison behavior for
+lists and records. Choose **Paragraphs (wrapped prose)** for documents whose
+sentences wrap across adjacent lines. Paragraph mode groups text until a blank
+line; it retains the intervening line breaks in exact excerpts. The original
+document bytes and Unicode extraction offsets remain unchanged. Each resulting
+passage still has the 2,000-character ceiling and the existing source budgets.
+
+The GUI saves the choice with the research draft. The CLI accepts
+`--passage-mode paragraph`; API skill arguments accept `"passage_mode":
+"paragraph"`. Supported values are `line` and `paragraph`. Saved results identify
+the mode that produced their counts, even if the current selection later changes.
+
+An insufficient-context result explicitly states that no model was invoked,
+including when the requested mode was a live provider. Selecting a provider does
+not imply that a request was sent.
+
+### Source and execution boundaries
+
 - Inputs must be indexed canonical snapshot JSON, regular files in this capture
   collection, with matching selected SHA-256, observation metadata, decoded
   content length, and HTTP content digest. Client paths are never accepted.
@@ -137,6 +157,7 @@ questions, and unknown modes are refused by the shared arguments schema.
 ```sh
 python3 -m pytest backend/tests/test_web_research.py -q
 python3 scripts/evaluate_web_research.py --output data/exports/web-research-eval.json
+python3 scripts/evaluate_web_research_real.py --output data/exports/web-research-real-eval.json
 node qa/rendered/rendered_qa.mjs --scenarios research --browser chromium
 node qa/rendered/rendered_qa.mjs --scenarios research --browser webkit
 ```
@@ -148,6 +169,15 @@ and mojibake preservation, empty/negative context, and instruction-bearing text.
 These are authored offline acceptance examples, not an independent live-model
 semantic benchmark. The release gate runs this evaluator alongside existing
 retrieval, ingestion, and recovery gates.
+
+The additional real-source gate uses complete, hash-bound frozen RFC documents
+with five cases and six required evidence anchors. It reuses the archived RT-09
+source manifestation and adds explicit paragraph boundaries after the JWT
+document demonstrated the weakness of counting every hard-wrapped line as a
+separate passage. Source hashes, parent manifests, scope distinctions and
+inclusion/exclusion counts are preserved in
+`backend/tests/fixtures/web_research_real_v1/README.md`. This extends evidence
+breadth without claiming independent model semantics or full live web research.
 
 The rendered scenario uses real local HTTP acquisition of authored documents,
 then stops their source servers before comparison. It tests activation,

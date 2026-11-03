@@ -1,0 +1,18 @@
+{
+  "schema_version": "mucaro_web_research_real_cases_v1",
+  "adjudication": "Reference anchors manually selected from the complete frozen RFC text. They test required evidence preservation, not independent model intelligence or current standards recommendations.",
+  "thresholds": {"case_pass_rate": 1.0, "required_anchor_coverage": 1.0, "exact_excerpt_rate": 1.0, "no_context_accuracy": 1.0},
+  "cases": [
+    {"id": "json-jwt-name-uniqueness", "a": "rfc8259", "b": "rfc7519", "question": "What do these documents require about unique object names and claim names?", "expected_context": true,
+     "anchors": [{"source_id": "rfc8259", "text": "The names within an object SHOULD be unique."}, {"source_id": "rfc7519", "text": "MUST be unique; JWT parsers MUST either reject JWTs with duplicate Claim Names or use a JSON parser that returns only the lexically last duplicate member name"}],
+     "relation": "DIFFERENT_REQUIREMENT_STRENGTH_AND_SCOPE; do not conflate general JSON objects with JWT claim sets"},
+    {"id": "json-jwt-duplicate-parser-behavior", "a": "rfc8259", "b": "rfc7519", "question": "How do parsers handle duplicate names and last values?", "expected_context": true,
+     "anchors": [{"source_id": "rfc8259", "text": "When the names within an object are not unique, the behavior of software that receives such an object is unpredictable."}, {"source_id": "rfc7519", "text": "JWT parsers MUST either reject JWTs with duplicate Claim Names or use a JSON parser that returns only the lexically last duplicate member name"}],
+     "relation": "DIFFERENT_SCOPE; preserve the explicit parser alternatives rather than inventing one universal rule"},
+    {"id": "json-smtp-utf8-scope", "a": "rfc8259", "b": "rfc6531", "question": "Which strings MUST be expressed or encoded in UTF-8?", "expected_context": true,
+     "anchors": [{"source_id": "rfc8259", "text": "JSON text exchanged between systems that are not part of a closed ecosystem MUST be encoded using UTF-8"}, {"source_id": "rfc6531", "text": "Strings referred to in this document, including ASCII strings, MUST be expressed in UTF-8."}],
+     "relation": "RELATED_ENCODING_DIFFERENT_PROTOCOL_SCOPE"},
+    {"id": "one-sided-technical-context", "a": "rfc8259", "b": "rfc7519", "question": "StringOrURI", "expected_context": false, "anchors": [], "relation": "ONE_SELECTED_SOURCE_LACKS_MATCHING_CONTEXT"},
+    {"id": "absent-context", "a": "rfc8259", "b": "rfc6531", "question": "Quantum teleportation elephants", "expected_context": false, "anchors": [], "relation": "NO_SELECTED_SOURCE_CONTEXT"}
+  ]
+}

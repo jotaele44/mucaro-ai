@@ -1204,6 +1204,7 @@ def build_parser() -> argparse.ArgumentParser:
     capture_compare.add_argument("--a-sha256", required=True)
     capture_compare.add_argument("--b-sha256", required=True)
     capture_compare.add_argument("--question", default="Compare these sources.")
+    capture_compare.add_argument("--passage-mode", choices=["line", "paragraph"], default="line", help="Keep wrapped prose together with paragraph mode; line mode preserves list/record boundaries.")
     capture_compare.add_argument("--synthesis", choices=["extractive", "mock", "openai_compatible_local", "anthropic"], default="extractive")
     capture_compare.add_argument("--format", choices=["json", "text"], default="json")
     capture_compare.set_defaults(handler=run_capture_compare)
@@ -9025,7 +9026,7 @@ def run_capture_list(args: argparse.Namespace, cfg: Settings) -> int:
 
 def run_capture_compare(args: argparse.Namespace, cfg: Settings) -> int:
     try:
-        result = execute_skill("mucaro/web-research", {key: getattr(args, key) for key in ("a_id", "b_id", "a_sha256", "b_sha256", "question", "synthesis")}, cfg=cfg, executed_by="cli")
+        result = execute_skill("mucaro/web-research", {key: getattr(args, key) for key in ("a_id", "b_id", "a_sha256", "b_sha256", "question", "synthesis", "passage_mode")}, cfg=cfg, executed_by="cli")
     except SkillRuntimeError as exc:
         emit_error(exc.status, exc.detail, args.format)
         return 2

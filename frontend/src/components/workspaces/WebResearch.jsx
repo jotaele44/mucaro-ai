@@ -23,8 +23,8 @@ export function WebResearchResult({ result, onDownload, busy = false }) {
   const answer = result.synthesis.answer.replace(/\(chunk_id=([^\s()]+)\)/g, (reference, id) => citationNumbers.has(id) ? `[${citationNumbers.get(id)}]` : reference);
   return <section className="panel nested-panel" aria-label="Frozen source comparison result">
     <h3>Comparison and synthesis</h3>
-    <p className="muted small">{result.synthesis.mode === "extractive" ? "Offline excerpts · no model invoked" : `${result.synthesis.mode} synthesis · review required`} · no URL fetched</p>
-    <p className="muted small">Passage accounting · duplicates retained</p>
+    <p className="muted small">{result.synthesis.status === "INSUFFICIENT_CONTEXT" ? "No model invoked · matching context required" : result.synthesis.mode === "extractive" ? "Offline excerpts · no model invoked" : `${result.synthesis.mode} synthesis · review required`} · no URL fetched</p>
+    <p className="muted small">{result.passage_mode === "paragraph" ? "Paragraph" : "Line"} passage accounting · duplicates retained</p>
     <dl className="research-counts">{[["A passages", counts.a], ["B passages", counts.b], ["Shared", counts.intersection], ["A only", counts.a_only], ["B only", counts.b_only], ["Union", counts.union], ["Difference", counts.symmetric_difference]].map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{count}</dd></div>)}</dl>
     <p>{identity.http_content_equal ? "The saved HTTP content has identical bytes." : "The saved HTTP content has different bytes."} {identity.extracted_text_equal ? "Extracted text is identical." : "Extracted text differs."} Real-world identity and the truth of differing claims remain unresolved.</p>
     <details><summary>Differing passages ({differences.length} groups)</summary>
@@ -54,6 +54,7 @@ export function WebResearch({ announce }) {
   const [allowed, setAllowed] = useState([]);
   const [values, setValues] = useState(() => { const saved = readDraft(); return { a: typeof saved.a === "string" ? saved.a : "", b: typeof saved.b === "string" ? saved.b : "", a_sha256: typeof saved.a_sha256 === "string" ? saved.a_sha256 : "", b_sha256: typeof saved.b_sha256 === "string" ? saved.b_sha256 : "", question: typeof saved.question === "string" ? saved.question : "Compare these sources.", synthesis: ["extractive", "mock", "openai_compatible_local", "anthropic"].includes(saved.synthesis) ? saved.synthesis : "extractive" }; });
   const [result, setResult] = useState(null);
+  const [passageMode, setPassageMode] = useState(() => readDraft().passage_mode === "paragraph" ? "paragraph" : "line");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const inFlight = useRef(false);
@@ -64,7 +65,7 @@ export function WebResearch({ announce }) {
     setResult(history.executions.slice().reverse().find((row) => row.skill_id === SKILL && row.status === "PASS")?.result || null);
   }, []);
   useEffect(() => { load().catch(setError); }, [load]);
-  useEffect(() => { try { sessionStorage.setItem(DRAFT, JSON.stringify(values)); } catch {} }, [values]);
+  useEffect(() => { try { sessionStorage.setItem(DRAFT, JSON.stringify({ ...values, passage_mode: passageMode })); } catch {} }, [values, passageMode]);
   async function action(fn) {
     if (inFlight.current) return;
     inFlight.current = true; setBusy(true); setError(null);
@@ -90,13 +91,15 @@ export function WebResearch({ announce }) {
     </fieldset> : <p className="muted small">Research skill active. <button type="button" className="secondary-button" disabled={busy} onClick={() => action(async () => { await api.deactivateSkill(SKILL); await load(); announce?.("Research deactivated. Saved results retained."); })}>Deactivate research</button></p>}
     <form aria-busy={busy} onSubmit={(event) => { event.preventDefault(); action(async () => {
       if (!a || !b || staleBinding) throw new Error("Select both captures from the current list and review their byte bindings.");
-      const response = await api.executeSkill(SKILL, { a_id: a.snapshot_id, a_sha256: values.a_sha256, b_id: b.snapshot_id, b_sha256: values.b_sha256, question: values.question, synthesis: values.synthesis });
+      const response = await api.executeSkill(SKILL, { a_id: a.snapshot_id, a_sha256: values.a_sha256, b_id: b.snapshot_id, b_sha256: values.b_sha256, question: values.question, synthesis: values.synthesis, passage_mode: passageMode });
       setResult(response.result); announce?.("Comparison saved. Review source differences and citation status.");
     }); }}>
       {["a", "b"].map((side) => <label className="field" key={side}>Source {side.toUpperCase()}<select required value={values[side]} disabled={busy} onChange={(event) => { const id = event.target.value; setValues((old) => ({ ...old, [side]: id, [`${side}_sha256`]: captures.find((row) => row.snapshot_id === id)?.snapshot_sha256 || "" })); }}><option value="">Choose a saved capture</option>{captures.map((capture) => <option value={capture.snapshot_id} key={capture.snapshot_id}>{capture.final_url} · {capture.retrieval_utc} · {capture.snapshot_id}</option>)}</select></label>)}
       {staleBinding && <p className="error-card" role="alert">A selected capture’s recorded SHA-256 changed. Its earlier binding is retained. Review the collection, then explicitly reselect the observation to accept a new binding.</p>}
       {(values.a || values.b) && <details><summary>Selected capture bindings</summary><dl className="facts">{["a", "b"].map((side) => <React.Fragment key={side}><dt>Source {side.toUpperCase()} ID / SHA-256</dt><dd className="mono">{values[side] || "Not selected"}<br />{values[`${side}_sha256`] || "Not selected"}</dd></React.Fragment>)}</dl></details>}
       <label className="field">Research question<textarea value={values.question} onChange={change("question")} disabled={busy} required maxLength={2000} /></label>
+      <label className="field">Passage boundaries<select value={passageMode} disabled={busy} onChange={(event) => setPassageMode(event.target.value)}><option value="line">Lines (lists and records)</option><option value="paragraph">Paragraphs (wrapped prose)</option></select></label>
+      <p className="muted small">Paragraph mode keeps adjacent prose lines together until a blank line. Original text and citation offsets are retained; each passage still has a 2,000-character ceiling.</p>
       <label className="field">Synthesis mode<select value={values.synthesis} onChange={change("synthesis")} disabled={busy}><option value="extractive">Offline excerpts (no model)</option><option value="mock">Mock model (offline test)</option><option value="openai_compatible_local">Local model (requires running server)</option><option value="anthropic">Anthropic (sends passages to provider)</option></select></label>
       {values.a && values.a === values.b && <p className="error-card">Choose distinct observations. A repeated capture is not independent corroboration.</p>}
       <button type="submit" className="primary-button" disabled={busy || mount?.state !== "ACTIVE" || !a || !b || staleBinding || a.snapshot_id === b.snapshot_id || !values.question.trim()}>{busy ? "Working on research…" : "Compare and synthesize"}</button>

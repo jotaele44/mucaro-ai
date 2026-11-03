@@ -1,0 +1,453 @@
+{
+  "builder": {
+    "identity": "mucaro_real_world_corpus_materializer_v1",
+    "manifest_content_sha256": "d98090c84450a0e1d646b9aea3a6d3db4a4d022cbda84aa98713689b61b25e70",
+    "query_count": 24,
+    "source_count": 24
+  },
+  "corpus_id": "mucaro-rt09-standards-public-records-v1",
+  "frozen_at": "2026-09-28T05:40:20.384708+00:00",
+  "queries": [
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc9110"
+      ],
+      "query": "HTTP Semantics RFC 9110",
+      "query_id": "rt09-q01"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc9111"
+      ],
+      "query": "HTTP Caching RFC 9111",
+      "query_id": "rt09-q02"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc9112"
+      ],
+      "query": "HTTP/1.1 RFC 9112",
+      "query_id": "rt09-q03"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc9113"
+      ],
+      "query": "HTTP/2 RFC 9113",
+      "query_id": "rt09-q04"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc9000"
+      ],
+      "query": "QUIC UDP-Based Multiplexed and Secure Transport RFC 9000",
+      "query_id": "rt09-q05"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc8446"
+      ],
+      "query": "TLS Protocol Version 1.3 RFC 8446",
+      "query_id": "rt09-q06"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc8259"
+      ],
+      "query": "JSON Data Interchange Format RFC 8259",
+      "query_id": "rt09-q07"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc6455"
+      ],
+      "query": "WebSocket Protocol RFC 6455",
+      "query_id": "rt09-q08"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc7519"
+      ],
+      "query": "JSON Web Token JWT RFC 7519",
+      "query_id": "rt09-q09"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc6749"
+      ],
+      "query": "OAuth 2.0 Authorization Framework RFC 6749",
+      "query_id": "rt09-q10"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc3986"
+      ],
+      "query": "Uniform Resource Identifier Generic Syntax RFC 3986",
+      "query_id": "rt09-q11"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc3987"
+      ],
+      "query": "Internationalized Resource Identifiers RFC 3987",
+      "query_id": "rt09-q12"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc5322"
+      ],
+      "query": "Internet Message Format RFC 5322",
+      "query_id": "rt09-q13"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc2045"
+      ],
+      "query": "MIME Part One Internet Message Bodies RFC 2045",
+      "query_id": "rt09-q14"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc2046"
+      ],
+      "query": "RFC 2046 Freed Borenstein Multipurpose Internet Mail Extensions MIME Part Two Media Types",
+      "query_id": "rt09-q15"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc6531"
+      ],
+      "query": "SMTP Extension Internationalized Email RFC 6531",
+      "query_id": "rt09-q16"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc6376"
+      ],
+      "query": "DomainKeys Identified Mail DKIM Signatures RFC 6376",
+      "query_id": "rt09-q17"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc7208"
+      ],
+      "query": "Sender Policy Framework SPF RFC 7208",
+      "query_id": "rt09-q18"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc6265"
+      ],
+      "query": "HTTP State Management Mechanism RFC 6265",
+      "query_id": "rt09-q19"
+    },
+    {
+      "category": "txt",
+      "expected_source_ids": [
+        "rfc7239"
+      ],
+      "query": "Forwarded HTTP Extension RFC 7239",
+      "query_id": "rt09-q20"
+    },
+    {
+      "category": "html",
+      "expected_source_ids": [
+        "wcag22"
+      ],
+      "query": "Web Content Accessibility Guidelines WCAG 2.2",
+      "query_id": "rt09-q21"
+    },
+    {
+      "category": "html",
+      "expected_source_ids": [
+        "csscolor4"
+      ],
+      "query": "CSS Color Module Level 4",
+      "query_id": "rt09-q22"
+    },
+    {
+      "category": "pdf",
+      "expected_source_ids": [
+        "nist_ai_rmf"
+      ],
+      "query": "Artificial Intelligence Risk Management Framework AI RMF 1.0",
+      "query_id": "rt09-q23"
+    },
+    {
+      "category": "pdf",
+      "expected_source_ids": [
+        "nist_csf2"
+      ],
+      "query": "NIST Cybersecurity Framework CSF 2.0",
+      "query_id": "rt09-q24"
+    }
+  ],
+  "schema_version": "mucaro-retrieval-corpus/1.0",
+  "sources": [
+    {
+      "byte_size": 502941,
+      "origin": "public_record",
+      "path": "rfc9110.txt",
+      "provenance_ref": "acquisition:rfc9110:21c1cdce6ab0e5509b04d84a28000836c7a087cf786efe6f04877ebfff47232a",
+      "sha256": "21c1cdce6ab0e5509b04d84a28000836c7a087cf786efe6f04877ebfff47232a",
+      "source_format": "txt",
+      "source_id": "rfc9110",
+      "synthetic": false
+    },
+    {
+      "byte_size": 84477,
+      "origin": "public_record",
+      "path": "rfc9111.txt",
+      "provenance_ref": "acquisition:rfc9111:aeb52adb3279d5f23dae34f68af11bd5cef0a0aff7ffcd014c9ca93c5302cf3e",
+      "sha256": "aeb52adb3279d5f23dae34f68af11bd5cef0a0aff7ffcd014c9ca93c5302cf3e",
+      "source_format": "txt",
+      "source_id": "rfc9111",
+      "synthetic": false
+    },
+    {
+      "byte_size": 109913,
+      "origin": "public_record",
+      "path": "rfc9112.txt",
+      "provenance_ref": "acquisition:rfc9112:e4f426bac6206b67fdf9e0da826154f70588db2133a0a86b15cde4ff725d8937",
+      "sha256": "e4f426bac6206b67fdf9e0da826154f70588db2133a0a86b15cde4ff725d8937",
+      "source_format": "txt",
+      "source_id": "rfc9112",
+      "synthetic": false
+    },
+    {
+      "byte_size": 191811,
+      "origin": "public_record",
+      "path": "rfc9113.txt",
+      "provenance_ref": "acquisition:rfc9113:a00ef91b64e111a282e77ec66980f5242e77c0bb5e33e0927e3b6757080506de",
+      "sha256": "a00ef91b64e111a282e77ec66980f5242e77c0bb5e33e0927e3b6757080506de",
+      "source_format": "txt",
+      "source_id": "rfc9113",
+      "synthetic": false
+    },
+    {
+      "byte_size": 403442,
+      "origin": "public_record",
+      "path": "rfc9000.txt",
+      "provenance_ref": "acquisition:rfc9000:f88aae47f8b18e102024916e975e919201d8dde689cba79b01079eaedd402e22",
+      "sha256": "f88aae47f8b18e102024916e975e919201d8dde689cba79b01079eaedd402e22",
+      "source_format": "txt",
+      "source_id": "rfc9000",
+      "synthetic": false
+    },
+    {
+      "byte_size": 337736,
+      "origin": "public_record",
+      "path": "rfc8446.txt",
+      "provenance_ref": "acquisition:rfc8446:47871bc8820a2c3b6ea89f061055577058862cf543686b82d10131239702b3bd",
+      "sha256": "47871bc8820a2c3b6ea89f061055577058862cf543686b82d10131239702b3bd",
+      "source_format": "txt",
+      "source_id": "rfc8446",
+      "synthetic": false
+    },
+    {
+      "byte_size": 28360,
+      "origin": "public_record",
+      "path": "rfc8259.txt",
+      "provenance_ref": "acquisition:rfc8259:61a5378f4255c720beb2a4b4a63b29540147c140f36988bf086291989b4cd2d7",
+      "sha256": "61a5378f4255c720beb2a4b4a63b29540147c140f36988bf086291989b4cd2d7",
+      "source_format": "txt",
+      "source_id": "rfc8259",
+      "synthetic": false
+    },
+    {
+      "byte_size": 162067,
+      "origin": "public_record",
+      "path": "rfc6455.txt",
+      "provenance_ref": "acquisition:rfc6455:765775326aee0ecca9b04bde3fd1f52932d498e33e34e428bd61b8a24da0fa3b",
+      "sha256": "765775326aee0ecca9b04bde3fd1f52932d498e33e34e428bd61b8a24da0fa3b",
+      "source_format": "txt",
+      "source_id": "rfc6455",
+      "synthetic": false
+    },
+    {
+      "byte_size": 63039,
+      "origin": "public_record",
+      "path": "rfc7519.txt",
+      "provenance_ref": "acquisition:rfc7519:fecd930e9ccf2276b95c0017c6c4ff5d09352e4bc3c7629946447894e0f97248",
+      "sha256": "fecd930e9ccf2276b95c0017c6c4ff5d09352e4bc3c7629946447894e0f97248",
+      "source_format": "txt",
+      "source_id": "rfc7519",
+      "synthetic": false
+    },
+    {
+      "byte_size": 163498,
+      "origin": "public_record",
+      "path": "rfc6749.txt",
+      "provenance_ref": "acquisition:rfc6749:f204fc8661d6c92d2ec6e0b54808f961a9ad26e792f57f312d9528335519bd71",
+      "sha256": "f204fc8661d6c92d2ec6e0b54808f961a9ad26e792f57f312d9528335519bd71",
+      "source_format": "txt",
+      "source_id": "rfc6749",
+      "synthetic": false
+    },
+    {
+      "byte_size": 141811,
+      "origin": "public_record",
+      "path": "rfc3986.txt",
+      "provenance_ref": "acquisition:rfc3986:3102dae4b68cebe40337730312fcb612297b8928547267e8b3d1ee6002b2d683",
+      "sha256": "3102dae4b68cebe40337730312fcb612297b8928547267e8b3d1ee6002b2d683",
+      "source_format": "txt",
+      "source_id": "rfc3986",
+      "synthetic": false
+    },
+    {
+      "byte_size": 111190,
+      "origin": "public_record",
+      "path": "rfc3987.txt",
+      "provenance_ref": "acquisition:rfc3987:7cc9e3c4e61ea326130d29d959b723209fe3a6c75cdcfb5badbd315d96cd7878",
+      "sha256": "7cc9e3c4e61ea326130d29d959b723209fe3a6c75cdcfb5badbd315d96cd7878",
+      "source_format": "txt",
+      "source_id": "rfc3987",
+      "synthetic": false
+    },
+    {
+      "byte_size": 122322,
+      "origin": "public_record",
+      "path": "rfc5322.txt",
+      "provenance_ref": "acquisition:rfc5322:cb459acca15a2aa895863eaeff6f1d5b9c4ca15578ae3e3706f757787a385969",
+      "sha256": "cb459acca15a2aa895863eaeff6f1d5b9c4ca15578ae3e3706f757787a385969",
+      "source_format": "txt",
+      "source_id": "rfc5322",
+      "synthetic": false
+    },
+    {
+      "byte_size": 72932,
+      "origin": "public_record",
+      "path": "rfc2045.txt",
+      "provenance_ref": "acquisition:rfc2045:9bb251635dd37fda97dcce6c08dea019432117a0f1e389051d2ecbf7b76350b0",
+      "sha256": "9bb251635dd37fda97dcce6c08dea019432117a0f1e389051d2ecbf7b76350b0",
+      "source_format": "txt",
+      "source_id": "rfc2045",
+      "synthetic": false
+    },
+    {
+      "byte_size": 105854,
+      "origin": "public_record",
+      "path": "rfc2046.txt",
+      "provenance_ref": "acquisition:rfc2046:7ac4096b9263e11a704f06892638258ac1ddc0394dd75ffdc171e7b5ba0123e0",
+      "sha256": "7ac4096b9263e11a704f06892638258ac1ddc0394dd75ffdc171e7b5ba0123e0",
+      "source_format": "txt",
+      "source_id": "rfc2046",
+      "synthetic": false
+    },
+    {
+      "byte_size": 40977,
+      "origin": "public_record",
+      "path": "rfc6531.txt",
+      "provenance_ref": "acquisition:rfc6531:4f48303f7b7659d0b3149730b51a03d59799a95b4d2ca7d913533f97b9db4b40",
+      "sha256": "4f48303f7b7659d0b3149730b51a03d59799a95b4d2ca7d913533f97b9db4b40",
+      "source_format": "txt",
+      "source_id": "rfc6531",
+      "synthetic": false
+    },
+    {
+      "byte_size": 176999,
+      "origin": "public_record",
+      "path": "rfc6376.txt",
+      "provenance_ref": "acquisition:rfc6376:00ae1e26aa19e0b8a6087435a524d23e824e2c31ebd62544dd714923bf8553f0",
+      "sha256": "00ae1e26aa19e0b8a6087435a524d23e824e2c31ebd62544dd714923bf8553f0",
+      "source_format": "txt",
+      "source_id": "rfc6376",
+      "synthetic": false
+    },
+    {
+      "byte_size": 144189,
+      "origin": "public_record",
+      "path": "rfc7208.txt",
+      "provenance_ref": "acquisition:rfc7208:3cca3f2551f50d24a7b6423a7451d285df077863dab4bb261080ee87844f2d5b",
+      "sha256": "3cca3f2551f50d24a7b6423a7451d285df077863dab4bb261080ee87844f2d5b",
+      "source_format": "txt",
+      "source_id": "rfc7208",
+      "synthetic": false
+    },
+    {
+      "byte_size": 79724,
+      "origin": "public_record",
+      "path": "rfc6265.txt",
+      "provenance_ref": "acquisition:rfc6265:dc4177094813e85a44a7897b892b76bc09160b3a03aea44f0f511f3a98f91933",
+      "sha256": "dc4177094813e85a44a7897b892b76bc09160b3a03aea44f0f511f3a98f91933",
+      "source_format": "txt",
+      "source_id": "rfc6265",
+      "synthetic": false
+    },
+    {
+      "byte_size": 35003,
+      "origin": "public_record",
+      "path": "rfc7239.txt",
+      "provenance_ref": "acquisition:rfc7239:f15c45c9e079684bc4284d041be63285923962448cb0d8540d54106c68c2a40d",
+      "sha256": "f15c45c9e079684bc4284d041be63285923962448cb0d8540d54106c68c2a40d",
+      "source_format": "txt",
+      "source_id": "rfc7239",
+      "synthetic": false
+    },
+    {
+      "byte_size": 512457,
+      "origin": "public_record",
+      "path": "wcag22.html",
+      "provenance_ref": "acquisition:wcag22:6e3c5fe397257cae509a2fb4752b73062cf8cbeb92c2cec618989b17e4cf7057",
+      "sha256": "6e3c5fe397257cae509a2fb4752b73062cf8cbeb92c2cec618989b17e4cf7057",
+      "source_format": "html",
+      "source_id": "wcag22",
+      "synthetic": false
+    },
+    {
+      "byte_size": 1221470,
+      "origin": "public_record",
+      "path": "css-color-4.html",
+      "provenance_ref": "acquisition:csscolor4:5e42c7a779ffaf380d727a122bb5b7a8ecb25c04db7f3d125aa166cafac3d71a",
+      "sha256": "5e42c7a779ffaf380d727a122bb5b7a8ecb25c04db7f3d125aa166cafac3d71a",
+      "source_format": "html",
+      "source_id": "csscolor4",
+      "synthetic": false
+    },
+    {
+      "byte_size": 1946127,
+      "origin": "public_record",
+      "path": "nist-ai-rmf-1.0.pdf",
+      "provenance_ref": "acquisition:nist_ai_rmf:7576edb531d9848825814ee88e28b1795d3a84b435b4b797d3670eafdc4a89f1",
+      "sha256": "7576edb531d9848825814ee88e28b1795d3a84b435b4b797d3670eafdc4a89f1",
+      "source_format": "pdf",
+      "source_id": "nist_ai_rmf",
+      "synthetic": false
+    },
+    {
+      "byte_size": 1518858,
+      "origin": "public_record",
+      "path": "nist-csf-2.0.pdf",
+      "provenance_ref": "acquisition:nist_csf2:3c31f46fee98cac0c4323453e5109291a213b4de7fef8c058af9bf67f717433c",
+      "sha256": "3c31f46fee98cac0c4323453e5109291a213b4de7fef8c058af9bf67f717433c",
+      "source_format": "pdf",
+      "source_id": "nist_csf2",
+      "synthetic": false
+    }
+  ],
+  "thresholds": {
+    "min_formats": 3,
+    "min_queries": 24,
+    "min_sources": 24,
+    "min_total_bytes": 2000000
+  }
+}
