@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { nextVectorOptions } from "../nextVectorOptions.js";
+import { contextualNextVectorOptions } from "../nextVectorOptions.js";
 
 /**
  * User-controlled follow-up choice. Selection has no side effects.
  * Start sends a single prompt through ChatView's canonical send() and work_runs.
  */
-export function NextVectorPicker({ request, onStart, disabled = false }) {
-  const options = useMemo(() => nextVectorOptions(request), [request]);
+export function NextVectorPicker({ request, suggestions = null, onStart, disabled = false }) {
+  const options = useMemo(() => contextualNextVectorOptions(request, suggestions), [request, suggestions]);
   const [selected, setSelected] = useState("continue");
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
