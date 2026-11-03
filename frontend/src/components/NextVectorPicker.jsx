@@ -10,11 +10,13 @@ export function NextVectorPicker({ request, suggestions = null, onStart, disable
   const [selected, setSelected] = useState("continue");
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
+  const pendingRetry = useRef(null);
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     setSelected("continue");
     submitting.current = false;
+    pendingRetry.current = null;
     setBusy(false);
     setError(null);
     setExpanded(false);
@@ -28,9 +30,20 @@ export function NextVectorPicker({ request, suggestions = null, onStart, disable
     submitting.current = true;
     setBusy(true);
     setError(null);
+    // Preserve the same request identity after an ambiguous transport failure.
+    // A changed selection/prompt represents a different user intent.
+    if (!pendingRetry.current || pendingRetry.current.prompt !== option.prompt) {
+      pendingRetry.current = {
+        prompt: option.prompt,
+        key: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      };
+    }
     try {
-      // Existing canonical send path enforces permissions, idempotency and run tracking.
-      await onStart(option.prompt);
+      // Replays of an accepted-but-unacknowledged POST reuse the same key.
+      await onStart(option.prompt, pendingRetry.current.key);
+      pendingRetry.current = null;
     } catch (err) {
       setError(err?.message || "The selected prompt could not be submitted.");
     } finally {

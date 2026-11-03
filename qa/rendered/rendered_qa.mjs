@@ -1690,6 +1690,58 @@ async function nextVectorScenario(browser, base, viewport, contextOptions) {
     await nextChooser.getByRole("button", { name: "Start selected vector" }).click();
     await page.waitForFunction((n) => document.querySelectorAll("article.run").length >= n, prior + 1, { timeout: 20000 });
     check("explicit retry submits after temporary failure", viewport, (await page.locator("article.run").count()) === prior + 1);
+    await waitRunState(page, "COMPLETED");
+    const ambiguousChooser = page.getByRole("form", { name: "Suggested next steps" });
+    await ambiguousChooser.waitFor();
+    const beforeAmbiguous = await page.locator("article.run").count();
+    // Query the canonical durable ledger: rendered cards alone can hide a
+    // committed request whose response never reached the browser.
+    const durableRunIds = async () => page.evaluate(async () => {
+      const id = JSON.parse(localStorage.getItem("mucaro.activeConversation") || "null");
+      if (!id) throw new Error("No active conversation ID");
+      const response = await fetch(`/conversations/${encodeURIComponent(id)}/runs?limit=100`);
+      if (!response.ok) throw new Error(`Run-ledger read failed: ${response.status}`);
+      const payload = await response.json();
+      if (!Array.isArray(payload.runs)) throw new Error("Missing durable runs array");
+      return payload.runs.map((run) => run.run_id).sort();
+    });
+    const beforeLedger = await durableRunIds();
+    let upstreamAccepted = false;
+    let firstKey = null;
+    let retryKey = null;
+    // Commit the first POST on the server, then lose its acknowledgement.
+    await page.route("**/conversations/*/messages", async (route) => {
+      firstKey = route.request().postDataJSON()?.idempotency_key;
+      const upstream = await route.fetch();
+      upstreamAccepted = upstream.ok();
+      await route.fulfill({
+        status: 503, contentType: "application/json",
+        body: JSON.stringify({ detail: { status: "ERROR_LOST_ACK", detail: "response lost after server accepted request" } }),
+      });
+    });
+    await ambiguousChooser.getByRole("button", { name: "Start selected vector" }).click();
+    await ambiguousChooser.getByRole("alert").waitFor();
+    await page.unroute("**/conversations/*/messages");
+    const acceptedLedger = await durableRunIds();
+    // A retry is a new HTTP POST but MUST retain the first request identity.
+    await page.route("**/conversations/*/messages", async (route) => {
+      retryKey = route.request().postDataJSON()?.idempotency_key;
+      await route.continue();
+    });
+    await ambiguousChooser.getByRole("button", { name: "Start selected vector" }).click();
+    await page.waitForFunction((count) => document.querySelectorAll("article.run").length >= count, beforeAmbiguous + 1, { timeout: 20000 });
+    const finalLedger = await durableRunIds();
+    check("lost-acknowledgement retry keeps identical idempotency key", viewport,
+      typeof firstKey === "string" && firstKey.length > 0 && firstKey === retryKey);
+    check("accepted-but-unacknowledged retry conserves durable run IDs", viewport,
+      upstreamAccepted &&
+      acceptedLedger.length === beforeLedger.length + 1 &&
+      finalLedger.length === acceptedLedger.length &&
+      finalLedger.every((id, i) => id === acceptedLedger[i]) &&
+      beforeLedger.every((id) => finalLedger.includes(id)));
+    check("accepted-but-unacknowledged retry remains exactly one visible run", viewport,
+      (await page.locator("article.run").count()) === beforeAmbiguous + 1);
+    await page.unroute("**/conversations/*/messages");
     await shot(page, viewport, "next-vector");
   } finally {
     await context.close();

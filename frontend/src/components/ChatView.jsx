@@ -265,13 +265,13 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
     if (node) stick.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80;
   }
 
-  async function send(prompt, modeOverride = null) {
+  async function send(prompt, modeOverride = null, suppliedIdempotencyKey = null) {
     setError(null);
     try {
       let id = conversationId;
       const creating = !id;
       if (creating) id = (await api.createConversation(prompt.slice(0, 60))).conversation_id;
-      const key = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const key = suppliedIdempotencyKey || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const result = await api.sendMessage(id, { prompt, mode: modeOverride || mode, idempotency_key: key, options: defaultOptions });
       // Switch to a new conversation only after its first run exists, so the reload sees and follows it.
       if (creating) onConversationCreated(id);
@@ -429,7 +429,7 @@ export function ChatView({ reconnect = 0, conversationId, onConversationCreated,
             key={views[views.length - 1].runId}
             request={views[views.length - 1].prompt}
             // Follow-up selection is not tool approval. Use the canonical ask-first mode.
-            onStart={(prompt) => send(prompt, "ask")}
+            onStart={(prompt, idempotencyKey) => send(prompt, "ask", idempotencyKey)}
           />
         )}
         {error && (
