@@ -29,7 +29,7 @@ def test_rendered_frontend_changes_fail_closed_without_browser_evidence():
     )
 
     assert state == "BLOCKED"
-    assert "browser/device" in reason
+    assert "exact-checkpoint browser receipts" in reason
 
 
 def test_non_frontend_checkpoint_does_not_invent_rendered_pass():
