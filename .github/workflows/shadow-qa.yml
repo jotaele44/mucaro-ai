@@ -36,9 +36,6 @@ jobs:
       SHADOW_CHECKPOINT_SHA: ${{ inputs.checkpoint_sha || github.sha }}
       SHADOW_EVIDENCE_MANIFEST_JSON: ${{ inputs.evidence_manifest_json || '' }}
       SHADOW_HISTORICAL_REPLAY: ${{ inputs.historical_replay || false }}
-      SHADOW_EVIDENCE_MANIFEST_PATH: ${{ runner.temp }}/shadow-evidence-manifest.json
-      SHADOW_RENDERED_CHROMIUM: ${{ runner.temp }}/shadow-rendered-chromium/receipt.json
-      SHADOW_RENDERED_WEBKIT: ${{ runner.temp }}/shadow-rendered-webkit/receipt.json
     steps:
       - uses: actions/checkout@v7
         with:
@@ -74,9 +71,7 @@ jobs:
         run: |
           test -n "$SHADOW_BASE_SHA"
           test -n "$SHADOW_CHECKPOINT_SHA"
-          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
-            test "$(git rev-parse HEAD)" = "$SHADOW_CHECKPOINT_SHA"
-          fi
+          test "$(git rev-parse HEAD)" = "$SHADOW_CHECKPOINT_SHA"
           test "$SHADOW_BASE_SHA" != "$SHADOW_CHECKPOINT_SHA"
           git cat-file -e "$SHADOW_BASE_SHA^{commit}"
           git merge-base --is-ancestor "$SHADOW_BASE_SHA" "$SHADOW_CHECKPOINT_SHA"
@@ -90,8 +85,10 @@ jobs:
         shell: bash
         run: |
           test -n "$SHADOW_EVIDENCE_MANIFEST_JSON"
+          SHADOW_EVIDENCE_MANIFEST_PATH="$RUNNER_TEMP/shadow-evidence-manifest.json"
           printf '%s\n' "$SHADOW_EVIDENCE_MANIFEST_JSON" > "$SHADOW_EVIDENCE_MANIFEST_PATH"
           python -m json.tool "$SHADOW_EVIDENCE_MANIFEST_PATH" >/dev/null
+          echo "SHADOW_EVIDENCE_MANIFEST_PATH=$SHADOW_EVIDENCE_MANIFEST_PATH" >> "$GITHUB_ENV"
       - name: Install rendered QA harness and browser engines
         if: github.event_name == 'workflow_dispatch' && inputs.historical_replay != true
         working-directory: qa/rendered
@@ -121,8 +118,8 @@ jobs:
             else
               args+=(
                 --execute-vector-evidence
-                --rendered-receipt "$SHADOW_RENDERED_CHROMIUM"
-                --rendered-receipt "$SHADOW_RENDERED_WEBKIT"
+                --rendered-receipt "$RUNNER_TEMP/shadow-rendered-chromium/receipt.json"
+                --rendered-receipt "$RUNNER_TEMP/shadow-rendered-webkit/receipt.json"
               )
             fi
           fi
