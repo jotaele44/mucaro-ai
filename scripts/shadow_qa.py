@@ -124,6 +124,22 @@ def exit_code_for_state(state: str) -> int:
         return 1
     return 6
 
+def overall_state_for_results(
+    *,
+    failed_gates: list[dict[str, object]],
+    blocked_gates: list[dict[str, object]],
+    unresolved_vectors: list[str],
+    blocked_vectors: list[str],
+    rendered_state: str,
+) -> str:
+    if failed_gates:
+        return "FAIL"
+    if blocked_gates or unresolved_vectors or blocked_vectors or rendered_state == "BLOCKED":
+        return "PROVISIONAL"
+    return "PASS"
+
+
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run bounded MUCARO Shadow QA against an exact frozen checkpoint.")
@@ -211,18 +227,19 @@ def main() -> int:
     # A gate can verify the declared changed-file denominator only when every executable gate passes
     # and every required adversarial vector is explicitly classified.
     # BLOCKED gates or unresolved vectors remain unresolved rather than being silently counted as verified.
-    if failed:
-        verified: list[str] = []
-        unresolved = list(paths)
-        overall = "FAIL"
-    elif blocked or unresolved_vectors or blocked_vectors:
-        verified = []
-        unresolved = list(paths)
-        overall = "PROVISIONAL"
-    else:
+    overall = overall_state_for_results(
+        failed_gates=failed,
+        blocked_gates=blocked,
+        unresolved_vectors=unresolved_vectors,
+        blocked_vectors=blocked_vectors,
+        rendered_state=rendered_state,
+    )
+    if overall == "PASS":
         verified = list(paths)
         unresolved = []
-        overall = "PASS"
+    else:
+        verified = []
+        unresolved = list(paths)
 
     receipt = {
         "schema_version": SCHEMA_VERSION,
