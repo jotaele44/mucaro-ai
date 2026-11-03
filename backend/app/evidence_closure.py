@@ -55,6 +55,8 @@ def adjudicate_identity(candidates: Iterable[Mapping[str, Any]]) -> dict[str, An
     upstream are NOT proof that the stated evidence has been validated.
     """
     rows = list(candidates)
+    if any(not isinstance(r, Mapping) for r in rows):
+        raise EvidenceInvariantError("candidate rows must be mappings")
     if not rows:
         return {"state": "UNRESOLVED", "winner": None, "candidates": [], "reason": "no candidates"}
     ids = [r.get("candidate_key") for r in rows]
@@ -91,9 +93,13 @@ def reconcile_source_rows(source_ids: Iterable[str], dispositions: Iterable[Mapp
     duplicating source records.
     """
     keys = list(source_ids)
+    if not keys:
+        raise EvidenceInvariantError("source universe cannot be empty")
     if any(not isinstance(k, str) or not k for k in keys) or len(keys) != len(set(keys)):
         raise EvidenceInvariantError("invalid/duplicate source identity")
     rows = list(dispositions)
+    if any(not isinstance(r, Mapping) for r in rows):
+        raise EvidenceInvariantError("disposition rows must be mappings")
     routed = [r.get("source_id") for r in rows]
     if any(not isinstance(k, str) or not k for k in routed) or len(routed) != len(set(routed)):
         raise EvidenceInvariantError("missing/duplicate disposition source_id")
