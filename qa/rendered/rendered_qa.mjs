@@ -1663,6 +1663,7 @@ async function nextVectorScenario(browser, base, viewport, contextOptions) {
     const last = runs.last();
     const prompt = await last.locator(".user-bubble").innerText();
     check("selected vector maps to correct prompt", viewport, prompt.includes("Investigate unresolved gaps") && prompt.includes("How does source lineage work?"));
+    check("selected vector runs in ask-first mode", viewport, (await last.locator(".mode-tag").count()) === 0);
     const apiRuns = await page.evaluate(async () => {
       const row = document.querySelectorAll("article.run");
       return row.length;
@@ -1681,6 +1682,10 @@ async function nextVectorScenario(browser, base, viewport, contextOptions) {
     check("failed submission leaves chooser and draft for retry", viewport,
       (await nextChooser.count()) === 1 && (await page.getByLabel("Message Mucaro").inputValue()) === draft);
     await page.unroute("**/conversations/*/messages");
+    const prior = await page.locator("article.run").count();
+    await nextChooser.getByRole("button", { name: "Start selected vector" }).click();
+    await page.waitForFunction((n) => document.querySelectorAll("article.run").length >= n, prior + 1, { timeout: 20000 });
+    check("explicit retry submits after temporary failure", viewport, (await page.locator("article.run").count()) === prior + 1);
     await shot(page, viewport, "next-vector");
   } finally {
     await context.close();
